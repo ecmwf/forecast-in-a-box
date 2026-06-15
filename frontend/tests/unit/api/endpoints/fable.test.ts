@@ -199,6 +199,53 @@ describe('retrieveFable', () => {
     expect(result.display_name).toBe('My Config')
   })
 
+  it('parses label tags whose value is null (backend Tag.value: str | None)', async () => {
+    // Regression (#494): label tags serialise as { key, value: null }; if the
+    // schema rejects the null, the whole retrieve fails and the page loses its
+    // blueprint (no graph, untitled, raw block ids).
+    worker.use(
+      http.get(API_ENDPOINTS.fable.get, () =>
+        HttpResponse.json({
+          blueprint_id: 'fable-oneoff',
+          version: 1,
+          builder: mockFable,
+          display_name: 'One-off run',
+          display_description: null,
+          tags: [{ key: '__fiab:oneoff__', value: null }],
+        }),
+      ),
+    )
+
+    const result = await retrieveFable('fable-oneoff')
+    expect(result.tags).toEqual(['__fiab:oneoff__'])
+    expect(result.display_name).toBe('One-off run')
+    expect(result.coreVersionMismatch).toBeNull()
+  })
+
+  it('extracts the CoreVersionMismatch tag from the tag list (backend #494)', async () => {
+    // CoreVersionMismatch is reserved: stripped from user tags (else it would
+    // render as a chip and 422 on save), its value surfaced separately.
+    worker.use(
+      http.get(API_ENDPOINTS.fable.get, () =>
+        HttpResponse.json({
+          blueprint_id: 'fable-mismatch',
+          version: 1,
+          builder: mockFable,
+          display_name: 'Stale config',
+          display_description: null,
+          tags: [
+            { key: 'prod', value: null },
+            { key: 'CoreVersionMismatch', value: '!3 != 4' },
+          ],
+        }),
+      ),
+    )
+
+    const result = await retrieveFable('fable-mismatch')
+    expect(result.tags).toEqual(['prod'])
+    expect(result.coreVersionMismatch).toBe('!3 != 4')
+  })
+
   it('sends blueprint_id as query parameter', async () => {
     let capturedUrl: string | null = null
 

@@ -247,26 +247,55 @@ export interface FableUpsertRequest {
   parent_id?: string
 }
 
-/**
- * A tag as returned by the backend: an object with a `key` and an optional
- * `value`. The `value` is intentionally ignored — existing functionality only
- * uses the key. The schema transforms the object to the key string so all
- * downstream code continues to work with plain strings.
- */
-const TagApiSchema = z
-  .object({ key: z.string(), value: z.string().optional() })
-  .transform((t) => t.key)
+/** Reserved tag (backend #494): value holds the version-mismatch detail
+ * (e.g. `"!3 != 4"`). Stripped from user tags, surfaced as a warning. */
+export const CORE_VERSION_MISMATCH_KEY = 'CoreVersionMismatch'
+
+/** Backend tag: `value` is null for plain labels, set for informational ones. */
+const TagObjectSchema = z.object({
+  key: z.string(),
+  value: z.string().nullish(),
+})
+
+export interface PartitionedTags {
+  /** User-facing tag keys (reserved keys removed). */
+  tags: Array<string>
+  /** `CoreVersionMismatch` detail, or null when versions agree. */
+  coreVersionMismatch: string | null
+}
+
+/** Split backend tags into plain keys (kept as `string[]` for existing
+ * save/search/group/display) and the extracted mismatch detail. */
+export function partitionBlueprintTags(
+  raw: ReadonlyArray<{ key: string; value?: string | null }>,
+): PartitionedTags {
+  let coreVersionMismatch: string | null = null
+  const tags: Array<string> = []
+  for (const tag of raw) {
+    if (tag.key === CORE_VERSION_MISMATCH_KEY) {
+      coreVersionMismatch = tag.value ?? null
+    } else {
+      tags.push(tag.key)
+    }
+  }
+  return { tags, coreVersionMismatch }
+}
 
 /** routes/blueprint.py: BlueprintListItem */
-export const BlueprintListItemSchema = z.object({
-  blueprint_id: z.string(),
-  version: z.number(),
-  display_name: z.string().nullable(),
-  display_description: z.string().nullable(),
-  tags: z.array(TagApiSchema).nullable(),
-  source: z.string().nullable(),
-  created_by: z.string().nullable(),
-})
+export const BlueprintListItemSchema = z
+  .object({
+    blueprint_id: z.string(),
+    version: z.number(),
+    display_name: z.string().nullable(),
+    display_description: z.string().nullable(),
+    tags: z.array(TagObjectSchema).nullable(),
+    source: z.string().nullable(),
+    created_by: z.string().nullable(),
+  })
+  .transform(({ tags, ...rest }) => ({
+    ...rest,
+    ...partitionBlueprintTags(tags ?? []),
+  }))
 
 export type BlueprintListItem = z.infer<typeof BlueprintListItemSchema>
 
@@ -297,15 +326,20 @@ export interface BlueprintDeleteRequest {
   version: number
 }
 
-export const FableRetrieveResponseSchema = z.object({
-  blueprint_id: z.string(),
-  version: z.number(),
-  builder: FableBuilderV1Schema,
-  display_name: z.string().nullable(),
-  display_description: z.string().nullable(),
-  tags: z.array(TagApiSchema),
-  parent_id: z.string().nullable().optional(),
-})
+export const FableRetrieveResponseSchema = z
+  .object({
+    blueprint_id: z.string(),
+    version: z.number(),
+    builder: FableBuilderV1Schema,
+    display_name: z.string().nullable(),
+    display_description: z.string().nullable(),
+    tags: z.array(TagObjectSchema),
+    parent_id: z.string().nullable().optional(),
+  })
+  .transform(({ tags, ...rest }) => ({
+    ...rest,
+    ...partitionBlueprintTags(tags),
+  }))
 
 export type FableRetrieveResponse = z.infer<typeof FableRetrieveResponseSchema>
 

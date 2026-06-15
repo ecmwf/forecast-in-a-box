@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import type { PresetEntry } from '@/features/dashboard/hooks/useConfigPresets'
 import { useFableRetrieve } from '@/api/hooks/useFable'
+import { CoreVersionMismatchBadge } from '@/components/common/CoreVersionMismatchBadge'
 import { FableMiniFlow } from '@/features/journal/components/FableMiniFlow'
 import { JournalChip } from '@/features/journal/components/JournalChip'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
@@ -79,6 +80,13 @@ export function PresetCard({
       <p className="text-sm text-muted-foreground">
         {t('item.outputs', { count: outputCount })}
       </p>
+
+      {preset.coreVersionMismatch && (
+        <CoreVersionMismatchBadge
+          detail={preset.coreVersionMismatch}
+          className="self-start"
+        />
+      )}
 
       {(modelLabel || outputKinds.length > 0 || preset.tags.length > 0) && (
         <div className="flex flex-wrap gap-1.5">

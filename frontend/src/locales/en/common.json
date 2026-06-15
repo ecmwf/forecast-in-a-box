@@ -191,5 +191,10 @@
   },
   "notificationBanner": {
     "dismiss": "Dismiss notification"
+  },
+  "coreVersionMismatch": {
+    "label": "Core version mismatch",
+    "detail": "Built with fiab-core v{{stored}}; you're running v{{current}}. It should still work, but may behave unexpectedly.",
+    "detailUnknown": "This configuration was created with a different fiab-core major version. It should still work, but may behave unexpectedly."
   }
 }

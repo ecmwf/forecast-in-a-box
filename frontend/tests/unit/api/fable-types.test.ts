@@ -16,6 +16,7 @@ import type {
 } from '@/api/types/fable.types'
 import {
   getBlockConfigurationRestrictions,
+  partitionBlueprintTags,
   toValidationState,
 } from '@/api/types/fable.types'
 
@@ -194,5 +195,29 @@ describe('toValidationState', () => {
     expect(
       getBlockConfigurationRestrictions(fable, validationState, 'b1'),
     ).toEqual({ param: 'list[enumClosed[2t,msl]]' })
+  })
+})
+
+describe('partitionBlueprintTags', () => {
+  it('returns plain keys and no mismatch for label tags', () => {
+    expect(
+      partitionBlueprintTags([{ key: 'prod', value: null }, { key: 'europe' }]),
+    ).toEqual({ tags: ['prod', 'europe'], coreVersionMismatch: null })
+  })
+
+  it('extracts CoreVersionMismatch and strips it from the key list', () => {
+    expect(
+      partitionBlueprintTags([
+        { key: 'prod', value: null },
+        { key: 'CoreVersionMismatch', value: '!3 != 4' },
+      ]),
+    ).toEqual({ tags: ['prod'], coreVersionMismatch: '!3 != 4' })
+  })
+
+  it('handles an empty list', () => {
+    expect(partitionBlueprintTags([])).toEqual({
+      tags: [],
+      coreVersionMismatch: null,
+    })
   })
 })

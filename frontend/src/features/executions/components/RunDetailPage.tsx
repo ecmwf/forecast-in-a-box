@@ -39,6 +39,7 @@ import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import { useDeleteJob, useJobStatus, useRestartJob } from '@/api/hooks/useJobs'
+import { CoreVersionMismatchBadge } from '@/components/common/CoreVersionMismatchBadge'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -215,6 +216,10 @@ export function RunDetailPage() {
         completedBlockCount={jobData.completed_block_ids?.length ?? null}
         plannedBlockCount={jobData.planned_block_ids?.length ?? null}
       />
+
+      {fableData?.coreVersionMismatch && (
+        <CoreVersionMismatchBadge detail={fableData.coreVersionMismatch} />
+      )}
 
       {jobData.status === 'failed' && jobData.error && (
         <RunErrorBanner
