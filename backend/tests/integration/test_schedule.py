@@ -24,7 +24,7 @@ from forecastbox.domain.blueprint.service import BlueprintSaveCommand as Bluepri
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.routes.experiment import ExperimentCreateRequest, ExperimentUpdateRequest
-from forecastbox.utility.time import value_dt2str
+from forecastbox.utility.time import current_time, value_dt2str
 
 from .conftest import testPluginId
 from .utils import (
@@ -394,7 +394,7 @@ def test_schedule_v2_execute(tmpdir: Any, backend_client_with_auth: httpx.Client
     time_output_path = str(pathlib.Path(str(tmpdir)) / "time_output")
     job_def_id, job_def_version = _save_full_blueprint(backend_client_with_auth, output_path, time_output_path)
 
-    first_run_override = dt.datetime.now() - dt.timedelta(minutes=5)
+    first_run_override = current_time("scheduling") - dt.timedelta(minutes=5)
     spec = ExperimentCreateRequest(
         blueprint_id=job_def_id,
         blueprint_version=job_def_version,

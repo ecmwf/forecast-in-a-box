@@ -9,19 +9,38 @@
 
 """Time and Date related utilities"""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from sqlalchemy import Column
 
+TimeQueryReason = Literal[
+    "liveness",  # for deciding whether a given long running thread is still alive
+    "scheduling",  # for calculating next_run, and deciding whether a next_run should fire
+    "glyph_resolution",  # eg when a cascade job starts executing
+    "dbref",  # for db inserts and created_at/updated_at
+    "pylock_save",  # for creating the pylock.toml.timestamp file utilized by the installer
+]
 
-def current_time() -> datetime:
-    """Return the current time used for scheduling decisions or submit time derivation."""
-    # NOTE used by scheduler for scheduling decision, exposed to the users via endpoint
-    # *Not* used for internal liveness measurement etc. Primarily to ensure the same timezone
-    # etc are being used.
-    return datetime.now()
+
+def current_time(reason: TimeQueryReason) -> datetime:
+    """Return the current time, for the given reason. Sets the proper time zone
+    to ensure consistency and client compatibility"""
+    # NOTE we dont use the reason atm, but in case we would ever need to its
+    # more convenient than grepping around
+    return datetime.now(UTC)
+
+
+def from_timestamp(ts: float) -> datetime:
+    """The `ts` is to come from like file stat ctime"""
+    local_install_time = datetime.fromtimestamp(ts)
+    utc_install_time = local_install_time.astimezone(UTC)
+    return utc_install_time
+
+
+canonical_output_format = "%Y-%m-%dT%H:%M:%S%:z"
 
 
 def value_dt2str(value: datetime | Column) -> str:
     """Convert a datetime to the canonical string format used for all client-exposed serialization."""
-    return value.strftime("%Y-%m-%dT%H:%M:%S")
+    return value.strftime(canonical_output_format)

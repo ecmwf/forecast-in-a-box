@@ -10,8 +10,10 @@
 """Jinja2-based string interpolation engine for ${...} glyph expressions.
 
 Uses ``${`` / ``}`` as variable delimiters instead of the Jinja2 default ``{{`` / ``}}``.
-Variables whose values match the canonical datetime format (``YYYY-MM-DD HH:MM:SS``) are
-auto-coerced to :class:`datetime` objects so that date filters and arithmetic work directly.
+Variables whose values match the canonical datetime format (``YYYY-MM-DD HH:MM:SS`` and tz-aware
+variants) are auto-coerced to :class:`datetime` objects so that date filters and arithmetic
+work directly. The auto-coercion is bound to fiab-core.types.DatetimeType, as they are
+inherently coupled.
 """
 
 import re
@@ -21,20 +23,20 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 
 from cascade.low.func import Either
+from fiab_core.types import DatetimeType, WrongType
 from jinja2 import Environment, StrictUndefined, TemplateSyntaxError
 from jinja2 import nodes as jnodes
 from jinja2.sandbox import SandboxedEnvironment
 
-# Only the canonical backend datetime format is auto-coerced; other date-like strings
-# (e.g. "2024-01-15") are intentionally kept as strings to avoid silent format changes.
-# We use the simple ISO 8601 format.
-_CANONICAL_DATETIME_FMT = "%Y-%m-%dT%H:%M:%S"
+from forecastbox.utility.time import value_dt2str
+
+_dt_instance = DatetimeType()
 
 
 def _try_parse_datetime(value: str) -> datetime | str:
     try:
-        return datetime.strptime(value, _CANONICAL_DATETIME_FMT)
-    except ValueError:
+        return _dt_instance.validate_convert(value)
+    except WrongType:
         return value
 
 
@@ -68,7 +70,7 @@ def _split(value: str, sep: str | None = None) -> list[str]:
 
 def _stringify_result(value: object) -> str:
     if isinstance(value, datetime):
-        return value.strftime(_CANONICAL_DATETIME_FMT)
+        return value_dt2str(value)
     return str(value)
 
 

@@ -20,6 +20,7 @@ from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import FIABConfig, UnmanagedGateway
+from forecastbox.utility.time import current_time
 
 
 def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
@@ -74,7 +75,7 @@ if __name__ == "__main__":
                     configuration_values=_config(
                         {
                             "source": "ecmwf-open-data",
-                            "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+                            "date": (current_time("scheduling") - timedelta(days=1)).strftime("%Y-%m-%d"),
                             "expver": "0001",
                         }
                     ),

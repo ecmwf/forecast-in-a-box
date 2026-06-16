@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -117,8 +117,8 @@ def test_next_run_endofyear() -> None:
 
 
 def test_current_scheduling_time() -> None:
-    before = datetime.now()
-    result = current_time()
-    after = datetime.now()
+    before = datetime.now(UTC)
+    result = current_time("scheduling")
+    after = datetime.now(UTC)
     assert isinstance(result, datetime)
     assert before <= result <= after

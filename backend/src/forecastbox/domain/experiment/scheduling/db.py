@@ -22,11 +22,12 @@ import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentNext
 from forecastbox.utility.db import addAndCommit, dbRetry, executeAndCommit, querySingle
+from forecastbox.utility.time import current_time
 
 
 async def upsert_experiment_next(*, experiment_id: ExperimentDefinitionId, scheduled_at: dt.datetime) -> None:
     """Insert or update the next scheduled run time for an experiment."""
-    ref_time = dt.datetime.now()
+    ref_time = current_time("dbref")
     existing = await querySingle(
         select(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id),
         _jobs_module.async_session_maker,

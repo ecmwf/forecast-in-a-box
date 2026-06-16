@@ -21,6 +21,7 @@ from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.schemata.jobs import GlobalGlyph
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, querySingle
+from forecastbox.utility.time import current_time
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -61,7 +62,7 @@ async def upsert_global_glyph(key: str, value: str, public: bool, overriddable: 
     ``overriddable`` must be ``None`` when ``public=False`` and a bool when ``public=True``.
     This invariant is enforced at the route layer; the domain layer trusts callers.
     """
-    ref_time = dt.datetime.now()
+    ref_time = current_time("dbref")
 
     async def function(i: int) -> GlobalGlyph:
         async with _jobs_module.async_session_maker() as session:

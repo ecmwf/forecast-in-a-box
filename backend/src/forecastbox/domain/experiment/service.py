@@ -56,7 +56,7 @@ def resolve_next_run(
 
     Raises ValueError if first_run_override is provided but older than max_delay_hours.
     """
-    now = current_time()
+    now = current_time("scheduling")
     if first_run_override is not None:
         age_hours = (now - first_run_override).total_seconds() / 3600
         if age_hours > max_delay_hours:

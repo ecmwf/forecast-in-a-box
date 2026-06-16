@@ -35,7 +35,7 @@ from forecastbox.schemata.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
-from forecastbox.utility.time import current_time
+from forecastbox.utility.time import current_time, value_dt2str
 
 PREFIX = "/api/v1/experiment"
 
@@ -346,7 +346,7 @@ async def get_next_experiment_run(
 @router.get("/operational/scheduler/current_time")
 async def get_scheduler_current_time() -> str:
     """Return the current time used for scheduling decisions (ISO 8601)."""
-    return current_time().isoformat()
+    return value_dt2str(current_time("scheduling"))
 
 
 @router.post("/operational/scheduler/restart")

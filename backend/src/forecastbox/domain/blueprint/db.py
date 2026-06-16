@@ -28,6 +28,7 @@ from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.schemata.jobs import Blueprint, BlueprintSource
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
+from forecastbox.utility.time import current_time
 
 
 async def upsert_blueprint(
@@ -54,7 +55,7 @@ async def upsert_blueprint(
     """
     id_provided = blueprint_id is not None
     blueprint_id = blueprint_id if blueprint_id is not None else BlueprintId(str(uuid.uuid4()))
-    ref_time = dt.datetime.now()
+    ref_time = current_time("dbref")
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:

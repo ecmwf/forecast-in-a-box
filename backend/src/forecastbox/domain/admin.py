@@ -22,6 +22,7 @@ from pathlib import Path
 import httpx
 
 from forecastbox.utility.config import fiab_home
+from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,8 @@ def save_pylock(pylock: str, release: Release) -> None:
     fiab_home.mkdir(parents=True, exist_ok=True)
 
     pylock_file_path.write_text(pylock)
-    timestamp_file_path.write_text(f"{int(datetime.now().timestamp())}:v{release}")
+    pylock_time = current_time("pylock_save")
+    timestamp_file_path.write_text(f"{int(pylock_time.timestamp())}:v{release}")
 
 
 def mark_release(release: Release) -> None:
