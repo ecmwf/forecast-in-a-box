@@ -20,7 +20,7 @@ from forecastbox.utility.packages import (
     get_package_versions,
     try_import,
     try_install,
-    try_updatedate,
+    try_updatedatetime,
     try_version,
 )
 
@@ -79,17 +79,17 @@ def test_try_version_returns_unknown_when_module_has_no_version_attribute() -> N
 
 
 # ---------------------------------------------------------------------------
-# try_updatedate
+# try_updatedatetime
 # ---------------------------------------------------------------------------
 
 
-def test_try_updatedate_package_not_found() -> None:
+def test_try_updatedatetime_package_not_found() -> None:
     with patch("importlib.metadata.distribution", side_effect=importlib.metadata.PackageNotFoundError):
-        result = try_updatedate("nonexistent-package")
+        result = try_updatedatetime("nonexistent-package")
     assert result == "unknown"
 
 
-def test_try_updatedate_success(tmp_path: pytest.TempPathFactory) -> None:
+def test_try_updatedatetime_success(tmp_path: pytest.TempPathFactory) -> None:
     metadata_file = tmp_path / "METADATA"  # type: ignore[operator]
     metadata_file.write_text("Metadata-Version: 2.1")
 
@@ -101,31 +101,74 @@ def test_try_updatedate_success(tmp_path: pytest.TempPathFactory) -> None:
     fake_dist.files = [fake_file]
 
     with patch("importlib.metadata.distribution", return_value=fake_dist):
-        result = try_updatedate("some-package")
+        result = try_updatedatetime("some-package")
 
     assert result != "unknown"
-    # Should be in YYYY/MM/DD format
-    parts = result.split("/")
-    assert len(parts) == 3
-    assert len(parts[0]) == 4  # year
+    # Should be in YYYY-MM-DDTHH:MM:SS format
+    import re
+
+    assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$", result), f"Unexpected format: {result!r}"
 
 
-def test_try_updatedate_no_metadata_file() -> None:
+def test_try_updatedatetime_success_uses_ctime(tmp_path: pytest.TempPathFactory) -> None:
+    import datetime
+    from unittest.mock import patch
+
+    metadata_file = tmp_path / "METADATA"  # type: ignore[operator]
+    metadata_file.write_text("Metadata-Version: 2.1")
+
+    fake_file = MagicMock()
+    fake_file.name = "METADATA"
+    fake_file.locate.return_value = metadata_file
+
+    fake_dist = MagicMock()
+    fake_dist.files = [fake_file]
+
+    fixed_ts = datetime.datetime(2024, 3, 15, 10, 30, 45).timestamp()
+    fake_stat = MagicMock()
+    fake_stat.st_ctime = fixed_ts
+
+    with patch("importlib.metadata.distribution", return_value=fake_dist):
+        with patch("pathlib.Path.stat", return_value=fake_stat):
+            result = try_updatedatetime("some-package")
+
+    assert result == "2024-03-15T10:30:45"
+
+
+def test_try_updatedatetime_no_metadata_file() -> None:
     fake_dist = MagicMock()
     fake_dist.files = []  # no METADATA file
 
     with patch("importlib.metadata.distribution", return_value=fake_dist):
-        result = try_updatedate("some-package")
+        result = try_updatedatetime("some-package")
 
     assert result == "unknown"
 
 
-def test_try_updatedate_dist_has_no_files() -> None:
+def test_try_updatedatetime_dist_has_no_files() -> None:
     fake_dist = MagicMock()
     fake_dist.files = None
 
     with patch("importlib.metadata.distribution", return_value=fake_dist):
-        result = try_updatedate("some-package")
+        result = try_updatedatetime("some-package")
+
+    assert result == "unknown"
+
+
+def test_try_updatedatetime_stat_raises_returns_unknown(tmp_path: pytest.TempPathFactory) -> None:
+    metadata_file = tmp_path / "METADATA"  # type: ignore[operator]
+    metadata_file.write_text("Metadata-Version: 2.1")
+
+    fake_file = MagicMock()
+    fake_file.name = "METADATA"
+    fake_file.locate.return_value = metadata_file
+
+    fake_dist = MagicMock()
+    fake_dist.files = [fake_file]
+
+    with patch("importlib.metadata.distribution", return_value=fake_dist):
+        with patch("pathlib.Path.stat", side_effect=OSError("permission denied")):
+            result = try_updatedatetime("some-package")
 
     assert result == "unknown"
 

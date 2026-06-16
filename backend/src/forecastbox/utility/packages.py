@@ -80,8 +80,13 @@ def try_version(pip_source: str, module_name: str) -> str:
         return "unknown"
 
 
-def try_updatedate(pip_source: str) -> str:
-    """Return the install date of a package as ``YYYY/MM/DD``, or "unknown"."""
+def try_updatedatetime(pip_source: str) -> str:
+    """Return the install datetime of a package as ``YYYY-MM-DDTHH:MM:SS``, or "unknown".
+
+    Uses the ctime of the package's METADATA file as a proxy for the install time.
+    """
+    from forecastbox.utility.time import value_dt2str
+
     try:
         dist = importlib.metadata.distribution(pip_source)
     except importlib.metadata.PackageNotFoundError:
@@ -95,7 +100,7 @@ def try_updatedate(pip_source: str) -> str:
     try:
         path = pathlib.Path(mtdf.locate())
         install_time = dt.datetime.fromtimestamp(path.stat().st_ctime)
-        return install_time.strftime("%Y/%m/%d")
+        return value_dt2str(install_time)
     except Exception:  # too much could happen -- file not exist, no rights, malformed ts, etc
         return "unknown"
 

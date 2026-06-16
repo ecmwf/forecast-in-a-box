@@ -43,7 +43,7 @@ from pyrsistent.typing import PMap
 from forecastbox.domain.plugin.compatibility import install_plugin_compatibly
 from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
-from forecastbox.utility.packages import try_import, try_updatedate, try_version
+from forecastbox.utility.packages import try_import, try_updatedatetime, try_version
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class PluginManager:
     plugins: PMap[PluginCompositeId, Plugin] = pmap()
     versions: PMap[PluginCompositeId, str] = pmap()
     errors: PMap[PluginCompositeId, str] = pmap()
-    updatedate: PMap[PluginCompositeId, str] = pmap()
+    updatedatetime: PMap[PluginCompositeId, str] = pmap()
     updater: threading.Thread | None = None
     updater_error: str | None = None
 
@@ -83,7 +83,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
         lookup = {}
         errors = {}
         versions = {}
-        updatedate = {}
+        updatedatetime = {}
         for pluginKey, pluginSettings in plugins.items():
             if not pluginSettings.enabled:
                 continue
@@ -108,7 +108,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
                 else:
                     assert_never(result)
                 versions[pluginKey] = try_version(pluginSettings.pip_source, pluginSettings.module_name)
-                updatedate[pluginKey] = try_updatedate(pluginSettings.pip_source)
+                updatedatetime[pluginKey] = try_updatedatetime(pluginSettings.pip_source)
 
         with timed_acquire(PluginManager.lock, 60) as result:
             if not result:
@@ -116,7 +116,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
             PluginManager.plugins = pmap(lookup)
             PluginManager.errors = pmap(errors)
             PluginManager.versions = pmap(versions)
-            PluginManager.updatedate = pmap(updatedate)
+            PluginManager.updatedatetime = pmap(updatedatetime)
         logger.debug("global plugin loading finished")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -146,7 +146,7 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             PluginManager.versions = PluginManager.versions.set(
                 pluginId, try_version(pluginSettings.pip_source, pluginSettings.module_name)
             )
-            PluginManager.updatedate = PluginManager.updatedate.set(pluginId, try_updatedate(pluginSettings.pip_source))
+            PluginManager.updatedatetime = PluginManager.updatedatetime.set(pluginId, try_updatedatetime(pluginSettings.pip_source))
         logger.debug(f"single plugin loading finished: {pluginId}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -186,7 +186,7 @@ class PluginsStatus(FiabBaseModel):
     updater_status: Literal["ok", "running", "retrieving"] | str
     plugin_errors: dict[PluginCompositeId, str]
     plugin_versions: dict[PluginCompositeId, str]
-    plugin_updatedate: dict[PluginCompositeId, str]
+    plugin_updatedatetime: dict[PluginCompositeId, str]
 
 
 def status_brief() -> str:
@@ -209,17 +209,17 @@ def status_full() -> PluginsStatus:
             status = "retrieving"
             plugin_errors = {}
             plugin_versions = {}
-            plugin_updatedate = {}
+            plugin_updatedatetime = {}
         else:
             status = status_brief()
             plugin_errors = dict(PluginManager.errors)
             plugin_versions = dict(PluginManager.versions)
-            plugin_updatedate = dict(PluginManager.updatedate)
+            plugin_updatedatetime = dict(PluginManager.updatedatetime)
     return PluginsStatus(
         updater_status=status,
         plugin_errors=plugin_errors,
         plugin_versions=plugin_versions,
-        plugin_updatedate=plugin_updatedate,
+        plugin_updatedatetime=plugin_updatedatetime,
     )
 
 

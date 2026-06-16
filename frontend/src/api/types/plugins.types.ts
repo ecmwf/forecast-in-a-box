@@ -136,7 +136,7 @@ export const PluginDetailSchema = z.object({
   remote_info: PluginRemoteInfoSchema.nullable(),
   errored_detail: z.string().nullable(),
   loaded_version: z.string().nullable(),
-  update_date: z.string().nullable(), // "YYYY/MM/DD" format
+  update_datetime: z.string().nullable(), // "YYYY-MM-DDTHH:MM:SS" format
 })
 
 export type PluginDetail = z.infer<typeof PluginDetailSchema>
@@ -157,7 +157,7 @@ export const PluginsStatusSchema = z.object({
   updater_status: z.string(),
   plugin_errors: z.record(z.string(), z.string()),
   plugin_versions: z.record(z.string(), z.string()),
-  plugin_updatedate: z.record(z.string(), z.string()),
+  plugin_updatedatetime: z.record(z.string(), z.string()),
 })
 
 export type PluginsStatus = z.infer<typeof PluginsStatusSchema>
@@ -195,7 +195,7 @@ export interface PluginInfo {
   isInstalled: boolean
   /** Whether an update is available (latestVersion > version) */
   hasUpdate: boolean
-  /** ISO date when last updated (from update_date) */
+  /** ISO datetime when last updated (from update_datetime) */
   updatedAt: string | null
   /** Error details if status is errored */
   errorDetail: string | null
@@ -247,8 +247,8 @@ export function toPluginInfo(
     isEnabled: detail.status === 'loaded' || detail.status === 'errored',
     isInstalled,
     hasUpdate,
-    updatedAt: detail.update_date
-      ? toValidDateOrNull(detail.update_date)
+    updatedAt: detail.update_datetime
+      ? toValidDateOrNull(detail.update_datetime)
       : null,
     errorDetail: detail.errored_detail,
     comment: detail.store_info?.comment ?? null,
@@ -258,24 +258,11 @@ export function toPluginInfo(
 }
 
 /**
- * Converts and validates a date string, returning null if unparseable.
+ * Converts and validates a datetime string, returning null if unparseable.
  */
 function toValidDateOrNull(dateStr: string): string | null {
-  const converted = convertUpdateDate(dateStr)
-  const date = new Date(converted)
-  return isNaN(date.getTime()) ? null : converted
-}
-
-/**
- * Convert backend date format (YYYY/MM/DD) to ISO format
- */
-function convertUpdateDate(dateStr: string): string {
-  // Convert "YYYY/MM/DD" to ISO format
-  const [year, month, day] = dateStr.split('/')
-  if (year && month && day) {
-    return `${year}-${month}-${day}T00:00:00Z`
-  }
-  return dateStr
+  const date = new Date(dateStr)
+  return isNaN(date.getTime()) ? null : dateStr
 }
 
 /**
