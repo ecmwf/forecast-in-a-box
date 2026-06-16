@@ -106,6 +106,9 @@ interface FableBuilderState {
   mode: BuilderMode
   step: BuilderStep
   selectedBlockId: BlockInstanceId | null
+  /** Edge currently hovered on the canvas; drives the qube-lens handle's
+   *  visibility. Ephemeral UI — never persisted, never part of undo history. */
+  hoveredEdgeId: string | null
   isPaletteOpen: boolean
   isConfigPanelOpen: boolean
   isMobilePaletteOpen: boolean
@@ -178,6 +181,7 @@ interface FableBuilderState {
   ) => void
   disconnectBlock: (targetBlockId: BlockInstanceId, inputName: string) => void
   selectBlock: (blockId: BlockInstanceId | null) => void
+  setHoveredEdge: (edgeId: string | null) => void
   setMode: (mode: BuilderMode) => void
   setStep: (step: BuilderStep) => void
   togglePalette: () => void
@@ -233,6 +237,7 @@ function createInitialState() {
     mode: 'graph' as BuilderMode,
     step: 'edit' as BuilderStep,
     selectedBlockId: null,
+    hoveredEdgeId: null as string | null,
     isPaletteOpen: true,
     isConfigPanelOpen: true,
     isMobilePaletteOpen: false,
@@ -633,6 +638,9 @@ export const useFableBuilderStore = create<FableBuilderState>()(
               // User closes it explicitly via toggleConfigPanel.
               isConfigPanelOpen: true,
             }),
+
+          // Pure ephemeral UI: no history, no dirty flag, no validation reset.
+          setHoveredEdge: (edgeId) => set({ hoveredEdgeId: edgeId }),
 
           setMode: (mode) => set({ mode }),
           setStep: (step) => set({ step }),

@@ -12,11 +12,13 @@ import { Cloud, Cog, Download, Shuffle } from 'lucide-react'
 import { z } from 'zod'
 import i18n from 'i18next'
 import { EnvironmentSpecificationSchema } from './job.types'
+import { QubeNodeSchema } from './artifacts.types'
 import {
   PluginCompositeIdSchema,
   parsePluginKey,
   toPluginDisplayId,
 } from './plugins.types'
+import type { QubeNode } from './artifacts.types'
 import type { LucideIcon } from 'lucide-react'
 import type { PluginCompositeId } from './plugins.types'
 
@@ -226,6 +228,11 @@ export const FableValidationExpansionSchema = z.object({
     .record(z.string(), z.record(z.string(), z.array(z.string())))
     .optional()
     .default({}),
+  /** Per-block output qube (qubed node tree) for the graph qube lens. */
+  block_output_qubes: z
+    .record(z.string(), QubeNodeSchema)
+    .optional()
+    .default({}),
 })
 
 export type FableValidationExpansion = z.infer<
@@ -375,6 +382,12 @@ export interface FableValidationState {
    * never resolves glyphs client-side.
    */
   resolvedConfigurationOptions: Record<BlockInstanceId, Record<string, string>>
+  /**
+   * Per-block output qube (qubed node tree), keyed by BlockInstanceId.
+   * The qube flowing out of a block — i.e. on every edge leaving it. Used by
+   * the graph qube lens; empty when the backend doesn't provide it.
+   */
+  blockOutputQubes: Record<BlockInstanceId, QubeNode>
 }
 
 export interface BlockKindMetadata {
@@ -690,6 +703,7 @@ export function toValidationState(
     blockStates,
     possibleSources: expansion.possible_sources,
     resolvedConfigurationOptions: expansion.resolved_configuration_options,
+    blockOutputQubes: expansion.block_output_qubes,
   }
 }
 

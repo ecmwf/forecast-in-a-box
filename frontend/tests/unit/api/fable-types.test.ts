@@ -74,6 +74,7 @@ describe('toValidationState', () => {
       possible_expansions: {},
       configuration_restrictions: {},
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: {},
     }
 
@@ -94,6 +95,7 @@ describe('toValidationState', () => {
       possible_expansions: {},
       configuration_restrictions: {},
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: {
         sink_file: {
           fname: ['missingRoot'],
@@ -121,6 +123,7 @@ describe('toValidationState', () => {
       possible_expansions: {},
       configuration_restrictions: {},
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: { sink_file: {} },
     }
 
@@ -146,6 +149,7 @@ describe('toValidationState', () => {
       },
       configuration_restrictions: {},
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: {},
     }
 
@@ -184,6 +188,7 @@ describe('toValidationState', () => {
         b1: { param: 'list[enumClosed[2t,msl]]' },
       },
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: {},
     }
 

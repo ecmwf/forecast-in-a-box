@@ -65,6 +65,7 @@ function makeValidationState(
     blockStates,
     possibleSources: [],
     resolvedConfigurationOptions: {},
+    blockOutputQubes: {},
   }
 }
 
@@ -103,6 +104,32 @@ describe('useFableBuilderStore', () => {
     it('is not dirty initially', () => {
       expect(useFableBuilderStore.getState().isDirty).toBe(false)
     })
+
+    it('has no hovered edge initially', () => {
+      expect(useFableBuilderStore.getState().hoveredEdgeId).toBeNull()
+    })
+  })
+
+  describe('setHoveredEdge', () => {
+    it('sets and clears the hovered edge', () => {
+      act(() => useFableBuilderStore.getState().setHoveredEdge('a-b-dataset'))
+      expect(useFableBuilderStore.getState().hoveredEdgeId).toBe('a-b-dataset')
+      act(() => useFableBuilderStore.getState().setHoveredEdge(null))
+      expect(useFableBuilderStore.getState().hoveredEdgeId).toBeNull()
+    })
+
+    it('is pure ephemeral UI: no effect on selection, dirty flag or validation', () => {
+      act(() =>
+        useFableBuilderStore
+          .getState()
+          .setValidationState(makeValidationState()),
+      )
+      act(() => useFableBuilderStore.getState().setHoveredEdge('a-b-dataset'))
+      const state = useFableBuilderStore.getState()
+      expect(state.selectedBlockId).toBeNull()
+      expect(state.isDirty).toBe(false)
+      expect(state.validationState).not.toBeNull()
+    })
   })
 
   describe('setFable', () => {
@@ -132,6 +159,7 @@ describe('useFableBuilderStore', () => {
           blockStates: {},
           possibleSources: [],
           resolvedConfigurationOptions: {},
+          blockOutputQubes: {},
         }),
       )
       act(() => useFableBuilderStore.getState().setFable(mockFable))
