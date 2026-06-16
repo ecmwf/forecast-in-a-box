@@ -5,6 +5,7 @@
 * project is managed by `uv` -- utilize that for running any python-related subcommands like `uv run pytest` or `uv run ty`
 * utilize `just` for command running -- `just val` is the "all typechecking and testing". Always run this prior to a commit, as well as utilizing pre-commit with prek
   * during development, utilize granular validation -- first, run type checking, then unit tests for the code you have created or changed, then all integration tests
+  * don't change formatting on a whim. When you notice a bug or breach of guidelines that is not related or affecting your current task, ignore it.
 * when you are creating a new package in backend/packages, initialize it with uv, add it to the backend/pyproject.toml workspace listing, and create there a basic justfile with the `val` recipe. When filling the `justfile` and the `pyproject.toml`, use the existing packages as templates
 * 
 
