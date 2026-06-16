@@ -29,6 +29,7 @@ import functools
 from collections.abc import Mapping
 from typing import Any, Callable, Concatenate, Iterable, ParamSpec, TypeVar, overload
 
+import numpy as np
 from fiab_core.fable import QubedOutput
 from qubed import Qube
 
@@ -93,6 +94,26 @@ def collapse(qube: Qube, axis: str | list[str]) -> Qube:
     return qube.remove_by_key(axes)
 
 
+def _broadcast_array_over_new_axis(value: np.ndarray, size: int) -> np.ndarray:
+    value = value.reshape((1,)) if value.ndim == 0 else value
+    expanded = np.expand_dims(value, axis=1)
+    return np.broadcast_to(expanded, (expanded.shape[0], size, *expanded.shape[2:]))
+
+
+def _broadcast_new_axis_metadata(qube: Qube, size: int) -> Qube:
+    metadata = {key: _broadcast_array_over_new_axis(value, size) for key, value in qube.metadata.items()}
+    children = tuple(_broadcast_new_axis_metadata(child, size) for child in qube.children)
+    return qube.replace(metadata=metadata, children=children)
+
+
+def _expand_axis(qube: Qube, key: str, values: Iterable[Any]) -> Qube:
+    axis_values = list(values)
+    value_group = Qube.from_datacube({key: axis_values}).children[0].values if axis_values else [None]
+    axis_size = len(axis_values) or 1
+    children = tuple(_broadcast_new_axis_metadata(child, axis_size) for child in qube.children)
+    return Qube.make_root([Qube.make_node(key, value_group, children)])
+
+
 @support_qubed_output
 def expand(qube: Qube, dimension: Mapping[str, Iterable[Any]]) -> Qube:
     """Return a new Qube with the dataqube expanded by adding the specified dimension(s).
@@ -119,11 +140,7 @@ def expand(qube: Qube, dimension: Mapping[str, Iterable[Any]]) -> Qube:
     >>> axes(expanded)
     {'ensemble': {'ens1', 'ens2'}, 'param': {'2t', 'tp'}, 'time': {0, 1, 2}}
     """
-    dataqube = functools.reduce(
-        lambda q, kv: Qube.make_root([Qube.make_node(kv[0], list(kv[1]) or [None], q.children)]), dimension.items(), qube
-    )
-
-    return dataqube
+    return functools.reduce(lambda q, kv: _expand_axis(q, kv[0], kv[1]), dimension.items(), qube)
 
 
 @support_qubed_output

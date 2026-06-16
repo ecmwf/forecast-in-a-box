@@ -79,6 +79,10 @@ def _extract_dataset(inputs: dict[str, QubedOutput], name: str) -> QubedOutput:
     return input_dataset
 
 
+def _is_empty_qube(qube: Qube) -> bool:
+    return next(iter(qube.datacubes()), None) is None
+
+
 def _restriction_value_strings(axis_values: set[Any], item_python_type: type[str] | type[int]) -> list[str]:
     if item_python_type is str:
         return sorted(value for value in axis_values if isinstance(value, str))
@@ -398,6 +402,11 @@ class Select(Transform):
             )
 
         output = select(input_dataset, {dimension: selected_values})
+        if output.dataqube is None or _is_empty_qube(output.dataqube):
+            return BlockValidation(
+                Either.error(f"selection of values {selected_values} from dimension {dimension} produced an empty dataset"),
+                restrict,
+            )
 
         return BlockValidation(Either.ok(output), restrict)
 

@@ -554,6 +554,17 @@ class TestSelect:
         assert isinstance(output, QubedOutput)
         assert axes(output)[STEP] == {0, 6}
 
+    def test_validate_rejects_empty_selection_after_axis_membership_passes(self, select_configuration: BlockInstance) -> None:
+        block = _select()
+        broken_qube = Qube.make_root([Qube.make_node("step", [6, 12], Qube.from_datacube({"param": ["2t"]}).children)])
+        input_dataset = QubedOutput(dataqube=broken_qube)
+        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["6"]})})
+
+        validation = block.validate(block=config, inputs={"dataset": input_dataset})
+
+        assert validation.e is not None
+        assert "produced an empty dataset" in validation.e
+
     def test_validate_rejects_unknown_dimension(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:

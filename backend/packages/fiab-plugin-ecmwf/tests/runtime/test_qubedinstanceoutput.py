@@ -91,6 +91,31 @@ class TestQubedOutputExpand:
         assert set(axes(expanded)["ensemble"]) == {"ens1", "ens2"}
         assert set(axes(expanded)["level"]) == {1000, 850}
 
+    def test_expand_integer_dimension_can_be_selected(self) -> None:
+        expanded = expand(Qube.from_datacube({"param": ["2t"]}), {"step": [6, 12]})
+
+        selected = expanded.select({"step": 6})
+
+        assert axes(selected)["step"] == {6}
+        assert axes(selected)["param"] == {"2t"}
+
+    def test_expand_empty_values_uses_none(self) -> None:
+        expanded = expand(Qube.empty(), {"param": []})
+
+        assert axes(expanded)["param"] == {None}
+
+    def test_expand_broadcasts_metadata_to_new_dimension(self) -> None:
+        output = Qube.from_datacube({"levtype": ["pl", "sfc"], "param": ["t", "q"]}).add_metadata(
+            {"name": ["pl-q", "pl-t", "sfc-q", "sfc-t"]},
+            depth=2,
+        )
+        expanded = expand(output, {"step": [6, 12, 18, 24, 30, 36, 42, 48]})
+
+        selected = expanded.select({"step": [6, 12, 30, 24]})
+
+        assert axes(selected)["step"] == {6, 12, 24, 30}
+        assert list(selected.leaves(metadata=True))
+
     @pytest.mark.parametrize("fixture_name", ["empty_output", "simple_output", "complex_output"])
     def test_expand_preserves_original(
         self,
