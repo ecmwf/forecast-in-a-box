@@ -50,6 +50,10 @@ Define success criteria. Loop until verified.
 
 For multi-step tasks, state a brief plan with verifiable checks.
 
+### 5. Correctness
+
+It is imperative formatting is correct and tests are passing. Make sure `npm run validate:fix` passes before you commit.
+
 ---
 
 ## Project Overview
