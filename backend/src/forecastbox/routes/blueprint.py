@@ -25,7 +25,7 @@ Glyph routes:
  - POST glyphs/global/delete  — delete a global glyph by id
 """
 
-from typing import Annotated, Literal, cast
+from typing import Annotated, Any, Literal, cast
 
 from cascade.low.func import assert_never
 from fastapi import APIRouter, Depends, status
@@ -170,6 +170,7 @@ class BlueprintValidationExpansionResponse(FiabBaseModel):
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
+    block_output_qubes: dict[BlockInstanceId, dict[str, Any]] = {}
 
 
 GlyphType = Literal["intrinsic", "global"]
@@ -430,6 +431,7 @@ async def expand_blueprint(
         configuration_restrictions=result.configuration_restrictions,
         resolved_configuration_options=result.resolved_configuration_options,
         missing_glyphs=result.missing_glyphs,
+        block_output_qubes=result.block_output_qubes,
     )
 
 
