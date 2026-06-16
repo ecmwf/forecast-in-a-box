@@ -20,11 +20,12 @@ via automatic schemata iteration.
 
 from typing import Literal
 
-from sqlalchemy import JSON, Boolean, CheckConstraint, Column, DateTime, ForeignKeyConstraint, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, CheckConstraint, Column, ForeignKeyConstraint, Integer, String, UniqueConstraint
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from forecastbox.utility.config import config
+from forecastbox.utility.time import UTCDateTime
 
 BlueprintSource = Literal["plugin_template", "user_defined", "oneoff_execution"]
 ExperimentType = Literal["cron_schedule", "batch_execution", "external_trigger"]
@@ -49,7 +50,7 @@ class Blueprint(Base):
     blueprint_id = Column(String(255), primary_key=True, nullable=False)
     version = Column(Integer, primary_key=True, nullable=False)
     created_by = Column(String(255), nullable=False)
-    created_at = Column(DateTime, nullable=False)
+    created_at = Column(UTCDateTime, nullable=False)
 
     # TODO later -- make sure entity validates this
     source = Column(String(64), nullable=False)
@@ -89,8 +90,8 @@ class GlobalGlyph(Base):
     public = Column(Boolean, nullable=False, default=False)
     overriddable = Column(Boolean, nullable=True)
     created_by = Column(String(255), nullable=False)
-    created_at = Column(DateTime, nullable=False)
-    updated_at = Column(DateTime, nullable=False)
+    created_at = Column(UTCDateTime, nullable=False)
+    updated_at = Column(UTCDateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("created_by", "key", name="uq_global_glyph_created_by_key"),
@@ -114,7 +115,7 @@ class ExperimentDefinition(Base):
     experiment_definition_id = Column(String(255), primary_key=True, nullable=False)
     version = Column(Integer, primary_key=True, nullable=False)
     created_by = Column(String(255), nullable=False)
-    created_at = Column(DateTime, nullable=False)
+    created_at = Column(UTCDateTime, nullable=False)
 
     display_name = Column(String(255), nullable=True)
     display_description = Column(String(1024), nullable=True)
@@ -152,8 +153,8 @@ class Run(Base):
     run_id = Column(String(255), primary_key=True, nullable=False)
     attempt_count = Column(Integer, primary_key=True, nullable=False)
     created_by = Column(String(255), nullable=False)
-    created_at = Column(DateTime, nullable=False)
-    updated_at = Column(DateTime, nullable=False)
+    created_at = Column(UTCDateTime, nullable=False)
+    updated_at = Column(UTCDateTime, nullable=False)
 
     blueprint_id = Column(String(255), nullable=False)
     blueprint_version = Column(Integer, nullable=False)
@@ -194,8 +195,8 @@ class ExperimentNext(Base):
 
     experiment_next_id = Column(String(255), primary_key=True, nullable=False)
     experiment_id = Column(String(255), nullable=False, unique=True)
-    scheduled_at = Column(DateTime, nullable=False)
-    updated_at = Column(DateTime, nullable=False)
+    scheduled_at = Column(UTCDateTime, nullable=False)
+    updated_at = Column(UTCDateTime, nullable=False)
 
 
 async_url = f"sqlite+aiosqlite:///{config.db.sqlite_jobdb_path}"

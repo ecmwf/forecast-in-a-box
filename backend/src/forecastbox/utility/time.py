@@ -10,9 +10,10 @@
 """Time and Date related utilities"""
 
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
-from sqlalchemy import Column
+from sqlalchemy import Column, DateTime
+from sqlalchemy.types import TypeDecorator
 
 TimeQueryReason = Literal[
     "liveness",  # for deciding whether a given long running thread is still alive
@@ -36,6 +37,24 @@ def from_timestamp(ts: float) -> datetime:
     local_install_time = datetime.fromtimestamp(ts)
     utc_install_time = local_install_time.astimezone(UTC)
     return utc_install_time
+
+
+class UTCDateTime(TypeDecorator[datetime]):
+    """DateTime column that always returns UTC-aware datetimes.
+
+    SQLite has no native timezone support, so SQLAlchemy's DateTime returns naive
+    datetimes on read regardless of timezone=True. This decorator attaches UTC tzinfo
+    to any naive datetime value read from the database, ensuring all in-process
+    datetimes are consistently tz-aware.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_result_value(self, value: datetime | None, dialect: Any) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
 
 
 canonical_output_format = "%Y-%m-%dT%H:%M:%S%:z"

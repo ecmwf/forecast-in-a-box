@@ -460,7 +460,8 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_wit
     outputTime = pathlib.Path(f"{tmpdir}/output{run_id}.time.txt")
     # Both submitDatetime and startDatetime equal created_at on the first run.
     # created_at is at higher precision than the second-resolution glyph values.
-    created_at_sec = created_at.split(".", 1)[0]
+    # Use fromisoformat + replace to strip sub-second precision while preserving the UTC offset.
+    created_at_sec = _dt.fromisoformat(created_at).replace(microsecond=0).isoformat()
     _time_line = outputTime.read_text()
     _time_parts = _time_line.split(";")
     assert _time_parts[0] == created_at_sec
@@ -514,7 +515,7 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_wit
     # the updated global value "changed_value".
     status_restarted_resp = backend_client_with_auth.get("/run/get", params={"run_id": run_id})
     assert status_restarted_resp.is_success, status_restarted_resp.text
-    created_at_restarted = status_restarted_resp.json()["created_at"].split(".", 1)[0]
+    created_at_restarted = _dt.fromisoformat(status_restarted_resp.json()["created_at"]).replace(microsecond=0).isoformat()
     _time_line_r = outputTime.read_text()
     _time_parts_r = _time_line_r.split(";")
     assert _time_parts_r[0] == created_at_sec
@@ -893,7 +894,7 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     assert glyphs_resp2.is_success, glyphs_resp2.text
     submit_example = next(g["valueExample"] for g in glyphs_resp2.json()["glyphs"] if g["name"] == "submitDatetime")
     # floor_day of the example value: strip time component
-    expected_floored = submit_example[:10] + "T00:00:00"
+    expected_floored = submit_example[:10] + "T00:00:00+00:00"
     source_jinja = BlockInstance(
         factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
         configuration_values=_config({"text": "${jinjaFilterGlyph}"}),

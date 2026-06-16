@@ -103,7 +103,7 @@ def calculate_next_run(after: datetime, crontab: str) -> datetime:
 
                 for hour in crontab_values.hours:
                     for minute in crontab_values.minutes:
-                        candidate_run = datetime(year, month, day_of_month, hour, minute)
+                        candidate_run = datetime(year, month, day_of_month, hour, minute, tzinfo=after.tzinfo)
                         if candidate_run > after:
                             return candidate_run
     raise ValueError(f"cron next run failure for {after} and {crontab}")

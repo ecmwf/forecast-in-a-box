@@ -565,7 +565,7 @@ async def test_jobs_experiment_next_upsert(mem_session_maker_both: async_session
         created_by="user1",
     )
 
-    t1 = dt.datetime(2026, 1, 1, 12, 0)
+    t1 = dt.datetime(2026, 1, 1, 12, 0, tzinfo=dt.timezone.utc)
     await scheduling_db.upsert_experiment_next(experiment_id=exp_id, scheduled_at=t1)
 
     result = await scheduling_db.get_experiment_next(exp_id)
@@ -573,7 +573,7 @@ async def test_jobs_experiment_next_upsert(mem_session_maker_both: async_session
     assert result.scheduled_at == t1
 
     # Upsert again should update the scheduled_at
-    t2 = dt.datetime(2026, 1, 2, 12, 0)
+    t2 = dt.datetime(2026, 1, 2, 12, 0, tzinfo=dt.timezone.utc)
     await scheduling_db.upsert_experiment_next(experiment_id=exp_id, scheduled_at=t2)
 
     result2 = await scheduling_db.get_experiment_next(exp_id)
