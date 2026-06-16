@@ -78,11 +78,12 @@ function createPluginKey(store: string, local: string): string {
 }
 
 /**
- * Get current date in backend format
+ * Get current datetime in backend format
  */
-function getCurrentDate(): string {
+function getCurrentDatetime(): string {
   const now = new Date()
-  return `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
 }
 
 export const pluginsHandlers = [
@@ -95,7 +96,7 @@ export const pluginsHandlers = [
       updater_status: 'idle',
       plugin_errors: {},
       plugin_versions: {},
-      plugin_updatedate: {},
+      plugin_updatedatetime: {},
     }
 
     for (const [key, detail] of Object.entries(pluginsState.plugins)) {
@@ -105,8 +106,8 @@ export const pluginsHandlers = [
       if (detail.loaded_version) {
         status.plugin_versions[key] = detail.loaded_version
       }
-      if (detail.update_date) {
-        status.plugin_updatedate[key] = detail.update_date
+      if (detail.update_datetime) {
+        status.plugin_updatedatetime[key] = detail.update_datetime
       }
     }
 
@@ -158,7 +159,7 @@ export const pluginsHandlers = [
       ...plugin,
       status: 'loaded',
       loaded_version: plugin.remote_info?.version ?? '1.0.0',
-      update_date: getCurrentDate(),
+      update_datetime: getCurrentDatetime(),
     }
 
     // Simulate backend reload: catalogue will 503 once while plugins restart
@@ -196,7 +197,7 @@ export const pluginsHandlers = [
       ...plugin,
       status: 'available',
       loaded_version: null,
-      update_date: null,
+      update_datetime: null,
       errored_detail: null,
     }
 
@@ -243,7 +244,7 @@ export const pluginsHandlers = [
       ...plugin,
       status: 'loaded',
       loaded_version: newVersion,
-      update_date: getCurrentDate(),
+      update_datetime: getCurrentDatetime(),
       errored_detail: null,
     }
 

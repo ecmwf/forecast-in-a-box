@@ -60,8 +60,8 @@ describe('getPluginStatus', () => {
       plugin_versions: {
         [createPluginKey('ecmwf', 'anemoi-inference')]: '1.0.0',
       },
-      plugin_updatedate: {
-        [createPluginKey('ecmwf', 'anemoi-inference')]: '2025/01/15',
+      plugin_updatedatetime: {
+        [createPluginKey('ecmwf', 'anemoi-inference')]: '2025-01-15T00:00:00',
       },
     }
 
@@ -99,7 +99,7 @@ describe('getPluginDetails', () => {
           remote_info: { version: '1.0.0' },
           errored_detail: null,
           loaded_version: '1.0.0',
-          update_date: '2025/01/15',
+          update_datetime: '2025-01-15T00:00:00',
         },
         [createPluginKey('ecmwf', 'storm-tracker')]: {
           status: 'available',
@@ -114,7 +114,7 @@ describe('getPluginDetails', () => {
           remote_info: { version: '2.0.0' },
           errored_detail: null,
           loaded_version: null,
-          update_date: null,
+          update_datetime: null,
         },
       },
     }
