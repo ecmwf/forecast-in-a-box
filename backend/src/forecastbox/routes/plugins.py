@@ -49,8 +49,8 @@ class PluginDetail(FiabBaseModel):
     """In case the plugin is errored, (eg installed but failed to load), this displays detail"""
     loaded_version: str | None = None
     """In case the plugin is loaded, this shows the version"""
-    update_date: str | None = None
-    """In case the plugin is installed, this shows the most recent update date"""
+    update_datetime: str | None = None
+    """In case the plugin is installed, this shows the most recent update datetime"""
 
 
 class PluginListing(FiabBaseModel):
@@ -102,7 +102,7 @@ def get_plugin_details(forceRefresh: bool = False) -> PluginListing:
             "status": status,
             "errored_detail": statuses.plugin_errors.get(pluginCompositeId, None),  # ty:ignore[no-matching-overload]
             "loaded_version": statuses.plugin_versions.get(pluginCompositeId, None),  # ty:ignore[no-matching-overload]
-            "update_date": statuses.plugin_updatedate.get(pluginCompositeId, None),  # ty:ignore[no-matching-overload]
+            "update_datetime": statuses.plugin_updatedatetime.get(pluginCompositeId, None),  # ty:ignore[no-matching-overload]
         }
         if pluginCompositeId not in rv:
             rv[pluginCompositeId] = PluginDetail(**update)  # ty:ignore[invalid-argument-type]
