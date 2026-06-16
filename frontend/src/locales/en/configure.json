@@ -205,7 +205,6 @@
     "handleLabel": "Inspect the qube on this edge",
     "statDimensions": "Dimensions",
     "statFields": "Fields",
-    "statSize": "Est. size",
     "narrowedDiff": "narrowed {{from}} → {{to}}",
     "tabDimensions": "Dimensions",
     "tabSelection": "Selection",
