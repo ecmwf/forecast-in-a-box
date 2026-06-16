@@ -15,7 +15,6 @@ import { useTranslation } from 'react-i18next'
 import { QubeInspector } from './QubeInspector'
 import type { QubeNode } from '@/api/types/artifacts.types'
 import type { BlockInstance, FableBuilderV1 } from '@/api/types/fable.types'
-import { computeQubeMetrics } from '@/features/fable-builder/lib/qube-metrics'
 import { computeEdgeNarrowing } from '@/features/fable-builder/lib/qube-narrowing'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
@@ -64,8 +63,7 @@ interface EdgeQubeLensProps {
 }
 
 /**
- * The qube-lens handle on an edge midpoint: a chip with the qube's
- * dimensionality (and a dot when an upstream Select narrowed it). Clicking opens
+ * The qube-lens handle on an edge midpoint: a small cube glyph. Clicking opens
  * the inspector. Renders nothing when the backend provides no qube for the edge.
  */
 export const EdgeQubeLens = memo(function ({
@@ -85,10 +83,6 @@ export const EdgeQubeLens = memo(function ({
     ? (blockOutputQubes[sourceId] as QubeNode | undefined)
     : undefined
 
-  const dimensionCount = useMemo(
-    () => (qube ? computeQubeMetrics(qube).dimensionCount : 0),
-    [qube],
-  )
   const narrowing = useMemo(
     () =>
       qube && blockOutputQubes
@@ -106,19 +100,17 @@ export const EdgeQubeLens = memo(function ({
   if (!qube) return null
 
   const active = hovered || open
-  const narrowed = narrowing.length > 0
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      {/* Subtle handle: dimensionality only; the rich view lives in the popover. */}
+      {/* Subtle handle: just a cube glyph; the rich view lives in the popover. */}
       <PopoverTrigger
         render={
           <button
             type="button"
             aria-label={t('qubeLens.handleLabel')}
             className={cn(
-              'nodrag nopan inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5',
-              'text-[0.65rem] leading-none font-medium transition-all',
+              'nodrag nopan inline-flex items-center justify-center rounded-full border px-3 py-1 transition-all',
               'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
               active
                 ? 'border-border bg-background text-muted-foreground shadow-sm'
@@ -128,18 +120,7 @@ export const EdgeQubeLens = memo(function ({
           />
         }
       >
-        <Boxes className="size-3 shrink-0" />
-        {dimensionCount > 0 && (
-          <span className="font-mono">
-            {t('qubeLens.dimensionCount', { count: dimensionCount })}
-          </span>
-        )}
-        {narrowed && (
-          <span
-            className="size-1.5 shrink-0 rounded-full bg-primary"
-            aria-hidden
-          />
-        )}
+        <Boxes className="size-3.5 shrink-0" />
       </PopoverTrigger>
 
       <PopoverContent

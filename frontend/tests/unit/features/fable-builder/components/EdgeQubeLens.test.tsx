@@ -8,7 +8,15 @@
  * does it submit to any jurisdiction.
  */
 
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { act } from '@testing-library/react'
 import { renderWithProviders } from '@tests/utils/render'
 import type {
@@ -103,7 +111,11 @@ describe('EdgeQubeLens', () => {
     })
   })
 
-  it('shows the qube dimensionality on the handle', async () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('shows the qube dimensionality in the inspector', async () => {
     // Edge selParam → selStep carries selParam's 3-D output qube.
     act(() =>
       useFableBuilderStore.getState().setValidationState(
@@ -124,6 +136,10 @@ describe('EdgeQubeLens', () => {
         hovered={false}
       />,
     )
+    // The handle is just a cube glyph; the dimensionality lives in the inspector.
+    await screen
+      .getByRole('button', { name: 'Inspect the qube on this edge' })
+      .click()
     await expect.element(screen.getByText('3D')).toBeVisible()
   })
 
@@ -175,6 +191,41 @@ describe('EdgeQubeLens', () => {
       .toBeVisible()
     // The (source-neutral) selection tab is present.
     await expect.element(screen.getByText('Selection')).toBeVisible()
+  })
+
+  it('toggling a spectrum bar off does not scroll the page (regression: popup jump)', async () => {
+    const scrollSpy = vi.spyOn(HTMLElement.prototype, 'scrollIntoView')
+    act(() =>
+      useFableBuilderStore.getState().setValidationState(
+        validationWith({
+          selParam: linearQube([
+            ['param', ['2t']],
+            ['step', ['0', '24', '48']],
+          ]),
+        }),
+      ),
+    )
+    const screen = await renderWithProviders(
+      <EdgeQubeLens
+        sourceId="selParam"
+        targetId="selStep"
+        inputName="dataset"
+        hovered
+      />,
+    )
+    await screen
+      .getByRole('button', { name: 'Inspect the qube on this edge' })
+      .click()
+    // Select then deselect the 'step' bar in the spectrum.
+    const bar = screen.getByRole('button', { name: 'step: 3' })
+    await bar.click()
+    await bar.click()
+    // Deselecting must not force a page-level scroll to the inspector top.
+    expect(
+      scrollSpy.mock.calls.some(
+        ([opts]) => typeof opts === 'object' && opts.block === 'start',
+      ),
+    ).toBe(false)
   })
 
   it('shows the upstream narrowing diff from comparing input and output qubes', async () => {

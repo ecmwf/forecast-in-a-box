@@ -16,10 +16,7 @@ import { QubeSpectrum } from './QubeSpectrum'
 import type { QubeNode } from '@/api/types/artifacts.types'
 import type { QubeDimension } from '@/features/fable-builder/lib/qube-matrix'
 import type { DimensionNarrowing } from '@/features/fable-builder/lib/qube-narrowing'
-import {
-  computeQubeMetrics,
-  formatBytes,
-} from '@/features/fable-builder/lib/qube-metrics'
+import { computeQubeMetrics } from '@/features/fable-builder/lib/qube-metrics'
 import { dimensionColor } from '@/features/fable-builder/lib/dimension-colors'
 import { qubeToRequest } from '@/features/fable-builder/lib/qube-to-request'
 import { Badge } from '@/components/ui/badge'
@@ -39,9 +36,19 @@ function ColorDot({ name }: { name: string }) {
   )
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({
+  value,
+  label,
+  align = 'start',
+}: {
+  value: string
+  label: string
+  align?: 'start' | 'end'
+}) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div
+      className={cn('flex flex-col gap-0.5', align === 'end' && 'items-end')}
+    >
       <span className="text-xl leading-none font-semibold text-foreground">
         {value}
       </span>
@@ -167,7 +174,6 @@ export function QubeInspector({
   const [query, setQuery] = useState('')
   const [hideFixed, setHideFixed] = useState(false)
   const [highlighted, setHighlighted] = useState<string | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const metrics = useMemo(() => computeQubeMetrics(node), [node])
   const narrowingByDim = useMemo(
@@ -194,10 +200,9 @@ export function QubeInspector({
     )
 
   const selectDimension = (key: string) => {
-    // Toggle: clicking the already-selected bar deselects it and scrolls back up.
+    // Toggle: clicking the already-selected bar clears the emphasis.
     if (highlighted === key) {
       setHighlighted(null)
-      rootRef.current?.scrollIntoView({ block: 'start' })
       return
     }
     setTab('dimensions')
@@ -207,7 +212,7 @@ export function QubeInspector({
   }
 
   return (
-    <div ref={rootRef} className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col gap-0.5">
           <span className="font-semibold text-foreground">
@@ -231,7 +236,7 @@ export function QubeInspector({
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="flex items-start justify-between gap-2">
         <Stat
           value={t('qubeLens.dimensionCount', {
             count: metrics.dimensionCount,
@@ -241,10 +246,7 @@ export function QubeInspector({
         <Stat
           value={metrics.fieldCount.toLocaleString()}
           label={t('qubeLens.statFields')}
-        />
-        <Stat
-          value={`≈ ${formatBytes(metrics.estimatedBytes)}`}
-          label={t('qubeLens.statSize')}
+          align="end"
         />
       </div>
 
