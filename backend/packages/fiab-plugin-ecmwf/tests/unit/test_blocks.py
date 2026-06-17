@@ -563,7 +563,7 @@ class TestSelect:
         validation = block.validate(block=config, inputs={"dataset": input_dataset})
 
         assert validation.result.e is not None
-        assert "produced an empty dataset" in validation.result.e
+        assert "produced an empty dataset" in validation.result.e.reason
 
     def test_validate_rejects_unknown_dimension(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
@@ -573,7 +573,7 @@ class TestSelect:
         validation = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
 
         assert validation.result.e is not None
-        assert "dimension missing is not in the input dimensions" in validation.result.e
+        assert "dimension missing is not in the input dimensions" in validation.result.e.reason
         assert DIMENSION in validation.restrictions
         assert VALUES not in validation.restrictions
 
@@ -585,7 +585,7 @@ class TestSelect:
         validation = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
 
         assert validation.result.e is not None
-        assert "values ['missing'] are not in dimension param" in validation.result.e
+        assert "values ['missing'] are not in dimension param" in validation.result.e.reason
         assert DIMENSION in validation.restrictions
         assert VALUES in validation.restrictions
 
@@ -900,7 +900,7 @@ class TestMapPlotSink:
         validation = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
 
         assert validation.result.e is not None
-        assert "params ['nonexistent'] are not in the input parameters" in validation.result.e
+        assert "params ['nonexistent'] are not in the input parameters" in validation.result.e.reason
         assert PARAM in validation.restrictions
 
     def test_validate_rejects_partial_unknown_params(self, operational_forecast_source_output: QubedOutput) -> None:
@@ -924,7 +924,7 @@ class TestMapPlotSink:
         validation = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
 
         assert validation.result.e is not None
-        assert "params ['nonexistent'] are not in the input parameters" in validation.result.e
+        assert "params ['nonexistent'] are not in the input parameters" in validation.result.e.reason
         assert PARAM in validation.restrictions
 
     def test_validate_from_ensemble_statistics(

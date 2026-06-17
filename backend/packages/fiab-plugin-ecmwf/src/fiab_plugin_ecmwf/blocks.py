@@ -25,7 +25,7 @@ from fiab_core.fable import (
     QubedOutput,
     RawOutput,
 )
-from fiab_core.plugin import BlockValidation, Error
+from fiab_core.plugin import BlockValidation, BlockValidationError, Error
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, Product, Sink, Source, Transform
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from fiab_core.types import ClosedEnumType, ListType
@@ -140,7 +140,9 @@ class OperationalForecastSource(Source):
 
         ifs_qoutput = QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True))
         if not contains(ifs_qoutput, {"time": time}):
-            return BlockValidation(Either.error(f"Invalid time: must be in {axes(ifs_qoutput)['time']}"))
+            return BlockValidation(
+                Either.error(BlockValidationError(reason=f"Invalid time: must be in {axes(ifs_qoutput)['time']}", is_hard=True))
+            )
 
         return BlockValidation(Either.ok(select(ifs_qoutput, {"time": time})))
 
@@ -221,7 +223,13 @@ class EnsembleStatistics(Product):
 
         param = block.config_as_str(PARAM)
         if not contains(input_dataset, {PARAM: param}):
-            return BlockValidation(Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}"))
+            return BlockValidation(
+                Either.error(
+                    BlockValidationError(
+                        reason=f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}", is_hard=True
+                    )
+                )
+            )
 
         output = coxpand(input_dataset, [PARAM, ENSEMBLE], {PARAM: [param]})
         return BlockValidation(Either.ok(output))
@@ -265,7 +273,13 @@ class TemporalStatistics(Product):
 
         param = block.config_as_str(PARAM)
         if not contains(input_dataset, {PARAM: param}):
-            return BlockValidation(Either.error(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}"))
+            return BlockValidation(
+                Either.error(
+                    BlockValidationError(
+                        reason=f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}", is_hard=True
+                    )
+                )
+            )
         output = coxpand(input_dataset, [PARAM, STEP], {PARAM: [param]})
         return BlockValidation(Either.ok(output))
 
@@ -375,13 +389,15 @@ class Select(Transform):
         try:
             dimension = self._selected_dimension(block)
         except BlockInstanceConfigurationError as exc:
-            return BlockValidation(Either.error(str(exc)), restrict)
+            return BlockValidation(Either.error(BlockValidationError(reason=str(exc), is_hard=True)), restrict)
 
         input_axes = axes(input_dataset)
         axis_values = input_axes.get(dimension)
         if axis_values is None:
             return BlockValidation(
-                Either.error(f"dimension {dimension} is not in the input dimensions: {input_dimensions}"),
+                Either.error(
+                    BlockValidationError(reason=f"dimension {dimension} is not in the input dimensions: {input_dimensions}", is_hard=True)
+                ),
                 restrict,
             )
 
@@ -392,19 +408,25 @@ class Select(Transform):
         try:
             selected_values = [_parse_axis_value(value) for value in self._selected_values(block)]
         except BlockInstanceConfigurationError as exc:
-            return BlockValidation(Either.error(str(exc)), restrict)
+            return BlockValidation(Either.error(BlockValidationError(reason=str(exc), is_hard=True)), restrict)
 
         missing_values = [value for value in selected_values if value not in axis_values]
         if missing_values:
             return BlockValidation(
-                Either.error(f"values {missing_values} are not in dimension {dimension}: {input_values}"),
+                Either.error(
+                    BlockValidationError(reason=f"values {missing_values} are not in dimension {dimension}: {input_values}", is_hard=True)
+                ),
                 restrict,
             )
 
         output = select(input_dataset, {dimension: selected_values})
         if output.dataqube is None or _is_empty_qube(output.dataqube):
             return BlockValidation(
-                Either.error(f"selection of values {selected_values} from dimension {dimension} produced an empty dataset"),
+                Either.error(
+                    BlockValidationError(
+                        reason=f"selection of values {selected_values} from dimension {dimension} produced an empty dataset", is_hard=True
+                    )
+                ),
                 restrict,
             )
 
@@ -445,7 +467,9 @@ class GribSink(Sink):
         path = block.config_as_str(PATH)
         dirname = os.path.dirname(path)
         if len(self._find_template_values(dirname)) != 0:
-            return BlockValidation(Either.error(f"Invalid filepath: directory path can not contain template values"))
+            return BlockValidation(
+                Either.error(BlockValidationError(reason=f"Invalid filepath: directory path can not contain template values", is_hard=True))
+            )
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type=GRIB_MIME)))
 
     def compile(
@@ -544,23 +568,33 @@ class MapPlotSink(Sink):
             splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
             fmt = block.config_as_str(FORMAT)
         except BlockInstanceConfigurationError as exc:
-            return BlockValidation(Either.error(str(exc)), restrict)
+            return BlockValidation(Either.error(BlockValidationError(reason=str(exc), is_hard=True)), restrict)
 
         missing_params = [param for param in params if param not in input_param_values]
         if missing_params:
             return BlockValidation(
-                Either.error(f"params {missing_params} are not in the input parameters: {_axis_value_strings(input_param_values)}"),
+                Either.error(
+                    BlockValidationError(
+                        reason=f"params {missing_params} are not in the input parameters: {_axis_value_strings(input_param_values)}",
+                        is_hard=True,
+                    )
+                ),
                 restrict,
             )
 
         if "none" in splitby_value and len(splitby_value) != 1:
             return BlockValidation(
-                Either.error(f"Invalid splitby value: if none is selected, no other dimensions can be present"), restrict
+                Either.error(
+                    BlockValidationError(
+                        reason=f"Invalid splitby value: if none is selected, no other dimensions can be present", is_hard=True
+                    )
+                ),
+                restrict,
             )
 
         mime_type = PLOT_FORMAT_TO_MIME.get(fmt)
         if mime_type is None:
-            return BlockValidation(Either.error(f"Unsupported output format: {fmt}"), restrict)
+            return BlockValidation(Either.error(BlockValidationError(reason=f"Unsupported output format: {fmt}", is_hard=True)), restrict)
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type=mime_type)), restrict)
 
     def compile(

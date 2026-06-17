@@ -30,8 +30,14 @@ Error = str
 
 
 @dataclass(frozen=True, eq=True, slots=True)
+class BlockValidationError:
+    reason: str
+    is_hard: bool
+
+
+@dataclass(frozen=True, eq=True, slots=True)
 class BlockValidation:
-    result: Either[BlockInstanceOutput, Error]  # type:ignore[invalid-argument] # semigroup
+    result: Either[BlockInstanceOutput, BlockValidationError]  # type:ignore[invalid-argument] # semigroup
     restrictions: ConfigurationOptionRestriction = field(default_factory=dict)
 
 

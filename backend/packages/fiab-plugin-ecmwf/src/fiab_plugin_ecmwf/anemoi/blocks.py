@@ -21,7 +21,7 @@ from fiab_core.fable import (
     ConfigurationOptionId,
     QubedOutput,
 )
-from fiab_core.plugin import BlockValidation, Error
+from fiab_core.plugin import BlockValidation, BlockValidationError, Error
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from fiab_core.tools.blocks import Source, Transform
 from fiab_core.tools.validators import positive
@@ -143,11 +143,13 @@ class AnemoiSource(Source):
         checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
         lead_time = block.config_as_int(LEAD_TIME, validator=positive)
         if ensemble_members < 1:
-            return BlockValidation(Either.error("Ensemble members must be an int, positive and non zero."))
+            return BlockValidation(
+                Either.error(BlockValidationError(reason="Ensemble members must be an int, positive and non zero.", is_hard=True))
+            )
 
         validation_error = checkpoint.validate_lead_time(lead_time)
         if validation_error is not None:
-            return BlockValidation(Either.error(validation_error))
+            return BlockValidation(Either.error(BlockValidationError(reason=validation_error, is_hard=True)))
 
         qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time))
         if ensemble_members > 1:
@@ -207,7 +209,9 @@ class AnemoiInputSource(Source):
         checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
         number = block.config_as_int(ENSEMBLE, validator=positive)
         if number < 1:
-            return BlockValidation(Either.error("Ensemble members must be an int, positive and non zero."))
+            return BlockValidation(
+                Either.error(BlockValidationError(reason="Ensemble members must be an int, positive and non zero.", is_hard=True))
+            )
         model_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
         model_input = expand(model_input, {ENSEMBLE: [number]})
 
@@ -255,12 +259,17 @@ class AnemoiTransform(Transform):
         if not contains(inputs["dataset"], qubed_input):
             difference_qube = qubed_input ^ inputs["dataset"].dataqube
             return BlockValidation(
-                Either.error(f"Input dataset is not compatible with the model checkpoint. Difference in qubes: {difference_qube}")
+                Either.error(
+                    BlockValidationError(
+                        reason=f"Input dataset is not compatible with the model checkpoint. Difference in qubes: {difference_qube}",
+                        is_hard=True,
+                    )
+                )
             )
 
         validation_error = checkpoint.validate_lead_time(lead_time)
         if validation_error is not None:
-            return BlockValidation(Either.error(validation_error))
+            return BlockValidation(Either.error(BlockValidationError(reason=validation_error, is_hard=True)))
 
         qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time=lead_time))
 

@@ -18,7 +18,7 @@ from fiab_core.fable import (
     NoOutput,
     QubedOutput,
 )
-from fiab_core.plugin import BlockValidation, Error
+from fiab_core.plugin import BlockValidation, BlockValidationError, Error
 from fiab_core.tools.blocks import Product, Sink, Transform
 
 DIR = ConfigurationOptionId("dir")
@@ -32,7 +32,7 @@ class _DemoTransform(Transform):
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
         dataset = inputs.get("dataset")
         if dataset is None:
-            return BlockValidation(Either.error("Missing input 'dataset'"))
+            return BlockValidation(Either.error(BlockValidationError(reason="Missing input 'dataset'", is_hard=True)))
         return BlockValidation(Either.ok(dataset))
 
     def compile(
@@ -53,7 +53,7 @@ class _DemoProduct(Product):
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
         dataset = inputs.get("dataset")
         if dataset is None:
-            return BlockValidation(Either.error("Missing input 'dataset'"))
+            return BlockValidation(Either.error(BlockValidationError(reason="Missing input 'dataset'", is_hard=True)))
         return BlockValidation(Either.ok(dataset))
 
     def compile(
@@ -73,7 +73,7 @@ class _DemoSink(Sink):
 
     def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
         if "dataset" not in inputs:
-            return BlockValidation(Either.error("Missing input 'dataset'"))
+            return BlockValidation(Either.error(BlockValidationError(reason="Missing input 'dataset'", is_hard=True)))
         return BlockValidation(Either.ok(NoOutput()))
 
     def compile(

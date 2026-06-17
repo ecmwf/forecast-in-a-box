@@ -15,7 +15,7 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     QubedOutput,
 )
-from fiab_core.plugin import BlockValidation, Error, Plugin
+from fiab_core.plugin import BlockValidation, BlockValidationError, Error, Plugin
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, QubedBlockBuilder
 
 
@@ -58,7 +58,7 @@ class QubedPluginBuilder:
         try:
             return factory.validate(rich_block, inputs)
         except BlockInstanceConfigurationError as exc:
-            return BlockValidation(Either.error(str(exc)))
+            return BlockValidation(Either.error(BlockValidationError(reason=str(exc), is_hard=True)))
 
     def expand(self, output: QubedOutput) -> list[BlockExpansion]:
         """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
@@ -92,7 +92,11 @@ class QubedPluginBuilder:
         def _generic_validate(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
             invalid = [f"{key}->{value.__class__.__name__}" for key, value in inputs.items() if not isinstance(value, QubedOutput)]
             if any(invalid):
-                return BlockValidation(Either.error(f"Expected only QubedOutputs in inputs, gotten {','.join(invalid)}"))
+                return BlockValidation(
+                    Either.error(
+                        BlockValidationError(reason=f"Expected only QubedOutputs in inputs, gotten {','.join(invalid)}", is_hard=True)
+                    )
+                )
             else:
                 inputs_validated = cast(dict[str, QubedOutput], inputs)
                 return self.validate(block, inputs_validated)
