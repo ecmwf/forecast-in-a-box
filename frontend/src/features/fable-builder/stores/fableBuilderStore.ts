@@ -29,6 +29,8 @@ import {
 
 export type BuilderMode = 'graph' | 'form'
 export type BuilderStep = 'edit' | 'review'
+/** Which tab the submit dialog opens on. */
+export type SubmitDialogMode = 'run' | 'schedule'
 export type EdgeStyle = 'bezier' | 'smoothstep' | 'step'
 export type { LayoutDirection } from '@/features/fable-builder/utils/layout-blocks'
 
@@ -129,6 +131,8 @@ interface FableBuilderState {
    *  `useDraftPersistence`; read by the DraftStatus indicator. */
   draftWritePending: boolean
   submitDialogOpen: boolean
+  /** Tab the submit dialog opens on; set by the action that opened it. */
+  submitDialogMode: SubmitDialogMode
   /** Palette block being dragged onto the canvas; null when idle. Not persisted. */
   draggedFactory: DraggedFactory | null
   /** Bounded undo/redo of `fable` snapshots. Selection, panel toggles, and
@@ -198,7 +202,7 @@ interface FableBuilderState {
     restrictions: Record<string, string>,
   ) => void
   setIsValidating: (validating: boolean) => void
-  setSubmitDialogOpen: (open: boolean) => void
+  setSubmitDialogOpen: (open: boolean, mode?: SubmitDialogMode) => void
   setDraggedFactory: (dragged: DraggedFactory | null) => void
   markSaved: (id: string, version: number, name?: string) => void
   /**
@@ -251,6 +255,7 @@ function createInitialState() {
     lastSavedAt: null,
     draftWritePending: false,
     submitDialogOpen: false,
+    submitDialogMode: 'run' as SubmitDialogMode,
     draggedFactory: null,
     past: [] as ReadonlyArray<FableBuilderV1>,
     future: [] as ReadonlyArray<FableBuilderV1>,
@@ -694,7 +699,12 @@ export const useFableBuilderStore = create<FableBuilderState>()(
                 ),
             })),
           setIsValidating: (validating) => set({ isValidating: validating }),
-          setSubmitDialogOpen: (open) => set({ submitDialogOpen: open }),
+          setSubmitDialogOpen: (open, mode) =>
+            set(
+              open
+                ? { submitDialogOpen: true, submitDialogMode: mode ?? 'run' }
+                : { submitDialogOpen: false },
+            ),
           setDraggedFactory: (dragged) => set({ draggedFactory: dragged }),
 
           markSaved: (id, version, name) =>

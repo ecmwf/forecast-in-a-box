@@ -9,20 +9,12 @@
  */
 
 import { useMemo } from 'react'
-import {
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle2,
-  Loader2,
-  Play,
-} from 'lucide-react'
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ConfigSummaryCard } from './ConfigSummaryCard'
 import type { BlockFactoryCatalogue, BlockKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
-import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { H2, P } from '@/components/base/typography'
-import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -46,16 +38,8 @@ interface ReviewStepProps {
 export function ReviewStep({ catalogue }: ReviewStepProps) {
   const { t } = useTranslation('configure')
   const fable = useFableBuilderStore((state) => state.fable)
-  const fableId = useFableBuilderStore((state) => state.fableId)
   const validationState = useFableBuilderStore((state) => state.validationState)
   const isValidating = useFableBuilderStore((state) => state.isValidating)
-  const setStep = useFableBuilderStore((state) => state.setStep)
-  const submitDialogOpen = useFableBuilderStore(
-    (state) => state.submitDialogOpen,
-  )
-  const setSubmitDialogOpen = useFableBuilderStore(
-    (state) => state.setSubmitDialogOpen,
-  )
 
   const blocksByKind = useMemo(() => {
     const groups: Record<
@@ -97,16 +81,7 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
     }
   }, [validationState])
 
-  function handleSubmit(): void {
-    setSubmitDialogOpen(true)
-  }
-
-  function handleBackToEdit(): void {
-    setStep('edit')
-  }
-
   const blockCount = Object.keys(fable.blocks).length
-  const canSubmit = validationSummary?.isValid && !isValidating
 
   return (
     <div className="h-full flex-1 overflow-y-auto bg-muted/30">
@@ -160,34 +135,12 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>{t('review.summaryTitle')}</CardTitle>
-                <CardDescription>
-                  {t('review.summaryDescription', { count: blockCount })}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBackToEdit}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  {t('review.backToEdit')}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSubmit}
-                  disabled={!canSubmit}
-                  className="gap-2"
-                >
-                  <Play className="h-4 w-4" />
-                  {t('review.submitJob')}
-                </Button>
-              </div>
-            </div>
+            {/* Back-to-edit / submit live in the sticky header (always visible);
+                the panel just summarises the config to avoid duplicate actions. */}
+            <CardTitle>{t('review.summaryTitle')}</CardTitle>
+            <CardDescription>
+              {t('review.summaryDescription', { count: blockCount })}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {BLOCK_KIND_ORDER.map((kind) => {
@@ -226,13 +179,6 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
             })}
           </CardContent>
         </Card>
-
-        <SubmitRunDialog
-          open={submitDialogOpen}
-          onOpenChange={setSubmitDialogOpen}
-          fable={fable}
-          fableId={fableId}
-        />
       </div>
     </div>
   )

@@ -8,10 +8,17 @@
  * does it submit to any jurisdiction.
  */
 
-import { useMemo, useState } from 'react'
-import { AlertCircle, Calendar, Loader2, Play } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import {
+  AlertCircle,
+  Calendar,
+  CornerDownLeft,
+  Loader2,
+  Play,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
+import type { FormEvent, RefObject } from 'react'
 import type {
   FableBuilderV1,
   FableRetrieveResponse,
@@ -42,13 +49,15 @@ import { useActivityStore } from '@/stores/activityStore'
 import { stripSystemTags } from '@/lib/system-tags'
 import { cn } from '@/lib/utils'
 
-type SubmitMode = 'run' | 'schedule'
+export type SubmitMode = 'run' | 'schedule'
 
 interface SubmitRunDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   fable: FableBuilderV1
   fableId: string | null
+  /** Tab to open on. Defaults to 'run'. */
+  initialMode?: SubmitMode
 }
 
 export function SubmitRunDialog({
@@ -56,18 +65,24 @@ export function SubmitRunDialog({
   onOpenChange,
   fable,
   fableId,
+  initialMode = 'run',
 }: SubmitRunDialogProps) {
   const { data: fableData } = useFableRetrieve(fableId)
+  // Focus the name field on open so Enter submits; otherwise focus lands on
+  // the run/schedule toggle (first tabbable) and Enter would flip the mode.
+  const nameRef = useRef<HTMLInputElement>(null)
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent initialFocus={nameRef}>
         {open && (
           <SubmitRunForm
             onOpenChange={onOpenChange}
             fable={fable}
             fableId={fableId}
             fableData={fableData}
+            nameRef={nameRef}
+            initialMode={initialMode}
           />
         )}
       </AlertDialogContent>
@@ -80,6 +95,8 @@ interface SubmitRunFormProps {
   fable: FableBuilderV1
   fableId: string | null
   fableData: FableRetrieveResponse | undefined
+  nameRef: RefObject<HTMLInputElement | null>
+  initialMode: SubmitMode
 }
 
 function SubmitRunForm({
@@ -87,6 +104,8 @@ function SubmitRunForm({
   fable,
   fableId,
   fableData,
+  nameRef,
+  initialMode,
 }: SubmitRunFormProps) {
   const { t } = useTranslation('executions')
   const navigate = useNavigate()
@@ -103,7 +122,7 @@ function SubmitRunForm({
     [fable, catalogue, fableData],
   )
 
-  const [mode, setMode] = useState<SubmitMode>('run')
+  const [mode, setMode] = useState<SubmitMode>(initialMode)
   const [name, setName] = useState(() => fableData?.display_name || '')
   const [description, setDescription] = useState(
     () => fableData?.display_description || '',
@@ -198,13 +217,25 @@ function SubmitRunForm({
   const isPending =
     mode === 'run' ? submitFable.isPending : createSchedule.isPending
 
+  // Enter anywhere in the form submits — mirroring the primary button, and
+  // guarded by the same conditions (a schedule needs a name).
+  function handleFormSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (isPending) return
+    if (mode === 'run') {
+      handleSubmitRun()
+    } else if (name.trim()) {
+      handleCreateSchedule()
+    }
+  }
+
   return (
     <>
       <AlertDialogHeader>
         <AlertDialogTitle>{t('submit.title')}</AlertDialogTitle>
       </AlertDialogHeader>
 
-      <div className="space-y-4">
+      <form className="space-y-4" onSubmit={handleFormSubmit}>
         {/* Mode toggle */}
         <div className="flex gap-1 rounded-md bg-muted p-1">
           <button
@@ -248,13 +279,13 @@ function SubmitRunForm({
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="submit-name">{t('submit.name')}</Label>
           <Input
+            ref={nameRef}
             id="submit-name"
             placeholder={
               mode === 'run' ? generatedName : t('submit.namePlaceholder')
             }
             value={name}
             onChange={(e) => setName(e.target.value)}
-            required
           />
         </div>
 
@@ -302,30 +333,35 @@ function SubmitRunForm({
           environment={environment}
           onChange={setEnvironment}
         />
-      </div>
 
-      <AlertDialogFooter>
-        <Button
-          variant="outline"
-          onClick={() => onOpenChange(false)}
-          disabled={isPending}
-        >
-          {t('submit.cancel')}
-        </Button>
-        <Button
-          onClick={mode === 'run' ? handleSubmitRun : handleCreateSchedule}
-          disabled={isPending || (mode === 'schedule' && !name.trim())}
-        >
-          {isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          {mode === 'run'
-            ? isPending
-              ? t('submit.submitting')
-              : t('submit.submit')
-            : isPending
-              ? t('submit.creatingSchedule')
-              : t('submit.createSchedule')}
-        </Button>
-      </AlertDialogFooter>
+        <AlertDialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
+            {t('submit.cancel')}
+          </Button>
+          <Button
+            type="submit"
+            disabled={isPending || (mode === 'schedule' && !name.trim())}
+          >
+            {isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            {mode === 'run'
+              ? isPending
+                ? t('submit.submitting')
+                : t('submit.submit')
+              : isPending
+                ? t('submit.creatingSchedule')
+                : t('submit.createSchedule')}
+            {/* ↵ marks the default action — Enter submits. */}
+            {!isPending && (
+              <CornerDownLeft className="size-3.5 opacity-70" aria-hidden />
+            )}
+          </Button>
+        </AlertDialogFooter>
+      </form>
     </>
   )
 }

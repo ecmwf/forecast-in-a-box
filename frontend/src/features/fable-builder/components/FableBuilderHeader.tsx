@@ -11,11 +11,14 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  CalendarClock,
   Check,
+  ChevronDown,
   Download,
   FileText,
   LayoutGrid,
   MoreVertical,
+  Play,
   Redo2,
   Save,
   Share2,
@@ -125,6 +128,15 @@ export function FableBuilderHeader({
 
   function handleReview(): void {
     setStep('review')
+  }
+
+  function handleRunOnce(): void {
+    // Skip the review page — submit straight from the canvas.
+    setSubmitDialogOpen(true, 'run')
+  }
+
+  function handleSchedule(): void {
+    setSubmitDialogOpen(true, 'schedule')
   }
 
   function handleBackToEdit(): void {
@@ -383,17 +395,51 @@ export function FableBuilderHeader({
                     </DropdownMenu>
                   </ButtonGroup>
 
+                  {/* Primary runs once (skipping review); caret holds the
+                      review/schedule paths. Tooltip wraps the whole group, not
+                      the button: disabled buttons swallow hover, and a
+                      per-button trigger would break ButtonGroup's join. */}
                   <Tooltip>
                     <TooltipTrigger render={<span className="inline-flex" />}>
-                      <Button
-                        size="sm"
-                        onClick={handleReview}
-                        disabled={!canReview}
-                        className="gap-2"
-                      >
-                        <Check className="h-4 w-4" />
-                        {t('header.reviewSubmit')}
-                      </Button>
+                      <ButtonGroup>
+                        <Button
+                          size="sm"
+                          onClick={handleRunOnce}
+                          disabled={!canReview}
+                          className="gap-2"
+                        >
+                          <Play className="h-4 w-4" />
+                          {t('header.runOnce')}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                size="sm"
+                                disabled={!canReview}
+                                aria-label={t('header.submitOptions')}
+                                className="px-1.5"
+                              />
+                            }
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-44">
+                            <DropdownMenuItem onClick={handleReview}>
+                              <Check className="mr-2 h-4 w-4 shrink-0" />
+                              <span className="whitespace-nowrap">
+                                {t('header.reviewSubmit')}
+                              </span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleSchedule}>
+                              <CalendarClock className="mr-2 h-4 w-4 shrink-0" />
+                              <span className="whitespace-nowrap">
+                                {t('header.runOnSchedule')}
+                              </span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </ButtonGroup>
                     </TooltipTrigger>
                     {reviewTooltip && (
                       <TooltipContent>{reviewTooltip}</TooltipContent>
@@ -451,12 +497,30 @@ export function FableBuilderHeader({
                       </span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
+                      onClick={handleRunOnce}
+                      disabled={!canReview}
+                    >
+                      <Play className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="whitespace-nowrap">
+                        {t('header.runOnce')}
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
                       onClick={handleReview}
                       disabled={!canReview}
                     >
                       <Check className="mr-2 h-4 w-4 shrink-0" />
                       <span className="whitespace-nowrap">
                         {t('header.reviewSubmit')}
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleSchedule}
+                      disabled={!canReview}
+                    >
+                      <CalendarClock className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="whitespace-nowrap">
+                        {t('header.runOnSchedule')}
                       </span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
