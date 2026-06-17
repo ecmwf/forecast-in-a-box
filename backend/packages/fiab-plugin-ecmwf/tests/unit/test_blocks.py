@@ -19,6 +19,7 @@ from fiab_core.fable import (
     BlockFactoryId,
     BlockInstanceId,
     ConfigurationOptionId,
+    ConfigurationOptionRestriction,
     PluginBlockFactoryId,
     PluginCompositeId,
     QubedOutput,
@@ -274,7 +275,7 @@ class TestOperationalForecastSource:
             ),
             OperationalForecastSource.configuration_options,
         )
-        output = block.validate(block=block_instance, inputs={}).result.get_or_raise()  # type: ignore[assignment]
+        output = block.validate(block=block_instance, inputs={}, restrictions={})  # type: ignore[assignment]
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, "param")
@@ -327,7 +328,7 @@ class TestOperationalForecastSource:
             OperationalForecastSource.configuration_options,
         )
         with pytest.raises(Exception, match=error):
-            block.validate(block=block_instance, inputs={}).result.get_or_raise()  # type: ignore[assignment]
+            block.validate(block=block_instance, inputs={}, restrictions={})  # type: ignore[assignment]
 
     def test_catalogue_value_types_are_canonical(self) -> None:
         assert (
@@ -352,8 +353,9 @@ class TestEnsembleStatistics:
         assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=ensemble_statistics_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, "param")
@@ -368,16 +370,17 @@ class TestEnsembleStatistics:
         temporal_block = TemporalStatistics()
         temporal_output = temporal_block.validate(  # type: ignore[assignment]
             block=temporal_statistics_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
-
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         block = EnsembleStatistics()
 
         assert block.intersect(other=temporal_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=ensemble_statistics_configuration,
-            inputs={"dataset": temporal_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": temporal_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, "param")
@@ -389,9 +392,8 @@ class TestEnsembleStatistics:
         modified_output = collapse(operational_forecast_source_output, "param")
 
         assert not block.intersect(other=modified_output)  # type: ignore[arg-type]
-        result = block.validate(block=ensemble_statistics_configuration, inputs={"dataset": modified_output})  # type: ignore[dict-item]
         with pytest.raises(Exception, match="param 2t is not in the input parameters"):
-            assert result.result.get_or_raise()
+            block.validate(block=ensemble_statistics_configuration, inputs={"dataset": modified_output}, restrictions={})  # type: ignore[dict-item]
 
 
 class TestTemporalStatistics:
@@ -409,8 +411,9 @@ class TestTemporalStatistics:
         assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=temporal_statistics_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, "param")
@@ -425,16 +428,17 @@ class TestTemporalStatistics:
         ensemble_block = EnsembleStatistics()
         ensemble_output = ensemble_block.validate(  # type: ignore[assignment]
             block=ensemble_statistics_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
-
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         block = TemporalStatistics()
 
         assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=temporal_statistics_configuration,
-            inputs={"dataset": ensemble_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": ensemble_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, "param")
@@ -446,9 +450,8 @@ class TestTemporalStatistics:
         modified_output = collapse(operational_forecast_source_output, "param")
 
         assert not block.intersect(other=modified_output)  # type: ignore[arg-type]
-        result = block.validate(block=temporal_statistics_configuration, inputs={"dataset": modified_output})  # type: ignore[dict-item]
         with pytest.raises(Exception, match="param 2t is not in the input parameters"):
-            assert result.result.get_or_raise()
+            block.validate(block=temporal_statistics_configuration, inputs={"dataset": modified_output}, restrictions={})  # type: ignore[dict-item]
 
 
 class TestZarrSink:
@@ -460,8 +463,9 @@ class TestZarrSink:
         assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=zarr_sink_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, RawOutput)
 
     def test_from_ensemble_statistics(
@@ -473,16 +477,17 @@ class TestZarrSink:
         ensemble_block = EnsembleStatistics()
         ensemble_output = ensemble_block.validate(  # type: ignore[assignment]
             block=ensemble_statistics_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
-
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         block = ZarrSink()
 
         assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=zarr_sink_configuration,
-            inputs={"dataset": ensemble_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": ensemble_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, RawOutput)
 
     def test_from_temporal_statistics(
@@ -494,16 +499,17 @@ class TestZarrSink:
         temporal_block = TemporalStatistics()
         temporal_output = temporal_block.validate(  # type: ignore[assignment]
             block=temporal_statistics_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
-
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         block = ZarrSink()
 
         assert block.intersect(other=temporal_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=zarr_sink_configuration,
-            inputs={"dataset": temporal_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": temporal_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, RawOutput)
 
     def test_compile(
@@ -513,7 +519,7 @@ class TestZarrSink:
         zarr_sink_configuration: BlockInstance,
     ) -> None:
         block = ZarrSink()
-        block.validate(block=zarr_sink_configuration, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+        block.validate(block=zarr_sink_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(
             inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
             block=zarr_sink_configuration,
@@ -531,7 +537,7 @@ class TestSelect:
     ) -> None:
         block = _select()
         assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
-        output = block.validate(block=select_configuration, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+        output = block.validate(block=select_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert axes(output)[PARAM] == {"2t"}
@@ -541,7 +547,7 @@ class TestSelect:
     ) -> None:
         block = _select()
         config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "param", "values": ["2t", "msl"]})})
-        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert axes(output)[PARAM] == {"2t", "msl"}
 
@@ -550,7 +556,7 @@ class TestSelect:
     ) -> None:
         block = _select()
         config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["0", "6"]})})
-        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert axes(output)[STEP] == {0, 6}
 
@@ -560,34 +566,30 @@ class TestSelect:
         input_dataset = QubedOutput(dataqube=broken_qube)
         config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["6"]})})
 
-        validation = block.validate(block=config, inputs={"dataset": input_dataset})
-
-        assert validation.result.e is not None
-        assert "produced an empty dataset" in validation.result.e.reason
+        with pytest.raises(Exception, match="produced an empty dataset"):
+            block.validate(block=config, inputs={"dataset": input_dataset}, restrictions={})
 
     def test_validate_rejects_unknown_dimension(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
         config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "missing", "values": ["2t"]})})
-        validation = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
-
-        assert validation.result.e is not None
-        assert "dimension missing is not in the input dimensions" in validation.result.e.reason
-        assert DIMENSION in validation.restrictions
-        assert VALUES not in validation.restrictions
+        restrictions: ConfigurationOptionRestriction = {}
+        with pytest.raises(Exception, match="dimension missing is not in the input dimensions"):
+            block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions=restrictions)  # type: ignore[dict-item]
+        assert DIMENSION in restrictions
+        assert VALUES not in restrictions
 
     def test_validate_rejects_unknown_values(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
         config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "param", "values": ["missing"]})})
-        validation = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
-
-        assert validation.result.e is not None
-        assert "values ['missing'] are not in dimension param" in validation.result.e.reason
-        assert DIMENSION in validation.restrictions
-        assert VALUES in validation.restrictions
+        restrictions: ConfigurationOptionRestriction = {}
+        with pytest.raises(Exception, match="values.*are not in dimension param"):
+            block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions=restrictions)  # type: ignore[dict-item]
+        assert DIMENSION in restrictions
+        assert VALUES in restrictions
 
     def test_validator_adds_dimension_restrictions(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
@@ -655,8 +657,9 @@ class TestGribSink:
         assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=grib_sink_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, RawOutput)
 
     def test_from_ensemble_statistics(
@@ -668,16 +671,17 @@ class TestGribSink:
         ensemble_block = EnsembleStatistics()
         ensemble_output = ensemble_block.validate(  # type: ignore[assignment]
             block=ensemble_statistics_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
-
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         block = GribSink()
 
         assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=grib_sink_configuration,
-            inputs={"dataset": ensemble_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": ensemble_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, RawOutput)
 
     def test_from_temporal_statistics(
@@ -689,16 +693,17 @@ class TestGribSink:
         temporal_block = TemporalStatistics()
         temporal_output = temporal_block.validate(  # type: ignore[assignment]
             block=temporal_statistics_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
-
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         block = GribSink()
 
         assert block.intersect(other=temporal_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=grib_sink_configuration,
-            inputs={"dataset": temporal_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            inputs={"dataset": temporal_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
         assert isinstance(output, RawOutput)
 
     @pytest.mark.parametrize(
@@ -727,7 +732,8 @@ class TestGribSink:
         output = block.validate(  # type: ignore[assignment]
             block=config,
             inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        ).result.get_or_raise()
+            restrictions={},
+        )
         assert isinstance(output, RawOutput)
 
     def test_invalid_path(self, operational_forecast_source_output: QubedOutput) -> None:
@@ -744,12 +750,12 @@ class TestGribSink:
             ),
             GribSink.configuration_options,
         )
-        output = block.validate(  # type: ignore[assignment]
-            block=config,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
-        )
         with pytest.raises(Exception, match="Invalid filepath: directory path can not contain template values"):
-            output.result.get_or_raise()
+            block.validate(
+                block=config,
+                inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item]
+                restrictions={},
+            )
 
     @pytest.mark.parametrize(
         "filepath, dims",
@@ -780,7 +786,7 @@ class TestGribSink:
             ),
             GribSink.configuration_options,
         )
-        block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+        block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block=config).get_or_raise()
         assert action.nodes.dims == dims
 
@@ -821,8 +827,10 @@ class TestMapPlotSink:
     ) -> None:
         block = MapPlotSink()
         output = block.validate(
-            block=map_plot_sink_configuration, inputs={"dataset": operational_forecast_source_output}
-        ).result.get_or_raise()  # type: ignore[dict-item]
+            block=map_plot_sink_configuration,
+            inputs={"dataset": operational_forecast_source_output},
+            restrictions={},  # type: ignore[dict-item]
+        )
         assert isinstance(output, RawOutput)
         assert output.type_fqn == "bytes"
         assert output.mime_type == "image/png"
@@ -853,7 +861,7 @@ class TestMapPlotSink:
             ),
             MapPlotSink.configuration_options,
         )
-        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
         assert output.type_fqn == "bytes"
         assert output.mime_type == expected_mime
@@ -876,7 +884,7 @@ class TestMapPlotSink:
             ),
             MapPlotSink.configuration_options,
         )
-        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+        output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
 
     def test_validate_rejects_unknown_param(self, operational_forecast_source_output: QubedOutput) -> None:
@@ -897,11 +905,10 @@ class TestMapPlotSink:
             ),
             MapPlotSink.configuration_options,
         )
-        validation = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
-
-        assert validation.result.e is not None
-        assert "params ['nonexistent'] are not in the input parameters" in validation.result.e.reason
-        assert PARAM in validation.restrictions
+        restrictions: ConfigurationOptionRestriction = {}
+        with pytest.raises(Exception, match="nonexistent"):
+            block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions=restrictions)  # type: ignore[dict-item]
+        assert PARAM in restrictions
 
     def test_validate_rejects_partial_unknown_params(self, operational_forecast_source_output: QubedOutput) -> None:
         block = MapPlotSink()
@@ -921,11 +928,10 @@ class TestMapPlotSink:
             ),
             MapPlotSink.configuration_options,
         )
-        validation = block.validate(block=config, inputs={"dataset": operational_forecast_source_output})  # type: ignore[dict-item]
-
-        assert validation.result.e is not None
-        assert "params ['nonexistent'] are not in the input parameters" in validation.result.e.reason
-        assert PARAM in validation.restrictions
+        restrictions: ConfigurationOptionRestriction = {}
+        with pytest.raises(Exception, match="nonexistent"):
+            block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions=restrictions)  # type: ignore[dict-item]
+        assert PARAM in restrictions
 
     def test_validate_from_ensemble_statistics(
         self,
@@ -933,15 +939,15 @@ class TestMapPlotSink:
         ensemble_statistics_configuration: BlockInstance,
         operational_forecast_source_output: QubedOutput,
     ) -> None:
-        ensemble_output = (
-            EnsembleStatistics()
-            .validate(block=ensemble_statistics_configuration, inputs={"dataset": operational_forecast_source_output})
-            .result.get_or_raise()  # type: ignore[dict-item]
+        ensemble_output = EnsembleStatistics().validate(
+            block=ensemble_statistics_configuration,
+            inputs={"dataset": operational_forecast_source_output},
+            restrictions={},
         )
 
         block = MapPlotSink()
         assert block.intersect(other=ensemble_output)  # type: ignore[arg-type]
-        output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ensemble_output}).result.get_or_raise()  # type: ignore[dict-item]
+        output = block.validate(block=map_plot_sink_configuration, inputs={"dataset": ensemble_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, RawOutput)
 
     @pytest.mark.parametrize("groupby", ["none", "number"])
@@ -965,7 +971,7 @@ class TestMapPlotSink:
             ),
             MapPlotSink.configuration_options,
         )
-        block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+        block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block=config).get_or_raise()
         assert action.nodes.dims == {}
 
@@ -988,7 +994,7 @@ class TestMapPlotSink:
             MapPlotSink.configuration_options,
         )
         with pytest.raises(Exception, match="Invalid splitby value: if none is selected, no other dimensions can be present"):
-            block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+            block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
 
     @pytest.mark.parametrize(
         "splitby, dims", [[[], {}], [["none"], {}], [["number"], {"number": 5}], [["number", "step"], {"number": 5, "step": 3}]]
@@ -1017,6 +1023,6 @@ class TestMapPlotSink:
             ),
             MapPlotSink.configuration_options,
         )
-        block.validate(block=config, inputs={"dataset": operational_forecast_source_output}).result.get_or_raise()  # type: ignore[dict-item]
+        block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block=config).get_or_raise()
         assert action.nodes.dims == dims

@@ -15,10 +15,11 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceOutput,
     ConfigurationOptionId,
+    ConfigurationOptionRestriction,
     NoOutput,
     QubedOutput,
 )
-from fiab_core.plugin import BlockValidation, BlockValidationError, Error
+from fiab_core.plugin import Error
 from fiab_core.tools.blocks import Product, Sink, Transform
 
 DIR = ConfigurationOptionId("dir")
@@ -29,11 +30,13 @@ class _DemoTransform(Transform):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         dataset = inputs.get("dataset")
         if dataset is None:
-            return BlockValidation(Either.error(BlockValidationError(reason="Missing input 'dataset'", is_hard=True)))
-        return BlockValidation(Either.ok(dataset))
+            raise ValueError("Missing input 'dataset'")
+        return dataset
 
     def compile(
         self,
@@ -50,11 +53,13 @@ class _DemoProduct(Product):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         dataset = inputs.get("dataset")
         if dataset is None:
-            return BlockValidation(Either.error(BlockValidationError(reason="Missing input 'dataset'", is_hard=True)))
-        return BlockValidation(Either.ok(dataset))
+            raise ValueError("Missing input 'dataset'")
+        return dataset
 
     def compile(
         self,
@@ -71,10 +76,12 @@ class _DemoSink(Sink):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {}
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         if "dataset" not in inputs:
-            return BlockValidation(Either.error(BlockValidationError(reason="Missing input 'dataset'", is_hard=True)))
-        return BlockValidation(Either.ok(NoOutput()))
+            raise ValueError("Missing input 'dataset'")
+        return NoOutput()
 
     def compile(
         self,

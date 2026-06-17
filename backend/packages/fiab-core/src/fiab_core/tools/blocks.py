@@ -24,9 +24,10 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     BlockKind,
     ConfigurationOptionId,
+    ConfigurationOptionRestriction,
     QubedOutput,
 )
-from fiab_core.plugin import BlockValidation, Error
+from fiab_core.plugin import Error
 from fiab_core.types import ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
 
 
@@ -172,7 +173,9 @@ class QubedBlockBuilder(abc.ABC):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption]
     inputs: list[str]
 
-    def validate(self, block: BlockInstanceRich, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         raise NotImplementedError
 
     def compile(

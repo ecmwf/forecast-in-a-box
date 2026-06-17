@@ -80,7 +80,7 @@ def test_demo_blocks_pass_through_dataset(
     dummy_output: QubedOutput,
 ) -> None:
     block = _rich_block(factory_id, builder)
-    validated = builder.validate(block=block, inputs={"dataset": dummy_output}).result.get_or_raise()
+    validated = builder.validate(block=block, inputs={"dataset": dummy_output}, restrictions={})
     assert validated is dummy_output
 
 
@@ -93,7 +93,7 @@ def test_demo_blocks_pass_through_dataset(
 )
 def test_demo_sinks_return_no_output(factory_id: BlockFactoryId, builder: QubedBlockBuilder, dummy_output: QubedOutput) -> None:
     block = _rich_block(factory_id, builder)
-    validated = builder.validate(block=block, inputs={"dataset": dummy_output}).result.get_or_raise()
+    validated = builder.validate(block=block, inputs={"dataset": dummy_output}, restrictions={})
     assert isinstance(validated, NoOutput)
 
 
@@ -113,6 +113,5 @@ def test_demo_sinks_return_no_output(factory_id: BlockFactoryId, builder: QubedB
 )
 def test_demo_blocks_require_dataset(factory_id: BlockFactoryId, builder: QubedBlockBuilder) -> None:
     block = _rich_block(factory_id, builder)
-    result = builder.validate(block=block, inputs={})
     with pytest.raises(Exception, match="Missing input 'dataset'"):
-        result.result.get_or_raise()
+        builder.validate(block=block, inputs={}, restrictions={})

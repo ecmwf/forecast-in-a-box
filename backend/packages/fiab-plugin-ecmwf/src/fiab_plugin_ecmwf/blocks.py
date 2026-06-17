@@ -25,7 +25,7 @@ from fiab_core.fable import (
     QubedOutput,
     RawOutput,
 )
-from fiab_core.plugin import BlockValidation, BlockValidationError, Error
+from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, Product, Sink, Source, Transform
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from fiab_core.types import ClosedEnumType, ListType
@@ -133,18 +133,18 @@ class OperationalForecastSource(Source):
     def _convert_time(cls, time: int) -> str:
         return f"{time:02d}00"
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         forecast = block.config_as_str(FORECAST)
         basetime = block.config_as_datetime(BASETIME)
         time = self._convert_time(basetime.time().hour)
 
         ifs_qoutput = QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True))
         if not contains(ifs_qoutput, {"time": time}):
-            return BlockValidation(
-                Either.error(BlockValidationError(reason=f"Invalid time: must be in {axes(ifs_qoutput)['time']}", is_hard=True))
-            )
+            raise ValueError(f"Invalid time: must be in {axes(ifs_qoutput)['time']}")
 
-        return BlockValidation(Either.ok(select(ifs_qoutput, {"time": time})))
+        return select(ifs_qoutput, {"time": time})
 
     def compile(
         self,
@@ -218,21 +218,17 @@ class EnsembleStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
 
         param = block.config_as_str(PARAM)
         if not contains(input_dataset, {PARAM: param}):
-            return BlockValidation(
-                Either.error(
-                    BlockValidationError(
-                        reason=f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}", is_hard=True
-                    )
-                )
-            )
+            raise ValueError(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
 
         output = coxpand(input_dataset, [PARAM, ENSEMBLE], {PARAM: [param]})
-        return BlockValidation(Either.ok(output))
+        return output
 
     def compile(
         self,
@@ -268,20 +264,16 @@ class TemporalStatistics(Product):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
 
         param = block.config_as_str(PARAM)
         if not contains(input_dataset, {PARAM: param}):
-            return BlockValidation(
-                Either.error(
-                    BlockValidationError(
-                        reason=f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}", is_hard=True
-                    )
-                )
-            )
+            raise ValueError(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
         output = coxpand(input_dataset, [PARAM, STEP], {PARAM: [param]})
-        return BlockValidation(Either.ok(output))
+        return output
 
     def compile(
         self,
@@ -320,9 +312,11 @@ class ZarrSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         _extract_dataset(inputs, "dataset")
-        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")))
+        return RawOutput(type_fqn="bytes", mime_type="text/plain")
 
     def compile(
         self,
@@ -377,60 +371,37 @@ class Select(Transform):
     def _selected_values(self, block: BlockInstance) -> list[str]:
         return block.config_as_list(VALUES, str, allow_empty=False)
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
-
-        restrict: ConfigurationOptionRestriction = {}
 
         input_dimensions = sorted(dimensions(input_dataset))
         if input_dimensions:
-            restrict[DIMENSION] = ClosedEnumType(input_dimensions)
+            restrictions[DIMENSION] = ClosedEnumType(input_dimensions)
 
-        try:
-            dimension = self._selected_dimension(block)
-        except BlockInstanceConfigurationError as exc:
-            return BlockValidation(Either.error(BlockValidationError(reason=str(exc), is_hard=True)), restrict)
+        dimension = self._selected_dimension(block)
 
         input_axes = axes(input_dataset)
         axis_values = input_axes.get(dimension)
         if axis_values is None:
-            return BlockValidation(
-                Either.error(
-                    BlockValidationError(reason=f"dimension {dimension} is not in the input dimensions: {input_dimensions}", is_hard=True)
-                ),
-                restrict,
-            )
+            raise ValueError(f"dimension {dimension} is not in the input dimensions: {input_dimensions}")
 
         input_values = _axis_value_strings(axis_values)
         if input_values:
-            restrict[VALUES] = ListType(ClosedEnumType(input_values))
+            restrictions[VALUES] = ListType(ClosedEnumType(input_values))
 
-        try:
-            selected_values = [_parse_axis_value(value) for value in self._selected_values(block)]
-        except BlockInstanceConfigurationError as exc:
-            return BlockValidation(Either.error(BlockValidationError(reason=str(exc), is_hard=True)), restrict)
+        selected_values = [_parse_axis_value(value) for value in self._selected_values(block)]
 
         missing_values = [value for value in selected_values if value not in axis_values]
         if missing_values:
-            return BlockValidation(
-                Either.error(
-                    BlockValidationError(reason=f"values {missing_values} are not in dimension {dimension}: {input_values}", is_hard=True)
-                ),
-                restrict,
-            )
+            raise ValueError(f"values {missing_values} are not in dimension {dimension}: {input_values}")
 
         output = select(input_dataset, {dimension: selected_values})
         if output.dataqube is None or _is_empty_qube(output.dataqube):
-            return BlockValidation(
-                Either.error(
-                    BlockValidationError(
-                        reason=f"selection of values {selected_values} from dimension {dimension} produced an empty dataset", is_hard=True
-                    )
-                ),
-                restrict,
-            )
+            raise ValueError(f"selection of values {selected_values} from dimension {dimension} produced an empty dataset")
 
-        return BlockValidation(Either.ok(output), restrict)
+        return output
 
     def compile(
         self,
@@ -462,15 +433,15 @@ class GribSink(Sink):
     def _find_template_values(cls, path: str) -> list[str]:
         return re.findall(r"\[(.*?)\]", path)
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         _extract_dataset(inputs, "dataset")  # check format of input and existence of dataset
         path = block.config_as_str(PATH)
         dirname = os.path.dirname(path)
         if len(self._find_template_values(dirname)) != 0:
-            return BlockValidation(
-                Either.error(BlockValidationError(reason=f"Invalid filepath: directory path can not contain template values", is_hard=True))
-            )
-        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type=GRIB_MIME)))
+            raise ValueError("Invalid filepath: directory path can not contain template values")
+        return RawOutput(type_fqn="bytes", mime_type=GRIB_MIME)
 
     def compile(
         self,
@@ -548,54 +519,36 @@ class MapPlotSink(Sink):
     }
     inputs: list[str] = ["dataset"]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+    def validate(
+        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
-
-        restrict: ConfigurationOptionRestriction = {}
 
         input_axes = axes(input_dataset)
         input_param_values = input_axes.get(PARAM, set())
         param_values = [value for value in input_param_values if isinstance(value, str)]
         if param_values:
-            restrict[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
+            restrictions[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
 
         common = common_dimensions(input_dataset).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
         splitby = [x for x in common if len(input_axes[x]) > 1]
-        restrict[SPLITBY] = ListType(ClosedEnumType(sorted(splitby) + ["none"]))
+        restrictions[SPLITBY] = ListType(ClosedEnumType(sorted(splitby) + ["none"]))
 
-        try:
-            params = block.config_as_list(PARAM, str, allow_empty=False)
-            splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
-            fmt = block.config_as_str(FORMAT)
-        except BlockInstanceConfigurationError as exc:
-            return BlockValidation(Either.error(BlockValidationError(reason=str(exc), is_hard=True)), restrict)
+        params = block.config_as_list(PARAM, str, allow_empty=False)
+        splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
+        fmt = block.config_as_str(FORMAT)
 
         missing_params = [param for param in params if param not in input_param_values]
         if missing_params:
-            return BlockValidation(
-                Either.error(
-                    BlockValidationError(
-                        reason=f"params {missing_params} are not in the input parameters: {_axis_value_strings(input_param_values)}",
-                        is_hard=True,
-                    )
-                ),
-                restrict,
-            )
+            raise ValueError(f"params {missing_params} are not in the input parameters: {_axis_value_strings(input_param_values)}")
 
         if "none" in splitby_value and len(splitby_value) != 1:
-            return BlockValidation(
-                Either.error(
-                    BlockValidationError(
-                        reason=f"Invalid splitby value: if none is selected, no other dimensions can be present", is_hard=True
-                    )
-                ),
-                restrict,
-            )
+            raise ValueError("Invalid splitby value: if none is selected, no other dimensions can be present")
 
         mime_type = PLOT_FORMAT_TO_MIME.get(fmt)
         if mime_type is None:
-            return BlockValidation(Either.error(BlockValidationError(reason=f"Unsupported output format: {fmt}", is_hard=True)), restrict)
-        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type=mime_type)), restrict)
+            raise ValueError(f"Unsupported output format: {fmt}")
+        return RawOutput(type_fqn="bytes", mime_type=mime_type)
 
     def compile(
         self,

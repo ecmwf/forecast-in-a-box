@@ -13,6 +13,7 @@ from fiab_core.fable import (
     BlockFactoryId,
     BlockInstance,
     BlockInstanceOutput,
+    ConfigurationOptionRestriction,
     QubedOutput,
 )
 from fiab_core.plugin import BlockValidation, BlockValidationError, Error, Plugin
@@ -55,10 +56,12 @@ class QubedPluginBuilder:
         """Given a block instance and its inputs, return either error or output and configuration restrictions."""
         factory = self.block_builders[block.factory_id.factory]
         rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
+        restrictions: ConfigurationOptionRestriction = {}
         try:
-            return factory.validate(rich_block, inputs)
-        except BlockInstanceConfigurationError as exc:
-            return BlockValidation(Either.error(BlockValidationError(reason=str(exc), is_hard=True)))
+            result = factory.validate(rich_block, inputs, restrictions)
+            return BlockValidation(Either.ok(result), restrictions)
+        except Exception as exc:
+            return BlockValidation(Either.error(BlockValidationError(repr(exc), True)), restrictions)
 
     def expand(self, output: QubedOutput) -> list[BlockExpansion]:
         """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
