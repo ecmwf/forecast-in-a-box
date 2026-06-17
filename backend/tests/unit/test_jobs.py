@@ -95,7 +95,7 @@ async def test_jobs_blueprint_insert_and_get(mem_session_maker_both: async_sessi
     assert result.version == 1
     assert result.source == "user_defined"
     assert result.display_name == "My job"
-    assert result.tags == ["tag1"]
+    assert result.tags == [{"tag1": None}]
 
 
 @pytest.mark.asyncio

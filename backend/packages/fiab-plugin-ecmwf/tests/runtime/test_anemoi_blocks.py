@@ -129,17 +129,17 @@ def anemoi_transform_configuration(dummy_checkpoint: str) -> BlockInstance:
 
 @pytest.fixture
 def anemoi_source_output(anemoi_source_configuration: BlockInstance) -> QubedOutput:
-    return AnemoiSource().validate(block=anemoi_source_configuration, inputs={}).get_or_raise()  # type: ignore[return-value]
+    return AnemoiSource().validate(block=anemoi_source_configuration, inputs={}).result.get_or_raise()  # type: ignore[return-value]
 
 
 @pytest.fixture
 def anemoi_source_ensemble_output(anemoi_source_ensemble_configuration: BlockInstance) -> QubedOutput:
-    return AnemoiSource().validate(block=anemoi_source_ensemble_configuration, inputs={}).get_or_raise()  # type: ignore[return-value]
+    return AnemoiSource().validate(block=anemoi_source_ensemble_configuration, inputs={}).result.get_or_raise()  # type: ignore[return-value]
 
 
 @pytest.fixture
 def anemoi_input_source_output(anemoi_input_source_configuration: BlockInstance) -> QubedOutput:
-    return AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}).get_or_raise()  # type: ignore[return-value]
+    return AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}).result.get_or_raise()  # type: ignore[return-value]
 
 
 class TestCheckpointArtifact:
@@ -161,7 +161,7 @@ class TestAnemoiSourceValidate:
     """Validate method - happy paths and error paths."""
 
     def test_valid_deterministic(self, anemoi_source_configuration: BlockInstance) -> None:
-        output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}).get_or_raise()
+        output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}).result.get_or_raise()
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
 
@@ -204,7 +204,7 @@ class TestAnemoiSourceValidate:
         )
         result = AnemoiSource().validate(block=block, inputs={})
         with pytest.raises(Exception, match="must be greater than checkpoint timestep"):
-            result.get_or_raise()
+            result.result.get_or_raise()
 
     def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: str) -> None:
         block = _make_block(
@@ -213,7 +213,7 @@ class TestAnemoiSourceValidate:
         )
         result = AnemoiSource().validate(block=block, inputs={})
         with pytest.raises(Exception, match="must be a multiple of checkpoint timestep"):
-            result.get_or_raise()
+            result.result.get_or_raise()
 
     def test_invalid_number_zero(self, dummy_checkpoint: str) -> None:
         block = _make_block(
@@ -237,7 +237,7 @@ class TestAnemoiSourceValidate:
             {"checkpoint": "dummy_store:unknown", "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 1},
         )
         with pytest.raises(Exception):
-            AnemoiSource().validate(block=block, inputs={}).get_or_raise()
+            AnemoiSource().validate(block=block, inputs={}).result.get_or_raise()
 
     def test_invalid_checkpoint_format(self) -> None:
         block = _make_block(
@@ -245,7 +245,7 @@ class TestAnemoiSourceValidate:
             {"checkpoint": "not-a-valid-id", "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 1},
         )
         with pytest.raises(ValueError, match="must be of the form"):
-            AnemoiSource().validate(block=block, inputs={}).get_or_raise()
+            AnemoiSource().validate(block=block, inputs={}).result.get_or_raise()
 
 
 class TestAnemoiSourceIntersect:
@@ -268,7 +268,7 @@ class TestAnemoiSourceIntersect:
 
 class TestAnemoiInputSourceValidate:
     def test_valid_config(self, anemoi_input_source_configuration: BlockInstance) -> None:
-        output = AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}).get_or_raise()
+        output = AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}).result.get_or_raise()
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
 
@@ -303,7 +303,7 @@ class TestAnemoiTransformValidate:
                 block=anemoi_transform_configuration,
                 inputs={"dataset": anemoi_input_source_output},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )
         assert isinstance(output, QubedOutput)
         assert contains(anemoi_input_source_output, "number")
@@ -321,7 +321,7 @@ class TestAnemoiTransformValidate:
                 block=anemoi_transform_configuration,
                 inputs={"dataset": input_with_number},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )
         assert isinstance(output, QubedOutput)
         assert contains(output, "number")
@@ -334,7 +334,7 @@ class TestAnemoiTransformValidate:
                 block=anemoi_transform_configuration,
                 inputs={"dataset": anemoi_input_source_output},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )  # type: ignore[assignment]
         assert contains(output, "step")
 
@@ -345,7 +345,7 @@ class TestAnemoiTransformValidate:
                 block=anemoi_transform_configuration,
                 inputs={"dataset": anemoi_input_source_output},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )  # type: ignore[assignment]
         assert contains(output, "param")
 
@@ -378,7 +378,7 @@ class TestAnemoiTransformValidate:
         )
         result = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
         with pytest.raises(Exception, match="must be a multiple of checkpoint timestep"):
-            result.get_or_raise()
+            result.result.get_or_raise()
 
     def test_unknown_checkpoint(self, registered_provider: None, dummy_qube: Qube) -> None:
         input_dataset = QubedOutput(dataqube=dummy_qube)
@@ -388,7 +388,7 @@ class TestAnemoiTransformValidate:
             input_ids={"dataset": "src"},
         )
         with pytest.raises(Exception):
-            AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}).get_or_raise()
+            AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}).result.get_or_raise()
 
     def test_incompatible_input_dataset(self, dummy_checkpoint: str) -> None:
         """If the input dataset does not contain the model's required input params, validate should error."""
@@ -400,7 +400,7 @@ class TestAnemoiTransformValidate:
         )
         result = AnemoiTransform().validate(block=block, inputs={"dataset": incompatible})
         with pytest.raises(Exception, match="not compatible"):
-            result.get_or_raise()
+            result.result.get_or_raise()
 
 
 class TestAnemoiTransformIntersect:
@@ -438,7 +438,7 @@ class TestFlowAnemoiSourceToTransform:
                 block=anemoi_transform_configuration,
                 inputs={"dataset": anemoi_source_output},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )
         assert isinstance(output, QubedOutput)
         assert contains(output, "param")
@@ -455,7 +455,7 @@ class TestFlowAnemoiSourceToTransform:
                 block=anemoi_transform_configuration,
                 inputs={"dataset": anemoi_source_ensemble_output},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )  # type: ignore[assignment]
         assert contains(output, "number")
         assert set(axes(output)["number"]) == {1, 2, 3}
@@ -475,7 +475,7 @@ class TestFlowAnemoiInputSourceToTransform:
                 block=anemoi_transform_configuration,
                 inputs={"dataset": anemoi_input_source_output},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )
         assert isinstance(output, QubedOutput)
         assert contains(output, "param")
@@ -499,7 +499,7 @@ class TestFlowChainedTransforms:
                 block=anemoi_transform_configuration,
                 inputs={"dataset": anemoi_input_source_output},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )  # type: ignore[assignment]
 
         second_config = _make_block(
@@ -513,7 +513,7 @@ class TestFlowChainedTransforms:
                 block=second_config,
                 inputs={"dataset": first_output},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )  # type: ignore[assignment]
 
         assert isinstance(second_output, QubedOutput)
@@ -534,7 +534,7 @@ class TestFlowChainedTransforms:
                 block=anemoi_transform_configuration,
                 inputs={"dataset": input_with_number},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )  # type: ignore[assignment]
         assert contains(first_output, "number")
 
@@ -549,7 +549,7 @@ class TestFlowChainedTransforms:
                 block=second_config,
                 inputs={"dataset": first_output},
             )
-            .get_or_raise()
+            .result.get_or_raise()
         )  # type: ignore[assignment]
 
         assert contains(second_output, "number")
