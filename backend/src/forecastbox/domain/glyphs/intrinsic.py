@@ -24,7 +24,7 @@ AvailableIntrinsicGlyphs = Literal[
 ]
 # fmt: on
 
-_current_time_example = value_dt2str(current_time())
+_current_time_example = value_dt2str(current_time("glyph_resolution"))
 
 # TODO: replace with frozendict once available so that we have immutability
 _values_and_examples: dict[AvailableIntrinsicGlyphs, str] = {

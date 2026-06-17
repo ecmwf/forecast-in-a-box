@@ -20,11 +20,15 @@ import type {
 } from '@/api/types/job.types'
 
 const now = new Date()
-const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
-const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
-const threeDaysAgo = new Date(
-  now.getTime() - 3 * 24 * 60 * 60 * 1000,
-).toISOString()
+const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
+  .toISOString()
+  .replace(/\.\d{3}Z$/, '+00:00')
+const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000)
+  .toISOString()
+  .replace(/\.\d{3}Z$/, '+00:00')
+const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .replace(/\.\d{3}Z$/, '+00:00')
 
 // ─── Execution mock state ─────────────────────────────────────────────────
 
@@ -111,8 +115,8 @@ const seedExecutions: Array<JobExecutionDetail> = [
     run_id: 'job-submitted-004',
     attempt_count: 1,
     status: 'submitted',
-    created_at: now.toISOString(),
-    updated_at: now.toISOString(),
+    created_at: now.toISOString().replace(/\.\d{3}Z$/, '+00:00'),
+    updated_at: now.toISOString().replace(/\.\d{3}Z$/, '+00:00'),
     blueprint_id: 'def-004',
     blueprint_version: 1,
     error: null,
@@ -222,7 +226,7 @@ export function getExecution(
 
 export function addExecution(request: JobExecuteRequest): JobExecuteResponse {
   const run_id = `exec-mock-${String(executionIdCounter++).padStart(3, '0')}`
-  const timestamp = new Date().toISOString()
+  const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00')
   executionsState[run_id] = {
     run_id,
     attempt_count: 1,

@@ -78,12 +78,10 @@ function createPluginKey(store: string, local: string): string {
 }
 
 /**
- * Get current datetime in backend format
+ * Get current datetime in backend format: "YYYY-MM-DDTHH:MM:SS+00:00"
  */
 function getCurrentDatetime(): string {
-  const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  return new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00')
 }
 
 export const pluginsHandlers = [

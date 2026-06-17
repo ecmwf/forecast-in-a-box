@@ -73,7 +73,7 @@ def execute_background(
         return asyncio.run_coroutine_threadsafe(coro, loop).result()  # type: ignore[arg-type]
 
     try:
-        start_time = current_time()
+        start_time = current_time("glyph_resolution")
         intrinsic_values: dict[str, str] = cast(
             dict[str, str],
             resolve_intrinsic_glyph_values(run_id, submit_time, start_time, attempt_count),

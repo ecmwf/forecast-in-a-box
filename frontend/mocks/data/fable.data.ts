@@ -253,8 +253,8 @@ export const mockSavedFables: Record<
     name: 'European Temperature Forecast',
     tags: ['europe', 'temperature', 'daily'],
     user_id: 'user-123',
-    created_at: '2024-01-10T10:00:00Z',
-    updated_at: '2024-01-15T14:30:00Z',
+    created_at: '2024-01-10 10:00:00+00:00',
+    updated_at: '2024-01-15 14:30:00+00:00',
   },
 
   'fable-002': {
@@ -289,8 +289,8 @@ export const mockSavedFables: Record<
     name: 'Open Data Archive',
     tags: ['open-data', 'archive'],
     user_id: 'user-123',
-    created_at: '2024-01-12T08:00:00Z',
-    updated_at: '2024-01-12T08:00:00Z',
+    created_at: '2024-01-12 08:00:00+00:00',
+    updated_at: '2024-01-12 08:00:00+00:00',
   },
 }
 

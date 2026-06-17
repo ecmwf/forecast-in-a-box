@@ -179,7 +179,10 @@ export const fableHandlers = [
       }
     }
 
-    const now = new Date().toISOString()
+    const now = new Date()
+      .toISOString()
+      .replace('T', ' ')
+      .replace(/\.\d{3}Z$/, '+00:00')
 
     if (parent_id) {
       const existing = savedFablesState[parent_id]
@@ -427,7 +430,10 @@ export const fableHandlers = [
     }
 
     const existing = mockGlobalGlyphs.find((g) => g.key === body.key)
-    const now = new Date().toISOString()
+    const now = new Date()
+      .toISOString()
+      .replace('T', ' ')
+      .replace(/\.\d{3}Z$/, '+00:00')
     if (existing) {
       existing.value = body.value
       existing.public = isPublic

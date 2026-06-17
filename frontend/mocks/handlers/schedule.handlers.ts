@@ -47,7 +47,9 @@ export const scheduleHandlers = [
   }),
 
   http.get(API_ENDPOINTS.schedule.currentTime, () => {
-    return HttpResponse.json(new Date().toISOString().slice(0, -1))
+    return HttpResponse.json(
+      new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00'),
+    )
   }),
 
   // Mutation endpoints
@@ -66,7 +68,10 @@ export const scheduleHandlers = [
       cron_expr: '0 6 * * *',
       max_acceptable_delay_hours: 24,
       enabled: true,
-      created_at: new Date().toISOString(),
+      created_at: new Date()
+        .toISOString()
+        .replace('T', ' ')
+        .replace(/\.\d{3}Z$/, '+00:00'),
       created_by: null,
       display_name: 'Updated Schedule',
       display_description: null,

@@ -140,8 +140,8 @@ tests/                   # Unit, integration, E2E tests
 ## Dates & timezones
 
 A user-settable **application timezone** lives in `uiStore.timeZone` (default
-`UTC`). Forecast date/times are stored and transmitted as **canonical naive UTC**
-(`YYYY-MM-DDTHH:MM:SS`) — the forecast pipeline (anemoi, map plots) is UTC
+`UTC`). Forecast date/times are stored and transmitted as **UTC with explicit
+offset** (`YYYY-MM-DDTHH:MM:SS+00:00`) — the forecast pipeline (anemoi, map plots) is UTC
 end-to-end. The application timezone is a **presentation layer**; conversion
 happens only at the entry/display boundary.
 

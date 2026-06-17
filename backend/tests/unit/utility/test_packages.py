@@ -9,6 +9,7 @@
 
 import importlib.metadata
 import subprocess
+from datetime import UTC
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
@@ -23,6 +24,7 @@ from forecastbox.utility.packages import (
     try_updatedatetime,
     try_version,
 )
+from forecastbox.utility.time import value_dt2str
 
 # ---------------------------------------------------------------------------
 # try_import
@@ -107,7 +109,7 @@ def test_try_updatedatetime_success(tmp_path: pytest.TempPathFactory) -> None:
     # Should be in YYYY-MM-DDTHH:MM:SS format
     import re
 
-    assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$", result), f"Unexpected format: {result!r}"
+    assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$", result), f"Unexpected format: {result!r}"
 
 
 def test_try_updatedatetime_success_uses_ctime(tmp_path: pytest.TempPathFactory) -> None:
@@ -124,7 +126,8 @@ def test_try_updatedatetime_success_uses_ctime(tmp_path: pytest.TempPathFactory)
     fake_dist = MagicMock()
     fake_dist.files = [fake_file]
 
-    fixed_ts = datetime.datetime(2024, 3, 15, 10, 30, 45).timestamp()
+    fixed_dt = datetime.datetime(2024, 3, 15, 10, 30, 45).astimezone(UTC)
+    fixed_ts = fixed_dt.timestamp()
     fake_stat = MagicMock()
     fake_stat.st_ctime = fixed_ts
 
@@ -132,7 +135,7 @@ def test_try_updatedatetime_success_uses_ctime(tmp_path: pytest.TempPathFactory)
         with patch("pathlib.Path.stat", return_value=fake_stat):
             result = try_updatedatetime("some-package")
 
-    assert result == "2024-03-15T10:30:45"
+    assert result == value_dt2str(fixed_dt)
 
 
 def test_try_updatedatetime_no_metadata_file() -> None:

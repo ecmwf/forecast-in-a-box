@@ -34,6 +34,7 @@ from forecastbox.schemata.jobs import Run, RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
 from forecastbox.utility.pydantic import FiabBaseModel
+from forecastbox.utility.time import current_time
 
 
 class CompilerRuntimeContext(FiabBaseModel):
@@ -68,7 +69,7 @@ async def upsert_run(
     """
     supplied_run_id = run_id
     effective_run_id = run_id if run_id is not None else RunId(str(uuid.uuid4()))
-    ref_time = dt.datetime.now()
+    ref_time = current_time("dbref")
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:
@@ -134,7 +135,7 @@ async def update_run_runtime(run_id: RunId, attempt_count: int, **kwargs: object
 
     No actor-level auth; this is an internal system operation called during execution.
     """
-    ref_time = dt.datetime.now()
+    ref_time = current_time("dbref")
     stmt = update(Run).where(Run.run_id == run_id, Run.attempt_count == attempt_count).values(updated_at=ref_time, **kwargs)
     await executeAndCommit(stmt, _jobs_module.async_session_maker)
 

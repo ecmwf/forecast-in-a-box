@@ -27,6 +27,8 @@ import orjson
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
+from forecastbox.utility.time import from_timestamp, value_dt2str
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,7 +87,6 @@ def try_updatedatetime(pip_source: str) -> str:
 
     Uses the ctime of the package's METADATA file as a proxy for the install time.
     """
-    from forecastbox.utility.time import value_dt2str
 
     try:
         dist = importlib.metadata.distribution(pip_source)
@@ -99,7 +100,7 @@ def try_updatedatetime(pip_source: str) -> str:
         return "unknown"
     try:
         path = pathlib.Path(mtdf.locate())
-        install_time = dt.datetime.fromtimestamp(path.stat().st_ctime)
+        install_time = from_timestamp(path.stat().st_ctime)
         return value_dt2str(install_time)
     except Exception:  # too much could happen -- file not exist, no rights, malformed ts, etc
         return "unknown"

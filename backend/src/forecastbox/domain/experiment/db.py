@@ -28,6 +28,7 @@ from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentType
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
+from forecastbox.utility.time import current_time
 
 
 async def upsert_experiment_definition(
@@ -53,7 +54,7 @@ async def upsert_experiment_definition(
     """
     id_provided = experiment_definition_id is not None
     experiment_id = experiment_definition_id if experiment_definition_id is not None else ExperimentDefinitionId(str(uuid.uuid4()))
-    ref_time = dt.datetime.now()
+    ref_time = current_time("dbref")
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:

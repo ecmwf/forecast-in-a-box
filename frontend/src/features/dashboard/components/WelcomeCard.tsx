@@ -58,7 +58,7 @@ function getUserDisplayName(email?: string): string | null {
 /**
  * Month-over-month change in forecast count; null when last month had none.
  *
- * `created_at` is naive server-local — `toLocalDate` corrects it before bucketing.
+ * `created_at` is UTC with explicit offset — `toLocalDate` converts before bucketing.
  */
 function forecastTrend(
   runs: ReadonlyArray<{ created_at: string }>,

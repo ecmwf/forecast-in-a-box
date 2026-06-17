@@ -80,8 +80,7 @@ function formatElapsed(ms: number): string {
 }
 
 function useElapsedTime(createdAt: string | null, isTerminal: boolean) {
-  // createdAt is naive server-local — `new Date(naive)` skews by the
-  // local TZ offset; route through the measured server/client offset.
+  // createdAt is UTC with explicit offset — route through the measured
   const { serverTimeToLocal } = useServerTime()
   const [elapsed, setElapsed] = useState<number | null>(null)
 
