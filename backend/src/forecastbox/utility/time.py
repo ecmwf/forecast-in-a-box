@@ -9,6 +9,7 @@
 
 """Time and Date related utilities"""
 
+import sys
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
@@ -57,9 +58,19 @@ class UTCDateTime(TypeDecorator[datetime]):
         return value
 
 
-canonical_output_format = "%Y-%m-%dT%H:%M:%S%:z"
+# NOTE the value_dt2str is used for client-exposed datetimes via routes like current time
+# or plugin update datetime, but also in glyph resolution in jobs etc. We may want to
+# include the callsite motivation in the function similarly to how current_time is done
+if (sys.version_info.major, sys.version_info.minor) >= (3, 12):
 
+    def value_dt2str(value: datetime | Column) -> str:
+        """Convert a datetime to the canonical string format used for all serialization."""
+        canonical_output_format = "%Y-%m-%dT%H:%M:%S%:z"
+        return value.strftime(canonical_output_format)
+else:
 
-def value_dt2str(value: datetime | Column) -> str:
-    """Convert a datetime to the canonical string format used for all client-exposed serialization."""
-    return value.strftime(canonical_output_format)
+    def value_dt2str(value: datetime | Column) -> str:
+        """Convert a datetime to the canonical string format used for all serialization."""
+        # NOTE there is no %:z in those pythons. The `isoformat` generally returns %f as well, which
+        # we prefer not to, hence we replace it.
+        return value.replace(microsecond=0).isoformat()
