@@ -11,8 +11,8 @@
 Types pertaining to declaring FIAB Plugins, in particular their Fable-based interface.
 """
 
-from dataclasses import dataclass, field
-from typing import Callable
+from dataclasses import dataclass, field, replace
+from typing import Callable, Self
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -34,10 +34,19 @@ class BlockValidationError:
     reason: str
     is_hard: bool
 
+    def __add__(self, other: Self) -> Self:
+        if not isinstance(other, BlockValidationError):
+            raise TypeError(other.__class__.__name__)
+        return replace(
+            self,
+            reason=self.reason + other.reason,
+            is_hard=self.is_hard or other.is_hard,
+        )
+
 
 @dataclass(frozen=True, eq=True, slots=True)
 class BlockValidation:
-    result: Either[BlockInstanceOutput, BlockValidationError]  # type:ignore[invalid-argument] # semigroup
+    result: Either[BlockInstanceOutput, BlockValidationError]
     restrictions: ConfigurationOptionRestriction = field(default_factory=dict)
 
 
