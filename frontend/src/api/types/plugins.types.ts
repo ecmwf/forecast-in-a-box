@@ -136,7 +136,7 @@ export const PluginDetailSchema = z.object({
   remote_info: PluginRemoteInfoSchema.nullable(),
   errored_detail: z.string().nullable(),
   loaded_version: z.string().nullable(),
-  update_datetime: z.string().nullable(), // naive UTC "YYYY-MM-DDTHH:MM:SS"; FE appends Z
+  update_datetime: z.string().nullable(), // UTC ISO with offset, e.g. "...+00:00"
 })
 
 export type PluginDetail = z.infer<typeof PluginDetailSchema>
@@ -195,7 +195,7 @@ export interface PluginInfo {
   isInstalled: boolean
   /** Whether an update is available (latestVersion > version) */
   hasUpdate: boolean
-  /** Last-updated UTC ISO, Z-suffixed (from update_datetime) */
+  /** Last-updated UTC ISO, tz-aware (from update_datetime) */
   updatedAt: string | null
   /** Error details if status is errored */
   errorDetail: string | null
@@ -258,8 +258,9 @@ export function toPluginInfo(
 }
 
 /**
- * Backend sends a naive UTC datetime; append `Z` so `new Date()` reads it as UTC,
- * not local. Already tz-aware values pass through. Null if unparseable.
+ * Normalize a backend UTC datetime for `new Date()`. Tz-aware values (e.g. a
+ * `+00:00` offset) pass through; a bare value gets `Z` appended so it reads as
+ * UTC, not local. Null if unparseable.
  */
 function toUtcIsoOrNull(dateStr: string): string | null {
   const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(dateStr)

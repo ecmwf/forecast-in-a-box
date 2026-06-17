@@ -45,6 +45,13 @@ describe('toPluginInfo — updatedAt timezone normalization', () => {
     ).toBe('2025-01-15T08:30:00+02:00')
   })
 
+  // The UTC-with-offset format the backend sends.
+  it('leaves a +00:00 (UTC offset) datetime untouched', () => {
+    expect(
+      toPluginInfo(ID, detailWith('2025-01-15T08:30:00+00:00')).updatedAt,
+    ).toBe('2025-01-15T08:30:00+00:00')
+  })
+
   it('is null when the backend sends no datetime', () => {
     expect(toPluginInfo(ID, detailWith(null)).updatedAt).toBeNull()
   })
