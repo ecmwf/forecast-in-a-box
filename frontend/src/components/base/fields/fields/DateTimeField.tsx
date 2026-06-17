@@ -146,6 +146,7 @@ function DateAndTimeInputs({
         value={date}
         onChange={(e) => handleDateChange(e.target.value)}
         disabled={disabled}
+        className="min-w-0"
       />
       <div className="mx-0.5 h-5 w-px bg-border" aria-hidden />
       <InputGroupInput
@@ -155,6 +156,7 @@ function DateAndTimeInputs({
         onChange={(e) => handleTimeChange(e.target.value)}
         disabled={disabled}
         aria-label={t('dateTimeField.timeLabel')}
+        className="w-[5.2rem] flex-none"
       />
       <InputGroupAddon align="inline-end">
         <Tooltip>
