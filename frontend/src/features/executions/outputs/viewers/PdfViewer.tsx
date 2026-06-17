@@ -58,22 +58,24 @@ export default function PdfViewer({
 
   useEffect(() => {
     if (!blob) return
-    const state: { cancelled: boolean; loaded: PDFDocumentProxy | null } = {
-      cancelled: false,
-      loaded: null,
-    }
+    const state: {
+      cancelled: boolean
+      task: ReturnType<typeof pdfjs.getDocument> | null
+    } = { cancelled: false, task: null }
     void (async () => {
       try {
         const buf = await blob.arrayBuffer()
 
         if (state.cancelled) return
-        state.loaded = await pdfjs.getDocument({ data: buf }).promise
+        // pdfjs v6: keep the loading task — it owns teardown.
+        state.task = pdfjs.getDocument({ data: buf })
+        const loaded = await state.task.promise
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated by cleanup
         if (state.cancelled) {
-          await state.loaded.destroy()
+          await state.task.destroy()
           return
         }
-        setDoc(state.loaded)
+        setDoc(loaded)
       } catch (err) {
         log.error('Failed to load PDF', { taskId: item.taskId, error: err })
         showToast.error(err instanceof Error ? err.message : String(err))
@@ -81,10 +83,8 @@ export default function PdfViewer({
     })()
     return () => {
       state.cancelled = true
-      if (state.loaded) {
-        // Fire-and-forget destroy — pdfjs cleans worker resources.
-        void state.loaded.destroy()
-      }
+      // Fire-and-forget: destroying the task tears down the document + worker.
+      void state.task?.destroy()
     }
   }, [blob, item.taskId])
 
