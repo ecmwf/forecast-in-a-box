@@ -58,7 +58,7 @@ export function RunActivityPopover({
     const byKey = new Map(buckets.map((bucket) => [bucket.key, bucket]))
     let total = 0
     for (const run of runs) {
-      // created_at is naive server-local — correct it before bucketing.
+      // created_at is UTC with explicit offset — convert before bucketing.
       const date = serverTimeToLocal(run.created_at)
       const bucket = byKey.get(`${date.getFullYear()}-${date.getMonth()}`)
       if (bucket) {

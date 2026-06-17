@@ -44,7 +44,7 @@ export const mockPluginListing: PluginListing = {
       remote_info: { version: '0.0.1' },
       errored_detail: null,
       loaded_version: '0.0.1',
-      update_datetime: '2026-02-03T00:00:00',
+      update_datetime: '2026-02-03T00:00:00+00:00',
     },
 
     // Disabled plugins (installed but not enabled)
@@ -62,7 +62,7 @@ export const mockPluginListing: PluginListing = {
       remote_info: { version: '1.0.0' },
       errored_detail: null,
       loaded_version: '1.0.0',
-      update_datetime: '2025-01-01T00:00:00',
+      update_datetime: '2025-01-01T00:00:00+00:00',
     },
     [createPluginKey('ecmwf', 'aifs-dataset')]: {
       status: 'disabled',
@@ -78,7 +78,7 @@ export const mockPluginListing: PluginListing = {
       remote_info: { version: '1.0.0' },
       errored_detail: null,
       loaded_version: '1.0.0',
-      update_datetime: '2025-01-01T00:00:00',
+      update_datetime: '2025-01-01T00:00:00+00:00',
     },
     [createPluginKey('ecmwf', 'regridding')]: {
       status: 'disabled',
@@ -94,7 +94,7 @@ export const mockPluginListing: PluginListing = {
       remote_info: { version: '2.0.5' },
       errored_detail: null,
       loaded_version: '2.0.5',
-      update_datetime: '2025-12-04T00:00:00',
+      update_datetime: '2025-12-04T00:00:00+00:00',
     },
     [createPluginKey('ecmwf', 'grib-export')]: {
       status: 'disabled',
@@ -110,7 +110,7 @@ export const mockPluginListing: PluginListing = {
       remote_info: { version: '2.1.0' },
       errored_detail: null,
       loaded_version: '2.1.0',
-      update_datetime: '2025-10-20T00:00:00',
+      update_datetime: '2025-10-20T00:00:00+00:00',
     },
     [createPluginKey('ecmwf', 'ensemble-forecast')]: {
       status: 'disabled',
@@ -126,7 +126,7 @@ export const mockPluginListing: PluginListing = {
       remote_info: { version: '2.4.0' },
       errored_detail: null,
       loaded_version: '2.1.0',
-      update_datetime: '2025-09-01T00:00:00',
+      update_datetime: '2025-09-01T00:00:00+00:00',
     },
     [createPluginKey('ecmwf', 'precipitation')]: {
       status: 'disabled',
@@ -141,7 +141,7 @@ export const mockPluginListing: PluginListing = {
       remote_info: { version: '1.2.0' },
       errored_detail: null,
       loaded_version: '1.2.0',
-      update_datetime: '2025-11-01T00:00:00',
+      update_datetime: '2025-11-01T00:00:00+00:00',
     },
 
     // Available plugins (not installed)

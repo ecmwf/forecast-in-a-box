@@ -99,7 +99,7 @@ describe('getPluginDetails', () => {
           remote_info: { version: '1.0.0' },
           errored_detail: null,
           loaded_version: '1.0.0',
-          update_datetime: '2025-01-15T00:00:00',
+          update_datetime: '2025-01-15T00:00:00+00:00',
         },
         [createPluginKey('ecmwf', 'storm-tracker')]: {
           status: 'available',

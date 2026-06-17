@@ -151,12 +151,11 @@ export function useDeleteSchedule() {
 }
 
 /**
- * Parse a naive datetime string from the backend.
+ * Parse a datetime string from the backend.
  *
- * The backend's current_scheduling_time() uses datetime.now() which returns
- * a naive datetime in the server's local timezone (no timezone suffix).
- * We parse it consistently with new Date() — the offset calculation and
- * conversion both use the same parsing, so any timezone difference cancels out.
+ * The backend returns UTC datetimes with an explicit "+00:00" offset
+ * (e.g. "2024-01-15T10:30:45+00:00"). We parse consistently with new Date()
+ * so the offset calculation and conversion use the same parsing.
  */
 function parseServerTime(dateStr: string): number {
   return new Date(dateStr.trim()).getTime()
@@ -165,8 +164,8 @@ function parseServerTime(dateStr: string): number {
 /**
  * Fetches the scheduler's current time and computes the offset from the client clock.
  *
- * The offset lets us translate naive datetime strings returned by the server
- * (which are in the server's local timezone) into correct client-local Dates.
+ * The offset lets us translate UTC datetime strings returned by the server
+ * into correct client-local Dates.
  *
  * Formula: correctEpoch = new Date(serverTimeStr).getTime() - offsetMs
  */

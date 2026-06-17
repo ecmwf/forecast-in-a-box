@@ -53,7 +53,7 @@ export const ForecastRunRow = memo(function ({
   const [metadataOpen, setMetadataOpen] = useState(false)
 
   const title = run.displayName || t('item.untitled')
-  // created_at is naive server-local — correct it via the measured server-clock offset.
+  // created_at is UTC with explicit offset — convert via the measured server-clock offset.
   const startedInstant = serverTimeToLocal(run.createdAt)
   const startedAt =
     formatInZone(startedInstant, timeZone, 'yyyy-MM-dd HH:mm') +
