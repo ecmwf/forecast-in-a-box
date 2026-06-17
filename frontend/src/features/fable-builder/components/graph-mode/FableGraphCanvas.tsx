@@ -78,7 +78,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
 
   const { fitView, setViewport, getNodesBounds } = useReactFlow()
-  const { onDragOver, onDrop } = useSidebarBlockDrop(catalogue)
+  const { onDragOver, onDrop, dropMode } = useSidebarBlockDrop(catalogue)
 
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState<FableNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -362,7 +362,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           />
         )}
       </ReactFlow>
-      <BlockDragPreview />
+      <BlockDragPreview mode={dropMode} />
     </div>
   )
 }

@@ -23,7 +23,7 @@
     "check": "prettier --check . && eslint . --max-warnings 0 && npm run typecheck",
     "fix": "prettier --write . && eslint --fix .",
     "analyze": "vite build --mode analyze",
-    "validate:fix": "npm run fix && npm run test:run && npm run test:e2e && npm run build",
+    "validate:fix": "npm run fix && npm run check && npm run test:run && npm run test:e2e && npm run build",
     "validate:ci": "npm run check && npm run test:run && npm run test:e2e && npm run build"
   },
   "dependencies": {
@@ -47,7 +47,7 @@
     "lz-string": "^1.5.0",
     "ol": "^10.9.0",
     "ol-mapbox-style": "^13.4.1",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "^6.0.227",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-force-graph-2d": "^1.29.1",
@@ -78,7 +78,7 @@
     "eslint-plugin-license-header": "^0.9.0",
     "i18next-cli": "^1.57.0",
     "msw": "^2.14.6",
-    "prettier": "3.8.3",
+    "prettier": "3.8.4",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "rollup-plugin-visualizer": "^7.0.1",
     "shadcn": "^4.7.0",

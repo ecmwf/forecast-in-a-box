@@ -310,3 +310,10 @@
     0 0 0 5px color-mix(in oklch, var(--primary) 70%, transparent),
     0 0 12px 3px color-mix(in oklch, var(--primary) 45%, transparent);
 }
+
+/* Branch drops glow emerald vs the blue insert/connect. */
+.react-flow__handle.dnd-active.dnd-active-branch {
+  box-shadow:
+    0 0 0 5px color-mix(in oklch, #10b981 70%, transparent),
+    0 0 12px 3px color-mix(in oklch, #10b981 45%, transparent);
+}

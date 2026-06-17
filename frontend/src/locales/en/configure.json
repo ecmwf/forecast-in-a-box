@@ -60,6 +60,9 @@
     "readFailed": "Failed to read file",
     "readUnknownError": "Unknown read error",
     "reviewSubmit": "Review & Submit",
+    "runOnce": "Run Once",
+    "runOnSchedule": "Run on Schedule",
+    "submitOptions": "More submit options",
     "backToEdit": "Back to Edit",
     "submitJob": "Submit Job",
     "reviewTooltipNoBlocks": "Add blocks to your configuration",
@@ -188,7 +191,12 @@
   },
   "addNode": {
     "searchPlaceholder": "Search blocks...",
-    "noBlocksFound": "No blocks found"
+    "noBlocksFound": "No blocks found",
+    "modeBranch": "Branch",
+    "modeInsert": "Insert",
+    "dropBranch": "New branch",
+    "dropInsert": "Slice & insert",
+    "dropConnect": "Connect"
   },
   "blockNode": {
     "configureBlock": "Configure block",

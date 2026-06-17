@@ -92,12 +92,12 @@ export function DateTimeField({
 }
 
 /**
- * Renders a date input beside a time input. The stored `value` is canonical
- * naive UTC (`YYYY-MM-DDTHH:MM:SS`); the inputs present it in the application
- * timezone and convert back on every edit, so the wire value stays UTC. A
- * badge shows the active timezone, making the entered time unambiguous. The
- * time defaults to `00:00` so the native picker opens at midnight rather than
- * the current wall-clock minute — forecast base-times round to the hour.
+ * Renders a date input beside a time input. `value` is a UTC datetime in
+ * `YYYY-MM-DDTHH:MM:SS` form (a backend-accepted UTC format); the inputs present
+ * it in the application timezone and convert back on every edit, so the wire
+ * value stays UTC. A badge shows the active timezone, making the entered time
+ * unambiguous. The time defaults to `00:00` so the native picker opens at
+ * midnight rather than the current wall-clock minute — base-times round to the hour.
  */
 function DateAndTimeInputs({
   id,
@@ -146,6 +146,7 @@ function DateAndTimeInputs({
         value={date}
         onChange={(e) => handleDateChange(e.target.value)}
         disabled={disabled}
+        className="min-w-0"
       />
       <div className="mx-0.5 h-5 w-px bg-border" aria-hidden />
       <InputGroupInput
@@ -155,6 +156,7 @@ function DateAndTimeInputs({
         onChange={(e) => handleTimeChange(e.target.value)}
         disabled={disabled}
         aria-label={t('dateTimeField.timeLabel')}
+        className="w-[5.2rem] flex-none"
       />
       <InputGroupAddon align="inline-end">
         <Tooltip>

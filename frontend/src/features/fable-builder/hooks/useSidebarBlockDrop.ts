@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   BlockFactory,
   BlockFactoryCatalogue,
@@ -21,6 +21,8 @@ import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuild
 // Slack (px) around a 20px connection handle so it is an easy drop target.
 const HANDLE_PADDING = 20
 const ACTIVE_CLASS = 'dnd-active'
+// Branch drops glow a distinct colour from insert/connect (see styles.css).
+const BRANCH_CLASS = 'dnd-active-branch'
 
 /** A concrete connection a drop would create against an existing node. */
 export interface DropConnection {
@@ -33,12 +35,31 @@ export interface DropConnection {
   handleEl: Element | null
 }
 
-/** Rewires needed around a newly-inserted block:
- *  - `downstream`: prior consumers of `conn.nodeId` (output drop), to route
- *    through the new block. Empty for sinks — they have no output. Drop
- *    becomes a sibling instead of a splice.
- *  - `priorParent`: the input's prior parent (input drop), to feed the new
- *    block instead of being orphaned by the connect. */
+/** What a drop will do — drives the hover signal and the wiring. branch: fork
+ *  off a source's output · insert: slice into an existing edge (source → new →
+ *  target) · connect: a plain new wire. */
+export type DropMode = 'branch' | 'insert' | 'connect'
+
+/** Classify what dropping on `conn` will do, for the hover signal. */
+export function dropModeForConnection(
+  conn: DropConnection,
+  fable: FableBuilderV1,
+): DropMode {
+  if (conn.isInput) {
+    const prior = fable.blocks[conn.nodeId].input_ids[conn.handleId] as
+      | string
+      | undefined
+    return prior ? 'insert' : 'connect'
+  }
+  const sourceHasConsumers = Object.values(fable.blocks).some((block) =>
+    Object.values(block.input_ids).includes(conn.nodeId),
+  )
+  return sourceHasConsumers ? 'branch' : 'connect'
+}
+
+/** Rewires for splicing a block in: `downstream` = prior consumers of the source
+ *  (output drop); `priorParent` = the input's prior parent (input drop). Drag
+ *  drops branch on output, so the hook only uses `priorParent`. */
 export function computeSpliceContext(
   conn: DropConnection,
   factory: BlockFactory,
@@ -166,8 +187,9 @@ function resolveDrop(
   return null
 }
 
-/** Drop handlers for the graph pane: a palette block dropped on a handle (or
- *  node) is added and wired up; on empty canvas it's just added. */
+/** Drop handlers for the graph pane. Wiring by drop target: target input →
+ *  slice & insert (source → new → target); source output / node body → branch.
+ *  `dropMode` mirrors this for the hover signal. */
 export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
   const draggedFactory = useFableBuilderStore((s) => s.draggedFactory)
   const fable = useFableBuilderStore((s) => s.fable)
@@ -181,15 +203,19 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
     (s) => s.endHistoryTransaction,
   )
   const activeHandleRef = useRef<Element | null>(null)
+  const [dropMode, setDropMode] = useState<DropMode | null>(null)
 
   const clearActiveHandle = useCallback(() => {
-    activeHandleRef.current?.classList.remove(ACTIVE_CLASS)
+    activeHandleRef.current?.classList.remove(ACTIVE_CLASS, BRANCH_CLASS)
     activeHandleRef.current = null
   }, [])
 
-  // Clear the hover highlight when a drag ends (covers drops off-canvas).
+  // Clear the hover highlight + signal when a drag ends (covers off-canvas).
   useEffect(() => {
-    if (!draggedFactory) clearActiveHandle()
+    if (!draggedFactory) {
+      clearActiveHandle()
+      setDropMode(null)
+    }
   }, [draggedFactory, clearActiveHandle])
 
   const onDragOver = useCallback(
@@ -209,9 +235,14 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
       const activeEl = conn?.handleEl ?? null
       if (activeEl === activeHandleRef.current) return
       clearActiveHandle()
-      if (activeEl) {
+      if (conn && activeEl) {
+        const mode = dropModeForConnection(conn, fable)
         activeEl.classList.add(ACTIVE_CLASS)
+        if (mode === 'branch') activeEl.classList.add(BRANCH_CLASS)
         activeHandleRef.current = activeEl
+        setDropMode(mode)
+      } else {
+        setDropMode(null)
       }
     },
     [draggedFactory, fable, catalogue, clearActiveHandle],
@@ -222,6 +253,7 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
       if (!draggedFactory) return
       e.preventDefault()
       clearActiveHandle()
+      setDropMode(null)
 
       const conn = resolveDrop(
         e.clientX,
@@ -231,10 +263,10 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
         catalogue,
       )
       const dragged = draggedFactory
-
-      const { downstream, priorParent } = conn
-        ? computeSpliceContext(conn, dragged.factory, fable)
-        : { downstream: [], priorParent: null }
+      // Only input drops splice; branch drops need no extra rewire.
+      const priorParent = conn?.isInput
+        ? computeSpliceContext(conn, dragged.factory, fable).priorParent
+        : null
 
       // Group add + connect + splice rewires into a single undo step.
       beginHistoryTransaction()
@@ -243,21 +275,14 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
 
         if (conn) {
           if (conn.isInput) {
-            // New block feeds the existing node's input port.
+            // Slice: source → new → target (reparent the input's prior source).
             connectBlocks(conn.nodeId, conn.handleId, newId)
-            // Splice: the input's prior parent now feeds the new block
-            // instead of being orphaned by the connectBlocks above.
             if (priorParent) {
               connectBlocks(newId, dragged.factory.inputs[0], priorParent)
             }
           } else {
-            // New block consumes the existing node's output.
+            // Branch: new consumes the source; its other consumers stay wired.
             connectBlocks(newId, dragged.factory.inputs[0], conn.nodeId)
-            // Splice: redirect prior consumers of conn.nodeId through new so
-            // the drop inserts an in-line transform rather than a side branch.
-            for (const { id, inputName } of downstream) {
-              connectBlocks(id, inputName, newId)
-            }
           }
         }
       } finally {
@@ -279,5 +304,5 @@ export function useSidebarBlockDrop(catalogue: BlockFactoryCatalogue) {
     ],
   )
 
-  return { onDragOver, onDrop }
+  return { onDragOver, onDrop, dropMode }
 }

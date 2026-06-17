@@ -23,6 +23,7 @@ import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
 import type { TFunction } from 'i18next'
 import type { PresetId } from '@/features/fable-builder/presets/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
+import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import {
   clearDraft,
@@ -102,6 +103,16 @@ export function FableBuilderPage({
   const setFableName = useFableBuilderStore((state) => state.setFableName)
   const mode = useFableBuilderStore((state) => state.mode)
   const step = useFableBuilderStore((state) => state.step)
+  const storeFableId = useFableBuilderStore((state) => state.fableId)
+  const submitDialogOpen = useFableBuilderStore(
+    (state) => state.submitDialogOpen,
+  )
+  const submitDialogMode = useFableBuilderStore(
+    (state) => state.submitDialogMode,
+  )
+  const setSubmitDialogOpen = useFableBuilderStore(
+    (state) => state.setSubmitDialogOpen,
+  )
   const setValidationState = useFableBuilderStore(
     (state) => state.setValidationState,
   )
@@ -305,6 +316,16 @@ export function FableBuilderPage({
           )}
         </div>
       </div>
+
+      {/* Lives here, not inside ReviewStep, so "Run Once" can open it straight
+          from the edit canvas without first routing through the review page. */}
+      <SubmitRunDialog
+        open={submitDialogOpen}
+        onOpenChange={setSubmitDialogOpen}
+        fable={fable}
+        fableId={storeFableId}
+        initialMode={submitDialogMode}
+      />
     </GlyphProvider>
   )
 }

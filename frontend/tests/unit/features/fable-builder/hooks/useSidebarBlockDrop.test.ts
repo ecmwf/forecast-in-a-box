@@ -15,7 +15,10 @@ import type {
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { DropConnection } from '@/features/fable-builder/hooks/useSidebarBlockDrop'
-import { computeSpliceContext } from '@/features/fable-builder/hooks/useSidebarBlockDrop'
+import {
+  computeSpliceContext,
+  dropModeForConnection,
+} from '@/features/fable-builder/hooks/useSidebarBlockDrop'
 
 function makeFactory(
   kind: BlockFactory['kind'],
@@ -188,5 +191,37 @@ describe('computeSpliceContext', () => {
       expect(ctx.priorParent).toBeNull()
       expect(ctx.downstream).toEqual([])
     })
+  })
+})
+
+describe('dropModeForConnection', () => {
+  it('output drop on a source with consumers → branch', () => {
+    const fable = makeFable({
+      source: makeBlock('anemoiSource'),
+      sink: makeBlock('mapPlotSink', { dataset: 'source' }),
+    })
+    expect(dropModeForConnection(outputConn('source'), fable)).toBe('branch')
+  })
+
+  it('output drop on a source with no consumers → connect', () => {
+    const fable = makeFable({ source: makeBlock('anemoiSource') })
+    expect(dropModeForConnection(outputConn('source'), fable)).toBe('connect')
+  })
+
+  it('input drop on an already-wired input → insert', () => {
+    const fable = makeFable({
+      source: makeBlock('anemoiSource'),
+      sink: makeBlock('mapPlotSink', { dataset: 'source' }),
+    })
+    expect(dropModeForConnection(inputConn('sink', 'dataset'), fable)).toBe(
+      'insert',
+    )
+  })
+
+  it('input drop on an empty input → connect', () => {
+    const fable = makeFable({ sink: makeBlock('mapPlotSink') })
+    expect(dropModeForConnection(inputConn('sink', 'dataset'), fable)).toBe(
+      'connect',
+    )
   })
 })

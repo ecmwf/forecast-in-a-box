@@ -66,6 +66,17 @@ function setupValidFableWithSink(): void {
   })
 }
 
+/**
+ * Navigate to the review step. "Review & Submit" moved into the split button's
+ * caret menu when "Run Once" became the primary action.
+ */
+async function openReviewStep(
+  screen: Awaited<ReturnType<typeof renderWithRouter>>,
+): Promise<void> {
+  await screen.getByRole('button', { name: /More submit options/i }).click()
+  await screen.getByRole('menuitem', { name: /Review & Submit/i }).click()
+}
+
 describe('Fable Builder Integration', () => {
   beforeEach(() => {
     // Wipe persisted state from earlier tests: FableBuilderPage restores
@@ -244,24 +255,19 @@ describe('Fable Builder Integration', () => {
       })
       .toBe(true)
 
-    // Click "Review & Submit" button
-    const reviewButton = screen.getByRole('button', {
-      name: /Review & Submit/i,
-    })
-    await reviewButton.click()
+    // Open the split-button menu and pick "Review & Submit"
+    await openReviewStep(screen)
 
     // Should transition to review step
     expect(useFableBuilderStore.getState().step).toBe('review')
 
-    // Review mode shows "Back to Edit" button (there are two: one in header, one in ReviewStep)
-    // Use .first() to avoid strict mode violation
+    // Review mode shows the sticky-header "Back to Edit" button
     await expect
-      .element(screen.getByRole('button', { name: /Back to Edit/i }).first())
+      .element(screen.getByRole('button', { name: /Back to Edit/i }))
       .toBeVisible()
 
-    // And "Submit Job" button (may be disabled if validation fails)
-    // Use .first() since there's a hidden span in the header and the button in ReviewStep
-    await expect.element(screen.getByText('Submit Job').first()).toBeVisible()
+    // And the "Submit Job" button (the label is in a sm:inline span)
+    await expect.element(screen.getByText('Submit Job')).toBeVisible()
   })
 
   it('allows returning from review step to edit step', async () => {
@@ -281,20 +287,57 @@ describe('Fable Builder Integration', () => {
       .toBe(true)
 
     // Go to review
-    await screen.getByRole('button', { name: /Review & Submit/i }).click()
+    await openReviewStep(screen)
     expect(useFableBuilderStore.getState().step).toBe('review')
 
-    // Click "Back to Edit" (use .first() since there are two: header and ReviewStep)
-    await screen
-      .getByRole('button', { name: /Back to Edit/i })
-      .first()
-      .click()
+    // Click "Back to Edit" in the sticky header
+    await screen.getByRole('button', { name: /Back to Edit/i }).click()
 
     // Should be back in edit mode
     expect(useFableBuilderStore.getState().step).toBe('edit')
 
     // Palette should be visible again
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
+  })
+
+  it('opens the submit dialog directly via "Run Once" without entering review', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    setupValidFableWithSink()
+    await expect
+      .poll(() => useFableBuilderStore.getState().validationState?.isValid, {
+        timeout: 3000,
+      })
+      .toBe(true)
+
+    await screen.getByRole('button', { name: 'Run Once', exact: true }).click()
+
+    // The dialog opens straight from the canvas — step stays 'edit'.
+    expect(useFableBuilderStore.getState().step).toBe('edit')
+    expect(useFableBuilderStore.getState().submitDialogOpen).toBe(true)
+    await expect.element(screen.getByText('Submit Forecast Job')).toBeVisible()
+  })
+
+  it('opens the submit dialog on the schedule tab via "Run on Schedule"', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    setupValidFableWithSink()
+    await expect
+      .poll(() => useFableBuilderStore.getState().validationState?.isValid, {
+        timeout: 3000,
+      })
+      .toBe(true)
+
+    await screen.getByRole('button', { name: /More submit options/i }).click()
+    await screen.getByRole('menuitem', { name: /Run on Schedule/i }).click()
+
+    expect(useFableBuilderStore.getState().submitDialogMode).toBe('schedule')
+    // Schedule mode swaps the primary action to "Create Schedule".
+    await expect
+      .element(screen.getByRole('button', { name: /Create Schedule/i }))
+      .toBeVisible()
   })
 
   it('completes a full build flow: add block → configure → save → review', async () => {
@@ -382,17 +425,17 @@ describe('Fable Builder Integration', () => {
       })
       .toBe(true)
 
-    // 7. Go to review
-    await screen.getByRole('button', { name: /Review & Submit/i }).click()
+    // 7. Go to review (via the split-button caret menu)
+    await openReviewStep(screen)
     expect(useFableBuilderStore.getState().step).toBe('review')
 
-    // Verify we're in review mode (use .first() since there are two "Back to Edit" buttons)
+    // Verify we're in review mode
     await expect
-      .element(screen.getByRole('button', { name: /Back to Edit/i }).first())
+      .element(screen.getByRole('button', { name: /Back to Edit/i }))
       .toBeVisible()
 
-    // The Submit Job button should be present (use .first() for multiple matches)
-    await expect.element(screen.getByText('Submit Job').first()).toBeVisible()
+    // The Submit Job button should be present
+    await expect.element(screen.getByText('Submit Job')).toBeVisible()
     // Per-test timeout raised: the 8 s validation poll above can't fit the
     // default 5 s test budget.
   }, 15000)

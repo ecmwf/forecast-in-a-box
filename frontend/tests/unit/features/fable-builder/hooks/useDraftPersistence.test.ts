@@ -9,11 +9,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import type { FableDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
 import {
   clearDraft,
   readDraft,
+  useDraftPersistence,
 } from '@/features/fable-builder/hooks/useDraftPersistence'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 
@@ -143,5 +144,55 @@ describe('draft persistence via store', () => {
     const result = readDraft()
     expect(result).not.toBeNull()
     expect(Object.keys(result!.fable.blocks)).toHaveLength(0)
+  })
+})
+
+describe('useDraftPersistence hook', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.useFakeTimers()
+    act(() => useFableBuilderStore.getState().newFable())
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    localStorage.clear()
+  })
+
+  it('writes the draft and clears the saving flag after the debounce', () => {
+    renderHook(() => useDraftPersistence())
+
+    act(() =>
+      useFableBuilderStore.setState({
+        fable: makeDraft().fable,
+        isDirty: true,
+      }),
+    )
+    expect(useFableBuilderStore.getState().draftWritePending).toBe(true)
+
+    act(() => vi.advanceTimersByTime(2000))
+
+    expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
+    expect(readDraft()).not.toBeNull()
+  })
+
+  it('flushes the draft and clears the saving flag when unmounted mid-debounce', () => {
+    const { unmount } = renderHook(() => useDraftPersistence())
+
+    // A dirty edit schedules a debounced write and shows "Saving…".
+    act(() =>
+      useFableBuilderStore.setState({
+        fable: makeDraft().fable,
+        isDirty: true,
+      }),
+    )
+    expect(useFableBuilderStore.getState().draftWritePending).toBe(true)
+    expect(readDraft()).toBeNull()
+
+    // Navigating away mid-debounce must not strand the flag or lose the draft.
+    act(() => unmount())
+
+    expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
+    expect(readDraft()).not.toBeNull()
   })
 })
