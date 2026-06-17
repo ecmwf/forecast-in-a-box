@@ -136,7 +136,7 @@ export const PluginDetailSchema = z.object({
   remote_info: PluginRemoteInfoSchema.nullable(),
   errored_detail: z.string().nullable(),
   loaded_version: z.string().nullable(),
-  update_datetime: z.string().nullable(), // "YYYY-MM-DDTHH:MM:SS" format
+  update_datetime: z.string().nullable(), // naive UTC "YYYY-MM-DDTHH:MM:SS"; FE appends Z
 })
 
 export type PluginDetail = z.infer<typeof PluginDetailSchema>
@@ -195,7 +195,7 @@ export interface PluginInfo {
   isInstalled: boolean
   /** Whether an update is available (latestVersion > version) */
   hasUpdate: boolean
-  /** ISO datetime when last updated (from update_datetime) */
+  /** Last-updated UTC ISO, Z-suffixed (from update_datetime) */
   updatedAt: string | null
   /** Error details if status is errored */
   errorDetail: string | null
@@ -248,7 +248,7 @@ export function toPluginInfo(
     isInstalled,
     hasUpdate,
     updatedAt: detail.update_datetime
-      ? toValidDateOrNull(detail.update_datetime)
+      ? toUtcIsoOrNull(detail.update_datetime)
       : null,
     errorDetail: detail.errored_detail,
     comment: detail.store_info?.comment ?? null,
@@ -258,11 +258,14 @@ export function toPluginInfo(
 }
 
 /**
- * Converts and validates a datetime string, returning null if unparseable.
+ * Backend sends a naive UTC datetime; append `Z` so `new Date()` reads it as UTC,
+ * not local. Already tz-aware values pass through. Null if unparseable.
  */
-function toValidDateOrNull(dateStr: string): string | null {
-  const date = new Date(dateStr)
-  return isNaN(date.getTime()) ? null : dateStr
+function toUtcIsoOrNull(dateStr: string): string | null {
+  const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(dateStr)
+    ? dateStr
+    : `${dateStr}Z`
+  return Number.isNaN(new Date(normalized).getTime()) ? null : normalized
 }
 
 /**
