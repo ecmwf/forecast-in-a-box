@@ -34,17 +34,6 @@ class BlockValidation:
     result: Either[BlockInstanceOutput, Error]  # type:ignore[invalid-argument] # semigroup
     restrictions: ConfigurationOptionRestriction = field(default_factory=dict)
 
-    def get_or_raise(self) -> BlockInstanceOutput:
-        return self.result.get_or_raise()
-
-    @property
-    def t(self) -> BlockInstanceOutput | None:
-        return self.result.t
-
-    @property
-    def e(self) -> Error | None:
-        return self.result.e
-
 
 Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], BlockValidation]
 """Given a block instance and its inputs, return either error or output and configuration restrictions"""
