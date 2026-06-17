@@ -108,7 +108,10 @@ export function deriveCapabilitiesFromCatalogue(
  * 3. Transforms to UI-friendly format
  */
 export function usePlugins(catalogue?: BlockFactoryCatalogue) {
-  const { data: listing, ...rest } = usePluginDetails()
+  // Forward fields by explicit access, not rest/spread — Query tracks per-field
+  // reads, so spreading re-renders on every field.
+  const query = usePluginDetails()
+  const listing = query.data
 
   const plugins = useMemo<Array<PluginInfo>>(() => {
     if (!listing) return []
@@ -118,9 +121,12 @@ export function usePlugins(catalogue?: BlockFactoryCatalogue) {
   }, [listing, catalogue])
 
   return {
-    ...rest,
     data: listing ? { plugins } : undefined,
     plugins,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
   }
 }
 
