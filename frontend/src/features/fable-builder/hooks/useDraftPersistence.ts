@@ -65,6 +65,26 @@ export function useDraftPersistence(): void {
   // Debounced write: subscribe only to the draft-relevant slices so the
   // listener doesn't run on every unrelated UI state change (panels, mode, …).
   useEffect(() => {
+    // Write the unsaved draft and clear the "saving" flag — shared by the
+    // debounce timer and the unmount flush. `finally` keeps it from sticking.
+    function flush(): void {
+      const { fable, fableId, fableName, fableVersion, isDirty } =
+        useFableBuilderStore.getState()
+      try {
+        if (isDirty) {
+          writeDraft({
+            fable,
+            fableId,
+            fableName,
+            fableVersion,
+            savedAt: Date.now(),
+          })
+        }
+      } finally {
+        useFableBuilderStore.setState({ draftWritePending: false })
+      }
+    }
+
     const unsub = useFableBuilderStore.subscribe(
       (state) => ({
         fable: state.fable,
@@ -95,17 +115,8 @@ export function useDraftPersistence(): void {
         if (timerRef.current) clearTimeout(timerRef.current)
         useFableBuilderStore.setState({ draftWritePending: true })
         timerRef.current = setTimeout(() => {
-          const { fable, fableId, fableName, fableVersion } =
-            useFableBuilderStore.getState()
-          writeDraft({
-            fable,
-            fableId,
-            fableName,
-            fableVersion,
-            savedAt: Date.now(),
-          })
           timerRef.current = null
-          useFableBuilderStore.setState({ draftWritePending: false })
+          flush()
         }, DEBOUNCE_MS)
       },
       {
@@ -119,7 +130,14 @@ export function useDraftPersistence(): void {
 
     return () => {
       unsub()
-      if (timerRef.current) clearTimeout(timerRef.current)
+      // Flush a pending write on unmount (navigating away mid-debounce): the
+      // store outlives the route, so otherwise the draft is lost and "Saving…"
+      // sticks.
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+        flush()
+      }
     }
   }, [])
 }
