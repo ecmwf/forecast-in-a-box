@@ -188,7 +188,12 @@
   },
   "addNode": {
     "searchPlaceholder": "Search blocks...",
-    "noBlocksFound": "No blocks found"
+    "noBlocksFound": "No blocks found",
+    "modeBranch": "Branch",
+    "modeInsert": "Insert",
+    "dropBranch": "New branch",
+    "dropInsert": "Slice & insert",
+    "dropConnect": "Connect"
   },
   "blockNode": {
     "configureBlock": "Configure block",

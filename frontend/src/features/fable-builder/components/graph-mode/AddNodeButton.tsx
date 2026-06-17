@@ -9,6 +9,7 @@
  */
 
 import { memo, useMemo, useState } from 'react'
+import { GitBranch, Scissors } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type {
@@ -30,6 +31,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 
 interface AddNodeButtonProps {
@@ -61,6 +63,7 @@ export const AddNodeButton = memo(function ({
   const { t } = useTranslation('configure')
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [addMode, setAddMode] = useState<'branch' | 'insert'>('branch')
 
   const addBlock = useFableBuilderStore((state) => state.addBlock)
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
@@ -127,16 +130,33 @@ export const AddNodeButton = memo(function ({
     return fallback
   }, [possibleExpansions, catalogue, expansionRestrictions])
 
+  // Existing consumers of this source — inserting is only meaningful when ≥1.
+  const downstreamConsumers = useMemo(
+    () =>
+      Object.entries(blocks).flatMap(([id, block]) =>
+        Object.entries(block.input_ids)
+          .filter(([, parentId]) => parentId === sourceBlockId)
+          .map(([inputName]) => ({ id, inputName })),
+      ),
+    [blocks, sourceBlockId],
+  )
+  const canOfferInsert = downstreamConsumers.length > 0
+  // Insert needs an output to continue the chain, so sinks are branch-only.
+  const insertMode = addMode === 'insert' && canOfferInsert
+
   const filteredFactories = useMemo(() => {
-    if (!search.trim()) return availableFactories
+    const byMode = insertMode
+      ? availableFactories.filter(({ factory }) => factory.kind !== 'sink')
+      : availableFactories
+    if (!search.trim()) return byMode
 
     const searchLower = search.toLowerCase()
-    return availableFactories.filter(
+    return byMode.filter(
       ({ factory }) =>
         factory.title.toLowerCase().includes(searchLower) ||
         factory.description.toLowerCase().includes(searchLower),
     )
-  }, [availableFactories, search])
+  }, [availableFactories, search, insertMode])
 
   const groupedFactories = useMemo(() => {
     const groups: Record<
@@ -162,16 +182,9 @@ export const AddNodeButton = memo(function ({
     factory: BlockFactory,
     restrictions: Record<string, string>,
   ) => {
-    // Splice: redirect existing consumers of sourceBlockId through the new
-    // block. Skipped for sinks and 0-input factories (can't slot in).
-    const canSplice = factory.kind !== 'sink' && factory.inputs.length > 0
-    const downstream = canSplice
-      ? Object.entries(blocks).flatMap(([id, block]) =>
-          Object.entries(block.input_ids)
-            .filter(([, parentId]) => parentId === sourceBlockId)
-            .map(([inputName]) => ({ id, inputName })),
-        )
-      : []
+    // Insert needs a non-sink with inputs; otherwise add as a branch.
+    const doInsert =
+      insertMode && factory.kind !== 'sink' && factory.inputs.length > 0
 
     // Group add + connect + splice rewires into a single undo step.
     beginHistoryTransaction()
@@ -183,8 +196,11 @@ export const AddNodeButton = memo(function ({
       }
       setBlockConfigurationRestrictions(newBlockId, restrictions)
 
-      for (const { id, inputName } of downstream) {
-        connectBlocks(id, inputName, newBlockId)
+      if (doInsert) {
+        // Slice: redirect the source's existing consumers through the new block.
+        for (const { id, inputName } of downstreamConsumers) {
+          connectBlocks(id, inputName, newBlockId)
+        }
       }
     } finally {
       endHistoryTransaction()
@@ -195,7 +211,13 @@ export const AddNodeButton = memo(function ({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (next) setAddMode('branch')
+      }}
+    >
       {/* The trigger is the output `<Handle>` (a div), not a native button. */}
       <PopoverTrigger nativeButton={false} render={children} />
       <PopoverContent
@@ -205,6 +227,38 @@ export const AddNodeButton = memo(function ({
         sideOffset={8}
         onClick={(e) => e.stopPropagation()}
       >
+        {canOfferInsert && (
+          <div className="border-b p-2">
+            {/* Branch off the source, or slice into its edges. */}
+            <ToggleGroup
+              value={[addMode]}
+              onValueChange={(values) => {
+                // Base UI single-select is still string[]; ignore empty (re-click).
+                const next = values[0]
+                if (next === 'branch' || next === 'insert') setAddMode(next)
+              }}
+              variant="outline"
+              className="w-full"
+            >
+              <ToggleGroupItem
+                value="branch"
+                variant="outline"
+                className="flex-1 gap-1.5 text-xs"
+              >
+                <GitBranch className="size-3.5" />
+                {t('addNode.modeBranch')}
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="insert"
+                variant="outline"
+                className="flex-1 gap-1.5 text-xs"
+              >
+                <Scissors className="size-3.5" />
+                {t('addNode.modeInsert')}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+        )}
         <div className="border-b p-2">
           <Input
             placeholder={t('addNode.searchPlaceholder')}
