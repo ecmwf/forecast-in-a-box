@@ -1,15 +1,12 @@
-name: CD for plugins (core+ecmwf)
+name: CD for fiab-core and fiab-plugin-test
 
-# Releases fiab-plugin-ecmwf and fiab-plugin-demo.
+# Releases fiab-core (and fiab-plugin-test, as that one is effectively used to
+# test core-backend interactions and its changes are coupled to core changes).
 #
-# It pushes a new tag pX.Y.Z.0, either provided on input, or derived from
+# It pushes a new tag cX.Y.Z.0, either provided on input, or derived from
 # the git repo as the highest existing tag + 0.0.1.
 # It builds and then tests the two wheels in isolation, each versioned X.Y.Z,
 # then pushes to PyPI.
-# The fiab-core version used for testing is taken to be cX.?.?, ie, the major
-# version is matching, others don't matter.
-# The fiab-core requirements constraints are >=X,<X+1.
-
 
 on:
   workflow_dispatch:
@@ -44,6 +41,7 @@ jobs:
 
           source scripts/cicd/scripts.sh
           setupBash "${{ inputs.testpypi }}" 
+          REPO_ROOT=$(pwd)
 
           TAG_PREF="c"
           TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
@@ -51,17 +49,28 @@ jobs:
 
           preparePythonWheelVersion $TAG
 
-          cd backend
-          uv venv venv && source venv/bin/activate
-          uv pip install twine build
+          cd backend/packages
           mkdir packagesDist
-          for e in $(ls -d packages/*) ; do 
-              pushd $e
-              just build
-              if [ -d dist ] ; then mv dist/* ../../packagesDist ; fi
-              popd
-          done
-          rm -rf packagesDist/fiab_mcp_server* # lets not be releasing this one just yet
+
+          pushd fiab-core
+          source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
+          just build
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh
+          just val
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          mv dist/* ../packagesDist
+          popd
+
+          pushd fiab-plugin-test
+          source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
+          just build
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh
+          just val
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          mv dist/* ../packagesDist
+          popd
 
           uploadPypi "${{ inputs.testpypi }}" 'packagesDist/*'
           gitTagAndPush "${{ inputs.testpypi }}" $TAG
