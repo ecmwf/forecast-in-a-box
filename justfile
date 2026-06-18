@@ -37,6 +37,9 @@ clean:
 	find backend -name '__pycache__' -exec rm -fr {} +
 	find backend -name 'dist' -type d -exec rm -rf {} +
 
+val-cicd-scripts:
+    bash scripts/cicd/test_scripts.sh
+
 val:
     #!/usr/bin/env bash
     set -euo pipefail

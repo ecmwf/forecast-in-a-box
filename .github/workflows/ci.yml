@@ -9,7 +9,8 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - 'cli/**'
-      - '.github/workflows/ci.yml'
+      - '.github/**'
+      - 'scripts/cicd/**'
     tags-ignore:
       - '**'
 
@@ -19,7 +20,8 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - 'cli/**'
-      - '.github/workflows/ci.yml'
+      - '.github/**'
+      - 'scripts/cicd/**'
 
   # Trigger the workflow manually
   workflow_dispatch: ~
@@ -39,6 +41,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend || steps.all-true.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend || steps.all-true.outputs.frontend }}
       cli: ${{ steps.filter.outputs.cli || steps.all-true.outputs.cli }}
+      cicd_scripts: ${{ steps.filter.outputs.cicd_scripts || steps.all-true.outputs.cicd_scripts }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -56,6 +59,9 @@ jobs:
             cli:
               - 'cli/**'
               - '.github/workflows/ci.yml'
+            cicd_scripts:
+              - '.github/**'
+              - 'scripts/cicd/**'
       # For workflow_dispatch and push events, set all outputs to true
       - name: Set outputs for non-PR events
         if: github.event_name != 'pull_request'
@@ -64,6 +70,7 @@ jobs:
           echo "backend=true" >> "$GITHUB_OUTPUT"
           echo "frontend=true" >> "$GITHUB_OUTPUT"
           echo "cli=true" >> "$GITHUB_OUTPUT"
+          echo "cicd_scripts=true" >> "$GITHUB_OUTPUT"
 
   macos:
     name: macos
@@ -182,3 +189,14 @@ jobs:
       # - uses: moonrepo/setup-rust@v1
       - name: Cargo tests
         run: echo "disabled until cargo fixed" # cargo test # TODO we actually have no tests, neither unit nor integration!
+
+  cicd-scripts:
+    name: CI/CD scripts
+    needs: changes
+    if: needs.changes.outputs.cicd_scripts == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
+      - run: just val-cicd-scripts

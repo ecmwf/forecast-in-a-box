@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Mock for git. Records all calls to $MOCK_CALLS_FILE.
+#
+# Configurable env vars:
+#   MOCK_GIT_TAGS_LIST  - newline-separated tags returned by 'git tag -l ...'
+#   MOCK_GIT_TAGS_ALL   - newline-separated tags returned by 'git tag' (no args)
+#   MOCK_CALLS_FILE     - path to file where all calls are recorded
+
+echo "git $*" >> "${MOCK_CALLS_FILE:-/dev/null}"
+
+case "$1" in
+  tag)
+    if [[ "${2:-}" == "-l" ]]; then
+      echo "${MOCK_GIT_TAGS_LIST:-}"
+    elif [[ $# -eq 1 ]]; then
+      echo "${MOCK_GIT_TAGS_ALL:-}"
+    fi
+    # 'git tag <name>' -- creating a tag, just record (no output)
+    ;;
+  push)
+    # just record
+    ;;
+  *)
+    # passthrough for any other git commands not needed in tests
+    ;;
+esac
