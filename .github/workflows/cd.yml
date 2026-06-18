@@ -34,7 +34,7 @@ jobs:
           git remote set-url origin https://$GH_USER:$GH_TOKEN@github.com/ecmwf/forecast-in-a-box.git
           git fetch --tags origin # NOTE dont use with: fetch-tags: true, the clone is still shallow
 
-          source .github/workflows/scripts.sh
+          source scripts/cicd/scripts.sh
           setupBash "${{ inputs.testpypi }}" 
 
           # derive the tag

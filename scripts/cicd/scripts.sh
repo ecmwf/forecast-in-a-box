@@ -37,9 +37,9 @@ function gitTagAndPush() {
     # args
     # $1 true => testpypi (no tag&push), false => regular pypi (do tag&push)
     # $2 <tag>
-    testypi=$1
+    testpypi=$1
     tag=$2
-    if [ "$testypi" = "false" ] ; then
+    if [ "$testpypi" = "false" ] ; then
         git tag "$tag"
         git push origin "$tag"
     fi
@@ -52,7 +52,7 @@ function getLatestTagAndIncrement() {
     # 1/ queries existing git tags starting with prefix and optionally droping fourth number
     # 2/ finds the num-highest with given prefix (or 0.0.0 if none found)
     # 3/ echo the result including prefix
-    # 
+    #
     tagPref=$1
     LATEST_TAG=$(
       git tag -l "${tagPref}*" \
@@ -95,7 +95,7 @@ function tagFromInputOrLatest() {
       validateTag "$input" "$tagPref"
       echo "$input"
     else
-      getLatestTagAndIncrement "$TAG_PREF"
+      getLatestTagAndIncrement "$tagPref"
     fi
 }
 
@@ -107,4 +107,3 @@ function preparePythonWheelVersion() {
     tag=$(echo "$tag_full" | sed -nE 's/^[a-zA-Z]*([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?$/\1/p')
     export SETUPTOOLS_SCM_PRETEND_VERSION=$tag
 }
-
