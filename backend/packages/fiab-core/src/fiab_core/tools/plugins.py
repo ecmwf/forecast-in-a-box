@@ -13,9 +13,10 @@ from fiab_core.fable import (
     BlockFactoryId,
     BlockInstance,
     BlockInstanceOutput,
+    ConfigurationOptionRestriction,
     QubedOutput,
 )
-from fiab_core.plugin import BlockValidation, Error, Plugin
+from fiab_core.plugin import BlockValidation, BlockValidationError, Error, Plugin
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, QubedBlockBuilder
 
 
@@ -55,10 +56,12 @@ class QubedPluginBuilder:
         """Given a block instance and its inputs, return either error or output and configuration restrictions."""
         factory = self.block_builders[block.factory_id.factory]
         rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
+        restrictions: ConfigurationOptionRestriction = {}
         try:
-            return factory.validate(rich_block, inputs)
-        except BlockInstanceConfigurationError as exc:
-            return BlockValidation(Either.error(str(exc)))
+            result = factory.validate(rich_block, inputs, restrictions)
+            return BlockValidation(Either.ok(result), restrictions)
+        except Exception as exc:
+            return BlockValidation(Either.error(BlockValidationError(repr(exc), True)), restrictions)
 
     def expand(self, output: QubedOutput) -> list[BlockExpansion]:
         """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
@@ -92,7 +95,11 @@ class QubedPluginBuilder:
         def _generic_validate(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
             invalid = [f"{key}->{value.__class__.__name__}" for key, value in inputs.items() if not isinstance(value, QubedOutput)]
             if any(invalid):
-                return BlockValidation(Either.error(f"Expected only QubedOutputs in inputs, gotten {','.join(invalid)}"))
+                return BlockValidation(
+                    Either.error(
+                        BlockValidationError(reason=f"Expected only QubedOutputs in inputs, gotten {','.join(invalid)}", is_hard=True)
+                    )
+                )
             else:
                 inputs_validated = cast(dict[str, QubedOutput], inputs)
                 return self.validate(block, inputs_validated)

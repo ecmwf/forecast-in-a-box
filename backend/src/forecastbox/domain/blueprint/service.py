@@ -270,7 +270,7 @@ async def validate_expand(
         if not validate_only and restrictions:
             configuration_restrictions[blockId] = {k: v.serialize() for k, v in restrictions.items()}
         if output_or_error.t is None:
-            block_errors[blockId] += [cast(str, output_or_error.e)]
+            block_errors[blockId] += [output_or_error.e.reason]
             invalidable.add(blockId)
             continue
         outputs[blockId] = output_or_error.t

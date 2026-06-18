@@ -129,17 +129,17 @@ def anemoi_transform_configuration(dummy_checkpoint: str) -> BlockInstance:
 
 @pytest.fixture
 def anemoi_source_output(anemoi_source_configuration: BlockInstance) -> QubedOutput:
-    return AnemoiSource().validate(block=anemoi_source_configuration, inputs={}).get_or_raise()  # type: ignore[return-value]
+    return AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions={})  # type: ignore[return-value]
 
 
 @pytest.fixture
 def anemoi_source_ensemble_output(anemoi_source_ensemble_configuration: BlockInstance) -> QubedOutput:
-    return AnemoiSource().validate(block=anemoi_source_ensemble_configuration, inputs={}).get_or_raise()  # type: ignore[return-value]
+    return AnemoiSource().validate(block=anemoi_source_ensemble_configuration, inputs={}, restrictions={})  # type: ignore[return-value]
 
 
 @pytest.fixture
 def anemoi_input_source_output(anemoi_input_source_configuration: BlockInstance) -> QubedOutput:
-    return AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}).get_or_raise()  # type: ignore[return-value]
+    return AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}, restrictions={})  # type: ignore[return-value]
 
 
 class TestCheckpointArtifact:
@@ -161,7 +161,7 @@ class TestAnemoiSourceValidate:
     """Validate method - happy paths and error paths."""
 
     def test_valid_deterministic(self, anemoi_source_configuration: BlockInstance) -> None:
-        output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}).get_or_raise()
+        output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions={})
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
 
@@ -187,7 +187,11 @@ class TestAnemoiSourceValidate:
             {"checkpoint": dummy_checkpoint, "lead_time": "abc", "base_time": "2024-01-01", "number": "1"},
         )
         with pytest.raises(BlockInstanceConfigurationError, match="expected int"):
-            AnemoiSource().validate(block=block, inputs={})
+            AnemoiSource().validate(
+                block=block,
+                inputs={},
+                restrictions={},
+            )
 
     def test_invalid_lead_time_negative(self, dummy_checkpoint: str) -> None:
         block = _make_block(
@@ -195,25 +199,27 @@ class TestAnemoiSourceValidate:
             {"checkpoint": dummy_checkpoint, "lead_time": -1, "base_time": datetime(2024, 1, 1), "number": 1},
         )
         with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
-            AnemoiSource().validate(block=block, inputs={})
+            AnemoiSource().validate(
+                block=block,
+                inputs={},
+                restrictions={},
+            )
 
     def test_invalid_lead_time_equal_to_timestep(self, dummy_checkpoint: str) -> None:
         block = _make_block(
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": 1, "base_time": datetime(2024, 1, 1), "number": 1},
         )
-        result = AnemoiSource().validate(block=block, inputs={})
         with pytest.raises(Exception, match="must be greater than checkpoint timestep"):
-            result.get_or_raise()
+            AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
     def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: str) -> None:
         block = _make_block(
             AnemoiSource,
             {"checkpoint": six_hour_dummy_checkpoint, "lead_time": 7, "base_time": datetime(2024, 1, 1), "number": 1},
         )
-        result = AnemoiSource().validate(block=block, inputs={})
         with pytest.raises(Exception, match="must be a multiple of checkpoint timestep"):
-            result.get_or_raise()
+            AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
     def test_invalid_number_zero(self, dummy_checkpoint: str) -> None:
         block = _make_block(
@@ -221,7 +227,11 @@ class TestAnemoiSourceValidate:
             {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 0},
         )
         with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
-            AnemoiSource().validate(block=block, inputs={})
+            AnemoiSource().validate(
+                block=block,
+                inputs={},
+                restrictions={},
+            )
 
     def test_invalid_number_not_a_digit(self, dummy_checkpoint: str) -> None:
         block = _make_raw_block(
@@ -229,7 +239,11 @@ class TestAnemoiSourceValidate:
             {"checkpoint": dummy_checkpoint, "lead_time": "24", "base_time": "2024-01-01", "number": "two"},
         )
         with pytest.raises(BlockInstanceConfigurationError, match="expected int"):
-            AnemoiSource().validate(block=block, inputs={})
+            AnemoiSource().validate(
+                block=block,
+                inputs={},
+                restrictions={},
+            )
 
     def test_unknown_checkpoint(self, registered_provider: None) -> None:
         block = _make_block(
@@ -237,7 +251,7 @@ class TestAnemoiSourceValidate:
             {"checkpoint": "dummy_store:unknown", "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 1},
         )
         with pytest.raises(Exception):
-            AnemoiSource().validate(block=block, inputs={}).get_or_raise()
+            AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
     def test_invalid_checkpoint_format(self) -> None:
         block = _make_block(
@@ -245,7 +259,7 @@ class TestAnemoiSourceValidate:
             {"checkpoint": "not-a-valid-id", "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 1},
         )
         with pytest.raises(ValueError, match="must be of the form"):
-            AnemoiSource().validate(block=block, inputs={}).get_or_raise()
+            AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
 
 class TestAnemoiSourceIntersect:
@@ -268,7 +282,7 @@ class TestAnemoiSourceIntersect:
 
 class TestAnemoiInputSourceValidate:
     def test_valid_config(self, anemoi_input_source_configuration: BlockInstance) -> None:
-        output = AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}).get_or_raise()
+        output = AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}, restrictions={})
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
 
@@ -297,13 +311,10 @@ class TestAnemoiInputSourceIntersect:
 
 class TestAnemoiTransformValidate:
     def test_valid_no_number_axis(self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput) -> None:
-        output = (
-            AnemoiTransform()
-            .validate(
-                block=anemoi_transform_configuration,
-                inputs={"dataset": anemoi_input_source_output},
-            )
-            .get_or_raise()
+        output = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"dataset": anemoi_input_source_output},
+            restrictions={},
         )
         assert isinstance(output, QubedOutput)
         assert contains(anemoi_input_source_output, "number")
@@ -315,37 +326,28 @@ class TestAnemoiTransformValidate:
         self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput
     ) -> None:
         input_with_number = expand(anemoi_input_source_output, {"number": [1, 2, 3]})
-        output = (
-            AnemoiTransform()
-            .validate(
-                block=anemoi_transform_configuration,
-                inputs={"dataset": input_with_number},
-            )
-            .get_or_raise()
+        output = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"dataset": input_with_number},
+            restrictions={},
         )
         assert isinstance(output, QubedOutput)
         assert contains(output, "number")
         assert set(axes(output)["number"]) == {1, 2, 3}
 
     def test_output_has_step_axis(self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput) -> None:
-        output: QubedOutput = (
-            AnemoiTransform()
-            .validate(
-                block=anemoi_transform_configuration,
-                inputs={"dataset": anemoi_input_source_output},
-            )
-            .get_or_raise()
+        output: QubedOutput = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"dataset": anemoi_input_source_output},
+            restrictions={},
         )  # type: ignore[assignment]
         assert contains(output, "step")
 
     def test_output_has_param_axis(self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput) -> None:
-        output: QubedOutput = (
-            AnemoiTransform()
-            .validate(
-                block=anemoi_transform_configuration,
-                inputs={"dataset": anemoi_input_source_output},
-            )
-            .get_or_raise()
+        output: QubedOutput = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"dataset": anemoi_input_source_output},
+            restrictions={},
         )  # type: ignore[assignment]
         assert contains(output, "param")
 
@@ -357,7 +359,11 @@ class TestAnemoiTransformValidate:
             input_ids={"dataset": "src"},
         )
         with pytest.raises(BlockInstanceConfigurationError, match="expected int"):
-            AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
+            AnemoiTransform().validate(
+                block=block,
+                inputs={"dataset": input_dataset},
+                restrictions={},
+            )
 
     def test_invalid_lead_time_negative(self, dummy_checkpoint: str, dummy_qube: Qube) -> None:
         input_dataset = QubedOutput(dataqube=dummy_qube)
@@ -367,7 +373,11 @@ class TestAnemoiTransformValidate:
             input_ids={"dataset": "src"},
         )
         with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
-            AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
+            AnemoiTransform().validate(
+                block=block,
+                inputs={"dataset": input_dataset},
+                restrictions={},
+            )
 
     def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: str, dummy_qube: Qube) -> None:
         input_dataset = QubedOutput(dataqube=dummy_qube)
@@ -376,9 +386,8 @@ class TestAnemoiTransformValidate:
             {"checkpoint": six_hour_dummy_checkpoint, "lead_time": 7},
             input_ids={"dataset": "src"},
         )
-        result = AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset})
         with pytest.raises(Exception, match="must be a multiple of checkpoint timestep"):
-            result.get_or_raise()
+            AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}, restrictions={})
 
     def test_unknown_checkpoint(self, registered_provider: None, dummy_qube: Qube) -> None:
         input_dataset = QubedOutput(dataqube=dummy_qube)
@@ -388,7 +397,7 @@ class TestAnemoiTransformValidate:
             input_ids={"dataset": "src"},
         )
         with pytest.raises(Exception):
-            AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}).get_or_raise()
+            AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}, restrictions={})
 
     def test_incompatible_input_dataset(self, dummy_checkpoint: str) -> None:
         """If the input dataset does not contain the model's required input params, validate should error."""
@@ -398,9 +407,8 @@ class TestAnemoiTransformValidate:
             {"checkpoint": dummy_checkpoint, "lead_time": 24},
             input_ids={"dataset": "src"},
         )
-        result = AnemoiTransform().validate(block=block, inputs={"dataset": incompatible})
         with pytest.raises(Exception, match="not compatible"):
-            result.get_or_raise()
+            AnemoiTransform().validate(block=block, inputs={"dataset": incompatible}, restrictions={})
 
 
 class TestAnemoiTransformIntersect:
@@ -432,13 +440,10 @@ class TestFlowAnemoiSourceToTransform:
         anemoi_transform_configuration: BlockInstance,
     ) -> None:
         """The deterministic source output should be a valid input for the transform."""
-        output = (
-            AnemoiTransform()
-            .validate(
-                block=anemoi_transform_configuration,
-                inputs={"dataset": anemoi_source_output},
-            )
-            .get_or_raise()
+        output = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"dataset": anemoi_source_output},
+            restrictions={},
         )
         assert isinstance(output, QubedOutput)
         assert contains(output, "param")
@@ -449,13 +454,10 @@ class TestFlowAnemoiSourceToTransform:
         anemoi_source_ensemble_output: QubedOutput,
         anemoi_transform_configuration: BlockInstance,
     ) -> None:
-        output: QubedOutput = (
-            AnemoiTransform()
-            .validate(
-                block=anemoi_transform_configuration,
-                inputs={"dataset": anemoi_source_ensemble_output},
-            )
-            .get_or_raise()
+        output: QubedOutput = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"dataset": anemoi_source_ensemble_output},
+            restrictions={},
         )  # type: ignore[assignment]
         assert contains(output, "number")
         assert set(axes(output)["number"]) == {1, 2, 3}
@@ -469,13 +471,10 @@ class TestFlowAnemoiInputSourceToTransform:
         anemoi_input_source_output: QubedOutput,
         anemoi_transform_configuration: BlockInstance,
     ) -> None:
-        output = (
-            AnemoiTransform()
-            .validate(
-                block=anemoi_transform_configuration,
-                inputs={"dataset": anemoi_input_source_output},
-            )
-            .get_or_raise()
+        output = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"dataset": anemoi_input_source_output},
+            restrictions={},
         )
         assert isinstance(output, QubedOutput)
         assert contains(output, "param")
@@ -493,13 +492,10 @@ class TestFlowChainedTransforms:
         anemoi_input_source_output: QubedOutput,
         anemoi_transform_configuration: BlockInstance,
     ) -> None:
-        first_output: QubedOutput = (
-            AnemoiTransform()
-            .validate(
-                block=anemoi_transform_configuration,
-                inputs={"dataset": anemoi_input_source_output},
-            )
-            .get_or_raise()
+        first_output: QubedOutput = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"dataset": anemoi_input_source_output},
+            restrictions={},
         )  # type: ignore[assignment]
 
         second_config = _make_block(
@@ -507,13 +503,10 @@ class TestFlowChainedTransforms:
             {"checkpoint": dummy_checkpoint, "lead_time": 48},
             input_ids={"dataset": "first_transform"},
         )
-        second_output: QubedOutput = (
-            AnemoiTransform()
-            .validate(
-                block=second_config,
-                inputs={"dataset": first_output},
-            )
-            .get_or_raise()
+        second_output: QubedOutput = AnemoiTransform().validate(
+            block=second_config,
+            inputs={"dataset": first_output},
+            restrictions={},
         )  # type: ignore[assignment]
 
         assert isinstance(second_output, QubedOutput)
@@ -528,13 +521,10 @@ class TestFlowChainedTransforms:
     ) -> None:
         input_with_number = expand(anemoi_input_source_output, {"number": [1, 2]})
 
-        first_output: QubedOutput = (
-            AnemoiTransform()
-            .validate(
-                block=anemoi_transform_configuration,
-                inputs={"dataset": input_with_number},
-            )
-            .get_or_raise()
+        first_output: QubedOutput = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"dataset": input_with_number},
+            restrictions={},
         )  # type: ignore[assignment]
         assert contains(first_output, "number")
 
@@ -543,13 +533,10 @@ class TestFlowChainedTransforms:
             {"checkpoint": dummy_checkpoint, "lead_time": 48},
             input_ids={"dataset": "first_transform"},
         )
-        second_output: QubedOutput = (
-            AnemoiTransform()
-            .validate(
-                block=second_config,
-                inputs={"dataset": first_output},
-            )
-            .get_or_raise()
+        second_output: QubedOutput = AnemoiTransform().validate(
+            block=second_config,
+            inputs={"dataset": first_output},
+            restrictions={},
         )  # type: ignore[assignment]
 
         assert contains(second_output, "number")
