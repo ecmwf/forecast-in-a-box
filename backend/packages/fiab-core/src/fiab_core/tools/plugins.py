@@ -75,7 +75,7 @@ class QubedPluginBuilder:
         self,
         inputs: ActionLookup,
         block: BlockInstance,
-    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+    ) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
         """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
         with PayloadBuildingContext(environment=self.base_environment):
             factory = self.block_builders[block.factory_id.factory]

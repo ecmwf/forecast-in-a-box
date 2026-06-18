@@ -137,16 +137,16 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     return []
 
 
-def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
     with PayloadBuildingContext(environment=[f"-e {pathlib.Path(__file__).parent.parent.parent}"]):
         # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
         if instance.factory_id.factory == "source_42":
-            action = from_source(Payload("fiab_plugin_test.runtime.source_42"))  # type: ignore
+            action = from_source(Payload("fiab_plugin_test.runtime.source_42"))
         elif instance.factory_id.factory == "source_text":
             text = instance.configuration_values[TEXT]
             if not isinstance(text, str):
                 return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
-            action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))  # type: ignore
+            action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))
         elif instance.factory_id.factory == "source_sleep":
             text = instance.configuration_values[TEXT]
             duration = instance.configuration_values[DURATION]
@@ -154,7 +154,7 @@ def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Er
                 return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
             if not isinstance(duration, float):
                 return Either.error(f"Invalid type for {DURATION!r}: expected float, got {type(duration).__name__}")
-            action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))  # type: ignore
+            action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))
         elif instance.factory_id.factory == "source_filesize":
             checkpoint_str = instance.configuration_values[CHECKPOINT]
             if not isinstance(checkpoint_str, str):
@@ -164,26 +164,26 @@ def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Er
             payload = Payload(
                 "fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]}
             )
-            action = from_source(payload)  # type: ignore
+            action = from_source(payload)
         elif instance.factory_id.factory == "transform_increment":
             a = lookup[instance.input_ids["a"]]
             amount = instance.configuration_values[AMOUNT]
             if not isinstance(amount, int):
                 return Either.error(f"Invalid type for {AMOUNT!r}: expected int, got {type(amount).__name__}")
-            action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": amount}))  # type: ignore
+            action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": amount}))
         elif instance.factory_id.factory == "product_join":
             a = lookup[instance.input_ids["a"]]
             b = lookup[instance.input_ids["b"]]
-            action = a.join(b, dim="inputs").reduce(Payload("fiab_plugin_test.runtime.product_join"))  # type: ignore
+            action = a.join(b, dim="inputs").reduce(Payload("fiab_plugin_test.runtime.product_join"))
         elif instance.factory_id.factory == "sink_file":
             data = lookup[instance.input_ids["data"]]
             fname = instance.configuration_values[FNAME]
             if not isinstance(fname, str):
                 return Either.error(f"Invalid type for {FNAME!r}: expected str, got {type(fname).__name__}")
-            action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))  # type: ignore
+            action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))
         elif instance.factory_id.factory == "sink_image":
             data = lookup[instance.input_ids["data"]]
-            action = data.map(Payload("fiab_plugin_test.runtime.sink_image"))  # type: ignore
+            action = data.map(Payload("fiab_plugin_test.runtime.sink_image"))
         else:
             raise TypeError(instance.factory_id.factory)
         return Either.ok(action)

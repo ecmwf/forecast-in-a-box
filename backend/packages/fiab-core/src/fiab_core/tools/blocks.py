@@ -162,7 +162,7 @@ class BlockInstanceRich(BlockInstance):
         typed_raw_value = cast(list[T], raw_value)
         if validator is not None:
             for item in typed_raw_value:
-                validator(item, option_id)  # ty: ignore[invalid-argument-type]
+                validator(item, option_id)
         return typed_raw_value
 
 
@@ -182,7 +182,7 @@ class QubedBlockBuilder(abc.ABC):
         self,
         inputs: ActionLookup,
         block: BlockInstance,
-    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+    ) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
         raise NotImplementedError
 
     def intersect(self, other: QubedOutput) -> bool:

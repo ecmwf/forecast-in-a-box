@@ -56,7 +56,7 @@ Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], BlockValid
 Expander = Callable[[BlockInstanceOutput], list[BlockExpansion]]
 """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
 
-Compiler = Callable[[ActionLookup, BlockInstance], Either[Action, Error]]  # type:ignore[invalid-argument] # semigroup
+Compiler = Callable[[ActionLookup, BlockInstance], Either[Action, Error]]  # ty:ignore[invalid-type-arguments] # semigroup
 """Given a cascade builder, represented as lookup of fluent actions, and a block instance corresponding to this plugin's Factory, either return the fluent action resulting from this block or an error"""
 
 
