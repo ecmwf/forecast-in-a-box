@@ -20,7 +20,7 @@ function uploadPypi() {
     wheelhouse=$2
     # NOTE we need wheelhouse to glob
     # shellcheck disable=SC2086
-    twine check $wheelhouse
+    uv run --with twine --no-project twine check $wheelhouse
     if [ "$testpypi" = "true" ] ; then
         TWINE_PASSWORD="$TWINE_PASSWORD_TEST"
         REPOSITORY="--repository testpypi --skip-existing"
@@ -30,7 +30,7 @@ function uploadPypi() {
     fi
     # NOTE we need wheelhouse to glob, and repository to expand
     # shellcheck disable=SC2086
-    TWINE_PASSWORD=$TWINE_PASSWORD twine upload --disable-progress-bar --verbose --non-interactive $REPOSITORY $wheelhouse
+    TWINE_PASSWORD=$TWINE_PASSWORD uv run --with twine --no-project twine upload --disable-progress-bar --verbose --non-interactive $REPOSITORY $wheelhouse
 }
 
 function gitTagAndPush() {
