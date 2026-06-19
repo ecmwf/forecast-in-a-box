@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -48,9 +49,9 @@ INPUT_SOURCE = ConfigurationOptionId("input_source")
 BASE_TIME = ConfigurationOptionId("base_time")
 
 
-def strip_timezone(dt: DATE) -> DATE:
+def strip_timezone(dt: datetime) -> datetime:
     if dt.tzinfo is not None:
-        return dt.astimezone(tz=None).replace(tzinfo=None)
+        return dt.astimezone(tz=UTC).replace(tzinfo=None)
     return dt
 
 
