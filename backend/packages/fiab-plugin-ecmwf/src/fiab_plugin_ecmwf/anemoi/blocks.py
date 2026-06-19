@@ -8,13 +8,13 @@
 # nor does it submit to any jurisdiction.
 
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions  # ty: ignore[unresolved-import]
-from earthkit.workflows.plugins.anemoi.types import DATE
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -48,6 +48,12 @@ INPUT_SOURCE = ConfigurationOptionId("input_source")
 BASE_TIME = ConfigurationOptionId("base_time")
 
 
+def strip_timezone(dt: datetime) -> datetime:
+    if dt.tzinfo is not None:
+        return dt.astimezone(tz=UTC).replace(tzinfo=None)
+    return dt
+
+
 class AnemoiBuilder:
     """Utility to build an Inference from an Anemoi checkpoint, for use in both Source and Transform blocks"""
 
@@ -73,11 +79,11 @@ class AnemoiBuilder:
             **self.checkpoint.get_additional_kwargs(),
         )
 
-    def from_input(self, input_source: str, date: DATE, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
+    def from_input(self, input_source: str, date: datetime, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
         input_configuration = self.checkpoint.get_input_configuration(input_source)
         return self.inference(lead_time=lead_time, extra_environment=INPUT_SOURCE_EXTRAS.get(input_source)).from_input(
             input=input_configuration,
-            date=date,
+            date=strip_timezone(date),
             lead_time=lead_time,
             ensemble_members=ensemble,
             **k,
@@ -89,14 +95,14 @@ class AnemoiBuilder:
             initial_conditions, **k, payload_metadata={"artifacts": [self.artifact_id]}
         )
 
-    def get_initial_conditions(self, input_source: str, date: DATE, ensemble: int = 1, **k: Any) -> Action:
+    def get_initial_conditions(self, input_source: str, date: datetime, ensemble: int = 1, **k: Any) -> Action:
         env = self.checkpoint.get_environment()
         env.extend(INPUT_SOURCE_EXTRAS.get(input_source, []))
 
         return get_initial_conditions(
             ckpt=self._local_path,
             input=self.checkpoint.get_input_configuration(input_source),
-            date=date,
+            date=strip_timezone(date),
             environment=env,
             ensemble_members=ensemble,
             payload_metadata={"artifacts": [self.artifact_id]},
@@ -168,7 +174,7 @@ class AnemoiSource(Source):
         action = builder.from_input(
             input_source=input_source,
             lead_time=block.config_as_int(LEAD_TIME, validator=positive),
-            date=block.config_as_datetime(BASE_TIME),
+            date=strip_timezone(block.config_as_datetime(BASE_TIME)),
             ensemble=block.config_as_int(ENSEMBLE, validator=positive),
         )
         return Either.ok(action)
@@ -223,7 +229,7 @@ class AnemoiInputSource(Source):
 
         action = builder.get_initial_conditions(
             input_source=block.config_as_str(INPUT_SOURCE),
-            date=block.config_as_datetime(BASE_TIME),
+            date=strip_timezone(block.config_as_datetime(BASE_TIME)),
             ensemble=block.config_as_int(ENSEMBLE, validator=positive),
         )
 
