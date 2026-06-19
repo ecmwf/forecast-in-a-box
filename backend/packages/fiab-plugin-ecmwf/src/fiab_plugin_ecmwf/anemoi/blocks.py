@@ -15,7 +15,6 @@ from typing import Any
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions  # ty: ignore[unresolved-import]
-from earthkit.workflows.plugins.anemoi.types import DATE
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -80,7 +79,7 @@ class AnemoiBuilder:
             **self.checkpoint.get_additional_kwargs(),
         )
 
-    def from_input(self, input_source: str, date: DATE, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
+    def from_input(self, input_source: str, date: datetime, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
         input_configuration = self.checkpoint.get_input_configuration(input_source)
         return self.inference(lead_time=lead_time, extra_environment=INPUT_SOURCE_EXTRAS.get(input_source)).from_input(
             input=input_configuration,
@@ -96,7 +95,7 @@ class AnemoiBuilder:
             initial_conditions, **k, payload_metadata={"artifacts": [self.artifact_id]}
         )
 
-    def get_initial_conditions(self, input_source: str, date: DATE, ensemble: int = 1, **k: Any) -> Action:
+    def get_initial_conditions(self, input_source: str, date: datetime, ensemble: int = 1, **k: Any) -> Action:
         env = self.checkpoint.get_environment()
         env.extend(INPUT_SOURCE_EXTRAS.get(input_source, []))
 
