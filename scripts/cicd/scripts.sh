@@ -141,12 +141,12 @@ function extractFiabCoreTag() {
 
 function majorFromVersion() {
     # args
-    # $1 <version> -- X.Y.Z version string, e.g. "2.1.0"
+    # $1 <version> -- X.Y.Z version string with optional prefix ([a-zA-Z]) and optional fourth number, e.g. "2.1.0" or "v1.2.3.0"
     # behaviour -- echoes the major version integer, e.g. "2"
     # usage: TAG_FIABCORE_MAJ=$(majorFromVersion "$TAG_FIABCORE")
     local version="$1"
     local major
-    major=$(echo "$version" | sed -nE 's/^([0-9]+)\.[0-9]+\.[0-9]+$/\1/p')
+    major=$(echo "$version" | sed -nE 's/^([a-zA-Z]+)?([0-9]+)\.[0-9]+\.[0-9]+(\.[0-9]+)?$/\2/p')
     if [[ -z "$major" ]]; then
         echo "majorFromVersion: cannot extract major from version: $version" >&2
         exit 1

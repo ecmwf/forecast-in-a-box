@@ -1,5 +1,5 @@
 val:
-    uv run ty check src/
+    uv run ty check src tests
     uv run pytest
 
 build:

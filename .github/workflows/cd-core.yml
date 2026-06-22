@@ -45,6 +45,7 @@ jobs:
 
           TAG_PREF="c"
           TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
+          TAG_FIABCORE_MAJ=$(majorFromVersion "$TAG")
           TAG="${TAG}.0"
 
           preparePythonWheelVersion $TAG
@@ -63,16 +64,20 @@ jobs:
           popd
 
           pushd fiab-plugin-test
+          patchFiabCoreDep "$TAG_FIABCORE_MAJ"
+          git add pyproject.toml
           source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
           just build
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
-          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh dist/*whl
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh ../packagesDist/fiab_core*whl dist/*whl
           just val
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           mv dist/* ../packagesDist
           popd
 
           uploadPypi "${{ inputs.testpypi }}" 'packagesDist/*'
+          git commit -m "Core Release $TAG" --allow-empty # NOTE we allow empty because the FIABCORE_MAJ possibly didnt change
+          git push
           gitTagAndPush "${{ inputs.testpypi }}" $TAG
 
         env:

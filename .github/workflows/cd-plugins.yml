@@ -1,4 +1,4 @@
-name: CD for plugins (core+ecmwf)
+name: CD for plugins (demo+ecmwf)
 
 # Releases fiab-plugin-ecmwf and fiab-plugin-demo.
 #
@@ -44,6 +44,7 @@ jobs:
 
           source scripts/cicd/scripts.sh
           setupBash "${{ inputs.testpypi }}" 
+          REPO_ROOT=$(pwd)
 
           TAG_PREF="p"
           TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
@@ -51,6 +52,9 @@ jobs:
           preparePythonWheelVersion $TAG
           TAG_FIABCORE=$(extractFiabCoreTag "$TAG")
           TAG_FIABCORE_MAJ=$(majorFromVersion "$TAG_FIABCORE")
+
+          cd backend/packages
+          mkdir packagesDist
 
           pushd fiab-plugin-ecmwf
           patchFiabCoreDep "$TAG_FIABCORE_MAJ"

@@ -1,4 +1,4 @@
-name: cd
+name: CD for main package (backend & frontend)
 
 on:
   workflow_dispatch:
@@ -36,6 +36,7 @@ jobs:
 
           source scripts/cicd/scripts.sh
           setupBash "${{ inputs.testpypi }}" 
+          REPO_ROOT=$(pwd)
 
           # derive the tag
           TAG_PREF="v"
@@ -68,7 +69,6 @@ jobs:
           git add install/pylock.toml
           git commit -m "Release $TAG" --allow-empty
           git push
-
           gitTagAndPush "${{ inputs.testpypi }}" $TAG
 
         env:

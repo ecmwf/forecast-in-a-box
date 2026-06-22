@@ -152,8 +152,10 @@ test_major_from_version() {
     result=$(majorFromVersion "10.0.0")
     assert_eq "two-digit major" "10" "$result"
 
+    result=$(majorFromVersion "c12.13.14.0")
+    assert_eq "4-part major with prefix" "12" "$result"
+
     assert_fails "bare integer rejected" majorFromVersion "2"
-    assert_fails "4-part version rejected" majorFromVersion "2.1.0.4"
     assert_fails "non-numeric rejected" majorFromVersion "notaversion"
 }
 
