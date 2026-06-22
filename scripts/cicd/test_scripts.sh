@@ -108,24 +108,23 @@ test_extract_fiab_core_tag() {
 
     reset_mocks
     export MOCK_GIT_TAGS_LIST="c2.0.0"
-    extractFiabCoreTag "p2.3.4"
-    assert_eq "sets TAG_FIABCORE" "2.0.0" "$TAG_FIABCORE"
-    assert_eq "sets TAG_FIABCORE_MAJ" "2" "$TAG_FIABCORE_MAJ"
+    result=$(extractFiabCoreTag "p2.3.4")
+    assert_eq "echoes fiab-core version" "2.0.0" "$result"
 
     reset_mocks
     export MOCK_GIT_TAGS_LIST=$'c2.0.0\nc2.1.5\nc2.1.0'
-    extractFiabCoreTag "p2.3.4"
-    assert_eq "picks latest cX tag" "2.1.5" "$TAG_FIABCORE"
+    result=$(extractFiabCoreTag "p2.3.4")
+    assert_eq "picks latest cX tag" "2.1.5" "$result"
 
     reset_mocks
     export MOCK_GIT_TAGS_LIST="c2.0.0.5"
-    extractFiabCoreTag "p2.0.0"
-    assert_eq "4-part cX tag stripped to X.Y.Z" "2.0.0" "$TAG_FIABCORE"
+    result=$(extractFiabCoreTag "p2.0.0")
+    assert_eq "4-part cX tag stripped to X.Y.Z" "2.0.0" "$result"
 
     reset_mocks
     export MOCK_GIT_TAGS_LIST=$'c1.0.0\nc1.2.3'  # only c1 tags, as git would return for "c1.*"
-    extractFiabCoreTag "p1.5.0"
-    assert_eq "only matches correct major" "1.2.3" "$TAG_FIABCORE"
+    result=$(extractFiabCoreTag "p1.5.0")
+    assert_eq "only matches correct major" "1.2.3" "$result"
     # verify the correct prefix was used to query git
     assert_contains "queries git with correct major prefix" "tag -l c1." "$(cat "$MOCK_CALLS_FILE")"
 
@@ -139,6 +138,26 @@ test_extract_fiab_core_tag() {
 }
 
 # ---------------------------------------------------------------------------
+# Tests: majorFromVersion
+# ---------------------------------------------------------------------------
+test_major_from_version() {
+    echo "--- majorFromVersion ---"
+
+    result=$(majorFromVersion "2.1.0")
+    assert_eq "extracts major from X.Y.Z" "2" "$result"
+
+    result=$(majorFromVersion "0.5.3")
+    assert_eq "extracts major=0" "0" "$result"
+
+    result=$(majorFromVersion "10.0.0")
+    assert_eq "two-digit major" "10" "$result"
+
+    assert_fails "bare integer rejected" majorFromVersion "2"
+    assert_fails "4-part version rejected" majorFromVersion "2.1.0.4"
+    assert_fails "non-numeric rejected" majorFromVersion "notaversion"
+}
+
+# ---------------------------------------------------------------------------
 # Tests: patchFiabCoreDep
 # ---------------------------------------------------------------------------
 test_patch_fiab_core_dep() {
@@ -147,9 +166,10 @@ test_patch_fiab_core_dep() {
     local tmpdir
     tmpdir=$(mktemp -d)
 
+    # Happy path: sentinel present, single matching line
     cat > "$tmpdir/pyproject.toml" << 'EOF'
 dependencies = [
-    "fiab-core>=0.0.1,<1.0.0", # ~=0.0
+    "fiab-core>=0.0.1,<1.0.0", # *auto-updateable* -- do not remove this comment
     "other-dep>=1.0",
 ]
 EOF
@@ -162,17 +182,50 @@ EOF
     result=$(cat "$tmpdir/pyproject.toml")
     assert_contains "patches fiab-core to >=2,<3" '"fiab-core>=2,<3"' "$result"
     assert_not_contains "old lower bound removed" "0.0.1" "$result"
+    assert_contains "sentinel comment present after patch" "auto-updateable" "$result"
     assert_contains "other dep unchanged" '"other-dep>=1.0"' "$result"
 
-    # Works for major=0
-    cat > "$tmpdir/pyproject.toml" << 'EOF'
-dependencies = ["fiab-core>=0,<1"]
-EOF
+    # Applying patch again (idempotent re-patch to different major)
     pushd "$tmpdir" > /dev/null
-    patchFiabCoreDep "0"
+    patchFiabCoreDep "3"
     popd > /dev/null
     result=$(cat "$tmpdir/pyproject.toml")
-    assert_contains "patches major=0 to >=0,<1" '"fiab-core>=0,<1"' "$result"
+    assert_contains "re-patch works" '"fiab-core>=3,<4"' "$result"
+    assert_contains "sentinel still present after re-patch" "auto-updateable" "$result"
+
+    # Robustness: a non-sentinel fiab-core mention on another line is not patched
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+# previous constraint was "fiab-core>=0,<1"
+dependencies = [
+    "fiab-core>=0.0.1,<1.0.0", # *auto-updateable* -- do not remove this comment
+    "other-dep>=1.0",
+]
+EOF
+    pushd "$tmpdir" > /dev/null
+    patchFiabCoreDep "2"
+    popd > /dev/null
+    result=$(cat "$tmpdir/pyproject.toml")
+    assert_contains "sentinel line patched" '"fiab-core>=2,<3"' "$result"
+    assert_contains "non-sentinel fiab-core line not patched" '"fiab-core>=0,<1"' "$result"
+
+    # Fails when sentinel comment is absent
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+dependencies = ["fiab-core>=0.0.1,<1.0.0"]
+EOF
+    pushd "$tmpdir" > /dev/null
+    assert_fails "fails without sentinel comment" patchFiabCoreDep "2"
+    popd > /dev/null
+
+    # Fails when multiple sentinel lines match
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+dependencies = [
+    "fiab-core>=0.0.1,<1.0.0", # *auto-updateable* -- do not remove this comment
+    "fiab-core>=0.0.1,<1.0.0", # *auto-updateable* -- do not remove this comment
+]
+EOF
+    pushd "$tmpdir" > /dev/null
+    assert_fails "fails with multiple sentinel lines" patchFiabCoreDep "2"
+    popd > /dev/null
 
     rm -rf "$tmpdir"
 }
@@ -465,6 +518,7 @@ echo ""
 
 test_prepare_python_wheel_version
 test_extract_fiab_core_tag
+test_major_from_version
 test_patch_fiab_core_dep
 test_get_latest_tag_and_increment
 test_validate_tag

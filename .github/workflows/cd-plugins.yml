@@ -49,7 +49,8 @@ jobs:
           TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
 
           preparePythonWheelVersion $TAG
-          extractFiabCoreTag "$TAG"
+          TAG_FIABCORE=$(extractFiabCoreTag "$TAG")
+          TAG_FIABCORE_MAJ=$(majorFromVersion "$TAG_FIABCORE")
 
           pushd fiab-plugin-ecmwf
           patchFiabCoreDep "$TAG_FIABCORE_MAJ"

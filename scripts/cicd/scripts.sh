@@ -112,10 +112,9 @@ function extractFiabCoreTag() {
     # args
     # $1 <plugin_tag> -- e.g. "p2.3.4" or "p2.3.4.0"
     # behaviour -- derives major version from plugin_tag, finds the latest git tag
-    # matching c<major>.*.*, strips to X.Y.Z, and exports:
-    #   TAG_FIABCORE     -- version string, e.g. "2.1.0"
-    #   TAG_FIABCORE_MAJ -- major only,    e.g. "2"
-    # fails hard if no matching tag exists
+    # matching c<major>.*.*, strips to X.Y.Z, and echoes the version string.
+    # fails hard if no matching tag exists or plugin_tag is malformed.
+    # usage: TAG_FIABCORE=$(extractFiabCoreTag "$TAG")
     local plugin_tag="$1"
     local major
     major=$(echo "$plugin_tag" | sed -nE 's/^[a-zA-Z]*([0-9]+)\.[0-9]+\.[0-9]+(\.[0-9]+)?$/\1/p')
@@ -137,17 +136,49 @@ function extractFiabCoreTag() {
         exit 1
     fi
 
-    TAG_FIABCORE="$found"
-    TAG_FIABCORE_MAJ="$major"
-    export TAG_FIABCORE TAG_FIABCORE_MAJ
+    echo "$found"
+}
+
+function majorFromVersion() {
+    # args
+    # $1 <version> -- X.Y.Z version string, e.g. "2.1.0"
+    # behaviour -- echoes the major version integer, e.g. "2"
+    # usage: TAG_FIABCORE_MAJ=$(majorFromVersion "$TAG_FIABCORE")
+    local version="$1"
+    local major
+    major=$(echo "$version" | sed -nE 's/^([0-9]+)\.[0-9]+\.[0-9]+$/\1/p')
+    if [[ -z "$major" ]]; then
+        echo "majorFromVersion: cannot extract major from version: $version" >&2
+        exit 1
+    fi
+    echo "$major"
 }
 
 function patchFiabCoreDep() {
     # args
     # $1 <major> -- integer major version, e.g. "2"
     # behaviour -- rewrites the fiab-core dependency constraint in pyproject.toml
-    # in CWD to "fiab-core>=${major},<${major+1}"
+    # in CWD to "fiab-core>=${major},<${major+1} # SENTINEL".
+    # MATCH requires the fiab-core dep to precede the sentinel, so only the
+    # actual dependency line is ever modified (other mentions of fiab-core without
+    # the sentinel, or with the sentinel before the dep, are not affected).
+    # Fails hard if pyproject.toml does not contain exactly one line matching MATCH.
     local major="$1"
     local next_major=$(( major + 1 ))
-    sed -i -E 's/"fiab-core[^"]*"/"fiab-core>='"$major"',<'"$next_major"'"/' pyproject.toml
+
+    local SENTINEL="auto-updateable"
+    local MATCH='"fiab-core[^"]*".*'"$SENTINEL"
+    local REPLACE_WITH="\"fiab-core>=${major},<${next_major}\", # ${SENTINEL} -- do not remove this comment"
+
+    local count
+    count=$(grep -cE "$MATCH" pyproject.toml || true)
+    if [[ "$count" -ne 1 ]]; then
+        echo "patchFiabCoreDep: expected exactly 1 ${SENTINEL} fiab-core line in pyproject.toml, found $count" >&2
+        exit 1
+    fi
+
+    # MATCH already encodes both the fiab-core dep and the sentinel (in that order),
+    # so a single substitution is sufficient and more precise than a two-stage
+    # address+pattern approach.
+    sed -i -E "s|${MATCH}.*|${REPLACE_WITH}|" pyproject.toml
 }
