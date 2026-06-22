@@ -224,6 +224,141 @@ test_upload_pypi() {
 }
 
 # ---------------------------------------------------------------------------
+# Tests: tearDownVenv.sh
+# ---------------------------------------------------------------------------
+test_teardown_venv() {
+    echo "--- tearDownVenv.sh ---"
+
+    local tmpvenv
+    tmpvenv=$(mktemp -d)
+
+    # Set up environment that mirrors what prepare*Venv.sh would leave behind
+    VIRTUAL_ENV="$tmpvenv"
+    UV_PROJECT_ENVIRONMENT="$tmpvenv"
+    UV_NO_PROJECT="1"
+
+    # Provide a mock deactivate shell function (normally defined by activate)
+    deactivate() { unset VIRTUAL_ENV 2>/dev/null || true; }
+
+    # shellcheck source=scripts/cicd/tearDownVenv.sh
+    source "$SCRIPT_DIR/tearDownVenv.sh"
+
+    unset -f deactivate 2>/dev/null || true
+
+    if [[ ! -d "$tmpvenv" ]]; then
+        _pass "teardown: venv directory removed"
+    else
+        _fail "teardown: venv directory removed" "directory still exists: $tmpvenv"
+        rm -rf "$tmpvenv"
+    fi
+
+    if [[ -z "${UV_PROJECT_ENVIRONMENT:-}" ]]; then
+        _pass "teardown: UV_PROJECT_ENVIRONMENT unset"
+    else
+        _fail "teardown: UV_PROJECT_ENVIRONMENT unset" "still set: $UV_PROJECT_ENVIRONMENT"
+    fi
+
+    if [[ -z "${UV_NO_PROJECT:-}" ]]; then
+        _pass "teardown: UV_NO_PROJECT unset"
+    else
+        _fail "teardown: UV_NO_PROJECT unset" "still set: $UV_NO_PROJECT"
+    fi
+
+    # Edge case: UV_PROJECT_ENVIRONMENT that does NOT match venv should be preserved
+    local tmpvenv2 tmpvenv3
+    tmpvenv2=$(mktemp -d)
+    tmpvenv3=$(mktemp -d)
+    VIRTUAL_ENV="$tmpvenv2"
+    UV_PROJECT_ENVIRONMENT="$tmpvenv3"   # different path
+    UV_NO_PROJECT="1"
+    deactivate() { unset VIRTUAL_ENV 2>/dev/null || true; }
+
+    source "$SCRIPT_DIR/tearDownVenv.sh"
+
+    unset -f deactivate 2>/dev/null || true
+
+    if [[ "${UV_PROJECT_ENVIRONMENT:-}" == "$tmpvenv3" ]]; then
+        _pass "teardown: UV_PROJECT_ENVIRONMENT preserved when path differs"
+    else
+        _fail "teardown: UV_PROJECT_ENVIRONMENT preserved when path differs" \
+              "expected '$tmpvenv3' got '${UV_PROJECT_ENVIRONMENT:-}'"
+    fi
+    rm -rf "$tmpvenv3"
+}
+
+# ---------------------------------------------------------------------------
+# Tests: prepareBuildVenv.sh
+# ---------------------------------------------------------------------------
+test_prepare_build_venv() {
+    echo "--- prepareBuildVenv.sh ---"
+
+    local tmpdir calls_file
+    tmpdir=$(mktemp -d)
+    calls_file="$tmpdir/calls"
+    touch "$calls_file"
+
+    # Source in a subshell with tmpdir as CWD so relative venv path works
+    local output
+    output=$(
+        cd "$tmpdir"
+        export PATH="$MOCKS_DIR:$PATH"
+        export MOCK_CALLS_FILE="$calls_file"
+        # shellcheck source=scripts/cicd/prepareBuildVenv.sh
+        source "$SCRIPT_DIR/prepareBuildVenv.sh"
+        printf "VIRTUAL_ENV=%s\n"              "${VIRTUAL_ENV:-}"
+        printf "UV_PROJECT_ENVIRONMENT=%s\n"   "${UV_PROJECT_ENVIRONMENT:-}"
+        printf "UV_NO_PROJECT=%s\n"            "${UV_NO_PROJECT:-}"
+    )
+    local calls
+    calls=$(cat "$calls_file")
+
+    assert_contains "prepareBuildVenv: uv venv buildVenv called" "uv venv buildVenv" "$calls"
+    assert_contains "prepareBuildVenv: uv pip install build called" "uv pip install build" "$calls"
+    assert_contains "prepareBuildVenv: VIRTUAL_ENV contains buildVenv" "buildVenv" "$output"
+    assert_contains "prepareBuildVenv: UV_PROJECT_ENVIRONMENT contains buildVenv" "buildVenv" "$output"
+    assert_contains "prepareBuildVenv: UV_NO_PROJECT=1" "UV_NO_PROJECT=1" "$output"
+
+    rm -rf "$tmpdir"
+}
+
+# ---------------------------------------------------------------------------
+# Tests: prepareValVenv.sh
+# ---------------------------------------------------------------------------
+test_prepare_val_venv() {
+    echo "--- prepareValVenv.sh ---"
+
+    local tmpdir calls_file
+    tmpdir=$(mktemp -d)
+    calls_file="$tmpdir/calls"
+    touch "$calls_file"
+
+    local output
+    output=$(
+        cd "$tmpdir"
+        export PATH="$MOCKS_DIR:$PATH"
+        export MOCK_CALLS_FILE="$calls_file"
+        # SCRIPT_DIR must be set (normally set by prepareBuildVenv.sh in the workflow)
+        export SCRIPT_DIR="$SCRIPT_DIR"
+        # shellcheck source=scripts/cicd/prepareValVenv.sh
+        source "$SCRIPT_DIR/prepareValVenv.sh"
+        printf "VIRTUAL_ENV=%s\n"             "${VIRTUAL_ENV:-}"
+        printf "UV_PROJECT_ENVIRONMENT=%s\n"  "${UV_PROJECT_ENVIRONMENT:-}"
+        printf "UV_NO_PROJECT=%s\n"           "${UV_NO_PROJECT:-}"
+    )
+    local calls
+    calls=$(cat "$calls_file")
+
+    assert_contains "prepareValVenv: uv venv valVenv called" "uv venv valVenv" "$calls"
+    assert_contains "prepareValVenv: uv pip install pytest" "uv pip install pytest" "$calls"
+    assert_contains "prepareValVenv: VIRTUAL_ENV contains valVenv" "valVenv" "$output"
+    # UV_PROJECT_ENVIRONMENT points to buildVenv (intentional, see script comment)
+    assert_contains "prepareValVenv: UV_PROJECT_ENVIRONMENT contains buildVenv" "buildVenv" "$output"
+    assert_contains "prepareValVenv: UV_NO_PROJECT=1" "UV_NO_PROJECT=1" "$output"
+
+    rm -rf "$tmpdir"
+}
+
+# ---------------------------------------------------------------------------
 # Tests: gitTagAndPush
 # ---------------------------------------------------------------------------
 test_git_tag_and_push() {
@@ -257,6 +392,9 @@ test_validate_tag
 test_tag_from_input_or_latest
 test_upload_pypi
 test_git_tag_and_push
+test_teardown_venv
+test_prepare_build_venv
+test_prepare_val_venv
 
 echo ""
 if [[ $TESTS_FAILED -gt 0 ]]; then

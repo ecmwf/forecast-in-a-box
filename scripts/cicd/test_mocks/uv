@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Mock for uv. Records all calls to $MOCK_CALLS_FILE.
+#
+# Configurable behavior:
+#   - 'uv venv <dir>': creates a fake venv at <dir>/ with a working bin/activate
+#   - 'uv pip install ...': records and succeeds
+#   - 'uv run --with twine --no-project twine <args>': records the full invocation
+#     (callers can grep for "twine check" / "twine upload" / flag names)
+#   - all other subcommands: record and succeed
+
+echo "uv $*" >> "${MOCK_CALLS_FILE:-/dev/null}"
+
+case "$1" in
+  venv)
+    dir="${2:-.venv}"
+    mkdir -p "$dir/bin"
+    cat > "$dir/bin/activate" << 'ACTIVATE_EOF'
+# Minimal fake activate produced by the uv mock
+VIRTUAL_ENV="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export VIRTUAL_ENV
+deactivate() {
+    unset VIRTUAL_ENV
+    unset -f deactivate 2>/dev/null || true
+}
+ACTIVATE_EOF
+    ;;
+  pip|run|sync|lock|add|remove|tree)
+    # record only (already recorded above), succeed
+    ;;
+  *)
+    ;;
+esac
