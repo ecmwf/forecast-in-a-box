@@ -1,4 +1,4 @@
-name: CD for main package (backend & frontend)
+name: CD for the application itself (backend & frontend)
 
 on:
   workflow_dispatch:
@@ -57,7 +57,8 @@ jobs:
 
           # test
           pushd backend
-          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh -r ../install/pylock.toml -e packages/fiab-plugin-test ./dist/*whl
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh -r ../install/pylock.toml
+          uv pip install -e packages/fiab-plugin-test ./dist/*whl # NOTE cannot be merged with above, pylock must be alone
           just val
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           popd
