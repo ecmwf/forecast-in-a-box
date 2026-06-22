@@ -49,10 +49,10 @@ jobs:
           TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
 
           preparePythonWheelVersion $TAG
-          # TODO-task extract fiab core tag: we need to TAG_FIABCORE=$(..) -- look for all tags starting with `c`, find any tag cX.Y1.Z1.D where the X is the major version in $TAG derived above (ie, TAG=dX.Y2.Z2) for this X; then set TAG_FIABCORE to X.Y1.Z1, and TAG_FIABCORE_MAJ=X. If no such tag found, fail hard
+          extractFiabCoreTag "$TAG"
 
           pushd fiab-plugin-ecmwf
-          # TODO-task replace the fiab-core dependency constraint with >=X,<X+1, where X comes from TAG_FIABCORE_MAJ
+          patchFiabCoreDep "$TAG_FIABCORE_MAJ"
           git add pyproject.toml
           source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
           uv pip install "fiab-core==${TAG_FIABCORE}"
@@ -65,7 +65,7 @@ jobs:
           popd
 
           pushd fiab-plugin-demo
-          # TODO-task replace the fiab-core dependency constraint with >=X,<X+1, where X comes from TAG_FIABCORE_MAJ
+          patchFiabCoreDep "$TAG_FIABCORE_MAJ"
           git add pyproject.toml
           source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
           uv pip install "fiab-core==${TAG_FIABCORE}"

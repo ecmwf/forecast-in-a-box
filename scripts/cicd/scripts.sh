@@ -107,3 +107,47 @@ function preparePythonWheelVersion() {
     tag=$(echo "$tag_full" | sed -nE 's/^[a-zA-Z]*([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?$/\1/p')
     export SETUPTOOLS_SCM_PRETEND_VERSION=$tag
 }
+
+function extractFiabCoreTag() {
+    # args
+    # $1 <plugin_tag> -- e.g. "p2.3.4" or "p2.3.4.0"
+    # behaviour -- derives major version from plugin_tag, finds the latest git tag
+    # matching c<major>.*.*, strips to X.Y.Z, and exports:
+    #   TAG_FIABCORE     -- version string, e.g. "2.1.0"
+    #   TAG_FIABCORE_MAJ -- major only,    e.g. "2"
+    # fails hard if no matching tag exists
+    local plugin_tag="$1"
+    local major
+    major=$(echo "$plugin_tag" | sed -nE 's/^[a-zA-Z]*([0-9]+)\.[0-9]+\.[0-9]+(\.[0-9]+)?$/\1/p')
+    if [[ -z "$major" ]]; then
+        echo "extractFiabCoreTag: cannot derive major version from tag: $plugin_tag" >&2
+        exit 1
+    fi
+
+    local found
+    found=$(
+        git tag -l "c${major}.*" \
+        | sed -nE 's/^c([0-9]+\.[0-9]+\.[0-9]+)(\.[0-9]+)?$/\1/p' \
+        | sort -V \
+        | tail -n1
+    )
+
+    if [[ -z "$found" ]]; then
+        echo "extractFiabCoreTag: no fiab-core tag found for major version $major" >&2
+        exit 1
+    fi
+
+    TAG_FIABCORE="$found"
+    TAG_FIABCORE_MAJ="$major"
+    export TAG_FIABCORE TAG_FIABCORE_MAJ
+}
+
+function patchFiabCoreDep() {
+    # args
+    # $1 <major> -- integer major version, e.g. "2"
+    # behaviour -- rewrites the fiab-core dependency constraint in pyproject.toml
+    # in CWD to "fiab-core>=${major},<${major+1}"
+    local major="$1"
+    local next_major=$(( major + 1 ))
+    sed -i -E 's/"fiab-core[^"]*"/"fiab-core>='"$major"',<'"$next_major"'"/' pyproject.toml
+}

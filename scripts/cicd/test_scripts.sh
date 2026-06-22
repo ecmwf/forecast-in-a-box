@@ -101,6 +101,83 @@ test_prepare_python_wheel_version() {
 }
 
 # ---------------------------------------------------------------------------
+# Tests: extractFiabCoreTag
+# ---------------------------------------------------------------------------
+test_extract_fiab_core_tag() {
+    echo "--- extractFiabCoreTag ---"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST="c2.0.0"
+    extractFiabCoreTag "p2.3.4"
+    assert_eq "sets TAG_FIABCORE" "2.0.0" "$TAG_FIABCORE"
+    assert_eq "sets TAG_FIABCORE_MAJ" "2" "$TAG_FIABCORE_MAJ"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST=$'c2.0.0\nc2.1.5\nc2.1.0'
+    extractFiabCoreTag "p2.3.4"
+    assert_eq "picks latest cX tag" "2.1.5" "$TAG_FIABCORE"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST="c2.0.0.5"
+    extractFiabCoreTag "p2.0.0"
+    assert_eq "4-part cX tag stripped to X.Y.Z" "2.0.0" "$TAG_FIABCORE"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST=$'c1.0.0\nc1.2.3'  # only c1 tags, as git would return for "c1.*"
+    extractFiabCoreTag "p1.5.0"
+    assert_eq "only matches correct major" "1.2.3" "$TAG_FIABCORE"
+    # verify the correct prefix was used to query git
+    assert_contains "queries git with correct major prefix" "tag -l c1." "$(cat "$MOCK_CALLS_FILE")"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST=""
+    assert_fails "no matching tag fails hard" extractFiabCoreTag "p2.0.0"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST="c2.0.0"
+    assert_fails "malformed plugin tag fails" extractFiabCoreTag "badtag"
+}
+
+# ---------------------------------------------------------------------------
+# Tests: patchFiabCoreDep
+# ---------------------------------------------------------------------------
+test_patch_fiab_core_dep() {
+    echo "--- patchFiabCoreDep ---"
+
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+dependencies = [
+    "fiab-core>=0.0.1,<1.0.0", # ~=0.0
+    "other-dep>=1.0",
+]
+EOF
+
+    pushd "$tmpdir" > /dev/null
+    patchFiabCoreDep "2"
+    popd > /dev/null
+
+    local result
+    result=$(cat "$tmpdir/pyproject.toml")
+    assert_contains "patches fiab-core to >=2,<3" '"fiab-core>=2,<3"' "$result"
+    assert_not_contains "old lower bound removed" "0.0.1" "$result"
+    assert_contains "other dep unchanged" '"other-dep>=1.0"' "$result"
+
+    # Works for major=0
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+dependencies = ["fiab-core>=0,<1"]
+EOF
+    pushd "$tmpdir" > /dev/null
+    patchFiabCoreDep "0"
+    popd > /dev/null
+    result=$(cat "$tmpdir/pyproject.toml")
+    assert_contains "patches major=0 to >=0,<1" '"fiab-core>=0,<1"' "$result"
+
+    rm -rf "$tmpdir"
+}
+
+# ---------------------------------------------------------------------------
 # Tests: getLatestTagAndIncrement
 # ---------------------------------------------------------------------------
 test_get_latest_tag_and_increment() {
@@ -387,6 +464,8 @@ echo "Running tests for scripts/cicd/scripts.sh"
 echo ""
 
 test_prepare_python_wheel_version
+test_extract_fiab_core_tag
+test_patch_fiab_core_dep
 test_get_latest_tag_and_increment
 test_validate_tag
 test_tag_from_input_or_latest
