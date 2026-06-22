@@ -93,7 +93,7 @@ class PluginCompositeId(FiabCoreBaseModel):
         return cls(store=PluginStoreId(store), local=PluginId(local))
 
     @staticmethod
-    def to_str(k: Self) -> str:
+    def to_str(k: "PluginCompositeId") -> str:
         return f"{k.store}:{k.local}"
 
 

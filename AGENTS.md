@@ -34,6 +34,10 @@
   ```
   This provides the actual inline review comments which `gh pr view` doesn't show properly, and filters out resolved threads
 
+# CI/CD
+* GitHub Actions workflows live in `.github/workflows/`
+* Reusable shell helpers consumed by the workflows are in `scripts/cicd/`; see `scripts/cicd/README.md` for how to extend them
+
 # Backend
 * for development related to backend or backend/packages, consult `backend/development.md`
 

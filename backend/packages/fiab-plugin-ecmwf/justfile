@@ -1,5 +1,8 @@
 val:
     uv run ty check src tests
+    just test
+
+test:
     uv run pytest ./tests/unit && uv run --extra runtime pytest ./tests/runtime
 
 build:

@@ -1,4 +1,4 @@
-name: cd
+name: CD for the backend itself (including the bundled frontend)
 
 on:
   workflow_dispatch:
@@ -36,36 +36,31 @@ jobs:
 
           source scripts/cicd/scripts.sh
           setupBash "${{ inputs.testpypi }}" 
+          REPO_ROOT=$(pwd)
 
           # derive the tag
           TAG_PREF="v"
           TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
           preparePythonWheelVersion $TAG
-
-          # prereqs
-          uv venv venv && source venv/bin/activate
-          export UV_PROJECT_ENVIRONMENT=$(pwd)/venv
-          uv pip install twine build
+          TAG_FIABCORE=$(extractFiabCoreTag "$TAG")
+          TAG_FIABCORE_MAJ=$(majorFromVersion "$TAG_FIABCORE")
 
           # build
+          source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
+          pushd backend && patchFiabCoreDep "$TAG_FIABCORE_MAJ" && popd
           just fiabwheel
           pushd backend
-          # NOTE checking packagesDist disabled for now
-          twine check ./dist/* # ./packagesDist/*
           uv export -o pylock.toml --no-emit-workspace --all-extras --no-dev > /dev/null
-          echo "# a comment to make git not fail even if no changes" >> pylock.toml
           mv pylock.toml ../install/pylock.toml
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           popd
 
           # test
           pushd backend
-          uv pip install -r ../install/pylock.toml
-          # NOTE uploading packagesDist disabled for now -- handled in a different CI action
-          uv pip install ./dist/*whl # ./packagesDist/*whl
-          uv pip install pytest pytest-xdist pytest-asyncio pytest-subtests pytest-mock # TODO how to get this from pyproject?
-          uv pip install -e packages/fiab-plugin-test
-          # TODO redesign the workflow to allow for arch-platform matrix here...? But from where to push the lock?
-          just val
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh -r ../install/pylock.toml
+          uv pip install -e packages/fiab-plugin-test ./dist/*whl # NOTE cannot be merged with above, pylock must be alone
+          just test
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           popd
 
           # upload
@@ -75,7 +70,6 @@ jobs:
           git add install/pylock.toml
           git commit -m "Release $TAG" --allow-empty
           git push
-
           gitTagAndPush "${{ inputs.testpypi }}" $TAG
 
         env:

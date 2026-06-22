@@ -101,6 +101,138 @@ test_prepare_python_wheel_version() {
 }
 
 # ---------------------------------------------------------------------------
+# Tests: extractFiabCoreTag
+# ---------------------------------------------------------------------------
+test_extract_fiab_core_tag() {
+    echo "--- extractFiabCoreTag ---"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST="c2.0.0"
+    result=$(extractFiabCoreTag "p2.3.4")
+    assert_eq "echoes fiab-core version" "2.0.0" "$result"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST=$'c2.0.0\nc2.1.5\nc2.1.0'
+    result=$(extractFiabCoreTag "p2.3.4")
+    assert_eq "picks latest cX tag" "2.1.5" "$result"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST="c2.0.0.5"
+    result=$(extractFiabCoreTag "p2.0.0")
+    assert_eq "4-part cX tag stripped to X.Y.Z" "2.0.0" "$result"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST=$'c1.0.0\nc1.2.3'  # only c1 tags, as git would return for "c1.*"
+    result=$(extractFiabCoreTag "p1.5.0")
+    assert_eq "only matches correct major" "1.2.3" "$result"
+    # verify the correct prefix was used to query git
+    assert_contains "queries git with correct major prefix" "tag -l c1." "$(cat "$MOCK_CALLS_FILE")"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST=""
+    assert_fails "no matching tag fails hard" extractFiabCoreTag "p2.0.0"
+
+    reset_mocks
+    export MOCK_GIT_TAGS_LIST="c2.0.0"
+    assert_fails "malformed plugin tag fails" extractFiabCoreTag "badtag"
+}
+
+# ---------------------------------------------------------------------------
+# Tests: majorFromVersion
+# ---------------------------------------------------------------------------
+test_major_from_version() {
+    echo "--- majorFromVersion ---"
+
+    result=$(majorFromVersion "2.1.0")
+    assert_eq "extracts major from X.Y.Z" "2" "$result"
+
+    result=$(majorFromVersion "0.5.3")
+    assert_eq "extracts major=0" "0" "$result"
+
+    result=$(majorFromVersion "10.0.0")
+    assert_eq "two-digit major" "10" "$result"
+
+    result=$(majorFromVersion "c12.13.14.0")
+    assert_eq "4-part major with prefix" "12" "$result"
+
+    assert_fails "bare integer rejected" majorFromVersion "2"
+    assert_fails "non-numeric rejected" majorFromVersion "notaversion"
+}
+
+# ---------------------------------------------------------------------------
+# Tests: patchFiabCoreDep
+# ---------------------------------------------------------------------------
+test_patch_fiab_core_dep() {
+    echo "--- patchFiabCoreDep ---"
+
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    # Happy path: sentinel present, single matching line
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+dependencies = [
+    "fiab-core>=0.0.1,<1.0.0", # *auto-updateable* -- do not remove this comment
+    "other-dep>=1.0",
+]
+EOF
+
+    pushd "$tmpdir" > /dev/null
+    patchFiabCoreDep "2"
+    popd > /dev/null
+
+    local result
+    result=$(cat "$tmpdir/pyproject.toml")
+    assert_contains "patches fiab-core to >=2,<3" '"fiab-core>=2,<3"' "$result"
+    assert_not_contains "old lower bound removed" "0.0.1" "$result"
+    assert_contains "sentinel comment present after patch" "auto-updateable" "$result"
+    assert_contains "other dep unchanged" '"other-dep>=1.0"' "$result"
+
+    # Applying patch again (idempotent re-patch to different major)
+    pushd "$tmpdir" > /dev/null
+    patchFiabCoreDep "3"
+    popd > /dev/null
+    result=$(cat "$tmpdir/pyproject.toml")
+    assert_contains "re-patch works" '"fiab-core>=3,<4"' "$result"
+    assert_contains "sentinel still present after re-patch" "auto-updateable" "$result"
+
+    # Robustness: a non-sentinel fiab-core mention on another line is not patched
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+# previous constraint was "fiab-core>=0,<1"
+dependencies = [
+    "fiab-core>=0.0.1,<1.0.0", # *auto-updateable* -- do not remove this comment
+    "other-dep>=1.0",
+]
+EOF
+    pushd "$tmpdir" > /dev/null
+    patchFiabCoreDep "2"
+    popd > /dev/null
+    result=$(cat "$tmpdir/pyproject.toml")
+    assert_contains "sentinel line patched" '"fiab-core>=2,<3"' "$result"
+    assert_contains "non-sentinel fiab-core line not patched" '"fiab-core>=0,<1"' "$result"
+
+    # Fails when sentinel comment is absent
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+dependencies = ["fiab-core>=0.0.1,<1.0.0"]
+EOF
+    pushd "$tmpdir" > /dev/null
+    assert_fails "fails without sentinel comment" patchFiabCoreDep "2"
+    popd > /dev/null
+
+    # Fails when multiple sentinel lines match
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+dependencies = [
+    "fiab-core>=0.0.1,<1.0.0", # *auto-updateable* -- do not remove this comment
+    "fiab-core>=0.0.1,<1.0.0", # *auto-updateable* -- do not remove this comment
+]
+EOF
+    pushd "$tmpdir" > /dev/null
+    assert_fails "fails with multiple sentinel lines" patchFiabCoreDep "2"
+    popd > /dev/null
+
+    rm -rf "$tmpdir"
+}
+
+# ---------------------------------------------------------------------------
 # Tests: getLatestTagAndIncrement
 # ---------------------------------------------------------------------------
 test_get_latest_tag_and_increment() {
@@ -224,6 +356,141 @@ test_upload_pypi() {
 }
 
 # ---------------------------------------------------------------------------
+# Tests: tearDownVenv.sh
+# ---------------------------------------------------------------------------
+test_teardown_venv() {
+    echo "--- tearDownVenv.sh ---"
+
+    local tmpvenv
+    tmpvenv=$(mktemp -d)
+
+    # Set up environment that mirrors what prepare*Venv.sh would leave behind
+    VIRTUAL_ENV="$tmpvenv"
+    UV_PROJECT_ENVIRONMENT="$tmpvenv"
+    UV_NO_PROJECT="1"
+
+    # Provide a mock deactivate shell function (normally defined by activate)
+    deactivate() { unset VIRTUAL_ENV 2>/dev/null || true; }
+
+    # shellcheck source=scripts/cicd/tearDownVenv.sh
+    source "$SCRIPT_DIR/tearDownVenv.sh"
+
+    unset -f deactivate 2>/dev/null || true
+
+    if [[ ! -d "$tmpvenv" ]]; then
+        _pass "teardown: venv directory removed"
+    else
+        _fail "teardown: venv directory removed" "directory still exists: $tmpvenv"
+        rm -rf "$tmpvenv"
+    fi
+
+    if [[ -z "${UV_PROJECT_ENVIRONMENT:-}" ]]; then
+        _pass "teardown: UV_PROJECT_ENVIRONMENT unset"
+    else
+        _fail "teardown: UV_PROJECT_ENVIRONMENT unset" "still set: $UV_PROJECT_ENVIRONMENT"
+    fi
+
+    if [[ -z "${UV_NO_PROJECT:-}" ]]; then
+        _pass "teardown: UV_NO_PROJECT unset"
+    else
+        _fail "teardown: UV_NO_PROJECT unset" "still set: $UV_NO_PROJECT"
+    fi
+
+    # Edge case: UV_PROJECT_ENVIRONMENT that does NOT match venv should be preserved
+    local tmpvenv2 tmpvenv3
+    tmpvenv2=$(mktemp -d)
+    tmpvenv3=$(mktemp -d)
+    VIRTUAL_ENV="$tmpvenv2"
+    UV_PROJECT_ENVIRONMENT="$tmpvenv3"   # different path
+    UV_NO_PROJECT="1"
+    deactivate() { unset VIRTUAL_ENV 2>/dev/null || true; }
+
+    source "$SCRIPT_DIR/tearDownVenv.sh"
+
+    unset -f deactivate 2>/dev/null || true
+
+    if [[ "${UV_PROJECT_ENVIRONMENT:-}" == "$tmpvenv3" ]]; then
+        _pass "teardown: UV_PROJECT_ENVIRONMENT preserved when path differs"
+    else
+        _fail "teardown: UV_PROJECT_ENVIRONMENT preserved when path differs" \
+              "expected '$tmpvenv3' got '${UV_PROJECT_ENVIRONMENT:-}'"
+    fi
+    rm -rf "$tmpvenv3"
+}
+
+# ---------------------------------------------------------------------------
+# Tests: prepareBuildVenv.sh
+# ---------------------------------------------------------------------------
+test_prepare_build_venv() {
+    echo "--- prepareBuildVenv.sh ---"
+
+    local tmpdir calls_file
+    tmpdir=$(mktemp -d)
+    calls_file="$tmpdir/calls"
+    touch "$calls_file"
+
+    # Source in a subshell with tmpdir as CWD so relative venv path works
+    local output
+    output=$(
+        cd "$tmpdir"
+        export PATH="$MOCKS_DIR:$PATH"
+        export MOCK_CALLS_FILE="$calls_file"
+        # shellcheck source=scripts/cicd/prepareBuildVenv.sh
+        source "$SCRIPT_DIR/prepareBuildVenv.sh"
+        printf "VIRTUAL_ENV=%s\n"              "${VIRTUAL_ENV:-}"
+        printf "UV_PROJECT_ENVIRONMENT=%s\n"   "${UV_PROJECT_ENVIRONMENT:-}"
+        printf "UV_NO_PROJECT=%s\n"            "${UV_NO_PROJECT:-}"
+    )
+    local calls
+    calls=$(cat "$calls_file")
+
+    assert_contains "prepareBuildVenv: uv venv buildVenv called" "uv venv buildVenv" "$calls"
+    assert_contains "prepareBuildVenv: uv pip install build called" "uv pip install build" "$calls"
+    assert_contains "prepareBuildVenv: VIRTUAL_ENV contains buildVenv" "buildVenv" "$output"
+    assert_contains "prepareBuildVenv: UV_PROJECT_ENVIRONMENT contains buildVenv" "buildVenv" "$output"
+    assert_contains "prepareBuildVenv: UV_NO_PROJECT=1" "UV_NO_PROJECT=1" "$output"
+
+    rm -rf "$tmpdir"
+}
+
+# ---------------------------------------------------------------------------
+# Tests: prepareValVenv.sh
+# ---------------------------------------------------------------------------
+test_prepare_val_venv() {
+    echo "--- prepareValVenv.sh ---"
+
+    local tmpdir calls_file
+    tmpdir=$(mktemp -d)
+    calls_file="$tmpdir/calls"
+    touch "$calls_file"
+
+    local output
+    output=$(
+        cd "$tmpdir"
+        export PATH="$MOCKS_DIR:$PATH"
+        export MOCK_CALLS_FILE="$calls_file"
+        # SCRIPT_DIR must be set (normally set by prepareBuildVenv.sh in the workflow)
+        export SCRIPT_DIR="$SCRIPT_DIR"
+        # shellcheck source=scripts/cicd/prepareValVenv.sh
+        source "$SCRIPT_DIR/prepareValVenv.sh"
+        printf "VIRTUAL_ENV=%s\n"             "${VIRTUAL_ENV:-}"
+        printf "UV_PROJECT_ENVIRONMENT=%s\n"  "${UV_PROJECT_ENVIRONMENT:-}"
+        printf "UV_NO_PROJECT=%s\n"           "${UV_NO_PROJECT:-}"
+    )
+    local calls
+    calls=$(cat "$calls_file")
+
+    assert_contains "prepareValVenv: uv venv valVenv called" "uv venv valVenv" "$calls"
+    assert_contains "prepareValVenv: uv pip install pytest" "uv pip install pytest" "$calls"
+    assert_contains "prepareValVenv: VIRTUAL_ENV contains valVenv" "valVenv" "$output"
+    # UV_PROJECT_ENVIRONMENT points to buildVenv (intentional, see script comment)
+    assert_contains "prepareValVenv: UV_PROJECT_ENVIRONMENT contains buildVenv" "buildVenv" "$output"
+    assert_contains "prepareValVenv: UV_NO_PROJECT=1" "UV_NO_PROJECT=1" "$output"
+
+    rm -rf "$tmpdir"
+}
+
+# ---------------------------------------------------------------------------
 # Tests: gitTagAndPush
 # ---------------------------------------------------------------------------
 test_git_tag_and_push() {
@@ -252,11 +519,17 @@ echo "Running tests for scripts/cicd/scripts.sh"
 echo ""
 
 test_prepare_python_wheel_version
+test_extract_fiab_core_tag
+test_major_from_version
+test_patch_fiab_core_dep
 test_get_latest_tag_and_increment
 test_validate_tag
 test_tag_from_input_or_latest
 test_upload_pypi
 test_git_tag_and_push
+test_teardown_venv
+test_prepare_build_venv
+test_prepare_val_venv
 
 echo ""
 if [[ $TESTS_FAILED -gt 0 ]]; then
