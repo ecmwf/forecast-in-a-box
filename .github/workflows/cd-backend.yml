@@ -1,4 +1,4 @@
-name: CD for the application itself (backend & frontend)
+name: CD for the backend itself (including the bundled frontend)
 
 on:
   workflow_dispatch:
