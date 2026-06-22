@@ -579,7 +579,7 @@ class MapPlotSink(Sink):
                     "groupby": None if groupby == "none" else groupby,
                     # "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
                 },
-                metadata={"environment": ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0"]},
+                metadata={"environment": ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11"]},
             )
         )
         return Either.ok(action)
