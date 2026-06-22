@@ -31,5 +31,52 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - uses: extractions/setup-just@v3
       - run: |
-          echo "placeholder"
+          # NOTE dont use action checkout, doesnt coop with auth
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          git clone -b $BRANCH --single-branch https://$GH_USER:$GH_TOKEN@github.com/ecmwf/forecast-in-a-box.git .
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://$GH_USER:$GH_TOKEN@github.com/ecmwf/forecast-in-a-box.git
+          git fetch --tags origin # NOTE dont use with: fetch-tags: true, the clone is still shallow
 
+          source scripts/cicd/scripts.sh
+          setupBash "${{ inputs.testpypi }}" 
+          REPO_ROOT=$(pwd)
+
+          TAG_PREF="c"
+          TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
+          TAG="${TAG}.0"
+
+          preparePythonWheelVersion $TAG
+
+          cd backend/packages
+          mkdir packagesDist
+
+          pushd fiab-core
+          source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
+          just build
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh
+          just val
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          mv dist/* ../packagesDist
+          popd
+
+          pushd fiab-plugin-test
+          source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
+          just build
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh
+          just val
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          mv dist/* ../packagesDist
+          popd
+
+          uploadPypi "${{ inputs.testpypi }}" 'packagesDist/*'
+          gitTagAndPush "${{ inputs.testpypi }}" $TAG
+
+        env:
+          TWINE_PASSWORD_PROD: ${{ secrets.PYPI_API_TOKEN }}
+          TWINE_PASSWORD_TEST: ${{ secrets.PYPI_TEST_API_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_REPO_READ_TOKEN }} # says read but actually is write -- and we need that
+          GH_USER: deploy

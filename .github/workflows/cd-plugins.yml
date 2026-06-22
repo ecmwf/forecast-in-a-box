@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Explicit tag. Use cX.Y.Z, make sure its free on pypi
+        description: Explicit tag. Use pX.Y.Z, make sure its free on pypi
         type: string
         required: false
       testpypi:
@@ -45,25 +45,41 @@ jobs:
           source scripts/cicd/scripts.sh
           setupBash "${{ inputs.testpypi }}" 
 
-          TAG_PREF="c"
+          TAG_PREF="p"
           TAG=$(tagFromInputOrLatest "${{ inputs.tag }}" $TAG_PREF)
-          TAG="${TAG}.0"
 
           preparePythonWheelVersion $TAG
+          # TODO-task extract fiab core tag: we need to TAG_FIABCORE=$(..) -- look for all tags starting with `c`, find any tag cX.Y1.Z1.D where the X is the major version in $TAG derived above (ie, TAG=dX.Y2.Z2) for this X; then set TAG_FIABCORE to X.Y1.Z1, and TAG_FIABCORE_MAJ=X. If no such tag found, fail hard
 
-          cd backend
-          uv venv venv && source venv/bin/activate
-          uv pip install twine build
-          mkdir packagesDist
-          for e in $(ls -d packages/*) ; do 
-              pushd $e
-              just build
-              if [ -d dist ] ; then mv dist/* ../../packagesDist ; fi
-              popd
-          done
-          rm -rf packagesDist/fiab_mcp_server* # lets not be releasing this one just yet
+          pushd fiab-plugin-ecmwf
+          # TODO-task replace the fiab-core dependency constraint with >=X,<X+1, where X comes from TAG_FIABCORE_MAJ
+          git add pyproject.toml
+          source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
+          uv pip install "fiab-core==${TAG_FIABCORE}"
+          just build
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh
+          just val
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          mv dist/* ../packagesDist
+          popd
+
+          pushd fiab-plugin-demo
+          # TODO-task replace the fiab-core dependency constraint with >=X,<X+1, where X comes from TAG_FIABCORE_MAJ
+          git add pyproject.toml
+          source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
+          uv pip install "fiab-core==${TAG_FIABCORE}"
+          just build
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          source $REPO_ROOT/scripts/cicd/prepareValVenv.sh
+          just val
+          source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
+          mv dist/* ../packagesDist
+          popd
 
           uploadPypi "${{ inputs.testpypi }}" 'packagesDist/*'
+          git commit -m "Plugin Release $TAG" --allow-empty # NOTE we allow empty because the FIABCORE_MAJ possibly didnt change
+          git push
           gitTagAndPush "${{ inputs.testpypi }}" $TAG
 
         env:
