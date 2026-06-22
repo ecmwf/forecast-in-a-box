@@ -64,7 +64,7 @@ jobs:
           just build
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           source $REPO_ROOT/scripts/cicd/prepareValVenv.sh dist/*whl
-          just val
+          just test
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           mv dist/* ../packagesDist
           popd
@@ -77,7 +77,7 @@ jobs:
           just build
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           source $REPO_ROOT/scripts/cicd/prepareValVenv.sh dist/*whl
-          just val
+          just test
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           mv dist/* ../packagesDist
           popd

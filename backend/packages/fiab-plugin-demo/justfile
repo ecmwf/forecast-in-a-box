@@ -1,5 +1,8 @@
 val:
-    # uv run ty check src tests # TODO temporarily disabled, enable after merging the release workflow and fixing types
+    uv run ty check src tests # TODO temporarily disabled, enable after merging the release workflow and fixing types
+    just test
+
+test:
     uv run pytest
 
 build:
