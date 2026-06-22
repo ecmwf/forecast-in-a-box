@@ -17,7 +17,7 @@ requires-python = ">=3.11"
 dynamic = [ "version" ]
 
 dependencies = [
-    "fiab-core>=0.0.1,<1.0.0", # *auto-updateable* -- do not remove this comment
+    "fiab-core>=1,<2", # auto-updateable -- do not remove this comment
 ]
 
 [dependency-groups]
