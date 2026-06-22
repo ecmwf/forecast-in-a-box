@@ -80,7 +80,7 @@ def _extract_dataset(inputs: dict[str, QubedOutput], name: str) -> QubedOutput:
 
 
 def _is_empty_qube(qube: Qube) -> bool:
-    return next(iter(qube.datacubes()), None) is None
+    return next(iter(qube.to_datacubes()), None) is None
 
 
 def _restriction_value_strings(axis_values: set[Any], item_python_type: type[str] | type[int]) -> list[str]:
