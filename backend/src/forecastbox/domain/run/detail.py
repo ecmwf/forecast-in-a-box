@@ -15,8 +15,7 @@ from fiab_core.fable import BlockInstanceId
 
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound
 from forecastbox.domain.run.types import RunId
-from forecastbox.utility.memcache import get as memcache_get
-from forecastbox.utility.memcache import insert as memcache_insert
+from forecastbox.utility.memcache import get, insert
 from forecastbox.utility.pydantic import FiabBaseModel
 
 
@@ -56,7 +55,7 @@ def store_compilation_detail(run_id: RunId, compilation_detail: CompilationDetai
 
     May raise ``TooLargeEntry`` if the detail exceeds cache capacity.
     """
-    memcache_insert(run_id, compilation_detail)
+    insert(run_id, compilation_detail)
 
 
 def retrieve_compilation_detail(run_id: RunId) -> CompilationDetail:
@@ -70,7 +69,7 @@ def retrieve_compilation_detail(run_id: RunId) -> CompilationDetail:
         If the cached value cannot be interpreted as a CompilationDetail.
     """
     try:
-        return memcache_get(run_id, CompilationDetail)
+        return get(run_id, CompilationDetail)
     except KeyError:
         raise CompilationDetailNotFound(f"No compilation detail found for run {run_id!r}")
     except TypeError as e:

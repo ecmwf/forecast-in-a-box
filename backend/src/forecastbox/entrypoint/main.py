@@ -47,12 +47,12 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
         # TODO migrate to cascade_platform -- but we *need* forkserver for linux. Mind service.py here as well
         backend = get_context("forkserver").Process(target=launch_backend)
         backend.start()
-        handle = ChildProcessGroup([backend])
+        handle = ChildProcessGroup((backend,))
         spawn_gateway = not isinstance(config.cascade.gateway, UnmanagedGateway)
     else:
         if not forecastbox.entrypoint.bootstrap.service.is_running():
             raise ValueError("configured to use service, but is not running!")
-        handle = ChildProcessGroup([])
+        handle = ChildProcessGroup(())
         spawn_gateway = False
 
     check_backend_ready(config, handle, attempts, spawn_gateway)

@@ -19,7 +19,7 @@ from forecastbox.utility.pydantic import FiabBaseModel
 T = TypeVar("T")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class PaginationSpecRemainder:
     """Shifted offset and remaining page capacity for the second data source.
 

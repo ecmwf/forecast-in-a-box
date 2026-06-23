@@ -7,7 +7,7 @@ import yaml
 from qubed import Qube
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class ForecastDataset:
     datacubes: list[dict]
     member_zero: Optional[dict] = None

@@ -52,7 +52,7 @@ if __name__ == "__main__":
     )
     backend = get_context("forkserver").Process(target=launch_backend)
     backend.start()
-    handle = ChildProcessGroup([backend])
+    handle = ChildProcessGroup((backend,))
     if backend.pid:
         mark_started(backend.pid)
     else:

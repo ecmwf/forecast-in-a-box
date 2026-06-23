@@ -21,7 +21,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fiab_core.artifacts import ArtifactsProvider
@@ -115,8 +115,6 @@ async def add_process_time_header(request: Request, call_next: Callable[[Request
 async def circumvent_auth(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     # TODO this is a hotfix, we'd instead like to fix properly in api/routers/auth.py
     if request.url.path == "/api/v1/users/me" and config.auth.passthrough:
-        from starlette.responses import JSONResponse
-
         return JSONResponse({"is_superuser": True})
     else:
         return await call_next(request)

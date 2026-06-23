@@ -15,9 +15,9 @@ from forecastbox.utility.concurrent import shutdown_correctly
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class ChildProcessGroup:
-    procs: list[BaseProcess]
+    procs: tuple[BaseProcess, ...]
 
     def wait(self) -> None:
         if self.procs:  # NOTE wait([]) actually stucks forever
