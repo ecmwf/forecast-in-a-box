@@ -182,7 +182,8 @@ def submit_load_plugins(start_after: Future[None]) -> None:
 
 
 class PluginsStatus(FiabBaseModel):
-    # TODO: Change these fields to use pyrsistent types (PMap) instead of dict once we solve pydantic serialization
+    # TODO Change these fields to use pyrsistent types (PMap) instead of dict once we solve pydantic serialization.
+    # However, no immediate hotfix is needed as this class is constructed with a lock, ie, consistently
     updater_status: Literal["ok", "running", "retrieving"] | str
     plugin_errors: dict[PluginCompositeId, str]
     plugin_versions: dict[PluginCompositeId, str]
