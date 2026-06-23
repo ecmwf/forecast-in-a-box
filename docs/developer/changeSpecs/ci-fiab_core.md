@@ -1,4 +1,5 @@
-# Current State as of 2026.06.04
+# Current State
+## As of 2026.06.04
 `fiab-core` package is not present in the pylock, hence only the range spec in backend's pyproject (`>=0.0.5,<1.0.0`) takes effect, pulling the newest or cached version that satisfies it.
 
 When installing a plugin, we don't check what version of fiab-core it is compatible with.
@@ -14,6 +15,16 @@ We need to address three scenarios:
 1. **Install**: how to let the user run only compatible plugin installs or updates,
 2. **Release**: how to execute releases of plugins, core, and backend,
 3. **Migration**: how to manage saved presets and runs in the presence of a plugin update.
+
+## Update on 2026.06.23
+1. There are three `cd` actions:
+  1. `cd-core` -- releases `fiab-core` and `fiab-plugin-test wheels, versioned by `cX.Y.Z.d` repo tag,
+  2. `cd-plugins` -- releases `fiab-plugin-{ecmwf, demo}` wheels, versioned by `pX.Y.Z` repo tag, 
+  3. `cd-backend` -- releases `forecastbox` wheel including the `.js` package, versioned by `vX.Y.Z` repo tag.
+2. The compatibility is driven by the major version being equal -- hence `v1.?.?` backend requires `c1.` and `p1.` plugins.
+3. The release actions are capable of deriving tags automatically, fail hard if there is no corresponding `core` version (for backend/plugins), automatically update constraints in `pyproject.toml` in case of major version increase.
+4. Unlike `ci`, the `cd` actions don't rely on repo-wide venv with local editable installs, but instead install fiab-core and fiab-test-plugin from pypi based on the most recent compatible version. This leads to a discrepancy between `ci` (which tests "this commit of the repo is mutually compatible") and `cd` (which tests "this wheel, installed clean, works") and may lead to situations where `ci` passes but `cd` does not -- but that is a necessary cost given different release timelines.
+5. On the client, the major-version is taken into account when dealing with plugins in general.
 
 # The Install Scenario
 ## Options
