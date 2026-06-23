@@ -8,7 +8,7 @@ from fiab_core.artifacts import AnemoiCheckpoint, Platform
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True, eq=True, slots=True)
 class PlatformInfo:
     """Platform Name and GPU memory (VRAM).
     - macOS: Returns total system memory (Unified Memory).

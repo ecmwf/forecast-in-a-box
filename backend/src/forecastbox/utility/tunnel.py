@@ -91,7 +91,7 @@ def _render_remote_command(command: RemoteCommand, output_path: str = "/dev/null
     return f"nohup bash --login -c '{rendered}' > {output_path} 2>&1 < /dev/null &"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class ConnectionHandle:
     """A persisted SSH tunnel connection."""
 
@@ -106,7 +106,7 @@ class ConnectionHandle:
         return f"tcp://localhost:{self.local_port}"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class CommandHandle:
     """A persistent SSH master connection for running remote commands (no port forwarding)."""
 

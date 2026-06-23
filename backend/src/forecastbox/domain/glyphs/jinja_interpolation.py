@@ -74,7 +74,7 @@ def _stringify_result(value: object) -> str:
     return str(value)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class CustomFunction:
     """A named function registered in the Jinja2 interpolation environment.
 

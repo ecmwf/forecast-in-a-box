@@ -48,6 +48,10 @@ class LensInstanceDetail(FiabBaseModel):
 
 
 @dataclass
+# Intentionally mutable: `process` holds a `subprocess.Popen` object whose internal state
+# (return code, file descriptors) is mutated externally by the OS throughout the process
+# lifecycle. Making this field immutable is not meaningful; the dataclass is kept mutable
+# to reflect that reality.
 class LensInstance:
     process: subprocess.Popen[bytes] | None
     lens_params: dict[str, Any]
