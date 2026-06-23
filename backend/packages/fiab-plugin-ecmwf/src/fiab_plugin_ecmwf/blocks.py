@@ -26,8 +26,7 @@ from fiab_core.fable import (
     RawOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceConfigurationError, Product, Sink, Source, Transform
-from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
+from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Product, Sink, Source, Transform
 from fiab_core.types import ClosedEnumType, ListType
 from qubed import Qube
 
@@ -134,7 +133,7 @@ class OperationalForecastSource(Source):
         return f"{time:02d}00"
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         forecast = block.config_as_str(FORECAST)
         basetime = block.config_as_datetime(BASETIME)
@@ -149,7 +148,7 @@ class OperationalForecastSource(Source):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         forecast = block.config_as_str(FORECAST)
         fc_preset = FORECAST_DATASETS[forecast]
@@ -219,7 +218,7 @@ class EnsembleStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
 
@@ -233,7 +232,7 @@ class EnsembleStatistics(Product):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
@@ -265,7 +264,7 @@ class TemporalStatistics(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
 
@@ -278,7 +277,7 @@ class TemporalStatistics(Product):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
@@ -313,7 +312,7 @@ class ZarrSink(Sink):
     inputs: list[str] = ["dataset"]
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         _extract_dataset(inputs, "dataset")
         return RawOutput(type_fqn="bytes", mime_type="text/plain")
@@ -321,7 +320,7 @@ class ZarrSink(Sink):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
 
@@ -362,17 +361,17 @@ class Select(Transform):
     }
     inputs: list[str] = ["dataset"]
 
-    def _selected_dimension(self, block: BlockInstance) -> ConfigurationOptionId:
+    def _selected_dimension(self, block: BlockInstanceRich) -> ConfigurationOptionId:
         dimension = ConfigurationOptionId(block.config_as_str(DIMENSION))
         if not dimension:
             raise BlockInstanceConfigurationError(f"Configuration option '{DIMENSION}' must be provided")
         return dimension
 
-    def _selected_values(self, block: BlockInstance) -> list[str]:
+    def _selected_values(self, block: BlockInstanceRich) -> list[str]:
         return block.config_as_list(VALUES, str, allow_empty=False)
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
 
@@ -406,7 +405,7 @@ class Select(Transform):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         dimension = self._selected_dimension(block)
@@ -434,7 +433,7 @@ class GribSink(Sink):
         return re.findall(r"\[(.*?)\]", path)
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         _extract_dataset(inputs, "dataset")  # check format of input and existence of dataset
         path = block.config_as_str(PATH)
@@ -446,7 +445,7 @@ class GribSink(Sink):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         path_dims = self._find_template_values(block.config_as_str(PATH))
@@ -520,7 +519,7 @@ class MapPlotSink(Sink):
     inputs: list[str] = ["dataset"]
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
 
@@ -553,7 +552,7 @@ class MapPlotSink(Sink):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         params = block.config_as_list(PARAM, str, allow_empty=False)

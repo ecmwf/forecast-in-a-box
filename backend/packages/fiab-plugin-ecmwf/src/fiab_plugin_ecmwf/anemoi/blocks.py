@@ -24,8 +24,7 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
-from fiab_core.tools.blocks import Source, Transform
+from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
 from fiab_core.tools.validators import positive
 
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
@@ -147,7 +146,7 @@ class AnemoiSource(Source):
     }
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         ensemble_members = block.config_as_int(ENSEMBLE, validator=positive)
         checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
@@ -165,7 +164,7 @@ class AnemoiSource(Source):
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
 
         input_source = block.config_as_str(INPUT_SOURCE)
@@ -211,7 +210,7 @@ class AnemoiInputSource(Source):
     }
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
         number = block.config_as_int(ENSEMBLE, validator=positive)
@@ -222,7 +221,7 @@ class AnemoiInputSource(Source):
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
 
         builder = AnemoiBuilder(block.config_as_str(CHECKPOINT))
@@ -255,7 +254,7 @@ class AnemoiTransform(Transform):
     }
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
         lead_time = block.config_as_int(LEAD_TIME, validator=positive)
@@ -277,7 +276,7 @@ class AnemoiTransform(Transform):
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["initial conditions"]
 

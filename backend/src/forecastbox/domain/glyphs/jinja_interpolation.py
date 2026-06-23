@@ -24,8 +24,7 @@ from typing import Any, Literal
 
 from cascade.low.func import Either
 from fiab_core.types import DatetimeType, WrongType
-from jinja2 import Environment, StrictUndefined, TemplateSyntaxError
-from jinja2 import nodes as jnodes
+from jinja2 import Environment, StrictUndefined, TemplateSyntaxError, nodes
 from jinja2.sandbox import SandboxedEnvironment
 
 from forecastbox.utility.time import value_dt2str
@@ -187,8 +186,8 @@ def render_expression(raw: str, variables: dict[str, str]) -> str:
     return template.render(ctx)
 
 
-def _collect_glyph_names(node: jnodes.Node, glyphs: set[str]) -> None:
-    if isinstance(node, jnodes.Name) and node.ctx == "load" and node.name not in _FILTER_NAMES:
+def _collect_glyph_names(node: nodes.Node, glyphs: set[str]) -> None:
+    if isinstance(node, nodes.Name) and node.ctx == "load" and node.name not in _FILTER_NAMES:
         glyphs.add(node.name)
     for child in node.iter_child_nodes():
         _collect_glyph_names(child, glyphs)

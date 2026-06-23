@@ -29,6 +29,7 @@ def _configure_schema(style_schema: str) -> None:
     - ``package@path`` -- uses a named schema with a custom style library path
     - Any other string -- passed directly to ``schema.use()``
     """
+    # import inside function justified: earthkit.plots is an optional dependency
     from earthkit.plots.schemas import schema  # type: ignore[unresolved-import]
 
     if "@" in style_schema:
@@ -77,6 +78,7 @@ def map_plot(
 
     Returns image bytes.
     """
+    # import inside function justified: earthkit.plots is an optional dependency
     from earthkit.plots import Figure  # type: ignore[unresolved-import]
     from earthkit.plots.components import layouts  # type: ignore[unresolved-import]
     from earthkit.plots.utils import iter_utils  # type: ignore[unresolved-import]

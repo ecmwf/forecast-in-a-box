@@ -15,6 +15,7 @@ from operator import or_
 from pathlib import Path
 from typing import Any, cast
 
+from earthkit.data.utils.dates import to_timedelta
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import QubedOutput
 from qubed import Qube
@@ -27,8 +28,6 @@ logger = logging.getLogger(__name__)
 
 
 def _timestep_seconds(timestep: str) -> int:
-    from earthkit.data.utils.dates import to_timedelta
-
     timestep_seconds = int(to_timedelta(timestep).total_seconds())
     if timestep_seconds <= 0:
         raise ValueError(f"Checkpoint timestep must be positive, got {timestep!r}")

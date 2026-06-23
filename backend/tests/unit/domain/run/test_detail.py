@@ -121,13 +121,13 @@ def test_store_and_retrieve_round_trip() -> None:
 
 def test_retrieve_raises_not_found_for_missing_key() -> None:
     run_id = RunId("nonexistent-run-id")
-    with patch("forecastbox.domain.run.detail.memcache_get", side_effect=KeyError("missing")):
+    with patch("forecastbox.domain.run.detail.get", side_effect=KeyError("missing")):
         with pytest.raises(CompilationDetailNotFound, match="nonexistent-run-id"):
             retrieve_compilation_detail(run_id)
 
 
 def test_retrieve_raises_corrupted_for_wrong_type() -> None:
     run_id = RunId("corrupted-run-id")
-    with patch("forecastbox.domain.run.detail.memcache_get", side_effect=TypeError("wrong type")):
+    with patch("forecastbox.domain.run.detail.get", side_effect=TypeError("wrong type")):
         with pytest.raises(CompilationDetailCorrupted, match="corrupted-run-id"):
             retrieve_compilation_detail(run_id)
