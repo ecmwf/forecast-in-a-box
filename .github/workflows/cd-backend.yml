@@ -58,7 +58,8 @@ jobs:
           # test
           pushd backend
           source $REPO_ROOT/scripts/cicd/prepareValVenv.sh -r ../install/pylock.toml
-          uv pip install -e packages/fiab-plugin-test ./dist/*whl # NOTE cannot be merged with above, pylock must be alone
+          # NOTE cannot be merged with above, pylock must be alone
+          uv pip install "fiab-core==${TAG_FIABCORE}" "fiab-plugin-test==${TAG_FIABCORE}" ./dist/*whl
           just test
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           popd
