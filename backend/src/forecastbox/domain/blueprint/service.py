@@ -286,8 +286,8 @@ async def validate_expand(
         if not validate_only and isinstance(output_or_error.t, QubedOutput):
             try:
                 block_output_qubes[blockId] = output_or_error.t.dataqube.to_json()
-            except Exception as exc:  # noqa: BLE001 — viz extra, never fatal
-                logger.debug("Could not serialize output qube for block %s: %s", blockId, exc)
+            except Exception as exc:  # viz extra, never fatal
+                logger.error(f"Could not serialize output qube for {blockId=}: {repr(exc)}")
 
         if not validate_only:
             possible_expansions[blockId] = (
