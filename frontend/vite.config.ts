@@ -30,13 +30,14 @@ export default defineConfig(({ mode }) => {
       }),
       viteReact(),
       tailwindcss(),
-      // Inject localhost CSP allowlist only in dev — prod CSP stays clean.
+      // The WMS lens runs on a dynamic loopback port; CSP must let the page
+      // reach it in all builds, not just dev.
       {
-        name: 'csp-dev-hosts',
+        name: 'csp-loopback-hosts',
         transformIndexHtml(html) {
           return html.replaceAll(
-            '<!--CSP_DEV_HOSTS-->',
-            isDev ? 'http://localhost:* http://127.0.0.1:*' : '',
+            '<!--CSP_LOOPBACK_HOSTS-->',
+            'http://localhost:* http://127.0.0.1:*',
           )
         },
       },
