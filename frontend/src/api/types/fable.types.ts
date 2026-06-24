@@ -228,11 +228,20 @@ export const FableValidationExpansionSchema = z.object({
     .record(z.string(), z.record(z.string(), z.array(z.string())))
     .optional()
     .default({}),
-  /** Per-block output qube (qubed node tree) for the graph qube lens. */
+  /** Per-block output qube for the graph lens; parsed per-block so one
+   * unparseable qube is dropped rather than failing the whole response. */
   block_output_qubes: z
-    .record(z.string(), QubeNodeSchema)
+    .record(z.string(), z.unknown())
     .optional()
-    .default({}),
+    .default({})
+    .transform((rec) => {
+      const out: Record<string, QubeNode> = {}
+      for (const [blockId, raw] of Object.entries(rec)) {
+        const parsed = QubeNodeSchema.safeParse(raw)
+        if (parsed.success) out[blockId] = parsed.data
+      }
+      return out
+    }),
 })
 
 export type FableValidationExpansion = z.infer<
@@ -655,6 +664,17 @@ export function getBlocksByKind(
     .map(([instanceId, instance]) => ({ instanceId, instance }))
 }
 
+/** Backend wraps validator failures with `repr(exc)`; unwrap that exact
+ * `Error('msg')` shape to the bare message, leaving clean strings untouched. */
+const PYTHON_EXCEPTION_REPR =
+  /^[A-Z]\w*(?:Error|Exception|Warning)\((['"])([\s\S]*)\1\)$/
+
+export function unwrapBackendError(message: string): string {
+  const match = PYTHON_EXCEPTION_REPR.exec(message)
+  if (!match) return message
+  return match[2].replace(/\\(['"\\])/g, '$1')
+}
+
 export function toValidationState(
   expansion: FableValidationExpansion,
   fable?: FableBuilderV1,
@@ -673,7 +693,9 @@ export function toValidationState(
   ])
 
   for (const blockId of allBlockIds) {
-    const backendErrors = expansion.block_errors[blockId] ?? []
+    const backendErrors = (expansion.block_errors[blockId] ?? []).map(
+      unwrapBackendError,
+    )
     const missingErrors = missingRequiredByBlock[blockId] ?? []
     const errors = [...backendErrors, ...missingErrors]
     const missingGlyphs = expansion.missing_glyphs[blockId] ?? {}
