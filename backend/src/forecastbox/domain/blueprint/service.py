@@ -23,7 +23,7 @@ No HTTP exceptions are raised here; callers are responsible for mapping
 import logging
 from collections import defaultdict
 from itertools import groupby
-from typing import cast
+from typing import Any, cast
 
 from fiab_core.fable import (
     BlockFactoryId,
@@ -35,6 +35,7 @@ from fiab_core.fable import (
     NoOutput,
     PluginBlockExpansion,
     PluginBlockFactoryId,
+    QubedOutput,
 )
 from pydantic import Field
 
@@ -104,6 +105,10 @@ class BlueprintValidationExpansion(FiabBaseModel):
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = Field(default_factory=dict)
+    block_output_qubes: dict[BlockInstanceId, dict[str, Any]] = Field(default_factory=dict)
+    """Per-block output qube serialized via ``Qube.to_json()`` (qubed node
+    tree), for visualizing the qube as it flows through the pipeline. Only
+    populated for the expand endpoint (``validate_only`` False)."""
 
 
 class BlueprintSaveCommand(FiabBaseModel):
@@ -156,6 +161,7 @@ async def validate_expand(
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     missing_glyphs_result: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
+    block_output_qubes: dict[BlockInstanceId, dict[str, Any]] = {}
     outputs = {}
 
     intrinsic_values = cast(dict[str, str], get_values_and_examples())
@@ -275,6 +281,14 @@ async def validate_expand(
             continue
         outputs[blockId] = output_or_error.t
 
+        # Serialize the block's output qube for the frontend qube lens. Best
+        # effort only — a malformed/edge-case qube must never fail validation.
+        if not validate_only and isinstance(output_or_error.t, QubedOutput):
+            try:
+                block_output_qubes[blockId] = output_or_error.t.dataqube.to_json()
+            except Exception as exc:  # viz extra, never fatal
+                logger.error(f"Could not serialize output qube for {blockId=}: {repr(exc)}")
+
         if not validate_only:
             possible_expansions[blockId] = (
                 [
@@ -306,6 +320,7 @@ async def validate_expand(
         block_errors=block_errors,
         global_errors=global_errors,
         missing_glyphs=missing_glyphs_result,
+        block_output_qubes=block_output_qubes,
     )
 
 

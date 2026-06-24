@@ -15,9 +15,11 @@ import type {
   FableValidationExpansion,
 } from '@/api/types/fable.types'
 import {
+  FableValidationExpansionSchema,
   getBlockConfigurationRestrictions,
   partitionBlueprintTags,
   toValidationState,
+  unwrapBackendError,
 } from '@/api/types/fable.types'
 
 const mockCatalogue: BlockFactoryCatalogue = {
@@ -74,6 +76,7 @@ describe('toValidationState', () => {
       possible_expansions: {},
       configuration_restrictions: {},
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: {},
     }
 
@@ -94,6 +97,7 @@ describe('toValidationState', () => {
       possible_expansions: {},
       configuration_restrictions: {},
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: {
         sink_file: {
           fname: ['missingRoot'],
@@ -121,6 +125,7 @@ describe('toValidationState', () => {
       possible_expansions: {},
       configuration_restrictions: {},
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: { sink_file: {} },
     }
 
@@ -146,6 +151,7 @@ describe('toValidationState', () => {
       },
       configuration_restrictions: {},
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: {},
     }
 
@@ -184,6 +190,7 @@ describe('toValidationState', () => {
         b1: { param: 'list[enumClosed[2t,msl]]' },
       },
       resolved_configuration_options: {},
+      block_output_qubes: {},
       missing_glyphs: {},
     }
 
@@ -195,6 +202,104 @@ describe('toValidationState', () => {
     expect(
       getBlockConfigurationRestrictions(fable, validationState, 'b1'),
     ).toEqual({ param: 'list[enumClosed[2t,msl]]' })
+  })
+})
+
+describe('unwrapBackendError', () => {
+  it('unwraps a single-quoted Python exception repr to the bare message', () => {
+    expect(
+      unwrapBackendError(
+        "ValueError('param 2t is not in the input parameters: [msl]')",
+      ),
+    ).toBe('param 2t is not in the input parameters: [msl]')
+  })
+
+  it('unwraps a double-quoted repr and un-escapes the embedded quote', () => {
+    expect(unwrapBackendError('ValueError("can\'t resolve")')).toBe(
+      "can't resolve",
+    )
+  })
+
+  it('unwraps custom exception classes ending in Error/Exception', () => {
+    expect(
+      unwrapBackendError("BlockInstanceConfigurationError('missing input')"),
+    ).toBe('missing input')
+  })
+
+  it('leaves already-clean messages untouched', () => {
+    const clean =
+      'Invalid filepath: directory path can not contain template values'
+    expect(unwrapBackendError(clean)).toBe(clean)
+  })
+
+  it('does not strip text that merely looks function-like', () => {
+    expect(unwrapBackendError('select(dataset) returned nothing')).toBe(
+      'select(dataset) returned nothing',
+    )
+  })
+
+  it('cleans backend block errors through toValidationState', () => {
+    const result = toValidationState({
+      global_errors: [],
+      block_errors: { b1: ["ValueError('bad value')"] },
+      possible_sources: [],
+      possible_expansions: {},
+      configuration_restrictions: {},
+      resolved_configuration_options: {},
+      block_output_qubes: {},
+      missing_glyphs: {},
+    })
+    expect(result.blockStates.b1.errors).toEqual(['bad value'])
+  })
+})
+
+describe('FableValidationExpansionSchema block_output_qubes', () => {
+  const base = {
+    global_errors: [],
+    block_errors: {},
+    possible_sources: [],
+    possible_expansions: {},
+    configuration_restrictions: {},
+    resolved_configuration_options: {},
+    missing_glyphs: {},
+  }
+
+  /** A well-formed qubed node tree (enum value-groups only). */
+  const enumQube = {
+    key: 'root',
+    values: { type: 'enum', dtype: 'str', values: ['root'] },
+    metadata: {},
+    children: [
+      {
+        key: 'param',
+        values: { type: 'enum', dtype: 'str', values: ['2t', 'msl'] },
+        metadata: {},
+        children: [],
+      },
+    ],
+  }
+
+  /** Wildcard value-groups serialize as the bare string `"*"`, which QubeNodeSchema rejects. */
+  const wildcardQube = {
+    key: 'root',
+    values: { type: 'enum', dtype: 'str', values: ['root'] },
+    metadata: {},
+    children: [{ key: 'param', values: '*', metadata: {}, children: [] }],
+  }
+
+  it('keeps valid qubes and drops unmodellable ones without failing the response', () => {
+    const result = FableValidationExpansionSchema.parse({
+      ...base,
+      block_output_qubes: { good: enumQube, bad: wildcardQube },
+    })
+
+    expect(Object.keys(result.block_output_qubes)).toEqual(['good'])
+    expect(result.block_output_qubes.good).toEqual(enumQube)
+  })
+
+  it('defaults to an empty object when omitted', () => {
+    const result = FableValidationExpansionSchema.parse({ ...base })
+    expect(result.block_output_qubes).toEqual({})
   })
 })
 

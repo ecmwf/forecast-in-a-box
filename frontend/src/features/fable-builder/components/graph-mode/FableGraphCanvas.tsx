@@ -75,6 +75,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const fitViewTrigger = useFableBuilderStore((state) => state.fitViewTrigger)
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
+  const setHoveredEdge = useFableBuilderStore((state) => state.setHoveredEdge)
   const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
 
   const { fitView, setViewport, getNodesBounds } = useReactFlow()
@@ -322,6 +323,16 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     [selectBlock],
   )
 
+  // Hovering a wire reveals its qube-lens handle (ephemeral UI; see FableEdge).
+  const onEdgeMouseEnter = useCallback(
+    (_: React.MouseEvent, edge: Edge) => setHoveredEdge(edge.id),
+    [setHoveredEdge],
+  )
+  const onEdgeMouseLeave = useCallback(
+    () => setHoveredEdge(null),
+    [setHoveredEdge],
+  )
+
   // Clicking empty canvas intentionally does NOT deselect the node
   // The sidebar stays with the last-selected node's config. To
   // deselect, use the X button in the ConfigPanel header.
@@ -335,6 +346,8 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onEdgeMouseEnter={onEdgeMouseEnter}
+        onEdgeMouseLeave={onEdgeMouseLeave}
         onDragOver={onDragOver}
         onDrop={onDrop}
         nodeTypes={nodeTypes}

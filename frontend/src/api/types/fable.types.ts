@@ -12,11 +12,13 @@ import { Cloud, Cog, Download, Shuffle } from 'lucide-react'
 import { z } from 'zod'
 import i18n from 'i18next'
 import { EnvironmentSpecificationSchema } from './job.types'
+import { QubeNodeSchema } from './artifacts.types'
 import {
   PluginCompositeIdSchema,
   parsePluginKey,
   toPluginDisplayId,
 } from './plugins.types'
+import type { QubeNode } from './artifacts.types'
 import type { LucideIcon } from 'lucide-react'
 import type { PluginCompositeId } from './plugins.types'
 
@@ -226,6 +228,20 @@ export const FableValidationExpansionSchema = z.object({
     .record(z.string(), z.record(z.string(), z.array(z.string())))
     .optional()
     .default({}),
+  /** Per-block output qube for the graph lens; parsed per-block so one
+   * unparseable qube is dropped rather than failing the whole response. */
+  block_output_qubes: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .default({})
+    .transform((rec) => {
+      const out: Record<string, QubeNode> = {}
+      for (const [blockId, raw] of Object.entries(rec)) {
+        const parsed = QubeNodeSchema.safeParse(raw)
+        if (parsed.success) out[blockId] = parsed.data
+      }
+      return out
+    }),
 })
 
 export type FableValidationExpansion = z.infer<
@@ -375,6 +391,12 @@ export interface FableValidationState {
    * never resolves glyphs client-side.
    */
   resolvedConfigurationOptions: Record<BlockInstanceId, Record<string, string>>
+  /**
+   * Per-block output qube (qubed node tree), keyed by BlockInstanceId.
+   * The qube flowing out of a block — i.e. on every edge leaving it. Used by
+   * the graph qube lens; empty when the backend doesn't provide it.
+   */
+  blockOutputQubes: Record<BlockInstanceId, QubeNode>
 }
 
 export interface BlockKindMetadata {
@@ -642,6 +664,17 @@ export function getBlocksByKind(
     .map(([instanceId, instance]) => ({ instanceId, instance }))
 }
 
+/** Backend wraps validator failures with `repr(exc)`; unwrap that exact
+ * `Error('msg')` shape to the bare message, leaving clean strings untouched. */
+const PYTHON_EXCEPTION_REPR =
+  /^[A-Z]\w*(?:Error|Exception|Warning)\((['"])([\s\S]*)\1\)$/
+
+export function unwrapBackendError(message: string): string {
+  const match = PYTHON_EXCEPTION_REPR.exec(message)
+  if (!match) return message
+  return match[2].replace(/\\(['"\\])/g, '$1')
+}
+
 export function toValidationState(
   expansion: FableValidationExpansion,
   fable?: FableBuilderV1,
@@ -660,7 +693,9 @@ export function toValidationState(
   ])
 
   for (const blockId of allBlockIds) {
-    const backendErrors = expansion.block_errors[blockId] ?? []
+    const backendErrors = (expansion.block_errors[blockId] ?? []).map(
+      unwrapBackendError,
+    )
     const missingErrors = missingRequiredByBlock[blockId] ?? []
     const errors = [...backendErrors, ...missingErrors]
     const missingGlyphs = expansion.missing_glyphs[blockId] ?? {}
@@ -690,6 +725,7 @@ export function toValidationState(
     blockStates,
     possibleSources: expansion.possible_sources,
     resolvedConfigurationOptions: expansion.resolved_configuration_options,
+    blockOutputQubes: expansion.block_output_qubes,
   }
 }
 
