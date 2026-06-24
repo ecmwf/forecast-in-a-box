@@ -15,7 +15,7 @@ import pytest
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactResolved, ArtifactsProvider, CompositeArtifactId
 from qubed import Qube
 
-DUMMY_QUBE = Qube.from_json(
+DUMMY_QUBE = Qube.from_tree_json(
     {
         "key": "root",
         "values": {"type": "enum", "dtype": "str", "values": ("root",)},
