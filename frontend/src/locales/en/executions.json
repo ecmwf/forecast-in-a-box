@@ -236,7 +236,8 @@
     "stop": "Stop"
   },
   "lens": {
-    "title": "Map viewer",
+    "title": "Output map viewer",
+    "subtitle": "All layers in this directory",
     "layers": "Layers",
     "activeLayers": "Active layers",
     "opacity": "Opacity",

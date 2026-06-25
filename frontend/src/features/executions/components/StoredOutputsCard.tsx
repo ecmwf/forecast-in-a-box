@@ -429,9 +429,18 @@ function LensViewerSheet({
         <SheetHeader className="flex flex-row items-start gap-3 border-b border-border p-4">
           <div className="min-w-0 flex-1">
             <SheetTitle>{t('lens.title')}</SheetTitle>
-            <SheetDescription className="truncate font-mono text-xs">
-              {title}
-            </SheetDescription>
+            {/* Hint + path share a line when wide; the path wraps below when cramped. */}
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <SheetDescription className="shrink-0">
+                {t('lens.subtitle')}
+              </SheetDescription>
+              <span
+                className="min-w-0 grow basis-64 truncate font-mono text-xs text-muted-foreground"
+                title={title}
+              >
+                {title}
+              </span>
+            </div>
           </div>
           <Button
             variant="ghost"
