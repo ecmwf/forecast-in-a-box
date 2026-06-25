@@ -47,7 +47,7 @@ import { buildLensBaseUrl, buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import { getJobResultHead } from '@/api/endpoints/job'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
 import { showToast } from '@/lib/toast'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -110,6 +110,8 @@ interface StoredOutputRow {
   taskId: string
   title: string
   isAvailable: boolean
+  /** Number of GRIB marker tasks the sink fanned out to. */
+  count: number
 }
 
 export function StoredOutputsCard({
@@ -132,8 +134,15 @@ export function StoredOutputsCard({
     for (const [taskId, meta] of Object.entries(outputs)) {
       if (meta.mime_type !== GRIB_DIR_MIME) continue
       const existing = byBlock.get(meta.original_block)
-      // Prefer an available marker so the payload fetch can succeed.
-      if (existing && (existing.isAvailable || !meta.is_available)) continue
+      if (existing) {
+        existing.count += 1
+        // Prefer an available marker as the representative payload source.
+        if (!existing.isAvailable && meta.is_available) {
+          existing.taskId = taskId
+          existing.isAvailable = true
+        }
+        continue
+      }
       const blockInstance = fable?.blocks[meta.original_block]
       const factory =
         catalogue && blockInstance
@@ -144,6 +153,7 @@ export function StoredOutputsCard({
         taskId,
         title: factory?.title ?? meta.original_block,
         isAvailable: meta.is_available,
+        count: 1,
       })
     }
     return Array.from(byBlock.values())
@@ -153,7 +163,7 @@ export function StoredOutputsCard({
 
   return (
     <>
-      <Card className="gap-3 p-4">
+      <Card shadow="none" className="gap-3 p-4">
         <div className="flex items-center gap-2">
           <FolderOpen className="h-4 w-4 text-muted-foreground" />
           <P className="font-medium">{t('storedOutputs.title')}</P>
@@ -215,6 +225,14 @@ function StoredOutputRowItem({
     void navigator.clipboard.writeText(buildWmsCapabilitiesUrl(lensPort)).then(
       () => showToast.success(t('storedOutputs.wmsUrlCopied')),
       () => showToast.error(t('storedOutputs.wmsUrlCopyFailed')),
+    )
+  }
+
+  const copyPath = (path: string) => {
+    void copyToClipboard(path).then((ok) =>
+      ok
+        ? showToast.success(t('storedOutputs.pathCopied'))
+        : showToast.error(t('storedOutputs.pathCopyFailed')),
     )
   }
 
@@ -296,15 +314,27 @@ function StoredOutputRowItem({
         GRIB
       </span>
       <div className="min-w-0 flex-1">
-        <P className="truncate text-sm font-medium">{row.title}</P>
+        <div className="flex items-baseline gap-2">
+          <P className="truncate text-sm font-medium">{row.title}</P>
+          {row.count > 1 && (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {t('storedOutputs.fileCount', { n: row.count })}
+            </span>
+          )}
+        </div>
         {dirPath ? (
-          <P
-            className="truncate font-mono text-xs text-muted-foreground"
-            title={dirPath}
+          <button
+            type="button"
+            onClick={() => copyPath(dirPath)}
+            className="group/path flex w-full min-w-0 items-center gap-1 text-left font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+            title={t('storedOutputs.copyPath')}
           >
-            {dir}
-            <span className="text-foreground/80">{name}</span>
-          </P>
+            <span className="truncate">
+              {dir}
+              <span className="text-foreground/80">{name}</span>
+            </span>
+            <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/path:opacity-70" />
+          </button>
         ) : row.isAvailable ? (
           <P className="font-mono text-xs text-muted-foreground">…</P>
         ) : (

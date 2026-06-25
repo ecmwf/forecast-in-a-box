@@ -219,6 +219,10 @@
   },
   "storedOutputs": {
     "title": "Stored outputs",
+    "fileCount": "{{n}} files",
+    "copyPath": "Copy directory path",
+    "pathCopied": "Path copied to clipboard",
+    "pathCopyFailed": "Could not copy path",
     "open": "Open",
     "copyWmsUrl": "Copy WMS URL",
     "wmsUrlCopied": "WMS URL copied to clipboard",

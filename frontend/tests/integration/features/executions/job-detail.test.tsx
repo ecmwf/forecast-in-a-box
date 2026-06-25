@@ -188,7 +188,8 @@ describe('RunDetailPage Integration', () => {
   describe('outputs panel', () => {
     it('shows available output count for completed job with outputs', async () => {
       const screen = await renderDetailPage('job-completed-001')
-      // job-completed-001 has 4 available outputs (task-out-1 … task-out-4)
+      // 4 outputs total: 3 previewable (grid) + 1 GRIB sink marker (shown in
+      // the "Stored outputs" card). The header tally counts the whole run.
       await expect.element(screen.getByText(/Generated: 4/)).toBeVisible()
     })
 

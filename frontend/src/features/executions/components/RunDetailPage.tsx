@@ -297,13 +297,14 @@ export function RunDetailPage() {
             <div
               ref={handleToolbarRef}
               className={cn(
-                'sticky top-12 z-10 mt-3 flex shrink-0 items-center gap-3 bg-background',
+                'sticky top-12 z-10 my-2 flex shrink-0 items-center gap-3 bg-background',
                 activeTab !== 'outputs' && 'hidden',
               )}
             />
             <TabsContent
               value="outputs"
-              className={cn(WIDE_TAB_CONTENT, 'space-y-4')}
+              // pr at wide layout keeps the grid off the column scrollbar.
+              className={cn(WIDE_TAB_CONTENT, 'space-y-4 min-[1280px]:pr-2')}
             >
               <StoredOutputsCard
                 jobId={jobId}
