@@ -12,7 +12,10 @@
     "graphUnavailable": "Graph visualisation unavailable",
     "graphUnavailableDescription": "The pipeline graph is not available for this job.",
     "specUnavailable": "Specification not available",
-    "specUnavailableDescription": "The original configuration was not stored for this job."
+    "specUnavailableDescription": "The original configuration was not stored for this job.",
+    "copySpec": "Copy",
+    "copied": "Copied",
+    "specCopyFailed": "Couldn't copy specification"
   },
   "status": {
     "submitted": "Submitted",

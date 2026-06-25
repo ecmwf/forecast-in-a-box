@@ -14,12 +14,15 @@
  * JSON viewer for the original fable specification snapshot.
  */
 
-import { useMemo } from 'react'
-import { FileJson } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, Copy, FileJson } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import { P } from '@/components/base/typography'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { copyToClipboard } from '@/lib/utils'
+import { showToast } from '@/lib/toast'
 
 interface SpecificationPanelProps {
   fableSnapshot: FableBuilderV1 | undefined
@@ -89,14 +92,20 @@ function highlightJson(
 
 export function SpecificationPanel({ fableSnapshot }: SpecificationPanelProps) {
   const { t } = useTranslation('executions')
+  const [copied, setCopied] = useState(false)
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  )
 
-  const highlighted = useMemo(() => {
+  useEffect(() => () => clearTimeout(copyResetRef.current), [])
+
+  const spec = useMemo(() => {
     if (!fableSnapshot) return null
     const json = JSON.stringify(fableSnapshot, null, 2)
-    return highlightJson(json)
+    return { json, segments: highlightJson(json) }
   }, [fableSnapshot])
 
-  if (!fableSnapshot || !highlighted) {
+  if (!fableSnapshot || !spec) {
     return (
       <Card className="overflow-hidden">
         <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
@@ -112,12 +121,36 @@ export function SpecificationPanel({ fableSnapshot }: SpecificationPanelProps) {
     )
   }
 
+  const handleCopy = async () => {
+    const ok = await copyToClipboard(spec.json)
+    if (!ok) {
+      showToast.error(t('detail.specCopyFailed'))
+      return
+    }
+    setCopied(true)
+    clearTimeout(copyResetRef.current)
+    copyResetRef.current = setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
-    <Card className="overflow-hidden">
+    <Card className="relative overflow-hidden">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleCopy}
+        className="absolute top-3 right-3 z-10 gap-1.5"
+      >
+        {copied ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" />
+        )}
+        {copied ? t('detail.copied') : t('detail.copySpec')}
+      </Button>
       <div className="overflow-x-auto p-6 min-[1280px]:flex-1 min-[1280px]:overflow-auto">
         <pre className="font-mono text-sm leading-relaxed">
           <code>
-            {highlighted.map((segment, i) => (
+            {spec.segments.map((segment, i) => (
               <span
                 key={`${segment.className}-${i}`}
                 className={segment.className}
