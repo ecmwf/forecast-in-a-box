@@ -374,7 +374,7 @@ function StoredOutputRowItem({
             <Copy className="h-3.5 w-3.5" />
           </TooltipTrigger>
           <TooltipContent>
-            <P className="max-w-xs text-xs">
+            <P className="max-w-xs text-xs text-inherit">
               {wmsUnavailable ? (
                 t('storedOutputs.wmsUnavailable')
               ) : (
