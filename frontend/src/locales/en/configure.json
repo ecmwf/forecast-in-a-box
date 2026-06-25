@@ -187,7 +187,9 @@
     "style": "Style",
     "curved": "Curved",
     "rounded": "Rounded",
-    "orthogonal": "Orthogonal"
+    "orthogonal": "Orthogonal",
+    "switchToForm": "Switch to form layout",
+    "switchToGraph": "Switch to graph layout"
   },
   "addNode": {
     "searchPlaceholder": "Search blocks...",
