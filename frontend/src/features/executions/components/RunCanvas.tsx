@@ -20,7 +20,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   Panel,
   ReactFlow,
   ReactFlowProvider,
@@ -244,12 +243,6 @@ function RunCanvasInner({
               color="#cbd5e1"
               className="dark:opacity-30"
             />
-            <MiniMap
-              nodeStrokeWidth={3}
-              position="bottom-right"
-              maskColor="transparent"
-              className="right-2! bottom-2! h-[60px]! w-[90px]! rounded border border-border bg-background/80 shadow-sm"
-            />
             <Controls
               showInteractive={false}
               position="bottom-left"
@@ -285,8 +278,8 @@ export function RunCanvas(props: RunCanvasProps) {
 
 const MIN_CANVAS_HEIGHT = 280
 const MAX_CANVAS_HEIGHT = 520
-/** Padding above + below the laid-out nodes so the Show-config / minimap /
- * controls overlays don't clip the top/bottom rows. */
+/** Padding above + below the laid-out nodes so the Show-config / controls
+ * overlays don't clip the top/bottom rows. */
 const VERTICAL_CHROME_PADDING = 96
 
 interface PositionedNode {
