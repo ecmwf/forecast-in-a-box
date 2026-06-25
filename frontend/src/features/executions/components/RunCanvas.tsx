@@ -263,7 +263,9 @@ function RunCanvasInner({
                 onClick={() => setShowConfig((prev) => !prev)}
               >
                 <Settings2 className="h-3.5 w-3.5" />
-                {showConfig ? t('detail.hideConfig') : t('detail.showConfig')}
+                {showConfig
+                  ? t('detail.hideParameters')
+                  : t('detail.showParameters')}
               </Button>
             </Panel>
           </ReactFlow>

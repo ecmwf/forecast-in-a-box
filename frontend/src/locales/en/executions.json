@@ -6,8 +6,8 @@
   "detail": {
     "backLink": "Executions",
     "untitledJob": "Untitled Job",
-    "showConfig": "Show config",
-    "hideConfig": "Hide config",
+    "showParameters": "Show parameters",
+    "hideParameters": "Hide parameters",
     "running": "Running...",
     "graphUnavailable": "Graph visualisation unavailable",
     "graphUnavailableDescription": "The pipeline graph is not available for this job.",
