@@ -137,7 +137,7 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
     r = SubmitJobRequest(
         job=JobSpec(
             infra_spec=infra_spec,
-            envvars={},
+            envvars=spec.environment.environment_variables,
             job_instance=JobInstanceRich(jobInstance=job, checkpointSpec=None),
         )
     )
