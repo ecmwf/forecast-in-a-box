@@ -19,7 +19,7 @@ against Run outputs. Routes cover: start, status, stop, list, and supported lens
 
 import logging
 import pathlib
-from typing import Any, Self, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Self
 
 from fastapi import APIRouter, HTTPException
 
