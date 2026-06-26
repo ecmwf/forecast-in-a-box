@@ -19,7 +19,7 @@ against Run outputs. Routes cover: start, status, stop, list, and supported lens
 
 import logging
 import pathlib
-from typing import Any, Self
+from typing import Any, Self, TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException
 
@@ -45,9 +45,12 @@ router = APIRouter(
 )
 
 try:
-    import skinnywms
+    if not TYPE_CHECKING:
+        import skinnywms
 
-    is_skinny_available = True
+        is_skinny_available = True
+    else:
+        skinnywms: Any = None
 except ModuleNotFoundError:
     is_skinny_available = False
 
