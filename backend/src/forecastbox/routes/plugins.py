@@ -63,8 +63,8 @@ class PluginListing(FiabBaseModel):
 
 
 @router.get("/status")
-def get_plugins_status_full() -> PluginsStatus:
-    return status_full()
+async def get_plugins_status_full() -> PluginsStatus:
+    return await status_full()
 
 
 # ---------------------------------------------------------------------------
@@ -73,12 +73,12 @@ def get_plugins_status_full() -> PluginsStatus:
 
 
 @router.get("/details")
-def get_plugin_details(forceRefresh: bool = False) -> PluginListing:
+async def get_plugin_details(forceRefresh: bool = False) -> PluginListing:
     # TODO implement forceRefresh -- we would need to prod the thread to update the store, but await its completion here
     if forceRefresh:
         raise NotImplementedError
     rv = {}
-    statuses = status_full()
+    statuses = await status_full()
     disabled = {pluginCompositeId for pluginCompositeId, pluginSettings in config.external.plugins.items() if not pluginSettings.enabled}
     errored = set(statuses.plugin_errors.keys())
     loaded = set(statuses.plugin_versions.keys())

@@ -25,6 +25,7 @@ or when running the initial plugin load -- but inside the updater threads,
 we lock for longer.
 """
 
+import asyncio
 import importlib
 import logging
 import threading
@@ -41,6 +42,7 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from forecastbox.domain.plugin.compatibility import install_plugin_compatibly
+from forecastbox.domain.plugin.db import get_all_plugin_states, upsert_plugin_state
 from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_updatedatetime, try_version
@@ -57,6 +59,7 @@ class PluginManager:
     updatedatetime: PMap[PluginCompositeId, str] = pmap()
     updater: threading.Thread | None = None
     updater_error: str | None = None
+    loop: asyncio.AbstractEventLoop | None = None
 
 
 def load_single(plugin: PluginSettings) -> Plugin | str:
@@ -77,6 +80,15 @@ def load_single(plugin: PluginSettings) -> Plugin | str:
     return "\n".join(errors)
 
 
+def _run_async_from_thread(coro: object) -> object:  # type: ignore[type-arg]
+    """Dispatch *coro* to the event loop stashed on PluginManager and block until done."""
+    loop = PluginManager.loop
+    if loop is None:
+        logger.warning("PluginManager.loop is not set; skipping DB write")
+        return None
+    return asyncio.run_coroutine_threadsafe(coro, loop).result()  # type: ignore[arg-type]
+
+
 def load_plugins(plugins: PluginsSettings) -> None:
     logger.info("starting initial plugin load")
     try:
@@ -87,14 +99,25 @@ def load_plugins(plugins: PluginsSettings) -> None:
         for pluginKey, pluginSettings in plugins.items():
             if not pluginSettings.enabled:
                 continue
+            plugin_id_str = PluginCompositeId.to_str(pluginKey)
+            install_error: str | None = None
             # NOTE consider running all pip invocations at once -- worse error reporting but better perf
-            if pluginSettings.update_strategy == "auto":
-                logger.info(f"auto-updating {pluginSettings.module_name}")
-                install_plugin_compatibly(pluginSettings.pip_source, None)
-            else:
-                if try_import(pluginSettings.module_name) is None:
-                    logger.info(f"installing {pluginSettings.module_name} for the first time")
+            try:
+                if pluginSettings.update_strategy == "auto":
+                    logger.info(f"auto-updating {pluginSettings.module_name}")
                     install_plugin_compatibly(pluginSettings.pip_source, None)
+                else:
+                    if try_import(pluginSettings.module_name) is None:
+                        logger.info(f"installing {pluginSettings.module_name} for the first time")
+                        install_plugin_compatibly(pluginSettings.pip_source, None)
+            except Exception as e:
+                install_error = repr(e)
+                logger.exception(f"install failed for {pluginKey}: {repr(e)}")
+
+            if install_error is not None:
+                _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=None, error=install_error))
+                errors[pluginKey] = install_error
+                continue
 
             if pluginKey in lookup:
                 errors[pluginKey] = f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}"
@@ -109,6 +132,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
                     assert_never(result)
                 versions[pluginKey] = try_version(pluginSettings.pip_source, pluginSettings.module_name)
                 updatedatetime[pluginKey] = try_updatedatetime(pluginSettings.pip_source)
+                _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=versions[pluginKey], error=None))
 
         with timed_acquire(PluginManager.lock, 60) as result:
             if not result:
@@ -126,14 +150,20 @@ def load_plugins(plugins: PluginsSettings) -> None:
 
 
 def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, install: bool, version: Version | None) -> None:
+    plugin_id_str = PluginCompositeId.to_str(pluginId)
     try:
         if install:
-            install_plugin_compatibly(pluginSettings.pip_source, version)
+            try:
+                install_plugin_compatibly(pluginSettings.pip_source, version)
+            except Exception as install_exc:
+                _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=None, error=repr(install_exc)))
+                raise
         # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases
         importlib.reload(importlib.import_module(pluginSettings.module_name))
         plugin_impl = try_import(pluginSettings.module_name)
         result = load_single(pluginSettings)
         logger.debug(f"plugin {pluginId} loaded with success: {isinstance(result, Plugin)}")
+        version_str = try_version(pluginSettings.pip_source, pluginSettings.module_name)
         with timed_acquire(PluginManager.lock, 60) as acquire_result:
             if not acquire_result:
                 raise ValueError("failed to acquire the shared lock")
@@ -143,10 +173,9 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
                 PluginManager.errors = PluginManager.errors.set(pluginId, result)
             else:
                 assert_never(result)
-            PluginManager.versions = PluginManager.versions.set(
-                pluginId, try_version(pluginSettings.pip_source, pluginSettings.module_name)
-            )
+            PluginManager.versions = PluginManager.versions.set(pluginId, version_str)
             PluginManager.updatedatetime = PluginManager.updatedatetime.set(pluginId, try_updatedatetime(pluginSettings.pip_source))
+        _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, error=None))
         logger.debug(f"single plugin loading finished: {pluginId}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -188,6 +217,7 @@ class PluginsStatus(FiabBaseModel):
     plugin_errors: dict[PluginCompositeId, str]
     plugin_versions: dict[PluginCompositeId, str]
     plugin_updatedatetime: dict[PluginCompositeId, str]
+    plugin_install_errors: dict[str, str] = {}
 
 
 def status_brief() -> str:
@@ -204,7 +234,7 @@ def plugins_ready() -> bool:
     return status_brief() == "ok"
 
 
-def status_full() -> PluginsStatus:
+async def status_full() -> PluginsStatus:
     with timed_acquire(PluginManager.lock, 0.2) as result:
         if not result:
             status = "retrieving"
@@ -216,11 +246,18 @@ def status_full() -> PluginsStatus:
             plugin_errors = dict(PluginManager.errors)
             plugin_versions = dict(PluginManager.versions)
             plugin_updatedatetime = dict(PluginManager.updatedatetime)
+    plugin_install_errors: dict[str, str] = {}
+    try:
+        states = await get_all_plugin_states()
+        plugin_install_errors = {s.plugin_id: s.error for s in states if s.error is not None}  # type: ignore[misc]
+    except Exception:
+        logger.warning("failed to load plugin install states from DB; returning empty", exc_info=True)
     return PluginsStatus(
         updater_status=status,
         plugin_errors=plugin_errors,
         plugin_versions=plugin_versions,
         plugin_updatedatetime=plugin_updatedatetime,
+        plugin_install_errors=plugin_install_errors,
     )
 
 
