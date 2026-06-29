@@ -28,6 +28,7 @@ import importlib
 import logging
 from collections.abc import Iterator
 
+from cascade.low.func import Either
 from packaging.specifiers import SpecifierSet
 from packaging.version import InvalidVersion, Version
 
@@ -67,10 +68,12 @@ def get_compatible_versions(plugin_settings: PluginSettings, available_versions:
             yield version_str
 
 
-def install_plugin_compatibly(pip_source: str, version: Version | None) -> str | None:
+def install_plugin_compatibly(pip_source: str, version: Version | None) -> Either[dict[str, str], str]:  # type: ignore[type-arg]
     """Install a plugin with compatibility constraints.
 
-    Returns ``None`` on success or an error string on failure.  Never raises.
+    Returns ``Either.ok(versions)`` on success, where ``versions`` maps newly-installed
+    package names to their version strings, or ``Either.error(msg)`` on failure.
+    Never raises.
     """
     if pip_source.startswith("-e"):
         pkgs = pip_source.split(" ", 1)
