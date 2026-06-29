@@ -11,10 +11,16 @@ from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
+    BlockInstanceId,
     BlockInstanceOutput,
+    BlueprintTemplate,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
     NoOutput,
+    PluginBlockFactoryId,
+    PluginCompositeId,
+    PluginId,
+    PluginStoreId,
     RawOutput,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
@@ -190,3 +196,34 @@ def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Er
 
 
 plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler)
+
+
+_SELF_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("__self__"), local=PluginId("__self__"))
+
+_BASIC_BLOCK_ID = BlockInstanceId("text_source")
+
+_testBasic = BlueprintTemplate(
+    display_name="testBasic",
+    display_description="A minimal test template with a single source_text block.",
+    blocks={
+        _BASIC_BLOCK_ID: BlockInstance(
+            factory_id=PluginBlockFactoryId(
+                plugin=_SELF_PLUGIN_ID,
+                factory=BlockFactoryId("source_text"),
+            ),
+            configuration_values={TEXT: "{{ example_text }}"},
+            input_ids={},
+        ),
+    },
+    local_glyphs={"example_text": "hello world"},
+    example_values={_BASIC_BLOCK_ID: {TEXT: "hello world"}},
+    example_glyphs={"example_text": "hello world"},
+)
+
+plugin = lambda: Plugin(
+    catalogue=catalogue(),
+    validator=validator,
+    expander=expander,
+    compiler=compiler,
+    blueprint_templates=(_testBasic,),
+)

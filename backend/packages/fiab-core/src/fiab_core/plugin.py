@@ -23,6 +23,7 @@ from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockInstance,
     BlockInstanceOutput,
+    BlueprintTemplate,
     ConfigurationOptionRestriction,
 )
 
@@ -72,3 +73,4 @@ class Plugin:
     validator: Validator
     expander: Expander
     compiler: Compiler
+    blueprint_templates: tuple[BlueprintTemplate, ...] = field(default_factory=tuple)

@@ -179,3 +179,25 @@ class NoOutput(FiabCoreBaseModel):
 BlockInstanceOutput = QubedOutput | RawOutput | NoOutput
 
 ActionLookup = dict[BlockInstanceId, Action]
+
+
+class BlueprintTemplateEnvironment(FiabCoreBaseModel):
+    environment_variables: dict[str, str] = Field(default_factory=dict)
+
+
+class BlueprintTemplate(FiabCoreBaseModel):
+    """A partial, ready-to-customise blueprint shipped by a plugin.
+
+    Exposes the public subset of a blueprint builder plus separate guiding
+    example values/glyphs the user is expected to override. `display_name` is the
+    stable key used by the backend for upsert and exclusion; it must be unique
+    within a plugin.
+    """
+
+    display_name: str
+    display_description: str
+    blocks: dict[BlockInstanceId, BlockInstance]
+    environment: BlueprintTemplateEnvironment | None = None
+    local_glyphs: dict[str, str] = Field(default_factory=dict)
+    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
+    example_glyphs: dict[str, str] = Field(default_factory=dict)
