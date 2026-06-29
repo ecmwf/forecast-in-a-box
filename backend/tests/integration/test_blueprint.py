@@ -187,6 +187,26 @@ def test_blueprint_upsert_nonexistent_id(backend_client_with_auth: httpx.Client)
     assert response.status_code == 404
 
 
+def test_plugin_template_in_blueprint_list(backend_client_with_auth: httpx.Client) -> None:
+    """Verify that the testBasic plugin template appears in the blueprint list after startup."""
+
+    def do_action() -> dict:
+        response = backend_client_with_auth.get("/plugin/status", timeout=10)
+        assert response.is_success
+        return response.json()
+
+    def verify_ok(data: dict) -> dict | None:
+        return data if data.get("updater_status") == "ok" else None
+
+    retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin loader did not reach 'ok' status")
+
+    response = backend_client_with_auth.get("/blueprint/list", timeout=10)
+    assert response.is_success, response.text
+    blueprints = response.json()["blueprints"]
+    matches = [b for b in blueprints if b.get("source") == "plugin_template" and b.get("display_name") == "testBasic"]
+    assert len(matches) == 1, f"Expected exactly one 'testBasic' plugin_template blueprint in the list, got: {blueprints}"
+
+
 def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     response = backend_client_with_auth.get("/blueprint/catalogue").raise_for_status()
     assert len(response.json()) > 0

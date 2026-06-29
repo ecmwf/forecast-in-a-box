@@ -102,6 +102,37 @@ def _version_from_install(installed: dict[str, str], module_name: str) -> str | 
     return None
 
 
+async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin) -> None:
+    """Upsert each blueprint template exposed by the plugin into the DB.
+
+    Uses lazy imports to avoid a circular dependency between the plugin and
+    blueprint domains.  A failure on any single template is logged and skipped
+    so the remaining templates are still ingested.
+    """
+    from forecastbox.domain.blueprint.db import find_plugin_template_id, upsert_blueprint
+    from forecastbox.domain.blueprint.service import template_to_builder
+    from forecastbox.utility.auth import AuthContext
+
+    plugin_id_str = PluginCompositeId.to_str(plugin_id)
+    auth = AuthContext(user_id=plugin_id_str, is_admin=True)
+    for template in plugin.blueprint_templates:
+        try:
+            existing_id = await find_plugin_template_id(created_by=plugin_id_str, display_name=template.display_name)
+            builder = template_to_builder(template, plugin_id)
+            await upsert_blueprint(
+                auth_context=auth,
+                blueprint_id=existing_id,
+                source="plugin_template",
+                created_by=plugin_id_str,
+                builder=builder.model_dump(mode="json"),
+                display_name=template.display_name,
+                display_description=template.display_description,
+            )
+            logger.debug(f"ingested template {template.display_name!r} from plugin {plugin_id_str!r}")
+        except Exception as e:
+            logger.error(f"failed to ingest template {template.display_name!r} from plugin {plugin_id_str!r}: {repr(e)}")
+
+
 def load_plugins(plugins: PluginsSettings) -> None:
     logger.info("starting initial plugin load")
     try:
@@ -151,6 +182,8 @@ def load_plugins(plugins: PluginsSettings) -> None:
                     pluginSettings.pip_source, pluginSettings.module_name
                 )
                 _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, install_error=None))
+                if isinstance(plugin_result, Plugin):
+                    _run_async_from_thread(_ingest_plugin_templates(pluginKey, plugin_result))
 
         with timed_acquire(PluginManager.lock, 60) as lock_result:
             if not lock_result:
@@ -195,6 +228,8 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             else:
                 assert_never(result)
         _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, install_error=None))
+        if isinstance(result, Plugin):
+            _run_async_from_thread(_ingest_plugin_templates(pluginId, result))
         logger.debug(f"single plugin loading finished: {pluginId}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")

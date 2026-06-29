@@ -197,6 +197,34 @@ async def count_blueprints(*, auth_context: AuthContext) -> int:
     return await dbRetry(function)
 
 
+async def find_plugin_template_id(*, created_by: str, display_name: str) -> BlueprintId | None:
+    """Return the blueprint_id of the latest non-deleted ``plugin_template`` row owned by a plugin.
+
+    Returns ``None`` if no matching row exists.  Used by template ingestion to
+    decide whether to append a new version to an existing blueprint or create a
+    fresh one.
+    """
+    query = (
+        select(Blueprint.blueprint_id)
+        .where(
+            Blueprint.source == "plugin_template",
+            Blueprint.created_by == created_by,
+            Blueprint.display_name == display_name,
+            Blueprint.is_deleted.is_(False),
+        )
+        .order_by(Blueprint.version.desc())
+        .limit(1)
+    )
+
+    async def function(i: int) -> BlueprintId | None:
+        async with _jobs_module.async_session_maker() as session:
+            result = await session.execute(query)
+            row = result.first()
+            return BlueprintId(str(row[0])) if row is not None else None
+
+    return await dbRetry(function)
+
+
 async def soft_delete_blueprint(blueprint_id: BlueprintId, *, expected_version: int, auth_context: AuthContext) -> None:
     """Mark all versions of a Blueprint as deleted.
 
