@@ -201,3 +201,11 @@ class BlueprintTemplate(FiabCoreBaseModel):
     local_glyphs: dict[str, str] = Field(default_factory=dict)
     example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
     example_glyphs: dict[str, str] = Field(default_factory=dict)
+
+
+SelfPluginId = PluginCompositeId(store=PluginStoreId("__self__"), local=PluginId("__self__"))
+"""Use this when building the blueprint templates shipped by a plugin.
+
+The backend substitutes the real plugin composite ID at install time.
+"""
+# TODO this class shows some awkwardness -- ideally, we'll make the existence of PluginCompositeId completely unknown to the insides of the plugins, at the expense of the backend mutating the classes at the routing time

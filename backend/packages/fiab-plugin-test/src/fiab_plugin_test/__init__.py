@@ -18,10 +18,8 @@ from fiab_core.fable import (
     ConfigurationOptionRestriction,
     NoOutput,
     PluginBlockFactoryId,
-    PluginCompositeId,
-    PluginId,
-    PluginStoreId,
     RawOutput,
+    SelfPluginId,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.types import FableType
@@ -198,26 +196,34 @@ def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Er
 plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler)
 
 
-_SELF_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("__self__"), local=PluginId("__self__"))
+def _make_source_text_block(text: str) -> BlockInstance:
+    return BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("source_text")),
+        configuration_values={TEXT: text} if text else {},
+        input_ids={},
+    )
 
-_BASIC_BLOCK_ID = BlockInstanceId("text_source")
+
+_BLOCK_FIXED = BlockInstanceId("text_fixed")
+_BLOCK_GLYPHS = BlockInstanceId("text_glyphs")
+_BLOCK_EXAMPLE = BlockInstanceId("text_example")
 
 _testBasic = BlueprintTemplate(
     display_name="testBasic",
-    display_description="A minimal test template with a single source_text block.",
+    display_description="A minimal test template demonstrating fixed values, glyph substitution, and example values.",
     blocks={
-        _BASIC_BLOCK_ID: BlockInstance(
-            factory_id=PluginBlockFactoryId(
-                plugin=_SELF_PLUGIN_ID,
-                factory=BlockFactoryId("source_text"),
-            ),
-            configuration_values={TEXT: "{{ example_text }}"},
-            input_ids={},
-        ),
+        # Fixed: configuration value is a literal string -- no glyphs, no example override needed.
+        _BLOCK_FIXED: _make_source_text_block("fixed text"),
+        # Glyphs: value references two glyphs; greeting is pinned in local_glyphs,
+        # name is provided only as an example the user should override.
+        _BLOCK_GLYPHS: _make_source_text_block("${greeting} ${name}"),
+        # Example only: no value in configuration_values; example_values shows
+        # what a user might start with.
+        _BLOCK_EXAMPLE: _make_source_text_block(""),
     },
-    local_glyphs={"example_text": "hello world"},
-    example_values={_BASIC_BLOCK_ID: {TEXT: "hello world"}},
-    example_glyphs={"example_text": "hello world"},
+    local_glyphs={"greeting": "hello"},
+    example_values={_BLOCK_EXAMPLE: {TEXT: "text from example values"}},
+    example_glyphs={"name": "world"},
 )
 
 plugin = lambda: Plugin(
