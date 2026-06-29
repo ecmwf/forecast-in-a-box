@@ -38,10 +38,7 @@ jobs:
           setupBash false
 
           BASE_TAG="${{ inputs.tag }}"
-          echo "$BASE_TAG" | grep -Eq '^c[0-9]+\.[0-9]+\.[0-9]+$' || {
-            echo "expected base tag in the form cX.Y.Z" >&2
-            exit 1
-          }
+          validateTag "$BASE_TAG" "c"
 
           HIGHEST_TAG=$(
             git tag -l "${BASE_TAG}.*" \

@@ -7,6 +7,9 @@ name: CD for the backend itself (including the bundled frontend)
 # triggers the frontend build), exports the dependency lockfile to
 # install/pylock.toml, and tests the wheel against the lockfile. On success
 # it uploads to PyPI, commits pylock.toml, and pushes the vX.Y.Z tag.
+# The fiab-core version used for building and testing is cX.?.?, ie, the major
+# version is matching, others don't matter.
+# The fiab-core requirements constraints are >=X,<X+1.
 
 on:
   workflow_dispatch:
