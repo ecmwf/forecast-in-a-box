@@ -1,10 +1,20 @@
-name: cd artifacts update
+name: CD for artifacts catalog update
+
+# Updates the artifacts catalog (install/artifacts.json), which lists the AI
+# models available to forecast-in-a-box. The catalog is versioned with the
+# same major/minor/patch as the corresponding core release (cX.Y.Z), with an
+# incrementing 4th number for each catalog-only update (cX.Y.Z.1, cX.Y.Z.2, ...).
+#
+# Given a base tag cX.Y.Z (produced by cd-core), it validates that the only
+# change since the last catalog tag (cX.Y.Z.N) is to install/artifacts.json,
+# validates the JSON schema using fiab-core at version X.Y.Z, and pushes a
+# new cX.Y.Z.(N+1) tag to mark the updated catalog.
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Base tag. Use cX.Y.Z
+        description: Base core tag. Use cX.Y.Z
         type: string
         required: true
 
@@ -13,53 +23,55 @@ jobs:
     name: "Validate and tag artifacts"
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
       - uses: astral-sh/setup-uv@v7
       - run: |
-          set -euo pipefail
+          # NOTE dont use action checkout, doesnt coop with auth
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          git clone -b $BRANCH --single-branch https://$GH_USER:$GH_TOKEN@github.com/ecmwf/forecast-in-a-box.git .
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://$GH_USER:$GH_TOKEN@github.com/ecmwf/forecast-in-a-box.git
+          git fetch --tags origin # NOTE dont use with: fetch-tags: true, the clone is still shallow
+
+          source scripts/cicd/scripts.sh
+          setupBash false
+
           BASE_TAG="${{ inputs.tag }}"
           echo "$BASE_TAG" | grep -Eq '^c[0-9]+\.[0-9]+\.[0-9]+$' || {
-            echo "expected tag in the form cX.Y.Z" >&2
+            echo "expected base tag in the form cX.Y.Z" >&2
             exit 1
           }
 
-          git fetch --tags origin
-
-          VERSION="${BASE_TAG#c}"
           HIGHEST_TAG=$(
             git tag -l "${BASE_TAG}.*" \
             | grep -E "^${BASE_TAG}\.[0-9]+$" \
             | sort -V \
             | tail -n1
           )
-          if [ -z "$HIGHEST_TAG" ] ; then
-            HIGHEST_TAG="${BASE_TAG}.0"
-          fi
+          [ -n "$HIGHEST_TAG" ] || {
+            echo "no existing tag found matching ${BASE_TAG}.N -- has cd-core been run?" >&2
+            exit 1
+          }
 
           CHANGED_FILES=$(git diff --name-only "$HIGHEST_TAG" HEAD)
-          if [ -z "$CHANGED_FILES" ] ; then
-            echo "expected at least artifacts.json to differ from $HIGHEST_TAG" >&2
+          [ -n "$CHANGED_FILES" ] || {
+            echo "expected install/artifacts.json to differ from $HIGHEST_TAG" >&2
             exit 1
-          fi
+          }
           if printf '%s\n' "$CHANGED_FILES" | grep -vx 'install/artifacts.json' >/dev/null ; then
-            echo "unexpected files changed relative to $HIGHEST_TAG" >&2
+            echo "unexpected files changed relative to $HIGHEST_TAG:" >&2
             printf '%s\n' "$CHANGED_FILES" >&2
             exit 1
           fi
-          if ! printf '%s\n' "$CHANGED_FILES" | grep -qx 'install/artifacts.json' ; then
-            echo "artifacts.json must be part of the changes relative to $HIGHEST_TAG" >&2
-            exit 1
-          fi
 
+          VERSION="${BASE_TAG#c}"
           uv run --no-project --with "fiab-core==${VERSION}" python backend/packages/fiab-core/scripts/parse_artifacts_catalog.py install/artifacts.json
 
           IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "${HIGHEST_TAG#c}"
           NEW_TAG="c${MAJOR}.${MINOR}.${PATCH}.$((BUILD + 1))"
-          git tag "$NEW_TAG"
-          git push origin "$NEW_TAG"
+          gitTagAndPush false "$NEW_TAG"
+
+        env:
+          GH_TOKEN: ${{ secrets.GH_REPO_READ_TOKEN }} # says read but actually is write -- and we need that
+          GH_USER: deploy

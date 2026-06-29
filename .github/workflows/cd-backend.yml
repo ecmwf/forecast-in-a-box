@@ -1,5 +1,13 @@
 name: CD for the backend itself (including the bundled frontend)
 
+# Releases the forecastbox backend package, which bundles the compiled frontend.
+#
+# It pushes a new tag vX.Y.Z, either provided on input, or derived from the
+# git repo as the highest existing tag + 0.0.1. It builds the wheel (which
+# triggers the frontend build), exports the dependency lockfile to
+# install/pylock.toml, and tests the wheel against the lockfile. On success
+# it uploads to PyPI, commits pylock.toml, and pushes the vX.Y.Z tag.
+
 on:
   workflow_dispatch:
     inputs:
