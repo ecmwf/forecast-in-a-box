@@ -204,17 +204,14 @@ class PluginState(Base):
 
     One row per plugin, keyed by the PluginCompositeId rendered as ``store:local``.
     Written and updated during plugin install; never versioned.
-
-    Columns owned by later tasks (excluded_templates, glyph_remapping, template_errors)
-    are defined here with safe defaults to avoid schema changes later (no migrations).
     """
 
     __tablename__ = "plugin_state"
 
     plugin_id = Column(String(255), primary_key=True, nullable=False)
-    version = Column(String(255), nullable=True)
+    plugin_version = Column(String(255), nullable=False)
     updated_at = Column(UTCDateTime, nullable=False)
-    error = Column(String(4096), nullable=True)
+    install_error = Column(String(4096), nullable=True)
     excluded_templates = Column(JSON, nullable=False, default=list)
     glyph_remapping = Column(JSON, nullable=False, default=dict)
     template_errors = Column(JSON, nullable=True)

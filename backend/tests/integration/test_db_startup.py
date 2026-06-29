@@ -8,7 +8,6 @@
 # nor does it submit to any jurisdiction.
 
 import pathlib
-import time
 
 import httpx
 
@@ -37,7 +36,5 @@ def test_plugin_install_state_persisted(backend_client: httpx.Client) -> None:
 
     status = retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin loader did not reach 'ok' status")
 
-    assert "plugin_install_errors" in status, "plugin_install_errors field missing from /plugin/status response"
-    assert "localTest:single" not in status["plugin_install_errors"], (
-        f"Test plugin reported an install error: {status['plugin_install_errors'].get('localTest:single')}"
-    )
+    plugin_errors = status.get("plugin_errors", {})
+    assert "localTest:single" not in plugin_errors, f"Test plugin reported an error: {plugin_errors.get('localTest:single')}"

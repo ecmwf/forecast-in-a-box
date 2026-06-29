@@ -67,7 +67,11 @@ def get_compatible_versions(plugin_settings: PluginSettings, available_versions:
             yield version_str
 
 
-def install_plugin_compatibly(pip_source: str, version: Version | None) -> None:
+def install_plugin_compatibly(pip_source: str, version: Version | None) -> str | None:
+    """Install a plugin with compatibility constraints.
+
+    Returns ``None`` on success or an error string on failure.  Never raises.
+    """
     if pip_source.startswith("-e"):
         pkgs = pip_source.split(" ", 1)
     else:
@@ -77,4 +81,4 @@ def install_plugin_compatibly(pip_source: str, version: Version | None) -> None:
             pkgs = [f"{pip_source}{plugin_default_specifier()}"]
     # TODO -- include the whole pylock.toml
     pkgs += get_existing_install_pin("fiab-core")
-    try_install(pkgs)
+    return try_install(pkgs)

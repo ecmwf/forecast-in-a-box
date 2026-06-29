@@ -15,9 +15,9 @@ share a single SQLite connection pool and in-process tests can monkeypatch
 
 This table records unversioned app state (install history, per-plugin config).
 Writes are idempotent: insert on first install with empty-default columns for
-excluded_templates / glyph_remapping / template_errors; update version /
-updated_at / error on subsequent installs without clobbering the columns owned
-by later tasks (04/05/06).
+excluded_templates / glyph_remapping / template_errors; update plugin_version /
+updated_at / install_error on subsequent installs without clobbering the columns
+owned by other subsystems.
 """
 
 import logging
@@ -32,13 +32,13 @@ from forecastbox.utility.time import current_time
 logger = logging.getLogger(__name__)
 
 
-async def upsert_plugin_state(*, plugin_id: str, version: str | None, error: str | None) -> None:
+async def upsert_plugin_state(*, plugin_id: str, version: str, install_error: str | None) -> None:
     """Insert or update the PluginState row for ``plugin_id``.
 
     On first install: creates a row with empty ``excluded_templates`` / ``glyph_remapping``
     defaults and ``template_errors=None``.
-    On subsequent installs: updates ``version``, ``updated_at``, and ``error`` only --
-    ``excluded_templates`` and ``glyph_remapping`` are not touched (owned by tasks 04/05).
+    On subsequent installs: updates ``plugin_version``, ``updated_at``, and ``install_error``
+    only -- ``excluded_templates`` and ``glyph_remapping`` are not touched.
     """
     ref_time = current_time("dbref")
 
@@ -50,9 +50,9 @@ async def upsert_plugin_state(*, plugin_id: str, version: str | None, error: str
                 session.add(
                     PluginState(
                         plugin_id=plugin_id,
-                        version=version,
+                        plugin_version=version,
                         updated_at=ref_time,
-                        error=error,
+                        install_error=install_error,
                         excluded_templates=[],
                         glyph_remapping={},
                         template_errors=None,
@@ -60,7 +60,9 @@ async def upsert_plugin_state(*, plugin_id: str, version: str | None, error: str
                 )
             else:
                 await session.execute(
-                    update(PluginState).where(PluginState.plugin_id == plugin_id).values(version=version, updated_at=ref_time, error=error)
+                    update(PluginState)
+                    .where(PluginState.plugin_id == plugin_id)
+                    .values(plugin_version=version, updated_at=ref_time, install_error=install_error)
                 )
             await session.commit()
 

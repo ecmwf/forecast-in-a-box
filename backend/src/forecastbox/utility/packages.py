@@ -106,19 +106,26 @@ def try_updatedatetime(pip_source: str) -> str:
         return "unknown"
 
 
-def try_install(packages: list[str]) -> None:
-    """Run ``uv pip install`` with the given pkg specs."""
+def try_install(packages: list[str]) -> str | None:
+    """Run ``uv pip install`` with the given pkg specs.
+
+    Returns ``None`` on success or an error string describing the failure.
+    Never raises.
+    """
     install_command = ["uv", "pip", "install"] + packages
     logger.debug(f"will run {install_command}")
     try:
         result = subprocess.run(install_command, check=False, capture_output=True)
     except FileNotFoundError as ex:
-        logger.error(f"installing {packages} failure: {repr(ex)}")
-        return
+        msg = f"installing {packages} failure: {repr(ex)}"
+        logger.error(msg)
+        return msg
     if result.returncode != 0:
         msg = f"installing {packages} failure: {result.returncode}. Stderr: {result.stderr}, Stdout: {result.stdout}, Args: {result.args}"
         logger.error(msg)
+        return msg
     logger.debug(f"install finished with {result.stdout=}, {result.stderr=}")
+    return None
 
 
 def get_existing_install_pin(distname: str) -> list[str]:

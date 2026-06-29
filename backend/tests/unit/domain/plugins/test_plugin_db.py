@@ -39,13 +39,13 @@ async def mem_session_maker(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[a
 @pytest.mark.asyncio
 async def test_upsert_creates_row_with_defaults(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """First upsert inserts a row with empty excluded_templates and glyph_remapping."""
-    await plugin_db.upsert_plugin_state(plugin_id="localTest:single", version="1.2.3", error=None)
+    await plugin_db.upsert_plugin_state(plugin_id="localTest:single", version="1.2.3", install_error=None)
 
     state = await plugin_db.get_plugin_state("localTest:single")
     assert state is not None
     assert state.plugin_id == "localTest:single"
-    assert state.version == "1.2.3"
-    assert state.error is None
+    assert state.plugin_version == "1.2.3"
+    assert state.install_error is None
     assert state.excluded_templates == []
     assert state.glyph_remapping == {}
     assert state.template_errors is None
@@ -54,10 +54,10 @@ async def test_upsert_creates_row_with_defaults(mem_session_maker: async_session
 
 @pytest.mark.asyncio
 async def test_upsert_updates_version_without_clobbering(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    """Second upsert updates version/error but does not clobber excluded_templates / glyph_remapping."""
-    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.1.0", error=None)
+    """Second upsert updates plugin_version/install_error but does not clobber excluded_templates / glyph_remapping."""
+    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.1.0", install_error=None)
 
-    # Simulate task-04/05 writes directly to DB
+    # Simulate writes by later subsystems directly to DB
     from sqlalchemy import update as sa_update
 
     async with _jobs_module.async_session_maker() as session:
@@ -68,13 +68,13 @@ async def test_upsert_updates_version_without_clobbering(mem_session_maker: asyn
         )
         await session.commit()
 
-    # Now re-install (update)
-    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.2.0", error=None)
+    # Re-install (update)
+    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.2.0", install_error=None)
 
     state = await plugin_db.get_plugin_state("myStore:myPlugin")
     assert state is not None
-    assert state.version == "0.2.0"
-    assert state.error is None
+    assert state.plugin_version == "0.2.0"
+    assert state.install_error is None
     # excluded_templates / glyph_remapping must NOT be reset
     assert state.excluded_templates == ["tplA"]
     assert state.glyph_remapping == {"old": "new"}
@@ -83,20 +83,20 @@ async def test_upsert_updates_version_without_clobbering(mem_session_maker: asyn
 @pytest.mark.asyncio
 async def test_upsert_persists_install_error(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """An install failure writes the error string and records the attempt."""
-    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version=None, error="pip failed: some reason")
+    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="unknown", install_error="pip failed: some reason")
 
     state = await plugin_db.get_plugin_state("bad:plugin")
     assert state is not None
-    assert state.error == "pip failed: some reason"
-    assert state.version is None
+    assert state.install_error == "pip failed: some reason"
+    assert state.plugin_version == "unknown"
     assert state.updated_at is not None
 
 
 @pytest.mark.asyncio
 async def test_get_all_plugin_states(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """get_all_plugin_states returns all persisted rows."""
-    await plugin_db.upsert_plugin_state(plugin_id="storeA:p1", version="1.0", error=None)
-    await plugin_db.upsert_plugin_state(plugin_id="storeA:p2", version=None, error="err")
+    await plugin_db.upsert_plugin_state(plugin_id="storeA:p1", version="1.0", install_error=None)
+    await plugin_db.upsert_plugin_state(plugin_id="storeA:p2", version="unknown", install_error="err")
 
     states = await plugin_db.get_all_plugin_states()
     ids = {s.plugin_id for s in states}

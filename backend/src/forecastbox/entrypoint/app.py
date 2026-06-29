@@ -9,6 +9,7 @@
 
 """FastAPI Entrypoint"""
 
+import asyncio
 import importlib
 import logging
 import os
@@ -45,8 +46,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    import asyncio
-
     logger.debug(f"Starting FIAB with config: {config}")
     for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
         module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
