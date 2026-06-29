@@ -23,6 +23,7 @@ from packaging.version import InvalidVersion, Version
 
 from forecastbox.domain.auth.users import UserRead
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
+from forecastbox.domain.plugin.db import update_plugin_settings
 from forecastbox.domain.plugin.manager import PluginsStatus, modify_enabled, status_full, submit_update_single, uninstall_plugin
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
@@ -197,4 +198,32 @@ def modify_enabled_endpoint(
     request: Request, pluginCompositeId: PluginCompositeId, isEnabled: bool, admin: UserRead | None = Depends(get_admin_user)
 ) -> Response:
     modify_enabled(pluginCompositeId, isEnabled)
+    return get_catalogue_redirect(request)
+
+
+class PluginSettingsUpdateRequest(FiabBaseModel):
+    pluginCompositeId: PluginCompositeId
+    excluded_templates: list[str] | None = None
+    """Names of templates to exclude.  ``None`` leaves the stored list unchanged;
+    an empty list explicitly clears all exclusions."""
+    glyph_remapping: dict[str, str] | None = None
+    """Glyph rename map to persist.  ``None`` leaves the stored map unchanged;
+    an empty dict explicitly clears all remappings."""
+
+
+@router.post("/settings")
+async def update_plugin_settings_endpoint(
+    request: Request,
+    body: PluginSettingsUpdateRequest,
+    admin: UserRead | None = Depends(get_admin_user),
+) -> Response:
+    """Persist plugin install settings and trigger a re-ingest so exclusions take effect immediately."""
+    await update_plugin_settings(
+        plugin_id=PluginCompositeId.to_str(body.pluginCompositeId),
+        excluded_templates=body.excluded_templates,
+        glyph_remapping=body.glyph_remapping,
+    )
+    result = submit_update_single(body.pluginCompositeId, install=False, version=None)
+    if result:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return get_catalogue_redirect(request)

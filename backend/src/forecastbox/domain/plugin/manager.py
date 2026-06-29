@@ -105,18 +105,34 @@ def _version_from_install(installed: dict[str, str], module_name: str) -> str | 
 async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin) -> None:
     """Upsert each blueprint template exposed by the plugin into the DB.
 
+    Excluded templates (per ``PluginState.excluded_templates``) are skipped and
+    any existing plugin-owned blueprint row with that ``display_name`` is
+    soft-deleted.  Non-excluded templates are upserted as normal.
+
     Uses lazy imports to avoid a circular dependency between the plugin and
     blueprint domains.  A failure on any single template is logged and skipped
     so the remaining templates are still ingested.
+
+    Glyph remapping is loaded from state but not applied here; that seam is
+    left for a later task.
     """
-    from forecastbox.domain.blueprint.db import find_plugin_template_id, upsert_blueprint
+    from forecastbox.domain.blueprint.db import find_plugin_template_id, soft_delete_plugin_template, upsert_blueprint
     from forecastbox.domain.blueprint.service import template_to_builder
+    from forecastbox.domain.plugin.db import get_plugin_settings
     from forecastbox.utility.auth import AuthContext
 
     plugin_id_str = PluginCompositeId.to_str(plugin_id)
     auth = AuthContext(user_id=plugin_id_str, is_admin=True)
+
+    excluded_templates, _glyph_remapping = await get_plugin_settings(plugin_id_str)
+    excluded_set = set(excluded_templates)
+
     for template in plugin.blueprint_templates:
         try:
+            if template.display_name in excluded_set:
+                await soft_delete_plugin_template(created_by=plugin_id_str, display_name=template.display_name)
+                logger.debug(f"soft-deleted excluded template {template.display_name!r} from plugin {plugin_id_str!r}")
+                continue
             existing_id = await find_plugin_template_id(created_by=plugin_id_str, display_name=template.display_name)
             builder = template_to_builder(template, plugin_id)
             await upsert_blueprint(

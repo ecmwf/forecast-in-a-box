@@ -108,3 +108,53 @@ async def test_get_plugin_state_missing(mem_session_maker: async_sessionmaker[As
     """get_plugin_state returns None for a plugin not yet installed."""
     state = await plugin_db.get_plugin_state("never:installed")
     assert state is None
+
+
+@pytest.mark.asyncio
+async def test_update_plugin_settings_partial_excluded(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """update_plugin_settings overwrites excluded_templates when provided, leaves glyph_remapping unchanged."""
+    await plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0", install_error=None)
+    await plugin_db.update_plugin_settings(plugin_id="s:p", excluded_templates=["tplA"], glyph_remapping=None)
+
+    state = await plugin_db.get_plugin_state("s:p")
+    assert state is not None
+    assert state.excluded_templates == ["tplA"]
+    assert state.glyph_remapping == {}
+
+    await plugin_db.update_plugin_settings(plugin_id="s:p", excluded_templates=None, glyph_remapping={"old": "new"})
+    state = await plugin_db.get_plugin_state("s:p")
+    assert state is not None
+    assert state.excluded_templates == ["tplA"]
+    assert state.glyph_remapping == {"old": "new"}
+
+
+@pytest.mark.asyncio
+async def test_update_plugin_settings_empty_list_clears(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """Passing an empty list for excluded_templates explicitly clears the stored list."""
+    await plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0", install_error=None)
+    await plugin_db.update_plugin_settings(plugin_id="s:q", excluded_templates=["x", "y"], glyph_remapping=None)
+    await plugin_db.update_plugin_settings(plugin_id="s:q", excluded_templates=[], glyph_remapping=None)
+
+    state = await plugin_db.get_plugin_state("s:q")
+    assert state is not None
+    assert state.excluded_templates == []
+
+
+@pytest.mark.asyncio
+async def test_update_plugin_settings_creates_row_if_missing(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """update_plugin_settings inserts a row with defaults when no PluginState exists yet."""
+    await plugin_db.update_plugin_settings(plugin_id="new:plugin", excluded_templates=["tplX"], glyph_remapping=None)
+
+    state = await plugin_db.get_plugin_state("new:plugin")
+    assert state is not None
+    assert state.excluded_templates == ["tplX"]
+    assert state.glyph_remapping == {}
+    assert state.plugin_version == "not installed"
+
+
+@pytest.mark.asyncio
+async def test_get_plugin_settings_defaults(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """get_plugin_settings returns empty defaults for a plugin with no persisted state."""
+    excluded, remapping = await plugin_db.get_plugin_settings("unknown:plugin")
+    assert excluded == []
+    assert remapping == {}

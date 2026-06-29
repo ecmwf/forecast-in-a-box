@@ -207,6 +207,46 @@ def test_plugin_template_in_blueprint_list(backend_client_with_auth: httpx.Clien
     assert len(matches) == 1, f"Expected exactly one 'testBasic' plugin_template blueprint in the list, got: {blueprints}"
 
 
+def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backend_admin_client: httpx.Client) -> None:
+    """Excluding a template via POST /plugin/settings removes it from the blueprint list."""
+    from .conftest import testPluginId
+
+    # Verify testExclusion is initially present.
+    response = backend_client_with_auth.get("/blueprint/list", timeout=10)
+    assert response.is_success, response.text
+    blueprints = response.json()["blueprints"]
+    assert any(b.get("display_name") == "testExclusion" for b in blueprints), (
+        f"testExclusion should be present before exclusion, got: {[b.get('display_name') for b in blueprints]}"
+    )
+
+    # Exclude testExclusion via the admin settings route.
+    response = backend_admin_client.post(
+        "/plugin/settings",
+        json={"pluginCompositeId": testPluginId.model_dump(), "excluded_templates": ["testExclusion"]},
+        timeout=10,
+    )
+    assert response.status_code in (200, 202), f"Unexpected status from /plugin/settings: {response.status_code} {response.text}"
+
+    # Wait for the re-ingest to complete.
+    def do_action() -> dict:
+        resp = backend_client_with_auth.get("/plugin/status", timeout=10)
+        assert resp.is_success
+        return resp.json()
+
+    def verify_ok(data: dict) -> dict | None:
+        return data if data.get("updater_status") == "ok" else None
+
+    retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin re-ingest did not reach 'ok' status")
+
+    # testExclusion must be gone; testBasic must remain.
+    response = backend_client_with_auth.get("/blueprint/list", timeout=10)
+    assert response.is_success, response.text
+    blueprints = response.json()["blueprints"]
+    names = [b.get("display_name") for b in blueprints if b.get("source") == "plugin_template"]
+    assert "testExclusion" not in names, f"testExclusion should have been excluded, but found: {names}"
+    assert "testBasic" in names, f"testBasic should still be present, but found: {names}"
+
+
 def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     response = backend_client_with_auth.get("/blueprint/catalogue").raise_for_status()
     assert len(response.json()) > 0

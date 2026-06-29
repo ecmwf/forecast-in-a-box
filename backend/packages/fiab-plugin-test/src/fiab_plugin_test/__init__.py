@@ -226,10 +226,20 @@ _testBasic = BlueprintTemplate(
     example_glyphs={"name": "world"},
 )
 
+_BLOCK_EXCL = BlockInstanceId("text_excl")
+
+_testExclusion = BlueprintTemplate(
+    display_name="testExclusion",
+    display_description="A minimal template used to verify admin exclusion via the settings route.",
+    blocks={
+        _BLOCK_EXCL: _make_source_text_block("exclusion test"),
+    },
+)
+
 plugin = lambda: Plugin(
     catalogue=catalogue(),
     validator=validator,
     expander=expander,
     compiler=compiler,
-    blueprint_templates=(_testBasic,),
+    blueprint_templates=(_testBasic, _testExclusion),
 )
