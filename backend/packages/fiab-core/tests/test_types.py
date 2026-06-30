@@ -21,6 +21,7 @@ from fiab_core.types import (
     DateType,
     FableType,
     FloatType,
+    GeoDomainType,
     IntType,
     ListType,
     NotFableType,
@@ -255,6 +256,67 @@ class TestListType:
             t.validate_convert(["1", "2", "3"])
         with pytest.raises(NotStringInput):
             t.validate_convert(None)
+
+
+class TestGeoDomainType:
+    """GeoDomainType: comma-separated names, or a west,south,east,north integer bbox validated via BoundingBoxType."""
+
+    def test_parses_as_a_list_type(self) -> None:
+        t = _parse("geodomain")
+        assert isinstance(t, GeoDomainType)
+        assert isinstance(t, ListType)
+
+    def test_serialize(self) -> None:
+        assert GeoDomainType().serialize() == "geodomain"
+        assert _parse("geodomain").serialize() == "geodomain"
+
+    def test_convert_names(self) -> None:
+        assert GeoDomainType().validate_convert("Germany,France,Italy") == ["Germany", "France", "Italy"]
+
+    def test_convert_bbox_keeps_string_tokens(self) -> None:
+        # west,south,east,north
+        assert GeoDomainType().validate_convert("-10,35,30,60") == ["-10", "35", "30", "60"]
+
+    def test_bbox_crossing_antimeridian_is_valid(self) -> None:
+        # west > east is a valid box crossing the antimeridian
+        assert GeoDomainType().validate_convert("170,-10,-170,10") == ["170", "-10", "-170", "10"]
+
+    def test_bbox_south_greater_than_north_raises(self) -> None:
+        with pytest.raises(WrongType, match="south"):
+            GeoDomainType().validate_convert("-10,60,30,35")
+
+    def test_bbox_latitude_out_of_range_raises(self) -> None:
+        with pytest.raises(WrongType, match="latitudes"):
+            GeoDomainType().validate_convert("-10,-100,30,60")
+
+    def test_numeric_but_not_integer_bbox_raises(self) -> None:
+        # an almost-bbox must fail loudly instead of being resolved as four region names
+        with pytest.raises(WrongType, match="whole-degree"):
+            GeoDomainType().validate_convert("-10.25,35.5,30,60")
+        with pytest.raises(WrongType, match="whole-degree"):
+            GeoDomainType().validate_convert("nan,35,30,60")
+        with pytest.raises(WrongType, match="whole-degree"):
+            GeoDomainType().validate_convert("-10,35,inf,60")
+
+    def test_four_non_numeric_tokens_are_names(self) -> None:
+        value = "Germany,France,Italy,Spain"
+        assert GeoDomainType().validate_convert(value) == ["Germany", "France", "Italy", "Spain"]
+
+    @pytest.mark.parametrize("value", ["auto", "Auto", "global", "DataDefined"])
+    def test_no_restriction_sentinel_alone_is_valid(self, value: str) -> None:
+        assert GeoDomainType().validate_convert(value) == [value]
+
+    @pytest.mark.parametrize("value", ["auto,Germany", "Germany,auto", "global,Europe"])
+    def test_no_restriction_sentinel_is_exclusive(self, value: str) -> None:
+        with pytest.raises(WrongType, match="cannot be combined"):
+            GeoDomainType().validate_convert(value)
+
+    def test_convert_empty_string_to_empty_list(self) -> None:
+        assert GeoDomainType().validate_convert("") == []
+
+    def test_convert_non_string_raises_type_error(self) -> None:
+        with pytest.raises(NotStringInput):
+            GeoDomainType().validate_convert(["Germany"])
 
 
 class TestFableTypeParse:

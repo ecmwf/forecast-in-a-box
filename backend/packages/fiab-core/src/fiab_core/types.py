@@ -16,6 +16,7 @@ Provides parsing, validation, and conversion for a small set of type expressions
 - enumClosed[...], enumOpen[...] (enumeration types)
 - list[FableType] (container types)
 - bbox (bounding box: exactly four integers)
+- geodomain (bounding box or region/country names; the frontend renders a map/region picker)
 - union[FableType, ...] (union types)
 """
 
@@ -80,6 +81,7 @@ class FableType(ABC):
             ("str", StringType),
             ("country", CountryType),
             ("bbox", BoundingBoxType),
+            ("geodomain", GeoDomainType),
         ]
         for name, factory in _ATOMIC:
             n = len(name)
@@ -125,7 +127,7 @@ class FableType(ABC):
 
         raise NotFableType(
             f"Invalid type expression: {type_expr!r}. "
-            "Expected one of: str, int, float, date, datetime, country, bbox, "
+            "Expected one of: str, int, float, date, datetime, country, bbox, geodomain, "
             "enumClosed[...], enumOpen[...], list[...], union[...]"
         )
 
@@ -330,6 +332,60 @@ class CountryType(StringType):
 
     def serialize(self) -> str:
         return "country"
+
+
+def _all_parse_as_float(items: list[Any]) -> bool:
+    try:
+        [float(item) for item in items]
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+# Single-token geodomain values meaning "no restriction -- use the data's own extent"
+# (compared case-insensitively). Exclusive: they cannot be combined with other values.
+GEODOMAIN_NO_RESTRICTION = frozenset({"auto", "global", "datadefined"})
+
+
+class GeoDomainType(ListType):
+    """Geographic-domain type: a bounding box, region/country names, or a no-restriction sentinel.
+
+    The wire value is a comma-separated string (same encoding as ``list[str]``) and the
+    conversion always returns the string tokens; the distinct serialized name lets the
+    frontend dispatch a map/region picker. Union-style semantics over the geo vocabulary:
+
+    - a single ``auto``/``global``/``DataDefined`` token (case-insensitive) means no
+      restriction -- the consumer uses the data's own extent. It must be the only value.
+    - exactly four integer items are a bounding box ``west,south,east,north`` in whole
+      degrees (validated via ``BoundingBoxType``; latitudes within [-90, 90],
+      south <= north; west > east is allowed and means the box crosses the antimeridian).
+      Four numeric-but-not-integer items are rejected rather than treated as names.
+    - anything else is region/country names (e.g. ``Europe``, or ``Germany,France,Italy``
+      to union), resolved by the consuming runtime. Names are deliberately not ``country``
+      values: presets like ``Europe`` or ``Arctic`` are valid geodomain names.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(StringType())
+
+    def validate_convert(self, value: Any) -> list[str]:
+        items = super().validate_convert(value)
+        try:
+            west, south, east, north = BoundingBoxType().validate_convert(value)
+        except WrongType:
+            if len(items) == 4 and _all_parse_as_float(items):
+                raise WrongType(f"Invalid bounding box {value!r}: coordinates must be whole-degree integers")
+            if len(items) > 1 and any(item.lower() in GEODOMAIN_NO_RESTRICTION for item in items):
+                raise WrongType(f"Invalid domain {value!r}: 'auto'/'global' cannot be combined with other values")
+            return items  # not a bbox -> no-restriction sentinel or region/country names
+        if not (-90 <= south <= 90 and -90 <= north <= 90):
+            raise WrongType(f"Invalid bounding box latitudes south={south}, north={north} (must be within [-90, 90])")
+        if south > north:
+            raise WrongType(f"Invalid bounding box: south ({south}) must be <= north ({north})")
+        return items
+
+    def serialize(self) -> str:
+        return "geodomain"
 
 
 class UnionType(FableType):
