@@ -39,7 +39,6 @@ from cascade.low.func import Either, assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
 from packaging.version import Version
-from pydantic import Field
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
@@ -314,9 +313,6 @@ class PluginsStatus(FiabBaseModel):
     plugin_errors: dict[PluginCompositeId, str]
     plugin_versions: dict[PluginCompositeId, str]
     plugin_updatedatetime: dict[PluginCompositeId, str]
-    plugin_template_errors: dict[PluginCompositeId, dict[str, str]] = Field(default_factory=dict)
-    """Per-plugin map of template ``display_name`` to validation error string for
-    templates that failed validation during the most recent ingestion pass."""
 
 
 def status_brief() -> str:
@@ -343,7 +339,6 @@ async def status_full() -> PluginsStatus:
             plugin_errors = dict(PluginManager.errors)
     plugin_versions: dict[PluginCompositeId, str] = {}
     plugin_updatedatetime: dict[PluginCompositeId, str] = {}
-    plugin_template_errors: dict[PluginCompositeId, dict[str, str]] = {}
     try:
         states = await get_all_plugin_states()
         for state in states:
@@ -360,7 +355,14 @@ async def status_full() -> PluginsStatus:
             plugin_versions[plugin_id] = state.plugin_version  # type: ignore[assignment]
             plugin_updatedatetime[plugin_id] = value_dt2str(state.updated_at)  # type: ignore[arg-type]
             if state.template_errors:  # type: ignore[truthy-bool]
-                plugin_template_errors[plugin_id] = dict(state.template_errors)  # type: ignore[arg-type]
+                # Format per-template errors as a single string and merge into plugin_errors,
+                # consistent with the existing install_error merge above.
+                template_err_str = "; ".join(
+                    f"template {name!r}: {msg}"
+                    for name, msg in state.template_errors.items()  # type: ignore[union-attr]
+                )
+                existing = plugin_errors.get(plugin_id)
+                plugin_errors[plugin_id] = f"{existing}; {template_err_str}" if existing else template_err_str
     except Exception:
         logger.warning("failed to load plugin states from DB; status may be incomplete", exc_info=True)
     return PluginsStatus(
@@ -368,7 +370,6 @@ async def status_full() -> PluginsStatus:
         plugin_errors=plugin_errors,
         plugin_versions=plugin_versions,
         plugin_updatedatetime=plugin_updatedatetime,
-        plugin_template_errors=plugin_template_errors,
     )
 
 

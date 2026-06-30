@@ -279,7 +279,7 @@ def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backe
 
 def test_plugin_template_validation_failure(backend_client_with_auth: httpx.Client) -> None:
     """Templates that fail validation with their example values are absent from the blueprint list
-    and are reported under plugin_template_errors in the plugin status."""
+    and their error is reported in plugin_errors in the plugin status."""
     from .conftest import testPluginId
 
     # Wait for the initial plugin load to finish.
@@ -300,13 +300,14 @@ def test_plugin_template_validation_failure(backend_client_with_auth: httpx.Clie
     names = [b.get("display_name") for b in blueprints if b.get("source") == "plugin_template"]
     assert "testFailValidation" not in names, f"testFailValidation should have been rejected but found in: {names}"
 
-    # Its error must be reported under plugin_template_errors in the status response.
-    # PluginsStatus dict keys for PluginCompositeId are serialized via str(), which gives
-    # the Pydantic model repr (e.g. "store='localTest' local='single'").
+    # Its error must be reported in plugin_errors (merged alongside install errors).
+    # PluginsStatus dict keys for PluginCompositeId are serialized via str(plugin_id).
     plugin_id_key = str(testPluginId)
-    template_errors_map = status.get("plugin_template_errors", {})
-    plugin_te = template_errors_map.get(plugin_id_key, {})
-    assert "testFailValidation" in plugin_te, f"Expected testFailValidation in plugin_template_errors[{plugin_id_key!r}], got: {plugin_te}"
+    plugin_errors = status.get("plugin_errors", {})
+    plugin_error_str = plugin_errors.get(plugin_id_key, "")
+    assert "testFailValidation" in plugin_error_str, (
+        f"Expected 'testFailValidation' in plugin_errors[{plugin_id_key!r}], got: {plugin_error_str!r}"
+    )
 
 
 def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:

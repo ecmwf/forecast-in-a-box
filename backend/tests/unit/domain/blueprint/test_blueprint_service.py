@@ -196,11 +196,11 @@ def test_resolve_builder_with_examples_fills_missing_config_value() -> None:
     assert result.blocks[_BLOCK_A].configuration_values[_OPT] == "from example"
 
 
-def test_resolve_builder_with_examples_does_not_overwrite_existing_config_value() -> None:
-    """An explicit template value takes precedence over the example value."""
+def test_resolve_builder_with_examples_overrides_existing_config_value() -> None:
+    """Example values override existing template values for validation purposes."""
     builder = _make_builder(block_text="template value")
     result = resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "example value"}}, {})
-    assert result.blocks[_BLOCK_A].configuration_values[_OPT] == "template value"
+    assert result.blocks[_BLOCK_A].configuration_values[_OPT] == "example value"
 
 
 def test_resolve_builder_with_examples_merges_example_glyphs() -> None:
@@ -210,11 +210,11 @@ def test_resolve_builder_with_examples_merges_example_glyphs() -> None:
     assert result.local_glyphs["name"] == "world"
 
 
-def test_resolve_builder_with_examples_does_not_overwrite_existing_local_glyph() -> None:
-    """An explicit template local glyph takes precedence over an example glyph."""
+def test_resolve_builder_with_examples_overrides_existing_local_glyph() -> None:
+    """Example glyphs override existing template local glyphs for validation purposes."""
     builder = _make_builder(local_glyphs={"name": "template"})
     result = resolve_builder_with_examples(builder, {}, {"name": "example"})
-    assert result.local_glyphs["name"] == "template"
+    assert result.local_glyphs["name"] == "example"
 
 
 def test_resolve_builder_with_examples_does_not_mutate_original() -> None:
