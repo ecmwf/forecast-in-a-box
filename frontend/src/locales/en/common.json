@@ -189,6 +189,28 @@
     "addItemPlaceholder": "Add item...",
     "noMatches": "No matches"
   },
+  "geoDomain": {
+    "placeholder": "Select an area…",
+    "autoLabel": "Auto",
+    "autoHint": "Plot everything the data covers",
+    "empty": "No area selected",
+    "tabPresets": "Presets",
+    "tabCountries": "Countries",
+    "tabMap": "Map",
+    "tabAdvanced": "Advanced",
+    "searchCountries": "Search countries…",
+    "noCountries": "No matching countries",
+    "modeSelect": "Countries",
+    "modeDraw": "Box",
+    "selectHint": "Click a country to add or remove it.",
+    "drawHint": "Drag on the map to draw a bounding box.",
+    "bordersApprox": "Borders are approximate.",
+    "expand": "Expand map",
+    "collapse": "Collapse map",
+    "clear": "Clear",
+    "boxSummary": "Box: {{west}}, {{south}}, {{east}}, {{north}}",
+    "advancedHint": "Enter a region, comma-separated countries, a bounding box in whole degrees (west,south,east,north), or a ${variable}."
+  },
   "notificationBanner": {
     "dismiss": "Dismiss notification"
   },

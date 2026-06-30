@@ -236,6 +236,23 @@ describe('parseValueType', () => {
       })
     })
   })
+
+  describe('geodomain type', () => {
+    it('parses "geodomain"', () => {
+      expect(parseValueType('geodomain')).toEqual({ type: 'geodomain' })
+    })
+
+    it('is case-insensitive', () => {
+      expect(parseValueType('GeoDomain')).toEqual({ type: 'geodomain' })
+    })
+
+    it('parses optional[geodomain] with optional flag', () => {
+      expect(parseValueType('optional[geodomain]')).toEqual({
+        type: 'geodomain',
+        optional: true,
+      })
+    })
+  })
 })
 
 describe('getDefaultValueForType', () => {
@@ -317,5 +334,9 @@ describe('getDefaultValueForType', () => {
 
   it('returns empty string for unknown type', () => {
     expect(getDefaultValueForType({ type: 'unknown', raw: 'xyz' })).toBe('')
+  })
+
+  it('returns empty string for geodomain', () => {
+    expect(getDefaultValueForType({ type: 'geodomain' })).toBe('')
   })
 })
