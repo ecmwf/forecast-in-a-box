@@ -33,7 +33,7 @@ import re
 import threading
 import time
 from concurrent.futures import Future
-from typing import Literal
+from typing import Literal, cast
 
 from cascade.low.func import Either, assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
@@ -43,7 +43,7 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from forecastbox.domain.plugin.compatibility import install_plugin_compatibly
-from forecastbox.domain.plugin.db import get_all_plugin_states, upsert_plugin_state
+from forecastbox.domain.plugin.db import get_all_plugin_states, get_plugin_state, upsert_plugin_state
 from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_version
@@ -62,7 +62,7 @@ class PluginManager:
     loop: asyncio.AbstractEventLoop | None = None
 
 
-def load_single(plugin: PluginSettings) -> Either[Plugin, str]:
+def load_single(plugin: PluginSettings) -> Either[Plugin, str]:  # type: ignore[invalid-argument]
     errors = []
     plugin_impl = try_import(plugin.module_name)
     if plugin_impl is None:
@@ -205,7 +205,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
                 logger.error(f"install failed for {pluginKey}: {install_error}")
                 _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version="install failed", install_error=install_error))
                 continue
-            if installed_versions is not None:
+            if installed_versions:
                 version_str = _version_from_install(installed_versions, pluginSettings.module_name)
                 if version_str is not None:
                     _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, install_error=None))
@@ -217,12 +217,20 @@ def load_plugins(plugins: PluginsSettings) -> None:
                 errors[pluginKey] = f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}"
             else:
                 plugin_result = load_single(pluginSettings)
-                logger.debug(f"plugin {pluginKey} loaded with success: {plugin_result.t is not None} and version {version_imported}")
                 if plugin_result.t is not None:
                     lookup[pluginKey] = plugin_result.t
                     version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
-                    # TODO validate version with database, if mismatch append to errors but dont drop from lookup
+                    logger.debug(f"plugin {pluginKey} loaded with success: True and version {version_imported}")
+                    if not installed_versions:
+                        db_state = _run_async_from_thread(get_plugin_state(plugin_id_str))
+                        if db_state is not None:
+                            db_ver: str = db_state.plugin_version  # type: ignore[assignment]
+                            if db_ver not in ("install failed", "not installed") and db_ver != version_imported:
+                                mismatch_msg = f"version mismatch: DB has {db_ver!r} but {version_imported!r} is imported"
+                                logger.warning(f"plugin {pluginKey}: {mismatch_msg}")
+                                errors[pluginKey] = mismatch_msg
                 else:
+                    logger.debug(f"plugin {pluginKey} loaded with success: False")
                     errors[pluginKey] = plugin_result.e
 
         # Publish all loaded plugins before running template ingestion so that
@@ -262,17 +270,27 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
         logger.debug(f"plugin {pluginId} loaded with success: {result.t is not None}")
         version_install = _version_from_install(installed_versions, pluginSettings.module_name)
         version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
-        # TODO compare versions, if mismatch, append to errors but dont unload
+        version_mismatch: str | None = None
+        if version_install is not None and version_install != version_imported:
+            version_mismatch = f"version mismatch: pip installed {version_install!r} but {version_imported!r} is imported"
+            logger.warning(f"plugin {pluginId}: {version_mismatch}")
         with timed_acquire(PluginManager.lock, 60) as acquire_result:
             if not acquire_result:
                 raise ValueError("failed to acquire the shared lock")
             if result.t is not None:
                 PluginManager.plugins = PluginManager.plugins.set(pluginId, result.t)
             else:
-                PluginManager.errors = PluginManager.errors.set(pluginId, result.e)
-        _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_installed, install_error=None))
-        if isinstance(result, Plugin):
-            _run_async_from_thread(_ingest_plugin_templates(pluginId, result))
+                PluginManager.errors = PluginManager.errors.set(pluginId, cast(str, result.e))
+            if version_mismatch is not None:
+                existing_err = PluginManager.errors.get(pluginId)
+                PluginManager.errors = PluginManager.errors.set(
+                    pluginId, f"{existing_err}; {version_mismatch}" if existing_err else version_mismatch
+                )
+        _run_async_from_thread(
+            upsert_plugin_state(plugin_id=plugin_id_str, version=version_install or version_imported, install_error=None)
+        )
+        if result.t is not None:
+            _run_async_from_thread(_ingest_plugin_templates(pluginId, result.t))
         logger.debug(f"single plugin loading finished: {pluginId}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
