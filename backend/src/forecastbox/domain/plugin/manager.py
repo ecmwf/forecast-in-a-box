@@ -62,7 +62,7 @@ class PluginManager:
     loop: asyncio.AbstractEventLoop | None = None
 
 
-def load_single(plugin: PluginSettings) -> Plugin | str:
+def load_single(plugin: PluginSettings) -> Either[Plugin, str]:
     errors = []
     plugin_impl = try_import(plugin.module_name)
     if plugin_impl is None:
@@ -74,10 +74,10 @@ def load_single(plugin: PluginSettings) -> Plugin | str:
         if not isinstance(maybe_plugin, Plugin):
             errors.append(f"plugin {plugin.module_name}'s `plugin()` does not give a Plugin")
         else:
-            return maybe_plugin
+            return Either.ok(maybe_plugin)
     except Exception as e:
         errors.append("failed to invoke plugin(): {repr(e)}")
-    return "\n".join(errors)
+    return Either.error("\n".join(errors))
 
 
 def _run_async_from_thread(coro: object) -> object:  # type: ignore[type-arg]
@@ -204,24 +204,26 @@ def load_plugins(plugins: PluginsSettings) -> None:
             if install_error is not None:
                 logger.error(f"install failed for {pluginKey}: {install_error}")
                 _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version="install failed", install_error=install_error))
-                errors[pluginKey] = install_error
                 continue
+            if installed_versions is not None:
+                version_str = _version_from_install(installed_versions, pluginSettings.module_name)
+                if version_str is not None:
+                    _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, install_error=None))
+                else:
+                    # pip does not report the version if it isn't changed -> this branch is not necessarily a bug
+                    logger.warning(f"pip install of plugin {plugin_id_str} did not produce a version, assuming no change")
 
             if pluginKey in lookup:
                 errors[pluginKey] = f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}"
             else:
                 plugin_result = load_single(pluginSettings)
-                logger.debug(f"plugin {pluginKey} loaded with success: {isinstance(plugin_result, Plugin)}")
-                if isinstance(plugin_result, Plugin):
-                    lookup[pluginKey] = plugin_result
-                elif isinstance(plugin_result, str):
-                    errors[pluginKey] = plugin_result
+                logger.debug(f"plugin {pluginKey} loaded with success: {plugin_result.t is not None} and version {version_imported}")
+                if plugin_result.t is not None:
+                    lookup[pluginKey] = plugin_result.t
+                    version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
+                    # TODO validate version with database, if mismatch append to errors but dont drop from lookup
                 else:
-                    assert_never(plugin_result)
-                version_str = _version_from_install(installed_versions, pluginSettings.module_name) or try_version(
-                    pluginSettings.pip_source, pluginSettings.module_name
-                )
-                _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, install_error=None))
+                    errors[pluginKey] = plugin_result.e
 
         # Publish all loaded plugins before running template ingestion so that
         # validate_expand can resolve factory references during validation.
@@ -256,22 +258,19 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             installed_versions = install_result.t or {}
         # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases
         importlib.reload(importlib.import_module(pluginSettings.module_name))
-        plugin_impl = try_import(pluginSettings.module_name)
         result = load_single(pluginSettings)
-        logger.debug(f"plugin {pluginId} loaded with success: {isinstance(result, Plugin)}")
-        version_str = _version_from_install(installed_versions, pluginSettings.module_name) or try_version(
-            pluginSettings.pip_source, pluginSettings.module_name
-        )
+        logger.debug(f"plugin {pluginId} loaded with success: {result.t is not None}")
+        version_install = _version_from_install(installed_versions, pluginSettings.module_name)
+        version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
+        # TODO compare versions, if mismatch, append to errors but dont unload
         with timed_acquire(PluginManager.lock, 60) as acquire_result:
             if not acquire_result:
                 raise ValueError("failed to acquire the shared lock")
-            if isinstance(result, Plugin):
-                PluginManager.plugins = PluginManager.plugins.set(pluginId, result)
-            elif isinstance(result, str):
-                PluginManager.errors = PluginManager.errors.set(pluginId, result)
+            if result.t is not None:
+                PluginManager.plugins = PluginManager.plugins.set(pluginId, result.t)
             else:
-                assert_never(result)
-        _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, install_error=None))
+                PluginManager.errors = PluginManager.errors.set(pluginId, result.e)
+        _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_installed, install_error=None))
         if isinstance(result, Plugin):
             _run_async_from_thread(_ingest_plugin_templates(pluginId, result))
         logger.debug(f"single plugin loading finished: {pluginId}")

@@ -18,7 +18,6 @@ import importlib
 import importlib.metadata
 import logging
 import pathlib
-import re
 import subprocess
 from collections.abc import Iterator
 from types import ModuleType
@@ -155,7 +154,7 @@ def try_install(packages: list[str]) -> Either[dict[str, str], str]:  # type: ig
         logger.error(msg)
         return Either.error(msg)
     logger.debug(f"install finished with {result.stdout=}, {result.stderr=}")
-    return Either.ok(_parse_pip_install(result.stdout))
+    return Either.ok(_parse_pip_install(result.stderr))
 
 
 def get_existing_install_pin(distname: str) -> list[str]:
