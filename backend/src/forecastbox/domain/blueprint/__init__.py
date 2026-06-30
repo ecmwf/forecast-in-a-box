@@ -15,5 +15,5 @@ Depends on the Glyph domain, to resolve and validate Glyphs.
 Depends on the Plugin domain, to determine fiab-core compatibility and retrieve plugin factories for validation.
 Depended on by Run and Experiment domains.
 
-Note: there is a dependency circularity where this domain is *depended on* by Plugin, for validating imported blueprint templates. This will be fixed later by refactoring into events.
+Note: there is a dependency circularity where this domain is *depended on* by Plugin, for validating imported blueprint templates and for remapping glyph names in those templates. This will be fixed later by refactoring into events.
 """

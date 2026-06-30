@@ -107,25 +107,25 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
 
     Excluded templates (per ``PluginState.excluded_templates``) are skipped and
     any existing plugin-owned blueprint row with that ``display_name`` is
-    soft-deleted.  Non-excluded templates are upserted as normal.
+    soft-deleted.  Non-excluded templates have their glyph names rewritten by
+    ``remap_builder_glyphs`` when a non-empty ``glyph_remapping`` is stored for
+    the plugin, then are upserted as normal.
 
-    Uses lazy imports to avoid a circular dependency between the plugin and
+    Uses lazy imports to avoid circular dependencies between the plugin and
     blueprint domains.  A failure on any single template is logged and skipped
     so the remaining templates are still ingested.
-    Note: this import is a breach of dependency hierarchy, and will be fixed later.
-
-    Glyph remapping is loaded from state but not applied here; that seam is
-    left for a later task.
+    Note: these imports are a breach of the dependency hierarchy (plugin domain
+    depending on blueprint domain), and will be fixed later by refactoring into events.
     """
     from forecastbox.domain.blueprint.db import find_plugin_template_id, soft_delete_plugin_template, upsert_blueprint
-    from forecastbox.domain.blueprint.service import template_to_builder
+    from forecastbox.domain.blueprint.service import remap_builder_glyphs, template_to_builder
     from forecastbox.domain.plugin.db import get_plugin_settings
     from forecastbox.utility.auth import AuthContext
 
     plugin_id_str = PluginCompositeId.to_str(plugin_id)
     auth = AuthContext(user_id=plugin_id_str, is_admin=True)
 
-    excluded_templates, _glyph_remapping = await get_plugin_settings(plugin_id_str)
+    excluded_templates, glyph_remapping = await get_plugin_settings(plugin_id_str)
     excluded_set = set(excluded_templates)
 
     for template in plugin.blueprint_templates:
@@ -136,6 +136,8 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
                 continue
             existing_id = await find_plugin_template_id(created_by=plugin_id_str, display_name=template.display_name)
             builder = template_to_builder(template, plugin_id)
+            if glyph_remapping:
+                builder = remap_builder_glyphs(builder, glyph_remapping)
             await upsert_blueprint(
                 auth_context=auth,
                 blueprint_id=existing_id,

@@ -24,7 +24,7 @@ from fiab_core.fable import (
     SelfPluginId,
 )
 
-from forecastbox.domain.blueprint.service import template_to_builder
+from forecastbox.domain.blueprint.service import BlueprintBuilder, remap_builder_glyphs, template_to_builder
 
 _REAL_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("myStore"), local=PluginId("myPlugin"))
 _BLOCK_A = BlockInstanceId("blockA")
@@ -129,3 +129,44 @@ def test_template_to_builder_example_values_not_in_configuration_values() -> Non
     )
     builder = template_to_builder(template, _REAL_PLUGIN_ID)
     assert opt not in builder.blocks[example_block].configuration_values
+
+
+# ---------------------------------------------------------------------------
+# remap_builder_glyphs
+# ---------------------------------------------------------------------------
+
+
+def test_remap_builder_glyphs_renames_config_value_and_local_glyph() -> None:
+    """Block config values, local-glyph values, and local-glyph keys are all renamed."""
+    builder = BlueprintBuilder(
+        blocks={
+            _BLOCK_A: BlockInstance(
+                factory_id=PluginBlockFactoryId(plugin=_REAL_PLUGIN_ID, factory=BlockFactoryId("source_text")),
+                configuration_values={_OPT: "${oldGlyph}"},
+                input_ids={},
+            )
+        },
+        local_glyphs={"localOld": "${oldGlyph}"},
+    )
+    mapping = {"oldGlyph": "newGlyph", "localOld": "localNew"}
+    remapped = remap_builder_glyphs(builder, mapping)
+
+    assert remapped.blocks[_BLOCK_A].configuration_values[_OPT] == "${newGlyph}"
+    assert "localNew" in remapped.local_glyphs
+    assert remapped.local_glyphs["localNew"] == "${newGlyph}"
+    assert "localOld" not in remapped.local_glyphs
+
+
+def test_remap_builder_glyphs_empty_mapping_returns_same_object() -> None:
+    builder = BlueprintBuilder(
+        blocks={
+            _BLOCK_A: BlockInstance(
+                factory_id=PluginBlockFactoryId(plugin=_REAL_PLUGIN_ID, factory=BlockFactoryId("source_text")),
+                configuration_values={_OPT: "${oldGlyph}"},
+                input_ids={},
+            )
+        },
+        local_glyphs={"myKey": "myVal"},
+    )
+    result = remap_builder_glyphs(builder, {})
+    assert result is builder

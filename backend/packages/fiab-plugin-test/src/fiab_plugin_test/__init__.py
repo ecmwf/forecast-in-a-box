@@ -236,10 +236,21 @@ _testExclusion = BlueprintTemplate(
     },
 )
 
+_BLOCK_REMAP = BlockInstanceId("text_remap")
+
+_testRemapping = BlueprintTemplate(
+    display_name="testRemapping",
+    display_description="A minimal template used to verify glyph-name remapping at install time.",
+    blocks={
+        _BLOCK_REMAP: _make_source_text_block("${pluginGlyphOld}"),
+    },
+    local_glyphs={"localOld": "${pluginGlyphOld}"},
+)
+
 plugin = lambda: Plugin(
     catalogue=catalogue(),
     validator=validator,
     expander=expander,
     compiler=compiler,
-    blueprint_templates=(_testBasic, _testExclusion),
+    blueprint_templates=(_testBasic, _testExclusion, _testRemapping),
 )

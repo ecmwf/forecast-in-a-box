@@ -208,21 +208,30 @@ def test_plugin_template_in_blueprint_list(backend_client_with_auth: httpx.Clien
 
 
 def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backend_admin_client: httpx.Client) -> None:
-    """Excluding a template via POST /plugin/settings removes it from the blueprint list."""
+    """Excluding a template via POST /plugin/settings removes it from the blueprint list.
+    Also verifies that glyph_remapping renames glyph references in testRemapping after re-ingest.
+    """
     from .conftest import testPluginId
 
-    # Verify testExclusion is initially present.
+    # Verify testExclusion and testRemapping are initially present.
     response = backend_client_with_auth.get("/blueprint/list", timeout=10)
     assert response.is_success, response.text
     blueprints = response.json()["blueprints"]
     assert any(b.get("display_name") == "testExclusion" for b in blueprints), (
         f"testExclusion should be present before exclusion, got: {[b.get('display_name') for b in blueprints]}"
     )
+    assert any(b.get("display_name") == "testRemapping" for b in blueprints), (
+        f"testRemapping should be present before remapping, got: {[b.get('display_name') for b in blueprints]}"
+    )
 
-    # Exclude testExclusion via the admin settings route.
+    # Exclude testExclusion and set a glyph remapping for testRemapping via the admin settings route.
     response = backend_admin_client.post(
         "/plugin/settings",
-        json={"pluginCompositeId": testPluginId.model_dump(), "excluded_templates": ["testExclusion"]},
+        json={
+            "pluginCompositeId": testPluginId.model_dump(),
+            "excluded_templates": ["testExclusion"],
+            "glyph_remapping": {"pluginGlyphOld": "pluginGlyphNew", "localOld": "localNew"},
+        },
         timeout=10,
     )
     assert response.status_code in (200, 202), f"Unexpected status from /plugin/settings: {response.status_code} {response.text}"
@@ -238,13 +247,34 @@ def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backe
 
     retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin re-ingest did not reach 'ok' status")
 
-    # testExclusion must be gone; testBasic must remain.
+    # testExclusion must be gone; testBasic and testRemapping must remain.
     response = backend_client_with_auth.get("/blueprint/list", timeout=10)
     assert response.is_success, response.text
     blueprints = response.json()["blueprints"]
     names = [b.get("display_name") for b in blueprints if b.get("source") == "plugin_template"]
     assert "testExclusion" not in names, f"testExclusion should have been excluded, but found: {names}"
     assert "testBasic" in names, f"testBasic should still be present, but found: {names}"
+    assert "testRemapping" in names, f"testRemapping should be present, but found: {names}"
+
+    # Verify that the glyph remapping was applied to testRemapping.
+    remap_item = next(b for b in blueprints if b.get("display_name") == "testRemapping")
+    remap_id = remap_item["blueprint_id"]
+    response = backend_client_with_auth.get(f"/blueprint/get?blueprint_id={remap_id}", timeout=10)
+    assert response.is_success, response.text
+    builder_data = response.json()["builder"]
+    # The block config value must reference the renamed glyph.
+    config_values = list(builder_data["blocks"].values())[0]["configuration_values"]
+    assert any("pluginGlyphNew" in v for v in config_values.values()), (
+        f"Expected pluginGlyphNew in config values after remapping, got: {config_values}"
+    )
+    assert not any("pluginGlyphOld" in v for v in config_values.values()), (
+        f"pluginGlyphOld should have been renamed, but found in config values: {config_values}"
+    )
+    # The local glyph key and value must also be renamed.
+    local_glyphs = builder_data["local_glyphs"]
+    assert "localNew" in local_glyphs, f"Expected localNew in local_glyphs after remapping, got: {local_glyphs}"
+    assert "localOld" not in local_glyphs, f"localOld should have been renamed, got: {local_glyphs}"
+    assert "pluginGlyphNew" in local_glyphs.get("localNew", ""), f"Expected localNew value to reference pluginGlyphNew, got: {local_glyphs}"
 
 
 def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:

@@ -16,6 +16,7 @@
 # (resolution, error, missing), etc
 
 import datetime as dt
+import re
 from dataclasses import dataclass
 
 from cascade.low.func import Either
@@ -194,3 +195,54 @@ def expand_glyph_values(glyph_values: dict[str, str], roots: set[str] | None = N
             _expand(key, frozenset())
 
     return dict(memo) if roots is not None else {k: memo[k] for k in source}
+
+
+_EXPR_RE = re.compile(r"\$\{([^}]+)\}")
+
+
+def remap_glyph_names(value: str, mapping: dict[str, str]) -> str:
+    """Rewrite glyph identifier names referenced inside ``${...}`` expressions.
+
+    ``mapping`` is a flat old-name -> new-name dict.  Only names reported by
+    ``extract_glyph_names`` (AST-level variable identifiers, excluding filter
+    and global names) are candidates for renaming.  Names absent from
+    ``mapping`` are left untouched.
+
+    The substitution is a single non-recursive pass: every ``${...}``
+    expression in ``value`` is processed once and the result is not
+    re-scanned.  This means that if ``mapping`` contains ``{"a": "b",
+    "b": "c"}``, an expression ``${a}`` is rewritten to ``${b}`` -- never
+    to ``${c}`` -- guaranteeing no double-application.
+
+    Identifiers are matched at word boundaries so that, for example, renaming
+    ``root`` does not affect ``rootDir``.  Filter and global names (e.g.
+    ``floor_day``, ``timedelta``) are excluded by ``extract_glyph_names`` and
+    are therefore never touched.
+
+    Returns ``value`` unchanged when ``mapping`` is empty, when ``value``
+    contains no ``${...}`` expressions, or when no referenced name is a key
+    in ``mapping``.  Malformed expressions are also returned unchanged.
+    """
+    if not mapping or "${" not in value:
+        return value
+
+    names_result = extract_glyph_names(value)
+    if names_result.e is not None:
+        return value
+
+    referenced: set[str] = names_result.t  # type: ignore[assignment]
+    to_rename = {n: mapping[n] for n in referenced if n in mapping}
+    if not to_rename:
+        return value
+
+    # Build a pattern that matches any of the names to rename as whole words,
+    # sorted longest-first to avoid prefix-match ambiguity in alternation.
+    sorted_names: list[str] = sorted(to_rename.keys(), key=lambda n: len(n), reverse=True)
+    names_pattern = "|".join(re.escape(n) for n in sorted_names)
+    ident_re = re.compile(rf"\b({names_pattern})\b")
+
+    def _replace_in_expr(m: re.Match) -> str:  # type: ignore[type-arg]
+        renamed_body = ident_re.sub(lambda nm: to_rename[nm.group(0)], m.group(1))
+        return "${" + renamed_body + "}"
+
+    return _EXPR_RE.sub(_replace_in_expr, value)

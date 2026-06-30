@@ -8,5 +8,5 @@ install error) is recorded in the ``plugin_state`` DB table via ``domain/plugin/
 Depends on no other domain.
 Depended on by Blueprint and Run domains -- they need to extract individual plugin validations and compilers, and to validate fiab-core version.
 
-Note: there is a dependency circularity where this domain *depends on* Blueprint, for validating imported blueprint templates. This will be fixed later by refactoring into events.
+Note: there is a dependency circularity where this domain *depends on* Blueprint, for validating imported blueprint templates and for remapping glyph names in those templates. This will be fixed later by refactoring into events.
 """

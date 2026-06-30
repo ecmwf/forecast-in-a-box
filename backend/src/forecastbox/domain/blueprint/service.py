@@ -51,7 +51,7 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db, resolution
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
-from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values
+from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values, remap_glyph_names
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.graph import topological_order
@@ -355,6 +355,36 @@ def template_to_builder(template: BlueprintTemplate, plugin_id: PluginCompositeI
         environment=environment,
         local_glyphs=dict(template.local_glyphs),
     )
+
+
+def remap_builder_glyphs(builder: BlueprintBuilder, mapping: dict[str, str]) -> BlueprintBuilder:
+    """Return a copy of *builder* with all glyph identifier references renamed per *mapping*.
+
+    Applied in a single non-recursive pass to:
+
+    * every configuration option value string in every block (``${name}``
+      references inside ``${...}`` expressions);
+    * every local-glyph value string (same rename inside ``${...}``);
+    * every local-glyph key: if the key itself is present in *mapping*, it is
+      renamed to the mapped value.
+
+    Returns *builder* unchanged (same object) when *mapping* is empty.
+    """
+    if not mapping:
+        return builder
+
+    new_blocks: dict[BlockInstanceId, BlockInstance] = {}
+    for block_id, block in builder.blocks.items():
+        new_config = {opt_id: remap_glyph_names(val, mapping) for opt_id, val in block.configuration_values.items()}
+        new_blocks[block_id] = block.model_copy(update={"configuration_values": new_config})
+
+    new_local_glyphs: dict[str, str] = {}
+    for key, val in builder.local_glyphs.items():
+        new_key = mapping.get(key, key)
+        new_val = remap_glyph_names(val, mapping)
+        new_local_glyphs[new_key] = new_val
+
+    return builder.model_copy(update={"blocks": new_blocks, "local_glyphs": new_local_glyphs})
 
 
 # ---------------------------------------------------------------------------
