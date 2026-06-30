@@ -24,7 +24,7 @@ from fiab_core.fable import (
     SelfPluginId,
 )
 
-from forecastbox.domain.blueprint.service import BlueprintBuilder, remap_builder_glyphs, template_to_builder
+from forecastbox.domain.blueprint.service import BlueprintBuilder, remap_builder_glyphs, resolve_builder_with_examples, template_to_builder
 
 _REAL_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("myStore"), local=PluginId("myPlugin"))
 _BLOCK_A = BlockInstanceId("blockA")
@@ -170,3 +170,60 @@ def test_remap_builder_glyphs_empty_mapping_returns_same_object() -> None:
     )
     result = remap_builder_glyphs(builder, {})
     assert result is builder
+
+
+# ---------------------------------------------------------------------------
+# resolve_builder_with_examples
+# ---------------------------------------------------------------------------
+
+
+def _make_builder(block_text: str | None = None, local_glyphs: dict[str, str] | None = None) -> BlueprintBuilder:
+    block = BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=_REAL_PLUGIN_ID, factory=BlockFactoryId("source_text")),
+        configuration_values={_OPT: block_text} if block_text is not None else {},
+        input_ids={},
+    )
+    return BlueprintBuilder(
+        blocks={_BLOCK_A: block},
+        local_glyphs=local_glyphs or {},
+    )
+
+
+def test_resolve_builder_with_examples_fills_missing_config_value() -> None:
+    """Example values fill in config options absent from the template block."""
+    builder = _make_builder(block_text=None)
+    result = resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "from example"}}, {})
+    assert result.blocks[_BLOCK_A].configuration_values[_OPT] == "from example"
+
+
+def test_resolve_builder_with_examples_does_not_overwrite_existing_config_value() -> None:
+    """An explicit template value takes precedence over the example value."""
+    builder = _make_builder(block_text="template value")
+    result = resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "example value"}}, {})
+    assert result.blocks[_BLOCK_A].configuration_values[_OPT] == "template value"
+
+
+def test_resolve_builder_with_examples_merges_example_glyphs() -> None:
+    """Example glyphs are merged into local_glyphs when they are absent."""
+    builder = _make_builder(local_glyphs={})
+    result = resolve_builder_with_examples(builder, {}, {"name": "world"})
+    assert result.local_glyphs["name"] == "world"
+
+
+def test_resolve_builder_with_examples_does_not_overwrite_existing_local_glyph() -> None:
+    """An explicit template local glyph takes precedence over an example glyph."""
+    builder = _make_builder(local_glyphs={"name": "template"})
+    result = resolve_builder_with_examples(builder, {}, {"name": "example"})
+    assert result.local_glyphs["name"] == "template"
+
+
+def test_resolve_builder_with_examples_does_not_mutate_original() -> None:
+    """The function is pure: the original builder is unchanged after the call."""
+    builder = _make_builder(block_text=None, local_glyphs={})
+    original_config = dict(builder.blocks[_BLOCK_A].configuration_values)
+    original_glyphs = dict(builder.local_glyphs)
+
+    resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "example"}}, {"k": "v"})
+
+    assert builder.blocks[_BLOCK_A].configuration_values == original_config
+    assert builder.local_glyphs == original_glyphs

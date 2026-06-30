@@ -135,6 +135,27 @@ async def update_plugin_settings(
     await dbRetry(function)
 
 
+async def update_template_errors(*, plugin_id: str, template_errors: dict[str, str] | None) -> None:
+    """Persist per-template validation errors for ``plugin_id``.
+
+    ``None`` clears any recorded errors (all templates passed).  A non-empty
+    dict maps ``display_name`` to the error string for that template.  Call
+    this after each ingestion pass so the status surface reflects the latest result.
+
+    If no PluginState row exists yet the call is silently skipped; the row will
+    be created by ``upsert_plugin_state`` which defaults ``template_errors`` to ``None``.
+    """
+
+    async def function(i: int) -> None:
+        async with _jobs_module.async_session_maker() as session:
+            result = await session.execute(select(PluginState).where(PluginState.plugin_id == plugin_id))
+            if result.scalar_one_or_none() is not None:
+                await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(template_errors=template_errors))
+                await session.commit()
+
+    await dbRetry(function)
+
+
 async def get_plugin_settings(plugin_id: str) -> tuple[list[str], dict[str, str]]:
     """Return ``(excluded_templates, glyph_remapping)`` for ``plugin_id``.
 

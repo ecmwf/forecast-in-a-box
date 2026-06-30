@@ -39,6 +39,7 @@ from cascade.low.func import Either, assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
 from packaging.version import Version
+from pydantic import Field
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
@@ -118,8 +119,13 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
     depending on blueprint domain), and will be fixed later by refactoring into events.
     """
     from forecastbox.domain.blueprint.db import find_plugin_template_id, soft_delete_plugin_template, upsert_blueprint
-    from forecastbox.domain.blueprint.service import remap_builder_glyphs, template_to_builder
-    from forecastbox.domain.plugin.db import get_plugin_settings
+    from forecastbox.domain.blueprint.service import (
+        remap_builder_glyphs,
+        resolve_builder_with_examples,
+        template_to_builder,
+        validate_expand,
+    )
+    from forecastbox.domain.plugin.db import get_plugin_settings, update_template_errors
     from forecastbox.utility.auth import AuthContext
 
     plugin_id_str = PluginCompositeId.to_str(plugin_id)
@@ -127,6 +133,8 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
 
     excluded_templates, glyph_remapping = await get_plugin_settings(plugin_id_str)
     excluded_set = set(excluded_templates)
+
+    template_errors: dict[str, str] = {}
 
     for template in plugin.blueprint_templates:
         try:
@@ -138,6 +146,17 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
             builder = template_to_builder(template, plugin_id)
             if glyph_remapping:
                 builder = remap_builder_glyphs(builder, glyph_remapping)
+            validation_builder = resolve_builder_with_examples(builder, template.example_values, template.example_glyphs)
+            result = await validate_expand(validation_builder, auth, validate_only=True)
+            all_errors: list[str] = list(result.global_errors)
+            for block_errs in result.block_errors.values():
+                all_errors.extend(block_errs)
+            if all_errors:
+                template_errors[template.display_name] = "; ".join(all_errors)
+                logger.warning(
+                    f"template {template.display_name!r} from plugin {plugin_id_str!r} failed validation, skipping upsert: {all_errors}"
+                )
+                continue
             await upsert_blueprint(
                 auth_context=auth,
                 blueprint_id=existing_id,
@@ -149,7 +168,10 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
             )
             logger.debug(f"ingested template {template.display_name!r} from plugin {plugin_id_str!r}")
         except Exception as e:
+            template_errors[template.display_name] = repr(e)
             logger.error(f"failed to ingest template {template.display_name!r} from plugin {plugin_id_str!r}: {repr(e)}")
+
+    await update_template_errors(plugin_id=plugin_id_str, template_errors=template_errors if template_errors else None)
 
 
 def load_plugins(plugins: PluginsSettings) -> None:
@@ -201,14 +223,18 @@ def load_plugins(plugins: PluginsSettings) -> None:
                     pluginSettings.pip_source, pluginSettings.module_name
                 )
                 _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, install_error=None))
-                if isinstance(plugin_result, Plugin):
-                    _run_async_from_thread(_ingest_plugin_templates(pluginKey, plugin_result))
 
+        # Publish all loaded plugins before running template ingestion so that
+        # validate_expand can resolve factory references during validation.
         with timed_acquire(PluginManager.lock, 60) as lock_result:
             if not lock_result:
                 raise ValueError("failed to acquire the shared lock")
             PluginManager.plugins = pmap(lookup)
             PluginManager.errors = pmap(errors)
+
+        for pluginKey, plugin_result in lookup.items():
+            _run_async_from_thread(_ingest_plugin_templates(pluginKey, plugin_result))
+
         logger.debug("global plugin loading finished")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -288,6 +314,9 @@ class PluginsStatus(FiabBaseModel):
     plugin_errors: dict[PluginCompositeId, str]
     plugin_versions: dict[PluginCompositeId, str]
     plugin_updatedatetime: dict[PluginCompositeId, str]
+    plugin_template_errors: dict[PluginCompositeId, dict[str, str]] = Field(default_factory=dict)
+    """Per-plugin map of template ``display_name`` to validation error string for
+    templates that failed validation during the most recent ingestion pass."""
 
 
 def status_brief() -> str:
@@ -314,6 +343,7 @@ async def status_full() -> PluginsStatus:
             plugin_errors = dict(PluginManager.errors)
     plugin_versions: dict[PluginCompositeId, str] = {}
     plugin_updatedatetime: dict[PluginCompositeId, str] = {}
+    plugin_template_errors: dict[PluginCompositeId, dict[str, str]] = {}
     try:
         states = await get_all_plugin_states()
         for state in states:
@@ -329,6 +359,8 @@ async def status_full() -> PluginsStatus:
                 )
             plugin_versions[plugin_id] = state.plugin_version  # type: ignore[assignment]
             plugin_updatedatetime[plugin_id] = value_dt2str(state.updated_at)  # type: ignore[arg-type]
+            if state.template_errors:  # type: ignore[truthy-bool]
+                plugin_template_errors[plugin_id] = dict(state.template_errors)  # type: ignore[arg-type]
     except Exception:
         logger.warning("failed to load plugin states from DB; status may be incomplete", exc_info=True)
     return PluginsStatus(
@@ -336,6 +368,7 @@ async def status_full() -> PluginsStatus:
         plugin_errors=plugin_errors,
         plugin_versions=plugin_versions,
         plugin_updatedatetime=plugin_updatedatetime,
+        plugin_template_errors=plugin_template_errors,
     )
 
 

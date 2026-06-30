@@ -357,6 +357,42 @@ def template_to_builder(template: BlueprintTemplate, plugin_id: PluginCompositeI
     )
 
 
+def resolve_builder_with_examples(
+    builder: BlueprintBuilder,
+    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]],
+    example_glyphs: dict[str, str],
+) -> BlueprintBuilder:
+    """Return a copy of ``builder`` with example values/glyphs overlaid for validation only.
+
+    Example configuration values fill in (without overwriting) the per-block
+    ``configuration_values``; example glyphs are merged into ``local_glyphs``.
+    The result is fed to ``validate_expand(validate_only=True)``; it is never persisted.
+
+    Overlay precedence: example values and glyphs only fill keys that are absent in
+    the builder -- they never overwrite an explicit template value.  This matches the
+    intended semantics: example values are defaults that the user is expected to
+    override, so anything already set in the template takes priority.
+
+    The function is pure: it operates on a deep copy of ``builder`` and never
+    mutates the caller's object.
+    """
+    copy = builder.model_copy(deep=True)
+
+    new_blocks: dict[BlockInstanceId, BlockInstance] = {}
+    for block_id, block in copy.blocks.items():
+        if block_id in example_values:
+            # Merge: example fills gaps; existing template values take precedence.
+            merged_config = {**example_values[block_id], **block.configuration_values}
+            new_blocks[block_id] = block.model_copy(update={"configuration_values": merged_config})
+        else:
+            new_blocks[block_id] = block
+
+    # Merge example_glyphs into local_glyphs; existing template glyphs take precedence.
+    merged_local_glyphs: dict[str, str] = {**example_glyphs, **copy.local_glyphs}
+
+    return copy.model_copy(update={"blocks": new_blocks, "local_glyphs": merged_local_glyphs})
+
+
 def remap_builder_glyphs(builder: BlueprintBuilder, mapping: dict[str, str]) -> BlueprintBuilder:
     """Return a copy of *builder* with all glyph identifier references renamed per *mapping*.
 

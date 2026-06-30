@@ -247,10 +247,24 @@ _testRemapping = BlueprintTemplate(
     local_glyphs={"localOld": "${pluginGlyphOld}"},
 )
 
+_BLOCK_FAIL_VAL = BlockInstanceId("fail_val_block")
+
+_testFailValidation = BlueprintTemplate(
+    display_name="testFailValidation",
+    display_description="A template that references a non-existent factory and always fails validation.",
+    blocks={
+        _BLOCK_FAIL_VAL: BlockInstance(
+            factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("nonexistent_factory")),
+            configuration_values={},
+            input_ids={},
+        ),
+    },
+)
+
 plugin = lambda: Plugin(
     catalogue=catalogue(),
     validator=validator,
     expander=expander,
     compiler=compiler,
-    blueprint_templates=(_testBasic, _testExclusion, _testRemapping),
+    blueprint_templates=(_testBasic, _testExclusion, _testRemapping, _testFailValidation),
 )
