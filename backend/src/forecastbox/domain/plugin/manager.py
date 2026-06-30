@@ -221,14 +221,13 @@ def load_plugins(plugins: PluginsSettings) -> None:
                     lookup[pluginKey] = plugin_result.t
                     version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
                     logger.debug(f"plugin {pluginKey} loaded with success: True and version {version_imported}")
-                    if not installed_versions:
-                        db_state = _run_async_from_thread(get_plugin_state(plugin_id_str))
-                        if db_state is not None:
-                            db_ver: str = db_state.plugin_version  # type: ignore[assignment]
-                            if db_ver not in ("install failed", "not installed") and db_ver != version_imported:
-                                mismatch_msg = f"version mismatch: DB has {db_ver!r} but {version_imported!r} is imported"
-                                logger.warning(f"plugin {pluginKey}: {mismatch_msg}")
-                                errors[pluginKey] = mismatch_msg
+                    db_state = _run_async_from_thread(get_plugin_state(plugin_id_str))
+                    if db_state is not None:
+                        db_ver: str = db_state.plugin_version  # type: ignore[assignment]
+                        if db_ver != version_imported:
+                            mismatch_msg = f"version mismatch: DB has {db_ver!r} but {version_imported!r} is imported"
+                            logger.warning(f"plugin {pluginKey}: {mismatch_msg}")
+                            errors[pluginKey] = mismatch_msg
                 else:
                     logger.debug(f"plugin {pluginKey} loaded with success: False")
                     errors[pluginKey] = plugin_result.e
@@ -286,9 +285,8 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
                 PluginManager.errors = PluginManager.errors.set(
                     pluginId, f"{existing_err}; {version_mismatch}" if existing_err else version_mismatch
                 )
-        _run_async_from_thread(
-            upsert_plugin_state(plugin_id=plugin_id_str, version=version_install or version_imported, install_error=None)
-        )
+        if version_install is not None:
+            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_install, install_error=None))
         if result.t is not None:
             _run_async_from_thread(_ingest_plugin_templates(pluginId, result.t))
         logger.debug(f"single plugin loading finished: {pluginId}")
