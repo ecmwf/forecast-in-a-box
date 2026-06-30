@@ -112,6 +112,7 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
     Uses lazy imports to avoid a circular dependency between the plugin and
     blueprint domains.  A failure on any single template is logged and skipped
     so the remaining templates are still ingested.
+    Note: this import is a breach of dependency hierarchy, and will be fixed later.
 
     Glyph remapping is loaded from state but not applied here; that seam is
     left for a later task.

@@ -12,6 +12,8 @@ Manages the Blueprint domain -- user-created entities that capture computation i
 Used to create Runs and Experiments.
 
 Depends on the Glyph domain, to resolve and validate Glyphs.
-Depends on the Plugin domain, to determine fiab-core compatibility.
+Depends on the Plugin domain, to determine fiab-core compatibility and retrieve plugin factories for validation.
 Depended on by Run and Experiment domains.
+
+Note: there is a dependency circularity where this domain is *depended on* by Plugin, for validating imported blueprint templates. This will be fixed later by refactoring into events.
 """
