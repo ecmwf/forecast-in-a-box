@@ -19,9 +19,8 @@ excluded_templates / glyph_remapping / template_errors; update plugin_version /
 updated_at / install_error on subsequent installs without clobbering the columns
 owned by other subsystems.
 
-The ``update_plugin_settings`` helper owns the settings columns
-(``excluded_templates``, ``glyph_remapping``) and does a partial update that
-leaves unspecified fields unchanged.
+The ``upsert_plugin_state`` helper owns all mutable columns and does a partial
+update that leaves unspecified fields (``None`` arguments) unchanged.
 """
 
 import logging
@@ -36,20 +35,33 @@ from forecastbox.utility.time import current_time
 logger = logging.getLogger(__name__)
 
 
-async def upsert_plugin_state(*, plugin_id: str, version: str | None = None, enabled: bool, install_error: str | None = None) -> None:
+async def upsert_plugin_state(
+    *,
+    plugin_id: str,
+    version: str | None = None,
+    enabled: bool | None = None,
+    install_error: str | None = None,
+    excluded_templates: list[str] | None = None,
+    glyph_remapping: dict[str, str] | None = None,
+) -> None:
     """Insert or update the PluginState row for ``plugin_id``.
 
-    On first install: creates a row with empty ``excluded_templates`` / ``glyph_remapping``
-    defaults, ``template_errors=None``, and ``asset_ingest_needed=True``.
-    On subsequent calls: updates ``plugin_version`` (if provided), ``updated_at``,
-    ``install_error``, and ``enabled``.  ``excluded_templates`` and ``glyph_remapping``
-    are never touched.
+    On first install: creates a row with empty ``excluded_templates`` /
+    ``glyph_remapping`` / ``template_errors`` defaults, ``asset_ingest_needed=True``,
+    and ``enabled=True``.  All ``None`` arguments fall back to their defaults for
+    new rows.
 
-    Sets ``asset_ingest_needed=True`` when the version changes or when ``enabled``
-    transitions from ``False`` to ``True``.
+    On subsequent calls: only the explicitly provided (non-``None``) arguments are
+    written; ``None`` means "leave the stored value unchanged".  The exception is
+    ``install_error``: pass ``""`` to explicitly clear a previous error; ``None``
+    leaves it untouched.
+
+    ``asset_ingest_needed`` is set to ``True`` when any of the following is true on
+    an existing row: the flag was already set, the version changed, the plugin is
+    being re-enabled, ``excluded_templates`` changed, or ``glyph_remapping`` changed.
 
     Raises ``RuntimeError`` if ``version`` is ``None`` and no existing row is found,
-    as that indicates a programming error (re-enabling a plugin that was never installed).
+    as that indicates a programming error (updating a plugin that was never installed).
     """
     ref_time = current_time("dbref")
 
@@ -68,26 +80,36 @@ async def upsert_plugin_state(*, plugin_id: str, version: str | None = None, ena
                         plugin_id=plugin_id,
                         plugin_version=version,
                         updated_at=ref_time,
-                        install_error=install_error,
-                        excluded_templates=[],
-                        glyph_remapping={},
-                        template_errors=None,
+                        install_error=install_error if install_error is not None else "",
+                        excluded_templates=excluded_templates if excluded_templates is not None else [],
+                        glyph_remapping=glyph_remapping if glyph_remapping is not None else {},
+                        template_errors={},
                         asset_ingest_needed=True,
-                        enabled=enabled,
+                        enabled=enabled if enabled is not None else True,
                     )
                 )
             else:
                 version_changed = version is not None and version != existing.plugin_version
-                enabling = enabled and not existing.enabled
-                new_ingest_needed = bool(existing.asset_ingest_needed) or version_changed or enabling
+                enabling = enabled is True and not existing.enabled
+                excluded_changed = excluded_templates is not None and excluded_templates != list(existing.excluded_templates or [])  # ty:ignore[invalid-argument-type]
+                remapping_changed = glyph_remapping is not None and glyph_remapping != dict(existing.glyph_remapping or {})  # ty:ignore[no-matching-overload]
+                new_ingest_needed = (
+                    bool(existing.asset_ingest_needed) or version_changed or enabling or excluded_changed or remapping_changed
+                )
                 values: dict[str, object] = {
                     "updated_at": ref_time,
-                    "install_error": install_error,
-                    "enabled": enabled,
                     "asset_ingest_needed": new_ingest_needed,
                 }
                 if version is not None:
                     values["plugin_version"] = version
+                if enabled is not None:
+                    values["enabled"] = enabled
+                if install_error is not None:
+                    values["install_error"] = install_error
+                if excluded_templates is not None:
+                    values["excluded_templates"] = excluded_templates
+                if glyph_remapping is not None:
+                    values["glyph_remapping"] = glyph_remapping
                 await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(**values))
             await session.commit()
 
@@ -111,54 +133,15 @@ async def get_all_plugin_states() -> list[PluginState]:
     return await dbRetry(function)
 
 
-async def update_plugin_settings(
-    *,
-    plugin_id: str,
-    excluded_templates: list[str] | None,
-    glyph_remapping: dict[str, str] | None,
-) -> None:
-    """Partially update the settings columns of the PluginState row for ``plugin_id``.
-
-    Only the fields that are not ``None`` are written; ``None`` means
-    "leave the stored value unchanged".  An empty list or empty dict
-    is a valid value meaning "explicitly clear".
-
-    Sets ``asset_ingest_needed=True`` when any setting actually changes value,
-    so the next load cycle re-applies the updated exclusions/remapping.
-
-    Raises ``RuntimeError`` if no row exists for ``plugin_id``; settings can
-    only be updated after the plugin has been installed at least once.
-    """
-
-    async def function(i: int) -> None:
-        async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(select(PluginState).where(PluginState.plugin_id == plugin_id))
-            existing = result.scalar_one_or_none()
-            if existing is None:
-                raise RuntimeError(f"update_plugin_settings called for plugin that is not installed: {plugin_id!r}")
-            else:
-                values: dict[str, object] = {}
-                if excluded_templates is not None and excluded_templates != existing.excluded_templates:
-                    values["excluded_templates"] = excluded_templates
-                if glyph_remapping is not None and glyph_remapping != existing.glyph_remapping:
-                    values["glyph_remapping"] = glyph_remapping
-                if values:
-                    values["asset_ingest_needed"] = True
-                    await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(**values))
-            await session.commit()
-
-    await dbRetry(function)
-
-
-async def update_template_errors(*, plugin_id: str, template_errors: dict[str, str] | None) -> None:
+async def update_template_errors(*, plugin_id: str, template_errors: dict[str, str]) -> None:
     """Persist per-template validation errors for ``plugin_id``.
 
-    ``None`` clears any recorded errors (all templates passed).  A non-empty
+    An empty dict clears any recorded errors (all templates passed).  A non-empty
     dict maps ``display_name`` to the error string for that template.  Call
     this after each ingestion pass so the status surface reflects the latest result.
 
     If no PluginState row exists yet the call is silently skipped; the row will
-    be created by ``upsert_plugin_state`` which defaults ``template_errors`` to ``None``.
+    be created by ``upsert_plugin_state`` which defaults ``template_errors`` to ``{}``.
     """
 
     async def function(i: int) -> None:

@@ -23,8 +23,8 @@ from packaging.version import InvalidVersion, Version
 
 from forecastbox.domain.auth.users import UserRead
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
-from forecastbox.domain.plugin.db import update_plugin_settings
-from forecastbox.domain.plugin.manager import PluginsStatus, modify_enabled, status_full, submit_update_single, uninstall_plugin
+from forecastbox.domain.plugin.db import upsert_plugin_state
+from forecastbox.domain.plugin.manager import PluginsStatus, status_full, submit_update_single, uninstall_plugin, unload_single
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.config import PluginSettings, config
@@ -194,16 +194,10 @@ def uninstall_plugin_endpoint(
     return get_catalogue_redirect(request)
 
 
-@router.post("/modifyEnabled")
-def modify_enabled_endpoint(
-    request: Request, pluginCompositeId: PluginCompositeId, isEnabled: bool, admin: UserRead | None = Depends(get_admin_user)
-) -> Response:
-    modify_enabled(pluginCompositeId, isEnabled)
-    return get_catalogue_redirect(request)
-
-
 class PluginSettingsUpdateRequest(FiabBaseModel):
     pluginCompositeId: PluginCompositeId
+    isEnabled: bool | None = None
+    """Enable or disable the plugin.  ``None`` leaves the stored value unchanged."""
     excluded_templates: list[str] | None = None
     """Names of templates to exclude.  ``None`` leaves the stored list unchanged;
     an empty list explicitly clears all exclusions."""
@@ -218,12 +212,16 @@ async def update_plugin_settings_endpoint(
     body: PluginSettingsUpdateRequest,
     admin: UserRead | None = Depends(get_admin_user),
 ) -> Response:
-    """Persist plugin install settings and trigger a re-ingest so exclusions take effect immediately."""
-    await update_plugin_settings(
-        plugin_id=PluginCompositeId.to_str(body.pluginCompositeId),
+    """Persist plugin settings (enabled flag, exclusions, remapping) and trigger a re-ingest."""
+    plugin_id_str = PluginCompositeId.to_str(body.pluginCompositeId)
+    await upsert_plugin_state(
+        plugin_id=plugin_id_str,
+        enabled=body.isEnabled,
         excluded_templates=body.excluded_templates,
         glyph_remapping=body.glyph_remapping,
     )
+    if body.isEnabled is False:
+        unload_single(body.pluginCompositeId)
     result = submit_update_single(body.pluginCompositeId, install=False, version=None)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
