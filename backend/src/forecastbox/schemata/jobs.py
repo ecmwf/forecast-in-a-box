@@ -215,6 +215,8 @@ class PluginState(Base):
     excluded_templates = Column(JSON, nullable=False, default=list)
     glyph_remapping = Column(JSON, nullable=False, default=dict)
     template_errors = Column(JSON, nullable=True)
+    asset_ingest_needed = Column(Boolean, nullable=False, default=True)
+    enabled = Column(Boolean, nullable=False, default=True)
 
 
 async_url = f"sqlite+aiosqlite:///{config.db.sqlite_jobdb_path}"

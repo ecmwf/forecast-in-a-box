@@ -262,3 +262,21 @@ async def soft_delete_plugin_template(*, created_by: str, display_name: str) -> 
         .values(is_deleted=True)
     )
     await executeAndCommit(stmt, _jobs_module.async_session_maker)
+
+
+async def soft_delete_all_plugin_templates(*, created_by: str) -> None:
+    """Mark all ``plugin_template`` rows owned by a plugin as deleted, regardless of display name.
+
+    Used when a plugin is disabled to remove all its blueprint templates at once.
+    Performs a bulk update without version or auth checks because the calling plugin
+    owns these rows.
+    """
+    stmt = (
+        update(Blueprint)
+        .where(
+            Blueprint.source == "plugin_template",
+            Blueprint.created_by == created_by,
+        )
+        .values(is_deleted=True)
+    )
+    await executeAndCommit(stmt, _jobs_module.async_session_maker)

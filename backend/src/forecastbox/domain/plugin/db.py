@@ -36,13 +36,20 @@ from forecastbox.utility.time import current_time
 logger = logging.getLogger(__name__)
 
 
-async def upsert_plugin_state(*, plugin_id: str, version: str, install_error: str | None) -> None:
+async def upsert_plugin_state(*, plugin_id: str, version: str | None, enabled: bool, install_error: str | None) -> None:
     """Insert or update the PluginState row for ``plugin_id``.
 
     On first install: creates a row with empty ``excluded_templates`` / ``glyph_remapping``
-    defaults and ``template_errors=None``.
-    On subsequent installs: updates ``plugin_version``, ``updated_at``, and ``install_error``
-    only -- ``excluded_templates`` and ``glyph_remapping`` are not touched.
+    defaults, ``template_errors=None``, and ``asset_ingest_needed=True``.
+    On subsequent calls: updates ``plugin_version`` (if provided), ``updated_at``,
+    ``install_error``, and ``enabled``.  ``excluded_templates`` and ``glyph_remapping``
+    are never touched.
+
+    Sets ``asset_ingest_needed=True`` when the version changes or when ``enabled``
+    transitions from ``False`` to ``True``.
+
+    Raises ``RuntimeError`` if ``version`` is ``None`` and no existing row is found,
+    as that indicates a programming error (re-enabling a plugin that was never installed).
     """
     ref_time = current_time("dbref")
 
@@ -51,6 +58,11 @@ async def upsert_plugin_state(*, plugin_id: str, version: str, install_error: st
             result = await session.execute(select(PluginState).where(PluginState.plugin_id == plugin_id))
             existing = result.scalar_one_or_none()
             if existing is None:
+                if version is None:
+                    raise RuntimeError(
+                        f"upsert_plugin_state called with version=None for unknown plugin {plugin_id!r}; "
+                        "this plugin has no prior DB row and cannot be upserted without a version"
+                    )
                 session.add(
                     PluginState(
                         plugin_id=plugin_id,
@@ -60,14 +72,23 @@ async def upsert_plugin_state(*, plugin_id: str, version: str, install_error: st
                         excluded_templates=[],
                         glyph_remapping={},
                         template_errors=None,
+                        asset_ingest_needed=True,
+                        enabled=enabled,
                     )
                 )
             else:
-                await session.execute(
-                    update(PluginState)
-                    .where(PluginState.plugin_id == plugin_id)
-                    .values(plugin_version=version, updated_at=ref_time, install_error=install_error)
-                )
+                version_changed = version is not None and version != existing.plugin_version
+                enabling = enabled and not existing.enabled
+                new_ingest_needed = bool(existing.asset_ingest_needed) or version_changed or enabling
+                values: dict[str, object] = {
+                    "updated_at": ref_time,
+                    "install_error": install_error,
+                    "enabled": enabled,
+                    "asset_ingest_needed": new_ingest_needed,
+                }
+                if version is not None:
+                    values["plugin_version"] = version
+                await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(**values))
             await session.commit()
 
     await dbRetry(function)
@@ -102,6 +123,9 @@ async def update_plugin_settings(
     "leave the stored value unchanged".  An empty list or empty dict
     is a valid value meaning "explicitly clear".
 
+    Always sets ``asset_ingest_needed=True`` when any setting is changed (or on
+    insert), so the next load cycle re-applies the updated exclusions/remapping.
+
     If no row exists yet (plugin configured but never installed), a new row is
     inserted with the provided settings and a sentinel ``plugin_version``.
     """
@@ -120,6 +144,8 @@ async def update_plugin_settings(
                         excluded_templates=excluded_templates if excluded_templates is not None else [],
                         glyph_remapping=glyph_remapping if glyph_remapping is not None else {},
                         template_errors=None,
+                        enabled=True,
+                        asset_ingest_needed=True,
                     )
                 )
             else:
@@ -129,6 +155,7 @@ async def update_plugin_settings(
                 if glyph_remapping is not None:
                     values["glyph_remapping"] = glyph_remapping
                 if values:
+                    values["asset_ingest_needed"] = True
                     await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(**values))
             await session.commit()
 
@@ -156,14 +183,32 @@ async def update_template_errors(*, plugin_id: str, template_errors: dict[str, s
     await dbRetry(function)
 
 
-async def get_plugin_settings(plugin_id: str) -> tuple[list[str], dict[str, str]]:
-    """Return ``(excluded_templates, glyph_remapping)`` for ``plugin_id``.
+async def set_plugin_enabled_state(*, plugin_id: str, enabled: bool) -> None:
+    """Set the ``enabled`` flag for an existing PluginState row without touching any other field.
 
-    Returns empty defaults if the plugin has no persisted state yet.
+    Used by ``unload_single`` to persist the disabled state after removing the plugin
+    from the in-memory maps.  If no row exists the call is a no-op.
     """
-    state = await get_plugin_state(plugin_id)
-    if state is None:
-        return [], {}
-    excluded: list[str] = list(state.excluded_templates) if state.excluded_templates else []  # type: ignore[arg-type]
-    remapping: dict[str, str] = dict(state.glyph_remapping) if state.glyph_remapping else {}  # type: ignore[arg-type]
-    return excluded, remapping
+
+    async def function(i: int) -> None:
+        async with _jobs_module.async_session_maker() as session:
+            await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(enabled=enabled))
+            await session.commit()
+
+    await dbRetry(function)
+
+
+async def clear_asset_ingest_needed(*, plugin_id: str) -> None:
+    """Clear the ``asset_ingest_needed`` flag immediately before starting template ingestion.
+
+    Clearing before (not after) ingestion means a partial failure does not leave the
+    flag set and trigger a spurious re-ingest; the per-template errors are already
+    persisted via ``update_template_errors``.  If no row exists the call is a no-op.
+    """
+
+    async def function(i: int) -> None:
+        async with _jobs_module.async_session_maker() as session:
+            await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(asset_ingest_needed=False))
+            await session.commit()
+
+    await dbRetry(function)

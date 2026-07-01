@@ -39,7 +39,7 @@ async def mem_session_maker(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[a
 @pytest.mark.asyncio
 async def test_upsert_creates_row_with_defaults(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """First upsert inserts a row with empty excluded_templates and glyph_remapping."""
-    await plugin_db.upsert_plugin_state(plugin_id="localTest:single", version="1.2.3", install_error=None)
+    await plugin_db.upsert_plugin_state(plugin_id="localTest:single", version="1.2.3", enabled=True, install_error=None)
 
     state = await plugin_db.get_plugin_state("localTest:single")
     assert state is not None
@@ -50,12 +50,14 @@ async def test_upsert_creates_row_with_defaults(mem_session_maker: async_session
     assert state.glyph_remapping == {}
     assert state.template_errors is None
     assert state.updated_at is not None
+    assert state.asset_ingest_needed is True
+    assert state.enabled is True
 
 
 @pytest.mark.asyncio
 async def test_upsert_updates_version_without_clobbering(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """Second upsert updates plugin_version/install_error but does not clobber excluded_templates / glyph_remapping."""
-    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.1.0", install_error=None)
+    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.1.0", enabled=True, install_error=None)
 
     # Simulate writes by later subsystems directly to DB
     from sqlalchemy import update as sa_update
@@ -68,8 +70,8 @@ async def test_upsert_updates_version_without_clobbering(mem_session_maker: asyn
         )
         await session.commit()
 
-    # Re-install (update)
-    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.2.0", install_error=None)
+    # Re-install (update) -- new version triggers asset_ingest_needed=True
+    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.2.0", enabled=True, install_error=None)
 
     state = await plugin_db.get_plugin_state("myStore:myPlugin")
     assert state is not None
@@ -78,12 +80,48 @@ async def test_upsert_updates_version_without_clobbering(mem_session_maker: asyn
     # excluded_templates / glyph_remapping must NOT be reset
     assert state.excluded_templates == ["tplA"]
     assert state.glyph_remapping == {"old": "new"}
+    assert state.asset_ingest_needed is True
+
+
+@pytest.mark.asyncio
+async def test_upsert_no_version_change_does_not_set_ingest(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """When version is unchanged, asset_ingest_needed is not set again once cleared."""
+    await plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0.0", enabled=True, install_error=None)
+    await plugin_db.clear_asset_ingest_needed(plugin_id="s:p")
+
+    await plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0.0", enabled=True, install_error=None)
+
+    state = await plugin_db.get_plugin_state("s:p")
+    assert state is not None
+    assert state.asset_ingest_needed is False
+
+
+@pytest.mark.asyncio
+async def test_upsert_reenable_sets_ingest(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """Re-enabling a disabled plugin sets asset_ingest_needed=True."""
+    await plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0.0", enabled=True, install_error=None)
+    await plugin_db.clear_asset_ingest_needed(plugin_id="s:q")
+    await plugin_db.set_plugin_enabled_state(plugin_id="s:q", enabled=False)
+
+    await plugin_db.upsert_plugin_state(plugin_id="s:q", version=None, enabled=True, install_error=None)
+
+    state = await plugin_db.get_plugin_state("s:q")
+    assert state is not None
+    assert state.enabled is True
+    assert state.asset_ingest_needed is True
+
+
+@pytest.mark.asyncio
+async def test_upsert_none_version_on_missing_row_raises(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """upsert_plugin_state with version=None and no existing row is a programming error."""
+    with pytest.raises(RuntimeError, match="no prior DB row"):
+        await plugin_db.upsert_plugin_state(plugin_id="never:seen", version=None, enabled=True, install_error=None)
 
 
 @pytest.mark.asyncio
 async def test_upsert_persists_install_error(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """An install failure writes the error string and records the attempt."""
-    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="unknown", install_error="pip failed: some reason")
+    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="unknown", enabled=True, install_error="pip failed: some reason")
 
     state = await plugin_db.get_plugin_state("bad:plugin")
     assert state is not None
@@ -95,8 +133,8 @@ async def test_upsert_persists_install_error(mem_session_maker: async_sessionmak
 @pytest.mark.asyncio
 async def test_get_all_plugin_states(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """get_all_plugin_states returns all persisted rows."""
-    await plugin_db.upsert_plugin_state(plugin_id="storeA:p1", version="1.0", install_error=None)
-    await plugin_db.upsert_plugin_state(plugin_id="storeA:p2", version="unknown", install_error="err")
+    await plugin_db.upsert_plugin_state(plugin_id="storeA:p1", version="1.0", enabled=True, install_error=None)
+    await plugin_db.upsert_plugin_state(plugin_id="storeA:p2", version="unknown", enabled=True, install_error="err")
 
     states = await plugin_db.get_all_plugin_states()
     ids = {s.plugin_id for s in states}
@@ -113,7 +151,7 @@ async def test_get_plugin_state_missing(mem_session_maker: async_sessionmaker[As
 @pytest.mark.asyncio
 async def test_update_plugin_settings_partial_excluded(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """update_plugin_settings overwrites excluded_templates when provided, leaves glyph_remapping unchanged."""
-    await plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0", install_error=None)
+    await plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0", enabled=True, install_error=None)
     await plugin_db.update_plugin_settings(plugin_id="s:p", excluded_templates=["tplA"], glyph_remapping=None)
 
     state = await plugin_db.get_plugin_state("s:p")
@@ -131,7 +169,7 @@ async def test_update_plugin_settings_partial_excluded(mem_session_maker: async_
 @pytest.mark.asyncio
 async def test_update_plugin_settings_empty_list_clears(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """Passing an empty list for excluded_templates explicitly clears the stored list."""
-    await plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0", install_error=None)
+    await plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0", enabled=True, install_error=None)
     await plugin_db.update_plugin_settings(plugin_id="s:q", excluded_templates=["x", "y"], glyph_remapping=None)
     await plugin_db.update_plugin_settings(plugin_id="s:q", excluded_templates=[], glyph_remapping=None)
 
@@ -150,11 +188,3 @@ async def test_update_plugin_settings_creates_row_if_missing(mem_session_maker: 
     assert state.excluded_templates == ["tplX"]
     assert state.glyph_remapping == {}
     assert state.plugin_version == "not installed"
-
-
-@pytest.mark.asyncio
-async def test_get_plugin_settings_defaults(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    """get_plugin_settings returns empty defaults for a plugin with no persisted state."""
-    excluded, remapping = await plugin_db.get_plugin_settings("unknown:plugin")
-    assert excluded == []
-    assert remapping == {}
