@@ -36,7 +36,7 @@ from forecastbox.utility.time import current_time
 logger = logging.getLogger(__name__)
 
 
-async def upsert_plugin_state(*, plugin_id: str, version: str | None, enabled: bool, install_error: str | None) -> None:
+async def upsert_plugin_state(*, plugin_id: str, version: str | None = None, enabled: bool, install_error: str | None = None) -> None:
     """Insert or update the PluginState row for ``plugin_id``.
 
     On first install: creates a row with empty ``excluded_templates`` / ``glyph_remapping``
@@ -123,11 +123,11 @@ async def update_plugin_settings(
     "leave the stored value unchanged".  An empty list or empty dict
     is a valid value meaning "explicitly clear".
 
-    Always sets ``asset_ingest_needed=True`` when any setting is changed (or on
-    insert), so the next load cycle re-applies the updated exclusions/remapping.
+    Sets ``asset_ingest_needed=True`` when any setting actually changes value,
+    so the next load cycle re-applies the updated exclusions/remapping.
 
-    If no row exists yet (plugin configured but never installed), a new row is
-    inserted with the provided settings and a sentinel ``plugin_version``.
+    Raises ``RuntimeError`` if no row exists for ``plugin_id``; settings can
+    only be updated after the plugin has been installed at least once.
     """
 
     async def function(i: int) -> None:
@@ -135,24 +135,12 @@ async def update_plugin_settings(
             result = await session.execute(select(PluginState).where(PluginState.plugin_id == plugin_id))
             existing = result.scalar_one_or_none()
             if existing is None:
-                session.add(
-                    PluginState(
-                        plugin_id=plugin_id,
-                        plugin_version="not installed",
-                        updated_at=current_time("dbref"),
-                        install_error=None,
-                        excluded_templates=excluded_templates if excluded_templates is not None else [],
-                        glyph_remapping=glyph_remapping if glyph_remapping is not None else {},
-                        template_errors=None,
-                        enabled=True,
-                        asset_ingest_needed=True,
-                    )
-                )
+                raise RuntimeError(f"update_plugin_settings called for plugin that is not installed: {plugin_id!r}")
             else:
                 values: dict[str, object] = {}
-                if excluded_templates is not None:
+                if excluded_templates is not None and excluded_templates != existing.excluded_templates:
                     values["excluded_templates"] = excluded_templates
-                if glyph_remapping is not None:
+                if glyph_remapping is not None and glyph_remapping != existing.glyph_remapping:
                     values["glyph_remapping"] = glyph_remapping
                 if values:
                     values["asset_ingest_needed"] = True
@@ -179,21 +167,6 @@ async def update_template_errors(*, plugin_id: str, template_errors: dict[str, s
             if result.scalar_one_or_none() is not None:
                 await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(template_errors=template_errors))
                 await session.commit()
-
-    await dbRetry(function)
-
-
-async def set_plugin_enabled_state(*, plugin_id: str, enabled: bool) -> None:
-    """Set the ``enabled`` flag for an existing PluginState row without touching any other field.
-
-    Used by ``unload_single`` to persist the disabled state after removing the plugin
-    from the in-memory maps.  If no row exists the call is a no-op.
-    """
-
-    async def function(i: int) -> None:
-        async with _jobs_module.async_session_maker() as session:
-            await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(enabled=enabled))
-            await session.commit()
 
     await dbRetry(function)
 

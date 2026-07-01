@@ -52,6 +52,7 @@ class PluginDetail(FiabBaseModel):
     """In case the plugin is loaded, this shows the version"""
     update_datetime: str | None = None
     """In case the plugin is installed, this shows the most recent update datetime"""
+    # TODO add here the remapping/exclusion data
 
 
 class PluginListing(FiabBaseModel):

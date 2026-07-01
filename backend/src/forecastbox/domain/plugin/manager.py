@@ -47,7 +47,6 @@ from forecastbox.domain.plugin.db import (
     clear_asset_ingest_needed,
     get_all_plugin_states,
     get_plugin_state,
-    set_plugin_enabled_state,
     update_template_errors,
     upsert_plugin_state,
 )
@@ -254,18 +253,21 @@ def load_plugins(plugins: PluginsSettings) -> None:
                     version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
                     logger.debug(f"plugin {pluginKey} loaded with success: True and version {version_imported}")
                     fresh_state = _run_async_from_thread(get_plugin_state(plugin_id_str))
-                    if fresh_state is not None:
+                    if fresh_state is None:
+                        # NOTE this is unexpected state -- it is either developer editable install, or db wipe. We prefer to report,
+                        # but dont prevent template ingest
+                        err_msg = f"plugin {pluginKey} state not found -- install originally failed?"
+                        logger.error(err_msg)
+                        errors[pluginKey] = err_msg
+                        _run_async_from_thread(
+                            upsert_plugin_state(plugin_id=plugin_id_str, version=version_imported, enabled=True, install_error=None)
+                        )
+                    else:
                         db_ver: str = fresh_state.plugin_version  # type: ignore[assignment]
                         if db_ver != version_imported:
                             mismatch_msg = f"version mismatch: DB has {db_ver!r} but {version_imported!r} is imported"
                             logger.warning(f"plugin {pluginKey}: {mismatch_msg}")
                             errors[pluginKey] = mismatch_msg
-                    else:
-                        # No DB row yet (e.g. fresh DB with already-importable plugin).
-                        # Create a row so that _ingest_plugin_templates can proceed.
-                        _run_async_from_thread(
-                            upsert_plugin_state(plugin_id=plugin_id_str, version=version_imported, enabled=True, install_error=None)
-                        )
                 else:
                     logger.debug(f"plugin {pluginKey} loaded with success: False")
                     errors[pluginKey] = plugin_result.e
@@ -323,7 +325,10 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
                 PluginManager.errors = PluginManager.errors.set(
                     pluginId, f"{existing_err}; {version_mismatch}" if existing_err else version_mismatch
                 )
-        _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_install, enabled=True, install_error=None))
+        if version_install is not None:
+            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_install, enabled=True, install_error=None))
+        else:
+            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, enabled=True, install_error=None))
         if result.t is not None:
             _run_async_from_thread(_ingest_plugin_templates(pluginId, result.t))
         logger.debug(f"single plugin loading finished: {pluginId}")
@@ -349,7 +354,7 @@ def unload_single(pluginId: PluginCompositeId) -> None:
     # on blueprint domain), and will be fixed later by refactoring into events.
     from forecastbox.domain.blueprint.db import soft_delete_all_plugin_templates
 
-    _run_async_from_thread(set_plugin_enabled_state(plugin_id=plugin_id_str, enabled=False))
+    _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, enabled=False))
     _run_async_from_thread(soft_delete_all_plugin_templates(created_by=plugin_id_str))
 
 

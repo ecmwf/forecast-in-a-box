@@ -99,11 +99,11 @@ async def test_upsert_no_version_change_does_not_set_ingest(mem_session_maker: a
 @pytest.mark.asyncio
 async def test_upsert_reenable_sets_ingest(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """Re-enabling a disabled plugin sets asset_ingest_needed=True."""
-    await plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0.0", enabled=True, install_error=None)
+    await plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0.0", enabled=True)
     await plugin_db.clear_asset_ingest_needed(plugin_id="s:q")
-    await plugin_db.set_plugin_enabled_state(plugin_id="s:q", enabled=False)
+    await plugin_db.upsert_plugin_state(plugin_id="s:q", enabled=False)
 
-    await plugin_db.upsert_plugin_state(plugin_id="s:q", version=None, enabled=True, install_error=None)
+    await plugin_db.upsert_plugin_state(plugin_id="s:q", enabled=True)
 
     state = await plugin_db.get_plugin_state("s:q")
     assert state is not None
@@ -179,12 +179,7 @@ async def test_update_plugin_settings_empty_list_clears(mem_session_maker: async
 
 
 @pytest.mark.asyncio
-async def test_update_plugin_settings_creates_row_if_missing(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    """update_plugin_settings inserts a row with defaults when no PluginState exists yet."""
-    await plugin_db.update_plugin_settings(plugin_id="new:plugin", excluded_templates=["tplX"], glyph_remapping=None)
-
-    state = await plugin_db.get_plugin_state("new:plugin")
-    assert state is not None
-    assert state.excluded_templates == ["tplX"]
-    assert state.glyph_remapping == {}
-    assert state.plugin_version == "not installed"
+async def test_update_plugin_settings_raises_if_missing(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """update_plugin_settings raises RuntimeError when no PluginState row exists yet."""
+    with pytest.raises(RuntimeError, match="not installed"):
+        await plugin_db.update_plugin_settings(plugin_id="new:plugin", excluded_templates=["tplX"], glyph_remapping=None)
