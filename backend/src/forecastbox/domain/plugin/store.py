@@ -53,14 +53,14 @@ class PluginRemoteInfo(FiabBaseModel):
 
 def get_latest_version(package_name: str, client: httpx.Client) -> str:
     url = f"https://pypi.org/pypi/{package_name}/json"
-    response = client.get(url)
-    if response.status_code == 200:
-        try:
+    try:
+        response = client.get(url)
+        if response.status_code == 200:
             return response.json()["info"]["version"]
-        except Exception:
-            logger.exception(f"getting version of {package_name=} => failure {response=}")
-    else:
-        logger.warning(f"getting version of {package_name=} => failure {response=}")
+        else:
+            logger.warning(f"getting version of {package_name=} => failure {response=}")
+    except Exception:
+        logger.exception(f"getting version of {package_name=} => failure {response=}")
     return "unknown"
 
 
