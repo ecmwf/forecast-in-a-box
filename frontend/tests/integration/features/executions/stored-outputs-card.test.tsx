@@ -14,9 +14,9 @@
  * Exercises the disk-written-sink card against the MSW job + lens handlers:
  * - rows derive from GribSink marker outputs (one per sink block, deduped
  *   across that sink's tasks) with the directory resolved from the payload
- * - unavailable markers disable the lens actions
- * - the copy action: start lens on the resolved directory → poll until
- *   running → row shows the running badge with port → Stop tears it down
+ * - unavailable markers hide the WMS action
+ * - Start WMS server boots the lens on the resolved directory → poll until
+ *   running → Copy + View + Stop controls appear → Stop tears it down
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -91,7 +91,7 @@ describe('StoredOutputsCard', () => {
     expect(screen.getByText('Stored outputs').elements()).toHaveLength(0)
   })
 
-  it('disables lens actions while the marker output is unavailable', async () => {
+  it('shows no WMS action while the marker output is unavailable', async () => {
     const screen = await renderCard({
       'task-out-grib': {
         mime_type: GRIB_DIR_MIME,
@@ -102,9 +102,10 @@ describe('StoredOutputsCard', () => {
     await expect
       .element(screen.getByText('File not yet written by the run'))
       .toBeVisible()
-    await expect
-      .element(screen.getByRole('button', { name: /^open/i }))
-      .toBeDisabled()
+    // No server controls until the files are generated.
+    expect(
+      screen.getByRole('button', { name: /start wms server/i }).elements(),
+    ).toHaveLength(0)
   })
 
   it('disables lens actions when SkinnyWMS is not installed on the server', async () => {
@@ -112,22 +113,30 @@ describe('StoredOutputsCard', () => {
     const screen = await renderCard(outputsWithMarkers)
     // Rows still render (the path is useful information on its own) …
     await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
-    // … but the lens actions are disabled with an explanatory title.
-    const openButton = screen.getByRole('button', { name: /^open/i })
-    await expect.element(openButton).toBeDisabled()
+    // … but the Start WMS action is disabled with an explanatory title.
+    const startButton = screen.getByRole('button', {
+      name: /start wms server/i,
+    })
+    await expect.element(startButton).toBeDisabled()
     await expect
-      .element(openButton)
+      .element(startButton)
       .toHaveAttribute('title', expect.stringContaining('not available'))
   })
 
-  it('copy starts the lens on the directory, the row shows a running badge, Stop tears it down', async () => {
+  it('Start WMS server boots the lens; Copy/View/Stop appear; Stop tears it down', async () => {
     const screen = await renderCard(outputsWithMarkers)
-    // Wait for the payload-resolved directory (enables the actions).
+    // Wait for the payload-resolved directory (enables the Start button).
     await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
 
-    await screen.getByRole('button', { name: /copy wms url/i }).click()
+    await screen.getByRole('button', { name: /start wms server/i }).click()
 
-    await expect.element(screen.getByText(/WMS running :54300/)).toBeVisible()
+    // Once running, Copy + View + Stop replace the Start button.
+    await expect
+      .element(screen.getByRole('button', { name: /copy wms url/i }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: /^view$/i }))
+      .toBeVisible()
     expect(listMockLenses()).toHaveLength(1)
     expect(listMockLenses()[0].status).toBe('running')
     // The lens serves the run-private directory from the payload.
@@ -135,11 +144,14 @@ describe('StoredOutputsCard', () => {
       '/data/output/job-completed-001_1',
     )
 
-    await screen.getByRole('button', { name: /^stop$/i }).click()
+    // Copy writes the WMS URL to the clipboard (no throw).
+    await screen.getByRole('button', { name: /copy wms url/i }).click()
+
+    // Stop tears the server down and restores the Start button.
+    await screen.getByRole('button', { name: /stop wms server/i }).click()
     await expect
-      .element(screen.getByText(/WMS running/))
-      .not.toBeInTheDocument()
-    // The stop request settles asynchronously after the badge clears.
+      .element(screen.getByRole('button', { name: /start wms server/i }))
+      .toBeVisible()
     await expect.poll(() => listMockLenses()).toHaveLength(0)
   })
 })

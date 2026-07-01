@@ -36,6 +36,23 @@ async function navigateTo(page: Page, path: string) {
   await page.waitForTimeout(2000)
 }
 
+/** Switch fable-builder layout via the graph-options dropdown. Form layout is
+ * reachable only from that menu now; no-ops if it isn't present. */
+async function switchLayout(page: Page, to: 'form' | 'graph') {
+  const options = page.getByRole('button', { name: /graph options/i })
+  if (!(await options.isVisible({ timeout: 5000 }).catch(() => false))) return
+  await options.click()
+  const item = page.getByRole('menuitem', {
+    name: new RegExp(`switch to ${to}`, 'i'),
+  })
+  if (await item.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await item.click()
+    await page.waitForTimeout(500)
+  } else {
+    await page.keyboard.press('Escape')
+  }
+}
+
 test.describe('Fable Builder - Form Mode', () => {
   test.beforeEach(async ({ page }) => {
     await navigateTo(page, '/configure')
@@ -48,26 +65,20 @@ test.describe('Fable Builder - Form Mode', () => {
       await expect(searchInput).toBeVisible()
     }
 
-    // Should have mode toggle buttons
-    const graphButton = page.getByRole('button', { name: /graph/i })
-    const formButton = page.getByRole('button', { name: /form/i })
-    if (await graphButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await expect(graphButton).toBeVisible()
-      await expect(formButton).toBeVisible()
+    // The graph-options dropdown (form layout is reachable from there)
+    const optionsButton = page.getByRole('button', { name: /graph options/i })
+    if (await optionsButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await expect(optionsButton).toBeVisible()
     }
   })
 
-  test('switches to Form mode via toggle button', async ({ page }) => {
-    const formButton = page.getByRole('button', { name: /form/i })
-    if (await formButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await formButton.click()
-      await page.waitForTimeout(500)
+  test('switches to Form mode via graph-options menu', async ({ page }) => {
+    await switchLayout(page, 'form')
 
-      // Form mode should show step navigation (source, transform, product, sink)
-      const sourceStep = page.getByRole('button', { name: /source/i })
-      if (await sourceStep.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(sourceStep).toBeVisible()
-      }
+    // Form mode should show step navigation (source, transform, product, sink)
+    const sourceStep = page.getByRole('button', { name: /source/i })
+    if (await sourceStep.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await expect(sourceStep).toBeVisible()
     }
   })
 
@@ -75,11 +86,7 @@ test.describe('Fable Builder - Form Mode', () => {
     page,
   }) => {
     // Switch to form mode
-    const formButton = page.getByRole('button', { name: /form/i })
-    if (await formButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await formButton.click()
-      await page.waitForTimeout(500)
-    }
+    await switchLayout(page, 'form')
 
     // Look for add block buttons in the form canvas area
     // In form mode, available block factories appear as "Add" buttons
@@ -109,11 +116,7 @@ test.describe('Fable Builder - Form Mode', () => {
     page,
   }) => {
     // Switch to form mode
-    const formButton = page.getByRole('button', { name: /form/i })
-    if (await formButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await formButton.click()
-      await page.waitForTimeout(500)
-    }
+    await switchLayout(page, 'form')
 
     // Add a block
     const addButtons = page.getByRole('button', {
@@ -137,11 +140,7 @@ test.describe('Fable Builder - Form Mode', () => {
 
   test('fills in configuration fields', async ({ page }) => {
     // Switch to form mode
-    const formButton = page.getByRole('button', { name: /form/i })
-    if (await formButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await formButton.click()
-      await page.waitForTimeout(500)
-    }
+    await switchLayout(page, 'form')
 
     // Add a source block
     const addButtons = page.getByRole('button', {
@@ -170,31 +169,27 @@ test.describe('Fable Builder - Form Mode', () => {
 
   test('navigates between form steps', async ({ page }) => {
     // Switch to form mode
-    const formButton = page.getByRole('button', { name: /form/i })
-    if (await formButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await formButton.click()
+    await switchLayout(page, 'form')
+
+    // Look for step navigation buttons
+    const nextButton = page.getByRole('button', { name: /next step/i })
+    if (await nextButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      // Add a source block first so we can navigate
+      const addButtons = page.getByRole('button', {
+        name: /operational forecast|ensemble|temporal|zarr/i,
+      })
+      if ((await addButtons.count()) > 0) {
+        await addButtons.first().click()
+        await page.waitForTimeout(500)
+      }
+
+      await nextButton.click()
       await page.waitForTimeout(500)
 
-      // Look for step navigation buttons
-      const nextButton = page.getByRole('button', { name: /next step/i })
-      if (await nextButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        // Add a source block first so we can navigate
-        const addButtons = page.getByRole('button', {
-          name: /operational forecast|ensemble|temporal|zarr/i,
-        })
-        if ((await addButtons.count()) > 0) {
-          await addButtons.first().click()
-          await page.waitForTimeout(500)
-        }
-
-        await nextButton.click()
-        await page.waitForTimeout(500)
-
-        // Should advance to next step (transform or product)
-        const prevButton = page.getByRole('button', { name: /previous step/i })
-        if (await prevButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await expect(prevButton).toBeVisible()
-        }
+      // Should advance to next step (transform or product)
+      const prevButton = page.getByRole('button', { name: /previous step/i })
+      if (await prevButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await expect(prevButton).toBeVisible()
       }
     }
   })
@@ -393,42 +388,34 @@ test.describe('Fable Builder - Graph Mode', () => {
         .catch(() => null)
 
       // Switch to form mode
-      const formButton = page.getByRole('button', { name: /form/i })
-      if (await formButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await formButton.click()
-        await page.waitForTimeout(500)
+      await switchLayout(page, 'form')
 
-        // Block count should persist
-        if (initialText) {
-          const newBlocksBadge = page.getByText(/\d+ blocks?/)
-          if (
-            await newBlocksBadge
-              .first()
-              .isVisible({ timeout: 3000 })
-              .catch(() => false)
-          ) {
-            const newText = await newBlocksBadge.first().textContent()
-            expect(newText).toBe(initialText)
-          }
+      // Block count should persist
+      if (initialText) {
+        const newBlocksBadge = page.getByText(/\d+ blocks?/)
+        if (
+          await newBlocksBadge
+            .first()
+            .isVisible({ timeout: 3000 })
+            .catch(() => false)
+        ) {
+          const newText = await newBlocksBadge.first().textContent()
+          expect(newText).toBe(initialText)
         }
+      }
 
-        // Switch back to graph mode
-        const graphButton = page.getByRole('button', { name: /graph/i })
-        if (await graphButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await graphButton.click()
-          await page.waitForTimeout(500)
+      // Switch back to graph mode
+      await switchLayout(page, 'graph')
 
-          // Node should still be there
-          const nodes = page.locator('.react-flow__node')
-          if (
-            await nodes
-              .first()
-              .isVisible({ timeout: 3000 })
-              .catch(() => false)
-          ) {
-            await expect(nodes.first()).toBeVisible()
-          }
-        }
+      // Node should still be there
+      const nodes = page.locator('.react-flow__node')
+      if (
+        await nodes
+          .first()
+          .isVisible({ timeout: 3000 })
+          .catch(() => false)
+      ) {
+        await expect(nodes.first()).toBeVisible()
       }
     }
   })
@@ -666,12 +653,14 @@ test.describe('Fable Builder - Review & Validation', () => {
           await backButton.click()
           await page.waitForTimeout(500)
 
-          // Should show mode toggle again (edit step)
-          const graphButton = page.getByRole('button', { name: /graph/i })
+          // Should show the graph-options button again (edit step)
+          const optionsButton = page.getByRole('button', {
+            name: /graph options/i,
+          })
           if (
-            await graphButton.isVisible({ timeout: 3000 }).catch(() => false)
+            await optionsButton.isVisible({ timeout: 3000 }).catch(() => false)
           ) {
-            await expect(graphButton).toBeVisible()
+            await expect(optionsButton).toBeVisible()
           }
         }
       }

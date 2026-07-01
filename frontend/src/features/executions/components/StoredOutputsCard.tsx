@@ -19,14 +19,16 @@
  * the server.
  */
 
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import {
   Copy,
+  Eye,
   FolderOpen,
   Loader2,
-  Map as MapIcon,
   Maximize2,
   Minimize2,
+  Play,
+  Square,
   X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -47,7 +49,7 @@ import { buildLensBaseUrl, buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import { getJobResultHead } from '@/api/endpoints/job'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
 import { showToast } from '@/lib/toast'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -110,6 +112,8 @@ interface StoredOutputRow {
   taskId: string
   title: string
   isAvailable: boolean
+  /** Number of GRIB marker tasks the sink fanned out to. */
+  count: number
 }
 
 export function StoredOutputsCard({
@@ -132,8 +136,15 @@ export function StoredOutputsCard({
     for (const [taskId, meta] of Object.entries(outputs)) {
       if (meta.mime_type !== GRIB_DIR_MIME) continue
       const existing = byBlock.get(meta.original_block)
-      // Prefer an available marker so the payload fetch can succeed.
-      if (existing && (existing.isAvailable || !meta.is_available)) continue
+      if (existing) {
+        existing.count += 1
+        // Prefer an available marker as the representative payload source.
+        if (!existing.isAvailable && meta.is_available) {
+          existing.taskId = taskId
+          existing.isAvailable = true
+        }
+        continue
+      }
       const blockInstance = fable?.blocks[meta.original_block]
       const factory =
         catalogue && blockInstance
@@ -144,6 +155,7 @@ export function StoredOutputsCard({
         taskId,
         title: factory?.title ?? meta.original_block,
         isAvailable: meta.is_available,
+        count: 1,
       })
     }
     return Array.from(byBlock.values())
@@ -153,7 +165,7 @@ export function StoredOutputsCard({
 
   return (
     <>
-      <Card className="gap-3 p-4">
+      <Card shadow="none" className="gap-3 p-4">
         <div className="flex items-center gap-2">
           <FolderOpen className="h-4 w-4 text-muted-foreground" />
           <P className="font-medium">{t('storedOutputs.title')}</P>
@@ -201,8 +213,6 @@ function StoredOutputRowItem({
   // The row owns its lens instance; the viewer sheet only displays it.
   const [lensId, setLensId] = useState<string | null>(null)
   const statusQuery = useLensStatus(lensId ?? undefined)
-  // Copy requested before the server was up — fulfilled once it is.
-  const pendingCopy = useRef(false)
 
   const status = lensId ? statusQuery.data?.status : undefined
   const port = lensId ? statusQuery.data?.ports[0] : undefined
@@ -218,52 +228,39 @@ function StoredOutputRowItem({
     )
   }
 
-  useEffect(() => {
-    if (running && pendingCopy.current) {
-      pendingCopy.current = false
-      copyUrl(port)
-    }
-  }, [running, port])
+  const copyPath = (path: string) => {
+    void copyToClipboard(path).then((ok) =>
+      ok
+        ? showToast.success(t('storedOutputs.pathCopied'))
+        : showToast.error(t('storedOutputs.pathCopyFailed')),
+    )
+  }
 
   // Surface a failed launch once, then reset so the user can retry.
   useEffect(() => {
     if (!failed) return
-    pendingCopy.current = false
     showToast.error(statusQuery.error?.message ?? t('storedOutputs.lensFailed'))
     setLensId(null)
   }, [failed])
 
-  /** Start the lens on the resolved directory, then hand the id to `then`. */
-  const ensureLens = (then?: (id: string) => void) => {
-    if (lensId) {
-      then?.(lensId)
-      return
-    }
-    if (!dirPath) return
+  /** Start the SkinnyWMS lens on the resolved directory. */
+  const startServer = () => {
+    if (lensId || !dirPath) return
     startMutation.mutate(
       { localPath: dirPath },
       {
-        onSuccess: (id) => {
-          setLensId(id)
-          then?.(id)
-        },
-        onError: (err) => {
-          pendingCopy.current = false
-          showToast.error(err.message)
-        },
+        onSuccess: (id) => setLensId(id),
+        onError: (err) => showToast.error(err.message),
       },
     )
   }
 
-  const open = () => ensureLens((id) => onOpenViewer(id, dirPath ?? row.title))
+  const view = () => {
+    if (lensId) onOpenViewer(lensId, dirPath ?? row.title)
+  }
 
   const copy = () => {
-    if (running) {
-      copyUrl(port)
-      return
-    }
-    pendingCopy.current = true
-    ensureLens()
+    if (port !== undefined) copyUrl(port)
   }
 
   const stop = () => {
@@ -275,15 +272,12 @@ function StoredOutputRowItem({
     setLensId(null)
   }
 
-  const disabled =
-    startMutation.isPending || !row.isAvailable || !dirPath || wmsUnavailable
-  const unavailableTitle = wmsUnavailable
+  const isStarting = startMutation.isPending || (!!lensId && !running)
+  const startDisabled = wmsUnavailable || !dirPath || isStarting
+  const startTitle = wmsUnavailable
     ? t('storedOutputs.wmsUnavailable')
-    : row.isAvailable
-      ? undefined
-      : t('storedOutputs.fileMissing')
+    : t('storedOutputs.startWms')
   const { dir, name } = dirPath ? splitPath(dirPath) : { dir: '', name: '' }
-  const starting = !!lensId && !running
 
   return (
     <li className="flex items-start gap-3 py-2.5">
@@ -296,15 +290,27 @@ function StoredOutputRowItem({
         GRIB
       </span>
       <div className="min-w-0 flex-1">
-        <P className="truncate text-sm font-medium">{row.title}</P>
+        <div className="flex items-baseline gap-2">
+          <P className="truncate text-sm font-medium">{row.title}</P>
+          {row.count > 1 && (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {t('storedOutputs.fileCount', { n: row.count })}
+            </span>
+          )}
+        </div>
         {dirPath ? (
-          <P
-            className="truncate font-mono text-xs text-muted-foreground"
-            title={dirPath}
+          <button
+            type="button"
+            onClick={() => copyPath(dirPath)}
+            className="group/path flex w-full min-w-0 items-center gap-1 text-left font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+            title={t('storedOutputs.copyPath')}
           >
-            {dir}
-            <span className="text-foreground/80">{name}</span>
-          </P>
+            <span className="truncate">
+              {dir}
+              <span className="text-foreground/80">{name}</span>
+            </span>
+            <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/path:opacity-70" />
+          </button>
         ) : row.isAvailable ? (
           <P className="font-mono text-xs text-muted-foreground">…</P>
         ) : (
@@ -318,77 +324,74 @@ function StoredOutputRowItem({
             {t('storedOutputs.wmsUnavailable')}
           </P>
         )}
-        {lensId && (
-          <div className="mt-1 flex items-center gap-2 text-xs">
-            <span
-              className={cn(
-                'h-1.5 w-1.5 rounded-full',
-                running ? 'bg-emerald-500' : 'animate-pulse bg-amber-500',
-              )}
-            />
-            <span className="text-muted-foreground">
-              {running
-                ? `${t('storedOutputs.running')} :${port}`
-                : t('storedOutputs.starting')}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-5 px-1.5 text-xs"
-              onClick={stop}
-            >
-              {t('storedOutputs.stop')}
-            </Button>
-          </div>
-        )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={open}
-          disabled={disabled}
-          className="gap-1.5"
-          title={unavailableTitle ?? t('storedOutputs.open')}
-        >
-          {startMutation.isPending || starting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <MapIcon className="h-3.5 w-3.5" />
-          )}
-          {t('storedOutputs.open')}
-        </Button>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-8 w-8"
-                onClick={copy}
-                disabled={disabled}
-                aria-label={t('storedOutputs.copyWmsUrl')}
-              />
-            }
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </TooltipTrigger>
-          <TooltipContent>
-            <P className="max-w-xs text-xs">
-              {wmsUnavailable ? (
-                t('storedOutputs.wmsUnavailable')
-              ) : (
-                <>
+        {!row.isAvailable ? null : running ? (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={stop}
+              disabled={stopMutation.isPending}
+              className="gap-1.5"
+            >
+              <Square className="h-3.5 w-3.5" />
+              {t('storedOutputs.stopWms')}
+            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={copy}
+                    className="gap-1.5"
+                    aria-label={t('storedOutputs.copyWmsUrl')}
+                  />
+                }
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {t('storedOutputs.copy')}
+              </TooltipTrigger>
+              <TooltipContent>
+                <P className="max-w-xs text-xs text-inherit">
                   <span className="font-medium">
                     {t('storedOutputs.externalTitle')}
                   </span>
                   <br />
                   {t('storedOutputs.externalHint')}
-                </>
-              )}
-            </P>
-          </TooltipContent>
-        </Tooltip>
+                </P>
+              </TooltipContent>
+            </Tooltip>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={view}
+              className="gap-1.5"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              {t('storedOutputs.view')}
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={startServer}
+            disabled={startDisabled}
+            className="gap-1.5"
+            title={startTitle}
+          >
+            {isStarting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+            {isStarting
+              ? t('storedOutputs.startingWms')
+              : t('storedOutputs.startWms')}
+          </Button>
+        )}
       </div>
     </li>
   )
@@ -429,9 +432,18 @@ function LensViewerSheet({
         <SheetHeader className="flex flex-row items-start gap-3 border-b border-border p-4">
           <div className="min-w-0 flex-1">
             <SheetTitle>{t('lens.title')}</SheetTitle>
-            <SheetDescription className="truncate font-mono text-xs">
-              {title}
-            </SheetDescription>
+            {/* Hint + path share a line when wide; the path wraps below when cramped. */}
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <SheetDescription className="shrink-0">
+                {t('lens.subtitle')}
+              </SheetDescription>
+              <span
+                className="min-w-0 grow basis-64 truncate font-mono text-xs text-muted-foreground"
+                title={title}
+              >
+                {title}
+              </span>
+            </div>
           </div>
           <Button
             variant="ghost"

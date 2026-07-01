@@ -66,10 +66,8 @@ import 'ol/ol.css'
 import OlMap from 'ol/Map'
 import View from 'ol/View'
 import ImageLayer from 'ol/layer/Image'
-import TileLayer from 'ol/layer/Tile'
 import VectorTileLayer from 'ol/layer/VectorTile'
 import ImageWMS from 'ol/source/ImageWMS'
-import XYZ from 'ol/source/XYZ'
 import { fromLonLat, toLonLat, transformExtent } from 'ol/proj'
 import { applyStyle as applyMapboxStyle } from 'ol-mapbox-style'
 import {
@@ -111,24 +109,15 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('WmsViewer')
 
-// External web basemaps (Carto); the SkinnyWMS native basemap is separate.
-type ExternalBasemapOption =
-  | {
-      type: 'raster'
-      id: string
-      label: string
-      url: string
-      attribution: string
-      tilePixelRatio: number
-    }
-  | {
-      type: 'vector'
-      id: string
-      label: string
-      // Mapbox-style JSON URL; ol-mapbox-style fetches it, builds the
-      // source from its `sources` block, and applies styling.
-      styleUrl: string
-    }
+// External web basemap (Carto vector); the SkinnyWMS native basemap is separate.
+interface ExternalBasemapOption {
+  type: 'vector'
+  id: string
+  label: string
+  // Mapbox-style JSON URL; ol-mapbox-style fetches it, builds the
+  // source from its `sources` block, and applies styling.
+  styleUrl: string
+}
 
 // SkinnyWMS's own map — `background` as the base, borders overlaid.
 interface SkinnyWmsBasemapOption {
@@ -143,17 +132,8 @@ const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
   {
     type: 'vector',
     id: 'carto-positron-vector',
-    label: 'Carto Positron (Vector)',
-    styleUrl: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-  },
-  {
-    type: 'raster',
-    id: 'carto-positron',
     label: 'Carto Positron',
-    url: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    tilePixelRatio: 1,
+    styleUrl: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
   },
 ]
 
@@ -189,23 +169,10 @@ const INITIAL_VIEW_BBOX_WGS84: [number, number, number, number] = [
   -180, -55, 180, 85,
 ]
 
-type ExternalBasemapLayer = TileLayer<XYZ> | VectorTileLayer
+type ExternalBasemapLayer = VectorTileLayer
 type BasemapLayer = ExternalBasemapLayer | ImageLayer<ImageWMS>
 
 function makeBasemapLayer(opt: ExternalBasemapOption): ExternalBasemapLayer {
-  if (opt.type === 'raster') {
-    const source = new XYZ({
-      url: opt.url,
-      attributions: opt.attribution,
-      // crossOrigin: required so canvas.toBlob (download/copy) doesn't
-      // taint. wrapX: false because ImageWMS overlays don't wrap, and a
-      // wrapping basemap would visually diverge from them.
-      crossOrigin: 'anonymous',
-      wrapX: false,
-      tilePixelRatio: opt.tilePixelRatio,
-    })
-    return new TileLayer({ source })
-  }
   // Vector tiles via Mapbox-style JSON. declutter: true prevents label
   // overlap at low zoom.
   const layer = new VectorTileLayer<VectorTileSource>({ declutter: true })

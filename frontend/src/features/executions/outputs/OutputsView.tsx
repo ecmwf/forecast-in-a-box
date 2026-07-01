@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { registerFirstPartyAdapters } from './adapters'
+import { GRIB_DIR_MIME } from './adapters/grib'
 import { MimeFilterChips } from './MimeFilterChips'
 import { OutputCard } from './OutputCard'
 import { resolveAdapter } from './registry'
@@ -88,13 +89,16 @@ export function OutputsView({
    * the grouped views. */
   const items = useMemo<Array<OutputItem>>(() => {
     if (!outputs) return []
-    const list = Object.entries(outputs).map(([taskId, meta]) => ({
-      jobId,
-      taskId,
-      mimeType: meta.mime_type,
-      originalBlock: meta.original_block,
-      isAvailable: meta.is_available,
-    }))
+    const list = Object.entries(outputs)
+      // GRIB markers show in the Stored outputs card, not the grid.
+      .filter(([, meta]) => meta.mime_type !== GRIB_DIR_MIME)
+      .map(([taskId, meta]) => ({
+        jobId,
+        taskId,
+        mimeType: meta.mime_type,
+        originalBlock: meta.original_block,
+        isAvailable: meta.is_available,
+      }))
     list.sort((a, b) => {
       if (a.originalBlock !== b.originalBlock) {
         return a.originalBlock < b.originalBlock ? -1 : 1
@@ -104,6 +108,22 @@ export function OutputsView({
     })
     return list
   }, [jobId, outputs])
+
+  /** GRIB markers aren't grid cards, but still count toward the header tally
+   * and block count. */
+  const storedStats = useMemo(() => {
+    let available = 0
+    let pending = 0
+    const blocks = new Set<string>()
+    for (const meta of Object.values(outputs ?? {})) {
+      if (meta.mime_type !== GRIB_DIR_MIME) continue
+      blocks.add(meta.original_block)
+      if (meta.is_available) available += 1
+      else pending += 1
+    }
+    return { available, pending, blocks }
+  }, [outputs])
+  const hasStoredOutputs = storedStats.blocks.size > 0
 
   /** Sniffer-promoted mimes for the whole list. Resolved here, not per card,
    * so the filter can't hide an item before its real mime is known. */
@@ -167,22 +187,31 @@ export function OutputsView({
   /** Synthesised placeholders when the outputs payload has no rows yet. */
   const blockSkeletons = useMemo<Array<OutputItem>>(() => {
     if (items.length > 0) return []
+    // Skeletons are for in-progress runs only.
+    if (isTerminalStatus(status)) return []
     if (!plannedBlockIds || plannedBlockIds.length === 0) return []
-    return plannedBlockIds.map((blockId) => ({
-      jobId,
-      taskId: `__planned__:${blockId}`,
-      mimeType: 'application/octet-stream',
-      originalBlock: blockId,
-      isAvailable: false,
-    }))
-  }, [items.length, plannedBlockIds, jobId])
+    return (
+      plannedBlockIds
+        // GRIB sink blocks belong to the Stored outputs card.
+        .filter((blockId) => !storedStats.blocks.has(blockId))
+        .map((blockId) => ({
+          jobId,
+          taskId: `__planned__:${blockId}`,
+          mimeType: 'application/octet-stream',
+          originalBlock: blockId,
+          isAvailable: false,
+        }))
+    )
+  }, [items.length, plannedBlockIds, jobId, status, storedStats])
 
   /** Distinct source blocks in the run. The group-by control only earns its
    * place — and is only shown — when there's more than one. */
   const distinctBlockCount = useMemo(() => {
     const source = items.length > 0 ? items : blockSkeletons
-    return new Set(source.map((item) => item.originalBlock)).size
-  }, [items, blockSkeletons])
+    const blocks = new Set(source.map((item) => item.originalBlock))
+    for (const block of storedStats.blocks) blocks.add(block)
+    return blocks.size
+  }, [items, blockSkeletons, storedStats])
 
   /** Available items still awaiting a sniff. A `?mimes=` filter can't decide
    * them yet, so they stand in as skeletons rather than a premature empty
@@ -238,6 +267,8 @@ export function OutputsView({
 
   /** True empty: no outputs payload AND no planned blocks. */
   if (items.length === 0 && blockSkeletons.length === 0) {
+    // GRIB-only run — the Stored outputs card covers it; render nothing.
+    if (hasStoredOutputs) return null
     return (
       <Card
         variant="flat"
@@ -259,14 +290,19 @@ export function OutputsView({
     )
   }
 
+  // Fold stored markers into the tally so it spans the whole run.
+  const shownAvailable = visibleAvailableCount + storedStats.available
+  const totalAvailable = availableCount + storedStats.available
+  const shownPending = visiblePendingCount + storedStats.pending
+
   const toolbar = (
     <div className="flex w-full flex-wrap items-center justify-between gap-3">
       <P className="text-muted-foreground">
-        {t('outputs.generated')}: {visibleAvailableCount}
-        {visibleAvailableCount !== availableCount && ` / ${availableCount}`}
-        {visiblePendingCount > 0 && (
+        {t('outputs.generated')}: {shownAvailable}
+        {shownAvailable !== totalAvailable && ` / ${totalAvailable}`}
+        {shownPending > 0 && (
           <span className="ml-2">
-            · {t('outputs.pending')}: {visiblePendingCount}
+            · {t('outputs.pending')}: {shownPending}
           </span>
         )}
       </P>
@@ -291,10 +327,12 @@ export function OutputsView({
     <Card
       variant="flat"
       shadow="none"
-      className="gap-0 overflow-hidden bg-transparent py-0"
+      // overflow-visible: the Card base would clip the first row's outer corners.
+      className="gap-0 overflow-visible bg-transparent py-0"
     >
       {toolbarSlot ? createPortal(toolbar, toolbarSlot) : null}
-      <div className="space-y-3 py-3">
+      {/* No top padding — the parent's space-y-4 sets the gap above the grid. */}
+      <div className="space-y-3 pb-3">
         {!toolbarSlot && toolbar}
 
         {visibleItems.length === 0 ? (

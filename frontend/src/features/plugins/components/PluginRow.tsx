@@ -82,7 +82,7 @@ export function PluginRow({
                   <AlertCircle className="h-4 w-4 text-red-500" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <P className="max-w-xs text-xs">
+                  <P className="max-w-xs text-xs text-inherit">
                     {plugin.errorDetail || t('status.errored')}
                   </P>
                 </TooltipContent>

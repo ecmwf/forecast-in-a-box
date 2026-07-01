@@ -9,6 +9,8 @@
  */
 
 import {
+  FileText,
+  LayoutGrid,
   Lock,
   LockOpen,
   Map,
@@ -53,15 +55,17 @@ export function GraphOptionsDropdown() {
   const setNodesLocked = useFableBuilderStore((s) => s.setNodesLocked)
   const toggleMiniMap = useFableBuilderStore((s) => s.toggleMiniMap)
   const triggerFitView = useFableBuilderStore((s) => s.triggerFitView)
+  const mode = useFableBuilderStore((s) => s.mode)
+  const setMode = useFableBuilderStore((s) => s.setMode)
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
           <Button
-            variant="default"
-            size="sm"
-            className="h-8 w-8 p-0 shadow-sm"
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
             aria-label={t('graphOptions.ariaLabel')}
           />
         }
@@ -69,98 +73,111 @@ export function GraphOptionsDropdown() {
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{t('graphOptions.view')}</DropdownMenuLabel>
-          <DropdownMenuItem
-            onClick={() => {
-              // Force layout recalculation by enabling auto-layout if needed
-              if (!autoLayout) {
-                setAutoLayout(true)
-              }
-              // Trigger fit view with a slight delay to allow layout to recalculate
-              setTimeout(triggerFitView, 50)
-            }}
-          >
-            <Sparkles />
-            {t('graphOptions.tidyUp')}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setNodesLocked(!nodesLocked)}>
-            {nodesLocked ? <Lock /> : <LockOpen />}
-            {nodesLocked
-              ? t('graphOptions.unlockNodes')
-              : t('graphOptions.lockNodes')}
-          </DropdownMenuItem>
-          <DropdownMenuCheckboxItem
-            checked={isMiniMapOpen}
-            onCheckedChange={toggleMiniMap}
-          >
-            <Map />
-            {t('graphOptions.showMinimap')}
-          </DropdownMenuCheckboxItem>
-        </DropdownMenuGroup>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{t('graphOptions.layout')}</DropdownMenuLabel>
-          <DropdownMenuCheckboxItem
-            checked={autoLayout}
-            onCheckedChange={setAutoLayout}
-          >
-            <Workflow />
-            {t('graphOptions.autoLayout')}
-          </DropdownMenuCheckboxItem>
-
-          {autoLayout && (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                {t('graphOptions.direction')}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuRadioGroup
-                  value={layoutDirection}
-                  onValueChange={(value) =>
-                    setLayoutDirection(value as LayoutDirection)
+        {mode === 'graph' && (
+          <>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{t('graphOptions.view')}</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => {
+                  // Force layout recalculation by enabling auto-layout if needed
+                  if (!autoLayout) {
+                    setAutoLayout(true)
                   }
-                >
-                  <DropdownMenuRadioItem value="TB">
-                    {t('graphOptions.topToBottom')}
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="LR">
-                    {t('graphOptions.leftToRight')}
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          )}
-        </DropdownMenuGroup>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{t('graphOptions.edges')}</DropdownMenuLabel>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              {t('graphOptions.style')}
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuRadioGroup
-                value={edgeStyle}
-                onValueChange={(value) => setEdgeStyle(value as EdgeStyle)}
+                  // Trigger fit view with a slight delay to allow layout to recalculate
+                  setTimeout(triggerFitView, 50)
+                }}
               >
-                <DropdownMenuRadioItem value="bezier">
-                  {t('graphOptions.curved')}
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="smoothstep">
-                  {t('graphOptions.rounded')}
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="step">
-                  {t('graphOptions.orthogonal')}
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        </DropdownMenuGroup>
+                <Sparkles />
+                {t('graphOptions.tidyUp')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setNodesLocked(!nodesLocked)}>
+                {nodesLocked ? <Lock /> : <LockOpen />}
+                {nodesLocked
+                  ? t('graphOptions.unlockNodes')
+                  : t('graphOptions.lockNodes')}
+              </DropdownMenuItem>
+              <DropdownMenuCheckboxItem
+                checked={isMiniMapOpen}
+                onCheckedChange={toggleMiniMap}
+              >
+                <Map />
+                {t('graphOptions.showMinimap')}
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuGroup>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{t('graphOptions.layout')}</DropdownMenuLabel>
+              <DropdownMenuCheckboxItem
+                checked={autoLayout}
+                onCheckedChange={setAutoLayout}
+              >
+                <Workflow />
+                {t('graphOptions.autoLayout')}
+              </DropdownMenuCheckboxItem>
+
+              {autoLayout && (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    {t('graphOptions.direction')}
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup
+                      value={layoutDirection}
+                      onValueChange={(value) =>
+                        setLayoutDirection(value as LayoutDirection)
+                      }
+                    >
+                      <DropdownMenuRadioItem value="TB">
+                        {t('graphOptions.topToBottom')}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="LR">
+                        {t('graphOptions.leftToRight')}
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )}
+            </DropdownMenuGroup>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{t('graphOptions.edges')}</DropdownMenuLabel>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  {t('graphOptions.style')}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup
+                    value={edgeStyle}
+                    onValueChange={(value) => setEdgeStyle(value as EdgeStyle)}
+                  >
+                    <DropdownMenuRadioItem value="bezier">
+                      {t('graphOptions.curved')}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="smoothstep">
+                      {t('graphOptions.rounded')}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="step">
+                      {t('graphOptions.orthogonal')}
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        <DropdownMenuItem
+          onClick={() => setMode(mode === 'graph' ? 'form' : 'graph')}
+        >
+          {mode === 'graph' ? <FileText /> : <LayoutGrid />}
+          {mode === 'graph'
+            ? t('graphOptions.switchToForm')
+            : t('graphOptions.switchToGraph')}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

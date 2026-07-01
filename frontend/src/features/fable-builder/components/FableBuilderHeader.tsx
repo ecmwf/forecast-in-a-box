@@ -15,8 +15,6 @@ import {
   Check,
   ChevronDown,
   Download,
-  FileText,
-  LayoutGrid,
   MoreVertical,
   Play,
   Redo2,
@@ -48,7 +46,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { H1 } from '@/components/base/typography'
-import { cn, copyToClipboard } from '@/lib/utils'
+import { copyToClipboard } from '@/lib/utils'
 import { showToast } from '@/lib/toast'
 import {
   Tooltip,
@@ -75,7 +73,6 @@ export function FableBuilderHeader({
 
   useEffect(() => () => clearTimeout(shareTimeoutRef.current), [])
 
-  const mode = useFableBuilderStore((s) => s.mode)
   const step = useFableBuilderStore((s) => s.step)
   const fableName = useFableBuilderStore((s) => s.fableName)
   // Fall back to a translated placeholder when the config is still unnamed.
@@ -84,7 +81,6 @@ export function FableBuilderHeader({
   const validationState = useFableBuilderStore((s) => s.validationState)
   const storeFableId = useFableBuilderStore((s) => s.fableId)
 
-  const setMode = useFableBuilderStore((s) => s.setMode)
   const setStep = useFableBuilderStore((s) => s.setStep)
   const setFable = useFableBuilderStore((s) => s.setFable)
   const setSubmitDialogOpen = useFableBuilderStore((s) => s.setSubmitDialogOpen)
@@ -236,7 +232,7 @@ export function FableBuilderHeader({
       />
 
       <header className="w-full overflow-hidden border-b border-border bg-card px-4 py-3">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4">
+        <div className="grid grid-cols-[1fr_auto] items-center gap-2 sm:gap-4">
           {/* Left: Back button + title */}
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Link to="/dashboard">
@@ -259,62 +255,15 @@ export function FableBuilderHeader({
             </div>
           </div>
 
-          {/* Center: Mode toggle (Graph/Form) */}
-          <div className="flex justify-center">
-            {step === 'edit' && (
-              <div className="flex shrink-0 items-center gap-1 rounded-lg bg-muted p-1">
-                {mode === 'graph' ? (
-                  <ButtonGroup>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="gap-1.5 shadow-sm sm:gap-2"
-                    >
-                      <LayoutGrid className="h-4 w-4" />
-                      <span className="hidden sm:inline">
-                        {t('header.graph')}
-                      </span>
-                    </Button>
-                    <GraphOptionsDropdown />
-                  </ButtonGroup>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setMode('graph')}
-                    className="gap-1.5 sm:gap-2"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                    <span className="hidden sm:inline">
-                      {t('header.graph')}
-                    </span>
-                  </Button>
-                )}
-                <Button
-                  variant={mode === 'form' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setMode('form')}
-                  className={cn(
-                    'gap-1.5 sm:gap-2',
-                    mode === 'form' && 'shadow-sm',
-                  )}
-                >
-                  <FileText className="h-4 w-4" />
-                  <span className="hidden sm:inline">{t('header.form')}</span>
-                </Button>
-              </div>
-            )}
-          </div>
-
           {/* Right: Action buttons */}
           <div className="flex shrink-0 items-center justify-end gap-2">
             {step === 'edit' ? (
               <>
                 {/* Desktop: Show main buttons */}
                 <div className="hidden items-center gap-2 sm:flex">
-                  {/* Undo/redo. Disabled when the respective stack is empty;
-                      keyboard shortcuts live in useUndoRedoShortcuts. */}
+                  {/* Graph options + undo/redo. Shortcuts in useUndoRedoShortcuts. */}
                   <div className="flex items-center gap-1">
+                    <GraphOptionsDropdown />
                     <Tooltip>
                       <TooltipTrigger render={<span className="inline-flex" />}>
                         <Button
