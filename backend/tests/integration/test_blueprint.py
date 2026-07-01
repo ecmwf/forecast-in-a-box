@@ -173,6 +173,29 @@ def test_blueprint_save_and_retrieve(backend_client_with_auth: httpx.Client) -> 
     assert response.json()["version"] == 1
     assert response.json()["display_name"] == "Test Blueprint"
 
+    # Verify source/created_by filters work correctly.
+    me_response = backend_client_with_auth.get("/users/me")
+    assert me_response.is_success, me_response.text
+    my_user_id = me_response.json()["id"]
+
+    # Filtering by source=user_defined and correct created_by must include the blueprint.
+    response = backend_client_with_auth.get("/blueprint/list", params={"source": "user_defined", "created_by": my_user_id})
+    assert response.is_success, response.text
+    ids = [b["blueprint_id"] for b in response.json()["blueprints"]]
+    assert saved["blueprint_id"] in ids, f"Expected blueprint to appear when filtered by source=user_defined and created_by={my_user_id!r}"
+
+    # Filtering by a different source must not include it.
+    response = backend_client_with_auth.get("/blueprint/list", params={"source": "plugin_template", "created_by": my_user_id})
+    assert response.is_success, response.text
+    ids = [b["blueprint_id"] for b in response.json()["blueprints"]]
+    assert saved["blueprint_id"] not in ids, "Blueprint should not appear when filtered by source=plugin_template"
+
+    # Filtering by a non-existent created_by must not include it.
+    response = backend_client_with_auth.get("/blueprint/list", params={"source": "user_defined", "created_by": "nonexistent-user-000"})
+    assert response.is_success, response.text
+    ids = [b["blueprint_id"] for b in response.json()["blueprints"]]
+    assert saved["blueprint_id"] not in ids, "Blueprint should not appear when created_by does not match"
+
 
 def test_blueprint_retrieve_nonexistent(backend_client_with_auth: httpx.Client) -> None:
     response = backend_client_with_auth.get("/blueprint/get", params={"blueprint_id": "does-not-exist"})
@@ -205,6 +228,22 @@ def test_plugin_template_in_blueprint_list(backend_client_with_auth: httpx.Clien
     blueprints = response.json()["blueprints"]
     matches = [b for b in blueprints if b.get("source") == "plugin_template" and b.get("display_name") == "testBasic"]
     assert len(matches) == 1, f"Expected exactly one 'testBasic' plugin_template blueprint in the list, got: {blueprints}"
+
+    # Filtering by source=plugin_template must return testBasic.
+    response = backend_client_with_auth.get("/blueprint/list", params={"source": "plugin_template"}, timeout=10)
+    assert response.is_success, response.text
+    source_filtered = response.json()["blueprints"]
+    assert any(b.get("display_name") == "testBasic" for b in source_filtered), (
+        f"testBasic should appear when filtered by source=plugin_template, got: {source_filtered}"
+    )
+
+    # Filtering by created_by=localTest:single must return testBasic.
+    response = backend_client_with_auth.get("/blueprint/list", params={"created_by": "localTest:single"}, timeout=10)
+    assert response.is_success, response.text
+    owner_filtered = response.json()["blueprints"]
+    assert any(b.get("display_name") == "testBasic" for b in owner_filtered), (
+        f"testBasic should appear when filtered by created_by=localTest:single, got: {owner_filtered}"
+    )
 
 
 def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backend_admin_client: httpx.Client) -> None:
