@@ -173,3 +173,23 @@ def test_sink_file_returns_bytes_locator(tmp_path: pathlib.Path) -> None:
     locator = sink_file("hello", str(tmp_path / "out.txt"))
     assert isinstance(locator, bytes)
     assert locator.startswith(b"file://")
+
+
+# ---------------------------------------------------------------------------
+# blueprint_templates
+# ---------------------------------------------------------------------------
+
+
+def test_plugin_has_testBasic_template() -> None:
+    from fiab_plugin_test import plugin
+
+    templates = plugin().blueprint_templates
+    names = [t.display_name for t in templates]
+    assert "testBasic" in names
+
+
+def test_testBasic_template_display_name() -> None:
+    from fiab_plugin_test import plugin
+
+    tmpl = next(t for t in plugin().blueprint_templates if t.display_name == "testBasic")
+    assert tmpl.display_name == "testBasic"

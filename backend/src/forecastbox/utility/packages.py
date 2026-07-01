@@ -24,6 +24,7 @@ from types import ModuleType
 
 import httpx
 import orjson
+from cascade.low.func import Either
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
@@ -106,19 +107,54 @@ def try_updatedatetime(pip_source: str) -> str:
         return "unknown"
 
 
-def try_install(packages: list[str]) -> None:
-    """Run ``uv pip install`` with the given pkg specs."""
+def _parse_pip_install(pip_output: str) -> dict[str, str]:
+    """Parse ``uv pip install`` stdout to extract newly-installed packages and their versions.
+
+    Lines starting with `` + `` are newly-installed entries, e.g.:
+    ``  + fiab-plugin-test==0.1.0 (from file:///path/to/package)``
+
+    Returns a dict mapping package name to version string.
+    """
+    rv: dict[str, str] = {}
+    for line in pip_output.splitlines():
+        clean = line.strip()
+        if not clean.startswith("+"):
+            continue
+        parts = clean.lstrip("+ ").split("==")
+        if len(parts) != 2:
+            logger.warning(f"Suspicious pip output line: {clean!r} -- ignoring")
+            continue
+        name = parts[0].strip()
+        version_raw = parts[1].split(" ", 1)[0].strip()
+        try:
+            Version(version_raw)
+            rv[name] = version_raw
+        except Exception as e:
+            logger.warning(f"failed to parse version for {name!r}: {version_raw!r} -- {repr(e)}")
+    return rv
+
+
+def try_install(packages: list[str]) -> Either[dict[str, str], str]:  # type: ignore[type-arg]
+    """Run ``uv pip install`` with the given pkg specs.
+
+    Returns ``Either.ok(versions)`` on success, where ``versions`` maps newly-installed
+    package names to their version strings, or ``Either.error(msg)`` on failure.
+    Never raises.
+    """
     install_command = ["uv", "pip", "install"] + packages
     logger.debug(f"will run {install_command}")
     try:
-        result = subprocess.run(install_command, check=False, capture_output=True)
+        result = subprocess.run(install_command, check=False, capture_output=True, text=True)
     except FileNotFoundError as ex:
-        logger.error(f"installing {packages} failure: {repr(ex)}")
-        return
+        msg = f"installing {packages} failure: {repr(ex)}"
+        logger.error(msg)
+        return Either.error(msg)
     if result.returncode != 0:
         msg = f"installing {packages} failure: {result.returncode}. Stderr: {result.stderr}, Stdout: {result.stdout}, Args: {result.args}"
         logger.error(msg)
+        return Either.error(msg)
     logger.debug(f"install finished with {result.stdout=}, {result.stderr=}")
+    return Either.ok(_parse_pip_install(result.stderr))
 
 
 def get_existing_install_pin(distname: str) -> list[str]:

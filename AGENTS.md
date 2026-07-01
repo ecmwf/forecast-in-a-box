@@ -14,6 +14,7 @@
 
 # General
 * do not use fancy unicode or emoji characters when creating text/markdown files
+* do not use double space after `.` when writing comments and doc strings
 * when asked to fetch PR review comments, use the GitHub GraphQL API to fetch only **unresolved** threads:
   ```bash
   gh api graphql -f query='

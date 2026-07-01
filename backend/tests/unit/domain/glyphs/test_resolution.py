@@ -23,7 +23,13 @@ from fiab_core.fable import (
 )
 
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
-from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, extract_glyphs, resolve_configurations
+from forecastbox.domain.glyphs.resolution import (
+    ExtractedGlyphs,
+    expand_glyph_values,
+    extract_glyphs,
+    remap_glyph_names,
+    resolve_configurations,
+)
 from forecastbox.utility.time import value_dt2str
 
 
@@ -488,3 +494,75 @@ def test_resolve_mixed_literal_and_expression() -> None:
     block = _block({"key": "prefix_${submitDatetime | floor_day}_suffix"})
     resolve_configurations(block, _GLYPHS)
     assert _value(block, "key") == "prefix_2024-01-15T00:00:00_suffix"
+
+
+# ---------------------------------------------------------------------------
+# remap_glyph_names
+# ---------------------------------------------------------------------------
+
+
+def test_remap_simple_name() -> None:
+    assert remap_glyph_names("${oldName}", {"oldName": "newName"}) == "${newName}"
+
+
+def test_remap_name_not_in_mapping_unchanged() -> None:
+    assert remap_glyph_names("${otherName}", {"oldName": "newName"}) == "${otherName}"
+
+
+def test_remap_no_mapping_unchanged() -> None:
+    assert remap_glyph_names("${myGlyph}", {}) == "${myGlyph}"
+
+
+def test_remap_plain_string_unchanged() -> None:
+    assert remap_glyph_names("plain text", {"oldName": "newName"}) == "plain text"
+
+
+def test_remap_word_boundary_safety() -> None:
+    """Renaming 'root' must not affect 'rootDir'."""
+    result = remap_glyph_names("${rootDir}", {"root": "base"})
+    assert result == "${rootDir}"
+
+
+def test_remap_word_boundary_exact_match() -> None:
+    """An exact whole-word match is still renamed."""
+    result = remap_glyph_names("${root}", {"root": "base"})
+    assert result == "${base}"
+
+
+def test_remap_filter_preserved() -> None:
+    """Filter names are never touched; only the variable identifier is renamed."""
+    result = remap_glyph_names("${x | floor_day}", {"x": "myDate"})
+    assert result == "${myDate | floor_day}"
+
+
+def test_remap_filter_name_not_renamed() -> None:
+    """A filter name that happens to match a mapping key is left untouched."""
+    result = remap_glyph_names("${submitDatetime | floor_day}", {"floor_day": "whatever"})
+    assert result == "${submitDatetime | floor_day}"
+
+
+def test_remap_multiple_references_in_one_string() -> None:
+    result = remap_glyph_names("${a} and ${b}", {"a": "x", "b": "y"})
+    assert result == "${x} and ${y}"
+
+
+def test_remap_partial_mapping_leaves_other_names() -> None:
+    result = remap_glyph_names("${a}_${b}", {"a": "A"})
+    assert result == "${A}_${b}"
+
+
+def test_remap_no_double_application() -> None:
+    """When a→b and b→c, renaming ${a} must yield ${b}, not ${c}."""
+    result = remap_glyph_names("${a}", {"a": "b", "b": "c"})
+    assert result == "${b}"
+
+
+def test_remap_mixed_literal_and_expression() -> None:
+    result = remap_glyph_names("prefix_${oldName}_suffix", {"oldName": "newName"})
+    assert result == "prefix_${newName}_suffix"
+
+
+def test_remap_expression_with_arithmetic() -> None:
+    """Rename works inside expressions containing arithmetic."""
+    result = remap_glyph_names("${submitDatetime | add_days(1)}", {"submitDatetime": "baseDate"})
+    assert result == "${baseDate | add_days(1)}"

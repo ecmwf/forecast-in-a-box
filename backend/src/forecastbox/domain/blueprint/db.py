@@ -197,6 +197,34 @@ async def count_blueprints(*, auth_context: AuthContext) -> int:
     return await dbRetry(function)
 
 
+async def find_plugin_template_id(*, created_by: str, display_name: str) -> BlueprintId | None:
+    """Return the blueprint_id of the latest non-deleted ``plugin_template`` row owned by a plugin.
+
+    Returns ``None`` if no matching row exists.  Used by template ingestion to
+    decide whether to append a new version to an existing blueprint or create a
+    fresh one.
+    """
+    query = (
+        select(Blueprint.blueprint_id)
+        .where(
+            Blueprint.source == "plugin_template",
+            Blueprint.created_by == created_by,
+            Blueprint.display_name == display_name,
+            Blueprint.is_deleted.is_(False),
+        )
+        .order_by(Blueprint.version.desc())
+        .limit(1)
+    )
+
+    async def function(i: int) -> BlueprintId | None:
+        async with _jobs_module.async_session_maker() as session:
+            result = await session.execute(query)
+            row = result.first()
+            return BlueprintId(str(row[0])) if row is not None else None
+
+    return await dbRetry(function)
+
+
 async def soft_delete_blueprint(blueprint_id: BlueprintId, *, expected_version: int, auth_context: AuthContext) -> None:
     """Mark all versions of a Blueprint as deleted.
 
@@ -215,4 +243,40 @@ async def soft_delete_blueprint(blueprint_id: BlueprintId, *, expected_version: 
     if not auth_context.allowed(cast(str, existing.created_by)):
         raise BlueprintAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete Blueprint {blueprint_id!r}.")
     stmt = update(Blueprint).where(Blueprint.blueprint_id == blueprint_id).values(is_deleted=True)
+    await executeAndCommit(stmt, _jobs_module.async_session_maker)
+
+
+async def soft_delete_plugin_template(*, created_by: str, display_name: str) -> None:
+    """Mark all ``plugin_template`` rows owned by a plugin with a given display name as deleted.
+
+    Performs a bulk update keyed on ``(created_by, display_name)`` without
+    version or auth checks because the calling plugin owns these rows.
+    """
+    stmt = (
+        update(Blueprint)
+        .where(
+            Blueprint.source == "plugin_template",
+            Blueprint.created_by == created_by,
+            Blueprint.display_name == display_name,
+        )
+        .values(is_deleted=True)
+    )
+    await executeAndCommit(stmt, _jobs_module.async_session_maker)
+
+
+async def soft_delete_all_plugin_templates(*, created_by: str) -> None:
+    """Mark all ``plugin_template`` rows owned by a plugin as deleted, regardless of display name.
+
+    Used when a plugin is disabled to remove all its blueprint templates at once.
+    Performs a bulk update without version or auth checks because the calling plugin
+    owns these rows.
+    """
+    stmt = (
+        update(Blueprint)
+        .where(
+            Blueprint.source == "plugin_template",
+            Blueprint.created_by == created_by,
+        )
+        .values(is_deleted=True)
+    )
     await executeAndCommit(stmt, _jobs_module.async_session_maker)

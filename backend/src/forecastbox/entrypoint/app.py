@@ -9,6 +9,7 @@
 
 """FastAPI Entrypoint"""
 
+import asyncio
 import importlib
 import logging
 import os
@@ -35,7 +36,7 @@ from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_m
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
 from forecastbox.domain.gateway.service import shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
-from forecastbox.domain.plugin.manager import join_updater_thread, submit_load_plugins
+from forecastbox.domain.plugin.manager import PluginManager, join_updater_thread, submit_load_plugins
 from forecastbox.domain.plugin.store import join_stores_thread, submit_initialize_stores
 from forecastbox.utility.config import config
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
@@ -58,6 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
     ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path))
     catalog_ready = submit_refresh_catalog()
+    PluginManager.loop = asyncio.get_running_loop()
     submit_load_plugins(start_after=catalog_ready)
     yield
     if config.backend.allow_scheduler:

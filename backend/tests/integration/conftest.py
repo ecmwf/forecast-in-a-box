@@ -226,3 +226,32 @@ def backend_client_with_auth(backend_client: httpx.Client) -> Generator[httpx.Cl
     response = backend_client.get("/users/me")
     assert response.is_success, "Failed to authenticate user"
     yield backend_client
+
+
+@pytest.fixture(scope="session")
+def backend_admin_client(backend_client: httpx.Client) -> Generator[httpx.Client, None, None]:
+    """A separate httpx.Client authenticated as the admin user (admin@somewhere.org).
+
+    Registers the user if not already present (note: the first registered user
+    becomes the superuser, so test_admin_flows.py must have run first).
+    Uses a dedicated client so that its auth cookies do not interfere with
+    backend_client or backend_client_with_auth.
+    """
+    admin_email = "admin@somewhere.org"
+    admin_password = "something"
+    admin_client = httpx.Client(base_url=str(backend_client.base_url), follow_redirects=True)
+    try:
+        # Try registering; ignore errors (user may already exist from test_admin_flows).
+        backend_client.post(
+            "/auth/register",
+            headers={"Content-Type": "application/json"},
+            json={"email": admin_email, "password": admin_password},
+        )
+        response = admin_client.post("/auth/jwt/login", data={"username": admin_email, "password": admin_password})
+        assert response.is_success, f"Admin login failed: {response.text}"
+        token = extract_auth_token_from_response(response)
+        assert token is not None, "Admin token should not be None"
+        admin_client.cookies.set(**prepare_cookie_with_auth_token(token))
+        yield admin_client
+    finally:
+        admin_client.close()

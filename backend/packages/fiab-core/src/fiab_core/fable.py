@@ -179,3 +179,33 @@ class NoOutput(FiabCoreBaseModel):
 BlockInstanceOutput = QubedOutput | RawOutput | NoOutput
 
 ActionLookup = dict[BlockInstanceId, Action]
+
+
+class BlueprintTemplateEnvironment(FiabCoreBaseModel):
+    environment_variables: dict[str, str] = Field(default_factory=dict)
+
+
+class BlueprintTemplate(FiabCoreBaseModel):
+    """A partial, ready-to-customise blueprint shipped by a plugin.
+
+    Exposes the public subset of a blueprint builder plus separate guiding
+    example values/glyphs the user is expected to override. `display_name` is the
+    stable key used by the backend for upsert and exclusion; it must be unique
+    within a plugin.
+    """
+
+    display_name: str
+    display_description: str
+    blocks: dict[BlockInstanceId, BlockInstance]
+    environment: BlueprintTemplateEnvironment | None = None
+    local_glyphs: dict[str, str] = Field(default_factory=dict)
+    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
+    example_glyphs: dict[str, str] = Field(default_factory=dict)
+
+
+SelfPluginId = PluginCompositeId(store=PluginStoreId("__self__"), local=PluginId("__self__"))
+"""Use this when building the blueprint templates shipped by a plugin.
+
+The backend substitutes the real plugin composite ID at install time.
+"""
+# TODO this class shows some awkwardness -- ideally, we'll make the existence of PluginCompositeId completely unknown to the insides of the plugins, at the expense of the backend mutating the classes at the routing time

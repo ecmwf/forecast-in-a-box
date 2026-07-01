@@ -187,6 +187,129 @@ def test_blueprint_upsert_nonexistent_id(backend_client_with_auth: httpx.Client)
     assert response.status_code == 404
 
 
+def test_plugin_template_in_blueprint_list(backend_client_with_auth: httpx.Client) -> None:
+    """Verify that the testBasic plugin template appears in the blueprint list after startup."""
+
+    def do_action() -> dict:
+        response = backend_client_with_auth.get("/plugin/status", timeout=10)
+        assert response.is_success
+        return response.json()
+
+    def verify_ok(data: dict) -> dict | None:
+        return data if data.get("updater_status") == "ok" else None
+
+    retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin loader did not reach 'ok' status")
+
+    response = backend_client_with_auth.get("/blueprint/list", timeout=10)
+    assert response.is_success, response.text
+    blueprints = response.json()["blueprints"]
+    matches = [b for b in blueprints if b.get("source") == "plugin_template" and b.get("display_name") == "testBasic"]
+    assert len(matches) == 1, f"Expected exactly one 'testBasic' plugin_template blueprint in the list, got: {blueprints}"
+
+
+def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backend_admin_client: httpx.Client) -> None:
+    """Excluding a template via POST /plugin/settings removes it from the blueprint list.
+    Also verifies that glyph_remapping renames glyph references in testRemapping after re-ingest.
+    """
+    from .conftest import testPluginId
+
+    # Verify testExclusion and testRemapping are initially present.
+    response = backend_client_with_auth.get("/blueprint/list", timeout=10)
+    assert response.is_success, response.text
+    blueprints = response.json()["blueprints"]
+    assert any(b.get("display_name") == "testExclusion" for b in blueprints), (
+        f"testExclusion should be present before exclusion, got: {[b.get('display_name') for b in blueprints]}"
+    )
+    assert any(b.get("display_name") == "testRemapping" for b in blueprints), (
+        f"testRemapping should be present before remapping, got: {[b.get('display_name') for b in blueprints]}"
+    )
+
+    # Exclude testExclusion and set a glyph remapping for testRemapping via the admin settings route.
+    response = backend_admin_client.post(
+        "/plugin/settings",
+        json={
+            "pluginCompositeId": testPluginId.model_dump(),
+            "excluded_templates": ["testExclusion"],
+            "glyph_remapping": {"pluginGlyphOld": "pluginGlyphNew", "localOld": "localNew"},
+        },
+        timeout=10,
+    )
+    assert response.status_code in (200, 202), f"Unexpected status from /plugin/settings: {response.status_code} {response.text}"
+
+    # Wait for the re-ingest to complete.
+    def do_action() -> dict:
+        resp = backend_client_with_auth.get("/plugin/status", timeout=10)
+        assert resp.is_success
+        return resp.json()
+
+    def verify_ok(data: dict) -> dict | None:
+        return data if data.get("updater_status") == "ok" else None
+
+    retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin re-ingest did not reach 'ok' status")
+
+    # testExclusion must be gone; testBasic and testRemapping must remain.
+    response = backend_client_with_auth.get("/blueprint/list", timeout=10)
+    assert response.is_success, response.text
+    blueprints = response.json()["blueprints"]
+    names = [b.get("display_name") for b in blueprints if b.get("source") == "plugin_template"]
+    assert "testExclusion" not in names, f"testExclusion should have been excluded, but found: {names}"
+    assert "testBasic" in names, f"testBasic should still be present, but found: {names}"
+    assert "testRemapping" in names, f"testRemapping should be present, but found: {names}"
+
+    # Verify that the glyph remapping was applied to testRemapping.
+    remap_item = next(b for b in blueprints if b.get("display_name") == "testRemapping")
+    remap_id = remap_item["blueprint_id"]
+    response = backend_client_with_auth.get(f"/blueprint/get?blueprint_id={remap_id}", timeout=10)
+    assert response.is_success, response.text
+    builder_data = response.json()["builder"]
+    # The block config value must reference the renamed glyph.
+    config_values = list(builder_data["blocks"].values())[0]["configuration_values"]
+    assert any("pluginGlyphNew" in v for v in config_values.values()), (
+        f"Expected pluginGlyphNew in config values after remapping, got: {config_values}"
+    )
+    assert not any("pluginGlyphOld" in v for v in config_values.values()), (
+        f"pluginGlyphOld should have been renamed, but found in config values: {config_values}"
+    )
+    # The local glyph key and value must also be renamed.
+    local_glyphs = builder_data["local_glyphs"]
+    assert "localNew" in local_glyphs, f"Expected localNew in local_glyphs after remapping, got: {local_glyphs}"
+    assert "localOld" not in local_glyphs, f"localOld should have been renamed, got: {local_glyphs}"
+    assert "pluginGlyphNew" in local_glyphs.get("localNew", ""), f"Expected localNew value to reference pluginGlyphNew, got: {local_glyphs}"
+
+
+def test_plugin_template_validation_failure(backend_client_with_auth: httpx.Client) -> None:
+    """Templates that fail validation with their example values are absent from the blueprint list
+    and their error is reported in plugin_errors in the plugin status."""
+    from .conftest import testPluginId
+
+    # Wait for the initial plugin load to finish.
+    def do_action() -> dict:
+        response = backend_client_with_auth.get("/plugin/status", timeout=10)
+        assert response.is_success
+        return response.json()
+
+    def verify_ok(data: dict) -> dict | None:
+        return data if data.get("updater_status") == "ok" else None
+
+    status = retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin loader did not reach 'ok' status")
+
+    # testFailValidation must NOT appear in the blueprint list.
+    response = backend_client_with_auth.get("/blueprint/list", timeout=10)
+    assert response.is_success, response.text
+    blueprints = response.json()["blueprints"]
+    names = [b.get("display_name") for b in blueprints if b.get("source") == "plugin_template"]
+    assert "testFailValidation" not in names, f"testFailValidation should have been rejected but found in: {names}"
+
+    # Its error must be reported in plugin_errors (merged alongside install errors).
+    # PluginsStatus dict keys for PluginCompositeId are serialized via str(plugin_id).
+    plugin_id_key = str(testPluginId)
+    plugin_errors = status.get("plugin_errors", {})
+    plugin_error_str = plugin_errors.get(plugin_id_key, "")
+    assert "testFailValidation" in plugin_error_str, (
+        f"Expected 'testFailValidation' in plugin_errors[{plugin_id_key!r}], got: {plugin_error_str!r}"
+    )
+
+
 def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -> None:
     response = backend_client_with_auth.get("/blueprint/catalogue").raise_for_status()
     assert len(response.json()) > 0

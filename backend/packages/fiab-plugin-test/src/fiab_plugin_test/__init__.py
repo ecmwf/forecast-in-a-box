@@ -11,11 +11,15 @@ from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockFactoryId,
     BlockInstance,
+    BlockInstanceId,
     BlockInstanceOutput,
+    BlueprintTemplate,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
     NoOutput,
+    PluginBlockFactoryId,
     RawOutput,
+    SelfPluginId,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.types import FableType
@@ -190,3 +194,77 @@ def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Er
 
 
 plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler)
+
+
+def _make_source_text_block(text: str) -> BlockInstance:
+    return BlockInstance(
+        factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("source_text")),
+        configuration_values={TEXT: text} if text else {},
+        input_ids={},
+    )
+
+
+_BLOCK_FIXED = BlockInstanceId("text_fixed")
+_BLOCK_GLYPHS = BlockInstanceId("text_glyphs")
+_BLOCK_EXAMPLE = BlockInstanceId("text_example")
+
+_testBasic = BlueprintTemplate(
+    display_name="testBasic",
+    display_description="A minimal test template demonstrating fixed values, glyph substitution, and example values.",
+    blocks={
+        # Fixed: configuration value is a literal string -- no glyphs, no example override needed.
+        _BLOCK_FIXED: _make_source_text_block("fixed text"),
+        # Glyphs: value references two glyphs; greeting is pinned in local_glyphs,
+        # name is provided only as an example the user should override.
+        _BLOCK_GLYPHS: _make_source_text_block("${greeting} ${name}"),
+        # Example only: no value in configuration_values; example_values shows
+        # what a user might start with.
+        _BLOCK_EXAMPLE: _make_source_text_block(""),
+    },
+    local_glyphs={"greeting": "hello"},
+    example_values={_BLOCK_EXAMPLE: {TEXT: "text from example values"}},
+    example_glyphs={"name": "world"},
+)
+
+_BLOCK_EXCL = BlockInstanceId("text_excl")
+
+_testExclusion = BlueprintTemplate(
+    display_name="testExclusion",
+    display_description="A minimal template used to verify admin exclusion via the settings route.",
+    blocks={
+        _BLOCK_EXCL: _make_source_text_block("exclusion test"),
+    },
+)
+
+_BLOCK_REMAP = BlockInstanceId("text_remap")
+
+_testRemapping = BlueprintTemplate(
+    display_name="testRemapping",
+    display_description="A minimal template used to verify glyph-name remapping at install time.",
+    blocks={
+        _BLOCK_REMAP: _make_source_text_block("${pluginGlyphOld}"),
+    },
+    local_glyphs={"localOld": "${pluginGlyphOld}"},
+)
+
+_BLOCK_FAIL_VAL = BlockInstanceId("fail_val_block")
+
+_testFailValidation = BlueprintTemplate(
+    display_name="testFailValidation",
+    display_description="A template that references a non-existent factory and always fails validation.",
+    blocks={
+        _BLOCK_FAIL_VAL: BlockInstance(
+            factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("nonexistent_factory")),
+            configuration_values={},
+            input_ids={},
+        ),
+    },
+)
+
+plugin = lambda: Plugin(
+    catalogue=catalogue(),
+    validator=validator,
+    expander=expander,
+    compiler=compiler,
+    blueprint_templates=(_testBasic, _testExclusion, _testRemapping, _testFailValidation),
+)

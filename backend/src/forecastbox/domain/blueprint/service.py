@@ -31,11 +31,14 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     BlockKind,
+    BlueprintTemplate,
     ConfigurationOptionId,
     NoOutput,
     PluginBlockExpansion,
     PluginBlockFactoryId,
+    PluginCompositeId,
     QubedOutput,
+    SelfPluginId,
 )
 from pydantic import Field
 
@@ -48,7 +51,7 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db, resolution
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
-from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values
+from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values, remap_glyph_names
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.graph import topological_order
@@ -322,6 +325,103 @@ async def validate_expand(
         missing_glyphs=missing_glyphs_result,
         block_output_qubes=block_output_qubes,
     )
+
+
+def template_to_builder(template: BlueprintTemplate, plugin_id: PluginCompositeId) -> BlueprintBuilder:
+    """Convert a ``BlueprintTemplate`` to a ``BlueprintBuilder`` suitable for persistence.
+
+    ``SelfPluginId`` sentinels in block factory IDs are replaced with the real
+    plugin composite ID.  ``example_values`` and ``example_glyphs`` are
+    intentionally not copied -- they are guiding-only data and must not appear
+    in ``configuration_values``.
+    """
+    blocks: dict[BlockInstanceId, BlockInstance] = {}
+    for block_id, block in template.blocks.items():
+        factory = block.factory_id
+        if factory.plugin == SelfPluginId:
+            factory = PluginBlockFactoryId(plugin=plugin_id, factory=factory.factory)
+        blocks[block_id] = BlockInstance(
+            factory_id=factory,
+            configuration_values=dict(block.configuration_values),
+            input_ids=dict(block.input_ids),
+        )
+    environment: EnvironmentSpecification | None = None
+    if template.environment is not None:
+        environment = EnvironmentSpecification(
+            environment_variables=template.environment.environment_variables,
+        )
+    return BlueprintBuilder(
+        blocks=blocks,
+        environment=environment,
+        local_glyphs=dict(template.local_glyphs),
+    )
+
+
+def resolve_builder_with_examples(
+    builder: BlueprintBuilder,
+    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]],
+    example_glyphs: dict[str, str],
+) -> BlueprintBuilder:
+    """Return a copy of ``builder`` with example values/glyphs overlaid for validation only.
+
+    Example configuration values overlay the per-block ``configuration_values``;
+    example glyphs are merged into ``local_glyphs``.  The result is fed to
+    ``validate_expand(validate_only=True)``; it is never persisted.
+
+    Overlay precedence: example values and glyphs **win** over any existing
+    template value.  Templates are validated at install time, before the user
+    has had a chance to fill in any values.  Template defaults (if any) may not
+    be valid examples on their own, so example values are allowed to override
+    them to produce a builder that passes validation.
+
+    The function is pure: it operates on a deep copy of ``builder`` and never
+    mutates the caller's object.
+    """
+    copy = builder.model_copy(deep=True)
+
+    new_blocks: dict[BlockInstanceId, BlockInstance] = {}
+    for block_id, block in copy.blocks.items():
+        if block_id in example_values:
+            # Merge: example values override existing template configuration values.
+            merged_config = {**block.configuration_values, **example_values[block_id]}
+            new_blocks[block_id] = block.model_copy(update={"configuration_values": merged_config})
+        else:
+            new_blocks[block_id] = block
+
+    # Merge example_glyphs into local_glyphs; example glyphs take precedence.
+    merged_local_glyphs: dict[str, str] = {**copy.local_glyphs, **example_glyphs}
+
+    return copy.model_copy(update={"blocks": new_blocks, "local_glyphs": merged_local_glyphs})
+
+
+def remap_builder_glyphs(builder: BlueprintBuilder, mapping: dict[str, str]) -> BlueprintBuilder:
+    """Return a copy of *builder* with all glyph identifier references renamed per *mapping*.
+
+    Applied in a single non-recursive pass to:
+
+    * every configuration option value string in every block (``${name}``
+      references inside ``${...}`` expressions);
+    * every local-glyph value string (same rename inside ``${...}``);
+    * every local-glyph key: if the key itself is present in *mapping*, it is
+      renamed to the mapped value.
+
+    Returns *builder* unchanged (same object) when *mapping* is empty.
+    """
+    if not mapping:
+        return builder
+
+    new_blocks: dict[BlockInstanceId, BlockInstance] = {}
+    for block_id, block in builder.blocks.items():
+        new_config = {opt_id: remap_glyph_names(val, mapping) for opt_id, val in block.configuration_values.items()}
+        new_blocks[block_id] = block.model_copy(update={"configuration_values": new_config})
+
+    new_local_glyphs: dict[str, str] = {}
+    for key, val in builder.local_glyphs.items():
+        new_key = mapping.get(key, key)
+        new_val = remap_glyph_names(val, mapping)
+        new_local_glyphs[new_key] = new_val
+
+    return builder.model_copy(update={"blocks": new_blocks, "local_glyphs": new_local_glyphs})
 
 
 # ---------------------------------------------------------------------------

@@ -25,6 +25,7 @@ Glyph routes:
  - POST glyphs/global/delete  — delete a global glyph by id
 """
 
+import logging
 from typing import Annotated, Any, Literal, cast
 
 from cascade.low.func import assert_never
@@ -59,6 +60,7 @@ from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 
+logger = logging.getLogger(__name__)
 PREFIX = "/api/v1/blueprint"
 
 router = APIRouter(

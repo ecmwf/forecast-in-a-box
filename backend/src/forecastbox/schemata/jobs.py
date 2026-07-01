@@ -199,6 +199,26 @@ class ExperimentNext(Base):
     updated_at = Column(UTCDateTime, nullable=False)
 
 
+class PluginState(Base):
+    """Persisted install state for each configured plugin.
+
+    One row per plugin, keyed by the PluginCompositeId rendered as ``store:local``.
+    Written and updated during plugin install; never versioned.
+    """
+
+    __tablename__ = "plugin_state"
+
+    plugin_id = Column(String(255), primary_key=True, nullable=False)
+    plugin_version = Column(String(255), nullable=False)
+    updated_at = Column(UTCDateTime, nullable=False)
+    install_error = Column(String(4096), nullable=True)
+    excluded_templates = Column(JSON, nullable=False, default=list)
+    glyph_remapping = Column(JSON, nullable=False, default=dict)
+    template_errors = Column(JSON, nullable=True)
+    asset_ingest_needed = Column(Boolean, nullable=False, default=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+
+
 async_url = f"sqlite+aiosqlite:///{config.db.sqlite_jobdb_path}"
 async_engine = create_async_engine(async_url, pool_pre_ping=True)
 async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
