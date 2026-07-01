@@ -11,10 +11,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   PRESET_DOMAINS,
+  boxHandles,
   detectMode,
   isAutoDomain,
   isBboxTokens,
+  isDegenerateBboxValue,
+  moveExtent,
   parseBbox,
+  resizeExtent,
   serializeBbox,
   serializeNames,
   toggleName,
@@ -60,6 +64,13 @@ describe('bbox round-trip', () => {
     expect(parseBbox(serializeBbox([-10, 30, 35, 60]))).toEqual([
       -10, 30, 35, 60,
     ])
+  })
+
+  it('flags boxes that round to zero width or height as degenerate', () => {
+    expect(isDegenerateBboxValue('10,20,10,40')).toBe(true) // zero width
+    expect(isDegenerateBboxValue('10,20,30,20')).toBe(true) // zero height
+    expect(isDegenerateBboxValue('10,20,30,40')).toBe(false)
+    expect(isDegenerateBboxValue('Germany')).toBe(false) // not a bbox at all
   })
 })
 
@@ -133,3 +144,55 @@ describe('isAutoDomain', () => {
   })
 })
 
+describe('box editing geometry', () => {
+  const WORLD: [number, number, number, number] = [-100, -100, 100, 100]
+
+  it('places 8 handles at the corners then the edge midpoints', () => {
+    const handles = boxHandles([0, 0, 10, 20])
+    expect(handles).toHaveLength(8)
+    expect(handles.slice(0, 4).map((h) => h.role)).toEqual([
+      'nw',
+      'ne',
+      'se',
+      'sw',
+    ])
+    expect(handles.find((h) => h.role === 'nw')).toMatchObject({ x: 0, y: 20 })
+    expect(handles.find((h) => h.role === 'e')).toMatchObject({ x: 10, y: 10 })
+  })
+
+  it('resizes a single edge from an edge handle', () => {
+    // Drag the east edge out to x=30; the other three edges are unchanged.
+    expect(resizeExtent([0, 0, 10, 20], 'e', 30, 999, WORLD)).toEqual([
+      0, 0, 30, 20,
+    ])
+  })
+
+  it('resizes both edges from a corner handle', () => {
+    // Drag the NW corner to (-5, 25): west → -5, north → 25.
+    expect(resizeExtent([0, 0, 10, 20], 'nw', -5, 25, WORLD)).toEqual([
+      -5, 0, 10, 25,
+    ])
+  })
+
+  it('flips (re-normalises) when a handle crosses the opposite edge', () => {
+    // Drag the east edge left past the west edge → the box flips.
+    expect(resizeExtent([0, 0, 10, 20], 'e', -4, 0, WORLD)).toEqual([
+      -4, 0, 0, 20,
+    ])
+  })
+
+  it('clamps a resized edge to the world bounds', () => {
+    expect(resizeExtent([0, 0, 10, 20], 'e', 500, 0, WORLD)).toEqual([
+      0, 0, 100, 20,
+    ])
+  })
+
+  it('translates the whole box by a delta', () => {
+    expect(moveExtent([0, 0, 10, 20], 5, -3, WORLD)).toEqual([5, -3, 15, 17])
+  })
+
+  it('clamps the translation so the box stays within the world', () => {
+    // +200 in x would push the east edge past 100; clamp so it lands on 100.
+    expect(moveExtent([0, 0, 10, 20], 200, 0, WORLD)).toEqual([90, 0, 100, 20])
+  })
+})

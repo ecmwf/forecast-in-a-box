@@ -102,6 +102,12 @@ export function serializeBbox(bbox: Bbox): string {
   return bbox.map((coord) => Math.round(coord)).join(',')
 }
 
+/** True if the value is a bbox with zero width or height (e.g. a click instead of a drag). */
+export function isDegenerateBboxValue(value: string): boolean {
+  const bbox = parseBbox(value)
+  return bbox !== null && (bbox[0] === bbox[2] || bbox[1] === bbox[3])
+}
+
 /** Serialise selected names (presets or countries) to the stored value. */
 export function serializeNames(names: ReadonlyArray<string>): string {
   return names.join(',')
@@ -142,3 +148,69 @@ export function detectMode(
   return 'raw'
 }
 
+/** The eight edit handles of a box: 4 corners then 4 edge midpoints. */
+export type BoxHandleRole = 'nw' | 'ne' | 'se' | 'sw' | 'n' | 'e' | 's' | 'w'
+
+export interface BoxHandle {
+  role: BoxHandleRole
+  x: number
+  y: number
+  /** CSS cursor to show while hovering/dragging the handle. */
+  cursor: string
+}
+
+/** Resize handles for an extent — corners first so they win hit-testing over the edge midpoints. */
+export function boxHandles(extent: OlExtent): Array<BoxHandle> {
+  const [minX, minY, maxX, maxY] = extent
+  const midX = (minX + maxX) / 2
+  const midY = (minY + maxY) / 2
+  return [
+    { role: 'nw', x: minX, y: maxY, cursor: 'nwse-resize' },
+    { role: 'ne', x: maxX, y: maxY, cursor: 'nesw-resize' },
+    { role: 'se', x: maxX, y: minY, cursor: 'nwse-resize' },
+    { role: 'sw', x: minX, y: minY, cursor: 'nesw-resize' },
+    { role: 'n', x: midX, y: maxY, cursor: 'ns-resize' },
+    { role: 'e', x: maxX, y: midY, cursor: 'ew-resize' },
+    { role: 's', x: midX, y: minY, cursor: 'ns-resize' },
+    { role: 'w', x: minX, y: midY, cursor: 'ew-resize' },
+  ]
+}
+
+const clampTo = (value: number, lo: number, hi: number) =>
+  Math.min(Math.max(value, lo), hi)
+
+/** Move the edge(s) a handle controls to (x, y), clamped to `world`; crossing the opposite edge flips the box. */
+export function resizeExtent(
+  extent: OlExtent,
+  role: BoxHandleRole,
+  x: number,
+  y: number,
+  world: OlExtent,
+): OlExtent {
+  const [wMinX, wMinY, wMaxX, wMaxY] = world
+  let [minX, minY, maxX, maxY] = extent
+  if (role.includes('w')) minX = clampTo(x, wMinX, wMaxX)
+  if (role.includes('e')) maxX = clampTo(x, wMinX, wMaxX)
+  if (role.includes('n')) maxY = clampTo(y, wMinY, wMaxY)
+  if (role.includes('s')) minY = clampTo(y, wMinY, wMaxY)
+  return [
+    Math.min(minX, maxX),
+    Math.min(minY, maxY),
+    Math.max(minX, maxX),
+    Math.max(minY, maxY),
+  ] as OlExtent
+}
+
+/** Translate the whole extent by (dx, dy), clamping the shift so it never leaves `world`. */
+export function moveExtent(
+  extent: OlExtent,
+  dx: number,
+  dy: number,
+  world: OlExtent,
+): OlExtent {
+  const [wMinX, wMinY, wMaxX, wMaxY] = world
+  const [minX, minY, maxX, maxY] = extent
+  const cdx = clampTo(dx, wMinX - minX, wMaxX - maxX)
+  const cdy = clampTo(dy, wMinY - minY, wMaxY - maxY)
+  return [minX + cdx, minY + cdy, maxX + cdx, maxY + cdy] as OlExtent
+}
