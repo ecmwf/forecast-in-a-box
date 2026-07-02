@@ -135,12 +135,22 @@ async def get_blueprint(blueprint_id: BlueprintId, version: int | None = None) -
     return await querySingle(query, _jobs_module.async_session_maker)
 
 
-async def list_blueprints(*, auth_context: AuthContext, offset: int = 0, limit: int | None = None) -> Iterable[Blueprint]:
+async def list_blueprints(
+    *,
+    auth_context: AuthContext,
+    offset: int = 0,
+    limit: int | None = None,
+    created_by: str | None = None,
+    source: BlueprintSource | None = None,
+) -> Iterable[Blueprint]:
     """Return the latest non-deleted version of every Blueprint visible to the caller, with optional paging.
 
     Admins and passthrough callers (``auth_context.has_admin()``) see all blueprints.
     Authenticated non-admin users see only their own blueprints and plugin templates.
     Orders by creation time, descending.
+
+    ``created_by`` and ``source`` are optional caller-supplied filters applied at the
+    outer query level so that paging counts and ordering remain correct.
     """
 
     async def function(i: int) -> list[Blueprint]:
@@ -154,14 +164,9 @@ async def list_blueprints(*, auth_context: AuthContext, offset: int = 0, limit: 
                 .group_by(Blueprint.blueprint_id)
                 .subquery()
             )
-            query = (
-                select(Blueprint)
-                .join(
-                    subq,
-                    (Blueprint.blueprint_id == subq.c.blueprint_id) & (Blueprint.version == subq.c.max_version),
-                )
-                .order_by(Blueprint.created_at.desc())
-                .offset(offset)
+            query = select(Blueprint).join(
+                subq,
+                (Blueprint.blueprint_id == subq.c.blueprint_id) & (Blueprint.version == subq.c.max_version),
             )
             if not auth_context.has_admin():
                 query = query.where(
@@ -170,6 +175,11 @@ async def list_blueprints(*, auth_context: AuthContext, offset: int = 0, limit: 
                         Blueprint.created_by == auth_context.user_id,
                     )
                 )
+            if created_by is not None:
+                query = query.where(Blueprint.created_by == created_by)
+            if source is not None:
+                query = query.where(Blueprint.source == source)
+            query = query.order_by(Blueprint.created_at.desc()).offset(offset)
             if limit is not None:
                 query = query.limit(limit)
             result = await session.execute(query)
@@ -178,8 +188,11 @@ async def list_blueprints(*, auth_context: AuthContext, offset: int = 0, limit: 
     return await dbRetry(function)
 
 
-async def count_blueprints(*, auth_context: AuthContext) -> int:
-    """Return the total number of distinct non-deleted Blueprint ids visible to the actor."""
+async def count_blueprints(*, auth_context: AuthContext, created_by: str | None = None, source: BlueprintSource | None = None) -> int:
+    """Return the total number of distinct non-deleted Blueprint ids visible to the actor.
+
+    ``created_by`` and ``source`` are optional caller-supplied filters.
+    """
 
     async def function(i: int) -> int:
         async with _jobs_module.async_session_maker() as session:
@@ -191,6 +204,10 @@ async def count_blueprints(*, auth_context: AuthContext) -> int:
                         Blueprint.created_by == auth_context.user_id,
                     )
                 )
+            if created_by is not None:
+                subq = subq.where(Blueprint.created_by == created_by)
+            if source is not None:
+                subq = subq.where(Blueprint.source == source)
             result = await session.execute(subq)
             return result.scalar() or 0
 

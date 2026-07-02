@@ -17,7 +17,7 @@
  * - POST /api/v1/plugin/install
  * - POST /api/v1/plugin/uninstall
  * - POST /api/v1/plugin/update
- * - POST /api/v1/plugin/modifyEnabled
+ * - POST /api/v1/plugin/settings
  */
 
 import { HttpResponse, delay, http } from 'msw'
@@ -252,20 +252,25 @@ export const pluginsHandlers = [
     return HttpResponse.json({ success: true })
   }),
 
-  // POST /api/v1/plugin/modifyEnabled
-  http.post(API_ENDPOINTS.plugin.modifyEnabled, async ({ request }) => {
+  // POST /api/v1/plugin/settings
+  http.post(API_ENDPOINTS.plugin.settings, async ({ request }) => {
     await delay(300)
-    const url = new URL(request.url)
-    const isEnabled = url.searchParams.get('isEnabled') === 'true'
-    const body = (await request.json()) as PluginCompositeId
+    const body = (await request.json()) as {
+      pluginCompositeId: PluginCompositeId
+      isEnabled?: boolean
+    }
+    const { pluginCompositeId, isEnabled } = body
 
-    const key = createPluginKey(body.store, body.local)
+    const key = createPluginKey(
+      pluginCompositeId.store,
+      pluginCompositeId.local,
+    )
     const plugin = pluginsState.plugins[key] as PluginDetail | undefined
 
     if (!plugin) {
       return new HttpResponse(
         JSON.stringify({
-          detail: `Plugin ${body.store}:${body.local} not found`,
+          detail: `Plugin ${pluginCompositeId.store}:${pluginCompositeId.local} not found`,
         }),
         { status: 404 },
       )
@@ -278,11 +283,13 @@ export const pluginsHandlers = [
       )
     }
 
-    // Update plugin state
-    pluginsState.plugins[key] = {
-      ...plugin,
-      status: isEnabled ? 'loaded' : 'disabled',
-      errored_detail: isEnabled ? null : plugin.errored_detail,
+    // Update plugin state if isEnabled was provided
+    if (isEnabled !== undefined) {
+      pluginsState.plugins[key] = {
+        ...plugin,
+        status: isEnabled ? 'loaded' : 'disabled',
+        errored_detail: isEnabled ? null : plugin.errored_detail,
+      }
     }
 
     return HttpResponse.json({ success: true })

@@ -106,7 +106,7 @@ export const API_ENDPOINTS = {
    * Plugin management endpoints
    *
    * Note: Uses singular "plugin" not "plugins" to match backend.
-   * POST endpoints use request body for PluginCompositeId (except modifyEnabled which also uses query param).
+   * POST endpoints use request body for PluginCompositeId.
    */
   plugin: {
     /** GET - Get plugin system status */
@@ -119,8 +119,8 @@ export const API_ENDPOINTS = {
     uninstall: `${API_PREFIX}/plugin/uninstall`,
     /** POST - Update a plugin (body: PluginCompositeId) */
     update: `${API_PREFIX}/plugin/update`,
-    /** POST - Enable/disable a plugin (body: PluginCompositeId, query: isEnabled) */
-    modifyEnabled: `${API_PREFIX}/plugin/modifyEnabled`,
+    /** POST - Update plugin settings, e.g. enable/disable (body: PluginSettingsUpdateRequest) */
+    settings: `${API_PREFIX}/plugin/settings`,
   },
 
   /**

@@ -197,37 +197,42 @@ describe('modifyPluginEnabled', () => {
 
   it('enables plugin successfully', async () => {
     const testPluginId = pluginId('ecmwf', 'anemoi-inference')
-    let receivedIsEnabled: string | null = null
+    let receivedIsEnabled: boolean | undefined = undefined
 
     worker.use(
-      http.post(API_ENDPOINTS.plugin.modifyEnabled, async ({ request }) => {
-        const url = new URL(request.url)
-        receivedIsEnabled = url.searchParams.get('isEnabled')
-        const body = (await request.json()) as PluginCompositeId
-        expect(body.store).toBe('ecmwf')
-        expect(body.local).toBe('anemoi-inference')
+      http.post(API_ENDPOINTS.plugin.settings, async ({ request }) => {
+        const body = (await request.json()) as {
+          pluginCompositeId: PluginCompositeId
+          isEnabled?: boolean
+        }
+        expect(body.pluginCompositeId.store).toBe('ecmwf')
+        expect(body.pluginCompositeId.local).toBe('anemoi-inference')
+        receivedIsEnabled = body.isEnabled
         return HttpResponse.json({ success: true })
       }),
     )
 
     await modifyPluginEnabled(testPluginId, true)
-    expect(receivedIsEnabled).toBe('true')
+    expect(receivedIsEnabled).toBe(true)
   })
 
   it('disables plugin successfully', async () => {
     const testPluginId = pluginId('ecmwf', 'anemoi-inference')
-    let receivedIsEnabled: string | null = null
+    let receivedIsEnabled: boolean | undefined = undefined
 
     worker.use(
-      http.post(API_ENDPOINTS.plugin.modifyEnabled, ({ request }) => {
-        const url = new URL(request.url)
-        receivedIsEnabled = url.searchParams.get('isEnabled')
+      http.post(API_ENDPOINTS.plugin.settings, async ({ request }) => {
+        const body = (await request.json()) as {
+          pluginCompositeId: PluginCompositeId
+          isEnabled?: boolean
+        }
+        receivedIsEnabled = body.isEnabled
         return HttpResponse.json({ success: true })
       }),
     )
 
     await modifyPluginEnabled(testPluginId, false)
-    expect(receivedIsEnabled).toBe('false')
+    expect(receivedIsEnabled).toBe(false)
   })
 })
 

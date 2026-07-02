@@ -55,7 +55,7 @@ from forecastbox.domain.glyphs.jinja_interpolation import get_custom_functions
 from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
-from forecastbox.schemata.jobs import GlobalGlyph
+from forecastbox.schemata.jobs import BlueprintSource, GlobalGlyph
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -133,6 +133,13 @@ class BlueprintListItem(FiabBaseModel):
     tags: list[Tag] | None = None
     source: str | None = None
     created_by: str | None = None
+
+
+class BlueprintListFilters(FiabBaseModel):
+    """Optional query-parameter filters for the blueprint list endpoint."""
+
+    created_by: str | None = None
+    source: BlueprintSource | None = None
 
 
 class BlueprintListResponse(FiabBaseModel):
@@ -306,12 +313,27 @@ async def get_blueprint(
 @router.get("/list")
 async def list_blueprints(
     pagination: Annotated[PaginationSpec, Depends()],
+    filters: Annotated[BlueprintListFilters, Depends()],
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> BlueprintListResponse:
-    """List the latest non-deleted version of every blueprint visible to the caller."""
-    total = await db.count_blueprints(auth_context=auth_context)
+    """List the latest non-deleted version of every blueprint visible to the caller.
+
+    Optional query parameters:
+    - ``created_by``: restrict to blueprints owned by this user or plugin.
+    - ``source``: restrict to blueprints with this source (``plugin_template``,
+      ``user_defined``, or ``oneoff_execution``).  Returns 422 for unknown values.
+    """
+    total = await db.count_blueprints(auth_context=auth_context, created_by=filters.created_by, source=filters.source)
     start = pagination.start()
-    page_defs = list(await db.list_blueprints(auth_context=auth_context, offset=start, limit=pagination.page_size))
+    page_defs = list(
+        await db.list_blueprints(
+            auth_context=auth_context,
+            offset=start,
+            limit=pagination.page_size,
+            created_by=filters.created_by,
+            source=filters.source,
+        )
+    )
     current_fiabcore_major = get_fiabcore_version().major
     items = []
     for defn in page_defs:

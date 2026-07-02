@@ -88,8 +88,9 @@ export async function modifyPluginEnabled(
   compositeId: PluginCompositeId,
   isEnabled: boolean,
 ): Promise<void> {
-  await apiClient.post(API_ENDPOINTS.plugin.modifyEnabled, compositeId, {
-    params: { isEnabled: String(isEnabled) },
+  await apiClient.post(API_ENDPOINTS.plugin.settings, {
+    pluginCompositeId: compositeId,
+    isEnabled,
   })
 }
 
