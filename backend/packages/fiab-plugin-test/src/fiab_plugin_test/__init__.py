@@ -111,7 +111,7 @@ catalogue = lambda: BlockFactoryCatalogue(
 def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
     restrictions: ConfigurationOptionRestriction = {}
     if instance.factory_id.factory == BlockFactoryId("transform_increment"):
-        restrictions = {AMOUNT: FableType.parse("enumClosed[1,2,3]")}
+        restrictions = {AMOUNT: FableType.parse("enumClosed[1,2,3]")[0]}
     if instance.factory_id.factory in ("sink_file",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
     elif instance.factory_id.factory in ("sink_image",):
@@ -130,7 +130,7 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
             return [
                 BlockExpansion(
                     factory=BlockFactoryId("transform_increment"),
-                    restrictions={AMOUNT: FableType.parse("enumClosed[1,2,3]")},
+                    restrictions={AMOUNT: FableType.parse("enumClosed[1,2,3]")[0]},
                 ),
                 BlockExpansion(factory=BlockFactoryId("product_join")),
                 BlockExpansion(factory=BlockFactoryId("sink_file")),

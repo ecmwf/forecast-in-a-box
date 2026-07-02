@@ -53,71 +53,125 @@ class FableType(ABC):
         """Serialize this type to a string expression that can be parsed back via FableType.parse()."""
 
     @staticmethod
-    def parse(type_expr: str) -> "FableType":
-        """Parse a type expression string into a FableType instance.
+    def parse(type_expr: str) -> "tuple[FableType, str]":
+        """Parse a type expression from the start of type_expr.
+
+        Returns ``(parsed_type, remainder)`` where ``remainder`` is the unparsed
+        tail of the input string. At the outer call site, verify that the
+        remainder is empty (or whitespace-only) to ensure the full expression
+        was consumed.
 
         Supports:
-        - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'country'
+        - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'country', 'bbox'
         - Enumerations: 'enumClosed[item1,item2]', 'enumOpen[item1,item2]'
         - Lists: 'list[int]', 'list[enumClosed[...]]', etc.
-        - Bounding box: 'bbox' (exactly four integers)
-        - Union: 'union[int,str]', 'union[date,datetime]', etc.
+        - Union: 'union[int,str]', 'union[enumClosed[a,b],date]', etc.
 
-        Raises NotFableType if the type expression is invalid.
+        Raises NotFableType if the expression cannot be parsed.
         """
-        type_expr = type_expr.strip()
+        type_expr = type_expr.lstrip()
 
-        if type_expr == "str":
-            return StringType()
-        if type_expr == "int":
-            return IntType()
-        if type_expr == "float":
-            return FloatType()
-        if type_expr == "date":
-            return DateType()
-        if type_expr == "datetime":
-            return DatetimeType()
-        if type_expr == "country":
-            return CountryType()
-        if type_expr == "bbox":
-            return BoundingBoxType()
+        # Atomic types: startswith + word-boundary check (next char not alnum or '_')
+        _ATOMIC = [
+            ("datetime", DatetimeType),
+            ("date", DateType),
+            ("float", FloatType),
+            ("int", IntType),
+            ("str", StringType),
+            ("country", CountryType),
+            ("bbox", BoundingBoxType),
+        ]
+        for name, factory in _ATOMIC:
+            n = len(name)
+            if type_expr.startswith(name) and (len(type_expr) == n or not (type_expr[n].isalnum() or type_expr[n] == "_")):
+                return (factory(), type_expr[n:])
 
-        if type_expr.startswith("enumClosed[") and type_expr.endswith("]"):
-            items_str = type_expr[11:-1]
-            items = [_normalize_enum_item(item) for item in items_str.split(",") if item.strip()]
+        # enumClosed[...]
+        if type_expr.startswith("enumClosed["):
+            bs = 10  # index of '['
+            pos = _find_matching_bracket(type_expr[bs:])
+            if pos == -1:
+                raise NotFableType("Unmatched '[' in enumClosed expression")
+            inner = type_expr[bs + 1 : bs + pos]
+            remainder = type_expr[bs + pos + 1 :]
+            items = [_normalize_enum_item(item) for item in inner.split(",") if item.strip()]
             if not items:
                 raise NotFableType("enumClosed must contain at least one item")
-            return ClosedEnumType(items)
+            return (ClosedEnumType(items), remainder)
 
-        if type_expr.startswith("enumOpen[") and type_expr.endswith("]"):
-            items_str = type_expr[9:-1]
-            items = [_normalize_enum_item(item) for item in items_str.split(",") if item.strip()]
+        # enumOpen[...]
+        if type_expr.startswith("enumOpen["):
+            bs = 8  # index of '['
+            pos = _find_matching_bracket(type_expr[bs:])
+            if pos == -1:
+                raise NotFableType("Unmatched '[' in enumOpen expression")
+            inner = type_expr[bs + 1 : bs + pos]
+            remainder = type_expr[bs + pos + 1 :]
+            items = [_normalize_enum_item(item) for item in inner.split(",") if item.strip()]
             if not items:
                 raise NotFableType("enumOpen must contain at least one item")
-            return OpenEnumType(items)
+            return (OpenEnumType(items), remainder)
 
-        if type_expr.startswith("list[") and type_expr.endswith("]"):
-            inner_type_expr = type_expr[5:-1]
-            inner_type = FableType.parse(inner_type_expr)
+        # list[...]
+        if type_expr.startswith("list["):
+            bs = 4  # index of '['
+            pos = _find_matching_bracket(type_expr[bs:])
+            if pos == -1:
+                raise NotFableType("Unmatched '[' in list expression")
+            inner = type_expr[bs + 1 : bs + pos]
+            remainder = type_expr[bs + pos + 1 :]
+            inner_type, inner_remainder = FableType.parse(inner)
+            if inner_remainder.strip():
+                raise NotFableType(f"Unexpected content after inner type in list: {inner_remainder!r}")
             if isinstance(inner_type, (ListType, UnionType)):
                 raise NotFableType("Nested lists and union types inside list are not supported")
-            return ListType(inner_type)
+            return (ListType(inner_type), remainder)
 
-        if type_expr.startswith("union[") and type_expr.endswith("]"):
-            inner = type_expr[6:-1]
-            member_types = [FableType.parse(t) for t in inner.split(",") if t.strip()]
-            if not member_types:
+        # union[...]
+        if type_expr.startswith("union["):
+            bs = 5  # index of '['
+            pos = _find_matching_bracket(type_expr[bs:])
+            if pos == -1:
+                raise NotFableType("Unmatched '[' in union expression")
+            inner = type_expr[bs + 1 : bs + pos].strip()
+            remainder = type_expr[bs + pos + 1 :]
+            if not inner:
                 raise NotFableType("union must contain at least one type")
-            for t in member_types:
+            member_types: list[FableType] = []
+            remaining = inner
+            first = True
+            while remaining:
+                remaining = remaining.lstrip()
+                if not first:
+                    if not remaining.startswith(","):
+                        raise NotFableType(f"Expected ',' between union member types, got {remaining!r}")
+                    remaining = remaining[1:].lstrip()
+                first = False
+                t, remaining = FableType.parse(remaining)
+                remaining = remaining.rstrip()
                 if isinstance(t, (ListType, UnionType)):
                     raise NotFableType("union cannot contain list or union types")
-            return UnionType(member_types)
+                member_types.append(t)
+            return (UnionType(member_types), remainder)
 
         raise NotFableType(
             f"Invalid type expression: {type_expr!r}. "
             "Expected one of: str, int, float, date, datetime, country, bbox, "
             "enumClosed[...], enumOpen[...], list[...], union[...]"
         )
+
+
+def _find_matching_bracket(s: str) -> int:
+    """Find the index of the ']' that matches the '[' at s[0]. Returns -1 if not found."""
+    depth = 0
+    for i, ch in enumerate(s):
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return i
+    return -1
 
 
 def _normalize_enum_item(item: str) -> str:
