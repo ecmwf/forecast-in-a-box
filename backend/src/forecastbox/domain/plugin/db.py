@@ -28,6 +28,7 @@ import logging
 from sqlalchemy import select, update
 
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.plugin.errors import PluginErrors
 from forecastbox.schemata.jobs import PluginState
 from forecastbox.utility.db import dbRetry, querySingle
 from forecastbox.utility.time import current_time
@@ -40,7 +41,7 @@ async def upsert_plugin_state(
     plugin_id: str,
     version: str | None = None,
     enabled: bool | None = None,
-    install_error: str | None = None,
+    plugin_errors: PluginErrors | None = None,
     excluded_templates: list[str] | None = None,
     glyph_remapping: dict[str, str] | None = None,
 ) -> None:
@@ -53,8 +54,8 @@ async def upsert_plugin_state(
 
     On subsequent calls: only the explicitly provided (non-``None``) arguments are
     written; ``None`` means "leave the stored value unchanged".  The exception is
-    ``install_error``: pass ``""`` to explicitly clear a previous error; ``None``
-    leaves it untouched.
+    ``plugin_errors``: pass an empty list to explicitly clear previous errors; ``None``
+    leaves them untouched.
 
     ``asset_ingest_needed`` is set to ``True`` when any of the following is true on
     an existing row: the flag was already set, the version changed, the plugin is
@@ -64,6 +65,7 @@ async def upsert_plugin_state(
     as that indicates a programming error (updating a plugin that was never installed).
     """
     ref_time = current_time("dbref")
+    plugin_errors_raw = [e.model_dump() for e in plugin_errors] if plugin_errors is not None else None
 
     async def function(i: int) -> None:
         async with _jobs_module.async_session_maker() as session:
@@ -80,7 +82,7 @@ async def upsert_plugin_state(
                         plugin_id=plugin_id,
                         plugin_version=version,
                         updated_at=ref_time,
-                        install_error=install_error if install_error is not None else "",
+                        plugin_errors=plugin_errors_raw if plugin_errors_raw is not None else [],
                         excluded_templates=excluded_templates if excluded_templates is not None else [],
                         glyph_remapping=glyph_remapping if glyph_remapping is not None else {},
                         template_errors={},
@@ -104,8 +106,8 @@ async def upsert_plugin_state(
                     values["plugin_version"] = version
                 if enabled is not None:
                     values["enabled"] = enabled
-                if install_error is not None:
-                    values["install_error"] = install_error
+                if plugin_errors_raw is not None:
+                    values["plugin_errors"] = plugin_errors_raw
                 if excluded_templates is not None:
                     values["excluded_templates"] = excluded_templates
                 if glyph_remapping is not None:

@@ -33,7 +33,7 @@ import re
 import threading
 import time
 from concurrent.futures import Future
-from typing import Literal, cast
+from typing import Literal
 
 from cascade.low.func import Either, assert_never
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
@@ -50,6 +50,7 @@ from forecastbox.domain.plugin.db import (
     update_template_errors,
     upsert_plugin_state,
 )
+from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_version
@@ -62,7 +63,7 @@ logger = logging.getLogger(__name__)
 class PluginManager:
     lock: threading.Lock = threading.Lock()
     plugins: PMap[PluginCompositeId, Plugin] = pmap()
-    errors: PMap[PluginCompositeId, str] = pmap()
+    errors: PMap[PluginCompositeId, PluginErrors] = pmap()
     updater: threading.Thread | None = None
     updater_error: str | None = None
     loop: asyncio.AbstractEventLoop | None = None
@@ -200,8 +201,8 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
 def load_plugins(plugins: PluginsSettings) -> None:
     logger.info("starting initial plugin load")
     try:
-        lookup = {}
-        errors = {}
+        lookup: dict[PluginCompositeId, Plugin] = {}
+        errors: dict[PluginCompositeId, PluginErrors] = {}
         for pluginKey, pluginSettings in plugins.items():
             plugin_id_str = PluginCompositeId.to_str(pluginKey)
             db_state = _run_async_from_thread(get_plugin_state(plugin_id_str))
@@ -230,19 +231,30 @@ def load_plugins(plugins: PluginsSettings) -> None:
             if install_error is not None:
                 logger.error(f"install failed for {pluginKey}: {install_error}")
                 _run_async_from_thread(
-                    upsert_plugin_state(plugin_id=plugin_id_str, version="install failed", enabled=True, install_error=install_error)
+                    upsert_plugin_state(
+                        plugin_id=plugin_id_str,
+                        version="install failed",
+                        enabled=True,
+                        plugin_errors=[PluginError(source="install", severity="error", detail=install_error)],
+                    )
                 )
                 continue
             if installed_versions:
                 version_str = _version_from_install(installed_versions, pluginSettings.module_name)
                 if version_str is not None:
-                    _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, install_error=""))
+                    _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, plugin_errors=[]))
                 else:
                     # pip does not report the version if it isn't changed -> this branch is not necessarily a bug
                     logger.warning(f"pip install of plugin {plugin_id_str} did not produce a version, assuming no change")
 
             if pluginKey in lookup:
-                errors[pluginKey] = f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}"
+                errors[pluginKey] = [
+                    PluginError(
+                        source="load",
+                        severity="error",
+                        detail=f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}",
+                    )
+                ]
                 continue
             else:
                 plugin_result = load_single(pluginSettings)
@@ -256,19 +268,19 @@ def load_plugins(plugins: PluginsSettings) -> None:
                         # but dont prevent template ingest
                         err_msg = f"plugin {pluginKey} state not found -- install originally failed?"
                         logger.error(err_msg)
-                        errors[pluginKey] = err_msg
+                        errors[pluginKey] = [PluginError(source="load", severity="error", detail=err_msg)]
                         _run_async_from_thread(
-                            upsert_plugin_state(plugin_id=plugin_id_str, version=version_imported, enabled=True, install_error="")
+                            upsert_plugin_state(plugin_id=plugin_id_str, version=version_imported, enabled=True, plugin_errors=[])
                         )
                     else:
                         db_ver: str = fresh_state.plugin_version  # type: ignore[assignment]
                         if db_ver != version_imported:
                             mismatch_msg = f"version mismatch: DB has {db_ver!r} but {version_imported!r} is imported"
                             logger.warning(f"plugin {pluginKey}: {mismatch_msg}")
-                            errors[pluginKey] = mismatch_msg
+                            errors[pluginKey] = [PluginError(source="load", severity="warning", detail=mismatch_msg)]
                 else:
                     logger.debug(f"plugin {pluginKey} loaded with success: False")
-                    errors[pluginKey] = plugin_result.e
+                    errors[pluginKey] = [PluginError(source="load", severity="error", detail=plugin_result.e)]  # type: ignore[arg-type]
 
         # Publish all loaded plugins before running template ingestion so that
         # validate_expand can resolve factory references during validation.
@@ -301,7 +313,11 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             install_result = install_plugin_compatibly(pluginSettings.pip_source, version)
             if install_result.e:
                 _run_async_from_thread(
-                    upsert_plugin_state(plugin_id=plugin_id_str, version="install failed", install_error=install_result.e)
+                    upsert_plugin_state(
+                        plugin_id=plugin_id_str,
+                        version="install failed",
+                        plugin_errors=[PluginError(source="install", severity="error", detail=install_result.e)],
+                    )
                 )
                 raise RuntimeError(f"install failed for {pluginId}: {install_result.e}")
             installed_versions = install_result.t or {}
@@ -311,26 +327,30 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
         logger.debug(f"plugin {pluginId} loaded with success: {result.t is not None}")
         version_install = _version_from_install(installed_versions, pluginSettings.module_name)
         version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
-        version_mismatch: str | None = None
+        version_mismatch_err: PluginError | None = None
         if version_install is not None and version_install != version_imported:
-            version_mismatch = f"version mismatch: pip installed {version_install!r} but {version_imported!r} is imported"
-            logger.warning(f"plugin {pluginId}: {version_mismatch}")
+            mismatch_msg = f"version mismatch: pip installed {version_install!r} but {version_imported!r} is imported"
+            logger.warning(f"plugin {pluginId}: {mismatch_msg}")
+            version_mismatch_err = PluginError(source="load", severity="warning", detail=mismatch_msg)
         with timed_acquire(PluginManager.lock, 60) as acquire_result:
             if not acquire_result:
                 raise ValueError("failed to acquire the shared lock")
             if result.t is not None:
                 PluginManager.plugins = PluginManager.plugins.set(pluginId, result.t)
+                new_errs: PluginErrors = [version_mismatch_err] if version_mismatch_err is not None else []
             else:
-                PluginManager.errors = PluginManager.errors.set(pluginId, cast(str, result.e))
-            if version_mismatch is not None:
-                existing_err = PluginManager.errors.get(pluginId)
-                PluginManager.errors = PluginManager.errors.set(
-                    pluginId, f"{existing_err}; {version_mismatch}" if existing_err else version_mismatch
-                )
+                load_err = PluginError(source="load", severity="error", detail=result.e)  # type: ignore[arg-type]
+                new_errs = [load_err]
+                if version_mismatch_err is not None:
+                    new_errs.append(version_mismatch_err)
+            if new_errs:
+                PluginManager.errors = PluginManager.errors.set(pluginId, new_errs)
+            elif pluginId in PluginManager.errors:
+                PluginManager.errors = PluginManager.errors.remove(pluginId)
         if version_install is not None:
-            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_install, install_error=""))
+            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_install, plugin_errors=[]))
         else:
-            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, install_error=""))
+            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, plugin_errors=[]))
         if result.t is not None:
             _run_async_from_thread(_ingest_plugin_templates(pluginId, result.t))
         logger.debug(f"single plugin loading finished: {pluginId}")
@@ -376,7 +396,7 @@ class PluginsStatus(FiabBaseModel):
     # TODO Change these fields to use pyrsistent types (PMap) instead of dict once we solve pydantic serialization.
     # However, no immediate hotfix is needed as this class is constructed with a lock, ie, consistently
     updater_status: Literal["ok", "running", "retrieving"] | str
-    plugin_errors: dict[PluginCompositeId, str]
+    plugin_errors: dict[PluginCompositeId, PluginErrors]
     plugin_versions: dict[PluginCompositeId, str]
     plugin_updatedatetime: dict[PluginCompositeId, str]
     plugin_enabled: dict[PluginCompositeId, bool]
@@ -402,7 +422,7 @@ async def status_full() -> PluginsStatus:
     with timed_acquire(PluginManager.lock, 0.2) as result:
         if not result:
             status = "retrieving"
-            plugin_errors: dict[PluginCompositeId, str] = {}
+            plugin_errors: dict[PluginCompositeId, PluginErrors] = {}
         else:
             status = status_brief()
             plugin_errors = dict(PluginManager.errors)
@@ -419,25 +439,25 @@ async def status_full() -> PluginsStatus:
             except Exception:
                 logger.warning(f"could not parse plugin_id {state.plugin_id!r} from DB; skipping")
                 continue
-            if state.install_error:  # type: ignore[misc]
-                existing = plugin_errors.get(plugin_id)
-                plugin_errors[plugin_id] = (
-                    f"{existing}; {state.install_error}" if existing else state.install_error  # type: ignore[misc]
-                )
+            db_plugin_errors: PluginErrors = [
+                PluginError(**e)
+                for e in (state.plugin_errors or [])  # type: ignore[union-attr]
+            ]
+            if db_plugin_errors:
+                existing = plugin_errors.get(plugin_id, [])
+                plugin_errors[plugin_id] = existing + db_plugin_errors
             plugin_versions[plugin_id] = state.plugin_version  # type: ignore[assignment]
             plugin_updatedatetime[plugin_id] = value_dt2str(state.updated_at)  # type: ignore[arg-type]
             plugin_enabled[plugin_id] = bool(state.enabled)
             plugin_excluded_templates[plugin_id] = list(state.excluded_templates) if state.excluded_templates else []  # type: ignore[arg-type]
             plugin_glyph_remapping[plugin_id] = dict(state.glyph_remapping) if state.glyph_remapping else {}  # type: ignore[arg-type]
             if state.template_errors:  # type: ignore[truthy-bool]
-                # Format per-template errors as a single string and merge into plugin_errors,
-                # consistent with the existing install_error merge above.
-                template_err_str = "; ".join(
-                    f"template {name!r}: {msg}"
+                template_errs: PluginErrors = [
+                    PluginError(source="template_ingest", severity="warning", detail=f"template {name!r}: {msg}")
                     for name, msg in state.template_errors.items()  # type: ignore[union-attr]
-                )
-                existing = plugin_errors.get(plugin_id)
-                plugin_errors[plugin_id] = f"{existing}; {template_err_str}" if existing else template_err_str
+                ]
+                existing = plugin_errors.get(plugin_id, [])
+                plugin_errors[plugin_id] = existing + template_errs
     except Exception:
         logger.warning("failed to load plugin states from DB; status may be incomplete", exc_info=True)
     return PluginsStatus(

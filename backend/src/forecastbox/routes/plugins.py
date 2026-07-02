@@ -25,6 +25,7 @@ from forecastbox.domain.auth.users import UserRead
 from forecastbox.domain.glyphs.resolution import remap_glyph_names
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.db import get_plugin_state, upsert_plugin_state
+from forecastbox.domain.plugin.errors import PluginErrors
 from forecastbox.domain.plugin.manager import (
     PluginManager,
     PluginsStatus,
@@ -54,8 +55,8 @@ class PluginDetail(FiabBaseModel):
     """Info about the plugin from the respective store. None if the plugin was installed locally"""
     remote_info: PluginRemoteInfo | None = None
     """Dynamic remote information such as the most recent published version. None if the plugin was installed locally"""
-    errored_detail: str | None = None
-    """In case the plugin is errored, (eg installed but failed to load), this displays detail"""
+    errored_detail: PluginErrors | None = None
+    """In case the plugin is errored or has warnings, this displays structured diagnostics"""
     loaded_version: str | None = None
     """In case the plugin is loaded, this shows the version"""
     update_datetime: str | None = None
