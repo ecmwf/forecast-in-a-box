@@ -22,9 +22,17 @@ from fiab_core.fable import PluginCompositeId
 from packaging.version import InvalidVersion, Version
 
 from forecastbox.domain.auth.users import UserRead
+from forecastbox.domain.glyphs.resolution import remap_glyph_names
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
-from forecastbox.domain.plugin.db import upsert_plugin_state
-from forecastbox.domain.plugin.manager import PluginsStatus, status_full, submit_update_single, uninstall_plugin, unload_single
+from forecastbox.domain.plugin.db import get_plugin_state, upsert_plugin_state
+from forecastbox.domain.plugin.manager import (
+    PluginManager,
+    PluginsStatus,
+    status_full,
+    submit_update_single,
+    uninstall_plugin,
+    unload_single,
+)
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.config import PluginSettings, config
@@ -226,3 +234,55 @@ async def update_plugin_settings_endpoint(
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return get_catalogue_redirect(request)
+
+
+class TemplateExampleValuesResponse(FiabBaseModel):
+    example_values: dict[str, dict[str, str]]
+    """Per-block example configuration values, keyed by block instance id then option id."""
+    example_glyphs: dict[str, str]
+    """Example glyph name-to-value pairs the user is expected to override."""
+
+
+@router.get("/templateExampleValues")
+async def get_template_example_values(
+    pluginCompositeId: Annotated[PluginCompositeId, Depends()],
+    displayName: str,
+) -> TemplateExampleValuesResponse:
+    """Return example_values and example_glyphs for a specific blueprint template from a loaded plugin.
+
+    Applies any stored glyph remapping to both the values and keys of the example data,
+    mirroring the remapping applied during template ingestion.
+
+    Returns 404 if the plugin is not loaded or the display name is not found.
+    Returns 403 if the template is excluded by admin settings.
+    """
+    plugin = PluginManager.plugins.get(pluginCompositeId)
+    if plugin is None:
+        raise HTTPException(status_code=404, detail=f"Plugin {PluginCompositeId.to_str(pluginCompositeId)!r} not loaded")
+
+    template = next((t for t in plugin.blueprint_templates if t.display_name == displayName), None)
+    if template is None:
+        raise HTTPException(
+            status_code=404, detail=f"Template {displayName!r} not found in plugin {PluginCompositeId.to_str(pluginCompositeId)!r}"
+        )
+
+    plugin_id_str = PluginCompositeId.to_str(pluginCompositeId)
+    plugin_state = await get_plugin_state(plugin_id_str)
+    excluded_set: set[str] = set(plugin_state.excluded_templates) if plugin_state and plugin_state.excluded_templates else set()  # type: ignore[arg-type]
+    if displayName in excluded_set:
+        raise HTTPException(status_code=403, detail=f"Template {displayName!r} is excluded")
+
+    glyph_remapping: dict[str, str] = dict(plugin_state.glyph_remapping) if plugin_state and plugin_state.glyph_remapping else {}  # type: ignore[no-matching-overload]
+
+    remapped_example_values: dict[str, dict[str, str]] = {
+        block_id: {opt_id: remap_glyph_names(val, glyph_remapping) for opt_id, val in opts.items()}
+        for block_id, opts in template.example_values.items()
+    }
+    remapped_example_glyphs: dict[str, str] = {
+        glyph_remapping.get(key, key): remap_glyph_names(val, glyph_remapping) for key, val in template.example_glyphs.items()
+    }
+
+    return TemplateExampleValuesResponse(
+        example_values=remapped_example_values,
+        example_glyphs=remapped_example_glyphs,
+    )

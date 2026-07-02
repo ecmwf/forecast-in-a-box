@@ -9,4 +9,8 @@ Depends on no other domain.
 Depended on by Blueprint and Run domains -- they need to extract individual plugin validations and compilers, and to validate fiab-core version.
 
 Note: there is a dependency circularity where this domain *depends on* Blueprint, for validating imported blueprint templates and for remapping glyph names in those templates. This will be fixed later by refactoring into events.
+
+Note: the plugin route (``routes/plugins.py``) depends on the Glyph domain (``domain/glyphs``) for
+``remap_glyph_names``, used to apply glyph remapping to template example values and glyphs in the
+``/plugin/templateExampleValues`` endpoint.
 """

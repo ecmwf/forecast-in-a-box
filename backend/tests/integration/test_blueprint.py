@@ -212,6 +212,7 @@ def test_blueprint_upsert_nonexistent_id(backend_client_with_auth: httpx.Client)
 
 def test_plugin_template_in_blueprint_list(backend_client_with_auth: httpx.Client) -> None:
     """Verify that the testBasic plugin template appears in the blueprint list after startup."""
+    from .conftest import testPluginId
 
     def do_action() -> dict:
         response = backend_client_with_auth.get("/plugin/status", timeout=10)
@@ -244,6 +245,18 @@ def test_plugin_template_in_blueprint_list(backend_client_with_auth: httpx.Clien
     assert any(b.get("display_name") == "testBasic" for b in owner_filtered), (
         f"testBasic should appear when filtered by created_by=localTest:single, got: {owner_filtered}"
     )
+
+    # The templateExampleValues route returns the correct examples for testBasic.
+    response = backend_client_with_auth.get(
+        "/plugin/templateExampleValues",
+        params={"store": testPluginId.store, "local": testPluginId.local, "displayName": "testBasic"},
+        timeout=10,
+    )
+    assert response.is_success, f"Expected 200 for testBasic example values, got: {response.status_code} {response.text}"
+    data = response.json()
+    assert "example_values" in data
+    assert "example_glyphs" in data
+    assert data["example_glyphs"].get("name") == "world", f"Expected name=world in example_glyphs, got: {data['example_glyphs']}"
 
 
 def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backend_admin_client: httpx.Client) -> None:
@@ -295,6 +308,14 @@ def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backe
     assert "testBasic" in names, f"testBasic should still be present, but found: {names}"
     assert "testRemapping" in names, f"testRemapping should be present, but found: {names}"
 
+    # Excluded template must return 403 from templateExampleValues.
+    response = backend_client_with_auth.get(
+        "/plugin/templateExampleValues",
+        params={"store": testPluginId.store, "local": testPluginId.local, "displayName": "testExclusion"},
+        timeout=10,
+    )
+    assert response.status_code == 403, f"Expected 403 for excluded testExclusion, got: {response.status_code} {response.text}"
+
     # Verify that the glyph remapping was applied to testRemapping.
     remap_item = next(b for b in blueprints if b.get("display_name") == "testRemapping")
     remap_id = remap_item["blueprint_id"]
@@ -314,6 +335,27 @@ def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backe
     assert "localNew" in local_glyphs, f"Expected localNew in local_glyphs after remapping, got: {local_glyphs}"
     assert "localOld" not in local_glyphs, f"localOld should have been renamed, got: {local_glyphs}"
     assert "pluginGlyphNew" in local_glyphs.get("localNew", ""), f"Expected localNew value to reference pluginGlyphNew, got: {local_glyphs}"
+
+
+def test_template_example_values_not_found(backend_client_with_auth: httpx.Client) -> None:
+    """Non-existent display name and non-existent plugin return 404 from templateExampleValues."""
+    from .conftest import testPluginId
+
+    # Unknown display name in a known plugin -> 404.
+    response = backend_client_with_auth.get(
+        "/plugin/templateExampleValues",
+        params={"store": testPluginId.store, "local": testPluginId.local, "displayName": "doesNotExist"},
+        timeout=10,
+    )
+    assert response.status_code == 404, f"Expected 404 for unknown displayName, got: {response.status_code} {response.text}"
+
+    # Unknown plugin -> 404.
+    response = backend_client_with_auth.get(
+        "/plugin/templateExampleValues",
+        params={"store": "unknownStore", "local": "unknownPlugin", "displayName": "testBasic"},
+        timeout=10,
+    )
+    assert response.status_code == 404, f"Expected 404 for unknown plugin, got: {response.status_code} {response.text}"
 
 
 def test_plugin_template_validation_failure(backend_client_with_auth: httpx.Client) -> None:
