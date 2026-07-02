@@ -53,9 +53,8 @@ async def upsert_plugin_state(
     new rows.
 
     On subsequent calls: only the explicitly provided (non-``None``) arguments are
-    written; ``None`` means "leave the stored value unchanged".  The exception is
-    ``plugin_errors``: pass an empty list to explicitly clear previous errors; ``None``
-    leaves them untouched.
+    written; ``None`` means "leave the stored value unchanged".  Pass an empty list
+    to explicitly clear previously stored errors.
 
     ``asset_ingest_needed`` is set to ``True`` when any of the following is true on
     an existing row: the flag was already set, the version changed, the plugin is

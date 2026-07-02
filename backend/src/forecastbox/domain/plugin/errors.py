@@ -32,7 +32,7 @@ Severities:
   shut down; none exist at the time of writing.
 """
 
-from typing import Literal
+from typing import Literal, NewType
 
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -43,4 +43,4 @@ class PluginError(FiabBaseModel):
     severity: Literal["warning", "error", "critical"]
 
 
-PluginErrors = list[PluginError]
+PluginErrors = NewType("PluginErrors", list[PluginError])

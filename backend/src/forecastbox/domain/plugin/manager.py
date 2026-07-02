@@ -235,26 +235,30 @@ def load_plugins(plugins: PluginsSettings) -> None:
                         plugin_id=plugin_id_str,
                         version="install failed",
                         enabled=True,
-                        plugin_errors=[PluginError(source="install", severity="error", detail=install_error)],
+                        plugin_errors=PluginErrors([PluginError(source="install", severity="error", detail=install_error)]),
                     )
                 )
                 continue
             if installed_versions:
                 version_str = _version_from_install(installed_versions, pluginSettings.module_name)
                 if version_str is not None:
-                    _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, plugin_errors=[]))
+                    _run_async_from_thread(
+                        upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, plugin_errors=PluginErrors([]))
+                    )
                 else:
                     # pip does not report the version if it isn't changed -> this branch is not necessarily a bug
                     logger.warning(f"pip install of plugin {plugin_id_str} did not produce a version, assuming no change")
 
             if pluginKey in lookup:
-                errors[pluginKey] = [
-                    PluginError(
-                        source="load",
-                        severity="error",
-                        detail=f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}",
-                    )
-                ]
+                errors[pluginKey] = PluginErrors(
+                    [
+                        PluginError(
+                            source="load",
+                            severity="error",
+                            detail=f"plugin {pluginKey} is provided by more than just {pluginSettings.pip_source}",
+                        )
+                    ]
+                )
                 continue
             else:
                 plugin_result = load_single(pluginSettings)
@@ -268,19 +272,21 @@ def load_plugins(plugins: PluginsSettings) -> None:
                         # but dont prevent template ingest
                         err_msg = f"plugin {pluginKey} state not found -- install originally failed?"
                         logger.error(err_msg)
-                        errors[pluginKey] = [PluginError(source="load", severity="error", detail=err_msg)]
+                        errors[pluginKey] = PluginErrors([PluginError(source="load", severity="error", detail=err_msg)])
                         _run_async_from_thread(
-                            upsert_plugin_state(plugin_id=plugin_id_str, version=version_imported, enabled=True, plugin_errors=[])
+                            upsert_plugin_state(
+                                plugin_id=plugin_id_str, version=version_imported, enabled=True, plugin_errors=PluginErrors([])
+                            )
                         )
                     else:
                         db_ver: str = fresh_state.plugin_version  # type: ignore[assignment]
                         if db_ver != version_imported:
                             mismatch_msg = f"version mismatch: DB has {db_ver!r} but {version_imported!r} is imported"
                             logger.warning(f"plugin {pluginKey}: {mismatch_msg}")
-                            errors[pluginKey] = [PluginError(source="load", severity="warning", detail=mismatch_msg)]
+                            errors[pluginKey] = PluginErrors([PluginError(source="load", severity="warning", detail=mismatch_msg)])
                 else:
                     logger.debug(f"plugin {pluginKey} loaded with success: False")
-                    errors[pluginKey] = [PluginError(source="load", severity="error", detail=plugin_result.e)]  # type: ignore[arg-type]
+                    errors[pluginKey] = PluginErrors([PluginError(source="load", severity="error", detail=plugin_result.e)])  # type: ignore[arg-type]
 
         # Publish all loaded plugins before running template ingestion so that
         # validate_expand can resolve factory references during validation.
@@ -316,7 +322,7 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
                     upsert_plugin_state(
                         plugin_id=plugin_id_str,
                         version="install failed",
-                        plugin_errors=[PluginError(source="install", severity="error", detail=install_result.e)],
+                        plugin_errors=PluginErrors([PluginError(source="install", severity="error", detail=install_result.e)]),
                     )
                 )
                 raise RuntimeError(f"install failed for {pluginId}: {install_result.e}")
@@ -337,20 +343,18 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
                 raise ValueError("failed to acquire the shared lock")
             if result.t is not None:
                 PluginManager.plugins = PluginManager.plugins.set(pluginId, result.t)
-                new_errs: PluginErrors = [version_mismatch_err] if version_mismatch_err is not None else []
+                new_errs: PluginErrors = PluginErrors([version_mismatch_err]) if version_mismatch_err is not None else PluginErrors([])
             else:
                 load_err = PluginError(source="load", severity="error", detail=result.e)  # type: ignore[arg-type]
-                new_errs = [load_err]
-                if version_mismatch_err is not None:
-                    new_errs.append(version_mismatch_err)
+                new_errs = PluginErrors([load_err, version_mismatch_err] if version_mismatch_err is not None else [load_err])
             if new_errs:
                 PluginManager.errors = PluginManager.errors.set(pluginId, new_errs)
             elif pluginId in PluginManager.errors:
                 PluginManager.errors = PluginManager.errors.remove(pluginId)
         if version_install is not None:
-            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_install, plugin_errors=[]))
+            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_install, plugin_errors=PluginErrors([])))
         else:
-            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, plugin_errors=[]))
+            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, plugin_errors=PluginErrors([])))
         if result.t is not None:
             _run_async_from_thread(_ingest_plugin_templates(pluginId, result.t))
         logger.debug(f"single plugin loading finished: {pluginId}")
@@ -439,25 +443,29 @@ async def status_full() -> PluginsStatus:
             except Exception:
                 logger.warning(f"could not parse plugin_id {state.plugin_id!r} from DB; skipping")
                 continue
-            db_plugin_errors: PluginErrors = [
-                PluginError(**e)
-                for e in (state.plugin_errors or [])  # type: ignore[union-attr]
-            ]
+            db_plugin_errors: PluginErrors = PluginErrors(
+                [
+                    PluginError(**e)  # type: ignore[arg-type]
+                    for e in (state.plugin_errors or [])  # type: ignore[union-attr]
+                ]
+            )
             if db_plugin_errors:
                 existing = plugin_errors.get(plugin_id, [])
-                plugin_errors[plugin_id] = existing + db_plugin_errors
+                plugin_errors[plugin_id] = PluginErrors(existing + db_plugin_errors)
             plugin_versions[plugin_id] = state.plugin_version  # type: ignore[assignment]
             plugin_updatedatetime[plugin_id] = value_dt2str(state.updated_at)  # type: ignore[arg-type]
             plugin_enabled[plugin_id] = bool(state.enabled)
             plugin_excluded_templates[plugin_id] = list(state.excluded_templates) if state.excluded_templates else []  # type: ignore[arg-type]
             plugin_glyph_remapping[plugin_id] = dict(state.glyph_remapping) if state.glyph_remapping else {}  # type: ignore[arg-type]
             if state.template_errors:  # type: ignore[truthy-bool]
-                template_errs: PluginErrors = [
-                    PluginError(source="template_ingest", severity="warning", detail=f"template {name!r}: {msg}")
-                    for name, msg in state.template_errors.items()  # type: ignore[union-attr]
-                ]
+                template_errs: PluginErrors = PluginErrors(
+                    [
+                        PluginError(source="template_ingest", severity="warning", detail=f"template {name!r}: {msg}")
+                        for name, msg in state.template_errors.items()  # type: ignore[union-attr]
+                    ]
+                )
                 existing = plugin_errors.get(plugin_id, [])
-                plugin_errors[plugin_id] = existing + template_errs
+                plugin_errors[plugin_id] = PluginErrors(existing + template_errs)
     except Exception:
         logger.warning("failed to load plugin states from DB; status may be incomplete", exc_info=True)
     return PluginsStatus(
