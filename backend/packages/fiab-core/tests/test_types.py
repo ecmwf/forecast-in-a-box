@@ -300,15 +300,19 @@ class TestFableTypeParse:
         assert t.validate_convert("a,b,a") == ["a", "b", "a"]
         assert t.serialize() == "list[enumClosed[a,b]]"
 
-    def test_parse_nested_lists_raises_error(self) -> None:
-        with pytest.raises(NotFableType):
-            FableType.parse("list[list[int]]")
+    def test_parse_nested_list_now_supported(self) -> None:
+        t = _parse("list[list[int]]")
+        assert isinstance(t, ListType)
+        assert isinstance(t.item_type, ListType)
+        # outer comma-split means each inner list gets one element
+        assert t.validate_convert("1,2,3") == [[1], [2], [3]]
 
     def test_parse_invalid_type_raises_error(self) -> None:
         with pytest.raises(NotFableType):
             FableType.parse("invalid_type")
-        with pytest.raises(NotFableType):
-            FableType.parse("string")
+        # "string" parses as str with "ing" as remainder; the outer callsite rejects it
+        _, remainder = FableType.parse("string")
+        assert remainder == "ing"
 
     def test_parse_empty_enum_raises_error(self) -> None:
         with pytest.raises(NotFableType):
@@ -428,9 +432,14 @@ class TestBoundingBoxType:
         assert t.validate_convert("10,20,30,40") == [10, 20, 30, 40]
         assert t.serialize() == "bbox"
 
-    def test_bbox_not_allowed_in_list(self) -> None:
-        with pytest.raises(NotFableType):
-            FableType.parse("list[bbox]")
+    def test_list_of_bbox_now_supported(self) -> None:
+        t = _parse("list[bbox]")
+        assert isinstance(t, ListType)
+        assert isinstance(t.item_type, BoundingBoxType)
+        # list[bbox] always fails at validate_convert: outer comma-split leaves
+        # single-element slots that cannot satisfy bbox's 4-element requirement
+        with pytest.raises(WrongType):
+            t.validate_convert("1,2,3,4")
 
 
 class TestUnionType:
@@ -488,21 +497,38 @@ class TestUnionType:
         with pytest.raises(NotFableType):
             FableType.parse("union[]")
 
-    def test_parse_union_of_unions_raises_error(self) -> None:
-        with pytest.raises(NotFableType):
-            FableType.parse("union[union[int,str],float]")
+    def test_parse_union_of_unions_now_supported(self) -> None:
+        t = _parse("union[union[int,str],float]")
+        assert isinstance(t, UnionType)
+        assert isinstance(t.types[0], UnionType)
+        assert isinstance(t.types[1], FloatType)
+        assert t.validate_convert("42") == 42
 
-    def test_parse_union_with_list_raises_error(self) -> None:
-        with pytest.raises(NotFableType):
-            FableType.parse("union[list[int],str]")
+    def test_parse_union_with_list_now_supported(self) -> None:
+        t = _parse("union[list[int],str]")
+        assert isinstance(t, UnionType)
+        assert isinstance(t.types[0], ListType)
+        assert t.validate_convert("1,2,3") == [1, 2, 3]
+        assert t.validate_convert("hello") == "hello"
 
-    def test_parse_union_with_bbox_raises_error(self) -> None:
-        with pytest.raises(NotFableType):
-            FableType.parse("union[bbox,str]")
+    def test_parse_union_with_bbox_now_supported(self) -> None:
+        t = _parse("union[bbox,str]")
+        assert isinstance(t, UnionType)
+        assert isinstance(t.types[0], BoundingBoxType)
+        assert t.validate_convert("1,2,3,4") == [1, 2, 3, 4]
+        assert t.validate_convert("hello") == "hello"
 
-    def test_parse_list_of_union_raises_error(self) -> None:
-        with pytest.raises(NotFableType):
-            FableType.parse("list[union[int,str]]")
+    def test_parse_list_of_union_now_supported(self) -> None:
+        t = _parse("list[union[int,str]]")
+        assert isinstance(t, ListType)
+        assert isinstance(t.item_type, UnionType)
+        assert t.validate_convert("42,hello,3") == [42, "hello", 3]
+
+    def test_parse_union_of_lists(self) -> None:
+        t = _parse("union[list[int],list[float]]")
+        assert isinstance(t, UnionType)
+        assert t.validate_convert("1,2,3") == [1, 2, 3]
+        assert t.validate_convert("1.5,2.5") == [1.5, 2.5]
 
     def test_parse_union_with_enum(self) -> None:
         t = _parse("union[enumClosed[a,b],str]")

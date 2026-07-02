@@ -71,7 +71,7 @@ class FableType(ABC):
         """
         type_expr = type_expr.lstrip()
 
-        # Atomic types: startswith + word-boundary check (next char not alnum or '_')
+        # Atomic types: "datetime" must precede "date" to avoid prefix ambiguity.
         _ATOMIC = [
             ("datetime", DatetimeType),
             ("date", DateType),
@@ -83,75 +83,44 @@ class FableType(ABC):
         ]
         for name, factory in _ATOMIC:
             n = len(name)
-            if type_expr.startswith(name) and (len(type_expr) == n or not (type_expr[n].isalnum() or type_expr[n] == "_")):
+            if type_expr.startswith(name):
                 return (factory(), type_expr[n:])
 
-        # enumClosed[...]
-        if type_expr.startswith("enumClosed["):
-            bs = 10  # index of '['
-            pos = _find_matching_bracket(type_expr[bs:])
-            if pos == -1:
-                raise NotFableType("Unmatched '[' in enumClosed expression")
-            inner = type_expr[bs + 1 : bs + pos]
-            remainder = type_expr[bs + pos + 1 :]
-            items = [_normalize_enum_item(item) for item in inner.split(",") if item.strip()]
-            if not items:
-                raise NotFableType("enumClosed must contain at least one item")
-            return (ClosedEnumType(items), remainder)
-
-        # enumOpen[...]
-        if type_expr.startswith("enumOpen["):
-            bs = 8  # index of '['
-            pos = _find_matching_bracket(type_expr[bs:])
-            if pos == -1:
-                raise NotFableType("Unmatched '[' in enumOpen expression")
-            inner = type_expr[bs + 1 : bs + pos]
-            remainder = type_expr[bs + pos + 1 :]
-            items = [_normalize_enum_item(item) for item in inner.split(",") if item.strip()]
-            if not items:
-                raise NotFableType("enumOpen must contain at least one item")
-            return (OpenEnumType(items), remainder)
+        # Enum types (enumClosed and enumOpen share identical logic)
+        _ENUMS = {"enumClosed": ClosedEnumType, "enumOpen": OpenEnumType}
+        for prefix, factory in _ENUMS.items():
+            if type_expr.startswith(prefix):
+                _, inner, remainder = _split_by_brackets(type_expr)
+                items = [_normalize_enum_item(item) for item in inner.split(",") if item.strip()]
+                if not items:
+                    raise NotFableType(f"{prefix} must contain at least one item")
+                return (factory(items), remainder)
 
         # list[...]
         if type_expr.startswith("list["):
-            bs = 4  # index of '['
-            pos = _find_matching_bracket(type_expr[bs:])
-            if pos == -1:
-                raise NotFableType("Unmatched '[' in list expression")
-            inner = type_expr[bs + 1 : bs + pos]
-            remainder = type_expr[bs + pos + 1 :]
+            _, inner, remainder = _split_by_brackets(type_expr)
             inner_type, inner_remainder = FableType.parse(inner)
             if inner_remainder.strip():
                 raise NotFableType(f"Unexpected content after inner type in list: {inner_remainder!r}")
-            if isinstance(inner_type, (ListType, UnionType)):
-                raise NotFableType("Nested lists and union types inside list are not supported")
             return (ListType(inner_type), remainder)
 
         # union[...]
         if type_expr.startswith("union["):
-            bs = 5  # index of '['
-            pos = _find_matching_bracket(type_expr[bs:])
-            if pos == -1:
-                raise NotFableType("Unmatched '[' in union expression")
-            inner = type_expr[bs + 1 : bs + pos].strip()
-            remainder = type_expr[bs + pos + 1 :]
-            if not inner:
-                raise NotFableType("union must contain at least one type")
+            _, inner, remainder = _split_by_brackets(type_expr)
             member_types: list[FableType] = []
             remaining = inner
             first = True
             while remaining:
-                remaining = remaining.lstrip()
                 if not first:
                     if not remaining.startswith(","):
                         raise NotFableType(f"Expected ',' between union member types, got {remaining!r}")
                     remaining = remaining[1:].lstrip()
                 first = False
                 t, remaining = FableType.parse(remaining)
-                remaining = remaining.rstrip()
-                if isinstance(t, (ListType, UnionType)):
-                    raise NotFableType("union cannot contain list or union types")
+                remaining = remaining.lstrip()
                 member_types.append(t)
+            if not member_types:
+                raise NotFableType("union must contain at least one type")
             return (UnionType(member_types), remainder)
 
         raise NotFableType(
@@ -161,17 +130,26 @@ class FableType(ABC):
         )
 
 
-def _find_matching_bracket(s: str) -> int:
-    """Find the index of the ']' that matches the '[' at s[0]. Returns -1 if not found."""
+def _split_by_brackets(s: str) -> tuple[str, str, str]:
+    """Split 'prefix[inner]remainder' into (prefix, inner, remainder).
+
+    The inner content is stripped of leading/trailing whitespace.
+    Raises NotFableType if no '[' is found or if the brackets are unmatched.
+    """
+    open_pos = s.find("[")
+    if open_pos == -1:
+        raise NotFableType(f"Expected '[' in expression: {s!r}")
+    prefix = s[:open_pos]
     depth = 0
-    for i, ch in enumerate(s):
+    for i in range(open_pos, len(s)):
+        ch = s[i]
         if ch == "[":
             depth += 1
         elif ch == "]":
             depth -= 1
             if depth == 0:
-                return i
-    return -1
+                return (prefix, s[open_pos + 1 : i].strip(), s[i + 1 :])
+    raise NotFableType(f"Unmatched '[' in {prefix!r} expression")
 
 
 def _normalize_enum_item(item: str) -> str:
@@ -314,6 +292,9 @@ class ListType(FableType):
         if not value:
             return []
 
+        # TODO this is fundamentally limiting to not containing ,-based types, like list[list[int]] or list[bbox]
+        # We should change to a proper parser here that understands the inner type and consumes with remainder,
+        # similarly to how type parsing for union works
         items = [item.strip() for item in value.split(",")]
         result = []
         for i, item in enumerate(items):
