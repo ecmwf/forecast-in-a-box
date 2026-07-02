@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { PluginCompositeId, PluginDetail } from '@/api/types/plugins.types'
-import { toPluginInfo } from '@/api/types/plugins.types'
+import { PluginDetailSchema, toPluginInfo } from '@/api/types/plugins.types'
 
 const ID: PluginCompositeId = { store: 'ecmwf', local: 'anemoi-inference' }
 
@@ -58,5 +58,49 @@ describe('toPluginInfo — updatedAt timezone normalization', () => {
 
   it('is null for an unparseable datetime', () => {
     expect(toPluginInfo(ID, detailWith('not-a-date')).updatedAt).toBeNull()
+  })
+})
+
+const baseRaw = {
+  status: 'loaded' as const,
+  store_info: null,
+  remote_info: null,
+  loaded_version: '1.0.0',
+  update_datetime: null,
+}
+
+describe('PluginDetailSchema — errored_detail parsing', () => {
+  it('accepts null and outputs null', () => {
+    const result = PluginDetailSchema.parse({
+      ...baseRaw,
+      errored_detail: null,
+    })
+    expect(result.errored_detail).toBeNull()
+  })
+
+  it('concatenates multiple error details with newline', () => {
+    const result = PluginDetailSchema.parse({
+      ...baseRaw,
+      errored_detail: [
+        { source: 'install', detail: 'pip failed', severity: 'error' },
+        { source: 'load', detail: 'import error', severity: 'error' },
+      ],
+    })
+    expect(result.errored_detail).toBe('pip failed\nimport error')
+  })
+
+  it('returns a single detail string for one error', () => {
+    const result = PluginDetailSchema.parse({
+      ...baseRaw,
+      errored_detail: [
+        { source: 'load', detail: 'module not found', severity: 'error' },
+      ],
+    })
+    expect(result.errored_detail).toBe('module not found')
+  })
+
+  it('returns null for an empty error list', () => {
+    const result = PluginDetailSchema.parse({ ...baseRaw, errored_detail: [] })
+    expect(result.errored_detail).toBeNull()
   })
 })
