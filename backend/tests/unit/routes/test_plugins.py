@@ -9,16 +9,32 @@
 
 """Unit tests for plugin route helpers — version/specifier parsing logic and /versions route."""
 
-from unittest.mock import patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.exceptions import HTTPException
-from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
+from fiab_core.fable import (
+    BlockFactory,
+    BlockFactoryCatalogue,
+    BlockFactoryId,
+    BlockInstance,
+    BlockInstanceId,
+    BlueprintTemplate,
+    ConfigurationOptionId,
+    PluginBlockFactoryId,
+    PluginCompositeId,
+    PluginId,
+    PluginStoreId,
+    SelfPluginId,
+)
+from fiab_core.plugin import Plugin
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
+from pyrsistent import pmap
 
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry
-from forecastbox.routes.plugins import get_plugin_versions
+from forecastbox.routes.plugins import get_plugin_versions, get_template_example_values
 from forecastbox.utility.config import PluginSettings
 
 # ---------------------------------------------------------------------------
@@ -168,3 +184,111 @@ def test_versions_pip_source_passed_to_get_package_versions() -> None:
         with patch("forecastbox.routes.plugins.get_package_versions", return_value=iter([])) as mock_gpv:
             get_plugin_versions(_COMPOSITE_ID)
     mock_gpv.assert_called_once_with("fiab-plugin-ecmwf")
+
+
+# ---------------------------------------------------------------------------
+# /templateExampleValues route
+# ---------------------------------------------------------------------------
+
+_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("test"), local=PluginId("plugin"))
+_TEXT = ConfigurationOptionId("text")
+_BLOCK_A = BlockInstanceId("block_a")
+
+_TEMPLATE_WITH_EXAMPLES = BlueprintTemplate(
+    display_name="myTemplate",
+    display_description="desc",
+    blocks={
+        _BLOCK_A: BlockInstance(
+            factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("source_text")),
+            configuration_values={_TEXT: "fixed"},
+            input_ids={},
+        ),
+    },
+    example_values={_BLOCK_A: {_TEXT: "${exampleGlyph}"}},
+    example_glyphs={"exampleGlyph": "hello world"},
+)
+
+_TEMPLATE_NO_EXAMPLES = BlueprintTemplate(
+    display_name="noExamples",
+    display_description="desc",
+    blocks={},
+)
+
+
+def _make_plugin(*templates: BlueprintTemplate) -> Plugin:
+    return Plugin(
+        catalogue=BlockFactoryCatalogue(factories={}),
+        validator=lambda inst, inputs: (_ for _ in ()).throw(NotImplementedError),  # type: ignore[return-value]
+        expander=lambda output: [],
+        compiler=lambda lookup, inst: (_ for _ in ()).throw(NotImplementedError),  # type: ignore[return-value]
+        blueprint_templates=templates,
+    )
+
+
+def _make_plugin_state(excluded: list[str] | None = None, remapping: dict[str, str] | None = None) -> MagicMock:
+    state = MagicMock()
+    state.excluded_templates = excluded or []
+    state.glyph_remapping = remapping or {}
+    return state
+
+
+def _run(coro: object) -> object:  # type: ignore[type-arg]
+    return asyncio.run(coro)  # type: ignore[arg-type]
+
+
+def test_template_example_values_returns_examples() -> None:
+    plugin = _make_plugin(_TEMPLATE_WITH_EXAMPLES)
+    state = _make_plugin_state()
+    with (
+        patch("forecastbox.routes.plugins.PluginManager") as mock_pm,
+        patch("forecastbox.routes.plugins.get_plugin_state", new=AsyncMock(return_value=state)),
+    ):
+        mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
+        result = _run(get_template_example_values(_PLUGIN_ID, "myTemplate"))
+    assert result.example_values == {_BLOCK_A: {_TEXT: "${exampleGlyph}"}}
+    assert result.example_glyphs == {"exampleGlyph": "hello world"}
+
+
+def test_template_example_values_applies_remapping() -> None:
+    plugin = _make_plugin(_TEMPLATE_WITH_EXAMPLES)
+    state = _make_plugin_state(remapping={"exampleGlyph": "renamedGlyph"})
+    with (
+        patch("forecastbox.routes.plugins.PluginManager") as mock_pm,
+        patch("forecastbox.routes.plugins.get_plugin_state", new=AsyncMock(return_value=state)),
+    ):
+        mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
+        result = _run(get_template_example_values(_PLUGIN_ID, "myTemplate"))
+    # Key renamed, value's glyph reference renamed
+    assert result.example_glyphs == {"renamedGlyph": "hello world"}
+    # The example_value string referencing ${exampleGlyph} must be rewritten
+    assert result.example_values[_BLOCK_A][_TEXT] == "${renamedGlyph}"
+
+
+def test_template_example_values_404_unknown_plugin() -> None:
+    with patch("forecastbox.routes.plugins.PluginManager") as mock_pm:
+        mock_pm.plugins = pmap()
+        with pytest.raises(HTTPException) as exc_info:
+            _run(get_template_example_values(_PLUGIN_ID, "myTemplate"))
+    assert exc_info.value.status_code == 404
+
+
+def test_template_example_values_404_unknown_display_name() -> None:
+    plugin = _make_plugin(_TEMPLATE_WITH_EXAMPLES)
+    with patch("forecastbox.routes.plugins.PluginManager") as mock_pm:
+        mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
+        with pytest.raises(HTTPException) as exc_info:
+            _run(get_template_example_values(_PLUGIN_ID, "nonExistent"))
+    assert exc_info.value.status_code == 404
+
+
+def test_template_example_values_403_excluded() -> None:
+    plugin = _make_plugin(_TEMPLATE_WITH_EXAMPLES)
+    state = _make_plugin_state(excluded=["myTemplate"])
+    with (
+        patch("forecastbox.routes.plugins.PluginManager") as mock_pm,
+        patch("forecastbox.routes.plugins.get_plugin_state", new=AsyncMock(return_value=state)),
+    ):
+        mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
+        with pytest.raises(HTTPException) as exc_info:
+            _run(get_template_example_values(_PLUGIN_ID, "myTemplate"))
+    assert exc_info.value.status_code == 403
