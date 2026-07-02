@@ -14,7 +14,9 @@ from datetime import date, datetime
 import pytest
 
 from fiab_core.types import (
+    BoundingBoxType,
     ClosedEnumType,
+    CountryType,
     DatetimeType,
     DateType,
     FableType,
@@ -25,6 +27,7 @@ from fiab_core.types import (
     NotStringInput,
     OpenEnumType,
     StringType,
+    UnionType,
     WrongType,
 )
 
@@ -350,3 +353,146 @@ class TestValidateConvertIntegration:
 
         with pytest.raises(NotStringInput):
             t.validate_convert(123)
+
+
+class TestCountryType:
+    """Tests for CountryType"""
+
+    def test_convert_valid_string(self) -> None:
+        t = CountryType()
+        assert t.validate_convert("France") == "France"
+        assert t.validate_convert("GB") == "GB"
+        assert t.validate_convert("") == ""
+
+    def test_convert_non_string_raises_type_error(self) -> None:
+        t = CountryType()
+        with pytest.raises(NotStringInput):
+            t.validate_convert(123)
+        with pytest.raises(NotStringInput):
+            t.validate_convert(None)
+
+    def test_serialize(self) -> None:
+        assert CountryType().serialize() == "country"
+
+    def test_parse_and_round_trip(self) -> None:
+        t = FableType.parse("country")
+        assert isinstance(t, CountryType)
+        assert t.validate_convert("Germany") == "Germany"
+        assert t.serialize() == "country"
+
+
+class TestBoundingBoxType:
+    """Tests for BoundingBoxType"""
+
+    def test_convert_valid_bbox(self) -> None:
+        t = BoundingBoxType()
+        assert t.validate_convert("-10,40,30,70") == [-10, 40, 30, 70]
+        assert t.validate_convert("0,0,0,0") == [0, 0, 0, 0]
+
+    def test_convert_wrong_element_count_raises_error(self) -> None:
+        t = BoundingBoxType()
+        with pytest.raises(WrongType):
+            t.validate_convert("1,2,3")
+        with pytest.raises(WrongType):
+            t.validate_convert("1,2,3,4,5")
+        with pytest.raises(WrongType):
+            t.validate_convert("")
+
+    def test_convert_non_integer_elements_raises_error(self) -> None:
+        t = BoundingBoxType()
+        with pytest.raises(WrongType):
+            t.validate_convert("1.5,2,3,4")
+        with pytest.raises(WrongType):
+            t.validate_convert("a,b,c,d")
+
+    def test_convert_non_string_raises_type_error(self) -> None:
+        t = BoundingBoxType()
+        with pytest.raises(NotStringInput):
+            t.validate_convert([1, 2, 3, 4])
+        with pytest.raises(NotStringInput):
+            t.validate_convert(None)
+
+    def test_serialize(self) -> None:
+        assert BoundingBoxType().serialize() == "bbox"
+
+    def test_parse_and_round_trip(self) -> None:
+        t = FableType.parse("bbox")
+        assert isinstance(t, BoundingBoxType)
+        assert t.validate_convert("10,20,30,40") == [10, 20, 30, 40]
+        assert t.serialize() == "bbox"
+
+    def test_bbox_not_allowed_in_list(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("list[bbox]")
+
+
+class TestUnionType:
+    """Tests for UnionType"""
+
+    def test_convert_greedy_first_match(self) -> None:
+        t = UnionType([IntType(), FloatType()])
+        assert t.validate_convert("42") == 42
+        assert isinstance(t.validate_convert("42"), int)
+
+    def test_convert_falls_through_to_second_type(self) -> None:
+        t = UnionType([IntType(), FloatType()])
+        assert t.validate_convert("3.14") == 3.14
+
+    def test_convert_all_fail_raises_error(self) -> None:
+        t = UnionType([IntType(), FloatType()])
+        with pytest.raises(WrongType):
+            t.validate_convert("not_a_number")
+
+    def test_convert_non_string_raises_type_error(self) -> None:
+        t = UnionType([IntType(), StringType()])
+        with pytest.raises(NotStringInput):
+            t.validate_convert(42)
+        with pytest.raises(NotStringInput):
+            t.validate_convert(None)
+
+    def test_serialize(self) -> None:
+        t = UnionType([IntType(), StringType()])
+        assert t.serialize() == "union[int,str]"
+
+    def test_serialize_multi_type(self) -> None:
+        t = UnionType([IntType(), FloatType(), DateType()])
+        assert t.serialize() == "union[int,float,date]"
+
+    def test_parse_and_round_trip(self) -> None:
+        t = FableType.parse("union[int,str]")
+        assert isinstance(t, UnionType)
+        assert len(t.types) == 2
+        assert isinstance(t.types[0], IntType)
+        assert isinstance(t.types[1], StringType)
+        assert t.serialize() == "union[int,str]"
+
+    def test_parse_union_with_date_and_datetime(self) -> None:
+        t = FableType.parse("union[date,datetime]")
+        assert isinstance(t, UnionType)
+        assert t.validate_convert("2026-05-08T10:30:45") == datetime(2026, 5, 8, 10, 30, 45)
+
+    def test_parse_union_with_country(self) -> None:
+        t = FableType.parse("union[int,country]")
+        assert isinstance(t, UnionType)
+        assert t.validate_convert("42") == 42
+        assert t.validate_convert("France") == "France"
+
+    def test_parse_empty_union_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("union[]")
+
+    def test_parse_union_of_unions_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("union[union[int,str],float]")
+
+    def test_parse_union_with_list_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("union[list[int],str]")
+
+    def test_parse_union_with_bbox_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("union[bbox,str]")
+
+    def test_parse_list_of_union_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("list[union[int,str]]")
