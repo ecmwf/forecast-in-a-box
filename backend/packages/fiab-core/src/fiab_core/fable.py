@@ -42,7 +42,10 @@ class BlockConfigurationOption(FiabCoreBaseModel):
     @model_validator(mode="after")
     def _validate_and_cache_value_type(self) -> Self:
         try:
-            self._value_type = FableType.parse(self.value_type)
+            parsed, remainder = FableType.parse(self.value_type)
+            if remainder.strip():
+                raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
+            self._value_type = parsed
         except NotFableType as exc:
             raise ValueError(str(exc)) from exc
         return self

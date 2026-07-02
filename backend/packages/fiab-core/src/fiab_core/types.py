@@ -12,8 +12,11 @@ FableType: Type system for Forecast As BLock Expression (Fable) configuration va
 
 Provides parsing, validation, and conversion for a small set of type expressions:
 - str, int, float, date, datetime (atomic types)
+- country (string subtype)
 - enumClosed[...], enumOpen[...] (enumeration types)
 - list[FableType] (container types)
+- bbox (bounding box: exactly four integers)
+- union[FableType, ...] (union types)
 """
 
 from abc import ABC, abstractmethod
@@ -50,55 +53,103 @@ class FableType(ABC):
         """Serialize this type to a string expression that can be parsed back via FableType.parse()."""
 
     @staticmethod
-    def parse(type_expr: str) -> "FableType":
-        """Parse a type expression string into a FableType instance.
+    def parse(type_expr: str) -> "tuple[FableType, str]":
+        """Parse a type expression from the start of type_expr.
+
+        Returns ``(parsed_type, remainder)`` where ``remainder`` is the unparsed
+        tail of the input string. At the outer call site, verify that the
+        remainder is empty (or whitespace-only) to ensure the full expression
+        was consumed.
 
         Supports:
-        - Atomic types: 'str', 'int', 'float', 'date', 'datetime'
+        - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'country', 'bbox'
         - Enumerations: 'enumClosed[item1,item2]', 'enumOpen[item1,item2]'
         - Lists: 'list[int]', 'list[enumClosed[...]]', etc.
+        - Union: 'union[int,str]', 'union[enumClosed[a,b],date]', etc.
 
-        Raises NotFableType if the type expression is invalid.
+        Raises NotFableType if the expression cannot be parsed.
         """
-        type_expr = type_expr.strip()
+        type_expr = type_expr.lstrip()
 
-        if type_expr == "str":
-            return StringType()
-        if type_expr == "int":
-            return IntType()
-        if type_expr == "float":
-            return FloatType()
-        if type_expr == "date":
-            return DateType()
-        if type_expr == "datetime":
-            return DatetimeType()
+        # Atomic types: "datetime" must precede "date" to avoid prefix ambiguity.
+        _ATOMIC = [
+            ("datetime", DatetimeType),
+            ("date", DateType),
+            ("float", FloatType),
+            ("int", IntType),
+            ("str", StringType),
+            ("country", CountryType),
+            ("bbox", BoundingBoxType),
+        ]
+        for name, factory in _ATOMIC:
+            n = len(name)
+            if type_expr.startswith(name):
+                return (factory(), type_expr[n:])
 
-        if type_expr.startswith("enumClosed[") and type_expr.endswith("]"):
-            items_str = type_expr[11:-1]
-            items = [_normalize_enum_item(item) for item in items_str.split(",") if item.strip()]
-            if not items:
-                raise NotFableType("enumClosed must contain at least one item")
-            return ClosedEnumType(items)
+        # Enum types (enumClosed and enumOpen share identical logic)
+        _ENUMS = {"enumClosed": ClosedEnumType, "enumOpen": OpenEnumType}
+        for prefix, factory in _ENUMS.items():
+            if type_expr.startswith(prefix):
+                _, inner, remainder = _split_by_brackets(type_expr)
+                items = [_normalize_enum_item(item) for item in inner.split(",") if item.strip()]
+                if not items:
+                    raise NotFableType(f"{prefix} must contain at least one item")
+                return (factory(items), remainder)
 
-        if type_expr.startswith("enumOpen[") and type_expr.endswith("]"):
-            items_str = type_expr[9:-1]
-            items = [_normalize_enum_item(item) for item in items_str.split(",") if item.strip()]
-            if not items:
-                raise NotFableType("enumOpen must contain at least one item")
-            return OpenEnumType(items)
+        # list[...]
+        if type_expr.startswith("list["):
+            _, inner, remainder = _split_by_brackets(type_expr)
+            inner_type, inner_remainder = FableType.parse(inner)
+            if inner_remainder.strip():
+                raise NotFableType(f"Unexpected content after inner type in list: {inner_remainder!r}")
+            return (ListType(inner_type), remainder)
 
-        if type_expr.startswith("list[") and type_expr.endswith("]"):
-            inner_type_expr = type_expr[5:-1]
-            inner_type = FableType.parse(inner_type_expr)
-            if isinstance(inner_type, ListType):
-                raise NotFableType("Nested lists are not supported")
-            return ListType(inner_type)
+        # union[...]
+        if type_expr.startswith("union["):
+            _, inner, remainder = _split_by_brackets(type_expr)
+            member_types: list[FableType] = []
+            remaining = inner
+            first = True
+            while remaining:
+                if not first:
+                    if not remaining.startswith(","):
+                        raise NotFableType(f"Expected ',' between union member types, got {remaining!r}")
+                    remaining = remaining[1:].lstrip()
+                first = False
+                t, remaining = FableType.parse(remaining)
+                remaining = remaining.lstrip()
+                member_types.append(t)
+            if not member_types:
+                raise NotFableType("union must contain at least one type")
+            return (UnionType(member_types), remainder)
 
         raise NotFableType(
             f"Invalid type expression: {type_expr!r}. "
-            "Expected one of: str, int, float, date, datetime, "
-            "enumClosed[...], enumOpen[...], list[...]"
+            "Expected one of: str, int, float, date, datetime, country, bbox, "
+            "enumClosed[...], enumOpen[...], list[...], union[...]"
         )
+
+
+def _split_by_brackets(s: str) -> tuple[str, str, str]:
+    """Split 'prefix[inner]remainder' into (prefix, inner, remainder).
+
+    The inner content is stripped of leading/trailing whitespace.
+    Raises NotFableType if no '[' is found or if the brackets are unmatched.
+    """
+    open_pos = s.find("[")
+    if open_pos == -1:
+        raise NotFableType(f"Expected '[' in expression: {s!r}")
+    prefix = s[:open_pos]
+    depth = 0
+    for i in range(open_pos, len(s)):
+        ch = s[i]
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return (prefix, s[open_pos + 1 : i].strip(), s[i + 1 :])
+    raise NotFableType(f"Unmatched '[' in {prefix!r} expression")
 
 
 def _normalize_enum_item(item: str) -> str:
@@ -241,6 +292,9 @@ class ListType(FableType):
         if not value:
             return []
 
+        # TODO this is fundamentally limiting to not containing ,-based types, like list[list[int]] or list[bbox]
+        # We should change to a proper parser here that understands the inner type and consumes with remainder,
+        # similarly to how type parsing for union works
         items = [item.strip() for item in value.split(",")]
         result = []
         for i, item in enumerate(items):
@@ -253,3 +307,46 @@ class ListType(FableType):
 
     def serialize(self) -> str:
         return f"list[{self.item_type.serialize()}]"
+
+
+class BoundingBoxType(ListType):
+    """Bounding box type. A list of exactly four integers: [west, south, east, north]."""
+
+    def __init__(self) -> None:
+        super().__init__(IntType())
+
+    def validate_convert(self, value: Any) -> list[int]:
+        result = super().validate_convert(value)
+        if len(result) != 4:
+            raise WrongType(f"BoundingBox must have exactly 4 elements, got {len(result)}")
+        return result
+
+    def serialize(self) -> str:
+        return "bbox"
+
+
+class CountryType(StringType):
+    """Country type. A string representing a country (detailed validation to be added later)."""
+
+    def serialize(self) -> str:
+        return "country"
+
+
+class UnionType(FableType):
+    """Union type. Tries each member type in order and returns the first successful conversion."""
+
+    def __init__(self, types: list[FableType]) -> None:
+        self.types = types
+
+    def validate_convert(self, value: Any) -> Any:
+        if not isinstance(value, str):
+            raise NotStringInput(f"Expected string, got {type(value).__name__}")
+        for t in self.types:
+            try:
+                return t.validate_convert(value)
+            except WrongType:
+                continue
+        raise WrongType(f"Cannot convert {value!r} to any of: {', '.join(t.serialize() for t in self.types)}")
+
+    def serialize(self) -> str:
+        return f"union[{','.join(t.serialize() for t in self.types)}]"

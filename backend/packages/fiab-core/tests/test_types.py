@@ -14,7 +14,9 @@ from datetime import date, datetime
 import pytest
 
 from fiab_core.types import (
+    BoundingBoxType,
     ClosedEnumType,
+    CountryType,
     DatetimeType,
     DateType,
     FableType,
@@ -25,8 +27,16 @@ from fiab_core.types import (
     NotStringInput,
     OpenEnumType,
     StringType,
+    UnionType,
     WrongType,
 )
+
+
+def _parse(expr: str) -> FableType:
+    """Parse a complete type expression, asserting there is no non-whitespace remainder."""
+    t, remainder = FableType.parse(expr)
+    assert not remainder.strip(), f"Expected empty remainder for {expr!r}, got {remainder!r}"
+    return t
 
 
 class TestStringType:
@@ -251,54 +261,58 @@ class TestFableTypeParse:
     """Tests for FableType.parse"""
 
     def test_parse_atomic_types(self) -> None:
-        assert isinstance(FableType.parse("str"), StringType)
-        assert isinstance(FableType.parse("int"), IntType)
-        assert isinstance(FableType.parse("float"), FloatType)
-        assert isinstance(FableType.parse("date"), DateType)
-        assert isinstance(FableType.parse("datetime"), DatetimeType)
+        assert isinstance(_parse("str"), StringType)
+        assert isinstance(_parse("int"), IntType)
+        assert isinstance(_parse("float"), FloatType)
+        assert isinstance(_parse("date"), DateType)
+        assert isinstance(_parse("datetime"), DatetimeType)
 
     def test_parse_whitespace_handling(self) -> None:
-        assert isinstance(FableType.parse("  str  "), StringType)
-        assert isinstance(FableType.parse(" int "), IntType)
+        assert isinstance(_parse("  str  "), StringType)
+        assert isinstance(_parse(" int "), IntType)
 
     def test_parse_closed_enum(self) -> None:
-        t = FableType.parse("enumClosed[option1,option2,option3]")
+        t = _parse("enumClosed[option1,option2,option3]")
         assert isinstance(t, ClosedEnumType)
         assert t.validate_convert("option1") == "option1"
         with pytest.raises(WrongType):
             t.validate_convert("invalid")
 
     def test_parse_open_enum(self) -> None:
-        t = FableType.parse("enumOpen[option1,option2]")
+        t = _parse("enumOpen[option1,option2]")
         assert isinstance(t, OpenEnumType)
         assert t.validate_convert("any_value") == "any_value"
 
     def test_parse_list_of_int(self) -> None:
-        t = FableType.parse("list[int]")
+        t = _parse("list[int]")
         assert isinstance(t, ListType)
         assert t.validate_convert("1,2,3") == [1, 2, 3]
 
     def test_parse_list_of_string(self) -> None:
-        t = FableType.parse("list[str]")
+        t = _parse("list[str]")
         assert isinstance(t, ListType)
         assert t.validate_convert("a,b,c") == ["a", "b", "c"]
 
     def test_parse_list_of_enum(self) -> None:
-        t = FableType.parse("list[enumClosed[a,b]]")
+        t = _parse("list[enumClosed[a,b]]")
         assert isinstance(t, ListType)
         assert isinstance(t.item_type, ClosedEnumType)
         assert t.validate_convert("a,b,a") == ["a", "b", "a"]
         assert t.serialize() == "list[enumClosed[a,b]]"
 
-    def test_parse_nested_lists_raises_error(self) -> None:
-        with pytest.raises(NotFableType):
-            FableType.parse("list[list[int]]")
+    def test_parse_nested_list_now_supported(self) -> None:
+        t = _parse("list[list[int]]")
+        assert isinstance(t, ListType)
+        assert isinstance(t.item_type, ListType)
+        # outer comma-split means each inner list gets one element
+        assert t.validate_convert("1,2,3") == [[1], [2], [3]]
 
     def test_parse_invalid_type_raises_error(self) -> None:
         with pytest.raises(NotFableType):
             FableType.parse("invalid_type")
-        with pytest.raises(NotFableType):
-            FableType.parse("string")
+        # "string" parses as str with "ing" as remainder; the outer callsite rejects it
+        _, remainder = FableType.parse("string")
+        assert remainder == "ing"
 
     def test_parse_empty_enum_raises_error(self) -> None:
         with pytest.raises(NotFableType):
@@ -307,16 +321,16 @@ class TestFableTypeParse:
             FableType.parse("enumOpen[]")
 
     def test_parse_list_with_whitespace(self) -> None:
-        t = FableType.parse("list[ int ]")
+        t = _parse("list[ int ]")
         assert isinstance(t, ListType)
 
     def test_parse_enum_with_whitespace(self) -> None:
-        t = FableType.parse("enumClosed[ a , b , c ]")
+        t = _parse("enumClosed[ a , b , c ]")
         assert isinstance(t, ClosedEnumType)
         assert t.validate_convert("a") == "a"
 
     def test_parse_enum_with_quoted_items(self) -> None:
-        t = FableType.parse("enumClosed['a', 'b', 'c']")
+        t = _parse("enumClosed['a', 'b', 'c']")
         assert isinstance(t, ClosedEnumType)
         assert t.validate_convert("b") == "b"
 
@@ -338,15 +352,248 @@ class TestValidateConvertIntegration:
         ]
 
         for type_expr, input_val, expected in cases:
-            fable_type = FableType.parse(type_expr)
+            fable_type = _parse(type_expr)
             result = fable_type.validate_convert(input_val)
             assert result == expected, f"Failed for {type_expr}"
 
     def test_error_propagation(self) -> None:
         """Test that type errors and value errors propagate correctly"""
-        t = FableType.parse("list[int]")
+        t = _parse("list[int]")
         with pytest.raises(WrongType):
             t.validate_convert("1,not_int,3")
 
         with pytest.raises(NotStringInput):
             t.validate_convert(123)
+
+
+class TestCountryType:
+    """Tests for CountryType"""
+
+    def test_convert_valid_string(self) -> None:
+        t = CountryType()
+        assert t.validate_convert("France") == "France"
+        assert t.validate_convert("GB") == "GB"
+        assert t.validate_convert("") == ""
+
+    def test_convert_non_string_raises_type_error(self) -> None:
+        t = CountryType()
+        with pytest.raises(NotStringInput):
+            t.validate_convert(123)
+        with pytest.raises(NotStringInput):
+            t.validate_convert(None)
+
+    def test_serialize(self) -> None:
+        assert CountryType().serialize() == "country"
+
+    def test_parse_and_round_trip(self) -> None:
+        t = _parse("country")
+        assert isinstance(t, CountryType)
+        assert t.validate_convert("Germany") == "Germany"
+        assert t.serialize() == "country"
+
+
+class TestBoundingBoxType:
+    """Tests for BoundingBoxType"""
+
+    def test_convert_valid_bbox(self) -> None:
+        t = BoundingBoxType()
+        assert t.validate_convert("-10,40,30,70") == [-10, 40, 30, 70]
+        assert t.validate_convert("0,0,0,0") == [0, 0, 0, 0]
+
+    def test_convert_wrong_element_count_raises_error(self) -> None:
+        t = BoundingBoxType()
+        with pytest.raises(WrongType):
+            t.validate_convert("1,2,3")
+        with pytest.raises(WrongType):
+            t.validate_convert("1,2,3,4,5")
+        with pytest.raises(WrongType):
+            t.validate_convert("")
+
+    def test_convert_non_integer_elements_raises_error(self) -> None:
+        t = BoundingBoxType()
+        with pytest.raises(WrongType):
+            t.validate_convert("1.5,2,3,4")
+        with pytest.raises(WrongType):
+            t.validate_convert("a,b,c,d")
+
+    def test_convert_non_string_raises_type_error(self) -> None:
+        t = BoundingBoxType()
+        with pytest.raises(NotStringInput):
+            t.validate_convert([1, 2, 3, 4])
+        with pytest.raises(NotStringInput):
+            t.validate_convert(None)
+
+    def test_serialize(self) -> None:
+        assert BoundingBoxType().serialize() == "bbox"
+
+    def test_parse_and_round_trip(self) -> None:
+        t = _parse("bbox")
+        assert isinstance(t, BoundingBoxType)
+        assert t.validate_convert("10,20,30,40") == [10, 20, 30, 40]
+        assert t.serialize() == "bbox"
+
+    def test_list_of_bbox_now_supported(self) -> None:
+        t = _parse("list[bbox]")
+        assert isinstance(t, ListType)
+        assert isinstance(t.item_type, BoundingBoxType)
+        # list[bbox] always fails at validate_convert: outer comma-split leaves
+        # single-element slots that cannot satisfy bbox's 4-element requirement
+        with pytest.raises(WrongType):
+            t.validate_convert("1,2,3,4")
+
+
+class TestUnionType:
+    """Tests for UnionType"""
+
+    def test_convert_greedy_first_match(self) -> None:
+        t = UnionType([IntType(), FloatType()])
+        assert t.validate_convert("42") == 42
+        assert isinstance(t.validate_convert("42"), int)
+
+    def test_convert_falls_through_to_second_type(self) -> None:
+        t = UnionType([IntType(), FloatType()])
+        assert t.validate_convert("3.14") == 3.14
+
+    def test_convert_all_fail_raises_error(self) -> None:
+        t = UnionType([IntType(), FloatType()])
+        with pytest.raises(WrongType):
+            t.validate_convert("not_a_number")
+
+    def test_convert_non_string_raises_type_error(self) -> None:
+        t = UnionType([IntType(), StringType()])
+        with pytest.raises(NotStringInput):
+            t.validate_convert(42)
+        with pytest.raises(NotStringInput):
+            t.validate_convert(None)
+
+    def test_serialize(self) -> None:
+        t = UnionType([IntType(), StringType()])
+        assert t.serialize() == "union[int,str]"
+
+    def test_serialize_multi_type(self) -> None:
+        t = UnionType([IntType(), FloatType(), DateType()])
+        assert t.serialize() == "union[int,float,date]"
+
+    def test_parse_and_round_trip(self) -> None:
+        t = _parse("union[int,str]")
+        assert isinstance(t, UnionType)
+        assert len(t.types) == 2
+        assert isinstance(t.types[0], IntType)
+        assert isinstance(t.types[1], StringType)
+        assert t.serialize() == "union[int,str]"
+
+    def test_parse_union_with_date_and_datetime(self) -> None:
+        t = _parse("union[date,datetime]")
+        assert isinstance(t, UnionType)
+        assert t.validate_convert("2026-05-08T10:30:45") == datetime(2026, 5, 8, 10, 30, 45)
+
+    def test_parse_union_with_country(self) -> None:
+        t = _parse("union[int,country]")
+        assert isinstance(t, UnionType)
+        assert t.validate_convert("42") == 42
+        assert t.validate_convert("France") == "France"
+
+    def test_parse_empty_union_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("union[]")
+
+    def test_parse_union_of_unions_now_supported(self) -> None:
+        t = _parse("union[union[int,str],float]")
+        assert isinstance(t, UnionType)
+        assert isinstance(t.types[0], UnionType)
+        assert isinstance(t.types[1], FloatType)
+        assert t.validate_convert("42") == 42
+
+    def test_parse_union_with_list_now_supported(self) -> None:
+        t = _parse("union[list[int],str]")
+        assert isinstance(t, UnionType)
+        assert isinstance(t.types[0], ListType)
+        assert t.validate_convert("1,2,3") == [1, 2, 3]
+        assert t.validate_convert("hello") == "hello"
+
+    def test_parse_union_with_bbox_now_supported(self) -> None:
+        t = _parse("union[bbox,str]")
+        assert isinstance(t, UnionType)
+        assert isinstance(t.types[0], BoundingBoxType)
+        assert t.validate_convert("1,2,3,4") == [1, 2, 3, 4]
+        assert t.validate_convert("hello") == "hello"
+
+    def test_parse_list_of_union_now_supported(self) -> None:
+        t = _parse("list[union[int,str]]")
+        assert isinstance(t, ListType)
+        assert isinstance(t.item_type, UnionType)
+        assert t.validate_convert("42,hello,3") == [42, "hello", 3]
+
+    def test_parse_union_of_lists(self) -> None:
+        t = _parse("union[list[int],list[float]]")
+        assert isinstance(t, UnionType)
+        assert t.validate_convert("1,2,3") == [1, 2, 3]
+        assert t.validate_convert("1.5,2.5") == [1.5, 2.5]
+
+    def test_parse_union_with_enum(self) -> None:
+        t = _parse("union[enumClosed[a,b],str]")
+        assert isinstance(t, UnionType)
+        assert isinstance(t.types[0], ClosedEnumType)
+        assert t.validate_convert("a") == "a"
+        assert t.validate_convert("anything") == "anything"
+
+    def test_parse_union_with_whitespace(self) -> None:
+        t = _parse("union[ int , str ]")
+        assert isinstance(t, UnionType)
+        assert isinstance(t.types[0], IntType)
+        assert isinstance(t.types[1], StringType)
+
+
+class TestFableTypeParseRemainder:
+    """Tests for the remainder returned by FableType.parse"""
+
+    def test_atomic_type_returns_remainder(self) -> None:
+        t, remainder = FableType.parse("int,str")
+        assert isinstance(t, IntType)
+        assert remainder == ",str"
+
+    def test_list_type_returns_remainder(self) -> None:
+        t, remainder = FableType.parse("list[int],more")
+        assert isinstance(t, ListType)
+        assert remainder == ",more"
+
+    def test_enum_type_returns_remainder(self) -> None:
+        t, remainder = FableType.parse("enumClosed[a,b],extra")
+        assert isinstance(t, ClosedEnumType)
+        assert remainder == ",extra"
+
+    def test_union_type_returns_remainder(self) -> None:
+        t, remainder = FableType.parse("union[int,str],extra")
+        assert isinstance(t, UnionType)
+        assert remainder == ",extra"
+
+    def test_nested_brackets_in_list_parsed_correctly(self) -> None:
+        t, remainder = FableType.parse("list[enumClosed[a,b]]suffix")
+        assert isinstance(t, ListType)
+        assert isinstance(t.item_type, ClosedEnumType)
+        assert remainder == "suffix"
+
+    def test_unmatched_bracket_in_list_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("list[int")
+
+    def test_unmatched_bracket_in_union_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("union[int,str")
+
+    def test_unmatched_bracket_in_enum_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("enumClosed[a,b")
+
+    def test_union_with_enum_member(self) -> None:
+        t, remainder = FableType.parse("union[enumClosed[x,y],int]")
+        assert isinstance(t, UnionType)
+        assert remainder == ""
+        assert isinstance(t.types[0], ClosedEnumType)
+        assert isinstance(t.types[1], IntType)
+        assert t.validate_convert("x") == "x"
+        assert t.validate_convert("42") == 42
+
+    def test_extra_content_in_list_raises_error(self) -> None:
+        with pytest.raises(NotFableType):
+            FableType.parse("list[int garbage]")
