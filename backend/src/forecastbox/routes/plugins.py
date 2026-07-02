@@ -18,7 +18,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
-from fiab_core.fable import PluginCompositeId
+from fiab_core.fable import BlockInstanceId, ConfigurationOptionId, PluginCompositeId
 from packaging.version import InvalidVersion, Version
 
 from forecastbox.domain.auth.users import UserRead
@@ -237,7 +237,7 @@ async def update_plugin_settings_endpoint(
 
 
 class TemplateExampleValuesResponse(FiabBaseModel):
-    example_values: dict[str, dict[str, str]]
+    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
     """Per-block example configuration values, keyed by block instance id then option id."""
     example_glyphs: dict[str, str]
     """Example glyph name-to-value pairs the user is expected to override."""
@@ -268,11 +268,13 @@ async def get_template_example_values(
 
     plugin_id_str = PluginCompositeId.to_str(pluginCompositeId)
     plugin_state = await get_plugin_state(plugin_id_str)
-    excluded_set: set[str] = set(plugin_state.excluded_templates) if plugin_state and plugin_state.excluded_templates else set()  # type: ignore[arg-type]
+    if plugin_state is None:
+        raise HTTPException(status_code=404, detail=f"Plugin {PluginCompositeId.to_str(pluginCompositeId)!r} not installed")
+    excluded_set: set[str] = set(plugin_state.excluded_templates) if plugin_state.excluded_templates else set()  # type: ignore[arg-type]
     if displayName in excluded_set:
         raise HTTPException(status_code=403, detail=f"Template {displayName!r} is excluded")
 
-    glyph_remapping: dict[str, str] = dict(plugin_state.glyph_remapping) if plugin_state and plugin_state.glyph_remapping else {}  # type: ignore[no-matching-overload]
+    glyph_remapping: dict[str, str] = dict(plugin_state.glyph_remapping) if plugin_state.glyph_remapping else {}  # type: ignore[no-matching-overload]
 
     remapped_example_values: dict[str, dict[str, str]] = {
         block_id: {opt_id: remap_glyph_names(val, glyph_remapping) for opt_id, val in opts.items()}
@@ -283,6 +285,6 @@ async def get_template_example_values(
     }
 
     return TemplateExampleValuesResponse(
-        example_values=remapped_example_values,
+        example_values=remapped_example_values,  # ty:ignore[invalid-argument-type]
         example_glyphs=remapped_example_glyphs,
     )
