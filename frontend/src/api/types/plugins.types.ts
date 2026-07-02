@@ -127,6 +127,12 @@ export const PluginRemoteInfoSchema = z.object({
 
 export type PluginRemoteInfo = z.infer<typeof PluginRemoteInfoSchema>
 
+const PluginErrorSchema = z.object({
+  source: z.string(),
+  detail: z.string(),
+  severity: z.string(),
+})
+
 /**
  * Plugin detail - full plugin information from backend
  */
@@ -134,7 +140,10 @@ export const PluginDetailSchema = z.object({
   status: z.enum(pluginStatusValues),
   store_info: PluginStoreEntrySchema.nullable(),
   remote_info: PluginRemoteInfoSchema.nullable(),
-  errored_detail: z.string().nullable(),
+  errored_detail: z
+    .array(PluginErrorSchema)
+    .transform((errors) => errors.map((e) => e.detail).join('\n') || null)
+    .nullable(),
   loaded_version: z.string().nullable(),
   update_datetime: z.string().nullable(), // UTC ISO with offset, e.g. "...+00:00"
 })
@@ -155,7 +164,12 @@ export type PluginListing = z.infer<typeof PluginListingSchema>
  */
 export const PluginsStatusSchema = z.object({
   updater_status: z.string(),
-  plugin_errors: z.record(z.string(), z.string()),
+  plugin_errors: z.record(
+    z.string(),
+    z
+      .array(PluginErrorSchema)
+      .transform((errors) => errors.map((e) => e.detail).join('\n')),
+  ),
   plugin_versions: z.record(z.string(), z.string()),
   plugin_updatedatetime: z.record(z.string(), z.string()),
 })

@@ -14,7 +14,6 @@ import { worker } from '@tests/../mocks/browser'
 import type {
   PluginCompositeId,
   PluginListing,
-  PluginsStatus,
 } from '@/api/types/plugins.types'
 import {
   getPluginDetails,
@@ -51,11 +50,16 @@ describe('getPluginStatus', () => {
   })
 
   it('fetches plugin status successfully', async () => {
-    const mockResponse: PluginsStatus = {
+    const mockResponse = {
       updater_status: 'idle',
       plugin_errors: {
-        [createPluginKey('ecmwf', 'legacy-viz')]:
-          'Failed to load: incompatible version',
+        [createPluginKey('ecmwf', 'legacy-viz')]: [
+          {
+            source: 'load',
+            detail: 'Failed to load: incompatible version',
+            severity: 'error',
+          },
+        ],
       },
       plugin_versions: {
         [createPluginKey('ecmwf', 'anemoi-inference')]: '1.0.0',

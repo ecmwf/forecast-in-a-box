@@ -211,7 +211,7 @@ class PluginState(Base):
     plugin_id = Column(String(255), primary_key=True, nullable=False)
     plugin_version = Column(String(255), nullable=False)
     updated_at = Column(UTCDateTime, nullable=False)
-    install_error = Column(String(4096), nullable=False, default="")
+    plugin_errors = Column(JSON, nullable=False, default=list)
     excluded_templates = Column(JSON, nullable=False, default=list)
     glyph_remapping = Column(JSON, nullable=False, default=dict)
     template_errors = Column(JSON, nullable=False, default=dict)

@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 import forecastbox.domain.plugin.db as plugin_db
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.plugin.errors import PluginError
 from forecastbox.schemata.jobs import Base
 
 
@@ -45,7 +46,7 @@ async def test_upsert_creates_row_with_defaults(mem_session_maker: async_session
     assert state is not None
     assert state.plugin_id == "localTest:single"
     assert state.plugin_version == "1.2.3"
-    assert state.install_error == ""
+    assert state.plugin_errors == []
     assert state.excluded_templates == []
     assert state.glyph_remapping == {}
     assert state.template_errors == {}
@@ -56,7 +57,7 @@ async def test_upsert_creates_row_with_defaults(mem_session_maker: async_session
 
 @pytest.mark.asyncio
 async def test_upsert_updates_version_without_clobbering(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    """Second upsert updates plugin_version/install_error but does not clobber excluded_templates / glyph_remapping."""
+    """Second upsert updates plugin_version/plugin_errors but does not clobber excluded_templates / glyph_remapping."""
     await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.1.0", enabled=True)
 
     # Simulate writes by later subsystems directly to DB
@@ -71,12 +72,12 @@ async def test_upsert_updates_version_without_clobbering(mem_session_maker: asyn
         await session.commit()
 
     # Re-install (update) -- new version triggers asset_ingest_needed=True
-    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.2.0", install_error="")
+    await plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.2.0", plugin_errors=[])
 
     state = await plugin_db.get_plugin_state("myStore:myPlugin")
     assert state is not None
     assert state.plugin_version == "0.2.0"
-    assert state.install_error == ""
+    assert state.plugin_errors == []
     # excluded_templates / glyph_remapping must NOT be reset
     assert state.excluded_templates == ["tplA"]
     assert state.glyph_remapping == {"old": "new"}
@@ -119,38 +120,45 @@ async def test_upsert_none_version_on_missing_row_raises(mem_session_maker: asyn
 
 
 @pytest.mark.asyncio
-async def test_upsert_persists_install_error(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    """An install failure writes the error string and records the attempt."""
-    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="unknown", enabled=True, install_error="pip failed: some reason")
+async def test_upsert_persists_plugin_errors(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """An install failure writes structured errors and records the attempt."""
+    install_err = PluginError(source="install", severity="error", detail="pip failed: some reason")
+    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="unknown", enabled=True, plugin_errors=[install_err])
 
     state = await plugin_db.get_plugin_state("bad:plugin")
     assert state is not None
-    assert state.install_error == "pip failed: some reason"
+    assert state.plugin_errors == [install_err.model_dump()]
     assert state.plugin_version == "unknown"
     assert state.updated_at is not None
 
 
 @pytest.mark.asyncio
-async def test_upsert_clears_install_error_with_empty_string(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
-    """Passing install_error='' clears a previously stored error; passing None leaves it untouched."""
-    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="0.1.0", install_error="old error")
-    # None should not touch the error
+async def test_upsert_clears_plugin_errors_with_empty_list(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
+    """Passing plugin_errors=[] clears previously stored errors; passing None leaves them untouched."""
+    old_err = PluginError(source="install", severity="error", detail="old error")
+    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="0.1.0", plugin_errors=[old_err])
+    # None should not touch the errors
     await plugin_db.upsert_plugin_state(plugin_id="bad:plugin")
     state = await plugin_db.get_plugin_state("bad:plugin")
     assert state is not None
-    assert state.install_error == "old error"
-    # "" should clear it
-    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", install_error="")
+    assert state.plugin_errors == [old_err.model_dump()]
+    # [] should clear them
+    await plugin_db.upsert_plugin_state(plugin_id="bad:plugin", plugin_errors=[])
     state = await plugin_db.get_plugin_state("bad:plugin")
     assert state is not None
-    assert state.install_error == ""
+    assert state.plugin_errors == []
 
 
 @pytest.mark.asyncio
 async def test_get_all_plugin_states(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """get_all_plugin_states returns all persisted rows."""
     await plugin_db.upsert_plugin_state(plugin_id="storeA:p1", version="1.0", enabled=True)
-    await plugin_db.upsert_plugin_state(plugin_id="storeA:p2", version="unknown", enabled=True, install_error="err")
+    await plugin_db.upsert_plugin_state(
+        plugin_id="storeA:p2",
+        version="unknown",
+        enabled=True,
+        plugin_errors=[PluginError(source="install", severity="error", detail="err")],
+    )
 
     states = await plugin_db.get_all_plugin_states()
     ids = {s.plugin_id for s in states}

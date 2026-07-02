@@ -380,9 +380,10 @@ def test_plugin_template_validation_failure(backend_client_with_auth: httpx.Clie
     # PluginsStatus dict keys for PluginCompositeId are serialized via str(plugin_id).
     plugin_id_key = str(testPluginId)
     plugin_errors = status.get("plugin_errors", {})
-    plugin_error_str = plugin_errors.get(plugin_id_key, "")
-    assert "testFailValidation" in plugin_error_str, (
-        f"Expected 'testFailValidation' in plugin_errors[{plugin_id_key!r}], got: {plugin_error_str!r}"
+    plugin_error_entries = plugin_errors.get(plugin_id_key, [])
+    details = " ".join(e.get("detail", "") for e in plugin_error_entries)
+    assert "testFailValidation" in details, (
+        f"Expected 'testFailValidation' in plugin_errors[{plugin_id_key!r}], got: {plugin_error_entries!r}"
     )
 
 
