@@ -4,24 +4,28 @@
 # This software is licensed under the terms of the Apache Licence Version 2.0
 # which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
 
-"""Generate the static country assets for the geodomain picker.
+"""Generate the static data assets for the geodomain picker.
 
-Writes both ``countries.json`` (the searchable list, grouped by continent) and
-``countries.geo.json`` (simplified polygons for the map) from one pass over the same records,
-so the two committed assets can never disagree on the name set.
+Writes three files from the catalogues of the installed earthkit-plots, so the picker can
+never offer a name the backend resolves differently (or not at all):
+
+- ``preset-domains.json`` -- the named domains from earthkit-plots' built-in catalogue
+  (``data/geo/domains.yml``), in shipped order.
+- ``countries.json`` -- the searchable country list, grouped by continent.
+- ``countries.geo.json`` -- simplified country polygons for the map.
 
 Run once (this is NOT part of the build) with a Python that has cartopy + earthkit-plots
 installed, e.g. the backend venv::
 
-    backend/.venv/bin/python frontend/scripts/gen-countries.py
+    backend/.venv/bin/python frontend/scripts/gen-geodomain-data.py
 
-Names come from Natural Earth 110m ``admin_0_map_units`` ``NAME_LONG`` -- the source
+Country names come from Natural Earth 110m ``admin_0_map_units`` ``NAME_LONG`` -- the source
 earthkit-plots' ``NaturalEarthDomain`` matches first (case insensitively) -- so the polygon
 shown in the picker is the domain the backend resolves (e.g. "France" = metropolitan). Every
-name is additionally probe-resolved through earthkit-plots' ``Domain.from_string``; names it
-cannot resolve are dropped and reported, so the shipped list is resolvable by construction.
-Geometry is simplified and coordinates rounded to keep the asset small; it is lazy-loaded
-inside the (already lazy) map chunk. Only re-run this script to refresh the assets.
+name (preset and country) is probe-resolved through earthkit-plots' ``Domain.from_string``;
+names it cannot resolve are dropped and reported, so the shipped lists are resolvable by
+construction. Geometry is simplified and coordinates rounded to keep the asset small; it is
+lazy-loaded inside the (already lazy) map chunk. Only re-run this script to refresh the assets.
 """
 
 import json
@@ -29,12 +33,16 @@ from collections import Counter
 from pathlib import Path
 
 import cartopy.io.shapereader as shpreader
+import earthkit.plots
+import yaml
 from earthkit.plots.geo.domains import Domain
 from shapely.geometry import mapping
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "src/components/base/fields/data"
+PRESETS_OUT = DATA_DIR / "preset-domains.json"
 LIST_OUT = DATA_DIR / "countries.json"
 GEOJSON_OUT = DATA_DIR / "countries.geo.json"
+DOMAINS_YML = Path(earthkit.plots.__file__).parent / "data/geo/domains.yml"
 # Polar / uninhabited groupings that would each form a one-item continent group.
 DROP_CONTINENTS = {"Antarctica", "Seven seas (open ocean)"}
 SIMPLIFY_TOLERANCE = 0.15  # degrees
@@ -59,9 +67,22 @@ def _resolves(name: str) -> Exception | None:
 
 
 def main() -> None:
+    dropped: list[tuple[str, Exception]] = []
+
+    # Preset domains: catalogue keys in shipped order, display-cased ("southeast Europe" is
+    # lowercase in the yml; resolution is case-insensitive so only the display changes).
+    presets: list[str] = []
+    for raw in yaml.safe_load(DOMAINS_YML.read_text())["domains"]:
+        name = raw[:1].upper() + raw[1:]
+        if (err := _resolves(name)) is not None:
+            dropped.append((name, err))
+            continue
+        presets.append(name)
+    PRESETS_OUT.write_text(json.dumps(presets, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"wrote {len(presets)} preset domains to {PRESETS_OUT}")
+
     shapefile = shpreader.natural_earth(resolution="110m", category="cultural", name="admin_0_map_units")
     seen: set[str] = set()
-    dropped: list[tuple[str, Exception]] = []
     rows: list[dict[str, str]] = []
     features: list[dict] = []
     for record in shpreader.Reader(shapefile).records():
@@ -77,8 +98,6 @@ def main() -> None:
         geometry = mapping(record.geometry.simplify(SIMPLIFY_TOLERANCE, preserve_topology=True))
         geometry = {**geometry, "coordinates": _round_coords(geometry["coordinates"])}
         features.append({"type": "Feature", "properties": {"name_long": name}, "geometry": geometry})
-
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     rows.sort(key=lambda row: (row["continent"], row["name_long"]))
     body = ",\n".join(json.dumps(row, ensure_ascii=False) for row in rows)
