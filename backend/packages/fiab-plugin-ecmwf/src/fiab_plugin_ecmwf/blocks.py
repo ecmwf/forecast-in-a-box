@@ -488,8 +488,8 @@ class MapPlotSink(Sink):
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
-            description="Geographic domain: global, europe, or a named region",
-            value_type="list[str]",
+            description="Area to display: auto (fit the data), global, a named region/country (select several to union), or a drawn bounding box",
+            value_type="geodomain",
             default_value="global",
         ),
         FORMAT: BlockConfigurationOption(

@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 import earthkit.data as ekd
 
+from .geo import parse_geodomain
+
 if TYPE_CHECKING:
     from earthkit.plots import Figure, Subplot  # type: ignore[unresolved-import]
 
@@ -88,7 +90,7 @@ def map_plot(
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
 
-    resolved_domain = None if domain in (["global"], ["Global"], ["DataDefined"]) else domain
+    resolved_domain = parse_geodomain(domain)
 
     if groupby and groupby != "none":
         unique_values = iter_utils.flatten(arg.metadata(groupby) for arg in fields)
