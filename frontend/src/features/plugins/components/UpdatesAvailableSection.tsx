@@ -17,6 +17,7 @@
 import { Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { PluginIcon } from './PluginIcon'
+import { PluginStatusBadge } from './PluginStatusBadge'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
 import { H3, H4, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
@@ -61,6 +62,10 @@ export function UpdatesAvailableSection({
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <H4 className="font-semibold">{plugin.name}</H4>
+                    {/* Non-healthy state belongs next to the update decision */}
+                    {plugin.status !== 'loaded' && (
+                      <PluginStatusBadge status={plugin.status} />
+                    )}
                     <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-sm font-bold text-amber-800 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                       {t('updateBadge', { version: plugin.latestVersion })}
                     </span>

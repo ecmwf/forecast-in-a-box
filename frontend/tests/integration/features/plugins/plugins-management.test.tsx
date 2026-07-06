@@ -126,10 +126,14 @@ function TestPluginsPage() {
       .filter(matchesCapability)
       .filter(matchesSearch)
 
+    // Mirrors plugins.index.tsx: updatable plugins stay in the installed list too
     const withUpdates = filteredPlugins.filter((p) => p.hasUpdate)
-    const installed = filteredPlugins.filter((p) => !p.hasUpdate)
+    const installed = filteredPlugins
 
     installed.sort((a, b) => {
+      if (a.hasUpdate !== b.hasUpdate) {
+        return a.hasUpdate ? -1 : 1
+      }
       if (a.isEnabled !== b.isEnabled) {
         return a.isEnabled ? -1 : 1
       }
@@ -290,8 +294,11 @@ describe('Plugins Management Integration', () => {
 
       // Updates section should show plugins with hasUpdate: true
       // From mock data: "ECMWF Ensemble" has an update available
+      // (it renders in the updates section AND the installed list)
       await expect.element(screen.getByText('Updates Available')).toBeVisible()
-      await expect.element(screen.getByText('ECMWF Ensemble')).toBeVisible()
+      await expect
+        .element(screen.getByText('ECMWF Ensemble').first())
+        .toBeVisible()
     })
 
     it('displays available plugins section', async () => {

@@ -26,8 +26,10 @@
 import { useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
+import { worker } from '@tests/../mocks/browser'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
 import type {
   CapabilityFilter,
@@ -42,6 +44,7 @@ import {
   useUninstallPlugin,
   useUpdatePlugin,
 } from '@/api/hooks/usePlugins'
+import { API_ENDPOINTS } from '@/api/endpoints'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -142,10 +145,14 @@ function TestPluginsPage() {
       )
     }
 
+    // Mirrors plugins.index.tsx: updatable plugins stay in the installed list too
     const withUpdates = filteredPlugins.filter((p) => p.hasUpdate)
-    const installed = filteredPlugins.filter((p) => !p.hasUpdate)
+    const installed = filteredPlugins
 
     installed.sort((a, b) => {
+      if (a.hasUpdate !== b.hasUpdate) {
+        return a.hasUpdate ? -1 : 1
+      }
       if (a.isEnabled !== b.isEnabled) {
         return a.isEnabled ? -1 : 1
       }
@@ -293,8 +300,11 @@ describe('Plugin Updates Integration', () => {
         .element(screen.getByRole('heading', { name: 'Plugin Store' }))
         .toBeVisible()
 
-      // ECMWF Ensemble has loaded_version '2.1.0' but remote_info version '2.4.0'
-      await expect.element(screen.getByText('ECMWF Ensemble')).toBeVisible()
+      // ECMWF Ensemble has loaded_version '2.1.0' but remote_info version '2.4.0';
+      // it renders in the updates section AND the installed list
+      await expect
+        .element(screen.getByText('ECMWF Ensemble').first())
+        .toBeVisible()
     })
 
     it('shows the update count in the section header', async () => {
@@ -366,6 +376,67 @@ describe('Plugin Updates Integration', () => {
     })
   })
 
+  describe('Errored Plugin With Update (dual visibility)', () => {
+    afterEach(() => {
+      worker.resetHandlers()
+    })
+
+    it('shows an errored updatable plugin in both sections with its diagnostics', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.details, () =>
+          HttpResponse.json({
+            plugins: {
+              "store='ecmwf' local='broken-ensemble'": {
+                status: 'errored',
+                store_info: {
+                  pip_source: 'fiab-plugin-broken',
+                  module_name: 'fiab_plugin_broken',
+                  display_title: 'Broken Ensemble',
+                  display_description: 'Errored plugin that has an update',
+                  display_author: 'ECMWF',
+                  comment: '',
+                },
+                remote_info: { version: '2.4.0' },
+                errored_detail: [
+                  {
+                    source: 'load',
+                    detail: 'import failed: incompatible core',
+                    severity: 'error',
+                  },
+                ],
+                loaded_version: '2.1.0',
+                update_datetime: '2026-02-03T00:00:00+00:00',
+              },
+            },
+          }),
+        ),
+      )
+
+      const screen = await renderWithRouter(<TestPluginsPage />)
+
+      await expect
+        .element(screen.getByRole('heading', { name: 'Plugin Store' }))
+        .toBeVisible()
+
+      // In the updates call-to-action section...
+      await expect.element(screen.getByText('Updates Available')).toBeVisible()
+
+      // ...AND counted in the installed list
+      await expect.element(screen.getByText('Total: 1')).toBeVisible()
+      await expect
+        .element(screen.getByText('Broken Ensemble').nth(1))
+        .toBeVisible()
+
+      // Errored status badge in both places (updates row + installed card)
+      await expect.element(screen.getByText('Errored').nth(1)).toBeVisible()
+
+      // Structured diagnostics visible on the installed card
+      await expect
+        .element(screen.getByText('import failed: incompatible core'))
+        .toBeVisible()
+    })
+  })
+
   describe('Filtering Updates', () => {
     it('shows only plugins with updates when hasUpdate filter is selected', async () => {
       const screen = await renderWithRouter(<TestPluginsPage />)
@@ -386,10 +457,12 @@ describe('Plugin Updates Integration', () => {
       await updatesOption.click()
 
       // After filtering, ECMWF Ensemble should still be visible (it has an update)
-      await expect.element(screen.getByText('ECMWF Ensemble')).toBeVisible()
+      await expect
+        .element(screen.getByText('ECMWF Ensemble').first())
+        .toBeVisible()
 
-      // Installed count should show 0 (all plugins with updates are in the updates section, not installed)
-      await expect.element(screen.getByText('Total: 0')).toBeVisible()
+      // Updatable plugins stay in the installed list, so the count includes them
+      await expect.element(screen.getByText('Total: 1')).toBeVisible()
     })
 
     it('filters updates section by search query', async () => {
@@ -405,7 +478,9 @@ describe('Plugin Updates Integration', () => {
       await searchInput.fill('Ensemble')
 
       // ECMWF Ensemble should still be visible
-      await expect.element(screen.getByText('ECMWF Ensemble')).toBeVisible()
+      await expect
+        .element(screen.getByText('ECMWF Ensemble').first())
+        .toBeVisible()
 
       // The updates section should still show
       await expect.element(screen.getByText('Updates Available')).toBeVisible()
@@ -509,7 +584,9 @@ describe('Plugin Updates Integration', () => {
 
       // Verify updates section is visible initially
       await expect.element(screen.getByText('Updates Available')).toBeVisible()
-      await expect.element(screen.getByText('ECMWF Ensemble')).toBeVisible()
+      await expect
+        .element(screen.getByText('ECMWF Ensemble').first())
+        .toBeVisible()
       await expect.element(screen.getByText('Current: v2.1.0')).toBeVisible()
 
       // Click Update Now on the ECMWF Ensemble plugin
