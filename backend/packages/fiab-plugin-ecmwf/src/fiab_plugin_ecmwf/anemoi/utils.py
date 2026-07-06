@@ -77,8 +77,8 @@ class CheckpointArtifact:
     def _open_qube_json(self, qube_json: dict) -> Qube | dict[str, Qube]:
         """Open a qube from a json representation, handling both single qube and multiple qube cases."""
         if not "key" in qube_json:
-            return {key: Qube.from_json(value) for key, value in qube_json.items()}
-        return Qube.from_json(qube_json)
+            return {key: Qube.from_tree_json(value) for key, value in qube_json.items()}
+        return Qube.from_tree_json(qube_json)
 
     def combine_if_nested_qube(self, dataset_qube: dict[str, Qube] | Qube) -> Qube:
         """Combine multiple dataset qubes into a single qube with a dataset dimension, using the dataset name as the coordinate value."""
