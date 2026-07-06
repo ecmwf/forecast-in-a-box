@@ -95,22 +95,22 @@ def compile_builder(
     block_to_mime: dict[BlockInstanceId, str] = {}
     sink_tasks: set[TaskId] = set()
 
-    for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
-        blockInstance = blueprint.blocks[blockId]
-        plugin = plugins.get(blockInstance.factory_id.plugin, None)
+    for blockId in topological_order(blueprint.blocks.items(), lambda block: block.instance.input_ids.values()):
+        routed = blueprint.blocks[blockId]
+        plugin = plugins.get(routed.factory_id.plugin, None)
         if not plugin:
-            raise ValueError(f"plugin for {blockId=} not found: {blockInstance.factory_id.plugin}")
-        block_factory = plugin.catalogue.factories[blockInstance.factory_id.factory]
-        missing_config = sorted(block_factory.configuration_options.keys() - blockInstance.configuration_values.keys())
+            raise ValueError(f"plugin for {blockId=} not found: {routed.factory_id.plugin}")
+        block_factory = plugin.catalogue.factories[routed.factory_id.factory]
+        missing_config = sorted(block_factory.configuration_options.keys() - routed.instance.configuration_values.keys())
         if missing_config:
             raise ValueError(f"compile failed at {blockId=} with missing configuration options: {missing_config}")
-        resolve_configurations(blockInstance, glyph_values)
-        converted_values = convert_known_configuration_values(blockInstance, block_factory)
+        resolve_configurations(routed.instance, glyph_values)
+        converted_values = convert_known_configuration_values(routed.instance, block_factory)
         if converted_values.t is None:
             raise ValueError(f"compile failed at {blockId=} with {converted_values.e}")
-        blockInstance.configuration_values = converted_values.t
+        routed.instance.configuration_values = converted_values.t
         with PayloadBuildingContext(blockId=blockId):
-            result = plugin.compiler(action_lookup, blockInstance)
+            result = plugin.compiler(action_lookup, routed.factory_id.factory, routed.instance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
         action_lookup[blockId] = result.t
@@ -119,10 +119,12 @@ def compile_builder(
         # This wasteful and redundant, ideally we'd return block output in the compile.
         # At this stage the validation should pass, but we still approach it defensively
         validator_inputs = {
-            input_name: block_outputs[source_id] for input_name, source_id in blockInstance.input_ids.items() if source_id in block_outputs
+            input_name: block_outputs[source_id]
+            for input_name, source_id in routed.instance.input_ids.items()
+            if source_id in block_outputs
         }
         try:
-            validated = plugin.validator(blockInstance, validator_inputs).result
+            validated = plugin.validator(routed.factory_id.factory, routed.instance, validator_inputs).result
             if validated.t is None:
                 raise ValueError(f"compile failed at {blockId=} with {validated.e}")
             block_outputs[blockId] = validated.t

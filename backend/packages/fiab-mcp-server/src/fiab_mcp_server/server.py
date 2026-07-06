@@ -105,7 +105,7 @@ class FiabMcpServer:
                             },
                             "block": {
                                 "type": "object",
-                                "description": "BlockInstance with factory_id, configuration_values, and input_ids",
+                                "description": "RoutedBlock with factory_id and instance fields",
                                 "properties": {
                                     "factory_id": {
                                         "type": "object",
@@ -124,18 +124,25 @@ class FiabMcpServer:
                                         },
                                         "required": ["plugin", "factory"],
                                     },
-                                    "configuration_values": {
+                                    "instance": {
                                         "type": "object",
-                                        "description": "Configuration values for the block",
-                                        "additionalProperties": True,
-                                    },
-                                    "input_ids": {
-                                        "type": "object",
-                                        "description": "Input connections mapping input names to block IDs",
-                                        "additionalProperties": {"type": "string"},
+                                        "description": "BlockInstance with configuration_values and input_ids",
+                                        "properties": {
+                                            "configuration_values": {
+                                                "type": "object",
+                                                "description": "Configuration values for the block",
+                                                "additionalProperties": True,
+                                            },
+                                            "input_ids": {
+                                                "type": "object",
+                                                "description": "Input connections mapping input names to block IDs",
+                                                "additionalProperties": {"type": "string"},
+                                            },
+                                        },
+                                        "required": ["configuration_values", "input_ids"],
                                     },
                                 },
-                                "required": ["factory_id", "configuration_values", "input_ids"],
+                                "required": ["factory_id", "instance"],
                             },
                         },
                         "required": ["builder", "block_id", "block"],
@@ -276,13 +283,13 @@ class FiabMcpServer:
 1. First, check the catalogue resource (fable://catalogue) to see available blocks
 2. Start a new builder with fable_start_building
 3. Add an 'exampleSource' as the data source (usually from fiab_plugin_toy)
-   - Use fable_add_block with proper BlockInstance structure (factory_id, configuration_values, input_ids)
+   - Use fable_add_block with proper RoutedBlock structure: factory_id (with plugin and factory) and instance (with configuration_values and input_ids)
 4. Add a 'meanProduct' to calculate the mean of the 2t variable
-   - Connect it to the source using input_ids
+   - Connect it to the source using instance.input_ids
 5. Each add_block call returns validation results showing if the workflow is valid and what blocks can be added next
 6. Save it with fable_save and appropriate tags
 
-Remember: Use the exact server schema - factory_id (with plugin and factory), configuration_values, and input_ids.""",
+Remember: Use the exact server schema - factory_id (with plugin and factory), and instance (with configuration_values and input_ids).""",
                             },
                         }
                     ]

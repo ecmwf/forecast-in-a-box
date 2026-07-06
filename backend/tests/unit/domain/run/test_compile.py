@@ -19,7 +19,7 @@ from fiab_core.fable import (
 from fiab_core.plugin import BlockValidation, Plugin
 from pyrsistent import pmap
 
-from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.blueprint.service import BlueprintBuilder, RoutedBlock
 from forecastbox.domain.glyphs.resolution import merge_glyph_values
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.compile import compile_builder
@@ -137,14 +137,14 @@ def test_compile_builder_fails_missing_config_before_plugin_compile(monkeypatch:
     option_id = ConfigurationOptionId("amount")
     compiler_called = False
 
-    def _compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, str]:  # type:ignore[invalid-type-arguments] # semigroup
+    def _compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, str]:  # type:ignore[invalid-type-arguments] # semigroup
         nonlocal compiler_called
-        del lookup, instance
+        del lookup, factory_id, instance
         compiler_called = True
         return Either.error("should not be called")
 
-    def _validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
-        del instance, inputs
+    def _validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
+        del factory_id, instance, inputs
         return BlockValidation(Either.ok(NoOutput()))
 
     def _expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
@@ -172,10 +172,9 @@ def test_compile_builder_fails_missing_config_before_plugin_compile(monkeypatch:
     monkeypatch.setattr(PluginManager, "plugins", pmap({plugin_id: plugin}))
     blueprint = BlueprintBuilder(
         blocks={
-            BlockInstanceId("source_requires_amount"): BlockInstance(
+            BlockInstanceId("source_requires_amount"): RoutedBlock(
                 factory_id=PluginBlockFactoryId(plugin=plugin_id, factory=factory_id),
-                configuration_values={},
-                input_ids={},
+                instance=BlockInstance(configuration_values={}, input_ids={}),
             )
         }
     )

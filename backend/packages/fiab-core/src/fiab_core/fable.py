@@ -149,14 +149,19 @@ class PluginBlockExpansion(FiabCoreBaseModel):
 
 
 class BlockInstance(FiabCoreBaseModel):
-    """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
+    """Pure block content: configuration values and input wiring. No routing concern."""
 
-    factory_id: PluginBlockFactoryId
-    # TODO separe into two classes with BlockInstanceRequest containing str, to improve the backend codebase typing etc
     configuration_values: dict[ConfigurationOptionId, Any]
-    """Keys come frome factory's `configuration_options`, values are either str-serialized (frontend2backend) or deserialized (backend2plugin)"""
+    """Keys come from factory's `configuration_options`, values are either str-serialized (frontend2backend) or deserialized (backend2plugin)"""
     input_ids: dict[str, BlockInstanceId]
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
+
+
+class LocalBlock(FiabCoreBaseModel):
+    """A block as declared inside a plugin (for BlueprintTemplates): carries only a local factory id."""
+
+    factory_id: BlockFactoryId
+    instance: BlockInstance
 
 
 class QubedOutput(FiabCoreBaseModel):
@@ -199,16 +204,8 @@ class BlueprintTemplate(FiabCoreBaseModel):
 
     display_name: str
     display_description: str
-    blocks: dict[BlockInstanceId, BlockInstance]
+    blocks: dict[BlockInstanceId, LocalBlock]
     environment: BlueprintTemplateEnvironment | None = None
     local_glyphs: dict[str, str] = Field(default_factory=dict)
     example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
     example_glyphs: dict[str, str] = Field(default_factory=dict)
-
-
-SelfPluginId = PluginCompositeId(store=PluginStoreId("__self__"), local=PluginId("__self__"))
-"""Use this when building the blueprint templates shipped by a plugin.
-
-The backend substitutes the real plugin composite ID at install time.
-"""
-# TODO this class shows some awkwardness -- ideally, we'll make the existence of PluginCompositeId completely unknown to the insides of the plugins, at the expense of the backend mutating the classes at the routing time

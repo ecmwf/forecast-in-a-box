@@ -91,7 +91,7 @@ def execute_background(
         # re-expand correctly on restart even if the intermediate dependency (e.g. "root") is no
         # longer in the global DB.
         referenced_glyph_names = {
-            name for block in builder.blocks.values() for name in cast(ExtractedGlyphs, extract_glyphs(block).t).glyphs
+            name for block in builder.blocks.values() for name in cast(ExtractedGlyphs, extract_glyphs(block.instance).t).glyphs
         }
         all_glyphs_raw = merge_glyph_values(
             intrinsic_values,

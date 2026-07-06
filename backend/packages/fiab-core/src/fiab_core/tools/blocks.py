@@ -20,6 +20,7 @@ from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
     BlockFactory,
+    BlockFactoryId,
     BlockInstance,
     BlockInstanceOutput,
     BlockKind,
@@ -40,15 +41,18 @@ T = TypeVar("T")
 
 class BlockInstanceRich(BlockInstance):
     _configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = PrivateAttr(default_factory=dict)
+    _factory_id: BlockFactoryId = PrivateAttr(default=BlockFactoryId(""))
 
     @classmethod
     def from_block(
         cls,
+        factory_id: BlockFactoryId,
         block: BlockInstance,
         configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption],
     ) -> Self:
         rich = cls.model_validate(block.model_dump(mode="python"))
         rich._configuration_options = configuration_options
+        rich._factory_id = factory_id
         return rich
 
     def _get_configuration_option(self, key: str | ConfigurationOptionId) -> tuple[ConfigurationOptionId, BlockConfigurationOption]:
@@ -56,16 +60,14 @@ class BlockInstanceRich(BlockInstance):
         option = self._configuration_options.get(option_id)
         if option is None:
             raise BlockInstanceConfigurationError(
-                f"Configuration option {option_id!r} is not declared for block factory {self.factory_id.factory!r}"
+                f"Configuration option {option_id!r} is not declared for block factory {self._factory_id!r}"
             )
         return option_id, option
 
     def _get_raw_value(self, option_id: ConfigurationOptionId) -> object:
         if option_id in self.configuration_values:
             return self.configuration_values[option_id]
-        raise BlockInstanceConfigurationError(
-            f"Configuration option {option_id!r} is missing for block factory {self.factory_id.factory!r}"
-        )
+        raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} is missing for block factory {self._factory_id!r}")
 
     def config_as_str(self, key: str | ConfigurationOptionId, *, validator: Callable[[str, str], None] | None = None) -> str:
         option_id, option = self._get_configuration_option(key)

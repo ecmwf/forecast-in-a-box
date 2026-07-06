@@ -18,7 +18,7 @@ from fiab_core.fable import (
     BlueprintTemplate,
     BlueprintTemplateEnvironment,
     ConfigurationOptionId,
-    PluginBlockFactoryId,
+    LocalBlock,
     PluginCompositeId,
     PluginId,
     PluginStoreId,
@@ -58,11 +58,10 @@ _BLOCK_ID = BlockInstanceId("b1")
 _TEXT = ConfigurationOptionId("text")
 
 
-def _make_block() -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=_PLUGIN_ID, factory=BlockFactoryId("source_text")),
-        configuration_values={_TEXT: "hello"},
-        input_ids={},
+def _make_block() -> LocalBlock:
+    return LocalBlock(
+        factory_id=BlockFactoryId("source_text"),
+        instance=BlockInstance(configuration_values={_TEXT: "hello"}, input_ids={}),
     )
 
 

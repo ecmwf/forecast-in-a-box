@@ -17,10 +17,6 @@ from fiab_core.fable import (
     BlockFactoryId,
     BlockInstance,
     ConfigurationOptionId,
-    PluginBlockFactoryId,
-    PluginCompositeId,
-    PluginId,
-    PluginStoreId,
     RawOutput,
 )
 
@@ -84,20 +80,20 @@ def test_source_filesize_factory_uses_closed_enum_checkpoint_type() -> None:
 # validator
 # ---------------------------------------------------------------------------
 
-_FAKE_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("s"), local=PluginId("l"))
 
-
-def _make_instance(factory: str, config: dict) -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=_FAKE_PLUGIN_ID, factory=BlockFactoryId(factory)),
-        configuration_values={ConfigurationOptionId(key): value for key, value in config.items()},
-        input_ids={},
+def _make_instance(factory: str, config: dict) -> tuple[BlockFactoryId, BlockInstance]:
+    return (
+        BlockFactoryId(factory),
+        BlockInstance(
+            configuration_values={ConfigurationOptionId(key): value for key, value in config.items()},
+            input_ids={},
+        ),
     )
 
 
 def test_validator_source_filesize_returns_str_raw_output() -> None:
-    instance = _make_instance("source_filesize", {"checkpoint": "mystore:mycheckpoint"})
-    validation = validator(instance, {})
+    factory_id, instance = _make_instance("source_filesize", {"checkpoint": "mystore:mycheckpoint"})
+    validation = validator(factory_id, instance, {})
     result = validation.result
     assert validation.restrictions == {}
     assert result.t is not None
@@ -115,8 +111,8 @@ def test_compiler_source_filesize_embeds_path_and_artifact_in_payload(tmp_path: 
     fake_id = CompositeArtifactId.from_str("mystore:mycheckpoint")
 
     with patch.object(ArtifactsProvider, "get_artifact_local_path", return_value=artifact_path):
-        instance = _make_instance("source_filesize", {"checkpoint": "mystore:mycheckpoint"})
-        result = compiler({}, instance)
+        factory_id, instance = _make_instance("source_filesize", {"checkpoint": "mystore:mycheckpoint"})
+        result = compiler({}, factory_id, instance)
 
     assert result.t is not None, f"compiler returned error: {result.e}"
 

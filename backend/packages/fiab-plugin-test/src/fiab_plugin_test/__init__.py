@@ -16,10 +16,9 @@ from fiab_core.fable import (
     BlueprintTemplate,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
+    LocalBlock,
     NoOutput,
-    PluginBlockFactoryId,
     RawOutput,
-    SelfPluginId,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.types import FableType
@@ -108,20 +107,20 @@ catalogue = lambda: BlockFactoryCatalogue(
 )
 
 
-def validator(instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
+def validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
     restrictions: ConfigurationOptionRestriction = {}
-    if instance.factory_id.factory == BlockFactoryId("transform_increment"):
+    if factory_id == BlockFactoryId("transform_increment"):
         restrictions = {AMOUNT: FableType.parse("enumClosed[1,2,3]")[0]}
-    if instance.factory_id.factory in ("sink_file",):
+    if factory_id in ("sink_file",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
-    elif instance.factory_id.factory in ("sink_image",):
+    elif factory_id in ("sink_image",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png")), restrictions)
-    elif instance.factory_id.factory in ("source_sleep", "source_text", "source_filesize"):
+    elif factory_id in ("source_sleep", "source_text", "source_filesize"):
         return BlockValidation(Either.ok(RawOutput(type_fqn="str", mime_type="text/plain")), restrictions)
-    elif instance.factory_id.factory in ("source_42", "transform_increment", "product_join"):
+    elif factory_id in ("source_42", "transform_increment", "product_join"):
         return BlockValidation(Either.ok(RawOutput(type_fqn="int")), restrictions)
     else:
-        raise TypeError(f"unexpected factory {instance.factory_id.factory}")
+        raise TypeError(f"unexpected factory {factory_id}")
 
 
 def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
@@ -141,17 +140,17 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     return []
 
 
-def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
+def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
     with PayloadBuildingContext(environment=[f"-e {pathlib.Path(__file__).parent.parent.parent}"]):
         # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
-        if instance.factory_id.factory == "source_42":
+        if factory_id == "source_42":
             action = from_source(Payload("fiab_plugin_test.runtime.source_42"))
-        elif instance.factory_id.factory == "source_text":
+        elif factory_id == "source_text":
             text = instance.configuration_values[TEXT]
             if not isinstance(text, str):
                 return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
             action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))
-        elif instance.factory_id.factory == "source_sleep":
+        elif factory_id == "source_sleep":
             text = instance.configuration_values[TEXT]
             duration = instance.configuration_values[DURATION]
             if not isinstance(text, str):
@@ -159,7 +158,7 @@ def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Er
             if not isinstance(duration, float):
                 return Either.error(f"Invalid type for {DURATION!r}: expected float, got {type(duration).__name__}")
             action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))
-        elif instance.factory_id.factory == "source_filesize":
+        elif factory_id == "source_filesize":
             checkpoint_str = instance.configuration_values[CHECKPOINT]
             if not isinstance(checkpoint_str, str):
                 return Either.error(f"Invalid type for {CHECKPOINT!r}: expected str, got {type(checkpoint_str).__name__}")
@@ -169,38 +168,40 @@ def compiler(lookup: ActionLookup, instance: BlockInstance) -> Either[Action, Er
                 "fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]}
             )
             action = from_source(payload)
-        elif instance.factory_id.factory == "transform_increment":
+        elif factory_id == "transform_increment":
             a = lookup[instance.input_ids["a"]]
             amount = instance.configuration_values[AMOUNT]
             if not isinstance(amount, int):
                 return Either.error(f"Invalid type for {AMOUNT!r}: expected int, got {type(amount).__name__}")
             action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": amount}))
-        elif instance.factory_id.factory == "product_join":
+        elif factory_id == "product_join":
             a = lookup[instance.input_ids["a"]]
             b = lookup[instance.input_ids["b"]]
             action = a.join(b, dim="inputs").reduce(Payload("fiab_plugin_test.runtime.product_join"))
-        elif instance.factory_id.factory == "sink_file":
+        elif factory_id == "sink_file":
             data = lookup[instance.input_ids["data"]]
             fname = instance.configuration_values[FNAME]
             if not isinstance(fname, str):
                 return Either.error(f"Invalid type for {FNAME!r}: expected str, got {type(fname).__name__}")
             action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))
-        elif instance.factory_id.factory == "sink_image":
+        elif factory_id == "sink_image":
             data = lookup[instance.input_ids["data"]]
             action = data.map(Payload("fiab_plugin_test.runtime.sink_image"))
         else:
-            raise TypeError(instance.factory_id.factory)
+            raise TypeError(factory_id)
         return Either.ok(action)
 
 
 plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler)
 
 
-def _make_source_text_block(text: str) -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values={TEXT: text} if text else {},
-        input_ids={},
+def _make_source_text_block(text: str) -> LocalBlock:
+    return LocalBlock(
+        factory_id=BlockFactoryId("source_text"),
+        instance=BlockInstance(
+            configuration_values={TEXT: text} if text else {},
+            input_ids={},
+        ),
     )
 
 
@@ -253,10 +254,9 @@ _testFailValidation = BlueprintTemplate(
     display_name="testFailValidation",
     display_description="A template that references a non-existent factory and always fails validation.",
     blocks={
-        _BLOCK_FAIL_VAL: BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("nonexistent_factory")),
-            configuration_values={},
-            input_ids={},
+        _BLOCK_FAIL_VAL: LocalBlock(
+            factory_id=BlockFactoryId("nonexistent_factory"),
+            instance=BlockInstance(configuration_values={}, input_ids={}),
         ),
     },
 )
