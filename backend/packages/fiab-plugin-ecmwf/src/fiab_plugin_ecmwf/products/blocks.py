@@ -35,6 +35,8 @@ from fiab_plugin_ecmwf.block_utils import (
     PARAM,
     STEP,
     TYPE,
+    THRESHOLD,
+    COMPARISON,
     _axis_value_strings,
     _create_param_key,
     _split_param_key,
@@ -47,7 +49,6 @@ def load_pproc_schema() -> str:
         return str(pproc_schema)
     
 
-    
 PPROC_SCHEMA = load_pproc_schema()
     
 
@@ -146,7 +147,7 @@ class PrescribedThresholdProbability(Product):
         prob_qube = Qube.empty()
         schema = Schema.from_file(PPROC_SCHEMA)
         for output, _ in schema.outputs_from_inputs(
-            inputs=list(datacubes(input_dataset)), output_template={TYPE: self.stat_type}
+            inputs=list(datacubes(input_dataset)), output_template={TYPE: self.stat_type, "selection": "default"}
         ):
             prob_qube = prob_qube | Qube.from_datacube(output)
         restrictions[PARAM] = ClosedEnumType([_create_param_key(paramid) for paramid in axes(prob_qube)[PARAM]])
@@ -169,7 +170,7 @@ class PrescribedThresholdProbability(Product):
         selected_param_id, _ = _split_param_key(block.config_as_str(PARAM))
         steps = block.config_as_list(STEP, str, allow_empty=False)
         action = action_from_outputs(
-            [{PARAM: [selected_param_id], TYPE: self.stat_type, STEP: steps}],
+            [{PARAM: [selected_param_id], TYPE: self.stat_type, STEP: steps, "selection": "default"}],
             PPROC_SCHEMA,
             input_task_action.as_action(PProcAction),
         )
@@ -180,6 +181,62 @@ class PrescribedThresholdProbability(Product):
             return False
         schema = Schema.from_file(PPROC_SCHEMA)
         outputs = list(
-            schema.outputs_from_inputs(inputs=list(datacubes(other)), output_template={TYPE: self.stat_type})
+            schema.outputs_from_inputs(inputs=list(datacubes(other)), output_template={TYPE: self.stat_type, "selection": "default"})
             )
         return len(outputs) > 0
+
+
+class CustomThresholdProbability(Product):
+    title: str = "Custom Threshold Probability"
+    description: str = "Computes probability of ensemble members being above/below the configured threshold"
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        THRESHOLD: BlockConfigurationOption(
+            title="Threshold",
+            description="Threshold value to compute probability for",
+            value_type="float",
+        ), 
+        COMPARISON: BlockConfigurationOption(
+            title="Comparison",
+            description="Comparison operator for threshold",
+            value_type="enumClosed['>=', '<=', '>', '<']",
+        ),
+    }
+    inputs: list[str] = ["dataset"]
+    stat_type: str = "ep"
+
+    def validate(
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
+        input_dataset = _extract_dataset(inputs, "dataset")
+        output = coxpand(input_dataset, [ENSEMBLE, TYPE], {TYPE: [self.stat_type]})
+        return output
+
+    def compile(
+        self,
+        inputs: ActionLookup,
+        block: BlockInstanceRich,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+        input_task_action = inputs[input_task]
+        actions = {}
+
+        for npath, narray in nodetree_arrays(input_task_action.nodes):
+            coords = {dim: values.data.tolist() for dim, values in narray.sel({ENSEMBLE: 1}).coords.items()}
+            coords.pop(ENSEMBLE)
+            actions[npath] = action_from_outputs(
+                requests=[
+                    {
+                        **coords,
+                        TYPE: self.stat_type,
+                        THRESHOLD: block.config_as_float(THRESHOLD),
+                        COMPARISON: block.config_as_str(COMPARISON),
+                        "selection": "custom",
+                    }
+                ],
+                pproc_schema=PPROC_SCHEMA,
+                sources=input_task_action.sel(path=npath).as_action(PProcAction),
+            )
+        return Either.ok(merge(**actions))
+
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, ENSEMBLE) and len(axes(other)[ENSEMBLE]) > 1 and contains(other, PARAM)

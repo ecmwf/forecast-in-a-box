@@ -23,6 +23,8 @@ SPLITBY = ConfigurationOptionId("splitby")
 FORECAST = ConfigurationOptionId("forecast")
 TYPE = ConfigurationOptionId("type")
 STATISTIC = ConfigurationOptionId("statistic")
+THRESHOLD = ConfigurationOptionId("threshold")
+COMPARISON = ConfigurationOptionId("comparison")
 
 
 def _create_param_key(param_id: str) -> str:
