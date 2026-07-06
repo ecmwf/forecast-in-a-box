@@ -15,30 +15,30 @@ import pytest
 from earthkit.workflows.fluent import Action
 from fiab_core.fable import (
     BlockFactoryId,
+    BlockInstanceId,
     PluginBlockFactoryId,
     PluginCompositeId,
     QubedOutput,
-    BlockInstanceId,
 )
 from fiab_core.fable import (
     BlockInstance as BlockInstanceBase,
 )
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 
+from fiab_plugin_ecmwf.block_utils import (
+    BASETIME,
+    ENSEMBLE,
+    FORECAST,
+    PARAM,
+    SOURCE,
+    STATISTIC,
+    STEP,
+)
 from fiab_plugin_ecmwf.blocks import (
     OperationalForecastSource,
 )
 from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
 from fiab_plugin_ecmwf.qubed_utils import select
-from fiab_plugin_ecmwf.block_utils import (
-    ENSEMBLE,
-    PARAM,
-    STEP,
-    SOURCE, 
-    BASETIME, 
-    FORECAST,
-    STATISTIC,
-)
 
 
 @pytest.fixture
