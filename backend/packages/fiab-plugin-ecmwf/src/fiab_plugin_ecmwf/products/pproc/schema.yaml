@@ -140,188 +140,191 @@ config:
                 productDefinitionTemplateNumber: 9
                 typeOfGeneratingProcess: 5
                 typeOfTimeIncrement: 2
-      filter:param:
-        "131060/131061/131062/131063/131064/131098/131099/131085":
-          accumulations:
-            step:
-              operation: difference
-              metadata:
-                stepType: "accum"
-                indicatorOfUnitForTimeIncrement: 1
-                timeIncrement: 12
-          filter:param:
-            "131060":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 0.001
-                  scale_factor: 3
-                metadata:
-                  scaleFactorOfLowerLimit: 0
-            "131061":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 0.005
-                  scale_factor: 3
-                metadata:
-                  scaleFactorOfLowerLimit: 0
-            "131062":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 0.01
-                  scale_factor: 3
-                metadata:
-                  scaleFactorOfLowerLimit: 0
-            "131063":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 0.02
-                  scale_factor: 3
-                metadata:
-                  scaleFactorOfLowerLimit: 0
-            "131064":
-              statistics:
-                threshold:
-                  comparison: '<'
-                  value: 0.0001
-                  scale_factor: 4
-                  limit_type: lower
-                metadata:
-                  scaleFactorOfLowerLimit: 1
-            "131098":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 0.025
-                  scale_factor: 3
-                metadata:
-                  scaleFactorOfLowerLimit: 0
-            "131099":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 0.05
-                  scale_factor: 3
-                metadata:
-                  scaleFactorOfLowerLimit: 0
-            "131085":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 0.1
-                  scale_factor: 3
-                metadata:
-                  scaleFactorOfLowerLimit: 0
-        "131065/131066/131067":
-          accumulations:
-            step:
-              operation: difference_rate
-              factor: 0.041666666666666664
-              metadata:
-                stepType: "avg"
-                indicatorOfUnitForTimeIncrement: 1
-                timeIncrement: 12
-          filter:param:
-            "131065":
-              statistics:
-                threshold:
-                  comparison: '<'
-                  value: 0.001
-                  scale_factor: 4
-                  limit_type: lower
-                metadata:
-                  scaledValueOfLowerLimit: 115741
-                  scaleFactorOfLowerLimit: 10
-            "131066":
-              statistics:
-                threshold:
-                  comparison: '>='
-                  value: 0.003
-                  scale_factor: 4
-                  limit_type: lower
-                metadata:
-                  scaledValueOfLowerLimit: 347222
-                  scaleFactorOfLowerLimit: 10
-            "131067":
-              statistics:
-                threshold:
-                  comparison: '>='
-                  value: 0.005
-                  scale_factor: 4
-                metadata:
-                  scaledValueOfLowerLimit: 578704
-                  scaleFactorOfLowerLimit: 10
-        "131068/131069/131073/131074/131075/131076/131077/131078/131079/131080/131081":
-          accumulations:
-            step:
-              operation: maximum
-          filter:param:
-            "131068":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 10
-            "131069":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 15
-            "131074":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 2
-            "131075":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 4
-            "131076":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 6
-            "131077":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 8
-            "131078":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 8
-            "131079":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 10
-            "131080":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 12
-            "131081":
-              statistics:
-                threshold:
-                  comparison: ">="
-                  value: 15
-        "131073":
-          filter:steptype:
-            instantaneous: {}
-            range:
-              accumulations:
-                step:
-                  operation: minimum
+      filter:selection:
+        "custom": 
           statistics:
             threshold:
-              comparison: "<="
-              value: 273.15
-              scale_factor: 2
-              limit_type: lower
+              comparison: "{comparison}"
+              value: "{threshold}"
+        "default":
+          filter:param:
+            "131060/131061/131062/131063/131064/131098/131099/131085":
+              accumulations:
+                step:
+                  operation: difference
+                  metadata:
+                    stepType: "accum"
+                    indicatorOfUnitForTimeIncrement: 1
+                    timeIncrement: 12
+              filter:param:
+                "131060":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.001
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131061":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.005
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131062":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.01
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131063":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.02
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131064":
+                  statistics:
+                    threshold:
+                      comparison: '<'
+                      value: 0.0001
+                      scale_factor: 4
+                    metadata:
+                      scaleFactorOfLowerLimit: 1
+                "131098":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.025
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131099":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.05
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131085":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.1
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+            "131065/131066/131067":
+              accumulations:
+                step:
+                  operation: difference_rate
+                  factor: 0.041666666666666664
+                  metadata:
+                    stepType: "avg"
+                    indicatorOfUnitForTimeIncrement: 1
+                    timeIncrement: 12
+              filter:param:
+                "131065":
+                  statistics:
+                    threshold:
+                      comparison: '<'
+                      value: 0.001
+                      scale_factor: 4
+                    metadata:
+                      scaledValueOfLowerLimit: 115741
+                      scaleFactorOfLowerLimit: 10
+                "131066":
+                  statistics:
+                    threshold:
+                      comparison: '>='
+                      value: 0.003
+                      scale_factor: 4
+                    metadata:
+                      scaledValueOfLowerLimit: 347222
+                      scaleFactorOfLowerLimit: 10
+                "131067":
+                  statistics:
+                    threshold:
+                      comparison: '>='
+                      value: 0.005
+                      scale_factor: 4
+                    metadata:
+                      scaledValueOfLowerLimit: 578704
+                      scaleFactorOfLowerLimit: 10
+            "131068/131069/131073/131074/131075/131076/131077/131078/131079/131080/131081":
+              accumulations:
+                step:
+                  operation: maximum
+              filter:param:
+                "131068":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 10
+                "131069":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 15
+                "131074":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 2
+                "131075":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 4
+                "131076":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 6
+                "131077":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 8
+                "131078":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 8
+                "131079":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 10
+                "131080":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 12
+                "131081":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 15
+            "131073":
+              filter:steptype:
+                instantaneous: {}
+                range:
+                  accumulations:
+                    step:
+                      operation: minimum
+              statistics:
+                threshold:
+                  comparison: "<="
+                  value: 273.15
+                  scale_factor: 2
 windows:
   filter:stream:
     oper/wave/enfo/waef:
@@ -377,7 +380,6 @@ windows:
                     width: 72
                     end: 240
                     interval: 24
-                    end: 216
                   - type: range
                     width: 120
                     end: 240
@@ -410,42 +412,37 @@ windows:
             interval: 24
             width: 168
     ep:
-      filter:stream:
-        enfo:
-          filter:param:
-            131060/131061/131062/131063/131098/131099/131085/131070/131071/131072/131100:
-              out_steps:
-                type: range
-                width: 24
-                interval: 12
-            131064/131065/131066/131067/131070/131071/131072/131100/131020/131021/131073:
-              out_steps:
-                - type: range
-                  width: 120
-                  start: 120
-                  interval: 120
-                - "120-168"
-                - "168-240"
-            131068/131069/131073/131022/131023/131024/131025/133093/133094/133095/133096/133097/133098:
-              out_steps:
-                type: instantaneous
-                start: 12
-                interval: 12
-        waef:
-          filter:param:
-            131074/131075/131076/131077/131078/131079/131080/131081:
-              out_steps:
-                - type: range
-                  width: 120
-                  start: 120
-                  interval: 120
-                - "120-168"
-                - "168-240"
-            131074/131075/131076/131077/131078/131079/131080/131081:
-              out_steps:
-                type: instantaneous
-                start: 12
-                interval: 12
+      filter:param:
+        131060/131061/131062/131063/131098/131099/131085/131070/131071/131072/131100:
+          out_steps:
+            type: range
+            width: 24
+            interval: 12
+        131064/131065/131066/131067/131070/131071/131072/131100/131020/131021/131073:
+          out_steps:
+            - type: range
+              width: 120
+              start: 120
+              interval: 120
+            - "120-168"
+            - "168-240"
+        131068/131069/131073/131022/131023/131024/131025/133093/133094/133095/133096/133097/133098:
+          out_steps:
+            type: instantaneous
+            start: 12
+            interval: 12
+        131074/131075/131076/131077/131078/131079/131080/131081:
+          out_steps:
+            - type: instantaneous
+              start: 12
+              interval: 12
+            - type: range
+              width: 120
+              start: 120
+              interval: 120
+            - "120-168"
+            - "168-240"
+        "*": {}
     efi/efic/sot:
       filter:stream:
         "eefo/weef":
@@ -469,7 +466,6 @@ windows:
                       end: 240
                       width: 72
                       interval: 24
-                      end: 216
                     - type: range
                       start: 12
                       end: 240
@@ -491,7 +487,6 @@ windows:
                       width: 72
                       end: 240
                       interval: 24
-                      end: 216
                     - type: range
                       width: 120
                       end: 240
@@ -539,7 +534,6 @@ windows:
                   width: 72
                   end: 240
                   interval: 12
-                  end: 216
                 - type: range
                   width: 120
                   end: 240
@@ -556,7 +550,6 @@ windows:
                   width: 72
                   end: 240
                   interval: 12
-                  end: 216
                 - type: range
                   width: 120
                   end: 240
@@ -579,22 +572,6 @@ windows:
             interval: 24
 inputs:
   filter:stream:
-    oper:
-      filter:type:
-        fc/fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-            inputs:
-              request: &oper_fc
-                stream: oper
-                type: fc
-    wave:
-      filter:type:
-        fc/fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-            inputs:
-              request: &wave_fc
-                stream: wave
-                type: fc
     enfo:
       filter:type:
         "em/es/pb/efi/sot/ep":
@@ -725,6 +702,13 @@ inputs:
             inputs:
               request:
                 param: "{param}"
+        "ep":
+          filter:selection:
+            custom:
+              forecast:
+                inputs:
+                  request:
+                    param: "{param}"
     "10":
       filter:type:
         fc/cf/pf/em/es/pb/fcmean/fcstdev/fcmin/fcmax:
