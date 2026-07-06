@@ -291,6 +291,19 @@
   },
   "template": {
     "prefilled": "Example values applied — adjust and save as your own preset",
-    "examplesUnavailable": "Template examples couldn't be loaded — starting without prefilled values"
+    "examplesUnavailable": "Template examples couldn't be loaded — starting without prefilled values",
+    "applied": "Template parameters applied",
+    "dialog": {
+      "title": "Template parameters",
+      "description": "Provide values for this template's placeholders — everything can still be changed in the builder.",
+      "prefilled": "Prefilled by the template ({{count}})",
+      "apply": "Apply",
+      "skip": "Skip",
+      "missingValue": "Needs a value",
+      "validating": "Validating…",
+      "valid": "Configuration validates",
+      "issues": "{{count}} validation issue",
+      "issues_other": "{{count}} validation issues"
+    }
   }
 }

@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Package } from 'lucide-react'
@@ -24,6 +24,9 @@ import type { TFunction } from 'i18next'
 import type { PresetId } from '@/features/fable-builder/presets/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
+import { TemplateParamsDialog } from './TemplateParamsDialog'
+import { deriveTemplateParameters } from '@/features/fable-builder/utils/template-parameters'
+import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import {
   clearDraft,
@@ -133,6 +136,8 @@ export function FableBuilderPage({
   const setIsValidating = useFableBuilderStore((state) => state.setIsValidating)
 
   const initializedRef = useRef(false)
+  const [templateInitialized, setTemplateInitialized] = useState(false)
+  const [templateParamsDone, setTemplateParamsDone] = useState(false)
 
   // Auto-persist drafts to localStorage + beforeunload guard
   useDraftPersistence()
@@ -198,6 +203,7 @@ export function FableBuilderPage({
         }),
       })
       initializedRef.current = true
+      setTemplateInitialized(true)
       return
     }
 
@@ -269,45 +275,104 @@ export function FableBuilderPage({
     t,
   ])
 
-  // Template mode: overlay the plugin's example values/glyphs once the
-  // builder is initialized — mirrors the backend's ingest-validation overlay.
-  const { data: templateExamples, error: templateExamplesError } =
-    useTemplateExampleValues(
-      templateMode ? templatePlugin : undefined,
-      templateMode ? templateName : undefined,
-    )
-  const templateExamplesApplied = useRef(false)
+  // Template mode: collect parameters via a dialog once builder + examples
+  // are ready, then overlay values (mirrors the backend's ingest overlay).
+  const examplesQuery = useTemplateExampleValues(
+    templateMode ? templatePlugin : undefined,
+    templateMode ? templateName : undefined,
+  )
+  const templateExamples = examplesQuery.data
+  const { glyphs: knownGlyphs, isLoading: knownGlyphsLoading } = useAllGlyphs()
 
-  useEffect(() => {
-    if (!templateMode || templateExamplesApplied.current) return
-    if (!initializedRef.current || !templateExamples) return
-    templateExamplesApplied.current = true
+  // Settled when fetched/errored — or unfetchable (deep link without params)
+  const examplesSettled =
+    !templatePlugin ||
+    !templateName ||
+    examplesQuery.isFetched ||
+    examplesQuery.isError
+
+  // Derive once from the freshly-forked builder, with intrinsics/globals
+  // subtracted so the dialog never asks for e.g. ${runId}.
+  const templateParams = useMemo(() => {
+    if (!templateInitialized || knownGlyphsLoading) return null
+    return deriveTemplateParameters(
+      useFableBuilderStore.getState().fable,
+      new Set(knownGlyphs.map((glyph) => glyph.name)),
+    )
+  }, [templateInitialized, knownGlyphs, knownGlyphsLoading])
+
+  function applyTemplateExampleValues() {
+    if (!templateExamples) return
     const { blocks } = useFableBuilderStore.getState().fable
     for (const [blockId, values] of Object.entries(
       templateExamples.example_values,
     )) {
       if (blocks[blockId]) updateBlockConfigBatch(blockId, values)
     }
+  }
+
+  function handleTemplateApply(values: Record<string, string>) {
+    applyTemplateExampleValues()
+    for (const [key, value] of Object.entries(values)) {
+      if (value !== '') setLocalGlyph(key, value)
+    }
+    setTemplateParamsDone(true)
+    showToast.success(t('template.applied'))
+  }
+
+  function handleTemplateSkip() {
+    applyTemplateExampleValues()
     for (const [key, value] of Object.entries(
-      templateExamples.example_glyphs,
+      templateExamples?.example_glyphs ?? {},
     )) {
       setLocalGlyph(key, value)
     }
-    showToast.info(t('configure:template.prefilled'))
+    setTemplateParamsDone(true)
+    showToast.info(t('template.prefilled'))
+  }
+
+  const templateHasParams =
+    templateParams !== null &&
+    (templateParams.required.length > 0 ||
+      Object.keys(templateParams.prefilled).length > 0)
+
+  const templateDialogOpen =
+    templateMode && templateHasParams && examplesSettled && !templateParamsDone
+
+  // Nothing user-facing to ask — apply any examples silently and continue
+  useEffect(() => {
+    if (!templateMode || templateParamsDone) return
+    if (templateParams === null || !examplesSettled || templateHasParams) return
+    const { blocks } = useFableBuilderStore.getState().fable
+    for (const [blockId, values] of Object.entries(
+      templateExamples?.example_values ?? {},
+    )) {
+      if (blocks[blockId]) updateBlockConfigBatch(blockId, values)
+    }
+    for (const [key, value] of Object.entries(
+      templateExamples?.example_glyphs ?? {},
+    )) {
+      setLocalGlyph(key, value)
+    }
+    setTemplateParamsDone(true)
+    if (templateExamples) showToast.info(t('template.prefilled'))
   }, [
     templateMode,
+    templateParamsDone,
+    templateParams,
+    examplesSettled,
+    templateHasParams,
     templateExamples,
-    existingFable,
     updateBlockConfigBatch,
     setLocalGlyph,
     t,
   ])
 
   useEffect(() => {
-    if (templateMode && templateExamplesError) {
-      showToast.warning(t('configure:template.examplesUnavailable'))
+    if (templateMode && examplesQuery.isError) {
+      showToast.warning(t('template.examplesUnavailable'))
     }
-  }, [templateMode, templateExamplesError, t])
+  }, [templateMode, examplesQuery.isError, t])
 
   // Sync React Query validation state → Zustand store for sibling components
   useEffect(() => {
@@ -406,6 +471,17 @@ export function FableBuilderPage({
         fableId={storeFableId}
         initialMode={submitDialogMode}
       />
+
+      {templateMode && templateParams && (
+        <TemplateParamsDialog
+          open={templateDialogOpen}
+          params={templateParams}
+          baseFable={fable}
+          examples={templateExamples}
+          onApply={handleTemplateApply}
+          onSkip={handleTemplateSkip}
+        />
+      )}
     </GlyphProvider>
   )
 }
