@@ -245,10 +245,11 @@ describe('useConfigPresets', () => {
         result.current.deletePreset('bp-001', 1)
       })
 
-      expect(mockDeleteBlueprint).toHaveBeenCalledWith({
-        blueprint_id: 'bp-001',
-        version: 1,
-      })
+      // mutate(payload, { onSuccess }) — assert the payload, allow the callback.
+      expect(mockDeleteBlueprint).toHaveBeenCalledWith(
+        { blueprint_id: 'bp-001', version: 1 },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      )
     })
 
     it('cleans up favourite flag on delete', () => {

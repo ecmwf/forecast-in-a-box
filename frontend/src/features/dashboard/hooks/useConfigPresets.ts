@@ -10,6 +10,7 @@
 
 import { useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
+import i18n from 'i18next'
 import type { BlueprintListItem } from '@/api/types/fable.types'
 import { getBlocksByKind } from '@/api/types/fable.types'
 import { retrieveFable } from '@/api/endpoints/fable'
@@ -19,7 +20,6 @@ import {
   useDeleteBlueprint,
   useListBlueprints,
 } from '@/api/hooks/useFable'
-import i18n from 'i18next'
 import { deriveModelLabel, deriveSinkKinds } from '@/features/journal/adapters'
 import { showToast } from '@/lib/toast'
 import { useLocalStorage } from '@/hooks/useLocalStorage'

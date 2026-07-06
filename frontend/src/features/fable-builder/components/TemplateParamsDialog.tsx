@@ -25,10 +25,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type {
-  ParameterUsage,
-  TemplateParameters,
-} from '@/features/fable-builder/utils/template-parameters'
+import type { TemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type { TemplateExampleValues } from '@/api/types/plugins.types'
 import { useFableValidation } from '@/api/hooks/useFable'
@@ -135,12 +132,14 @@ export function TemplateParamsDialog({
 
   /** Backend-resolved value at the parameter's first usage site */
   function resolvedPreview(name: string): string | null {
-    const site: ParameterUsage | undefined = params.usage[name]?.[0]
-    if (!site || !expansion) return null
-    return (
-      expansion.resolved_configuration_options[site.blockId]?.[site.optionId] ??
-      null
-    )
+    // `in` guards, not `?.`: index access is typed non-nullable here
+    // (noUncheckedIndexedAccess off), so `?.`/`??` would read as unnecessary.
+    if (!expansion || !(name in params.usage)) return null
+    const site = params.usage[name][0]
+    const resolved = expansion.resolved_configuration_options
+    if (!(site.blockId in resolved)) return null
+    const options = resolved[site.blockId]
+    return site.optionId in options ? options[site.optionId] : null
   }
 
   /** True when the backend still reports this glyph as missing */

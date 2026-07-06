@@ -36,9 +36,11 @@ import {
   updatePlugin,
   updatePluginSettings,
 } from '@/api/endpoints/plugins'
-import { parsePluginIdString } from '@/api/types/plugins.types'
+import {
+  parsePluginIdString,
+  toPluginInfoList,
+} from '@/api/types/plugins.types'
 import { getCatalogue } from '@/api/endpoints/fable'
-import { toPluginInfoList } from '@/api/types/plugins.types'
 import { fableKeys } from '@/api/hooks/useFable'
 import { createLogger } from '@/lib/logger'
 

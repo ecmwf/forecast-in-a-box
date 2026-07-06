@@ -30,6 +30,7 @@ import type {
   IntrinsicGlyphItem,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
+import type { BlueprintListFilters } from '@/api/endpoints/fable'
 import {
   createGlobalGlyph,
   deleteBlueprint,
@@ -44,7 +45,6 @@ import {
   updateBlueprint,
   upsertFable,
 } from '@/api/endpoints/fable'
-import type { BlueprintListFilters } from '@/api/endpoints/fable'
 import { getFactory } from '@/api/types/fable.types'
 import { ApiClientError } from '@/api/client'
 import { QUERY_CONSTANTS } from '@/utils/constants'

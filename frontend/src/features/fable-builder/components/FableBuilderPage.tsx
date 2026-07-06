@@ -20,11 +20,11 @@ import { ThreeColumnLayout } from './layout/ThreeColumnLayout'
 import { FableGraphCanvas } from './graph-mode/FableGraphCanvas'
 import { FableFormCanvas } from './form-mode/FableFormCanvas'
 import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
+import { TemplateParamsDialog } from './TemplateParamsDialog'
 import type { TFunction } from 'i18next'
 import type { PresetId } from '@/features/fable-builder/presets/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
-import { TemplateParamsDialog } from './TemplateParamsDialog'
 import { deriveTemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
@@ -307,7 +307,7 @@ export function FableBuilderPage({
     for (const [blockId, values] of Object.entries(
       templateExamples.example_values,
     )) {
-      if (blocks[blockId]) updateBlockConfigBatch(blockId, values)
+      if (blockId in blocks) updateBlockConfigBatch(blockId, values)
     }
   }
 
@@ -347,7 +347,7 @@ export function FableBuilderPage({
     for (const [blockId, values] of Object.entries(
       templateExamples?.example_values ?? {},
     )) {
-      if (blocks[blockId]) updateBlockConfigBatch(blockId, values)
+      if (blockId in blocks) updateBlockConfigBatch(blockId, values)
     }
     for (const [key, value] of Object.entries(
       templateExamples?.example_glyphs ?? {},
