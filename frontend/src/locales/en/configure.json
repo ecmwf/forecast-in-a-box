@@ -288,5 +288,9 @@
       "label": "Output",
       "description": "Store or visualize results"
     }
+  },
+  "template": {
+    "prefilled": "Example values applied — adjust and save as your own preset",
+    "examplesUnavailable": "Template examples couldn't be loaded — starting without prefilled values"
   }
 }

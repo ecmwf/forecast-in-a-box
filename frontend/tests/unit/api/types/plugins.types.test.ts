@@ -324,3 +324,21 @@ describe('isUnstampedVersion', () => {
     expect(isUnstampedVersion('unknown')).toBe(false)
   })
 })
+
+describe('parsePluginIdString', () => {
+  it('splits a "store:local" composite string on the first colon', async () => {
+    const { parsePluginIdString } = await import('@/api/types/plugins.types')
+    expect(parsePluginIdString('local:plugin-test')).toEqual({
+      store: 'local',
+      local: 'plugin-test',
+    })
+    expect(parsePluginIdString('ecmwf:some:name')).toEqual({
+      store: 'ecmwf',
+      local: 'some:name',
+    })
+    expect(parsePluginIdString('no-colon')).toEqual({
+      store: 'no-colon',
+      local: '',
+    })
+  })
+})

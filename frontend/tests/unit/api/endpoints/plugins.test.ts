@@ -294,3 +294,41 @@ describe('updatePlugin', () => {
     // If we get here without error, the test passes
   })
 })
+
+describe('getTemplateExampleValues', () => {
+  afterEach(() => {
+    worker.resetHandlers()
+  })
+
+  it('fetches example values with store/local/displayName query params', async () => {
+    const { getTemplateExampleValues } = await import('@/api/endpoints/plugins')
+    let receivedParams: Record<string, string | null> = {}
+
+    worker.use(
+      http.get(API_ENDPOINTS.plugin.templateExampleValues, ({ request }) => {
+        const url = new URL(request.url)
+        receivedParams = {
+          store: url.searchParams.get('store'),
+          local: url.searchParams.get('local'),
+          displayName: url.searchParams.get('displayName'),
+        }
+        return HttpResponse.json({
+          example_values: { block_1: { area: '[-10, 40, 10, 60]' } },
+          example_glyphs: { leadtime: '48' },
+        })
+      }),
+    )
+
+    const result = await getTemplateExampleValues(
+      { store: 'local', local: 'plugin-test' },
+      'testBasic',
+    )
+    expect(receivedParams).toEqual({
+      store: 'local',
+      local: 'plugin-test',
+      displayName: 'testBasic',
+    })
+    expect(result.example_values.block_1).toEqual({ area: '[-10, 40, 10, 60]' })
+    expect(result.example_glyphs).toEqual({ leadtime: '48' })
+  })
+})

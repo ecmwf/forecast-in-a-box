@@ -26,6 +26,12 @@ const searchSchema = z.object({
     .optional(),
   state: z.string().optional(),
   fableId: z.string().optional(),
+  /** Open fableId as a template: fork (create-on-save) and prefill example values */
+  template: z.boolean().optional(),
+  /** Owning plugin ("store:local") for the example-values lookup */
+  templatePlugin: z.string().optional(),
+  /** Template display name for the example-values lookup */
+  templateName: z.string().optional(),
 })
 
 export type ConfigureSearch = z.infer<typeof searchSchema>
@@ -36,13 +42,17 @@ export const Route = createFileRoute('/_authenticated/configure')({
 })
 
 function ConfigurePage() {
-  const { preset, state, fableId } = Route.useSearch()
+  const { preset, state, fableId, template, templatePlugin, templateName } =
+    Route.useSearch()
   return (
     <FableBuilderPage
       key={fableId}
       fableId={fableId}
       preset={preset}
       encodedState={state}
+      templateMode={template}
+      templatePlugin={templatePlugin}
+      templateName={templateName}
     />
   )
 }

@@ -102,6 +102,9 @@ interface FableBuilderState {
   fable: FableBuilderV1
   fableId: string | null
   fableVersion: number | null
+  /** Blueprint this session was forked from (e.g. a plugin template) —
+   *  passed as parent_id when saving creates a new blueprint. */
+  forkParentId: string | null
   fableName: string
   mode: BuilderMode
   step: BuilderStep
@@ -232,6 +235,7 @@ function createInitialState() {
     fable: createEmptyFable(),
     fableId: null,
     fableVersion: null,
+    forkParentId: null as string | null,
     // Blank by default; FableBuilderHeader renders a translated placeholder.
     fableName: '',
     mode: 'graph' as BuilderMode,
@@ -345,6 +349,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
               fable,
               fableId: id,
               fableVersion: null,
+              forkParentId: null,
               isDirty: false,
               selectedBlockId: null,
               validationState: null,
@@ -719,6 +724,8 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             set({
               fableId: id,
               fableVersion: version,
+              // The saved blueprint has its own identity now
+              forkParentId: null,
               isDirty: false,
               lastSavedAt: Date.now(),
               ...(name !== undefined && { fableName: name }),

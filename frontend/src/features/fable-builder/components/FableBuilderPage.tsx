@@ -44,6 +44,7 @@ import {
   useFableRetrieve,
   useFableValidation,
 } from '@/api/hooks/useFable'
+import { useTemplateExampleValues } from '@/api/hooks/usePlugins'
 import { H2, P } from '@/components/base/typography'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -89,18 +90,31 @@ interface FableBuilderPageProps {
   fableId?: string
   preset?: PresetId
   encodedState?: string
+  /** Open fableId as a template: fork (create-on-save) and prefill example values */
+  templateMode?: boolean
+  /** Owning plugin ("store:local") for the example-values lookup */
+  templatePlugin?: string
+  /** Template display name for the example-values lookup */
+  templateName?: string
 }
 
 export function FableBuilderPage({
   fableId,
   preset,
   encodedState,
+  templateMode = false,
+  templatePlugin,
+  templateName,
 }: FableBuilderPageProps) {
   const { t } = useTranslation(['configure', 'common'])
   const fable = useFableBuilderStore((state) => state.fable)
   const setFable = useFableBuilderStore((state) => state.setFable)
   const newFable = useFableBuilderStore((state) => state.newFable)
   const setFableName = useFableBuilderStore((state) => state.setFableName)
+  const updateBlockConfigBatch = useFableBuilderStore(
+    (state) => state.updateBlockConfigBatch,
+  )
+  const setLocalGlyph = useFableBuilderStore((state) => state.setLocalGlyph)
   const mode = useFableBuilderStore((state) => state.mode)
   const step = useFableBuilderStore((state) => state.step)
   const storeFableId = useFableBuilderStore((state) => state.fableId)
@@ -172,6 +186,21 @@ export function FableBuilderPage({
   useEffect(() => {
     if (initializedRef.current) return
 
+    // Template mode: fork — load the template's builder without adopting its
+    // identity, so saving creates a new blueprint (parent_id = the template).
+    if (templateMode && fableId) {
+      if (!existingFable) return
+      setFable(existingFable, null)
+      useFableBuilderStore.setState({
+        forkParentId: fableId,
+        ...(fableRetrieveData?.display_name && {
+          fableName: fableRetrieveData.display_name,
+        }),
+      })
+      initializedRef.current = true
+      return
+    }
+
     // Check for a recoverable draft before normal initialization
     const draft = readDraft()
     if (draft) {
@@ -230,7 +259,55 @@ export function FableBuilderPage({
       // URL state sync will handle this case
       initializedRef.current = true
     }
-  }, [fableId, existingFable, fableRetrieveData, preset, encodedState, t])
+  }, [
+    fableId,
+    existingFable,
+    fableRetrieveData,
+    preset,
+    encodedState,
+    templateMode,
+    t,
+  ])
+
+  // Template mode: overlay the plugin's example values/glyphs once the
+  // builder is initialized — mirrors the backend's ingest-validation overlay.
+  const { data: templateExamples, error: templateExamplesError } =
+    useTemplateExampleValues(
+      templateMode ? templatePlugin : undefined,
+      templateMode ? templateName : undefined,
+    )
+  const templateExamplesApplied = useRef(false)
+
+  useEffect(() => {
+    if (!templateMode || templateExamplesApplied.current) return
+    if (!initializedRef.current || !templateExamples) return
+    templateExamplesApplied.current = true
+    const { blocks } = useFableBuilderStore.getState().fable
+    for (const [blockId, values] of Object.entries(
+      templateExamples.example_values,
+    )) {
+      if (blocks[blockId]) updateBlockConfigBatch(blockId, values)
+    }
+    for (const [key, value] of Object.entries(
+      templateExamples.example_glyphs,
+    )) {
+      setLocalGlyph(key, value)
+    }
+    showToast.info(t('configure:template.prefilled'))
+  }, [
+    templateMode,
+    templateExamples,
+    existingFable,
+    updateBlockConfigBatch,
+    setLocalGlyph,
+    t,
+  ])
+
+  useEffect(() => {
+    if (templateMode && templateExamplesError) {
+      showToast.warning(t('configure:template.examplesUnavailable'))
+    }
+  }, [templateMode, templateExamplesError, t])
 
   // Sync React Query validation state → Zustand store for sibling components
   useEffect(() => {
@@ -292,7 +369,10 @@ export function FableBuilderPage({
         className="flex min-w-0 flex-col"
         style={{ height: 'calc(100vh - 7rem)' }}
       >
-        <FableBuilderHeader fableId={fableId} catalogue={catalogue} />
+        <FableBuilderHeader
+          fableId={templateMode ? undefined : fableId}
+          catalogue={catalogue}
+        />
 
         {/* Wrapper is relative so the validation banner overlays absolutely —
             toggling it must not shift the canvas. */}

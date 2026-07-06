@@ -30,11 +30,13 @@ import {
   enablePlugin,
   getPluginDetails,
   getPluginStatus,
+  getTemplateExampleValues,
   installPlugin,
   uninstallPlugin,
   updatePlugin,
   updatePluginSettings,
 } from '@/api/endpoints/plugins'
+import { parsePluginIdString } from '@/api/types/plugins.types'
 import { getCatalogue } from '@/api/endpoints/fable'
 import { toPluginInfoList } from '@/api/types/plugins.types'
 import { fableKeys } from '@/api/hooks/useFable'
@@ -216,6 +218,31 @@ export function useUpdatePluginSettings() {
       settings: PluginSettingsUpdate
     }) => updatePluginSettings(compositeId, settings),
   )
+}
+
+/**
+ * Example values/glyphs for a blueprint template.
+ * @param pluginId - "store:local" composite string (blueprint `created_by` format)
+ * @param displayName - The template's display name within the plugin
+ */
+export function useTemplateExampleValues(
+  pluginId: string | undefined,
+  displayName: string | undefined,
+) {
+  return useQuery({
+    queryKey: [
+      ...pluginKeys.all,
+      'templateExampleValues',
+      pluginId,
+      displayName,
+    ],
+    queryFn: () =>
+      getTemplateExampleValues(parsePluginIdString(pluginId!), displayName!),
+    enabled: !!pluginId && !!displayName,
+    staleTime: Infinity,
+    // 403 (excluded) / 404 (plugin unloaded) are terminal — don't retry
+    retry: false,
+  })
 }
 
 /**

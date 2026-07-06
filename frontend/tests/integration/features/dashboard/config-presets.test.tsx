@@ -25,6 +25,7 @@ import { worker } from '@tests/test-extend'
 import { ConfigPresetsSection } from '@/features/dashboard/components/ConfigPresetsSection'
 import { PresetsPage } from '@/features/dashboard/components/PresetsPage'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import { ToastProvider } from '@/providers/ToastProvider'
 import { ONEOFF_TAG } from '@/lib/system-tags'
 
 // Mock useMedia to simulate desktop layout
@@ -95,6 +96,34 @@ function useBlueprintListHandler(
 
 function useEmptyBlueprintListHandler() {
   useBlueprintListHandler([])
+}
+
+const mockTemplates: Array<WireBlueprint> = [
+  {
+    blueprint_id: 'tpl-001',
+    version: 1,
+    display_name: 'Fast Map',
+    display_description: 'Ready-made starting point',
+    tags: null,
+    source: 'plugin_template',
+    created_by: 'local:plugin-test',
+  },
+]
+
+/** List handler that honours the ?source= filter, like the real backend. */
+function useSourceAwareListHandler(all: Array<WireBlueprint>) {
+  worker.use(
+    http.get(API_ENDPOINTS.fable.list, ({ request }) => {
+      const source = new URL(request.url).searchParams.get('source')
+      const blueprints = source ? all.filter((b) => b.source === source) : all
+      return HttpResponse.json({
+        blueprints,
+        total: blueprints.length,
+        page: 1,
+        page_size: 50,
+      })
+    }),
+  )
 }
 
 describe('ConfigPresetsSection', () => {
@@ -263,5 +292,144 @@ describe('PresetsPage', () => {
 
     const loadButtons = screen.getByText('Use this Preset')
     await expect.element(loadButtons.first()).toBeVisible()
+  })
+})
+
+describe('PresetsPage — Templates tab', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('lists plugin templates with chip, plugin label and a Use template action', async () => {
+    useSourceAwareListHandler([...mockBlueprints, ...mockTemplates])
+
+    const screen = await renderWithRouter(<PresetsPage />)
+
+    await screen.getByRole('button', { name: 'Templates' }).click()
+
+    await expect.element(screen.getByText('Fast Map')).toBeVisible()
+    await expect
+      .element(screen.getByText('Template', { exact: true }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByText('From plugin: plugin-test'))
+      .toBeVisible()
+    await expect.element(screen.getByText('Use template')).toBeVisible()
+    // User presets don't render on the Templates tab
+    await expect
+      .element(screen.getByText('European Forecast'))
+      .not.toBeInTheDocument()
+  })
+
+  it('does not leak templates into the All tab', async () => {
+    useSourceAwareListHandler([...mockBlueprints, ...mockTemplates])
+
+    const screen = await renderWithRouter(<PresetsPage />)
+
+    await expect.element(screen.getByText('European Forecast')).toBeVisible()
+    await expect.element(screen.getByText('Fast Map')).not.toBeInTheDocument()
+  })
+})
+
+describe('PresetsPage — template lineage', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('shows a "Based on" hint for presets forked from a template', async () => {
+    useSourceAwareListHandler(mockBlueprints.slice(0, 1))
+    worker.use(
+      http.get(API_ENDPOINTS.fable.get, ({ request }) => {
+        const id = new URL(request.url).searchParams.get('blueprint_id')
+        if (id === 'bp-001') {
+          return HttpResponse.json({
+            blueprint_id: 'bp-001',
+            version: 1,
+            builder: { blocks: {} },
+            display_name: 'European Forecast',
+            display_description: null,
+            tags: [],
+            parent_id: 'tpl-001',
+          })
+        }
+        if (id === 'tpl-001') {
+          return HttpResponse.json({
+            blueprint_id: 'tpl-001',
+            version: 1,
+            builder: { blocks: {} },
+            display_name: 'Fast Map',
+            display_description: null,
+            tags: [],
+            parent_id: null,
+          })
+        }
+        return HttpResponse.json({ message: 'not found' }, { status: 404 })
+      }),
+    )
+
+    const screen = await renderWithRouter(<PresetsPage />)
+
+    await expect.element(screen.getByText('European Forecast')).toBeVisible()
+    await expect.element(screen.getByText(/Based on: Fast Map/)).toBeVisible()
+  })
+})
+
+describe('PresetsPage — delete preset', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('shows a success toast and no refresh error after deleting', async () => {
+    let list = mockBlueprints.slice(0, 1)
+    worker.use(
+      http.get(API_ENDPOINTS.fable.list, () =>
+        HttpResponse.json({
+          blueprints: list,
+          total: list.length,
+          page: 1,
+          page_size: 50,
+        }),
+      ),
+      http.get(API_ENDPOINTS.fable.get, ({ request }) => {
+        const id = new URL(request.url).searchParams.get('blueprint_id')
+        if (id === 'bp-001' && list.length > 0) {
+          return HttpResponse.json({
+            blueprint_id: 'bp-001',
+            version: 1,
+            builder: { blocks: {} },
+            display_name: 'European Forecast',
+            display_description: null,
+            tags: [],
+            parent_id: null,
+          })
+        }
+        return HttpResponse.json(
+          { detail: `Blueprint '${id}' not found` },
+          { status: 404 },
+        )
+      }),
+      http.post(API_ENDPOINTS.fable.delete, () => {
+        list = []
+        return HttpResponse.json({ success: true })
+      }),
+    )
+
+    const screen = await renderWithRouter(
+      <ToastProvider>
+        <PresetsPage />
+      </ToastProvider>,
+    )
+    await expect.element(screen.getByText('European Forecast')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'More options' }).click()
+    await screen.getByText('Delete').click()
+
+    await expect.element(screen.getByText('Preset deleted')).toBeVisible()
+    await expect
+      .element(screen.getByText('European Forecast'))
+      .not.toBeInTheDocument()
+    await expect
+      .element(screen.getByText(/Failed to refresh data/))
+      .not.toBeInTheDocument()
   })
 })

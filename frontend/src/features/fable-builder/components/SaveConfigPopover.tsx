@@ -115,6 +115,8 @@ export function SaveConfigPopover({
   const fable = useFableBuilderStore((s) => s.fable)
   const storeFableId = useFableBuilderStore((s) => s.fableId)
   const storeFableVersion = useFableBuilderStore((s) => s.fableVersion)
+  const forkParentId = useFableBuilderStore((s) => s.forkParentId)
+  const storeFableName = useFableBuilderStore((s) => s.fableName)
   const markSaved = useFableBuilderStore((s) => s.markSaved)
 
   const upsertFable = useUpsertFable()
@@ -140,6 +142,7 @@ export function SaveConfigPopover({
     if (nextOpen) {
       setTitle(
         fableData?.display_name ||
+          storeFableName ||
           t('configure:save.defaultTitle', generateDefaultTitleParts()),
       )
       setComments(fableData?.display_description || '')
@@ -160,13 +163,17 @@ export function SaveConfigPopover({
         t('configure:save.defaultTitle', generateDefaultTitleParts())
       const result = await upsertFable.mutateAsync({
         fable,
-        // Update: pass ID + version for in-place update
-        // Save as New: pass ID as parentId for lineage tracking
+        // Update: ID + version + stored parent_id (backend replaces the row).
+        // Save as New / template fork: the origin becomes parentId.
         fableId: isExistingUpdate ? effectiveFableId : undefined,
         fableVersion: isExistingUpdate
           ? (storeFableVersion ?? fableData?.version)
           : undefined,
-        parentId: asCopy ? (effectiveFableId ?? undefined) : undefined,
+        parentId: isExistingUpdate
+          ? (fableData?.parent_id ?? undefined)
+          : asCopy
+            ? (effectiveFableId ?? undefined)
+            : (forkParentId ?? undefined),
         display_name: displayTitle,
         display_description: comments.trim(),
         tags,

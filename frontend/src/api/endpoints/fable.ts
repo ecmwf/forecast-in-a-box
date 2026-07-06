@@ -110,15 +110,29 @@ export async function upsertFable(
   )
 }
 
+/** Optional server-side filters for the blueprint list endpoint */
+export interface BlueprintListFilters {
+  /** Restrict to blueprints with this source (e.g. 'plugin_template', 'user_defined') */
+  source?: string
+  /** Restrict to blueprints owned by this user or plugin */
+  createdBy?: string
+}
+
 /**
  * List all saved blueprints (paginated)
  */
 export async function listBlueprints(
   page: number = 1,
   pageSize: number = 10,
+  filters?: BlueprintListFilters,
 ): Promise<BlueprintListResponse> {
   return apiClient.get(API_ENDPOINTS.fable.list, {
-    params: { page, page_size: pageSize },
+    params: {
+      page,
+      page_size: pageSize,
+      ...(filters?.source && { source: filters.source }),
+      ...(filters?.createdBy && { created_by: filters.createdBy }),
+    },
     schema: BlueprintListResponseSchema,
   })
 }

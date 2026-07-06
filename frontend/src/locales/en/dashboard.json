@@ -132,7 +132,8 @@
     "searchPlaceholder": "Search presets...",
     "filters": {
       "all": "All",
-      "bookmarked": "Bookmarked"
+      "bookmarked": "Bookmarked",
+      "templates": "Templates"
     },
     "page": {
       "title": "Configuration Presets",
@@ -147,7 +148,18 @@
       "previous": "Previous",
       "next": "Next",
       "page": "Page {{current}} of {{total}}"
-    }
+    },
+    "templates": {
+      "chip": "Template",
+      "fromPlugin": "From plugin: {{plugin}}",
+      "use": "Use template",
+      "empty": {
+        "title": "No templates available",
+        "description": "Installed plugins can ship blueprint templates as ready-made starting points."
+      }
+    },
+    "basedOn": "Based on: {{name}}",
+    "deleted": "Preset deleted"
   },
   "notification": {
     "newModels": "New models and model versions have been published in the",

@@ -16,6 +16,7 @@ import {
   expandFable,
   getCatalogue,
   retrieveFable,
+  updateBlueprint,
   upsertFable,
 } from '@/api/endpoints/fable'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -324,5 +325,33 @@ describe('upsertFable', () => {
       parent_id: 'existing-id',
     })
     expect(capturedBody).toMatchObject({ parent_id: 'existing-id' })
+  })
+})
+
+describe('updateBlueprint', () => {
+  afterEach(() => {
+    worker.resetHandlers()
+  })
+
+  it('re-sends parent_id so the version bump keeps its lineage', async () => {
+    let capturedBody: unknown = null
+
+    worker.use(
+      http.post(API_ENDPOINTS.fable.update, async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json({ blueprint_id: 'bp-1', version: 3 })
+      }),
+    )
+
+    await updateBlueprint({
+      blueprint_id: 'bp-1',
+      version: 2,
+      builder: mockFable,
+      display_name: 'Renamed',
+      display_description: '',
+      tags: [],
+      parent_id: 'tpl-001',
+    })
+    expect(capturedBody).toMatchObject({ parent_id: 'tpl-001' })
   })
 })

@@ -19,7 +19,9 @@ import {
   useDeleteBlueprint,
   useListBlueprints,
 } from '@/api/hooks/useFable'
+import i18n from 'i18next'
 import { deriveModelLabel, deriveSinkKinds } from '@/features/journal/adapters'
+import { showToast } from '@/lib/toast'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { isOneoffBlueprint, stripSystemTags } from '@/lib/system-tags'
@@ -104,7 +106,12 @@ export function useConfigPresets() {
   // Functional setFavourites updates keep these callbacks stable (favourites is
   // not in the closure) so memoised preset rows don't re-render on every render.
   function deletePreset(blueprintId: string, version: number) {
-    deleteMutation.mutate({ blueprint_id: blueprintId, version })
+    deleteMutation.mutate(
+      { blueprint_id: blueprintId, version },
+      {
+        onSuccess: () => showToast.success(i18n.t('dashboard:presets.deleted')),
+      },
+    )
     // Clean up favourite flag
     const { [blueprintId]: _, ...rest } = favourites
     setFavourites(rest)
