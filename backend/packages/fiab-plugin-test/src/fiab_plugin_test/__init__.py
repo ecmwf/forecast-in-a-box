@@ -14,9 +14,9 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlockInstanceOutput,
     BlueprintTemplate,
+    BlueprintTemplateBlock,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
-    LocalBlock,
     NoOutput,
     RawOutput,
 )
@@ -195,8 +195,8 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
 plugin = lambda: Plugin(catalogue=catalogue(), validator=validator, expander=expander, compiler=compiler)
 
 
-def _make_source_text_block(text: str) -> LocalBlock:
-    return LocalBlock(
+def _make_source_text_block(text: str) -> BlueprintTemplateBlock:
+    return BlueprintTemplateBlock(
         factory_id=BlockFactoryId("source_text"),
         instance=BlockInstance(
             configuration_values={TEXT: text} if text else {},
@@ -254,7 +254,7 @@ _testFailValidation = BlueprintTemplate(
     display_name="testFailValidation",
     display_description="A template that references a non-existent factory and always fails validation.",
     blocks={
-        _BLOCK_FAIL_VAL: LocalBlock(
+        _BLOCK_FAIL_VAL: BlueprintTemplateBlock(
             factory_id=BlockFactoryId("nonexistent_factory"),
             instance=BlockInstance(configuration_values={}, input_ids={}),
         ),

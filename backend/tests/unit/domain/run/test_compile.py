@@ -13,13 +13,12 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     ConfigurationOptionId,
     NoOutput,
-    PluginBlockFactoryId,
     PluginCompositeId,
 )
 from fiab_core.plugin import BlockValidation, Plugin
 from pyrsistent import pmap
 
-from forecastbox.domain.blueprint.service import BlueprintBuilder, RoutedBlock
+from forecastbox.domain.blueprint.service import BlueprintBuilder, RoutableBlock
 from forecastbox.domain.glyphs.resolution import merge_glyph_values
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.compile import compile_builder
@@ -171,12 +170,14 @@ def test_compile_builder_fails_missing_config_before_plugin_compile(monkeypatch:
     )
     monkeypatch.setattr(PluginManager, "plugins", pmap({plugin_id: plugin}))
     blueprint = BlueprintBuilder(
-        blocks={
-            BlockInstanceId("source_requires_amount"): RoutedBlock(
-                factory_id=PluginBlockFactoryId(plugin=plugin_id, factory=factory_id),
+        blocks=[
+            RoutableBlock(
+                instance_id=BlockInstanceId("source_requires_amount"),
+                plugin=plugin_id,
+                factory=factory_id,
                 instance=BlockInstance(configuration_values={}, input_ids={}),
             )
-        }
+        ]
     )
 
     with pytest.raises(ValueError, match="missing configuration options"):

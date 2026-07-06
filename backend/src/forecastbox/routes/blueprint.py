@@ -36,7 +36,6 @@ from fiab_core.fable import (
     BlockInstanceId,
     ConfigurationOptionId,
     PluginBlockExpansion,
-    PluginBlockFactoryId,
     PluginCompositeId,
 )
 
@@ -47,7 +46,13 @@ from forecastbox.domain.blueprint.exceptions import (
     BlueprintNotFound,
     BlueprintVersionConflict,
 )
-from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, BlueprintValidationExpansion, Tag
+from forecastbox.domain.blueprint.service import (
+    BlueprintBuilder,
+    BlueprintSaveCommand,
+    BlueprintValidationExpansion,
+    PluginBlockFactoryId,
+    Tag,
+)
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples

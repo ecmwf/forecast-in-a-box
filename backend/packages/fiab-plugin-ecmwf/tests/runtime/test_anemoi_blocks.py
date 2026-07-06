@@ -11,7 +11,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
-from fiab_core.fable import BlockFactoryId, ConfigurationOptionId, PluginBlockFactoryId, PluginCompositeId, QubedOutput
+from fiab_core.fable import BlockFactoryId, ConfigurationOptionId, PluginCompositeId, QubedOutput
 from fiab_core.fable import BlockInstance as BlockInstanceBase
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
@@ -39,14 +39,10 @@ def _make_block(
     """Build a *typed* BlockInstanceRich whose configuration values have already
     been converted to the correct Python types (int, datetime, …)."""
     base = BlockInstanceBase(
-        factory_id=PluginBlockFactoryId(
-            plugin=PluginCompositeId.from_str("ecmwf:ecmwf"),
-            factory=factory_cls.__name__,  # type: ignore[arg-type]
-        ),
         input_ids=input_ids or {},
         configuration_values=_config(config),
     )
-    return BlockInstance.from_block(base, factory_cls.configuration_options)
+    return BlockInstance.from_block(BlockFactoryId(factory_cls.__name__), base, factory_cls.configuration_options)  # type: ignore[arg-type]
 
 
 def _make_raw_block(
@@ -57,14 +53,10 @@ def _make_raw_block(
     """Build a BlockInstanceRich whose configuration values are *raw strings*
     (as they would arrive from the frontend before deserialisation)."""
     base = BlockInstanceBase(
-        factory_id=PluginBlockFactoryId(
-            plugin=PluginCompositeId.from_str("ecmwf:ecmwf"),
-            factory=factory_cls.__name__,  # type: ignore[arg-type]
-        ),
         input_ids=input_ids or {},
         configuration_values=_config(config),
     )
-    return BlockInstance.from_block(base, factory_cls.configuration_options)
+    return BlockInstance.from_block(BlockFactoryId(factory_cls.__name__), base, factory_cls.configuration_options)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

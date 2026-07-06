@@ -59,7 +59,7 @@ Expander = Callable[[BlockInstanceOutput], list[BlockExpansion]]
 """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
 
 Compiler = Callable[[ActionLookup, BlockFactoryId, BlockInstance], Either[Action, Error]]  # ty:ignore[invalid-type-arguments] # semigroup
-"""Given a cascade builder, represented as lookup of fluent actions, the local factory id, and a block instance corresponding to this plugin's Factory, either return the fluent action resulting from this block or an error"""
+"""Given a cascade builder, represented as lookup of fluent actions, a factory id from this Plugin, and a block instance corresponding to it, either return the fluent action resulting from this block or an error"""
 
 
 @dataclass(frozen=True, eq=True, slots=True)

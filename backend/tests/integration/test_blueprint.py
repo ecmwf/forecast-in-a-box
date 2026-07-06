@@ -34,10 +34,10 @@ from typing import Any, get_args
 import cloudpickle
 import httpx
 import pytest
-from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, ConfigurationOptionId, PluginBlockFactoryId, PluginCompositeId
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, ConfigurationOptionId, PluginCompositeId
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
-from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, Tag
+from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, RoutableBlock, Tag
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
 from forecastbox.routes.run import CompilationDetailResponse, RunCreateResponse
 
@@ -65,56 +65,88 @@ def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float 
 
 
 def _make_builder_source_only() -> BlueprintBuilder:
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    return BlueprintBuilder(blocks={BlockInstanceId("source_42"): source_42})
+    return BlueprintBuilder(
+        blocks=[
+            source_42,
+        ]
+    )
 
 
 def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    transform_increment = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values=_config({"amount": "1"}),
-        input_ids={"a": BlockInstanceId("source_42")},
+    transform_increment = RoutableBlock(
+        instance_id=BlockInstanceId("transform_increment"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values=_config({"amount": "1"}),
+            input_ids={"a": BlockInstanceId("source_42")},
+        ),
     )
-    product_join = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("product_join")),
-        configuration_values={},
-        input_ids={"a": BlockInstanceId("transform_increment"), "b": BlockInstanceId("source_42")},
+    product_join = RoutableBlock(
+        instance_id=BlockInstanceId("product_join"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("product_join"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={"a": BlockInstanceId("transform_increment"), "b": BlockInstanceId("source_42")},
+        ),
     )
-    sink_main = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/output${{runId}}.main.txt"}),
-        input_ids={"data": BlockInstanceId("product_join")},
+    sink_main = RoutableBlock(
+        instance_id=BlockInstanceId("sink_main"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/output${{runId}}.main.txt"}),
+            input_ids={"data": BlockInstanceId("product_join")},
+        ),
     )
-    source_time = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values=_config(
-            {"text": "${submitDatetime};${startDatetime};${basicExecuteGlobalGlyph};${blueprintExecuteLocalGlyph}"}
+    source_time = RoutableBlock(
+        instance_id=BlockInstanceId("source_time"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_text"),
+        instance=BlockInstance(
+            configuration_values=_config(
+                {"text": "${submitDatetime};${startDatetime};${basicExecuteGlobalGlyph};${blueprintExecuteLocalGlyph}"}
+            ),
         ),
         input_ids={},
     )
-    sink_time = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/output${{runId}}.time.txt"}),
-        input_ids={"data": BlockInstanceId("source_time")},
+    sink_time = RoutableBlock(
+        instance_id=BlockInstanceId("sink_time"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/output${{runId}}.time.txt"}),
+            input_ids={"data": BlockInstanceId("source_time")},
+        ),
     )
     return BlueprintBuilder(
-        blocks={
-            BlockInstanceId("source_42"): source_42,
-            BlockInstanceId("transform_increment"): transform_increment,
-            BlockInstanceId("product_join"): product_join,
-            BlockInstanceId("sink_main"): sink_main,
-            BlockInstanceId("source_time"): source_time,
-            BlockInstanceId("sink_time"): sink_time,
-        },
+        blocks=[
+            source_42,
+            transform_increment,
+            product_join,
+            sink_main,
+            source_time,
+            sink_time,
+        ],
         local_glyphs={"blueprintExecuteLocalGlyph": "local_glyph_value"},
     )
 
@@ -391,7 +423,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     response = backend_client_with_auth.get("/blueprint/catalogue").raise_for_status()
     assert len(response.json()) > 0
 
-    builder = BlueprintBuilder(blocks={})
+    builder = BlueprintBuilder(blocks=[])
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.json()["possible_sources"] == [
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "source_42"},
@@ -401,12 +433,16 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     ]
     assert response.json()["possible_expansions"] == {}
 
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    blocks = {BlockInstanceId("source_42"): source_42}
+    blocks = [source_42]
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.json()["possible_expansions"] == {
@@ -422,12 +458,16 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         ]
     }
 
-    transform_increment = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values=_config({"amount": "2"}),
-        input_ids={"a": BlockInstanceId("source_42")},
+    transform_increment = RoutableBlock(
+        instance_id=BlockInstanceId("transform_increment"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values=_config({"amount": "2"}),
+            input_ids={"a": BlockInstanceId("source_42")},
+        ),
     )
-    blocks[BlockInstanceId("transform_increment")] = transform_increment
+    blocks.append(transform_increment)
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.json()["possible_expansions"]["transform_increment"] == [
@@ -441,19 +481,27 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image", "restrictions": {}},
     ]
 
-    product_join = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("product_join")),
-        configuration_values={},
-        input_ids={"a": BlockInstanceId("transform_increment"), "b": BlockInstanceId("source_42")},
+    product_join = RoutableBlock(
+        instance_id=BlockInstanceId("product_join"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("product_join"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={"a": BlockInstanceId("transform_increment"), "b": BlockInstanceId("source_42")},
+        ),
     )
     # Using an unknown glyph should not fail validation — it should be reported in missing_glyphs
-    sink_file_bad = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/output${{blueprintExpandGlobalGlyph}}.main.txt"}),
-        input_ids={"data": BlockInstanceId("product_join")},
+    sink_file_bad = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file_bad"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/output${{blueprintExpandGlobalGlyph}}.main.txt"}),
+            input_ids={"data": BlockInstanceId("product_join")},
+        ),
     )
-    blocks[BlockInstanceId("product_join")] = product_join
-    blocks[BlockInstanceId("sink_file")] = sink_file_bad
+    blocks.append(product_join)
+    blocks.append(sink_file_bad)
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
@@ -482,12 +530,16 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     assert len(response.json()["global_errors"]) > 0
 
     # A block using a local glyph defined on the builder should pass validation
-    sink_file_local = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/output${{blueprintExpandLocalGlyph}}.main.txt"}),
-        input_ids={"data": BlockInstanceId("product_join")},
+    sink_file_local = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file_local"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/output${{blueprintExpandLocalGlyph}}.main.txt"}),
+            input_ids={"data": BlockInstanceId("product_join")},
+        ),
     )
-    blocks[BlockInstanceId("sink_file")] = sink_file_local
+    blocks.append(sink_file_local)
     builder_with_local = BlueprintBuilder(
         blocks=dict(blocks),
         local_glyphs={"blueprintExpandLocalGlyph": "expand_local_value"},
@@ -498,12 +550,16 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/outputexpand_local_value.main.txt"
 
     # A known intrinsic glyph (${runId}) should also pass validation
-    sink_file_intrinsic = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/output${{runId}}.main.txt"}),
-        input_ids={"data": BlockInstanceId("product_join")},
+    sink_file_intrinsic = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file_intrinsic"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/output${{runId}}.main.txt"}),
+            input_ids={"data": BlockInstanceId("product_join")},
+        ),
     )
-    blocks[BlockInstanceId("sink_file")] = sink_file_intrinsic
+    blocks.append(sink_file_intrinsic)
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
@@ -533,12 +589,20 @@ def test_blueprint_expand_restrictions(backend_client_with_auth: httpx.Client) -
     It also returns the same restriction for transform_increment's own configuration.
     This test verifies both restrictions survive the full route round-trip.
     """
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    builder = BlueprintBuilder(blocks={BlockInstanceId("source_42"): source_42})
+    builder = BlueprintBuilder(
+        blocks=[
+            source_42,
+        ]
+    )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
 
@@ -548,16 +612,20 @@ def test_blueprint_expand_restrictions(backend_client_with_auth: httpx.Client) -
         "transform_increment expansion must carry an enumClosed[1,2,3] restriction on 'amount'"
     )
 
-    transform_increment = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values=_config({"amount": "2"}),
-        input_ids={"a": BlockInstanceId("source_42")},
+    transform_increment = RoutableBlock(
+        instance_id=BlockInstanceId("transform_increment"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values=_config({"amount": "2"}),
+            input_ids={"a": BlockInstanceId("source_42")},
+        ),
     )
     builder = BlueprintBuilder(
-        blocks={
-            BlockInstanceId("source_42"): source_42,
-            BlockInstanceId("transform_increment"): transform_increment,
-        }
+        blocks=[
+            source_42,
+            transform_increment,
+        ]
     )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
@@ -575,18 +643,31 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_wit
       is still validated normally.
     - Malformed glyph expressions (syntax errors) remain hard block_errors.
     """
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
     # sink_file with fname referencing a missing glyph
-    sink_file = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/output_${{missingRoot}}.txt"}),
-        input_ids={"data": BlockInstanceId("source_42")},
+    sink_file = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/output_${{missingRoot}}.txt"}),
+            input_ids={"data": BlockInstanceId("source_42")},
+        ),
     )
-    builder = BlueprintBuilder(blocks={BlockInstanceId("source_42"): source_42, BlockInstanceId("sink_file"): sink_file})
+    builder = BlueprintBuilder(
+        blocks=[
+            source_42,
+            sink_file,
+        ]
+    )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
     data = response.json()
@@ -619,13 +700,20 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_wit
     assert del_resp.is_success, del_resp.text
 
     # Malformed expression remains a hard block_error
-    sink_file_malformed = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": "${x |}"}),
-        input_ids={"data": BlockInstanceId("source_42")},
+    sink_file_malformed = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file_malformed"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": "${x |}"}),
+            input_ids={"data": BlockInstanceId("source_42")},
+        ),
     )
     builder_malformed = BlueprintBuilder(
-        blocks={BlockInstanceId("source_42"): source_42, BlockInstanceId("sink_file"): sink_file_malformed}
+        blocks=[
+            source_42,
+            sink_file_malformed.model_copy(update={"instance_id": BlockInstanceId("sink_file")}),
+        ]
     )
     response_malformed = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_malformed.model_dump())
     assert response_malformed.is_success, response_malformed.text
@@ -867,17 +955,30 @@ def test_list_glyph_functions(backend_client_with_auth: httpx.Client) -> None:
 
 def test_blueprint_expand_failure_01(backend_client_with_auth: httpx.Client) -> None:
     """Source has an invalid factory; transform referencing it must not generate its own error."""
-    bad_source = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("nonexistent_factory")),
-        configuration_values={},
-        input_ids={},
+    bad_source = RoutableBlock(
+        instance_id=BlockInstanceId("bad_source"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("nonexistent_factory"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    good_transform = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values=_config({"amount": "1"}),
-        input_ids={"a": BlockInstanceId("bad_source")},
+    good_transform = RoutableBlock(
+        instance_id=BlockInstanceId("good_transform"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values=_config({"amount": "1"}),
+            input_ids={"a": BlockInstanceId("bad_source")},
+        ),
     )
-    builder = BlueprintBuilder(blocks={BlockInstanceId("bad_source"): bad_source, BlockInstanceId("good_transform"): good_transform})
+    builder = BlueprintBuilder(
+        blocks=[
+            bad_source,
+            good_transform,
+        ]
+    )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
     block_errors = response.json()["block_errors"]
@@ -887,17 +988,30 @@ def test_blueprint_expand_failure_01(backend_client_with_auth: httpx.Client) -> 
 
 def test_blueprint_expand_failure_02(backend_client_with_auth: httpx.Client) -> None:
     """Transform declares an input id that does not exist in the blueprint; only the transform errors."""
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    bad_transform = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values=_config({"amount": "1"}),
-        input_ids={"a": BlockInstanceId("nonexistent_block")},
+    bad_transform = RoutableBlock(
+        instance_id=BlockInstanceId("bad_transform"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values=_config({"amount": "1"}),
+            input_ids={"a": BlockInstanceId("nonexistent_block")},
+        ),
     )
-    builder = BlueprintBuilder(blocks={BlockInstanceId("source_42"): source_42, BlockInstanceId("bad_transform"): bad_transform})
+    builder = BlueprintBuilder(
+        blocks=[
+            source_42,
+            bad_transform,
+        ]
+    )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
     block_errors = response.json()["block_errors"]
@@ -907,17 +1021,30 @@ def test_blueprint_expand_failure_02(backend_client_with_auth: httpx.Client) -> 
 
 def test_blueprint_expand_failure_03(backend_client_with_auth: httpx.Client) -> None:
     """Bad source and transform with a non-existent input id both report independent errors."""
-    bad_source = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("nonexistent_factory")),
-        configuration_values={},
-        input_ids={},
+    bad_source = RoutableBlock(
+        instance_id=BlockInstanceId("bad_source"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("nonexistent_factory"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    bad_transform = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values=_config({"amount": "1"}),
-        input_ids={"a": BlockInstanceId("nonexistent_block")},
+    bad_transform = RoutableBlock(
+        instance_id=BlockInstanceId("bad_transform"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values=_config({"amount": "1"}),
+            input_ids={"a": BlockInstanceId("nonexistent_block")},
+        ),
     )
-    builder = BlueprintBuilder(blocks={BlockInstanceId("bad_source"): bad_source, BlockInstanceId("bad_transform"): bad_transform})
+    builder = BlueprintBuilder(
+        blocks=[
+            bad_source,
+            bad_transform,
+        ]
+    )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
     block_errors = response.json()["block_errors"]
@@ -925,12 +1052,21 @@ def test_blueprint_expand_failure_03(backend_client_with_auth: httpx.Client) -> 
     assert "bad_transform" in block_errors
 
     # we now verify that the missing-glyph warning for transform is reported, despite parent being invalid
-    bad_transform2 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values=_config({"amount": "${nonExistentGlyph}"}),
-        input_ids={"a": BlockInstanceId("bad_source")},
+    bad_transform2 = RoutableBlock(
+        instance_id=BlockInstanceId("bad_transform2"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values=_config({"amount": "${nonExistentGlyph}"}),
+            input_ids={"a": BlockInstanceId("bad_source")},
+        ),
     )
-    builder = BlueprintBuilder(blocks={BlockInstanceId("bad_source"): bad_source, BlockInstanceId("bad_transform"): bad_transform2})
+    builder = BlueprintBuilder(
+        blocks=[
+            bad_source,
+            bad_transform2.model_copy(update={"instance_id": BlockInstanceId("bad_transform")}),
+        ]
+    )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
     block_errors = response.json()["block_errors"]
@@ -942,17 +1078,30 @@ def test_blueprint_expand_failure_03(backend_client_with_auth: httpx.Client) -> 
 
 def test_blueprint_expand_failure_04_invalid_configuration_type(backend_client_with_auth: httpx.Client) -> None:
     """Type conversion errors are reported by backend validation before plugin validation."""
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    bad_transform = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values=_config({"amount": "not_an_int"}),
-        input_ids={"a": BlockInstanceId("source_42")},
+    bad_transform = RoutableBlock(
+        instance_id=BlockInstanceId("bad_transform"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values=_config({"amount": "not_an_int"}),
+            input_ids={"a": BlockInstanceId("source_42")},
+        ),
     )
-    builder = BlueprintBuilder(blocks={BlockInstanceId("source_42"): source_42, BlockInstanceId("bad_transform"): bad_transform})
+    builder = BlueprintBuilder(
+        blocks=[
+            source_42,
+            bad_transform,
+        ]
+    )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
     block_errors = response.json()["block_errors"]
@@ -962,21 +1111,29 @@ def test_blueprint_expand_failure_04_invalid_configuration_type(backend_client_w
 
 def test_blueprint_expand_missing_configuration_is_not_error(backend_client_with_auth: httpx.Client) -> None:
     """Missing values are omitted during validation instead of producing hard errors."""
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    transform_missing_amount = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values={},
-        input_ids={"a": BlockInstanceId("source_42")},
+    transform_missing_amount = RoutableBlock(
+        instance_id=BlockInstanceId("transform_missing_amount"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={"a": BlockInstanceId("source_42")},
+        ),
     )
     builder = BlueprintBuilder(
-        blocks={
-            BlockInstanceId("source_42"): source_42,
-            BlockInstanceId("transform_missing_amount"): transform_missing_amount,
-        }
+        blocks=[
+            source_42,
+            transform_missing_amount,
+        ]
     )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
@@ -986,21 +1143,29 @@ def test_blueprint_expand_missing_configuration_is_not_error(backend_client_with
 
 def test_blueprint_create_and_update_allow_missing_configuration_values(backend_client_with_auth: httpx.Client) -> None:
     """Draft blueprints with missing config can be saved, but compilation stays strict."""
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    transform_missing_amount = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values={},
-        input_ids={"a": BlockInstanceId("source_42")},
+    transform_missing_amount = RoutableBlock(
+        instance_id=BlockInstanceId("transform_missing_amount"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={"a": BlockInstanceId("source_42")},
+        ),
     )
     builder = BlueprintBuilder(
-        blocks={
-            BlockInstanceId("source_42"): source_42,
-            BlockInstanceId("transform_missing_amount"): transform_missing_amount,
-        }
+        blocks=[
+            source_42,
+            transform_missing_amount,
+        ]
     )
 
     create_response = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
@@ -1032,18 +1197,29 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     assert post_resp.is_success, post_resp.text
 
     # Build a blueprint whose local glyph composes the global part and a known intrinsic
-    source_text = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values=_config({"text": "${compositeLocalGlyph}"}),
-        input_ids={},
+    source_text = RoutableBlock(
+        instance_id=BlockInstanceId("source_text"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_text"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "${compositeLocalGlyph}"}),
+            input_ids={},
+        ),
     )
-    sink_file = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/composite_expand_output.txt"}),
-        input_ids={"data": BlockInstanceId("source_text")},
+    sink_file = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/composite_expand_output.txt"}),
+            input_ids={"data": BlockInstanceId("source_text")},
+        ),
     )
     builder = BlueprintBuilder(
-        blocks={BlockInstanceId("source_text"): source_text, BlockInstanceId("sink_file"): sink_file},
+        blocks=[
+            source_text,
+            sink_file,
+        ],
         local_glyphs={"compositeLocalGlyph": "${compositeExpandGlobalPart}/${runId}"},
     )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
@@ -1060,13 +1236,20 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
 
     # A local glyph that references an unknown glyph surfaces as a missing_glyph warning,
     # even though the composite glyph key itself is known.
-    sink_file_missing = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/output.txt"}),
-        input_ids={"data": BlockInstanceId("source_text")},
+    sink_file_missing = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file_missing"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/output.txt"}),
+            input_ids={"data": BlockInstanceId("source_text")},
+        ),
     )
     builder_nested_unknown = BlueprintBuilder(
-        blocks={BlockInstanceId("source_text"): source_text, BlockInstanceId("sink_file"): sink_file_missing},
+        blocks=[
+            source_text,
+            sink_file_missing.model_copy(update={"instance_id": BlockInstanceId("sink_file")}),
+        ],
         local_glyphs={"compositeLocalGlyph": "${compositeExpandGlobalPart}/${notDefinedAnywhere}"},
     )
     response_nested = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_nested_unknown.model_dump())
@@ -1078,7 +1261,10 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
 
     # A builder with a circular glyph reference must report a global_error
     builder_cyclic = BlueprintBuilder(
-        blocks={BlockInstanceId("source_text"): source_text, BlockInstanceId("sink_file"): sink_file},
+        blocks=[
+            source_text,
+            sink_file,
+        ],
         local_glyphs={"compositeLocalGlyph": "${compositeLocalGlyph}/suffix"},
     )
     response_cyclic = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_cyclic.model_dump())
@@ -1095,13 +1281,19 @@ def test_blueprint_composite_glyph_expand(tmpdir: Any, backend_client_with_auth:
     submit_example = next(g["valueExample"] for g in glyphs_resp2.json()["glyphs"] if g["name"] == "submitDatetime")
     # floor_day of the example value: strip time component
     expected_floored = submit_example[:10] + "T00:00:00+00:00"
-    source_jinja = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values=_config({"text": "${jinjaFilterGlyph}"}),
-        input_ids={},
+    source_jinja = RoutableBlock(
+        instance_id=BlockInstanceId("source_jinja"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_text"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "${jinjaFilterGlyph}"}),
+            input_ids={},
+        ),
     )
     builder_jinja = BlueprintBuilder(
-        blocks={BlockInstanceId("source_jinja"): source_jinja},
+        blocks=[
+            source_jinja,
+        ],
         local_glyphs={"jinjaFilterGlyph": "${submitDatetime | floor_day}"},
     )
     response_jinja = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_jinja.model_dump())
@@ -1134,12 +1326,20 @@ def test_blueprint_jinja_interpolation_expand(backend_client_with_auth: httpx.Cl
     """
     # Malformed: hyphens make `this-is-no-filter` parsed as subtraction; the resulting "glyph"
     # names (is, no, filter) are unknown, so the block gets a missing_glyph entry.
-    source_malformed = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values=_config({"text": "${startDatetime | this-is-no-filter}"}),
-        input_ids={},
+    source_malformed = RoutableBlock(
+        instance_id=BlockInstanceId("source_malformed"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_text"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "${startDatetime | this-is-no-filter}"}),
+            input_ids={},
+        ),
     )
-    builder_malformed = BlueprintBuilder(blocks={BlockInstanceId("source_text"): source_malformed})
+    builder_malformed = BlueprintBuilder(
+        blocks=[
+            source_malformed.model_copy(update={"instance_id": BlockInstanceId("source_text")}),
+        ]
+    )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_malformed.model_dump())
     assert response.is_success, response.text
     data = response.json()
@@ -1149,12 +1349,20 @@ def test_blueprint_jinja_interpolation_expand(backend_client_with_auth: httpx.Cl
     # Well-formed: pure jinja arithmetic using registered globals (datetime, timedelta) and filter (floor_day).
     # Parentheses are required because Jinja2's | (filter) has higher precedence than +.
     # (datetime(2024, 1, 15) + timedelta(days=1)) | floor_day = 2024-01-16T00:00:00
-    source_wellformed = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values=_config({"text": "${(datetime(2024, 1, 15) + timedelta(days=1)) | floor_day}"}),
-        input_ids={},
+    source_wellformed = RoutableBlock(
+        instance_id=BlockInstanceId("source_wellformed"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_text"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "${(datetime(2024, 1, 15) + timedelta(days=1)) | floor_day}"}),
+            input_ids={},
+        ),
     )
-    builder_wellformed = BlueprintBuilder(blocks={BlockInstanceId("source_text"): source_wellformed})
+    builder_wellformed = BlueprintBuilder(
+        blocks=[
+            source_wellformed.model_copy(update={"instance_id": BlockInstanceId("source_text")}),
+        ]
+    )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_wellformed.model_dump())
     assert response.is_success, response.text
     data = response.json()
@@ -1176,27 +1384,39 @@ def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_with_auth
     )
     assert post_resp.is_success, post_resp.text
 
-    source_text = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values=_config({"text": "${compositeLocalGlyphExec}"}),
-        input_ids={},
+    source_text = RoutableBlock(
+        instance_id=BlockInstanceId("source_text"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_text"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "${compositeLocalGlyphExec}"}),
+            input_ids={},
+        ),
     )
-    sink_file = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/composite_exec_output.txt"}),
-        input_ids={"data": BlockInstanceId("source_text")},
+    sink_file = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/composite_exec_output.txt"}),
+            input_ids={"data": BlockInstanceId("source_text")},
+        ),
     )
-    sink_file_2 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/composite_exec_output_2.txt"}),
-        input_ids={"data": BlockInstanceId("source_text")},
+    sink_file_2 = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file_2"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/composite_exec_output_2.txt"}),
+            input_ids={"data": BlockInstanceId("source_text")},
+        ),
     )
     builder = BlueprintBuilder(
-        blocks={
-            BlockInstanceId("source_text"): source_text,
-            BlockInstanceId("sink_file"): sink_file,
-            BlockInstanceId("sink_file_2"): sink_file_2,
-        },
+        blocks=[
+            source_text,
+            sink_file,
+            sink_file_2,
+        ],
         local_glyphs={"compositeLocalGlyphExec": "${compositeExecGlobalPart}/${runId}"},
     )
     save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
@@ -1250,42 +1470,67 @@ def _make_builder_source_and_sink(tmpdir: str) -> BlueprintBuilder:
     Produces exactly one non-sink task (source_42) whose output is the integer 42,
     and one sink task (sink_file).
     """
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    sink = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/output_${{runId}}.txt"}),
-        input_ids={"data": BlockInstanceId("source_42")},
+    sink = RoutableBlock(
+        instance_id=BlockInstanceId("sink"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/output_${{runId}}.txt"}),
+            input_ids={"data": BlockInstanceId("source_42")},
+        ),
     )
-    return BlueprintBuilder(blocks={BlockInstanceId("source_42"): source_42, BlockInstanceId("my_sink"): sink})
+    return BlueprintBuilder(
+        blocks=[
+            source_42,
+            sink.model_copy(update={"instance_id": BlockInstanceId("my_sink")}),
+        ]
+    )
 
 
 def _make_builder_source_and_two_sinks(tmpdir: str) -> BlueprintBuilder:
     """Blueprint with source_42 → sink_file and source_42 → sink_image."""
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    sink_file = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/output_${{runId}}.txt"}),
-        input_ids={"data": BlockInstanceId("source_42")},
+    sink_file = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/output_${{runId}}.txt"}),
+            input_ids={"data": BlockInstanceId("source_42")},
+        ),
     )
-    sink_image = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_image")),
-        configuration_values={},
-        input_ids={"data": BlockInstanceId("source_42")},
+    sink_image = RoutableBlock(
+        instance_id=BlockInstanceId("sink_image"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_image"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={"data": BlockInstanceId("source_42")},
+        ),
     )
     return BlueprintBuilder(
-        blocks={
-            BlockInstanceId("source_42"): source_42,
-            BlockInstanceId("my_sink"): sink_file,
-            BlockInstanceId("my_image_sink"): sink_image,
-        }
+        blocks=[
+            source_42,
+            sink_file.model_copy(update={"instance_id": BlockInstanceId("my_sink")}),
+            sink_image.model_copy(update={"instance_id": BlockInstanceId("my_image_sink")}),
+        ]
     )
 
 
@@ -1440,17 +1685,30 @@ def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, a
 @pytest.mark.skip("leaves hanging process behind")
 def test_gateway_restart_with_in_progress_job(backend_client_with_auth: httpx.Client) -> None:
     """Kill the gateway while a job is active; verify the expected status transitions."""
-    sleeper = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_sleep")),
-        configuration_values=_config({"text": "hello", "duration": "30"}),
-        input_ids={},
+    sleeper = RoutableBlock(
+        instance_id=BlockInstanceId("sleeper"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_sleep"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "hello", "duration": "30"}),
+            input_ids={},
+        ),
     )
-    sink = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": "/dev/null"}),
-        input_ids={"data": BlockInstanceId("sleeper")},
+    sink = RoutableBlock(
+        instance_id=BlockInstanceId("sink"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": "/dev/null"}),
+            input_ids={"data": BlockInstanceId("sleeper")},
+        ),
     )
-    builder = BlueprintBuilder(blocks={BlockInstanceId("sleeper"): sleeper, BlockInstanceId("sleeper_sink"): sink})
+    builder = BlueprintBuilder(
+        blocks=[
+            sleeper,
+            sink.model_copy(update={"instance_id": BlockInstanceId("sleeper_sink")}),
+        ]
+    )
     save_resp = backend_client_with_auth.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
     assert save_resp.is_success, save_resp.text
     blueprint_id = save_resp.json()["blueprint_id"]
@@ -1509,21 +1767,29 @@ def test_blueprint_artifact_execute(tmpdir: Any, backend_client_with_auth: httpx
 
     checkpoint_composite_id = f"{fake_artifact_store_id}:{test_blueprint_artifact_id}"
 
-    source_filesize = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_filesize")),
-        configuration_values=_config({"checkpoint": checkpoint_composite_id}),
-        input_ids={},
+    source_filesize = RoutableBlock(
+        instance_id=BlockInstanceId("source_filesize"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_filesize"),
+        instance=BlockInstance(
+            configuration_values=_config({"checkpoint": checkpoint_composite_id}),
+            input_ids={},
+        ),
     )
-    sink = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": f"{tmpdir}/filesize_${{runId}}.txt"}),
-        input_ids={"data": BlockInstanceId("source_filesize")},
+    sink = RoutableBlock(
+        instance_id=BlockInstanceId("sink"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/filesize_${{runId}}.txt"}),
+            input_ids={"data": BlockInstanceId("source_filesize")},
+        ),
     )
     builder = BlueprintBuilder(
-        blocks={
-            BlockInstanceId("source_filesize"): source_filesize,
-            BlockInstanceId("sink_file"): sink,
-        }
+        blocks=[
+            source_filesize,
+            sink.model_copy(update={"instance_id": BlockInstanceId("sink_file")}),
+        ]
     )
 
     # Validate blueprint via expand

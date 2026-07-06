@@ -21,8 +21,8 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlueprintTemplate,
+    BlueprintTemplateBlock,
     ConfigurationOptionId,
-    LocalBlock,
     PluginCompositeId,
     PluginId,
     PluginStoreId,
@@ -197,7 +197,7 @@ _TEMPLATE_WITH_EXAMPLES = BlueprintTemplate(
     display_name="myTemplate",
     display_description="desc",
     blocks={
-        _BLOCK_A: LocalBlock(
+        _BLOCK_A: BlueprintTemplateBlock(
             factory_id=BlockFactoryId("source_text"),
             instance=BlockInstance(configuration_values={_TEXT: "fixed"}, input_ids={}),
         ),

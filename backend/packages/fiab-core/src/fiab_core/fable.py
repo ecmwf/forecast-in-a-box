@@ -100,17 +100,6 @@ class PluginCompositeId(FiabCoreBaseModel):
         return f"{k.store}:{k.local}"
 
 
-class PluginBlockFactoryId(FiabCoreBaseModel):
-    """Note to plugin authors: This is a routing class. When you implement your BlockFactories for the catalogue,
-    you dont use this, you only need to declare a BlockFactoryId unique inside your plugin. Similarly, when you
-    return which BlockFactories are possible in the expand method, you only return your BlockFactoryIds. This
-    appears only when you receive BlockInstances in the compile/validate -- and again, you just need to use the
-    BlockFactoryId part of this class, as the PluginCompositeId is guaranteed to correspond to your plugin"""
-
-    plugin: PluginCompositeId
-    factory: BlockFactoryId
-
-
 class BlockFactoryCatalogue(FiabCoreBaseModel):
     factories: dict[BlockFactoryId, BlockFactory]
 
@@ -139,7 +128,7 @@ class PluginBlockExpansion(FiabCoreBaseModel):
     """Expansion result as returned to clients, combining plugin identity with restrictions.
 
     This is the service-level representation sent to API consumers, containing
-    the full PluginBlockFactoryId and serialized restriction types.
+    the full plugin composite id, factory id, and serialized restriction types.
     """
 
     plugin: PluginCompositeId
@@ -149,19 +138,12 @@ class PluginBlockExpansion(FiabCoreBaseModel):
 
 
 class BlockInstance(FiabCoreBaseModel):
-    """Pure block content: configuration values and input wiring. No routing concern."""
+    """Configuration values and input wiring, as specified by a client when building a Fable."""
 
     configuration_values: dict[ConfigurationOptionId, Any]
     """Keys come from factory's `configuration_options`, values are either str-serialized (frontend2backend) or deserialized (backend2plugin)"""
     input_ids: dict[str, BlockInstanceId]
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
-
-
-class LocalBlock(FiabCoreBaseModel):
-    """A block as declared inside a plugin (for BlueprintTemplates): carries only a local factory id."""
-
-    factory_id: BlockFactoryId
-    instance: BlockInstance
 
 
 class QubedOutput(FiabCoreBaseModel):
@@ -193,6 +175,13 @@ class BlueprintTemplateEnvironment(FiabCoreBaseModel):
     environment_variables: dict[str, str] = Field(default_factory=dict)
 
 
+class BlueprintTemplateBlock(FiabCoreBaseModel):
+    """A routing-equipped wrapper around a BlockInstance"""
+
+    factory_id: BlockFactoryId
+    instance: BlockInstance
+
+
 class BlueprintTemplate(FiabCoreBaseModel):
     """A partial, ready-to-customise blueprint shipped by a plugin.
 
@@ -204,7 +193,7 @@ class BlueprintTemplate(FiabCoreBaseModel):
 
     display_name: str
     display_description: str
-    blocks: dict[BlockInstanceId, LocalBlock]
+    blocks: dict[BlockInstanceId, BlueprintTemplateBlock]
     environment: BlueprintTemplateEnvironment | None = None
     local_glyphs: dict[str, str] = Field(default_factory=dict)
     example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
