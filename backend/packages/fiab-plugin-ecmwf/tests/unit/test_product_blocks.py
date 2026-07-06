@@ -27,12 +27,15 @@ from fiab_plugin_ecmwf.block_utils import (
     PARAM,
     STEP,
     TYPE,
+    THRESHOLD,
+    COMPARISON,
     _create_param_key,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, contains
 from fiab_plugin_ecmwf.products.blocks import (
     EnsembleStatistics,
     PrescribedThresholdProbability,
+    CustomThresholdProbability,
 )
 
 @pytest.fixture
@@ -47,6 +50,21 @@ def prescribed_threshold_prob_configuration() -> BlockInstance:
             },
         ),
         PrescribedThresholdProbability.configuration_options,
+    )
+
+
+@pytest.fixture
+def custom_threshold_prob_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockInstanceBase(
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="CustomThresholdProbability"),  # type: ignore
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values={
+                THRESHOLD: 0.5,
+                COMPARISON: ">=",
+            },
+        ),
+        CustomThresholdProbability.configuration_options,
     )
 
 
@@ -127,5 +145,48 @@ class TestPrescribedThresholdProb:
         ).get_or_raise()
         requests = datacubes(action.nodes) 
         assert len(requests) == 1
+        assert "class" in requests[0]
         for dim, value in {PARAM: ["131073"], TYPE: ["ep"], STEP: ["12"]}.items():
             assert requests[0][dim] == value
+
+class TestCustomThresholdProb:
+    def test_from_operational_forecast_source(
+        self, custom_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
+    ) -> None:
+        block = CustomThresholdProbability()
+
+        assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=custom_threshold_prob_configuration,
+            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert contains(output, PARAM)
+        output_axes = axes(output)
+        assert len(output_axes[PARAM]) == 3
+        assert output_axes[TYPE] == {"ep"}
+        assert len(output_axes[STEP]) > 0
+
+    def test_compile(
+        self,
+        operational_forecast_source_output: QubedOutput,
+        operational_forecast_source_action: Action,
+        custom_threshold_prob_configuration: BlockInstance,
+    ) -> None:
+        block = CustomThresholdProbability()
+        block.validate(
+            block=custom_threshold_prob_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={}
+        )  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
+            block=custom_threshold_prob_configuration,
+        ).get_or_raise()
+        requests = datacubes(action.nodes) 
+        assert len(requests) == 2
+        for request in requests:
+            assert THRESHOLD not in request
+            assert COMPARISON not in request
+            assert request[TYPE] == ["ep"]
+            assert set.isdisjoint(set(request[PARAM]), {"131", "151", "167"}) is False
