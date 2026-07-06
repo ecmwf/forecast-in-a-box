@@ -70,6 +70,10 @@ export function PluginRow({
   const isWarningOnly = plugin.errorSeverity === 'warning'
   const pypiUrl = getPyPIUrl(plugin.pipSource)
 
+  // Roughly when line-clamp-6 will cut the tooltip text (~45 chars/line)
+  const diagnosticsClamped =
+    (plugin.errorDetail?.reduce((n, e) => n + e.detail.length, 0) ?? 0) > 240
+
   return (
     <div
       className={cn(
@@ -99,11 +103,16 @@ export function PluginRow({
                 </TooltipTrigger>
                 <TooltipContent>
                   {plugin.errorDetail ? (
-                    <PluginDiagnostics
-                      errors={plugin.errorDetail}
-                      plain
-                      className="max-w-xs"
-                    />
+                    <div className="max-w-xs">
+                      <div className="line-clamp-6">
+                        <PluginDiagnostics errors={plugin.errorDetail} plain />
+                      </div>
+                      {diagnosticsClamped && (
+                        <P className="mt-1 text-xs text-inherit opacity-70">
+                          {t('diagnostics.seeDetails')}
+                        </P>
+                      )}
+                    </div>
                   ) : (
                     <P className="max-w-xs text-xs text-inherit">
                       {t('status.errored')}

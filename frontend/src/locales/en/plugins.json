@@ -67,6 +67,7 @@
     "error": "Plugin System Error"
   },
   "diagnostics": {
+    "seeDetails": "See the details page for the full text",
     "source": {
       "install": "Installation",
       "load": "Plugin load",
