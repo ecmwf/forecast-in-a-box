@@ -32,17 +32,6 @@ from qubed import Qube
 from fiab_plugin_ecmwf import blocks as ecmwf_block_builders
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.utils import get_checkpoint_enum_type
-from fiab_plugin_ecmwf.blocks import (
-    GribSink,
-    MapPlotSink,
-    OperationalForecastSource,
-    Select,
-    ZarrSink,
-    FORECAST_DATASETS
-)
-from fiab_plugin_ecmwf.datasets import ForecastDataset
-from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
-from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
 from fiab_plugin_ecmwf.block_utils import (
     DIMENSION,
     ENSEMBLE,
@@ -51,6 +40,11 @@ from fiab_plugin_ecmwf.block_utils import (
     VALUES,
     _create_param_key,
 )
+from fiab_plugin_ecmwf.blocks import FORECAST_DATASETS, GribSink, MapPlotSink, OperationalForecastSource, Select, ZarrSink
+from fiab_plugin_ecmwf.datasets import ForecastDataset
+from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
+from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
+
 
 def _config(values: dict[str, object]) -> dict[ConfigurationOptionId, object]:
     return {ConfigurationOptionId(key): value for key, value in values.items()}
@@ -67,6 +61,7 @@ def _block_instance(
         input_ids=input_ids or {},
         configuration_values=_config(values),
     )
+
 
 def _select() -> Select:
     block = _block_builder("select")
@@ -251,6 +246,7 @@ class TestOperationalForecastSource:
         assert PARAM not in OperationalForecastSource.configuration_options
         assert STEP not in OperationalForecastSource.configuration_options
         assert ENSEMBLE not in OperationalForecastSource.configuration_options
+
 
 class TestZarrSink:
     def test_from_operational_forecast_source(
