@@ -277,3 +277,8 @@ def select(
     {'param': {'2t'}, 'time': {0, 1, 2}}
     """
     return QubedOutput(dataqube=qube.dataqube.select(selection))
+
+
+@support_qubed_output
+def datacubes(qube: Qube) -> Iterable[dict[str, Any | list[Any]]]:
+    return qube.datacubes()
