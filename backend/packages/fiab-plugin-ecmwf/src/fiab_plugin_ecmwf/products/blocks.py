@@ -28,29 +28,29 @@ from ppcore.products import action_from_outputs
 from ppcore.schema.schema import Schema
 from qubed import Qube
 
-from fiab_plugin_ecmwf.qubed_utils import axes, contains, coxpand, datacubes, select
 from fiab_plugin_ecmwf.block_utils import (
-    STATISTIC,
+    COMPARISON,
     ENSEMBLE,
     PARAM,
+    STATISTIC,
     STEP,
-    TYPE,
     THRESHOLD,
-    COMPARISON,
+    TYPE,
     _axis_value_strings,
     _create_param_key,
+    _extract_dataset,
     _split_param_key,
-    _extract_dataset
 )
+from fiab_plugin_ecmwf.qubed_utils import axes, contains, coxpand, datacubes, select
 
 
 def load_pproc_schema() -> str:
     with path("fiab_plugin_ecmwf.products.pproc", "schema.yaml") as pproc_schema:
         return str(pproc_schema)
-    
+
 
 PPROC_SCHEMA = load_pproc_schema()
-    
+
 
 class EnsembleStatistics(Product):
     title: str = "Ensemble Mean and Standard Deviation"
@@ -182,7 +182,7 @@ class PrescribedThresholdProbability(Product):
         schema = Schema.from_file(PPROC_SCHEMA)
         outputs = list(
             schema.outputs_from_inputs(inputs=list(datacubes(other)), output_template={TYPE: self.stat_type, "selection": "default"})
-            )
+        )
         return len(outputs) > 0
 
 
@@ -194,7 +194,7 @@ class CustomThresholdProbability(Product):
             title="Threshold",
             description="Threshold value to compute probability for",
             value_type="float",
-        ), 
+        ),
         COMPARISON: BlockConfigurationOption(
             title="Comparison",
             description="Comparison operator for threshold",

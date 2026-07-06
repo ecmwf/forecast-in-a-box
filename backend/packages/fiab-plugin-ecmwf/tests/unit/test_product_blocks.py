@@ -12,31 +12,32 @@ import pytest
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.nodetree import datacubes
 from fiab_core.fable import (
+    BlockInstance as BlockInstanceBase,
+)
+from fiab_core.fable import (
     BlockInstanceId,
     ConfigurationOptionId,
     PluginBlockFactoryId,
     PluginCompositeId,
     QubedOutput,
 )
-from fiab_core.fable import (
-    BlockInstance as BlockInstanceBase,
-)
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 
 from fiab_plugin_ecmwf.block_utils import (
+    COMPARISON,
     PARAM,
     STEP,
-    TYPE,
     THRESHOLD,
-    COMPARISON,
+    TYPE,
     _create_param_key,
 )
-from fiab_plugin_ecmwf.qubed_utils import axes, contains
 from fiab_plugin_ecmwf.products.blocks import (
+    CustomThresholdProbability,
     EnsembleStatistics,
     PrescribedThresholdProbability,
-    CustomThresholdProbability,
 )
+from fiab_plugin_ecmwf.qubed_utils import axes, contains
+
 
 @pytest.fixture
 def prescribed_threshold_prob_configuration() -> BlockInstance:
@@ -101,7 +102,7 @@ class TestEnsembleStatistics:
             inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
             block=ensemble_statistics_configuration,
         ).get_or_raise()
-        requests = datacubes(action.nodes) 
+        requests = datacubes(action.nodes)
         assert len(requests) == 2
         expected = [{PARAM: ["131"], TYPE: ["em"], STEP: ["0", "6", "12"]}, {PARAM: ["167", "151"], TYPE: ["em"], STEP: ["0", "6", "12"]}]
         for index, request in enumerate(requests):
@@ -143,11 +144,12 @@ class TestPrescribedThresholdProb:
             inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
             block=prescribed_threshold_prob_configuration,
         ).get_or_raise()
-        requests = datacubes(action.nodes) 
+        requests = datacubes(action.nodes)
         assert len(requests) == 1
         assert "class" in requests[0]
         for dim, value in {PARAM: ["131073"], TYPE: ["ep"], STEP: ["12"]}.items():
             assert requests[0][dim] == value
+
 
 class TestCustomThresholdProb:
     def test_from_operational_forecast_source(
@@ -176,14 +178,12 @@ class TestCustomThresholdProb:
         custom_threshold_prob_configuration: BlockInstance,
     ) -> None:
         block = CustomThresholdProbability()
-        block.validate(
-            block=custom_threshold_prob_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={}
-        )  # type: ignore[dict-item]
+        block.validate(block=custom_threshold_prob_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(
             inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
             block=custom_threshold_prob_configuration,
         ).get_or_raise()
-        requests = datacubes(action.nodes) 
+        requests = datacubes(action.nodes)
         assert len(requests) == 2
         for request in requests:
             assert THRESHOLD not in request

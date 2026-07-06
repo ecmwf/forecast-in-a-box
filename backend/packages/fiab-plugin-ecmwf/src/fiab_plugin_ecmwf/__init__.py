@@ -12,7 +12,6 @@ from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
-from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics, PrescribedThresholdProbability
 from fiab_plugin_ecmwf.blocks import (
     GribSink,
     MapPlotSink,
@@ -20,6 +19,7 @@ from fiab_plugin_ecmwf.blocks import (
     Select,
     ZarrSink,
 )
+from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics, PrescribedThresholdProbability
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("operationalForecastSource"): OperationalForecastSource(),

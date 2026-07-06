@@ -1,10 +1,9 @@
 from typing import Any
 
-from pymetkit import ParamDB
-from qubed import Qube
-
 from fiab_core.fable import ConfigurationOptionId, QubedOutput
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
+from pymetkit import ParamDB
+from qubed import Qube
 
 SOURCE = ConfigurationOptionId("source")
 BASETIME = ConfigurationOptionId("base_time")
