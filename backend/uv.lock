@@ -726,6 +726,15 @@ wheels = [
 ]
 
 [[package]]
+name = "code-meters"
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b7/c6/49cb64fc3f7cdb12f10aad07f5ab7a6a750f81c5fc9c6cd912a7471364cf/code-meters-0.0.3.tar.gz", hash = "sha256:1c9b9e4f078d0df9290ea48bdeed5d3e7102261c3fccb68253e9fea9071bafdb", size = 10129, upload-time = "2024-02-23T15:50:40.138Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/3d/ed5fea1e8b2b6f86116a8fbe7cf50194f488276db86871fce39c74e620fb/code_meters-0.0.3-py3-none-any.whl", hash = "sha256:d77fbe9bdfb2b50239addc1976a66867dff6031e1c79be5962ede903fba92ef6", size = 8801, upload-time = "2024-02-23T15:50:38.443Z" },
+]
+
+[[package]]
 name = "conflator"
 version = "0.1.8"
 source = { registry = "https://pypi.org/simple" }
@@ -1578,6 +1587,8 @@ dependencies = [
     { name = "earthkit-workflows", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "earthkit-workflows-anemoi", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "fiab-core", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pproc-core", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pymetkit", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
 
 [package.optional-dependencies]
@@ -1602,6 +1613,8 @@ requires-dist = [
     { name = "earthkit-workflows-anemoi", specifier = ">=0.7.2" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
+    { name = "pproc-core", git = "https://github.com/ecmwf/pproc.git?subdirectory=pproc-core&rev=feature%2Fmono-repo" },
+    { name = "pymetkit", git = "https://github.com/ecmwf/metkit.git?rev=feature%2Fparamdb-api" },
 ]
 provides-extras = ["runtime"]
 
@@ -3169,6 +3182,20 @@ wheels = [
 ]
 
 [[package]]
+name = "pproc-core"
+version = "2.0.1.dev39"
+source = { git = "https://github.com/ecmwf/pproc.git?subdirectory=pproc-core&rev=feature%2Fmono-repo#f710dae6456701fdb781c962a6cfdb26903c2e4d" }
+dependencies = [
+    { name = "code-meters", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "conflator", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "earthkit-time", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "earthkit-workflows", extra = ["vizualize"], marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "numpy", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pandas", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pydantic", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+]
+
+[[package]]
 name = "prek"
 version = "0.3.6"
 source = { registry = "https://pypi.org/simple" }
@@ -3451,6 +3478,19 @@ wheels = [
 [package.optional-dependencies]
 crypto = [
     { name = "cryptography", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+]
+
+[[package]]
+name = "pymetkit"
+version = "1.18.3"
+source = { git = "https://github.com/ecmwf/metkit.git?rev=feature%2Fparamdb-api#365f7c4c2c527dc9b6702bc6970e1c25168ad420" }
+dependencies = [
+    { name = "cffi", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "findlibs", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "metkitlib", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "platformdirs", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pyyaml", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "requests", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
 
 [[package]]
