@@ -127,11 +127,25 @@ export const PluginRemoteInfoSchema = z.object({
 
 export type PluginRemoteInfo = z.infer<typeof PluginRemoteInfoSchema>
 
-const PluginErrorSchema = z.object({
+/**
+ * Structured plugin diagnostic (backend PluginError).
+ * source: install | load | template_ingest; severity: warning | error | critical.
+ * Plain strings so new backend values don't fail parsing.
+ */
+export const PluginErrorSchema = z.object({
   source: z.string(),
   detail: z.string(),
   severity: z.string(),
 })
+
+export type PluginError = z.infer<typeof PluginErrorSchema>
+
+/**
+ * Flatten structured plugin errors to a display string, one detail per line
+ */
+export function pluginErrorsToText(errors: Array<PluginError>): string {
+  return errors.map((e) => e.detail).join('\n')
+}
 
 /**
  * Plugin detail - full plugin information from backend
@@ -140,10 +154,7 @@ export const PluginDetailSchema = z.object({
   status: z.enum(pluginStatusValues),
   store_info: PluginStoreEntrySchema.nullable(),
   remote_info: PluginRemoteInfoSchema.nullable(),
-  errored_detail: z
-    .array(PluginErrorSchema)
-    .transform((errors) => errors.map((e) => e.detail).join('\n') || null)
-    .nullable(),
+  errored_detail: z.array(PluginErrorSchema).nullable(),
   loaded_version: z.string().nullable(),
   update_datetime: z.string().nullable(), // UTC ISO with offset, e.g. "...+00:00"
 })
@@ -164,17 +175,31 @@ export type PluginListing = z.infer<typeof PluginListingSchema>
  */
 export const PluginsStatusSchema = z.object({
   updater_status: z.string(),
-  plugin_errors: z.record(
-    z.string(),
-    z
-      .array(PluginErrorSchema)
-      .transform((errors) => errors.map((e) => e.detail).join('\n')),
-  ),
+  plugin_errors: z.record(z.string(), z.array(PluginErrorSchema)),
   plugin_versions: z.record(z.string(), z.string()),
   plugin_updatedatetime: z.record(z.string(), z.string()),
+  plugin_enabled: z.record(z.string(), z.boolean()),
+  plugin_excluded_templates: z.record(z.string(), z.array(z.string())),
+  plugin_glyph_remapping: z.record(
+    z.string(),
+    z.record(z.string(), z.string()),
+  ),
 })
 
 export type PluginsStatus = z.infer<typeof PluginsStatusSchema>
+
+/**
+ * Payload fields for POST /plugin/settings (backend PluginSettingsUpdateRequest).
+ * Omitted fields leave the stored value unchanged; an empty list/dict clears it.
+ */
+export interface PluginSettingsUpdate {
+  /** Enable or disable the plugin */
+  isEnabled?: boolean
+  /** Blueprint-template display names to exclude from ingestion */
+  excluded_templates?: Array<string>
+  /** Glyph rename map applied at template ingestion */
+  glyph_remapping?: Record<string, string>
+}
 
 /**
  * UI-friendly plugin info (transformed from PluginDetail)
@@ -211,8 +236,8 @@ export interface PluginInfo {
   hasUpdate: boolean
   /** Last-updated UTC ISO, tz-aware (from update_datetime) */
   updatedAt: string | null
-  /** Error details if status is errored */
-  errorDetail: string | null
+  /** Structured diagnostics when the plugin has errors or warnings */
+  errorDetail: Array<PluginError> | null
   /** Store comment */
   comment: string | null
   /** Pip source for installation */
@@ -234,6 +259,29 @@ export interface PluginsStats {
 }
 
 /**
+ * True when `remote` is a strictly newer release than `loaded`.
+ * Compares numeric release segments only — pre-release suffixes are ignored,
+ * and unparseable versions (e.g. the backend's "unknown" sentinel) are never newer.
+ */
+export function isNewerVersion(remote: string, loaded: string): boolean {
+  const remoteSegments = parseReleaseSegments(remote)
+  const loadedSegments = parseReleaseSegments(loaded)
+  if (!remoteSegments || !loadedSegments) return false
+  const length = Math.max(remoteSegments.length, loadedSegments.length)
+  for (let i = 0; i < length; i++) {
+    const r = remoteSegments[i] ?? 0
+    const l = loadedSegments[i] ?? 0
+    if (r !== l) return r > l
+  }
+  return false
+}
+
+function parseReleaseSegments(version: string): Array<number> | null {
+  const release = version.trim().match(/^v?(\d+(?:\.\d+)*)/)?.[1]
+  return release ? release.split('.').map(Number) : null
+}
+
+/**
  * Transform a PluginDetail to UI-friendly PluginInfo
  */
 export function toPluginInfo(
@@ -246,7 +294,7 @@ export function toPluginInfo(
     isInstalled &&
     detail.loaded_version !== null &&
     detail.remote_info !== null &&
-    detail.loaded_version !== detail.remote_info.version
+    isNewerVersion(detail.remote_info.version, detail.loaded_version)
 
   return {
     id,
@@ -264,7 +312,7 @@ export function toPluginInfo(
     updatedAt: detail.update_datetime
       ? toUtcIsoOrNull(detail.update_datetime)
       : null,
-    errorDetail: detail.errored_detail,
+    errorDetail: detail.errored_detail?.length ? detail.errored_detail : null,
     comment: detail.store_info?.comment ?? null,
     pipSource: detail.store_info?.pip_source ?? null,
     moduleName: detail.store_info?.module_name ?? null,

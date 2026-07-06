@@ -18,6 +18,7 @@
 import type {
   PluginCompositeId,
   PluginListing,
+  PluginSettingsUpdate,
   PluginsStatus,
 } from '@/api/types/plugins.types'
 import { apiClient } from '@/api/client'
@@ -80,36 +81,36 @@ export async function updatePlugin(
 }
 
 /**
- * Modify plugin enabled state (enable or disable)
+ * Update plugin settings (enabled flag, template exclusions, glyph remapping)
  * @param compositeId - The plugin composite ID { store, local }
- * @param isEnabled - Whether to enable (true) or disable (false) the plugin
+ * @param settings - Fields to change; omitted fields stay unchanged
  */
-export async function modifyPluginEnabled(
+export async function updatePluginSettings(
   compositeId: PluginCompositeId,
-  isEnabled: boolean,
+  settings: PluginSettingsUpdate,
 ): Promise<void> {
   await apiClient.post(API_ENDPOINTS.plugin.settings, {
     pluginCompositeId: compositeId,
-    isEnabled,
+    ...settings,
   })
 }
 
 /**
- * Enable a plugin (convenience wrapper for modifyPluginEnabled)
+ * Enable a plugin (convenience wrapper for updatePluginSettings)
  * @param compositeId - The plugin composite ID { store, local }
  */
 export async function enablePlugin(
   compositeId: PluginCompositeId,
 ): Promise<void> {
-  await modifyPluginEnabled(compositeId, true)
+  await updatePluginSettings(compositeId, { isEnabled: true })
 }
 
 /**
- * Disable a plugin (convenience wrapper for modifyPluginEnabled)
+ * Disable a plugin (convenience wrapper for updatePluginSettings)
  * @param compositeId - The plugin composite ID { store, local }
  */
 export async function disablePlugin(
   compositeId: PluginCompositeId,
 ): Promise<void> {
-  await modifyPluginEnabled(compositeId, false)
+  await updatePluginSettings(compositeId, { isEnabled: false })
 }

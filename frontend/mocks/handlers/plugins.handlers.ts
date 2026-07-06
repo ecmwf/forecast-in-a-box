@@ -26,6 +26,7 @@ import type {
   PluginCompositeId,
   PluginDetail,
   PluginListing,
+  PluginSettingsUpdate,
   PluginsStatus,
 } from '@/api/types/plugins.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -95,6 +96,9 @@ export const pluginsHandlers = [
       plugin_errors: {},
       plugin_versions: {},
       plugin_updatedatetime: {},
+      plugin_enabled: {},
+      plugin_excluded_templates: {},
+      plugin_glyph_remapping: {},
     }
 
     for (const [key, detail] of Object.entries(pluginsState.plugins)) {
@@ -106,6 +110,11 @@ export const pluginsHandlers = [
       }
       if (detail.update_datetime) {
         status.plugin_updatedatetime[key] = detail.update_datetime
+      }
+      if (detail.status !== 'available') {
+        status.plugin_enabled[key] = detail.status !== 'disabled'
+        status.plugin_excluded_templates[key] = []
+        status.plugin_glyph_remapping[key] = {}
       }
     }
 
@@ -257,8 +266,7 @@ export const pluginsHandlers = [
     await delay(300)
     const body = (await request.json()) as {
       pluginCompositeId: PluginCompositeId
-      isEnabled?: boolean
-    }
+    } & PluginSettingsUpdate
     const { pluginCompositeId, isEnabled } = body
 
     const key = createPluginKey(

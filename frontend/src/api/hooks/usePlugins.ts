@@ -22,6 +22,7 @@ import type {
   PluginCompositeId,
   PluginInfo,
   PluginListing,
+  PluginSettingsUpdate,
   PluginsStatus,
 } from '@/api/types/plugins.types'
 import {
@@ -30,9 +31,9 @@ import {
   getPluginDetails,
   getPluginStatus,
   installPlugin,
-  modifyPluginEnabled,
   uninstallPlugin,
   updatePlugin,
+  updatePluginSettings,
 } from '@/api/endpoints/plugins'
 import { getCatalogue } from '@/api/endpoints/fable'
 import { toPluginInfoList } from '@/api/types/plugins.types'
@@ -200,15 +201,15 @@ export function useUpdatePlugin() {
   return usePluginMutation(updatePlugin)
 }
 
-export function useModifyPluginEnabled() {
+export function useUpdatePluginSettings() {
   return usePluginMutation(
     ({
       compositeId,
-      isEnabled,
+      settings,
     }: {
       compositeId: PluginCompositeId
-      isEnabled: boolean
-    }) => modifyPluginEnabled(compositeId, isEnabled),
+      settings: PluginSettingsUpdate
+    }) => updatePluginSettings(compositeId, settings),
   )
 }
 

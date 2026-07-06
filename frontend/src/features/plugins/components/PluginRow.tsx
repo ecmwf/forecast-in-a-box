@@ -21,6 +21,7 @@ import { getPyPIUrl } from '../utils/plugin-url'
 import { CapabilityBadges } from './CapabilityBadges'
 import { PluginIcon } from './PluginIcon'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
+import { pluginErrorsToText } from '@/api/types/plugins.types'
 import { PluginStatusBadge } from '@/features/plugins/components/PluginStatusBadge'
 import { Button } from '@/components/ui/button'
 import {
@@ -82,8 +83,10 @@ export function PluginRow({
                   <AlertCircle className="h-4 w-4 text-red-500" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <P className="max-w-xs text-xs text-inherit">
-                    {plugin.errorDetail || t('status.errored')}
+                  <P className="max-w-xs text-xs whitespace-pre-line text-inherit">
+                    {plugin.errorDetail
+                      ? pluginErrorsToText(plugin.errorDetail)
+                      : t('status.errored')}
                   </P>
                 </TooltipContent>
               </Tooltip>

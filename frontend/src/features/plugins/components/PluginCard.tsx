@@ -30,6 +30,7 @@ import { PluginIcon } from './PluginIcon'
 import { PluginStatusBadge } from './PluginStatusBadge'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
+import { pluginErrorsToText } from '@/api/types/plugins.types'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -157,8 +158,8 @@ export function PluginCard({
       {hasError && plugin.errorDetail && (
         <Alert variant="destructive" className="mb-3 py-2">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="text-xs">
-            {plugin.errorDetail}
+          <AlertDescription className="text-xs whitespace-pre-line">
+            {pluginErrorsToText(plugin.errorDetail)}
           </AlertDescription>
         </Alert>
       )}
