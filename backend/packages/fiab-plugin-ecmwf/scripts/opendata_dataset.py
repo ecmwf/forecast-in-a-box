@@ -17,7 +17,12 @@ import requests
 from ecmwf.opendata import Client
 from qubed import Qube
 
-EXCLUDE = [{"type": ["em", "es", "ep"]}, {"levtype": ["sol"]}, {"param": ["z", "sdor", "slor"], "levtype": ["sfc"]}]
+EXCLUDE = [
+    {"type": ["em", "es", "ep"]},
+    {"levtype": ["sol"]},
+    {"param": ["z", "sdor", "slor"], "levtype": ["sfc"]},
+    {"param": ["z"], "levtype": ["pl"]},
+]
 SPLIT_BY = ["stream", "type", "levtype", "time"]
 DROP = ["date"]
 TYPES = {
