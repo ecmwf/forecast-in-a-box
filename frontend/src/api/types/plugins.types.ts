@@ -305,6 +305,12 @@ function parseReleaseSegments(version: string): Array<number> | null {
   return release ? release.split('.').map(Number) : null
 }
 
+/** All-zero versions come from unstamped dev installs — nothing to compare against */
+export function isUnstampedVersion(version: string): boolean {
+  const segments = parseReleaseSegments(version)
+  return segments !== null && segments.every((segment) => segment === 0)
+}
+
 /**
  * Transform a PluginDetail to UI-friendly PluginInfo
  */
@@ -317,6 +323,7 @@ export function toPluginInfo(
   const hasUpdate =
     isInstalled &&
     detail.loaded_version !== null &&
+    !isUnstampedVersion(detail.loaded_version) &&
     detail.remote_info !== null &&
     isNewerVersion(detail.remote_info.version, detail.loaded_version)
   const errorDetail = detail.errored_detail?.length

@@ -13,6 +13,7 @@ import type { PluginCompositeId, PluginDetail } from '@/api/types/plugins.types'
 import {
   PluginDetailSchema,
   isNewerVersion,
+  isUnstampedVersion,
   pluginErrorsMaxSeverity,
   toPluginInfo,
 } from '@/api/types/plugins.types'
@@ -208,5 +209,24 @@ describe('toPluginInfo — hasUpdate', () => {
     expect(toPluginInfo(ID, installedWith('2.4.0', '2.1.0')).hasUpdate).toBe(
       false,
     )
+  })
+
+  it('does not flag against an unstamped (all-zero) dev install', () => {
+    expect(toPluginInfo(ID, installedWith('0.0.0', '1.0.0')).hasUpdate).toBe(
+      false,
+    )
+  })
+})
+
+describe('isUnstampedVersion', () => {
+  it('detects all-zero versions', () => {
+    expect(isUnstampedVersion('0.0.0')).toBe(true)
+    expect(isUnstampedVersion('0.0')).toBe(true)
+  })
+
+  it('is false for stamped or unparseable versions', () => {
+    expect(isUnstampedVersion('1.0.0')).toBe(false)
+    expect(isUnstampedVersion('0.0.1')).toBe(false)
+    expect(isUnstampedVersion('unknown')).toBe(false)
   })
 })
