@@ -452,6 +452,114 @@ describe('Plugins Management Integration', () => {
     })
   })
 
+  describe('Severity-Aware Diagnostics', () => {
+    function detailsResponse(plugin: object) {
+      return HttpResponse.json({
+        plugins: { "store='ecmwf' local='diag-test'": plugin },
+      })
+    }
+
+    const baseDetail = {
+      store_info: {
+        pip_source: 'fiab-plugin-diag',
+        module_name: 'fiab_plugin_diag',
+        display_title: 'Diag Test',
+        display_description: 'Plugin for diagnostics rendering',
+        display_author: 'ECMWF',
+        comment: '',
+      },
+      remote_info: null,
+      loaded_version: '1.0.0',
+      update_datetime: null,
+    }
+
+    it('softens a warning-only errored plugin to an amber Warning badge', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.details, () =>
+          detailsResponse({
+            ...baseDetail,
+            status: 'errored',
+            errored_detail: [
+              {
+                source: 'template_ingest',
+                detail: "template 'x' failed validation",
+                severity: 'warning',
+              },
+            ],
+          }),
+        ),
+      )
+
+      const screen = await renderWithRouter(<TestPluginsPage />)
+      await expect
+        .element(screen.getByRole('heading', { name: 'Plugin Store' }))
+        .toBeVisible()
+
+      await expect
+        .element(screen.getByText('Warning', { exact: true }))
+        .toBeVisible()
+      await expect.element(screen.getByText('Errored')).not.toBeInTheDocument()
+      await expect
+        .element(screen.getByText(/template 'x' failed validation/))
+        .toBeVisible()
+    })
+
+    it('keeps the red Errored badge when any diagnostic is an error', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.details, () =>
+          detailsResponse({
+            ...baseDetail,
+            status: 'errored',
+            errored_detail: [
+              { source: 'install', detail: 'pip failed', severity: 'error' },
+              {
+                source: 'template_ingest',
+                detail: 'bad template',
+                severity: 'warning',
+              },
+            ],
+          }),
+        ),
+      )
+
+      const screen = await renderWithRouter(<TestPluginsPage />)
+      await expect
+        .element(screen.getByRole('heading', { name: 'Plugin Store' }))
+        .toBeVisible()
+
+      await expect.element(screen.getByText('Errored')).toBeVisible()
+      // Both diagnostics listed with their source labels
+      await expect.element(screen.getByText('Installation')).toBeVisible()
+      await expect.element(screen.getByText('Template ingestion')).toBeVisible()
+    })
+
+    it('shows warnings on a loaded plugin', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.details, () =>
+          detailsResponse({
+            ...baseDetail,
+            status: 'loaded',
+            errored_detail: [
+              {
+                source: 'load',
+                detail: 'version mismatch: DB has 0.9',
+                severity: 'warning',
+              },
+            ],
+          }),
+        ),
+      )
+
+      const screen = await renderWithRouter(<TestPluginsPage />)
+      await expect
+        .element(screen.getByRole('heading', { name: 'Plugin Store' }))
+        .toBeVisible()
+
+      await expect.element(screen.getByText('Loaded')).toBeVisible()
+      await expect.element(screen.getByText(/version mismatch/)).toBeVisible()
+    })
+  })
+
   describe('Error Handling', () => {
     it('handles plugin details API returning 500', async () => {
       worker.use(

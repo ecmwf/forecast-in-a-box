@@ -13,6 +13,7 @@ import type { PluginCompositeId, PluginDetail } from '@/api/types/plugins.types'
 import {
   PluginDetailSchema,
   isNewerVersion,
+  pluginErrorsMaxSeverity,
   toPluginInfo,
 } from '@/api/types/plugins.types'
 
@@ -103,15 +104,51 @@ describe('toPluginInfo — errorDetail normalization', () => {
   it('normalizes an empty error list to null', () => {
     const info = toPluginInfo(ID, { ...detailWith(null), errored_detail: [] })
     expect(info.errorDetail).toBeNull()
+    expect(info.errorSeverity).toBeNull()
   })
 
-  it('passes structured errors through', () => {
+  it('passes structured errors through and derives the max severity', () => {
     const errors = [{ source: 'load', detail: 'boom', severity: 'error' }]
     const info = toPluginInfo(ID, {
       ...detailWith(null),
       errored_detail: errors,
     })
     expect(info.errorDetail).toEqual(errors)
+    expect(info.errorSeverity).toBe('error')
+  })
+})
+
+describe('pluginErrorsMaxSeverity', () => {
+  it('returns null for an empty list', () => {
+    expect(pluginErrorsMaxSeverity([])).toBeNull()
+  })
+
+  it('ranks critical > error > warning', () => {
+    expect(
+      pluginErrorsMaxSeverity([
+        { source: 'load', detail: 'a', severity: 'warning' },
+        { source: 'install', detail: 'b', severity: 'critical' },
+        { source: 'load', detail: 'c', severity: 'error' },
+      ]),
+    ).toBe('critical')
+  })
+
+  it('is warning for a warning-only list', () => {
+    expect(
+      pluginErrorsMaxSeverity([
+        { source: 'template_ingest', detail: 'a', severity: 'warning' },
+        { source: 'template_ingest', detail: 'b', severity: 'warning' },
+      ]),
+    ).toBe('warning')
+  })
+
+  it('treats unknown severities as error', () => {
+    expect(
+      pluginErrorsMaxSeverity([
+        { source: 'load', detail: 'a', severity: 'warning' },
+        { source: 'load', detail: 'b', severity: 'fatal' },
+      ]),
+    ).toBe('error')
   })
 })
 

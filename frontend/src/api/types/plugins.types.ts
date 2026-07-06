@@ -140,11 +140,33 @@ export const PluginErrorSchema = z.object({
 
 export type PluginError = z.infer<typeof PluginErrorSchema>
 
-/**
- * Flatten structured plugin errors to a display string, one detail per line
- */
-export function pluginErrorsToText(errors: Array<PluginError>): string {
-  return errors.map((e) => e.detail).join('\n')
+export type PluginErrorSeverity = 'warning' | 'error' | 'critical'
+
+const SEVERITY_RANK: Record<PluginErrorSeverity, number> = {
+  warning: 1,
+  error: 2,
+  critical: 3,
+}
+
+/** Unknown severity strings count as 'error' */
+export function normalizePluginErrorSeverity(
+  severity: string,
+): PluginErrorSeverity {
+  return severity in SEVERITY_RANK ? (severity as PluginErrorSeverity) : 'error'
+}
+
+/** Highest severity present, null for an empty list */
+export function pluginErrorsMaxSeverity(
+  errors: Array<PluginError>,
+): PluginErrorSeverity | null {
+  let max: PluginErrorSeverity | null = null
+  for (const error of errors) {
+    const severity = normalizePluginErrorSeverity(error.severity)
+    if (!max || SEVERITY_RANK[severity] > SEVERITY_RANK[max]) {
+      max = severity
+    }
+  }
+  return max
 }
 
 /**
@@ -238,6 +260,8 @@ export interface PluginInfo {
   updatedAt: string | null
   /** Structured diagnostics when the plugin has errors or warnings */
   errorDetail: Array<PluginError> | null
+  /** Highest severity among errorDetail entries */
+  errorSeverity: PluginErrorSeverity | null
   /** Store comment */
   comment: string | null
   /** Pip source for installation */
@@ -295,6 +319,9 @@ export function toPluginInfo(
     detail.loaded_version !== null &&
     detail.remote_info !== null &&
     isNewerVersion(detail.remote_info.version, detail.loaded_version)
+  const errorDetail = detail.errored_detail?.length
+    ? detail.errored_detail
+    : null
 
   return {
     id,
@@ -312,7 +339,8 @@ export function toPluginInfo(
     updatedAt: detail.update_datetime
       ? toUtcIsoOrNull(detail.update_datetime)
       : null,
-    errorDetail: detail.errored_detail?.length ? detail.errored_detail : null,
+    errorDetail,
+    errorSeverity: errorDetail ? pluginErrorsMaxSeverity(errorDetail) : null,
     comment: detail.store_info?.comment ?? null,
     pipSource: detail.store_info?.pip_source ?? null,
     moduleName: detail.store_info?.module_name ?? null,

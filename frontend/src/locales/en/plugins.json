@@ -61,9 +61,22 @@
     "uninstalled": "Uninstalled",
     "available": "Available",
     "errored": "Errored",
+    "warning": "Warning",
     "updateAvailable": "Update Available",
     "incompatible": "Incompatible",
     "error": "Plugin System Error"
+  },
+  "diagnostics": {
+    "source": {
+      "install": "Installation",
+      "load": "Plugin load",
+      "template_ingest": "Template ingestion"
+    },
+    "severity": {
+      "warning": "Warning",
+      "error": "Error",
+      "critical": "Critical"
+    }
   },
   "updatesSection": {
     "title": "Updates Available",
