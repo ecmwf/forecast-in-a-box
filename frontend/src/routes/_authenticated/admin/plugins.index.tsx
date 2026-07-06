@@ -140,12 +140,16 @@ function PluginsPage() {
       .filter(matchesCapability)
       .filter(matchesSearch)
 
-    // Separate updates
+    // Updatable plugins get the call-to-action section but stay in the installed
+    // list — excluding them there hides status, diagnostics, and controls.
     const withUpdates = filteredPlugins.filter((p) => p.hasUpdate)
-    const installed = filteredPlugins.filter((p) => !p.hasUpdate)
+    const installed = filteredPlugins
 
-    // Sort: loaded first, then by name
+    // Sort: updatable first, then enabled, then by name
     installed.sort((a, b) => {
+      if (a.hasUpdate !== b.hasUpdate) {
+        return a.hasUpdate ? -1 : 1
+      }
       if (a.isEnabled !== b.isEnabled) {
         return a.isEnabled ? -1 : 1
       }

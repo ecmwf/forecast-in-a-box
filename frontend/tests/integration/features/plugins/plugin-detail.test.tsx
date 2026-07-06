@@ -48,6 +48,7 @@ const mockPlugin: PluginInfo = {
   hasUpdate: false,
   updatedAt: null,
   errorDetail: null,
+  errorSeverity: null,
   comment: null,
   pipSource: null,
   moduleName: null,

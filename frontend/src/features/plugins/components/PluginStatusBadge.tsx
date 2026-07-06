@@ -21,7 +21,10 @@
  */
 
 import { useTranslation } from 'react-i18next'
-import type { PluginStatus } from '@/api/types/plugins.types'
+import type {
+  PluginErrorSeverity,
+  PluginStatus,
+} from '@/api/types/plugins.types'
 import type { StatusBadgeVariant } from '@/components/common/StatusBadge'
 import {
   STATUS_BADGE_VARIANTS,
@@ -32,12 +35,15 @@ interface PluginStatusBadgeProps {
   status: PluginStatus
   /** Whether an update is available (shown as visual indicator) */
   hasUpdate?: boolean
+  /** Max diagnostic severity — softens 'errored' to a Warning badge when warning-only */
+  severity?: PluginErrorSeverity | null
   className?: string
 }
 
 export function PluginStatusBadge({
   status,
   hasUpdate,
+  severity,
   className,
 }: PluginStatusBadgeProps) {
   const { t } = useTranslation('plugins')
@@ -58,7 +64,9 @@ export function PluginStatusBadge({
   const variant: StatusBadgeVariant =
     hasUpdate && status === 'loaded'
       ? { label: t('status.updateAvailable'), ...STATUS_BADGE_VARIANTS.warning }
-      : statusConfig[status]
+      : status === 'errored' && severity === 'warning'
+        ? { label: t('status.warning'), ...STATUS_BADGE_VARIANTS.warning }
+        : statusConfig[status]
 
   return <StatusBadge variant={variant} className={className} />
 }

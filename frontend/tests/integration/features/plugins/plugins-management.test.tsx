@@ -126,10 +126,14 @@ function TestPluginsPage() {
       .filter(matchesCapability)
       .filter(matchesSearch)
 
+    // Mirrors plugins.index.tsx: updatable plugins stay in the installed list too
     const withUpdates = filteredPlugins.filter((p) => p.hasUpdate)
-    const installed = filteredPlugins.filter((p) => !p.hasUpdate)
+    const installed = filteredPlugins
 
     installed.sort((a, b) => {
+      if (a.hasUpdate !== b.hasUpdate) {
+        return a.hasUpdate ? -1 : 1
+      }
       if (a.isEnabled !== b.isEnabled) {
         return a.isEnabled ? -1 : 1
       }
@@ -290,8 +294,11 @@ describe('Plugins Management Integration', () => {
 
       // Updates section should show plugins with hasUpdate: true
       // From mock data: "ECMWF Ensemble" has an update available
+      // (it renders in the updates section AND the installed list)
       await expect.element(screen.getByText('Updates Available')).toBeVisible()
-      await expect.element(screen.getByText('ECMWF Ensemble')).toBeVisible()
+      await expect
+        .element(screen.getByText('ECMWF Ensemble').first())
+        .toBeVisible()
     })
 
     it('displays available plugins section', async () => {
@@ -442,6 +449,114 @@ describe('Plugins Management Integration', () => {
 
       // Button should work - MSW handler has 500ms delay for refresh
       await expect.poll(() => true, { timeout: 1000 }).toBe(true)
+    })
+  })
+
+  describe('Severity-Aware Diagnostics', () => {
+    function detailsResponse(plugin: object) {
+      return HttpResponse.json({
+        plugins: { "store='ecmwf' local='diag-test'": plugin },
+      })
+    }
+
+    const baseDetail = {
+      store_info: {
+        pip_source: 'fiab-plugin-diag',
+        module_name: 'fiab_plugin_diag',
+        display_title: 'Diag Test',
+        display_description: 'Plugin for diagnostics rendering',
+        display_author: 'ECMWF',
+        comment: '',
+      },
+      remote_info: null,
+      loaded_version: '1.0.0',
+      update_datetime: null,
+    }
+
+    it('softens a warning-only errored plugin to an amber Warning badge', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.details, () =>
+          detailsResponse({
+            ...baseDetail,
+            status: 'errored',
+            errored_detail: [
+              {
+                source: 'template_ingest',
+                detail: "template 'x' failed validation",
+                severity: 'warning',
+              },
+            ],
+          }),
+        ),
+      )
+
+      const screen = await renderWithRouter(<TestPluginsPage />)
+      await expect
+        .element(screen.getByRole('heading', { name: 'Plugin Store' }))
+        .toBeVisible()
+
+      await expect
+        .element(screen.getByText('Warning', { exact: true }))
+        .toBeVisible()
+      await expect.element(screen.getByText('Errored')).not.toBeInTheDocument()
+      await expect
+        .element(screen.getByText(/template 'x' failed validation/))
+        .toBeVisible()
+    })
+
+    it('keeps the red Errored badge when any diagnostic is an error', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.details, () =>
+          detailsResponse({
+            ...baseDetail,
+            status: 'errored',
+            errored_detail: [
+              { source: 'install', detail: 'pip failed', severity: 'error' },
+              {
+                source: 'template_ingest',
+                detail: 'bad template',
+                severity: 'warning',
+              },
+            ],
+          }),
+        ),
+      )
+
+      const screen = await renderWithRouter(<TestPluginsPage />)
+      await expect
+        .element(screen.getByRole('heading', { name: 'Plugin Store' }))
+        .toBeVisible()
+
+      await expect.element(screen.getByText('Errored')).toBeVisible()
+      // Both diagnostics listed with their source labels
+      await expect.element(screen.getByText('Installation')).toBeVisible()
+      await expect.element(screen.getByText('Template ingestion')).toBeVisible()
+    })
+
+    it('shows warnings on a loaded plugin', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.details, () =>
+          detailsResponse({
+            ...baseDetail,
+            status: 'loaded',
+            errored_detail: [
+              {
+                source: 'load',
+                detail: 'version mismatch: DB has 0.9',
+                severity: 'warning',
+              },
+            ],
+          }),
+        ),
+      )
+
+      const screen = await renderWithRouter(<TestPluginsPage />)
+      await expect
+        .element(screen.getByRole('heading', { name: 'Plugin Store' }))
+        .toBeVisible()
+
+      await expect.element(screen.getByText('Loaded')).toBeVisible()
+      await expect.element(screen.getByText(/version mismatch/)).toBeVisible()
     })
   })
 

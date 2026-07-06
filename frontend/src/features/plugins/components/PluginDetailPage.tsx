@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
 import { createSingleBlockFable } from '../utils/pipeline-generator'
 import { BlockFactoryCard } from './BlockFactoryCard'
 import { CapabilityBadges } from './CapabilityBadges'
+import { PluginDiagnostics } from './PluginDiagnostics'
 import { PluginIcon } from './PluginIcon'
 import { PluginStatusBadge } from './PluginStatusBadge'
 import type {
@@ -146,6 +147,7 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
             <PluginStatusBadge
               status={plugin.status}
               hasUpdate={plugin.hasUpdate}
+              severity={plugin.errorSeverity}
             />
           </div>
         </div>
@@ -155,6 +157,9 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
       {plugin.description && (
         <P className="text-muted-foreground">{plugin.description}</P>
       )}
+
+      {/* Diagnostics */}
+      {plugin.errorDetail && <PluginDiagnostics errors={plugin.errorDetail} />}
 
       {/* Capabilities */}
       {plugin.capabilities.length > 0 && (

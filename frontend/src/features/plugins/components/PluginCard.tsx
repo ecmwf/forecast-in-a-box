@@ -15,22 +15,16 @@
  */
 
 import { formatDistanceToNow } from 'date-fns'
-import {
-  AlertCircle,
-  Download,
-  ExternalLink,
-  MoreVertical,
-  Trash2,
-} from 'lucide-react'
+import { Download, ExternalLink, MoreVertical, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getPyPIUrl } from '../utils/plugin-url'
 import { CapabilityBadges } from './CapabilityBadges'
+import { PluginDiagnostics } from './PluginDiagnostics'
 import { PluginIcon } from './PluginIcon'
 import { PluginStatusBadge } from './PluginStatusBadge'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -93,7 +87,10 @@ export function PluginCard({
         !plugin.isEnabled &&
           plugin.isInstalled &&
           'opacity-80 hover:opacity-100',
-        hasError && 'border-red-200 dark:border-red-800',
+        hasError &&
+          (plugin.errorSeverity === 'warning'
+            ? 'border-amber-200 dark:border-amber-800'
+            : 'border-red-200 dark:border-red-800'),
       )}
       variant={variant}
       shadow={shadow}
@@ -124,6 +121,7 @@ export function PluginCard({
         <PluginStatusBadge
           status={plugin.status}
           hasUpdate={plugin.hasUpdate}
+          severity={plugin.errorSeverity}
           className="shrink-0"
         />
       </div>
@@ -153,14 +151,9 @@ export function PluginCard({
         </P>
       )}
 
-      {/* Error Alert */}
-      {hasError && plugin.errorDetail && (
-        <Alert variant="destructive" className="mb-3 py-2">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="text-xs">
-            {plugin.errorDetail}
-          </AlertDescription>
-        </Alert>
+      {/* Diagnostics — also shown for loaded plugins carrying warnings */}
+      {plugin.errorDetail && (
+        <PluginDiagnostics errors={plugin.errorDetail} className="mb-3 py-2" />
       )}
 
       {/* Capabilities - only show for installed plugins with capabilities */}

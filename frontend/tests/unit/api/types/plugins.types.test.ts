@@ -10,7 +10,13 @@
 
 import { describe, expect, it } from 'vitest'
 import type { PluginCompositeId, PluginDetail } from '@/api/types/plugins.types'
-import { PluginDetailSchema, toPluginInfo } from '@/api/types/plugins.types'
+import {
+  PluginDetailSchema,
+  isNewerVersion,
+  isUnstampedVersion,
+  pluginErrorsMaxSeverity,
+  toPluginInfo,
+} from '@/api/types/plugins.types'
 
 const ID: PluginCompositeId = { store: 'ecmwf', local: 'anemoi-inference' }
 
@@ -78,29 +84,149 @@ describe('PluginDetailSchema — errored_detail parsing', () => {
     expect(result.errored_detail).toBeNull()
   })
 
-  it('concatenates multiple error details with newline', () => {
+  it('preserves structured errors', () => {
+    const errors = [
+      { source: 'install', detail: 'pip failed', severity: 'error' },
+      {
+        source: 'template_ingest',
+        detail: 'bad template',
+        severity: 'warning',
+      },
+    ]
     const result = PluginDetailSchema.parse({
       ...baseRaw,
-      errored_detail: [
-        { source: 'install', detail: 'pip failed', severity: 'error' },
-        { source: 'load', detail: 'import error', severity: 'error' },
-      ],
+      errored_detail: errors,
     })
-    expect(result.errored_detail).toBe('pip failed\nimport error')
+    expect(result.errored_detail).toEqual(errors)
+  })
+})
+
+describe('toPluginInfo — errorDetail normalization', () => {
+  it('normalizes an empty error list to null', () => {
+    const info = toPluginInfo(ID, { ...detailWith(null), errored_detail: [] })
+    expect(info.errorDetail).toBeNull()
+    expect(info.errorSeverity).toBeNull()
   })
 
-  it('returns a single detail string for one error', () => {
-    const result = PluginDetailSchema.parse({
-      ...baseRaw,
-      errored_detail: [
-        { source: 'load', detail: 'module not found', severity: 'error' },
-      ],
+  it('passes structured errors through and derives the max severity', () => {
+    const errors = [{ source: 'load', detail: 'boom', severity: 'error' }]
+    const info = toPluginInfo(ID, {
+      ...detailWith(null),
+      errored_detail: errors,
     })
-    expect(result.errored_detail).toBe('module not found')
+    expect(info.errorDetail).toEqual(errors)
+    expect(info.errorSeverity).toBe('error')
+  })
+})
+
+describe('pluginErrorsMaxSeverity', () => {
+  it('returns null for an empty list', () => {
+    expect(pluginErrorsMaxSeverity([])).toBeNull()
   })
 
-  it('returns null for an empty error list', () => {
-    const result = PluginDetailSchema.parse({ ...baseRaw, errored_detail: [] })
-    expect(result.errored_detail).toBeNull()
+  it('ranks critical > error > warning', () => {
+    expect(
+      pluginErrorsMaxSeverity([
+        { source: 'load', detail: 'a', severity: 'warning' },
+        { source: 'install', detail: 'b', severity: 'critical' },
+        { source: 'load', detail: 'c', severity: 'error' },
+      ]),
+    ).toBe('critical')
+  })
+
+  it('is warning for a warning-only list', () => {
+    expect(
+      pluginErrorsMaxSeverity([
+        { source: 'template_ingest', detail: 'a', severity: 'warning' },
+        { source: 'template_ingest', detail: 'b', severity: 'warning' },
+      ]),
+    ).toBe('warning')
+  })
+
+  it('treats unknown severities as error', () => {
+    expect(
+      pluginErrorsMaxSeverity([
+        { source: 'load', detail: 'a', severity: 'warning' },
+        { source: 'load', detail: 'b', severity: 'fatal' },
+      ]),
+    ).toBe('error')
+  })
+})
+
+describe('isNewerVersion', () => {
+  it('detects a newer remote release', () => {
+    expect(isNewerVersion('2.4.0', '2.1.0')).toBe(true)
+  })
+
+  it('compares segments numerically, not lexicographically', () => {
+    expect(isNewerVersion('1.10.0', '1.9.0')).toBe(true)
+    expect(isNewerVersion('1.9.0', '1.10.0')).toBe(false)
+  })
+
+  it('is false for equal versions, also with differing segment counts', () => {
+    expect(isNewerVersion('1.2.0', '1.2.0')).toBe(false)
+    expect(isNewerVersion('1.2', '1.2.0')).toBe(false)
+    expect(isNewerVersion('1.2.0', '1.2')).toBe(false)
+  })
+
+  it('is false when the loaded version is newer (dev installs)', () => {
+    expect(isNewerVersion('2.1.0', '2.4.0')).toBe(false)
+  })
+
+  it('is false for the backend "unknown" sentinel (failed PyPI lookup)', () => {
+    expect(isNewerVersion('unknown', '1.0.0')).toBe(false)
+    expect(isNewerVersion('1.0.0', 'unknown')).toBe(false)
+  })
+
+  it('ignores pre-release suffixes (final does not out-rank its own rc)', () => {
+    expect(isNewerVersion('1.2.3', '1.2.3rc1')).toBe(false)
+    expect(isNewerVersion('1.2.4', '1.2.3rc1')).toBe(true)
+  })
+})
+
+describe('toPluginInfo — hasUpdate', () => {
+  function installedWith(loaded: string, remote: string): PluginDetail {
+    return {
+      ...detailWith(null),
+      loaded_version: loaded,
+      remote_info: { version: remote },
+    }
+  }
+
+  it('flags an update when the remote release is newer', () => {
+    expect(toPluginInfo(ID, installedWith('2.1.0', '2.4.0')).hasUpdate).toBe(
+      true,
+    )
+  })
+
+  it('does not flag when the remote version is "unknown"', () => {
+    expect(toPluginInfo(ID, installedWith('2.1.0', 'unknown')).hasUpdate).toBe(
+      false,
+    )
+  })
+
+  it('does not flag when the loaded version is ahead of the remote', () => {
+    expect(toPluginInfo(ID, installedWith('2.4.0', '2.1.0')).hasUpdate).toBe(
+      false,
+    )
+  })
+
+  it('does not flag against an unstamped (all-zero) dev install', () => {
+    expect(toPluginInfo(ID, installedWith('0.0.0', '1.0.0')).hasUpdate).toBe(
+      false,
+    )
+  })
+})
+
+describe('isUnstampedVersion', () => {
+  it('detects all-zero versions', () => {
+    expect(isUnstampedVersion('0.0.0')).toBe(true)
+    expect(isUnstampedVersion('0.0')).toBe(true)
+  })
+
+  it('is false for stamped or unparseable versions', () => {
+    expect(isUnstampedVersion('1.0.0')).toBe(false)
+    expect(isUnstampedVersion('0.0.1')).toBe(false)
+    expect(isUnstampedVersion('unknown')).toBe(false)
   })
 })

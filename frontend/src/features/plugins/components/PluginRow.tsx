@@ -15,10 +15,17 @@
  */
 
 import { formatDistanceToNow } from 'date-fns'
-import { AlertCircle, Eye, MoreVertical, Trash2 } from 'lucide-react'
+import {
+  AlertCircle,
+  Eye,
+  MoreVertical,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getPyPIUrl } from '../utils/plugin-url'
 import { CapabilityBadges } from './CapabilityBadges'
+import { PluginDiagnostics } from './PluginDiagnostics'
 import { PluginIcon } from './PluginIcon'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
 import { PluginStatusBadge } from '@/features/plugins/components/PluginStatusBadge'
@@ -60,14 +67,22 @@ export function PluginRow({
     : null
 
   const hasError = plugin.status === 'errored'
+  const isWarningOnly = plugin.errorSeverity === 'warning'
   const pypiUrl = getPyPIUrl(plugin.pipSource)
+
+  // Roughly when line-clamp-6 will cut the tooltip text (~45 chars/line)
+  const diagnosticsClamped =
+    (plugin.errorDetail?.reduce((n, e) => n + e.detail.length, 0) ?? 0) > 240
 
   return (
     <div
       className={cn(
         'group grid grid-cols-1 items-center gap-4 px-6 py-5 transition-colors hover:bg-muted/50 sm:grid-cols-12',
         !plugin.isEnabled && 'opacity-75 hover:opacity-100',
-        hasError && 'bg-red-50/50 dark:bg-red-950/20',
+        hasError &&
+          (isWarningOnly
+            ? 'bg-amber-50/50 dark:bg-amber-950/20'
+            : 'bg-red-50/50 dark:bg-red-950/20'),
       )}
     >
       {/* Plugin Details */}
@@ -76,15 +91,33 @@ export function PluginRow({
         <div>
           <div className="flex items-center gap-2">
             <H4 className="text-sm font-semibold">{plugin.name}</H4>
-            {hasError && (
+            {/* Diagnostics icon — also shown for loaded plugins carrying warnings */}
+            {(hasError || plugin.errorDetail) && (
               <Tooltip>
                 <TooltipTrigger>
-                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  {isWarningOnly ? (
+                    <TriangleAlert className="h-4 w-4 text-amber-500" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                  )}
                 </TooltipTrigger>
                 <TooltipContent>
-                  <P className="max-w-xs text-xs text-inherit">
-                    {plugin.errorDetail || t('status.errored')}
-                  </P>
+                  {plugin.errorDetail ? (
+                    <div className="max-w-xs">
+                      <div className="line-clamp-6">
+                        <PluginDiagnostics errors={plugin.errorDetail} plain />
+                      </div>
+                      {diagnosticsClamped && (
+                        <P className="mt-1 text-xs text-inherit opacity-70">
+                          {t('diagnostics.seeDetails')}
+                        </P>
+                      )}
+                    </div>
+                  ) : (
+                    <P className="max-w-xs text-xs text-inherit">
+                      {t('status.errored')}
+                    </P>
+                  )}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -118,6 +151,7 @@ export function PluginRow({
         <PluginStatusBadge
           status={plugin.status}
           hasUpdate={plugin.hasUpdate}
+          severity={plugin.errorSeverity}
         />
       </div>
 

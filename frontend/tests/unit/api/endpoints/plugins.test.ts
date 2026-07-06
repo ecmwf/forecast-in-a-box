@@ -14,14 +14,15 @@ import { worker } from '@tests/../mocks/browser'
 import type {
   PluginCompositeId,
   PluginListing,
+  PluginSettingsUpdate,
 } from '@/api/types/plugins.types'
 import {
   getPluginDetails,
   getPluginStatus,
   installPlugin,
-  modifyPluginEnabled,
   uninstallPlugin,
   updatePlugin,
+  updatePluginSettings,
 } from '@/api/endpoints/plugins'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
@@ -66,6 +67,18 @@ describe('getPluginStatus', () => {
       },
       plugin_updatedatetime: {
         [createPluginKey('ecmwf', 'anemoi-inference')]: '2025-01-15T00:00:00',
+      },
+      plugin_enabled: {
+        [createPluginKey('ecmwf', 'anemoi-inference')]: true,
+        [createPluginKey('ecmwf', 'legacy-viz')]: true,
+      },
+      plugin_excluded_templates: {
+        [createPluginKey('ecmwf', 'anemoi-inference')]: ['Excluded Template'],
+      },
+      plugin_glyph_remapping: {
+        [createPluginKey('ecmwf', 'anemoi-inference')]: {
+          old_name: 'new_name',
+        },
       },
     }
 
@@ -194,10 +207,14 @@ describe('uninstallPlugin', () => {
   })
 })
 
-describe('modifyPluginEnabled', () => {
+describe('updatePluginSettings', () => {
   afterEach(() => {
     worker.resetHandlers()
   })
+
+  type SettingsBody = {
+    pluginCompositeId: PluginCompositeId
+  } & PluginSettingsUpdate
 
   it('enables plugin successfully', async () => {
     const testPluginId = pluginId('ecmwf', 'anemoi-inference')
@@ -205,10 +222,7 @@ describe('modifyPluginEnabled', () => {
 
     worker.use(
       http.post(API_ENDPOINTS.plugin.settings, async ({ request }) => {
-        const body = (await request.json()) as {
-          pluginCompositeId: PluginCompositeId
-          isEnabled?: boolean
-        }
+        const body = (await request.json()) as SettingsBody
         expect(body.pluginCompositeId.store).toBe('ecmwf')
         expect(body.pluginCompositeId.local).toBe('anemoi-inference')
         receivedIsEnabled = body.isEnabled
@@ -216,7 +230,7 @@ describe('modifyPluginEnabled', () => {
       }),
     )
 
-    await modifyPluginEnabled(testPluginId, true)
+    await updatePluginSettings(testPluginId, { isEnabled: true })
     expect(receivedIsEnabled).toBe(true)
   })
 
@@ -226,17 +240,36 @@ describe('modifyPluginEnabled', () => {
 
     worker.use(
       http.post(API_ENDPOINTS.plugin.settings, async ({ request }) => {
-        const body = (await request.json()) as {
-          pluginCompositeId: PluginCompositeId
-          isEnabled?: boolean
-        }
+        const body = (await request.json()) as SettingsBody
         receivedIsEnabled = body.isEnabled
         return HttpResponse.json({ success: true })
       }),
     )
 
-    await modifyPluginEnabled(testPluginId, false)
+    await updatePluginSettings(testPluginId, { isEnabled: false })
     expect(receivedIsEnabled).toBe(false)
+  })
+
+  it('sends template exclusions and glyph remapping, omitting unset fields', async () => {
+    const testPluginId = pluginId('ecmwf', 'anemoi-inference')
+    let receivedBody: SettingsBody | undefined = undefined
+
+    worker.use(
+      http.post(API_ENDPOINTS.plugin.settings, async ({ request }) => {
+        receivedBody = (await request.json()) as SettingsBody
+        return HttpResponse.json({ success: true })
+      }),
+    )
+
+    await updatePluginSettings(testPluginId, {
+      excluded_templates: ['Broken Template'],
+      glyph_remapping: { old_name: 'new_name' },
+    })
+    expect(receivedBody).toEqual({
+      pluginCompositeId: testPluginId,
+      excluded_templates: ['Broken Template'],
+      glyph_remapping: { old_name: 'new_name' },
+    })
   })
 })
 
