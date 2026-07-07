@@ -127,7 +127,6 @@ def _make_builder_full(tmpdir: str) -> BlueprintBuilder:
                 {"text": "${submitDatetime};${startDatetime};${basicExecuteGlobalGlyph};${blueprintExecuteLocalGlyph}"}
             ),
         ),
-        input_ids={},
     )
     sink_time = RoutableBlock(
         instance_id=BlockInstanceId("sink_time"),
@@ -176,7 +175,8 @@ def test_blueprint_save_and_retrieve(backend_client_with_auth: httpx.Client) -> 
     assert retrieved["version"] == 1
     assert retrieved["display_name"] == "Test Blueprint"
     assert retrieved["tags"] == [{"key": "test", "value": None}, {"key": "integration", "value": None}]
-    assert retrieved["builder"]["blocks"]["source_42"]["factory_id"]["factory"] == "source_42"
+    source_42_block = next(b for b in retrieved["builder"]["blocks"] if b["instance_id"] == "source_42")
+    assert source_42_block["factory"] == "source_42"
     assert retrieved["builder"]["environment"]["hosts"] == 2
     assert retrieved["builder"]["environment"]["workers_per_host"] == 4
 
@@ -371,7 +371,7 @@ def test_plugin_template_exclusion(backend_client_with_auth: httpx.Client, backe
     assert response.is_success, response.text
     builder_data = response.json()["builder"]
     # The block config value must reference the renamed glyph.
-    config_values = list(builder_data["blocks"].values())[0]["configuration_values"]
+    config_values = builder_data["blocks"][0]["instance"]["configuration_values"]
     assert any("pluginGlyphNew" in v for v in config_values.values()), (
         f"Expected pluginGlyphNew in config values after remapping, got: {config_values}"
     )
@@ -491,8 +491,8 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         ),
     )
     # Using an unknown glyph should not fail validation — it should be reported in missing_glyphs
-    sink_file_bad = RoutableBlock(
-        instance_id=BlockInstanceId("sink_file_bad"),
+    sink_file = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file"),
         plugin=testPluginId,
         factory=BlockFactoryId("sink_file"),
         instance=BlockInstance(
@@ -501,7 +501,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
         ),
     )
     blocks.append(product_join)
-    blocks.append(sink_file_bad)
+    blocks.append(sink_file)
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
@@ -523,15 +523,16 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
 
     # A builder with an intrinsic name used as a local glyph key should fail validation
     builder_invalid_local = BlueprintBuilder(
-        blocks=dict(blocks),
+        blocks=list(blocks),
         local_glyphs={"runId": "should-not-be-allowed"},
     )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_invalid_local.model_dump())
     assert len(response.json()["global_errors"]) > 0
 
-    # A block using a local glyph defined on the builder should pass validation
+    # A block using a local glyph defined on the builder should pass validation.
+    # Replace the sink_file block in the list with a variant that references the local glyph.
     sink_file_local = RoutableBlock(
-        instance_id=BlockInstanceId("sink_file_local"),
+        instance_id=BlockInstanceId("sink_file"),
         plugin=testPluginId,
         factory=BlockFactoryId("sink_file"),
         instance=BlockInstance(
@@ -539,9 +540,9 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
             input_ids={"data": BlockInstanceId("product_join")},
         ),
     )
-    blocks.append(sink_file_local)
+    blocks = [sink_file_local if b.instance_id == BlockInstanceId("sink_file") else b for b in blocks]
     builder_with_local = BlueprintBuilder(
-        blocks=dict(blocks),
+        blocks=blocks,
         local_glyphs={"blueprintExpandLocalGlyph": "expand_local_value"},
     )
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder_with_local.model_dump())
@@ -549,9 +550,10 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
     assert len(response.json()["global_errors"]) == 0
     assert response.json()["resolved_configuration_options"]["sink_file"]["fname"] == f"{tmpdir}/outputexpand_local_value.main.txt"
 
-    # A known intrinsic glyph (${runId}) should also pass validation
+    # A known intrinsic glyph (${runId}) should also pass validation.
+    # Replace the sink_file block again with the intrinsic-glyph variant.
     sink_file_intrinsic = RoutableBlock(
-        instance_id=BlockInstanceId("sink_file_intrinsic"),
+        instance_id=BlockInstanceId("sink_file"),
         plugin=testPluginId,
         factory=BlockFactoryId("sink_file"),
         instance=BlockInstance(
@@ -559,7 +561,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_with_auth: httpx.Client) -
             input_ids={"data": BlockInstanceId("product_join")},
         ),
     )
-    blocks.append(sink_file_intrinsic)
+    blocks = [sink_file_intrinsic if b.instance_id == BlockInstanceId("sink_file") else b for b in blocks]
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_with_auth.request(url="/blueprint/expand", method="put", json=builder.model_dump())
