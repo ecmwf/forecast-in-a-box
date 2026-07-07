@@ -24,6 +24,7 @@
 
 import { useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
+import type { JobExecutionDetail } from '@/api/types/job.types'
 import { useJobsStatus } from '@/api/hooks/useJobs'
 import { storedDirQueryOptions } from '@/features/executions/outputs/stored-dir'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
@@ -38,43 +39,52 @@ export interface LensPathMatch {
   runCreatedAt: string | null
 }
 
-interface MarkerRow extends LensPathMatch {
+export interface GribMarkerRow extends LensPathMatch {
   isAvailable: boolean
+}
+
+/**
+ * One representative marker per sink block per run (a sink fans out to
+ * one marker per cascade branch, all pointing at the same directory) —
+ * mirrors StoredOutputsCard's row derivation. Only available markers.
+ */
+export function gribMarkerRows(
+  runs: ReadonlyArray<JobExecutionDetail>,
+): Array<GribMarkerRow> {
+  const rows: Array<GribMarkerRow> = []
+  for (const run of runs) {
+    if (!run.outputs) continue
+    const byBlock = new Map<string, GribMarkerRow>()
+    for (const [taskId, meta] of Object.entries(run.outputs)) {
+      if (meta.mime_type !== GRIB_DIR_MIME) continue
+      const existing = byBlock.get(meta.original_block)
+      if (existing) {
+        if (!existing.isAvailable && meta.is_available) {
+          existing.taskId = taskId
+          existing.isAvailable = true
+        }
+        continue
+      }
+      byBlock.set(meta.original_block, {
+        jobId: run.run_id,
+        taskId,
+        blockId: meta.original_block,
+        runCreatedAt: run.created_at,
+        isAvailable: meta.is_available,
+      })
+    }
+    rows.push(...byBlock.values())
+  }
+  return rows.filter((r) => r.isAvailable)
 }
 
 export function useLensPathIndex(): ReadonlyMap<string, LensPathMatch> {
   const { data: jobsList } = useJobsStatus(1, INDEXED_RUNS)
 
-  // One representative marker per sink block per run (a sink fans out to
-  // one marker per cascade branch, all pointing at the same directory) —
-  // mirrors StoredOutputsCard's row derivation.
-  const markers = useMemo<Array<MarkerRow>>(() => {
-    const rows: Array<MarkerRow> = []
-    for (const run of jobsList?.runs ?? []) {
-      if (!run.outputs) continue
-      const byBlock = new Map<string, MarkerRow>()
-      for (const [taskId, meta] of Object.entries(run.outputs)) {
-        if (meta.mime_type !== GRIB_DIR_MIME) continue
-        const existing = byBlock.get(meta.original_block)
-        if (existing) {
-          if (!existing.isAvailable && meta.is_available) {
-            existing.taskId = taskId
-            existing.isAvailable = true
-          }
-          continue
-        }
-        byBlock.set(meta.original_block, {
-          jobId: run.run_id,
-          taskId,
-          blockId: meta.original_block,
-          runCreatedAt: run.created_at,
-          isAvailable: meta.is_available,
-        })
-      }
-      rows.push(...byBlock.values())
-    }
-    return rows.filter((r) => r.isAvailable)
-  }, [jobsList])
+  const markers = useMemo<Array<GribMarkerRow>>(
+    () => gribMarkerRows(jobsList?.runs ?? []),
+    [jobsList],
+  )
 
   return useQueries({
     queries: markers.map((m) => storedDirQueryOptions(m.jobId, m.taskId)),

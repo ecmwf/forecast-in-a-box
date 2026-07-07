@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { entryDisplayName } from '../entry-ref'
 import type { ComparisonEntry } from '../entry-ref'
 import { cn } from '@/lib/utils'
-import { formatInZone, useAppTimeZone  } from '@/lib/datetime'
+import { formatInZone, useAppTimeZone } from '@/lib/datetime'
 
 export const SLOT_BADGE_CLASS = {
   A: 'bg-blue-600 text-white dark:bg-blue-500',
