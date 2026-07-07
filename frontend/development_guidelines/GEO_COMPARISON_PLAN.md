@@ -11,7 +11,7 @@
 - [x] Phase 2 — Comparison basket, entry points, contextual nav tab (+ initial /compare route with basket strip & A/B URL slots, so the nav link has a target)
 - [x] Phase 3 — `/compare` route, page shell, lens orchestration (incl. host-path source form; panels host the single-source viewer until Phase 4)
 - [x] Phase 4 — Comparison viewer (side-by-side, swipe, experimental modes; linked pairing, epoch-union timeline with availability tracks)
-- [ ] Phase 5 — External WMS URL sources (+ stretch: GeoJSON overlays)
+- [x] Phase 5 — External WMS URL sources (probe + form; GeoJSON overlays deferred — see deviation log)
 - [ ] Phase 6 — Polish + full verification
 
 ### Deviation log
