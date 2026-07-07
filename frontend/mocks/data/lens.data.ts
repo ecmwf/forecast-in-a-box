@@ -14,6 +14,7 @@
  * the UI's poll-until-running flow is exercised realistically.
  */
 
+import { hasMockWmsServer, registerMockWmsServer } from './wms.data'
 import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
 
 interface MockLensInstance {
@@ -67,16 +68,43 @@ export function pollMockLens(id: string): LensInstanceDetailResponse | null {
   const instance = lensState[id]
   if (instance.detail.status === 'starting') {
     if (instance.pollsUntilRunning <= 0) {
+      const port = portCounter++
       instance.detail = {
         ...instance.detail,
         status: 'running',
-        ports: [portCounter++],
+        ports: [port],
+      }
+      // Serve WMS behind every mock lens so the viewer/compare flows work
+      // end-to-end in dev:mock. Tests that pre-registered the port keep
+      // their fixture.
+      if (!hasMockWmsServer(port)) {
+        registerMockWmsServer(port, DEFAULT_LENS_WMS_CONFIG)
       }
     } else {
       instance.pollsUntilRunning--
     }
   }
   return instance.detail
+}
+
+/** Layer set served behind mock lenses — enough surface + pressure-level
+ * parameters and a time dimension to exercise viewer and compare flows. */
+const DEFAULT_LENS_WMS_CONFIG = {
+  layers: [
+    {
+      name: '2t',
+      title: '2 m temperature',
+      time: '2026-07-06T00:00:00Z/2026-07-07T00:00:00Z/PT6H',
+    },
+    {
+      name: 'msl',
+      title: 'Mean sea level pressure',
+      time: '2026-07-06T00:00:00Z/2026-07-07T00:00:00Z/PT6H',
+    },
+    { name: 'tp', title: 'Total precipitation' },
+    { name: 'q@pl_500', title: 'Specific humidity at 500 hPa' },
+    { name: 'q@pl_850', title: 'Specific humidity at 850 hPa' },
+  ],
 }
 
 export function stopMockLens(id: string): boolean {

@@ -46,6 +46,10 @@ export function resetWmsState(): void {
   servers = new Map()
 }
 
+export function hasMockWmsServer(port: number): boolean {
+  return servers.has(port)
+}
+
 export function registerMockWmsServer(
   port: number,
   config: MockWmsServerConfig,

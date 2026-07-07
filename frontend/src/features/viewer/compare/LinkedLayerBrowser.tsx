@@ -21,6 +21,8 @@ import { useMemo, useState } from 'react'
 import { Plus, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber } from '../format'
+import { rebaseLensUrl } from '../wms-capabilities'
+import { LegendImage } from '../components/LegendImage'
 import type { PairedLayer, SourceSlot } from './layer-pairing'
 import type { CompareSelection } from './useCompareSelection'
 import type { LensSource } from '../hooks/useLensSource'
@@ -39,11 +41,15 @@ export function LinkedLayerBrowser({
   selection,
   sourceA,
   sourceB,
+  baseUrlA,
+  baseUrlB,
 }: {
   pairs: ReadonlyArray<PairedLayer>
   selection: CompareSelection
   sourceA: LensSource
   sourceB: LensSource
+  baseUrlA: string
+  baseUrlB: string
 }) {
   const { t } = useTranslation('compare')
   const [search, setSearch] = useState('')
@@ -87,7 +93,12 @@ export function LinkedLayerBrowser({
         {selection.linkMode === 'linked' ? (
           <ul className="space-y-1">
             {filteredPairs.map((pair) => (
-              <PairRow key={pair.key} pair={pair} selection={selection} />
+              <PairRow
+                key={pair.key}
+                pair={pair}
+                selection={selection}
+                baseUrls={{ a: baseUrlA, b: baseUrlB }}
+              />
             ))}
             {filteredPairs.length === 0 && (
               <P className="p-2 text-sm text-muted-foreground">
@@ -119,9 +130,11 @@ export function LinkedLayerBrowser({
 function PairRow({
   pair,
   selection,
+  baseUrls,
 }: {
   pair: PairedLayer
   selection: CompareSelection
+  baseUrls: Record<SourceSlot, string>
 }) {
   const { t } = useTranslation('compare')
   const active = selection.isPairActive(pair.key)
@@ -174,7 +187,7 @@ function PairRow({
         </span>
       </button>
       {active && (
-        <div className="px-2 pb-2">
+        <div className="space-y-2 px-2 pb-2">
           <Slider
             value={[Math.round(selection.pairOpacity(pair.key) * 100)]}
             min={0}
@@ -185,6 +198,30 @@ function PairRow({
               selection.setPairOpacity(pair.key, firstNumber(v) / 100)
             }
           />
+          {/* Per-source legends — differing color scales must be visible. */}
+          {(['a', 'b'] as const).flatMap((slot) => {
+            const layer = pair.perSource[slot]
+            const legendUrl = layer?.styles[0]?.legendUrl
+            if (!layer || !legendUrl) return []
+            return [
+              <div key={slot} className="flex items-start gap-1.5">
+                <span
+                  className={cn(
+                    'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
+                    SLOT_CHIP_CLASS[slot],
+                  )}
+                >
+                  {slot.toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <LegendImage
+                    url={rebaseLensUrl(legendUrl, baseUrls[slot])}
+                    title={`${title} (${slot.toUpperCase()})`}
+                  />
+                </div>
+              </div>,
+            ]
+          })}
         </div>
       )}
     </li>
