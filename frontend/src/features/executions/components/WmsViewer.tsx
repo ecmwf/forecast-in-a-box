@@ -30,14 +30,7 @@
  * users know to load the source GRIB into a real GIS for value queries.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronDown,
   ChevronLeft,
@@ -63,13 +56,8 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import 'ol/ol.css'
-import OlMap from 'ol/Map'
-import View from 'ol/View'
 import ImageLayer from 'ol/layer/Image'
-import { fromLonLat, toLonLat, transformExtent } from 'ol/proj'
 import type ImageWMS from 'ol/source/ImageWMS'
-import type MapBrowserEvent from 'ol/MapBrowserEvent'
-import type { BasemapLayer, BasemapOption } from '@/features/viewer/ol-layers'
 import type {
   LayerGroup,
   ParsedLayer,
@@ -77,27 +65,20 @@ import type {
 } from '@/features/viewer/wms-capabilities'
 import {
   expandTimeSteps,
-  groupLayers,
-  parseCapabilities,
-  partitionGroups,
   rebaseLensUrl,
-  skinnyWmsBasemap,
-  uniquePressureLevels,
 } from '@/features/viewer/wms-capabilities'
 import {
-  BASEMAPS,
   DEFAULT_BASEMAP_ID,
   DEFAULT_LAYER_OPACITY,
-  INITIAL_VIEW_BBOX_WGS84,
-  REFERENCE_OVERLAY_Z,
-  SKINNYWMS_BASEMAP,
-  WEB_MERCATOR_EXTENT,
-  makeBasemapLayer,
   makeDataLayerSource,
-  makeSkinnyWmsBasemap,
 } from '@/features/viewer/ol-layers'
 import { firstNumber, formatLatLon, formatStep } from '@/features/viewer/format'
 import { exportMapPng, loadLegendImages } from '@/features/viewer/map-export'
+import { useLensSource } from '@/features/viewer/hooks/useLensSource'
+import { useOlMapBase } from '@/features/viewer/hooks/useOlMapBase'
+import { useBasemap } from '@/features/viewer/hooks/useBasemap'
+import { useWmsLayerStack } from '@/features/viewer/hooks/useWmsLayerStack'
+import { usePointerReadout } from '@/features/viewer/hooks/usePointerReadout'
 import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -121,8 +102,6 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('WmsViewer')
 
-// GetCapabilities retry — lens `running` precedes WMS-port readiness.
-const CAPABILITIES_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
 // Safety ceiling per prefetch image — server-hung loads shouldn't leak layers.
 const PREFETCH_LOAD_TIMEOUT_MS = 30_000
 // Hover-popover close delay — lets the cursor travel trigger→content.
@@ -133,11 +112,6 @@ interface WmsViewerProps {
   baseUrl: string
 }
 
-interface ManagedLayer {
-  layer: ImageLayer<ImageWMS>
-  source: ImageWMS
-}
-
 // ============================================================
 // Main component
 // ============================================================
@@ -145,29 +119,6 @@ interface ManagedLayer {
 export default function WmsViewer({ baseUrl }: WmsViewerProps) {
   const { t } = useTranslation('executions')
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<OlMap | null>(null)
-  const fittedRef = useRef(false)
-  const bboxRef = useRef<[number, number, number, number] | null>(null)
-  const managedRef = useRef<Map<string, ManagedLayer>>(new Map())
-  const basemapLayerRef = useRef<BasemapLayer | null>(null)
-
-  const [layers, setLayers] = useState<Array<ParsedLayer>>([])
-  const [decorationLayers, setDecorationLayers] = useState<Array<ParsedLayer>>(
-    [],
-  )
-  const [bbox, setBbox] = useState<[number, number, number, number] | null>(
-    null,
-  )
-  const [error, setError] = useState<string | null>(null)
-  const [loadingLayers, setLoadingLayers] = useState(true)
-
-  // Selection: ordered list (index 0 = top of stack) + per-layer opacity.
-  // A layer's *visibility* is implicit (in the array = visible).
-  const [activeOrder, setActiveOrder] = useState<Array<string>>([])
-  const [layerOpacities, setLayerOpacities] = useState<Map<string, number>>(
-    new Map(),
-  )
-  const [masterOpacity, setMasterOpacity] = useState(1)
 
   // Tile-load counter drives the toolbar spinner. Clamped at 0 because
   // canceled tiles can swallow the end event.
@@ -179,14 +130,27 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
     [],
   )
 
-  const [pointer, setPointer] = useState<{ lat: number; lon: number } | null>(
-    null,
-  )
+  // -------- Capabilities (per-source state) --------
 
-  // Group + level view-models, recomputed when capabilities change.
-  const groups = useMemo<Array<LayerGroup>>(() => groupLayers(layers), [layers])
-  const partitioned = useMemo(() => partitionGroups(groups), [groups])
-  const allLevels = useMemo(() => uniquePressureLevels(groups), [groups])
+  const {
+    layers,
+    decorationLayers,
+    bbox,
+    error,
+    loadingLayers,
+    retrying,
+    partitioned,
+    allLevels,
+    retry: onRetryCapabilities,
+  } = useLensSource(baseUrl)
+
+  // Selection: ordered list (index 0 = top of stack) + per-layer opacity.
+  // A layer's *visibility* is implicit (in the array = visible).
+  const [activeOrder, setActiveOrder] = useState<Array<string>>([])
+  const [layerOpacities, setLayerOpacities] = useState<Map<string, number>>(
+    new Map(),
+  )
+  const [masterOpacity, setMasterOpacity] = useState(1)
 
   // Time-step union across active layers that advertise a TIME dimension.
   const timeSteps = useMemo<Array<string>>(() => {
@@ -205,279 +169,42 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
     if (timeIndex >= timeSteps.length && timeSteps.length > 0) setTimeIndex(0)
   }, [timeSteps, timeIndex])
 
-  // -------- Capabilities fetch --------
-
-  // Lens `running` status precedes WMS-port readiness; retry hides the race.
-  // `retryNonce` re-triggers the effect on manual retry.
-  const [retryNonce, setRetryNonce] = useState(0)
-  const [retrying, setRetrying] = useState(false)
-
-  useEffect(() => {
-    const ac = new AbortController()
-    const delaysMs = CAPABILITIES_RETRY_DELAYS_MS
-    setError(null)
-    setLoadingLayers(true)
-    setRetrying(false)
-    void (async () => {
-      let lastErr: unknown
-      for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
-        if (ac.signal.aborted) return
-        try {
-          const res = await fetch(
-            `${baseUrl}/wms?service=WMS&version=1.3.0&request=GetCapabilities`,
-            { signal: ac.signal },
-          )
-          if (!res.ok) throw new Error(`GetCapabilities ${res.status}`)
-          const xml = await res.text()
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- aborted by cleanup
-          if (ac.signal.aborted) return
-          const parsed = parseCapabilities(xml)
-          setLayers(parsed.layers)
-          setDecorationLayers(parsed.decorationLayers)
-          setBbox(parsed.bbox)
-          setLoadingLayers(false)
-          setRetrying(false)
-          return
-        } catch (err) {
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- aborted by cleanup
-          if (ac.signal.aborted) return
-          lastErr = err
-          if (attempt === delaysMs.length) break
-          setRetrying(true)
-          await new Promise((r) => setTimeout(r, delaysMs[attempt]))
-        }
-      }
-      if (ac.signal.aborted) return
-      log.error('Failed to fetch WMS capabilities', { error: lastErr })
-      setError(lastErr instanceof Error ? lastErr.message : String(lastErr))
-      setLoadingLayers(false)
-      setRetrying(false)
-    })()
-    return () => ac.abort()
-  }, [baseUrl, retryNonce])
-
-  const onRetryCapabilities = useCallback(() => setRetryNonce((n) => n + 1), [])
-
   // -------- OL setup + lifecycle --------
 
-  const tryFit = useCallback((force: boolean = false) => {
-    const map = mapRef.current
-    if (!map) return
-    if (!force && fittedRef.current) return
-    const size = map.getSize()
-    if (!size || size[0] < 1 || size[1] < 1) return
-    // Forced = "Fit to globe" button → full WMS bbox; unforced (initial
-    // auto-fit) → Europe-centric default. Falls back to the default if
-    // the WMS bbox isn't known yet.
-    const targetWgs84 =
-      force && bboxRef.current ? bboxRef.current : INITIAL_VIEW_BBOX_WGS84
-    fittedRef.current = true
-    const view = map.getView()
-    const extent = transformExtent(
-      targetWgs84,
-      'EPSG:4326',
-      view.getProjection(),
-    )
-    view.fit(extent, { padding: [40, 40, 40, 40] })
-  }, [])
+  const { mapRef, basemapLayerRef, tryFit, setFitBbox } = useOlMapBase(
+    containerRef,
+    { resetKey: baseUrl, incLoading, decLoading },
+  )
+
+  useEffect(() => {
+    setFitBbox(bbox)
+  }, [bbox, setFitBbox])
 
   const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
-  const previousBasemapIdRef = useRef<string>(DEFAULT_BASEMAP_ID)
-
-  // SkinnyWMS decoration layers, split into base map + reference layers.
-  const skinnyBasemap = useMemo(
-    () => skinnyWmsBasemap(decorationLayers),
-    [decorationLayers],
-  )
-  // Offer the SkinnyWMS basemap only once a `background` layer is advertised.
-  const availableBasemaps = useMemo<ReadonlyArray<BasemapOption>>(
-    () =>
-      skinnyBasemap.background ? [...BASEMAPS, SKINNYWMS_BASEMAP] : BASEMAPS,
-    [skinnyBasemap.background],
-  )
-
-  useLayoutEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-    // Mount with default basemap; swap effect below adopts user choice.
-    const basemap = makeBasemapLayer(BASEMAPS[0])
-    const source = basemap.getSource()
-    source?.on('tileloadstart', incLoading)
-    source?.on('tileloadend', decLoading)
-    source?.on('tileloaderror', decLoading)
-    basemapLayerRef.current = basemap
-    const map = new OlMap({
-      target: container,
-      layers: [basemap],
-      view: new View({
-        // Pre-fit framing on Europe — avoids a [0,0] world flash before
-        // tryFit() runs.
-        center: fromLonLat([12, 50]),
-        zoom: 3,
-        projection: 'EPSG:3857',
-        // smoothExtentConstraint: false keeps pans strictly within the
-        // world; without it, slight overshoot makes SkinnyWMS return
-        // stretched-stripe images for out-of-bounds BBOXes.
-        extent: WEB_MERCATOR_EXTENT,
-        smoothExtentConstraint: false,
-        constrainResolution: false,
-      }),
-    })
-    mapRef.current = map
-    // Sheets animate in from off-screen; the container is 0×0 at mount
-    // time. Watch for resize and tell OL to recompute viewport size so
-    // tiles render once the drawer settles. Auto-fit kicks in here too —
-    // fit() needs valid pixel dimensions only available post-resize.
-    const ro = new ResizeObserver(() => {
-      map.updateSize()
-      tryFit()
-    })
-    ro.observe(container)
-    return () => {
-      ro.disconnect()
-      map.setTarget(undefined)
-      mapRef.current = null
-      managedRef.current.clear()
-    }
-  }, [baseUrl, tryFit, incLoading, decLoading])
-
-  useEffect(() => {
-    bboxRef.current = bbox
-    tryFit()
-  }, [bbox, tryFit])
-
-  // -------- Basemap swap --------
-  // Full layer replacement (not setSource) — the basemap types differ.
-  useEffect(() => {
-    const map = mapRef.current
-    const oldLayer = basemapLayerRef.current
-    if (!map || !oldLayer) return
-    if (previousBasemapIdRef.current === basemapId) return
-    previousBasemapIdRef.current = basemapId
-    const opt = availableBasemaps.find((b) => b.id === basemapId) ?? BASEMAPS[0]
-    let newLayer: BasemapLayer
-    if (opt.type === 'skinnywms' && skinnyBasemap.background) {
-      const skinny = makeSkinnyWmsBasemap(
-        baseUrl,
-        skinnyBasemap.background.name,
-      )
-      const source = skinny.getSource()
-      source?.on('imageloadstart', incLoading)
-      source?.on('imageloadend', decLoading)
-      source?.on('imageloaderror', decLoading)
-      newLayer = skinny
-    } else {
-      // Carto basemap — or skinnywms with no background, which falls back.
-      const external = opt.type === 'skinnywms' ? BASEMAPS[0] : opt
-      const tiled = makeBasemapLayer(external)
-      const source = tiled.getSource()
-      source?.on('tileloadstart', incLoading)
-      source?.on('tileloadend', decLoading)
-      source?.on('tileloaderror', decLoading)
-      newLayer = tiled
-    }
-    map.removeLayer(oldLayer)
-    map.getLayers().insertAt(0, newLayer)
-    basemapLayerRef.current = newLayer
-  }, [
-    basemapId,
-    availableBasemaps,
-    skinnyBasemap.background,
+  const { availableBasemaps } = useBasemap({
+    mapRef,
+    basemapLayerRef,
     baseUrl,
+    decorationLayers,
+    basemapId,
     incLoading,
     decLoading,
-  ])
-
-  // -------- SkinnyWMS reference overlay --------
-  // Coastline/border layers over the data while the SkinnyWMS basemap is
-  // active. Tied to the basemap choice — no separate toggle.
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    if (basemapId !== SKINNYWMS_BASEMAP.id) return
-    if (skinnyBasemap.reference.length === 0) return
-    const source = makeDataLayerSource(baseUrl, {
-      LAYERS: skinnyBasemap.reference.map((l) => l.name).join(','),
-      STYLES: '',
-      FORMAT: 'image/png',
-      TRANSPARENT: 'TRUE',
-    })
-    source.on('imageloadstart', incLoading)
-    source.on('imageloadend', decLoading)
-    source.on('imageloaderror', decLoading)
-    const overlay = new ImageLayer({ source, zIndex: REFERENCE_OVERLAY_Z })
-    map.addLayer(overlay)
-    return () => {
-      map.removeLayer(overlay)
-    }
-  }, [basemapId, skinnyBasemap.reference, baseUrl, incLoading, decLoading])
+  })
 
   // -------- WMS layer rendering --------
-  // One ImageLayer per active layer. Single-image mode (vs. TileWMS) so
-  // OL atomically swaps to the new image when params change — avoids the
-  // staggered per-tile sweep that flickers during time-slider scrubbing.
-  // Index 0 = topmost; effective opacity = master × per-layer.
 
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    const managed = managedRef.current
-
-    const wantedNames = new Set<string>()
-    activeOrder.forEach((layerName, idx) => {
-      const layer = layers.find((l) => l.name === layerName)
-      if (!layer || layer.styles.length === 0) return
-      const style = layer.styles[0]
-      wantedNames.add(layerName)
-
-      const params: Record<string, string> = {
-        LAYERS: layerName,
-        STYLES: style.name,
-        FORMAT: 'image/png',
-        TRANSPARENT: 'TRUE',
-      }
-      if (layer.time && activeTime) params.TIME = activeTime
-
-      const perLayer = layerOpacities.get(layerName) ?? DEFAULT_LAYER_OPACITY
-      const effectiveOpacity = perLayer * masterOpacity
-      const z = activeOrder.length - idx // index 0 → highest z
-
-      const existing = managed.get(layerName)
-      if (existing) {
-        existing.source.updateParams(params)
-        existing.layer.setOpacity(effectiveOpacity)
-        existing.layer.setZIndex(z)
-      } else {
-        const source = makeDataLayerSource(baseUrl, params)
-        source.on('imageloadstart', incLoading)
-        source.on('imageloadend', decLoading)
-        source.on('imageloaderror', decLoading)
-        const olLayer = new ImageLayer({
-          source,
-          opacity: effectiveOpacity,
-          zIndex: z,
-        })
-        map.addLayer(olLayer)
-        managed.set(layerName, { layer: olLayer, source })
-      }
-    })
-
-    for (const [name, m] of managed) {
-      if (!wantedNames.has(name)) {
-        map.removeLayer(m.layer)
-        managed.delete(name)
-      }
-    }
-  }, [
-    baseUrl,
-    layers,
+  const resolveTime = useCallback(
+    (layer: ParsedLayer) => (layer.time && activeTime ? activeTime : null),
+    [activeTime],
+  )
+  useWmsLayerStack(mapRef, baseUrl, layers, {
+    masterOpacity,
     activeOrder,
     layerOpacities,
-    masterOpacity,
-    activeTime,
+    resolveTime,
     incLoading,
     decLoading,
-  ])
+  })
 
   // -------- Time-step prefetch --------
   // Warms the browser HTTP cache for every (time-aware active layer ×
@@ -552,23 +279,7 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
 
   // -------- Pointer read-out --------
 
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    const onMove = (evt: MapBrowserEvent) => {
-      if (evt.dragging) return
-      const [lon, lat] = toLonLat(evt.coordinate)
-      setPointer({ lat, lon })
-    }
-    const onLeave = () => setPointer(null)
-    map.on('pointermove', onMove)
-    const target = map.getTargetElement()
-    target.addEventListener('mouseleave', onLeave)
-    return () => {
-      map.un('pointermove', onMove)
-      target.removeEventListener('mouseleave', onLeave)
-    }
-  }, [])
+  const pointer = usePointerReadout(mapRef)
 
   // -------- Selection handlers --------
 
