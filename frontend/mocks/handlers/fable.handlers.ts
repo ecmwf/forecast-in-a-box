@@ -32,23 +32,44 @@ interface SavedFableEntry {
   user_id: string
   created_at: string
   updated_at: string
+  /** Blueprint source; plugin templates use 'plugin_template' */
+  source?: string | null
+  /** Forked-from lineage (e.g. the template a preset was created from) */
+  parent_id?: string | null
 }
 
 function seedSavedFables(): Record<string, SavedFableEntry | undefined> {
-  return Object.fromEntries(
-    Object.entries(mockSavedFables).map(([id, entry]) => [
-      id,
-      {
-        ...entry,
-        display_name: entry.name,
-        display_description: '',
-      },
-    ]),
-  )
+  const seeded: Record<string, SavedFableEntry | undefined> =
+    Object.fromEntries(
+      Object.entries(mockSavedFables).map(([id, entry]) => [
+        id,
+        {
+          ...entry,
+          display_name: entry.name,
+          display_description: '',
+        },
+      ]),
+    )
+
+  // Plugin-shipped blueprint template (created_by = "store:local")
+  const templateBase = Object.values(mockSavedFables)[0]
+  seeded['template-basic-map'] = {
+    ...templateBase,
+    display_name: 'testBasic',
+    display_description: 'Ready-made starting point shipped by a plugin',
+    tags: [],
+    user_id: 'local:plugin-test',
+    source: 'plugin_template',
+  }
+
+  return seeded
 }
 
 function seedFableVersions(): Record<string, number> {
-  return Object.fromEntries(Object.keys(mockSavedFables).map((id) => [id, 1]))
+  return {
+    ...Object.fromEntries(Object.keys(mockSavedFables).map((id) => [id, 1])),
+    'template-basic-map': 1,
+  }
 }
 
 let savedFablesState: Record<string, SavedFableEntry | undefined> =
@@ -184,33 +205,7 @@ export const fableHandlers = [
       .replace('T', ' ')
       .replace(/\.\d{3}Z$/, '+00:00')
 
-    if (parent_id) {
-      const existing = savedFablesState[parent_id]
-      if (!existing) {
-        return HttpResponse.json(
-          { message: 'Fable not found' },
-          { status: 404 },
-        )
-      }
-
-      const newVersion = (fableVersions[parent_id] ?? 1) + 1
-      fableVersions[parent_id] = newVersion
-
-      savedFablesState[parent_id] = {
-        ...existing,
-        fable: builder,
-        display_name,
-        display_description,
-        tags: storedTags.length > 0 ? storedTags : existing.tags,
-        updated_at: now,
-      }
-
-      return HttpResponse.json({
-        blueprint_id: parent_id,
-        version: newVersion,
-      })
-    }
-
+    // Real-backend semantics: create mints a new blueprint; parent_id is lineage only
     const newId = `fable-${String(fableIdCounter++).padStart(3, '0')}`
     fableVersions[newId] = 1
 
@@ -223,6 +218,7 @@ export const fableHandlers = [
       user_id: 'mock-user-123',
       created_at: now,
       updated_at: now,
+      parent_id: parent_id ?? null,
     }
 
     return HttpResponse.json({ blueprint_id: newId, version: 1 })
@@ -268,6 +264,8 @@ export const fableHandlers = [
             typeof t === 'string' ? t : t.key,
           )
         : existing.tags,
+      // Real-backend semantics: omitted parent_id wipes lineage
+      parent_id: body.parent_id ?? null,
       updated_at: new Date().toISOString(),
     }
 
@@ -277,12 +275,39 @@ export const fableHandlers = [
     })
   }),
 
-  http.get(API_ENDPOINTS.fable.list, async () => {
+  http.post(API_ENDPOINTS.fable.delete, async ({ request }) => {
     await delay(200)
+    const body = (await request.json()) as {
+      blueprint_id: string
+      version: number
+    }
+    if (!savedFablesState[body.blueprint_id]) {
+      return HttpResponse.json(
+        { detail: `Blueprint '${body.blueprint_id}' not found` },
+        { status: 404 },
+      )
+    }
+    delete savedFablesState[body.blueprint_id]
+    delete fableVersions[body.blueprint_id]
+    return HttpResponse.json({ success: true })
+  }),
+
+  http.get(API_ENDPOINTS.fable.list, async ({ request }) => {
+    await delay(200)
+
+    const url = new URL(request.url)
+    const sourceFilter = url.searchParams.get('source')
+    const createdByFilter = url.searchParams.get('created_by')
 
     const blueprints = Object.entries(savedFablesState)
       .filter(
         (pair): pair is [string, SavedFableEntry] => pair[1] !== undefined,
+      )
+      .filter(
+        ([, entry]) => !sourceFilter || (entry.source ?? null) === sourceFilter,
+      )
+      .filter(
+        ([, entry]) => !createdByFilter || entry.user_id === createdByFilter,
       )
       .map(([id, entry]) => ({
         blueprint_id: id,
@@ -290,7 +315,7 @@ export const fableHandlers = [
         display_name: entry.display_name,
         display_description: entry.display_description,
         tags: entry.tags.map((k) => ({ key: k, value: '' })),
-        source: null,
+        source: entry.source ?? null,
         created_by: entry.user_id,
       }))
 
@@ -497,6 +522,7 @@ export const fableHandlers = [
       display_name: saved.display_name,
       display_description: saved.display_description,
       tags: saved.tags.map((k) => ({ key: k, value: '' })),
+      parent_id: saved.parent_id ?? null,
       created_at: saved.created_at,
       updated_at: saved.updated_at,
     })

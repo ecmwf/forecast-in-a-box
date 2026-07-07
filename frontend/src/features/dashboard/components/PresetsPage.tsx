@@ -15,7 +15,9 @@ import { Bookmark, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { useConfigPresets } from '../hooks/useConfigPresets'
+import { useTemplatePresets } from '../hooks/useTemplatePresets'
 import type { PresetEntry } from '../hooks/useConfigPresets'
+import type { TemplateEntry } from '../hooks/useTemplatePresets'
 import type {
   FacetKey,
   FacetToken,
@@ -65,6 +67,8 @@ const PresetRow = memo(function ({
   const showFlow = useUiStore((state) => state.journalShowFlow)
   // Cache-shared with useConfigPresets — a hit, not a new request.
   const { data: blueprint } = useFableRetrieve(preset.blueprintId)
+  // Forked-from lineage (e.g. the template this preset was created from)
+  const { data: parent } = useFableRetrieve(blueprint?.parent_id ?? null)
   const [metadataOpen, setMetadataOpen] = useState(false)
 
   const builder = blueprint?.builder
@@ -103,6 +107,8 @@ const PresetRow = memo(function ({
           )}
           <div className="mb-2 truncate text-sm text-muted-foreground">
             {t('journal:item.outputs', { count: preset.outputCount })}
+            {parent?.display_name &&
+              ` · ${t('presets.basedOn', { name: parent.display_name })}`}
           </div>
           {hasChips && (
             <div className="flex flex-wrap items-center gap-2">
@@ -209,9 +215,78 @@ const PresetRow = memo(function ({
   )
 })
 
+/**
+ * One plugin-template row — a starting point offered by a plugin. Read-only:
+ * no favourite/edit/delete; the only action is forking it into the builder.
+ */
+const TemplateRow = memo(function ({ template }: { template: TemplateEntry }) {
+  const { t } = useTranslation(['dashboard', 'journal'])
+  const showFlow = useUiStore((state) => state.journalShowFlow)
+  const { data: blueprint } = useFableRetrieve(template.blueprintId)
+
+  const builder = blueprint?.builder
+  const title = template.displayName || t('journal:item.untitled')
+  const useTemplateSearch = {
+    fableId: template.blueprintId,
+    template: true,
+    ...(template.pluginId && { templatePlugin: template.pluginId }),
+    ...(template.displayName && { templateName: template.displayName }),
+  }
+
+  return (
+    <div className="group/row p-6 transition-colors hover:bg-muted/50">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0 grow">
+          <div className="mb-1 flex min-w-0 items-center gap-2">
+            <Link
+              to="/configure"
+              search={useTemplateSearch}
+              className="min-w-0 truncate text-sm font-medium hover:underline"
+            >
+              {title}
+            </Link>
+            <JournalChip label={t('presets.templates.chip')} variant="tag" />
+          </div>
+          {template.displayDescription && (
+            <p className="mb-1 truncate text-sm text-muted-foreground">
+              {template.displayDescription}
+            </p>
+          )}
+          {template.pluginLabel && (
+            <div className="truncate text-sm text-muted-foreground">
+              {t('presets.templates.fromPlugin', {
+                plugin: template.pluginLabel,
+              })}
+            </div>
+          )}
+        </div>
+
+        {showFlow && builder && (
+          <FableMiniFlow
+            builder={builder}
+            className="max-w-[18rem] shrink-0"
+            monochrome
+          />
+        )}
+
+        <div className="mt-2 flex w-full items-center justify-end sm:mt-0 sm:w-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            render={<Link to="/configure" search={useTemplateSearch} />}
+            nativeButton={false}
+          >
+            {t('presets.templates.use')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+})
+
 const PAGE_SIZE = 10
 
-type PresetFilter = 'all' | 'bookmarked'
+type PresetFilter = 'all' | 'bookmarked' | 'templates'
 
 /** Case-insensitive substring test of a preset against one facet token. */
 function matchesPresetFacet(
@@ -261,6 +336,7 @@ export function PresetsPage() {
   const setShowFlow = useUiStore((state) => state.setJournalShowFlow)
 
   const { presets, deletePreset, toggleFavourite } = useConfigPresets()
+  const { templates } = useTemplatePresets()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<PresetFilter>('all')
   const [page, setPage] = useState(1)
@@ -271,19 +347,34 @@ export function PresetsPage() {
     () => filterPresets(presets, filter, parseQuery(deferredQuery)),
     [presets, filter, deferredQuery],
   )
+  // Templates support plain-text search only (no model/output/tag facets).
+  const filteredTemplates = useMemo(() => {
+    const text = parseQuery(deferredQuery).text.toLowerCase()
+    if (!text) return templates
+    return templates.filter(
+      (template) =>
+        (template.displayName ?? '').toLowerCase().includes(text) ||
+        (template.displayDescription ?? '').toLowerCase().includes(text) ||
+        (template.pluginLabel ?? '').toLowerCase().includes(text),
+    )
+  }, [templates, deferredQuery])
 
   const handleAddFacet = useCallback((token: FacetToken) => {
     setQuery((current) => addToken(current, token))
     setPage(1)
   }, [])
 
-  const totalPages = Math.max(1, Math.ceil(filteredPresets.length / PAGE_SIZE))
+  const showTemplates = filter === 'templates'
+  const activeCount = showTemplates
+    ? filteredTemplates.length
+    : filteredPresets.length
+  const totalPages = Math.max(1, Math.ceil(activeCount / PAGE_SIZE))
   // Clamp: a delete (or any list shrink) can leave `page` past the last page.
   const currentPage = Math.min(page, totalPages)
-  const paginatedPresets = filteredPresets.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  )
+  const pageSlice = <T,>(items: Array<T>) =>
+    items.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const paginatedPresets = pageSlice(filteredPresets)
+  const paginatedTemplates = pageSlice(filteredTemplates)
 
   return (
     <ListPageContainer>
@@ -323,7 +414,7 @@ export function PresetsPage() {
             />
 
             <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
-              {(['all', 'bookmarked'] as const).map((f) => (
+              {(['all', 'bookmarked', 'templates'] as const).map((f) => (
                 <button
                   key={f}
                   type="button"
@@ -347,7 +438,21 @@ export function PresetsPage() {
 
         {/* List */}
         <div className="divide-y divide-border">
-          {paginatedPresets.length > 0 ? (
+          {showTemplates ? (
+            paginatedTemplates.length > 0 ? (
+              paginatedTemplates.map((template) => (
+                <TemplateRow key={template.blueprintId} template={template} />
+              ))
+            ) : query ? (
+              <EmptyState icon={Bookmark} title={t('presets.empty.filtered')} />
+            ) : (
+              <EmptyState
+                icon={Bookmark}
+                title={t('presets.templates.empty.title')}
+                description={t('presets.templates.empty.description')}
+              />
+            )
+          ) : paginatedPresets.length > 0 ? (
             paginatedPresets.map((preset) => (
               <PresetRow
                 key={preset.blueprintId}

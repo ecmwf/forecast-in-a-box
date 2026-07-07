@@ -245,6 +245,34 @@ export const PluginsStatusSchema = z.object({
 export type PluginsStatus = z.infer<typeof PluginsStatusSchema>
 
 /**
+ * Example data for a blueprint template from GET /plugin/templateExampleValues.
+ * Mirrors what the backend overlays during template ingest validation.
+ */
+export const TemplateExampleValuesSchema = z.object({
+  /** Per-block example configuration values, keyed by block instance id then option id */
+  example_values: z.record(z.string(), z.record(z.string(), z.string())),
+  /** Example glyph name-to-value pairs the user is expected to override */
+  example_glyphs: z.record(z.string(), z.string()),
+})
+
+export type TemplateExampleValues = z.infer<typeof TemplateExampleValuesSchema>
+
+/**
+ * Parse a "store:local" composite string (the blueprint `created_by` format
+ * for plugin templates). Splits on the first colon.
+ */
+export function parsePluginIdString(id: string): PluginCompositeId {
+  const separatorIndex = id.indexOf(':')
+  if (separatorIndex === -1) {
+    return { store: id, local: '' }
+  }
+  return {
+    store: id.slice(0, separatorIndex),
+    local: id.slice(separatorIndex + 1),
+  }
+}
+
+/**
  * Payload fields for POST /plugin/settings (backend PluginSettingsUpdateRequest).
  * Omitted fields leave the stored value unchanged; an empty list/dict clears it.
  */

@@ -20,12 +20,14 @@ import type {
   PluginListing,
   PluginSettingsUpdate,
   PluginsStatus,
+  TemplateExampleValues,
 } from '@/api/types/plugins.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import {
   PluginListingSchema,
   PluginsStatusSchema,
+  TemplateExampleValuesSchema,
 } from '@/api/types/plugins.types'
 
 /**
@@ -92,6 +94,25 @@ export async function updatePluginSettings(
   await apiClient.post(API_ENDPOINTS.plugin.settings, {
     pluginCompositeId: compositeId,
     ...settings,
+  })
+}
+
+/**
+ * Get example values/glyphs for a blueprint template from a loaded plugin
+ * @param compositeId - The plugin composite ID { store, local }
+ * @param displayName - The template's display name within the plugin
+ */
+export async function getTemplateExampleValues(
+  compositeId: PluginCompositeId,
+  displayName: string,
+): Promise<TemplateExampleValues> {
+  return apiClient.get(API_ENDPOINTS.plugin.templateExampleValues, {
+    params: {
+      store: compositeId.store,
+      local: compositeId.local,
+      displayName,
+    },
+    schema: TemplateExampleValuesSchema,
   })
 }
 

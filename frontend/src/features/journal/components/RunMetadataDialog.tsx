@@ -70,6 +70,8 @@ export function RunMetadataDialog({
         fable: blueprint.builder,
         fableId: blueprint.blueprint_id,
         fableVersion: blueprint.version,
+        // Re-send lineage — the backend update replaces the metadata row
+        parentId: blueprint.parent_id ?? undefined,
         display_name: name.trim() || (blueprint.display_name ?? ''),
         display_description: description.trim(),
         // Keep the one-off marker — editing details must not promote a run

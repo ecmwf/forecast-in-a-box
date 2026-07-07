@@ -29,8 +29,10 @@ export function PresetCard({
   preset: PresetEntry
   onToggleFavourite: () => void
 }) {
-  const { t } = useTranslation('journal')
+  const { t } = useTranslation(['journal', 'dashboard'])
   const { data: blueprint } = useFableRetrieve(preset.blueprintId)
+  // Forked-from lineage (e.g. the template this preset was created from)
+  const { data: parent } = useFableRetrieve(blueprint?.parent_id ?? null)
   const [metadataOpen, setMetadataOpen] = useState(false)
 
   const builder = blueprint?.builder
@@ -79,6 +81,8 @@ export function PresetCard({
 
       <p className="text-sm text-muted-foreground">
         {t('item.outputs', { count: outputCount })}
+        {parent?.display_name &&
+          ` · ${t('dashboard:presets.basedOn', { name: parent.display_name })}`}
       </p>
 
       {preset.coreVersionMismatch && (

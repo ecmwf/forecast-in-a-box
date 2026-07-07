@@ -302,4 +302,26 @@ export const pluginsHandlers = [
 
     return HttpResponse.json({ success: true })
   }),
+
+  // GET /api/v1/plugin/templateExampleValues
+  http.get(API_ENDPOINTS.plugin.templateExampleValues, async ({ request }) => {
+    await delay(200)
+    const url = new URL(request.url)
+    const displayName = url.searchParams.get('displayName')
+
+    // Matches the 'template-basic-map' blueprint fixture in fable.handlers.ts
+    if (displayName !== 'testBasic') {
+      return new HttpResponse(
+        JSON.stringify({ detail: `Template ${displayName} not found` }),
+        { status: 404 },
+      )
+    }
+
+    return HttpResponse.json({
+      example_values: {
+        block_source_1: { base_time: '2026-07-01T00:00:00' },
+      },
+      example_glyphs: { leadtime: '48' },
+    })
+  }),
 ]

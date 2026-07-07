@@ -121,6 +121,8 @@ export const API_ENDPOINTS = {
     update: `${API_PREFIX}/plugin/update`,
     /** POST - Update plugin settings, e.g. enable/disable (body: PluginSettingsUpdateRequest) */
     settings: `${API_PREFIX}/plugin/settings`,
+    /** GET - Example values/glyphs for a blueprint template (query: store, local, displayName) */
+    templateExampleValues: `${API_PREFIX}/plugin/templateExampleValues`,
   },
 
   /**

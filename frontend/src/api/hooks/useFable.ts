@@ -30,6 +30,7 @@ import type {
   IntrinsicGlyphItem,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
+import type { BlueprintListFilters } from '@/api/endpoints/fable'
 import {
   createGlobalGlyph,
   deleteBlueprint,
@@ -53,8 +54,8 @@ export const fableKeys = {
   catalogue: () => [...fableKeys.all, 'catalogue'] as const,
   // Prefix shared by every paginated blueprint-list query — invalidate to refresh all of them.
   blueprintsBase: () => [...fableKeys.all, 'blueprints'] as const,
-  blueprints: (page?: number, pageSize?: number) =>
-    [...fableKeys.all, 'blueprints', page, pageSize] as const,
+  blueprints: (page?: number, pageSize?: number, filters?: object) =>
+    [...fableKeys.all, 'blueprints', page, pageSize, filters ?? null] as const,
   detail: (id: string) => [...fableKeys.all, 'detail', id] as const,
   validation: (fable: FableBuilderV1) =>
     [...fableKeys.all, 'validation', JSON.stringify(fable)] as const,
@@ -159,10 +160,14 @@ export function useFableValidation(
   })
 }
 
-export function useListBlueprints(page: number = 1, pageSize: number = 50) {
+export function useListBlueprints(
+  page: number = 1,
+  pageSize: number = 50,
+  filters?: BlueprintListFilters,
+) {
   return useQuery<BlueprintListResponse>({
-    queryKey: fableKeys.blueprints(page, pageSize),
-    queryFn: () => listBlueprints(page, pageSize),
+    queryKey: fableKeys.blueprints(page, pageSize, filters),
+    queryFn: () => listBlueprints(page, pageSize, filters),
     staleTime: QUERY_CONSTANTS.STALE_TIMES.DEFAULT,
   })
 }
@@ -192,7 +197,8 @@ export function useUpsertFable() {
       display_description,
       tags,
     }) => {
-      // Update existing blueprint when we have both ID and version
+      // Update when we have ID + version. parent_id is re-sent — the
+      // backend replaces the metadata row and omitting it wipes lineage.
       if (fableId && fableVersion != null) {
         return updateBlueprint({
           blueprint_id: fableId,
@@ -201,6 +207,7 @@ export function useUpsertFable() {
           display_name,
           display_description,
           tags: tags ?? [],
+          parent_id: parentId ?? null,
         })
       }
       // Create new blueprint (parentId tracks "forked from" lineage)
@@ -233,10 +240,10 @@ export function useDeleteBlueprint() {
 
   return useMutation<void, Error, BlueprintDeleteRequest>({
     mutationFn: deleteBlueprint,
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: fableKeys.detail(variables.blueprint_id),
-      })
+    onSuccess: () => {
+      // Only refresh lists. Invalidating the deleted blueprint's detail
+      // would refetch a 404 from still-mounted rows and toast an error;
+      // the stale cache entry is unreachable once the lists update.
       queryClient.invalidateQueries({
         queryKey: fableKeys.blueprintsBase(),
       })
