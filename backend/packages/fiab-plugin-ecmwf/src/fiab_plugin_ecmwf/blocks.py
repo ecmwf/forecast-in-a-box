@@ -47,11 +47,11 @@ from .block_utils import (
     STEP,
     VALUES,
     _axis_value_strings,
-    _param_id_to_param_key,
     _extract_dataset,
     _is_empty_qube,
-    _parse_axis_value,
+    _param_id_to_param_key,
     _param_key_to_param_id,
+    _parse_axis_value,
 )
 from .datasets import load_datasets
 from .qubed_utils import axes, common_dimensions, contains, dimensions, select

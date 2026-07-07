@@ -293,7 +293,11 @@ class TestSelect:
     ) -> None:
         block = _select()
         config = select_configuration.model_copy(
-            update={"configuration_values": _config({"dimension": "param", "values": [_param_id_to_param_key("167"), _param_id_to_param_key("151")]})}
+            update={
+                "configuration_values": _config(
+                    {"dimension": "param", "values": [_param_id_to_param_key("167"), _param_id_to_param_key("151")]}
+                )
+            }
         )
         output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
