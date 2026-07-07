@@ -115,29 +115,6 @@ const seedExecutions: Array<JobExecutionDetail> = [
     planned_block_ids: null,
   },
   {
-    // Second run with a stored GRIB output — comparison tests pair it
-    // with job-completed-001.
-    run_id: 'job-completed-008',
-    attempt_count: 1,
-    status: 'completed',
-    created_at: twoHoursAgo,
-    updated_at: twoHoursAgo,
-    blueprint_id: 'def-001',
-    blueprint_version: 1,
-    error: null,
-    progress: '100',
-    cascade_job_id: 'cascade-008',
-    outputs: {
-      'task-out-grib-b': {
-        mime_type: 'text/plain; fiab-format=gribdir',
-        original_block: 'block_sink_1',
-        is_available: true,
-      },
-    },
-    completed_block_ids: null,
-    planned_block_ids: null,
-  },
-  {
     run_id: 'job-submitted-004',
     attempt_count: 1,
     status: 'submitted',
@@ -152,6 +129,32 @@ const seedExecutions: Array<JobExecutionDetail> = [
     outputs: null,
   },
 ]
+
+/** Test-only fixture: a second completed run with a stored GRIB output —
+ * comparison tests pair it with job-completed-001. Not part of the default
+ * seed (list-driven tests assume a single completed run); inject it via
+ * {@link injectMockExecution}. */
+export const secondGribRunExecution: JobExecutionDetail = {
+  run_id: 'job-grib-b-008',
+  attempt_count: 1,
+  status: 'completed',
+  created_at: twoHoursAgo,
+  updated_at: twoHoursAgo,
+  blueprint_id: 'def-001',
+  blueprint_version: 1,
+  error: null,
+  progress: '100',
+  cascade_job_id: 'cascade-008',
+  outputs: {
+    'task-out-grib-b': {
+      mime_type: 'text/plain; fiab-format=gribdir',
+      original_block: 'block_sink_1',
+      is_available: true,
+    },
+  },
+  completed_block_ids: null,
+  planned_block_ids: null,
+}
 
 /** Test-only fixture for the mixed-availability filter case. Not added to
  * the default seed — inject it via {@link injectMockExecution} from the test

@@ -1,0 +1,209 @@
+/*
+ * (C) Copyright 2026- ECMWF and individual contributors.
+ *
+ * This software is licensed under the terms of the Apache Licence Version 2.0
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
+ * granted to it by virtue of its status as an intergovernmental organisation nor
+ * does it submit to any jurisdiction.
+ */
+
+/**
+ * Linked/unlinked layer selection across two compare sources.
+ *
+ * Linked (default): one ordered list of PAIR keys drives both sides —
+ * picking "2 m temperature" activates it on every source that has it; a
+ * missing side simply contributes nothing. Unlinked: each side owns its
+ * ordered layer-name list. Transitions are lossless linked→unlinked (the
+ * derived per-source orders are copied) and union-rebuilding the other
+ * way. Zero pair overlap forces unlinked — the caller surfaces the notice.
+ */
+
+import { useCallback, useMemo, useState } from 'react'
+import { DEFAULT_LAYER_OPACITY } from '../ol-layers'
+import type { PairedLayer, SourceSlot } from './layer-pairing'
+
+export type LinkMode = 'linked' | 'unlinked'
+
+interface PerSourceSelection {
+  activeOrder: Array<string>
+  layerOpacities: Map<string, number>
+}
+
+export interface CompareSelection {
+  linkMode: LinkMode
+  /** True when unlinked was forced by zero overlap (shows the notice). */
+  autoUnlinked: boolean
+  /** Active pair keys, index 0 = top (linked mode). */
+  linkedOrder: ReadonlyArray<string>
+  /** Layer NAMES + opacities for a source's stack, in stacking order. */
+  activeOrderFor: (slot: SourceSlot) => Array<string>
+  opacitiesFor: (slot: SourceSlot) => Map<string, number>
+  isPairActive: (key: string) => boolean
+  togglePair: (key: string) => void
+  setPairOpacity: (key: string, opacity: number) => void
+  pairOpacity: (key: string) => number
+  isLayerActive: (slot: SourceSlot, name: string) => boolean
+  toggleLayer: (slot: SourceSlot, name: string) => void
+  setLinkMode: (mode: LinkMode, options?: { auto?: boolean }) => void
+  clear: () => void
+}
+
+export function useCompareSelection(
+  pairs: ReadonlyArray<PairedLayer>,
+): CompareSelection {
+  const [linkMode, setLinkModeState] = useState<LinkMode>('linked')
+  const [autoUnlinked, setAutoUnlinked] = useState(false)
+  const [linkedOrder, setLinkedOrder] = useState<Array<string>>([])
+  const [linkedOpacities, setLinkedOpacities] = useState<Map<string, number>>(
+    new Map(),
+  )
+  const [perSource, setPerSource] = useState<
+    Record<SourceSlot, PerSourceSelection>
+  >({
+    a: { activeOrder: [], layerOpacities: new Map() },
+    b: { activeOrder: [], layerOpacities: new Map() },
+  })
+
+  const pairByKey = useMemo(
+    () => new Map(pairs.map((p) => [p.key, p])),
+    [pairs],
+  )
+
+  /** Linked selection projected onto one source's layer names. */
+  const deriveForSlot = useCallback(
+    (slot: SourceSlot): PerSourceSelection => {
+      const activeOrder: Array<string> = []
+      const layerOpacities = new Map<string, number>()
+      for (const key of linkedOrder) {
+        const layer = pairByKey.get(key)?.perSource[slot]
+        if (!layer) continue
+        activeOrder.push(layer.name)
+        layerOpacities.set(
+          layer.name,
+          linkedOpacities.get(key) ?? DEFAULT_LAYER_OPACITY,
+        )
+      }
+      return { activeOrder, layerOpacities }
+    },
+    [linkedOrder, linkedOpacities, pairByKey],
+  )
+
+  const activeOrderFor = useCallback(
+    (slot: SourceSlot) =>
+      linkMode === 'linked'
+        ? deriveForSlot(slot).activeOrder
+        : perSource[slot].activeOrder,
+    [linkMode, deriveForSlot, perSource],
+  )
+  const opacitiesFor = useCallback(
+    (slot: SourceSlot) =>
+      linkMode === 'linked'
+        ? deriveForSlot(slot).layerOpacities
+        : perSource[slot].layerOpacities,
+    [linkMode, deriveForSlot, perSource],
+  )
+
+  const togglePair = useCallback((key: string) => {
+    setLinkedOrder((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [key, ...prev],
+    )
+    setLinkedOpacities((prev) => {
+      if (prev.has(key)) return prev
+      const next = new Map(prev)
+      next.set(key, DEFAULT_LAYER_OPACITY)
+      return next
+    })
+  }, [])
+
+  const setPairOpacity = useCallback((key: string, opacity: number) => {
+    setLinkedOpacities((prev) => {
+      const next = new Map(prev)
+      next.set(key, opacity)
+      return next
+    })
+  }, [])
+
+  const toggleLayer = useCallback((slot: SourceSlot, name: string) => {
+    setPerSource((prev) => {
+      const current = prev[slot]
+      const active = current.activeOrder.includes(name)
+      const activeOrder = active
+        ? current.activeOrder.filter((n) => n !== name)
+        : [name, ...current.activeOrder]
+      const layerOpacities = new Map(current.layerOpacities)
+      if (!active && !layerOpacities.has(name)) {
+        layerOpacities.set(name, DEFAULT_LAYER_OPACITY)
+      }
+      return { ...prev, [slot]: { activeOrder, layerOpacities } }
+    })
+  }, [])
+
+  const setLinkMode = useCallback(
+    (mode: LinkMode, options?: { auto?: boolean }) => {
+      setLinkModeState((prevMode) => {
+        if (prevMode === mode) return prevMode
+        if (mode === 'unlinked') {
+          // Lossless: copy the derived per-source projections.
+          setPerSource({ a: deriveForSlot('a'), b: deriveForSlot('b') })
+        } else {
+          // Rebuild pair order from the union of both sides' active layers.
+          setPerSource((current) => {
+            const order: Array<string> = []
+            const opacities = new Map<string, number>()
+            for (const pair of pairByKey.values()) {
+              const aName = pair.perSource.a?.name
+              const bName = pair.perSource.b?.name
+              const aActive =
+                aName !== undefined && current.a.activeOrder.includes(aName)
+              const bActive =
+                bName !== undefined && current.b.activeOrder.includes(bName)
+              if (!aActive && !bActive) continue
+              order.push(pair.key)
+              const opacity =
+                (aName !== undefined
+                  ? current.a.layerOpacities.get(aName)
+                  : undefined) ??
+                (bName !== undefined
+                  ? current.b.layerOpacities.get(bName)
+                  : undefined) ??
+                DEFAULT_LAYER_OPACITY
+              opacities.set(pair.key, opacity)
+            }
+            setLinkedOrder(order)
+            setLinkedOpacities(opacities)
+            return current
+          })
+        }
+        return mode
+      })
+      setAutoUnlinked(mode === 'unlinked' ? (options?.auto ?? false) : false)
+    },
+    [deriveForSlot, pairByKey],
+  )
+
+  const clear = useCallback(() => {
+    setLinkedOrder([])
+    setLinkedOpacities(new Map())
+    setPerSource({
+      a: { activeOrder: [], layerOpacities: new Map() },
+      b: { activeOrder: [], layerOpacities: new Map() },
+    })
+  }, [])
+
+  return {
+    linkMode,
+    autoUnlinked,
+    linkedOrder,
+    activeOrderFor,
+    opacitiesFor,
+    isPairActive: (key) => linkedOrder.includes(key),
+    togglePair,
+    setPairOpacity,
+    pairOpacity: (key) => linkedOpacities.get(key) ?? DEFAULT_LAYER_OPACITY,
+    isLayerActive: (slot, name) => perSource[slot].activeOrder.includes(name),
+    toggleLayer,
+    setLinkMode,
+    clear,
+  }
+}
