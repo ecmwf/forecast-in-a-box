@@ -20,10 +20,11 @@
  */
 
 import { useMemo, useState } from 'react'
-import { FolderInput, Radar, Rows3 } from 'lucide-react'
+import { FolderInput, Globe, Loader2, Radar, Rows3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryDisplayName } from '../entry-ref'
 import { gribMarkerRows, useLensPathIndex } from '../hooks/useLensPathIndex'
+import { probeWmsEndpoint } from '../wms-probe'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { AddToComparisonButton } from './AddToComparisonButton'
 import type { GribMarkerRow } from '../hooks/useLensPathIndex'
@@ -143,12 +144,13 @@ export function ComparisonSourcePicker() {
         </section>
       )}
 
-      {/* External data — host path (WMS URL form lands in a later phase) */}
-      <section className="space-y-1">
+      {/* External data — host path + external WMS endpoint */}
+      <section className="space-y-2">
         <SectionLabel icon={<FolderInput className="h-3.5 w-3.5" />}>
           {t('picker.external')}
         </SectionLabel>
         <HostPathForm />
+        <WmsUrlForm />
       </section>
     </div>
   )
@@ -254,6 +256,85 @@ function HostPathForm() {
           {t('picker.add')}
         </Button>
       </div>
+    </div>
+  )
+}
+
+type WmsFormError = 'invalid-url' | 'unreachable' | 'parse' | null
+
+function WmsUrlForm() {
+  const { t } = useTranslation('compare')
+  const [url, setUrl] = useState('')
+  const [probing, setProbing] = useState(false)
+  const [error, setError] = useState<WmsFormError>(null)
+  const addEntry = useComparisonStore((s) => s.addEntry)
+
+  const submit = async () => {
+    if (probing || !url.trim()) return
+    setProbing(true)
+    setError(null)
+    const result = await probeWmsEndpoint(url)
+    setProbing(false)
+    if (!result.ok) {
+      setError(result.reason)
+      return
+    }
+    const added = addEntry({
+      kind: 'wms',
+      url: result.baseUrl,
+      label: result.label,
+    })
+    if (added === 'added') {
+      showToast.success(t('toast.added', { name: result.label }))
+      setUrl('')
+    } else if (added === 'full') {
+      showToast.error(t('toast.full', { max: 8 }))
+    }
+  }
+
+  const errorText =
+    error === 'invalid-url'
+      ? t('picker.wmsUrl.errorInvalidUrl')
+      : error === 'unreachable'
+        ? t('picker.wmsUrl.errorUnreachable')
+        : error === 'parse'
+          ? t('picker.wmsUrl.errorParse')
+          : null
+
+  return (
+    <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+      <P className="flex items-center gap-1.5 text-sm font-medium">
+        <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+        {t('picker.wmsUrl.title')}
+      </P>
+      <P className="text-xs text-muted-foreground">
+        {t('picker.wmsUrl.description')}
+      </P>
+      <div className="flex gap-2">
+        <Input
+          value={url}
+          onChange={(e) => {
+            setUrl(e.target.value)
+            setError(null)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void submit()
+          }}
+          placeholder={t('picker.wmsUrl.placeholder')}
+          className="h-8 font-mono text-xs"
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void submit()}
+          disabled={!url.trim() || probing}
+          className="h-8 shrink-0 gap-1.5"
+        >
+          {probing && <Loader2 className="h-3 w-3 animate-spin" />}
+          {probing ? t('picker.wmsUrl.probing') : t('picker.wmsUrl.connect')}
+        </Button>
+      </div>
+      {errorText && <P className="text-xs text-destructive">{errorText}</P>}
     </div>
   )
 }
