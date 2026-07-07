@@ -169,6 +169,40 @@ export function pluginErrorsMaxSeverity(
   return max
 }
 
+/** The single visual state a plugin's status badge conveys. */
+export type PluginBadgeKind =
+  | 'loaded'
+  | 'disabled'
+  | 'warning'
+  | 'errored'
+  | 'update'
+  | 'available'
+
+/**
+ * The one badge a plugin shows. Badge and status filter both derive from this,
+ * so they can't drift. Precedence: disabled → update → warning → errored →
+ * available → loaded.
+ */
+export function pluginBadgeKind(plugin: {
+  status: PluginStatus
+  isEnabled?: boolean
+  hasUpdate?: boolean
+  errorSeverity?: PluginErrorSeverity | null
+}): PluginBadgeKind {
+  // Disabled dominates — blocks stay out of the catalogue until re-enabled.
+  // (Uninstalled 'available' plugins keep their own badge.)
+  if (plugin.isEnabled === false && plugin.status !== 'available') {
+    return 'disabled'
+  }
+  if (plugin.hasUpdate && plugin.status === 'loaded') return 'update'
+  // Severity drives the badge, not status — a warning is amber whether the
+  // plugin loaded or errored.
+  if (plugin.errorSeverity === 'warning') return 'warning'
+  if (plugin.status === 'errored') return 'errored'
+  if (plugin.status === 'available') return 'available'
+  return 'loaded'
+}
+
 /**
  * Plugin detail - full plugin information from backend
  */
@@ -250,7 +284,8 @@ export interface PluginInfo {
   capabilities: Array<PluginCapability>
   /** Current status from backend */
   status: PluginStatus
-  /** Whether plugin is enabled (loaded or errored) */
+  /** Enabled = its blocks appear in the catalogue. Reflects `plugin_enabled`,
+   *  not merely whether it loaded. */
   isEnabled: boolean
   /** Whether plugin is installed (not available) */
   isInstalled: boolean
@@ -313,11 +348,15 @@ export function isUnstampedVersion(version: string): boolean {
 
 /**
  * Transform a PluginDetail to UI-friendly PluginInfo
+ *
+ * @param enabled - The `plugin_enabled` flag (/plugin/status). Orthogonal to
+ *   `status`; omit to infer from `status`.
  */
 export function toPluginInfo(
   id: PluginCompositeId,
   detail: PluginDetail,
   capabilities: Array<PluginCapability> = [],
+  enabled?: boolean,
 ): PluginInfo {
   const isInstalled = detail.status !== 'available'
   const hasUpdate =
@@ -340,7 +379,10 @@ export function toPluginInfo(
     latestVersion: detail.remote_info?.version ?? null,
     capabilities,
     status: detail.status,
-    isEnabled: detail.status === 'loaded' || detail.status === 'errored',
+    // Prefer plugin_enabled; fall back to status when it's absent. `??` so an
+    // explicit `false` wins.
+    isEnabled:
+      enabled ?? (detail.status === 'loaded' || detail.status === 'errored'),
     isInstalled,
     hasUpdate,
     updatedAt: detail.update_datetime
@@ -368,16 +410,20 @@ function toUtcIsoOrNull(dateStr: string): string | null {
 
 /**
  * Transform PluginListing response to array of PluginInfo
+ *
+ * @param enabledMap - `plugin_enabled` from /plugin/status, keyed like
+ *   `listing.plugins`. Drives each plugin's `isEnabled`.
  */
 export function toPluginInfoList(
   listing: PluginListing,
   capabilitiesMap: Map<string, Array<PluginCapability>> = new Map(),
+  enabledMap: Record<string, boolean> = {},
 ): Array<PluginInfo> {
   return Object.entries(listing.plugins).map(([key, detail]) => {
     const id = parsePluginKey(key)
     const displayId = toPluginDisplayId(id)
     const capabilities = capabilitiesMap.get(displayId) ?? []
-    return toPluginInfo(id, detail, capabilities)
+    return toPluginInfo(id, detail, capabilities, enabledMap[key])
   })
 }
 

@@ -148,6 +148,7 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
               status={plugin.status}
               hasUpdate={plugin.hasUpdate}
               severity={plugin.errorSeverity}
+              isEnabled={plugin.isEnabled}
             />
           </div>
         </div>

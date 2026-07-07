@@ -28,10 +28,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-/**
- * Status filter includes all backend statuses plus 'all' and 'hasUpdate'
- */
-export type StatusFilter = 'all' | 'hasUpdate' | PluginStatus
+/** Matches the badge a plugin shows (`pluginBadgeKind`), not raw `status` — so
+ *  "Disabled" catches loaded-but-disabled plugins and "Warning" is filterable. */
+export type StatusFilter = 'all' | 'hasUpdate' | 'warning' | PluginStatus
 
 export type CapabilityFilter = 'all' | PluginCapability
 
@@ -87,6 +86,9 @@ export function PluginsFilters({
             <SelectItem value="loaded">{t('filters.status.loaded')}</SelectItem>
             <SelectItem value="disabled">
               {t('filters.status.disabled')}
+            </SelectItem>
+            <SelectItem value="warning">
+              {t('filters.status.warning')}
             </SelectItem>
             <SelectItem value="errored">
               {t('filters.status.errored')}

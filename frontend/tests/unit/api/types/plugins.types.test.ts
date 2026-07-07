@@ -14,8 +14,10 @@ import {
   PluginDetailSchema,
   isNewerVersion,
   isUnstampedVersion,
+  pluginBadgeKind,
   pluginErrorsMaxSeverity,
   toPluginInfo,
+  toPluginInfoList,
 } from '@/api/types/plugins.types'
 
 const ID: PluginCompositeId = { store: 'ecmwf', local: 'anemoi-inference' }
@@ -116,6 +118,96 @@ describe('toPluginInfo — errorDetail normalization', () => {
     })
     expect(info.errorDetail).toEqual(errors)
     expect(info.errorSeverity).toBe('error')
+  })
+})
+
+describe('toPluginInfo — isEnabled reflects the plugin_enabled flag', () => {
+  const loaded = detailWith(null) // status: 'loaded'
+
+  it('honours an explicit enabled=false even when the module loaded', () => {
+    // The bug this fixes: a loaded-but-disabled plugin used to read as enabled.
+    expect(toPluginInfo(ID, loaded, [], false).isEnabled).toBe(false)
+  })
+
+  it('honours an explicit enabled=true', () => {
+    const errored: PluginDetail = { ...loaded, status: 'errored' }
+    expect(toPluginInfo(ID, errored, [], true).isEnabled).toBe(true)
+  })
+
+  it('falls back to status when the flag is absent (loaded → enabled)', () => {
+    expect(toPluginInfo(ID, loaded).isEnabled).toBe(true)
+  })
+
+  it('falls back to status when the flag is absent (available → disabled)', () => {
+    const available: PluginDetail = { ...loaded, status: 'available' }
+    expect(toPluginInfo(ID, available).isEnabled).toBe(false)
+  })
+})
+
+describe('toPluginInfoList — joins plugin_enabled by backend key', () => {
+  const key = "store='ecmwf' local='anemoi-inference'"
+  const listing = { plugins: { [key]: detailWith(null) } }
+
+  it('applies the enabledMap entry to the matching plugin', () => {
+    const [info] = toPluginInfoList(listing, new Map(), { [key]: false })
+    expect(info.isEnabled).toBe(false)
+  })
+
+  it('falls back to status when a plugin is missing from the map', () => {
+    const [info] = toPluginInfoList(listing, new Map(), {})
+    expect(info.isEnabled).toBe(true) // status 'loaded'
+  })
+})
+
+describe('pluginBadgeKind — one source of truth for badge + filter', () => {
+  it('disabled dominates a loaded module (badge + filter agree)', () => {
+    expect(
+      pluginBadgeKind({ status: 'loaded', isEnabled: false }),
+    ).toBe('disabled')
+  })
+
+  it('disabled dominates over a pending update and a warning', () => {
+    expect(
+      pluginBadgeKind({
+        status: 'loaded',
+        isEnabled: false,
+        hasUpdate: true,
+        errorSeverity: 'warning',
+      }),
+    ).toBe('disabled')
+  })
+
+  it('an uninstalled (available) plugin is not "disabled"', () => {
+    expect(
+      pluginBadgeKind({ status: 'available', isEnabled: false }),
+    ).toBe('available')
+  })
+
+  it('a pending update on a loaded, enabled plugin → update', () => {
+    expect(
+      pluginBadgeKind({ status: 'loaded', isEnabled: true, hasUpdate: true }),
+    ).toBe('update')
+  })
+
+  it('a warning drives the badge regardless of loaded/errored status', () => {
+    expect(
+      pluginBadgeKind({ status: 'loaded', errorSeverity: 'warning' }),
+    ).toBe('warning')
+    expect(
+      pluginBadgeKind({ status: 'errored', errorSeverity: 'warning' }),
+    ).toBe('warning')
+  })
+
+  it('an error/critical diagnostic → errored', () => {
+    expect(
+      pluginBadgeKind({ status: 'errored', errorSeverity: 'error' }),
+    ).toBe('errored')
+  })
+
+  it('falls through to the plain status when nothing else applies', () => {
+    expect(pluginBadgeKind({ status: 'loaded', isEnabled: true })).toBe('loaded')
+    expect(pluginBadgeKind({ status: 'available' })).toBe('available')
+    expect(pluginBadgeKind({ status: 'errored' })).toBe('errored')
   })
 })
 

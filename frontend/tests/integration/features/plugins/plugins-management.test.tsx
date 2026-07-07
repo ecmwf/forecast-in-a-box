@@ -31,6 +31,7 @@ import type {
   CapabilityFilter,
   StatusFilter,
 } from '@/features/plugins/components/PluginsFilters'
+import { pluginBadgeKind } from '@/api/types/plugins.types'
 import {
   useDisablePlugin,
   useEnablePlugin,
@@ -115,7 +116,10 @@ function TestPluginsPage() {
       statusFilter !== 'available' &&
       statusFilter !== 'hasUpdate'
     ) {
-      filteredPlugins = filteredPlugins.filter((p) => p.status === statusFilter)
+      // Mirrors plugins.index.tsx: filter by the badge kind, not raw status.
+      filteredPlugins = filteredPlugins.filter(
+        (p) => pluginBadgeKind(p) === statusFilter,
+      )
     }
 
     if (statusFilter === 'hasUpdate') {
@@ -533,7 +537,7 @@ describe('Plugins Management Integration', () => {
       await expect.element(screen.getByText('Template ingestion')).toBeVisible()
     })
 
-    it('shows warnings on a loaded plugin', async () => {
+    it('badges a loaded plugin carrying a warning as amber Warning (severity-driven)', async () => {
       worker.use(
         http.get(API_ENDPOINTS.plugin.details, () =>
           detailsResponse({
@@ -555,7 +559,12 @@ describe('Plugins Management Integration', () => {
         .element(screen.getByRole('heading', { name: 'Plugin Store' }))
         .toBeVisible()
 
-      await expect.element(screen.getByText('Loaded')).toBeVisible()
+      // Loaded + warning → amber "Warning" (severity-driven), not green
+      // "Loaded"; the diagnostic is still listed below.
+      await expect
+        .element(screen.getByText('Warning', { exact: true }))
+        .toBeVisible()
+      await expect.element(screen.getByText('Loaded')).not.toBeInTheDocument()
       await expect.element(screen.getByText(/version mismatch/)).toBeVisible()
     })
   })

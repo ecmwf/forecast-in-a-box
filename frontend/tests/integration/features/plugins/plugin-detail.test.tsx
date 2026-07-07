@@ -75,6 +75,16 @@ describe('Plugin Detail Page', () => {
 
       await expect.element(screen.getByText('Loaded')).toBeVisible()
     })
+
+    it('shows a Disabled badge for a loaded-but-disabled plugin', async () => {
+      // Loaded-but-disabled: surface "Disabled", not the misleading "Loaded".
+      const disabled: PluginInfo = { ...mockPlugin, isEnabled: false }
+      const screen = await renderWithRouter(
+        <PluginDetailPage plugin={disabled} catalogue={mockCatalogue} />,
+      )
+
+      await expect.element(screen.getByText('Disabled')).toBeVisible()
+    })
   })
 
   describe('Plugin Description', () => {

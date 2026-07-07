@@ -34,14 +34,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Switch } from '@/components/ui/switch'
 import { Spinner } from '@/components/ui/spinner'
 import { P } from '@/components/base/typography'
+import { PluginToggle } from '@/features/plugins/components/PluginToggle'
 import { cn } from '@/lib/utils'
 
 interface PluginCardProps {
   plugin: PluginInfo
   onToggle: (compositeId: PluginCompositeId, enabled: boolean) => void
+  /** Target enabled value while a toggle is in flight; undefined when idle. */
+  pendingEnabled?: boolean
   onInstall: (compositeId: PluginCompositeId) => void
   onUninstall: (compositeId: PluginCompositeId) => void
   onUpdate: (compositeId: PluginCompositeId) => void
@@ -54,6 +56,7 @@ interface PluginCardProps {
 export function PluginCard({
   plugin,
   onToggle,
+  pendingEnabled,
   onInstall,
   onUninstall,
   onUpdate,
@@ -73,8 +76,8 @@ export function PluginCard({
   // Use compact layout for uninstalled plugins
   const isCompact = !plugin.isInstalled
 
-  // Show error state
-  const hasError = plugin.status === 'errored'
+  // Any diagnostic, or a bare `errored` state; severity picks the amber vs red border.
+  const hasDiagnostics = !!plugin.errorDetail || plugin.status === 'errored'
 
   // PyPI URL derived from the pip source, when one exists
   const pypiUrl = getPyPIUrl(plugin.pipSource)
@@ -87,7 +90,7 @@ export function PluginCard({
         !plugin.isEnabled &&
           plugin.isInstalled &&
           'opacity-80 hover:opacity-100',
-        hasError &&
+        hasDiagnostics &&
           (plugin.errorSeverity === 'warning'
             ? 'border-amber-200 dark:border-amber-800'
             : 'border-red-200 dark:border-red-800'),
@@ -122,6 +125,7 @@ export function PluginCard({
           status={plugin.status}
           hasUpdate={plugin.hasUpdate}
           severity={plugin.errorSeverity}
+          isEnabled={plugin.isEnabled}
           className="shrink-0"
         />
       </div>
@@ -216,12 +220,10 @@ export function PluginCard({
                 {t('actions.viewDetails')}
               </Button>
             )}
-            <Switch
-              checked={plugin.isEnabled}
-              onCheckedChange={(checked) => onToggle(plugin.id, checked)}
-              aria-label={
-                plugin.isEnabled ? t('actions.disable') : t('actions.enable')
-              }
+            <PluginToggle
+              plugin={plugin}
+              pendingEnabled={pendingEnabled}
+              onToggle={onToggle}
             />
           </>
         ) : (
