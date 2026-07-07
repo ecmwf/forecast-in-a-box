@@ -6,7 +6,7 @@
 
 ## Progress
 
-- [ ] Phase 0 — MSW WMS mocks + WmsViewer characterization tests *(in progress)*
+- [x] Phase 0 — MSW WMS mocks + WmsViewer characterization tests
 - [ ] Phase 1 — Extract shared viewer core into `src/features/viewer/`
 - [ ] Phase 2 — Comparison basket, entry points, contextual nav tab
 - [ ] Phase 3 — `/compare` route, page shell, lens orchestration (incl. host-path source form)
