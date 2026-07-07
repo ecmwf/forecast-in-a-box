@@ -65,7 +65,10 @@ export function PluginStatusBadge({
 
   const variantByKind: Record<PluginBadgeKind, StatusBadgeVariant> = {
     loaded: { label: t('status.loaded'), ...STATUS_BADGE_VARIANTS.active },
-    disabled: { label: t('status.disabled'), ...STATUS_BADGE_VARIANTS.disabled },
+    disabled: {
+      label: t('status.disabled'),
+      ...STATUS_BADGE_VARIANTS.disabled,
+    },
     warning: { label: t('status.warning'), ...STATUS_BADGE_VARIANTS.warning },
     errored: { label: t('status.errored'), ...STATUS_BADGE_VARIANTS.error },
     update: {

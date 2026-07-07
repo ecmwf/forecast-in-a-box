@@ -161,9 +161,9 @@ describe('toPluginInfoList — joins plugin_enabled by backend key', () => {
 
 describe('pluginBadgeKind — one source of truth for badge + filter', () => {
   it('disabled dominates a loaded module (badge + filter agree)', () => {
-    expect(
-      pluginBadgeKind({ status: 'loaded', isEnabled: false }),
-    ).toBe('disabled')
+    expect(pluginBadgeKind({ status: 'loaded', isEnabled: false })).toBe(
+      'disabled',
+    )
   })
 
   it('disabled dominates over a pending update and a warning', () => {
@@ -178,9 +178,9 @@ describe('pluginBadgeKind — one source of truth for badge + filter', () => {
   })
 
   it('an uninstalled (available) plugin is not "disabled"', () => {
-    expect(
-      pluginBadgeKind({ status: 'available', isEnabled: false }),
-    ).toBe('available')
+    expect(pluginBadgeKind({ status: 'available', isEnabled: false })).toBe(
+      'available',
+    )
   })
 
   it('a pending update on a loaded, enabled plugin → update', () => {
@@ -199,13 +199,15 @@ describe('pluginBadgeKind — one source of truth for badge + filter', () => {
   })
 
   it('an error/critical diagnostic → errored', () => {
-    expect(
-      pluginBadgeKind({ status: 'errored', errorSeverity: 'error' }),
-    ).toBe('errored')
+    expect(pluginBadgeKind({ status: 'errored', errorSeverity: 'error' })).toBe(
+      'errored',
+    )
   })
 
   it('falls through to the plain status when nothing else applies', () => {
-    expect(pluginBadgeKind({ status: 'loaded', isEnabled: true })).toBe('loaded')
+    expect(pluginBadgeKind({ status: 'loaded', isEnabled: true })).toBe(
+      'loaded',
+    )
     expect(pluginBadgeKind({ status: 'available' })).toBe('available')
     expect(pluginBadgeKind({ status: 'errored' })).toBe('errored')
   })
