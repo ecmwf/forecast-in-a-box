@@ -34,7 +34,7 @@ import {
   useUpdatePlugin,
 } from '@/api/hooks/usePlugins'
 import { useStatus } from '@/api/hooks/useStatus'
-import { encodePluginId } from '@/api/types/plugins.types'
+import { encodePluginId, pluginBadgeKind } from '@/api/types/plugins.types'
 import { H3 } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
@@ -86,6 +86,13 @@ function PluginsPage() {
   const updatePlugin = useUpdatePlugin()
   const refreshPlugins = useRefreshPlugins()
 
+  // Plugins mid-toggle → their target enabled value. enable/disable are single
+  // shared mutations, so we track per-plugin here to drive the optimistic
+  // switch + spinner while the async op settles.
+  const [pendingToggles, setPendingToggles] = useState<Map<string, boolean>>(
+    () => new Map(),
+  )
+
   // Separate plugins by status
   const {
     pluginsWithUpdates,
@@ -125,13 +132,14 @@ function PluginsPage() {
 
     let filteredPlugins = plugins.filter((p) => p.isInstalled)
 
-    // Apply status filter (for installed plugins only)
+    // Filter by the badge the user sees (pluginBadgeKind), not raw status —
+    // else a loaded-but-disabled plugin wouldn't show under Disabled.
     if (statusFilter !== 'all' && statusFilter !== 'available') {
       if (statusFilter === 'hasUpdate') {
         filteredPlugins = filteredPlugins.filter((p) => p.hasUpdate)
       } else {
         filteredPlugins = filteredPlugins.filter(
-          (p) => p.status === statusFilter,
+          (p) => pluginBadgeKind(p) === statusFilter,
         )
       }
     }
@@ -211,11 +219,16 @@ function PluginsPage() {
 
   // Handlers
   const handleToggle = (compositeId: PluginCompositeId, enabled: boolean) => {
-    if (enabled) {
-      enablePlugin.mutate(compositeId)
-    } else {
-      disablePlugin.mutate(compositeId)
-    }
+    const key = `${compositeId.store}/${compositeId.local}`
+    setPendingToggles((prev) => new Map(prev).set(key, enabled))
+    const mutation = enabled ? enablePlugin : disablePlugin
+    mutation.mutateAsync(compositeId).finally(() => {
+      setPendingToggles((prev) => {
+        const next = new Map(prev)
+        next.delete(key)
+        return next
+      })
+    })
   }
 
   const handleInstall = (compositeId: PluginCompositeId) => {
@@ -335,6 +348,7 @@ function PluginsPage() {
             plugins={installedPlugins}
             viewMode={pluginsViewMode}
             onToggle={handleToggle}
+            pendingToggles={pendingToggles}
             onInstall={handleInstall}
             onUninstall={handleUninstall}
             onUpdate={handleUpdate}

@@ -37,18 +37,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Switch } from '@/components/ui/switch'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { H4, P } from '@/components/base/typography'
+import { PluginToggle } from '@/features/plugins/components/PluginToggle'
 import { cn } from '@/lib/utils'
 
 interface PluginRowProps {
   plugin: PluginInfo
   onToggle: (compositeId: PluginCompositeId, enabled: boolean) => void
+  /** Target enabled value while a toggle is in flight; undefined when idle. */
+  pendingEnabled?: boolean
   onUninstall: (compositeId: PluginCompositeId) => void
   onViewDetails?: (plugin: PluginInfo) => void
 }
@@ -56,6 +58,7 @@ interface PluginRowProps {
 export function PluginRow({
   plugin,
   onToggle,
+  pendingEnabled,
   onUninstall,
   onViewDetails,
 }: PluginRowProps) {
@@ -66,7 +69,8 @@ export function PluginRow({
     ? formatDistanceToNow(new Date(plugin.updatedAt), { addSuffix: true })
     : null
 
-  const hasError = plugin.status === 'errored'
+  // Any diagnostic, or a bare `errored` state; severity (below) picks amber vs red.
+  const hasDiagnostics = !!plugin.errorDetail || plugin.status === 'errored'
   const isWarningOnly = plugin.errorSeverity === 'warning'
   const pypiUrl = getPyPIUrl(plugin.pipSource)
 
@@ -79,7 +83,7 @@ export function PluginRow({
       className={cn(
         'group grid grid-cols-1 items-center gap-4 px-6 py-5 transition-colors hover:bg-muted/50 sm:grid-cols-12',
         !plugin.isEnabled && 'opacity-75 hover:opacity-100',
-        hasError &&
+        hasDiagnostics &&
           (isWarningOnly
             ? 'bg-amber-50/50 dark:bg-amber-950/20'
             : 'bg-red-50/50 dark:bg-red-950/20'),
@@ -92,7 +96,7 @@ export function PluginRow({
           <div className="flex items-center gap-2">
             <H4 className="text-sm font-semibold">{plugin.name}</H4>
             {/* Diagnostics icon — also shown for loaded plugins carrying warnings */}
-            {(hasError || plugin.errorDetail) && (
+            {hasDiagnostics && (
               <Tooltip>
                 <TooltipTrigger>
                   {isWarningOnly ? (
@@ -152,6 +156,7 @@ export function PluginRow({
           status={plugin.status}
           hasUpdate={plugin.hasUpdate}
           severity={plugin.errorSeverity}
+          isEnabled={plugin.isEnabled}
         />
       </div>
 
@@ -172,12 +177,10 @@ export function PluginRow({
 
         {/* Toggle Switch */}
         {plugin.isInstalled && (
-          <Switch
-            checked={plugin.isEnabled}
-            onCheckedChange={(checked) => onToggle(plugin.id, checked)}
-            aria-label={
-              plugin.isEnabled ? t('actions.disable') : t('actions.enable')
-            }
+          <PluginToggle
+            plugin={plugin}
+            pendingEnabled={pendingEnabled}
+            onToggle={onToggle}
           />
         )}
 

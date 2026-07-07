@@ -33,6 +33,8 @@ interface PluginsListProps {
   plugins: Array<PluginInfo>
   viewMode: AdminViewMode
   onToggle: (compositeId: PluginCompositeId, enabled: boolean) => void
+  /** Plugins mid-toggle, keyed `store/local` → target enabled value. */
+  pendingToggles?: ReadonlyMap<string, boolean>
   onInstall: (compositeId: PluginCompositeId) => void
   onUninstall: (compositeId: PluginCompositeId) => void
   onUpdate: (compositeId: PluginCompositeId) => void
@@ -45,6 +47,7 @@ export function PluginsList({
   plugins,
   viewMode,
   onToggle,
+  pendingToggles,
   onInstall,
   onUninstall,
   onUpdate,
@@ -53,6 +56,9 @@ export function PluginsList({
   shadow,
 }: PluginsListProps) {
   const { t } = useTranslation('plugins')
+
+  const pendingEnabledFor = (plugin: PluginInfo): boolean | undefined =>
+    pendingToggles?.get(`${plugin.id.store}/${plugin.id.local}`)
 
   // Force card view on mobile (below Tailwind's sm breakpoint)
   const isMobile = useMedia('(max-width: 639px)')
@@ -77,6 +83,7 @@ export function PluginsList({
             key={plugin.displayId}
             plugin={plugin}
             onToggle={onToggle}
+            pendingEnabled={pendingEnabledFor(plugin)}
             onInstall={onInstall}
             onUninstall={onUninstall}
             onUpdate={onUpdate}
@@ -109,6 +116,7 @@ export function PluginsList({
             key={plugin.displayId}
             plugin={plugin}
             onToggle={onToggle}
+            pendingEnabled={pendingEnabledFor(plugin)}
             onUninstall={onUninstall}
             onViewDetails={onViewDetails}
           />

@@ -67,6 +67,7 @@ export function UpdatesAvailableSection({
                       <PluginStatusBadge
                         status={plugin.status}
                         severity={plugin.errorSeverity}
+                        isEnabled={plugin.isEnabled}
                       />
                     )}
                     <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-sm font-bold text-amber-800 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-300">

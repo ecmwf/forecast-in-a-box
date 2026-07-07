@@ -113,13 +113,16 @@ export function usePlugins(catalogue?: BlockFactoryCatalogue) {
   // reads, so spreading re-renders on every field.
   const query = usePluginDetails()
   const listing = query.data
+  // plugin_enabled lives on a separate endpoint — join it so the toggle
+  // reflects real enabled state, not just whether the module loaded.
+  const enabledMap = usePluginStatus().data?.plugin_enabled
 
   const plugins = useMemo<Array<PluginInfo>>(() => {
     if (!listing) return []
 
     const capabilitiesMap = deriveCapabilitiesFromCatalogue(catalogue)
-    return toPluginInfoList(listing, capabilitiesMap)
-  }, [listing, catalogue])
+    return toPluginInfoList(listing, capabilitiesMap, enabledMap)
+  }, [listing, catalogue, enabledMap])
 
   return {
     data: listing ? { plugins } : undefined,
@@ -174,9 +177,11 @@ function usePluginMutation<TVariables>(
       await action(variables)
       // Poll until the catalogue is available again (plugins finished reloading)
       await waitForCatalogue()
-      // Now refresh both caches — catalogue is ready so these will succeed
+      // Refresh caches. Status carries plugin_enabled, so it must refresh too
+      // or the toggle sticks.
       await queryClient.invalidateQueries({ queryKey: fableKeys.catalogue() })
       await queryClient.invalidateQueries({ queryKey: pluginKeys.details() })
+      await queryClient.invalidateQueries({ queryKey: pluginKeys.status() })
     },
   })
 }

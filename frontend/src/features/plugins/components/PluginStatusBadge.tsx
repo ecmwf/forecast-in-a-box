@@ -22,10 +22,12 @@
 
 import { useTranslation } from 'react-i18next'
 import type {
+  PluginBadgeKind,
   PluginErrorSeverity,
   PluginStatus,
 } from '@/api/types/plugins.types'
 import type { StatusBadgeVariant } from '@/components/common/StatusBadge'
+import { pluginBadgeKind } from '@/api/types/plugins.types'
 import {
   STATUS_BADGE_VARIANTS,
   StatusBadge,
@@ -35,8 +37,12 @@ interface PluginStatusBadgeProps {
   status: PluginStatus
   /** Whether an update is available (shown as visual indicator) */
   hasUpdate?: boolean
-  /** Max diagnostic severity — softens 'errored' to a Warning badge when warning-only */
+  /** Max diagnostic severity; drives the badge directly (a warning is amber
+   *  whether the plugin loaded or errored). */
   severity?: PluginErrorSeverity | null
+  /** `plugin_enabled` flag. Explicit `false` → "Disabled" regardless of load
+   *  status. Omit to drive the badge by `status` alone. */
+  isEnabled?: boolean
   className?: string
 }
 
@@ -44,29 +50,36 @@ export function PluginStatusBadge({
   status,
   hasUpdate,
   severity,
+  isEnabled,
   className,
 }: PluginStatusBadgeProps) {
   const { t } = useTranslation('plugins')
 
-  const statusConfig: Record<PluginStatus, StatusBadgeVariant> = {
+  // Shared with the status filter so the two can't drift.
+  const kind = pluginBadgeKind({
+    status,
+    isEnabled,
+    hasUpdate,
+    errorSeverity: severity,
+  })
+
+  const variantByKind: Record<PluginBadgeKind, StatusBadgeVariant> = {
     loaded: { label: t('status.loaded'), ...STATUS_BADGE_VARIANTS.active },
     disabled: {
       label: t('status.disabled'),
       ...STATUS_BADGE_VARIANTS.disabled,
     },
+    warning: { label: t('status.warning'), ...STATUS_BADGE_VARIANTS.warning },
+    errored: { label: t('status.errored'), ...STATUS_BADGE_VARIANTS.error },
+    update: {
+      label: t('status.updateAvailable'),
+      ...STATUS_BADGE_VARIANTS.warning,
+    },
     available: {
       label: t('status.available'),
       ...STATUS_BADGE_VARIANTS.available,
     },
-    errored: { label: t('status.errored'), ...STATUS_BADGE_VARIANTS.error },
   }
 
-  const variant: StatusBadgeVariant =
-    hasUpdate && status === 'loaded'
-      ? { label: t('status.updateAvailable'), ...STATUS_BADGE_VARIANTS.warning }
-      : status === 'errored' && severity === 'warning'
-        ? { label: t('status.warning'), ...STATUS_BADGE_VARIANTS.warning }
-        : statusConfig[status]
-
-  return <StatusBadge variant={variant} className={className} />
+  return <StatusBadge variant={variantByKind[kind]} className={className} />
 }
