@@ -12,45 +12,59 @@ import pytest
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.nodetree import datacubes
 from fiab_core.fable import (
-    BlockInstance as BlockInstanceBase,
-)
-from fiab_core.fable import (
+    BlockFactoryId,
     BlockInstanceId,
     ConfigurationOptionId,
     PluginBlockFactoryId,
     PluginCompositeId,
     QubedOutput,
 )
+from fiab_core.fable import (
+    BlockInstance as BlockInstanceBase,
+)
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
+from qubed import Qube
 
+from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.block_utils import (
     COMPARISON,
     PARAM,
     STEP,
     THRESHOLD,
     TYPE,
-    _create_param_key,
+    LEVTYPE,
+    _param_id_to_param_key,
 )
 from fiab_plugin_ecmwf.products.blocks import (
     CustomThresholdProbability,
     EnsembleStatistics,
-    PrescribedThresholdProbability,
+    PredefinedThresholdProbability,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, contains
 
 
 @pytest.fixture
-def prescribed_threshold_prob_configuration() -> BlockInstance:
+def ensemble_statistics_output() -> QubedOutput:
+    return QubedOutput(dataqube=Qube.from_datacube({PARAM: ["167", "151", "131"], STEP: [0, 6, 12], TYPE: ["em", "es"]}))
+
+
+@pytest.fixture
+def threshold_probability_output() -> QubedOutput:
+    return QubedOutput(dataqube=Qube.from_datacube({PARAM: "167", STEP: [0, 6, 12], TYPE: ["ep"]}))
+
+
+@pytest.fixture
+def predefined_threshold_prob_configuration() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="PrescribedThresholdProbability"),  # type: ignore
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="predefinedThresholdProbability"),  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
-                PARAM: _create_param_key("131073"),
+                PARAM: _param_id_to_param_key("131073"),
                 STEP: ["12"],
             },
         ),
-        PrescribedThresholdProbability.configuration_options,
+        PredefinedThresholdProbability.configuration_options,
     )
 
 
@@ -58,7 +72,7 @@ def prescribed_threshold_prob_configuration() -> BlockInstance:
 def custom_threshold_prob_configuration() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="CustomThresholdProbability"),  # type: ignore
+            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="customThresholdProbability"),  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 THRESHOLD: 0.5,
@@ -109,16 +123,24 @@ class TestEnsembleStatistics:
             for dim, value in expected[index].items():
                 assert request[dim] == sorted(value)
 
+    def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
+        for expansion in plugin().expander(ensemble_statistics_output):
+            assert expansion.factory not in [
+                BlockFactoryId("ensembleStatistics"),
+                BlockFactoryId("prescribedThresholdProbability"),
+                BlockFactoryId("customThresholdProbability"),
+            ]
 
-class TestPrescribedThresholdProb:
+
+class TestPredefinedThresholdProb:
     def test_from_operational_forecast_source(
-        self, prescribed_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
+        self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        block = PrescribedThresholdProbability()
+        block = PredefinedThresholdProbability()
 
         assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
-            block=prescribed_threshold_prob_configuration,
+            block=predefined_threshold_prob_configuration,
             inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
             restrictions={},
         )
@@ -128,21 +150,37 @@ class TestPrescribedThresholdProb:
         output_axes = axes(output)
         assert output_axes[PARAM] == {"131073"}
         assert output_axes[TYPE] == {"ep"}
-        assert len(output_axes[STEP]) > 0
+        assert output_axes[STEP] == {12}
+        assert output_axes[LEVTYPE] == {"sfc"}
+
+    def test_validator_adds_parameters_restrictions(
+        self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
+    ) -> None:
+        restrictions = (
+            plugin().validator(predefined_threshold_prob_configuration, {"dataset": operational_forecast_source_output}).restrictions
+        )
+        assert restrictions[PARAM].serialize() == f"enumClosed[{_param_id_to_param_key('131073')}]"
+
+    def test_validator_adds_step_restrictions(
+        self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
+    ) -> None:
+        config = predefined_threshold_prob_configuration.model_copy(update={"configuration_values": {PARAM: _param_id_to_param_key("131073")}})
+        restrictions = plugin().validator(config, {"dataset": operational_forecast_source_output}).restrictions
+        assert restrictions[STEP].serialize() == "list[enumClosed[12]]"
 
     def test_compile(
         self,
         operational_forecast_source_output: QubedOutput,
         operational_forecast_source_action: Action,
-        prescribed_threshold_prob_configuration: BlockInstance,
+        predefined_threshold_prob_configuration: BlockInstance,
     ) -> None:
-        block = PrescribedThresholdProbability()
+        block = PredefinedThresholdProbability()
         block.validate(
-            block=prescribed_threshold_prob_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={}
+            block=predefined_threshold_prob_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={}
         )  # type: ignore[dict-item]
         action = block.compile(
             inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
-            block=prescribed_threshold_prob_configuration,
+            block=predefined_threshold_prob_configuration,
         ).get_or_raise()
         requests = datacubes(action.nodes)
         assert len(requests) == 1
@@ -150,8 +188,19 @@ class TestPrescribedThresholdProb:
         for dim, value in {PARAM: ["131073"], TYPE: ["ep"], STEP: ["12"]}.items():
             assert requests[0][dim] == value
 
+    def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
+        for expansion in plugin().expander(threshold_probability_output):
+            assert expansion.factory not in [
+                BlockFactoryId("ensembleStatistics"),
+                BlockFactoryId("predefinedThresholdProbability"),
+                BlockFactoryId("customThresholdProbability"),
+            ]
+
 
 class TestCustomThresholdProb:
+    def test_catalogue_value_type_is_canonical(self) -> None:
+        assert CustomThresholdProbability.configuration_options[ConfigurationOptionId("comparison")].value_type == "enumClosed['>=', '<=', '>', '<']"
+
     def test_from_operational_forecast_source(
         self, custom_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
@@ -190,3 +239,11 @@ class TestCustomThresholdProb:
             assert COMPARISON not in request
             assert request[TYPE] == ["ep"]
             assert set.isdisjoint(set(request[PARAM]), {"131", "151", "167"}) is False
+
+    def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
+        for expansion in plugin().expander(threshold_probability_output):
+            assert expansion.factory not in [
+                BlockFactoryId("ensembleStatistics"),
+                BlockFactoryId("prescribedThresholdProbability"),
+                BlockFactoryId("customThresholdProbability"),
+            ]
