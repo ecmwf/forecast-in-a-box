@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPresetsRouteImport } from './routes/_authenticated/presets'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfigureRouteImport } from './routes/_authenticated/configure'
+import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticated/compare'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedSchedulesIndexRouteImport } from './routes/_authenticated/schedules.index'
 import { Route as AuthenticatedExecutionsIndexRouteImport } from './routes/_authenticated/executions.index'
@@ -58,6 +59,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
 const AuthenticatedConfigureRoute = AuthenticatedConfigureRouteImport.update({
   id: '/configure',
   path: '/configure',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCompareRoute = AuthenticatedCompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/compare': typeof AuthenticatedCompareRoute
   '/configure': typeof AuthenticatedConfigureRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/presets': typeof AuthenticatedPresetsRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/compare': typeof AuthenticatedCompareRoute
   '/configure': typeof AuthenticatedConfigureRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/presets': typeof AuthenticatedPresetsRoute
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/compare': typeof AuthenticatedCompareRoute
   '/_authenticated/configure': typeof AuthenticatedConfigureRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/presets': typeof AuthenticatedPresetsRoute
@@ -219,6 +228,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin'
+    | '/compare'
     | '/configure'
     | '/dashboard'
     | '/presets'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/compare'
     | '/configure'
     | '/dashboard'
     | '/presets'
@@ -260,6 +271,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/about'
     | '/_authenticated/admin'
+    | '/_authenticated/compare'
     | '/_authenticated/configure'
     | '/_authenticated/dashboard'
     | '/_authenticated/presets'
@@ -327,6 +339,13 @@ declare module '@tanstack/react-router' {
       path: '/configure'
       fullPath: '/configure'
       preLoaderRoute: typeof AuthenticatedConfigureRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/compare': {
+      id: '/_authenticated/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof AuthenticatedCompareRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin': {
@@ -522,6 +541,7 @@ const AuthenticatedConfigureRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedCompareRoute: typeof AuthenticatedCompareRoute
   AuthenticatedConfigureRoute: typeof AuthenticatedConfigureRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedPresetsRoute: typeof AuthenticatedPresetsRoute
@@ -533,6 +553,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedCompareRoute: AuthenticatedCompareRoute,
   AuthenticatedConfigureRoute: AuthenticatedConfigureRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedPresetsRoute: AuthenticatedPresetsRoute,

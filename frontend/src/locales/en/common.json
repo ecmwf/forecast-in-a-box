@@ -48,7 +48,8 @@
     "label": "Main navigation",
     "overview": "Overview",
     "configuration": "Configuration",
-    "executions": "Executions"
+    "executions": "Executions",
+    "compare": "Compare"
   },
   "status": {
     "title": "System Status",

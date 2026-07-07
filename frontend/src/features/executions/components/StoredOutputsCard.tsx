@@ -32,7 +32,6 @@ import {
   X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
@@ -46,8 +45,9 @@ import {
   useStopLens,
 } from '@/api/hooks/useLens'
 import { buildLensBaseUrl, buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
-import { getJobResultHead } from '@/api/endpoints/job'
+import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import { AddToComparisonButton } from '@/features/compare/components/AddToComparisonButton'
 import { showToast } from '@/lib/toast'
 import { cn, copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -69,9 +69,6 @@ import { P } from '@/components/base/typography'
 
 const WmsViewer = lazy(() => import('./WmsViewer'))
 
-/** The directory payload is a short path — cap the fetch defensively. */
-const DIR_PAYLOAD_BYTES = 1024
-
 const GRIB_CHIP_CLASS =
   'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
 
@@ -83,27 +80,14 @@ function splitPath(path: string): { dir: string; name: string } {
   return { dir: trimmed.slice(0, idx + 1), name: trimmed.slice(idx + 1) }
 }
 
-/** Resolve the lens directory for a marker output: its payload holds the
- * glyph-resolved output directory as plain text, written by the backend. */
-function useStoredDirPath(jobId: string, taskId: string, enabled: boolean) {
-  return useQuery<string>({
-    queryKey: ['job-result', 'stored-dir', jobId, taskId],
-    queryFn: async () => {
-      const head = await getJobResultHead(jobId, taskId, DIR_PAYLOAD_BYTES)
-      return new TextDecoder().decode(head).trim()
-    },
-    enabled,
-    staleTime: Infinity,
-    retry: 1,
-  })
-}
-
 interface StoredOutputsCardProps {
   jobId: string
   outputs: RunOutputs | null
   /** Optional: resolve human-readable sink titles from the run's fable. */
   fable?: FableBuilderV1
   catalogue?: BlockFactoryCatalogue
+  /** Blueprint display name — snapshotted into comparison entries. */
+  runName?: string
 }
 
 interface StoredOutputRow {
@@ -121,6 +105,7 @@ export function StoredOutputsCard({
   outputs,
   fable,
   catalogue,
+  runName,
 }: StoredOutputsCardProps) {
   const { t } = useTranslation('executions')
   const [viewer, setViewer] = useState<{
@@ -176,6 +161,7 @@ export function StoredOutputsCard({
               key={row.blockId}
               jobId={jobId}
               row={row}
+              runName={runName}
               onOpenViewer={(lensId, title) => setViewer({ lensId, title })}
             />
           ))}
@@ -197,10 +183,12 @@ export function StoredOutputsCard({
 function StoredOutputRowItem({
   jobId,
   row,
+  runName,
   onOpenViewer,
 }: {
   jobId: string
   row: StoredOutputRow
+  runName?: string
   onOpenViewer: (lensId: string, title: string) => void
 }) {
   const { t } = useTranslation('executions')
@@ -326,6 +314,18 @@ function StoredOutputRowItem({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
+        <AddToComparisonButton
+          entry={{
+            kind: 'output',
+            jobId,
+            taskId: row.taskId,
+            blockId: row.blockId,
+            runName: runName ?? '',
+            blockTitle: row.title,
+            runCreatedAt: null,
+          }}
+          disabled={!row.isAvailable}
+        />
         {!row.isAvailable ? null : running ? (
           <>
             <Button

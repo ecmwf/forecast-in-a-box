@@ -15,6 +15,7 @@
 
 import {
   FileText,
+  GitCompareArrows,
   LayoutDashboard,
   Play,
   SlidersHorizontal,
@@ -23,6 +24,7 @@ import { Link, useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useFableRetrieve } from '@/api/hooks/useFable'
 import { useJobStatus } from '@/api/hooks/useJobs'
+import { useComparisonCount } from '@/features/compare/stores/comparisonStore'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -73,6 +75,31 @@ function RunNavItem({ jobId }: { jobId: string }) {
   )
 }
 
+/**
+ * Contextual Compare item — appears only while the comparison basket is
+ * non-empty (same pattern as the run item). The count subscription lives
+ * in this leaf so basket changes re-render one link, not the whole nav.
+ */
+function CompareNavItem() {
+  const { t } = useTranslation('common')
+  const count = useComparisonCount()
+  if (count === 0) return null
+  return (
+    <Link
+      to="/compare"
+      activeOptions={{ includeSearch: false }}
+      className={itemClass}
+      activeProps={{ className: activeItemClass, 'aria-current': 'page' }}
+    >
+      <GitCompareArrows className="h-4 w-4" />
+      {t('nav.compare')}
+      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums">
+        {count}
+      </span>
+    </Link>
+  )
+}
+
 export function NavToggle() {
   const { t } = useTranslation('common')
   // `jobId` is only present on the /executions/$jobId route.
@@ -96,6 +123,7 @@ export function NavToggle() {
         </Link>
       ))}
       {jobId && <RunNavItem jobId={jobId} />}
+      <CompareNavItem />
     </nav>
   )
 }

@@ -8,7 +8,7 @@
 
 - [x] Phase 0 — MSW WMS mocks + WmsViewer characterization tests
 - [x] Phase 1 — Extract shared viewer core into `src/features/viewer/` (WmsViewer 2597→~630 lines; utils → hooks → components in three commits; characterization green throughout)
-- [ ] Phase 2 — Comparison basket, entry points, contextual nav tab
+- [x] Phase 2 — Comparison basket, entry points, contextual nav tab (+ initial /compare route with basket strip & A/B URL slots, so the nav link has a target)
 - [ ] Phase 3 — `/compare` route, page shell, lens orchestration (incl. host-path source form)
 - [ ] Phase 4 — Comparison viewer (side-by-side, swipe, experimental modes)
 - [ ] Phase 5 — External WMS URL sources (+ stretch: GeoJSON overlays)
