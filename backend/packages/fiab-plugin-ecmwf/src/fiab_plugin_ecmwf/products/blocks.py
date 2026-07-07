@@ -37,9 +37,9 @@ from fiab_plugin_ecmwf.block_utils import (
     THRESHOLD,
     TYPE,
     _axis_value_strings,
-    _create_param_key,
+    _param_id_to_param_key,
     _extract_dataset,
-    _split_param_key,
+    _param_key_to_param_id,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, coxpand, datacubes, select
 
@@ -122,9 +122,9 @@ class EnsembleStatistics(Product):
         return contains(other, ENSEMBLE) and len(coords[ENSEMBLE]) > 1 and contains(other, PARAM)
 
 
-class PrescribedThresholdProbability(Product):
-    title: str = "Prescribed Threshold Probability"
-    description: str = "Computes probability of ensemble members being above/below a prescribed threshold"
+class PredefinedThresholdProbability(Product):
+    title: str = "Predefined Threshold Probability"
+    description: str = "Computes probability of ensemble members being above/below a predefined threshold"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         PARAM: BlockConfigurationOption(
             title="Parameter",
@@ -132,8 +132,8 @@ class PrescribedThresholdProbability(Product):
             value_type="str",
         ),
         STEP: BlockConfigurationOption(
-            title="Parameter",
-            description="Parameter to compute",
+            title="Steps",
+            description="Steps to compute",
             value_type="list[str]",
         ),
     }
@@ -150,15 +150,14 @@ class PrescribedThresholdProbability(Product):
             inputs=list(datacubes(input_dataset)), output_template={TYPE: self.stat_type, "selection": "default"}
         ):
             prob_qube = prob_qube | Qube.from_datacube(output)
-        restrictions[PARAM] = ClosedEnumType([_create_param_key(paramid) for paramid in axes(prob_qube)[PARAM]])
+        restrictions[PARAM] = ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(prob_qube)[PARAM]])
 
-        selected_param_id, _ = _split_param_key(block.config_as_str(PARAM))
+        selected_param_id = _param_key_to_param_id(block.config_as_str(PARAM))
         param_qube = prob_qube.select({PARAM: selected_param_id})
         restrictions[STEP] = ListType(ClosedEnumType(_axis_value_strings(axes(param_qube)[STEP])))
 
         steps = block.config_as_list(STEP, str, allow_empty=False)
-        output = coxpand(input_dataset, [ENSEMBLE, TYPE, PARAM], {TYPE: [self.stat_type], PARAM: [selected_param_id], STEP: steps})
-        return output
+        return QubedOutput(dataqube=param_qube.select({STEP: steps}))
 
     def compile(
         self,
@@ -167,7 +166,7 @@ class PrescribedThresholdProbability(Product):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
-        selected_param_id, _ = _split_param_key(block.config_as_str(PARAM))
+        selected_param_id = _param_key_to_param_id(block.config_as_str(PARAM))
         steps = block.config_as_list(STEP, str, allow_empty=False)
         action = action_from_outputs(
             [{PARAM: [selected_param_id], TYPE: self.stat_type, STEP: steps, "selection": "default"}],

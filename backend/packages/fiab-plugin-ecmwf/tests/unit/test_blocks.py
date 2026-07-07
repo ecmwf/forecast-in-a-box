@@ -40,7 +40,7 @@ from fiab_plugin_ecmwf.block_utils import (
     PARAM,
     STEP,
     VALUES,
-    _create_param_key,
+    _param_id_to_param_key,
 )
 from fiab_plugin_ecmwf.blocks import FORECAST_DATASETS, GribSink, MapPlotSink, OperationalForecastSource, Select, ZarrSink
 from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
@@ -78,7 +78,7 @@ def select_configuration() -> BlockInstance:
             "select",
             {
                 "dimension": "param",
-                "values": [_create_param_key("167")],
+                "values": [_param_id_to_param_key("167")],
             },
             input_ids={"dataset": BlockInstanceId("source_output")},
         ),
@@ -124,7 +124,7 @@ def map_plot_sink_configuration() -> BlockInstance:
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values=_config(
                 {
-                    "param": [_create_param_key("167")],
+                    "param": [_param_id_to_param_key("167")],
                     "domain": ["global"],
                     "format": "png",
                     "groupby": "step",
@@ -293,7 +293,7 @@ class TestSelect:
     ) -> None:
         block = _select()
         config = select_configuration.model_copy(
-            update={"configuration_values": _config({"dimension": "param", "values": [_create_param_key("167"), _create_param_key("151")]})}
+            update={"configuration_values": _config({"dimension": "param", "values": [_param_id_to_param_key("167"), _param_id_to_param_key("151")]})}
         )
         output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
@@ -537,7 +537,7 @@ class TestMapPlotSink:
         restrictions = plugin().validator(map_plot_sink_configuration, {"dataset": operational_forecast_source_output}).restrictions
         assert (
             restrictions[PARAM].serialize()
-            == f"list[enumClosed[{_create_param_key('131')},{_create_param_key('151')},{_create_param_key('167')}]]"
+            == f"list[enumClosed[{_param_id_to_param_key('167')},{_param_id_to_param_key('151')},{_param_id_to_param_key('131')}]]"
         )
 
     def test_expander_has_no_parameters_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
@@ -580,7 +580,7 @@ class TestMapPlotSink:
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
-                        "param": [_create_param_key("167")],
+                        "param": [_param_id_to_param_key("167")],
                         "domain": ["global"],
                         "format": fmt,
                         "groupby": "none",
@@ -603,7 +603,7 @@ class TestMapPlotSink:
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
-                        "param": [_create_param_key("167"), _create_param_key("151")],
+                        "param": [_param_id_to_param_key("167"), _param_id_to_param_key("151")],
                         "domain": ["global"],
                         "format": "png",
                         "groupby": "none",
@@ -647,7 +647,7 @@ class TestMapPlotSink:
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
-                        "param": [_create_param_key("167"), "nonexistent"],
+                        "param": [_param_id_to_param_key("167"), "nonexistent"],
                         "domain": ["global"],
                         "format": "png",
                         "groupby": "none",
@@ -690,7 +690,7 @@ class TestMapPlotSink:
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
-                        "param": [_create_param_key("167"), _create_param_key("151")],
+                        "param": [_param_id_to_param_key("167"), _param_id_to_param_key("151")],
                         "domain": ["global"],
                         "format": "png",
                         "groupby": groupby,
@@ -712,7 +712,7 @@ class TestMapPlotSink:
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
-                        "param": [_create_param_key("167"), _create_param_key("151")],
+                        "param": [_param_id_to_param_key("167"), _param_id_to_param_key("151")],
                         "domain": ["global"],
                         "format": "png",
                         "groupby": "none",
@@ -742,7 +742,7 @@ class TestMapPlotSink:
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
-                        "param": [_create_param_key("167"), _create_param_key("151")],
+                        "param": [_param_id_to_param_key("151"), _param_id_to_param_key("167")],
                         "domain": ["global"],
                         "format": "png",
                         "groupby": "none",

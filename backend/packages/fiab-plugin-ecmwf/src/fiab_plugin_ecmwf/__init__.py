@@ -19,12 +19,13 @@ from fiab_plugin_ecmwf.blocks import (
     Select,
     ZarrSink,
 )
-from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics, PrescribedThresholdProbability
+from fiab_plugin_ecmwf.products.blocks import CustomThresholdProbability, EnsembleStatistics, PredefinedThresholdProbability
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("operationalForecastSource"): OperationalForecastSource(),
     BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
-    BlockFactoryId("prescribedThresholdProbability"): PrescribedThresholdProbability(),
+    BlockFactoryId("predefinedThresholdProbability"): PredefinedThresholdProbability(),
+    BlockFactoryId("customThresholdProbability"): CustomThresholdProbability(),
     BlockFactoryId("select"): Select(),
     BlockFactoryId("zarrSink"): ZarrSink(),
     BlockFactoryId("gribSink"): GribSink(),

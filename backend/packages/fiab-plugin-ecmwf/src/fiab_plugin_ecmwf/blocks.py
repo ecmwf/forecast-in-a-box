@@ -47,11 +47,11 @@ from .block_utils import (
     STEP,
     VALUES,
     _axis_value_strings,
-    _create_param_key,
+    _param_id_to_param_key,
     _extract_dataset,
     _is_empty_qube,
     _parse_axis_value,
-    _split_param_key,
+    _param_key_to_param_id,
 )
 from .datasets import load_datasets
 from .qubed_utils import axes, common_dimensions, contains, dimensions, select
@@ -264,7 +264,7 @@ class Select(Transform):
 
         input_values = _axis_value_strings(axis_values)
         if dimension == PARAM:
-            axis_values = [_create_param_key(paramid) for paramid in axis_values]
+            axis_values = [_param_id_to_param_key(paramid) for paramid in axis_values]
             input_values = axis_values
         if input_values:
             restrictions[VALUES] = ListType(ClosedEnumType(input_values))
@@ -276,7 +276,7 @@ class Select(Transform):
             raise ValueError(f"values {missing_values} are not in dimension {dimension}: {input_values}")
 
         if dimension == PARAM:
-            selected_values = [_split_param_key(str(value))[0] for value in selected_values]
+            selected_values = [_param_key_to_param_id(str(value)) for value in selected_values]
         output = select(input_dataset, {dimension: selected_values})
         if output.dataqube is None or _is_empty_qube(output.dataqube):
             raise ValueError(f"selection of values {selected_values} from dimension {dimension} produced an empty dataset")
@@ -291,7 +291,7 @@ class Select(Transform):
         input_task = block.input_ids["dataset"]
         dimension = self._selected_dimension(block)
         if dimension == PARAM:
-            values = [_split_param_key(value)[0] for value in self._selected_values(block)]
+            values = [_param_key_to_param_id(value) for value in self._selected_values(block)]
             selected = inputs[input_task].select({dimension: values if len(values) > 1 else values[0]}, expand=True)
         else:
             values = [_parse_axis_value(value) for value in self._selected_values(block)]
@@ -410,7 +410,7 @@ class MapPlotSink(Sink):
 
         input_axes = axes(input_dataset)
         input_param_values = input_axes.get(PARAM, set())
-        param_values = [_create_param_key(x) for x in input_param_values]
+        param_values = [_param_id_to_param_key(x) for x in input_param_values]
         if param_values:
             restrictions[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
 
@@ -440,7 +440,7 @@ class MapPlotSink(Sink):
         block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        params = [_split_param_key(x)[0] for x in block.config_as_list(PARAM, str, allow_empty=False)]
+        params = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
         groupby = block.config_as_str(GROUPBY)
         splitby = block.config_as_list(SPLITBY, str, allow_empty=True)
         if "none" in splitby:
