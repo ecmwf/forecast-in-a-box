@@ -28,11 +28,11 @@ from qubed import Qube
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.block_utils import (
     COMPARISON,
+    LEVTYPE,
     PARAM,
     STEP,
     THRESHOLD,
     TYPE,
-    LEVTYPE,
     _param_id_to_param_key,
 )
 from fiab_plugin_ecmwf.products.blocks import (
@@ -164,7 +164,9 @@ class TestPredefinedThresholdProb:
     def test_validator_adds_step_restrictions(
         self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        config = predefined_threshold_prob_configuration.model_copy(update={"configuration_values": {PARAM: _param_id_to_param_key("131073")}})
+        config = predefined_threshold_prob_configuration.model_copy(
+            update={"configuration_values": {PARAM: _param_id_to_param_key("131073")}}
+        )
         restrictions = plugin().validator(config, {"dataset": operational_forecast_source_output}).restrictions
         assert restrictions[STEP].serialize() == "list[enumClosed[12]]"
 
@@ -199,7 +201,10 @@ class TestPredefinedThresholdProb:
 
 class TestCustomThresholdProb:
     def test_catalogue_value_type_is_canonical(self) -> None:
-        assert CustomThresholdProbability.configuration_options[ConfigurationOptionId("comparison")].value_type == "enumClosed['>=', '<=', '>', '<']"
+        assert (
+            CustomThresholdProbability.configuration_options[ConfigurationOptionId("comparison")].value_type
+            == "enumClosed['>=', '<=', '>', '<']"
+        )
 
     def test_from_operational_forecast_source(
         self, custom_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
