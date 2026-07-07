@@ -124,19 +124,6 @@ class BlockExpansion(FiabCoreBaseModel):
     """Restrictions on configuration options for this expansion"""
 
 
-class PluginBlockExpansion(FiabCoreBaseModel):
-    """Expansion result as returned to clients, combining plugin identity with restrictions.
-
-    This is the service-level representation sent to API consumers, containing
-    the full plugin composite id, factory id, and serialized restriction types.
-    """
-
-    plugin: PluginCompositeId
-    factory: BlockFactoryId
-    restrictions: dict[ConfigurationOptionId, str] = Field(default_factory=dict)
-    """Serialized FableType restrictions (e.g., 'int', 'enumClosed[a,b]')"""
-
-
 class BlockInstance(FiabCoreBaseModel):
     """Configuration values and input wiring, as specified by a client when building a Fable."""
 

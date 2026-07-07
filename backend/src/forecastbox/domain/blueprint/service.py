@@ -34,7 +34,6 @@ from fiab_core.fable import (
     BlueprintTemplate,
     ConfigurationOptionId,
     NoOutput,
-    PluginBlockExpansion,
     PluginCompositeId,
     QubedOutput,
 )
@@ -79,6 +78,19 @@ class PluginBlockFactoryId(FiabBaseModel):
 
     plugin: PluginCompositeId
     factory: BlockFactoryId
+
+
+class SerializedBlockExpansion(FiabBaseModel):
+    """Expansion result as returned to clients, combining plugin identity with restrictions.
+
+    This is the service-level representation sent to API consumers, containing
+    the full plugin composite id, factory id, and serialized restriction types.
+    """
+
+    plugin: PluginCompositeId
+    factory: BlockFactoryId
+    restrictions: dict[ConfigurationOptionId, str] = Field(default_factory=dict)
+    """Serialized FableType restrictions (e.g., 'int', 'enumClosed[a,b]')"""
 
 
 class RoutableBlock(FiabBaseModel):
@@ -127,7 +139,7 @@ class BlueprintValidationExpansion(FiabBaseModel):
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
+    possible_expansions: dict[BlockInstanceId, list[SerializedBlockExpansion]]
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = Field(default_factory=dict)
@@ -182,7 +194,7 @@ async def validate_expand(
             if block_factory.kind == "source" and not block_factory.inputs
         ]
     )
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]] = {}
+    possible_expansions: dict[BlockInstanceId, list[SerializedBlockExpansion]] = {}
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
@@ -326,7 +338,7 @@ async def validate_expand(
         if not validate_only:
             possible_expansions[blockId] = (
                 [
-                    PluginBlockExpansion(
+                    SerializedBlockExpansion(
                         plugin=any_plugin_id,
                         factory=expansion.factory,
                         restrictions={k: v.serialize() for k, v in expansion.restrictions.items()},

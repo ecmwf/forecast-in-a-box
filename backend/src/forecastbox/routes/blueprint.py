@@ -35,7 +35,6 @@ from fiab_core.fable import (
     BlockFactoryCatalogue,
     BlockInstanceId,
     ConfigurationOptionId,
-    PluginBlockExpansion,
     PluginCompositeId,
 )
 
@@ -51,6 +50,7 @@ from forecastbox.domain.blueprint.service import (
     BlueprintSaveCommand,
     BlueprintValidationExpansion,
     PluginBlockFactoryId,
+    SerializedBlockExpansion,
     Tag,
 )
 from forecastbox.domain.blueprint.types import BlueprintId
@@ -180,7 +180,7 @@ class BlueprintValidationExpansionResponse(FiabBaseModel):
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
+    possible_expansions: dict[BlockInstanceId, list[SerializedBlockExpansion]]
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
