@@ -26,15 +26,15 @@ THRESHOLD = ConfigurationOptionId("threshold")
 COMPARISON = ConfigurationOptionId("comparison")
 
 
-def _create_param_key(param_id: str) -> str:
+def _param_id_to_param_key(param_id: str) -> str:
     db = ParamDB()
     shortname = db.param_id_to_shortname(int(param_id))
-    return f"{param_id}-{shortname}"
+    return f"{shortname}-{param_id}"
 
 
-def _split_param_key(param_key: str) -> tuple[str, str]:
-    param_id, shortname = param_key.split("-", 1)
-    return param_id, shortname
+def _param_key_to_param_id(param_key: str) -> str:
+    _, param_id = param_key.split("-", 1)
+    return param_id
 
 
 def _extract_dataset(inputs: dict[str, QubedOutput], name: str) -> QubedOutput:

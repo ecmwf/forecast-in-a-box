@@ -5,75 +5,28 @@ config:
     matrix-loader: "file-io"
   metadata_from_output: ["param", "stream", "date"]
 
-  filter:param:
-    "*": {}
-    "10/131068/131069/207/228249/228005/237207/238207/239207":
-      preprocessing:
-        - operation: norm
-    "121":
-      filter:type:
-        em/es:
-          accumulations:
-            step:
-              operation: maximum
-              metadata:
-                stepType: max
-    "122":
-      filter:type:
-        em/es:
-          accumulations:
-            step:
-              operation: minimum
-              metadata:
-                stepType: min
-    131060/131061/131062/131063/131064/131065/131066/131067/131098/131099/131085:
-      filter:type:
-        ep:
-          preprocessing:
-            - operation: scale
-              value: 0.001
-    235029/237029/238029/235030/237030/238030/239030/235031/237031/238031/239031/235033/237033/238033/239033/235034/237034/238034/239034/235035/237035/238035/239035/235036/237036/238036/239036/235037/237037/238037/239037/235038/237038/238038/239038/235039/237039/238039/239039/235040/237040/238040/239040/235055/237055/238055/239055:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          filter:param:
-            235029/237029/238029/235030/237030/238030/239030/235031/237031/238031/239031/235055/237055/238055/239055:
-              vmin: 0.
-            235029/237029/238029/235030/237030/238030/239030/235031/237031/238031/239031/235048/237048/238048/239048/235055/237055/238055/239055:
-              preprocessing:
-                - operation: scale
-                  value: 0.01157407
-            235033/237033/238033/239033/235034/237034/238034/239034/235035/237035/238035/239035/235036/237036/238036/239036/235037/237037/238037/239037/235038/237038/238038/239038/235039/237039/238039/239039/235040/237040/238040/239040/235043/237043/238043/239043/235189/237189/238189/239189:
-              preprocessing:
-                - operation: scale
-                  value: 0.00001157407
-          filter:stream:
-            enfh/enwh/eefh/weeh:
-              accumulations:
-                hdate: {}
-            "*": {}
-          accumulations:
-            step:
-              deaccumulate: true
-        taem/taes: {}
-    235078/237078/238078/239078:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          preprocessing:
-            - operation: scale
-              value: 1000
-    235108/237108/238108/239108/235263/237263/238263/239263/235288/237288/238288/239288:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          preprocessing:
-            - operation: scale
-              value: 100
-    235290/237290/238290/239290:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          preprocessing:
-            - operation: scale
-              value: 46697.6
   filter:type:
+    fc/cf/pf:
+      filter:param:
+        "10/207/228249/228005/237207/238207/239207":
+          preprocessing:
+            - operation: norm
+        "121":
+          filter:type:
+            em/es:
+              accumulations:
+                step:
+                  operation: maximum
+                  metadata:
+                    stepType: max
+        "122":
+          filter:type:
+            em/es:
+              accumulations:
+                step:
+                  operation: minimum
+                  metadata:
+                    stepType: min
     em/es:
       entrypoint: "pproc-ensms"
       metadata_from_output: ["param", "stream", "date", "type"]
@@ -149,6 +102,12 @@ config:
         "default":
           filter:param:
             "131060/131061/131062/131063/131064/131098/131099/131085":
+              filter:class:
+                ai:
+                  preprocessing:
+                    - operation: scale
+                      value: 0.001
+                "*": {}
               accumulations:
                 step:
                   operation: difference
@@ -222,6 +181,12 @@ config:
                     metadata:
                       scaleFactorOfLowerLimit: 0
             "131065/131066/131067":
+              filter:class:
+                ai:
+                  preprocessing:
+                    - operation: scale
+                      value: 0.001
+                "*": {}
               accumulations:
                 step:
                   operation: difference_rate
@@ -264,11 +229,15 @@ config:
                   operation: maximum
               filter:param:
                 "131068":
+                  preprocessing:
+                    - operation: norm
                   statistics:
                     threshold:
                       comparison: ">="
                       value: 10
                 "131069":
+                  preprocessing:
+                    - operation: norm
                   statistics:
                     threshold:
                       comparison: ">="
@@ -400,10 +369,6 @@ windows:
                 type: range
                 interval: 24
                 width: 168
-        "msmm":
-          out_steps:
-            type: monthly
-            date: "{date}"
     taem/taes:
       filter:stream:
         "enfo/eefo/oper/efhs/eehs":
@@ -571,1256 +536,229 @@ windows:
             width: 168
             interval: 24
 inputs:
-  filter:stream:
-    enfo:
-      filter:type:
-        "em/es/pb/efi/sot/ep":
-          forecast:
-            inputs:
-              - request: &enfo_cf
-                  stream: enfo
-                  type: cf
-              - request: &enfo_pf
-                  stream: enfo
-                  type: "pf"
-                members: &enfo_members
-                  start: 1
-                  end: 50
-        "cf/efic":
-          forecast:
-            inputs:
-              request: *enfo_cf
-        "pf":
-          forecast:
-            inputs:
-              request: *enfo_pf
-              members: *enfo_members
-        fcmean/fcstdev/fcmin/fcmax:
-          filter:members:
-            only_zero:
+  filter:class:
+    ai:
+      filter:stream:
+        enfo:
+          filter:type:
+            "em/es/pb/efi/sot/ep":
+              forecast:
+                inputs:
+                  - request: &enfo_cf
+                      stream: enfo
+                      type: cf
+                  - request: &enfo_pf
+                      stream: enfo
+                      type: "pf"
+                    members: &enfo_members
+                      start: 1
+                      end: 50
+            "cf/efic":
               forecast:
                 inputs:
                   request: *enfo_cf
-            no_zero:
+            "pf":
               forecast:
                 inputs:
                   request: *enfo_pf
                   members: *enfo_members
-            contains_zero:
-              from_inputs: false
+            fcmean/fcstdev/fcmin/fcmax:
+              filter:members:
+                only_zero:
+                  forecast:
+                    inputs:
+                      request: *enfo_cf
+                no_zero:
+                  forecast:
+                    inputs:
+                      request: *enfo_pf
+                      members: *enfo_members
+                contains_zero:
+                  from_inputs: false
+                  forecast:
+                    inputs:
+                      - request: *enfo_cf
+                      - request: *enfo_pf
+                        members: *enfo_members
+          climatology:
+            inputs:
+              request:
+                stream: "efhs"
+                time: "0000"
+            scheme: ecmwf-4days
+        waef:
+          filter:type:
+            em/es/pb/efi/sot:
               forecast:
                 inputs:
-                  - request: *enfo_cf
-                  - request: *enfo_pf
+                  - request: &waef_cf
+                      stream: waef
+                      type: "cf"
+                  - request: &waef_pf
+                      stream: waef
+                      type: "pf"
                     members: *enfo_members
-      climatology:
-        inputs:
-          request:
-            stream: "efhs"
-            time: "0000"
-        scheme: ecmwf-4days
-    waef:
-      filter:type:
-        em/es/pb/efi/sot:
-          forecast:
-            inputs:
-              - request: &waef_cf
-                  stream: waef
-                  type: "cf"
-              - request: &waef_pf
-                  stream: waef
-                  type: "pf"
-                members: *enfo_members
-        "cf/efic":
-          forecast:
-            inputs:
-              request: *waef_cf
-        "pf/ep":
-          forecast:
-            inputs:
-              request: *waef_pf
-              members: *enfo_members
-        fcmean/fcstdev/fcmin/fcmax:
-          filter:members:
-            only_zero:
+            "cf/efic":
               forecast:
                 inputs:
-                  request:
-                    <<: *waef_cf
-            no_zero:
+                  request: *waef_cf
+            "pf/ep":
               forecast:
                 inputs:
                   request: *waef_pf
                   members: *enfo_members
-            contains_zero:
-              from_inputs: false
+            fcmean/fcstdev/fcmin/fcmax:
+              filter:members:
+                only_zero:
+                  forecast:
+                    inputs:
+                      request:
+                        <<: *waef_cf
+                no_zero:
+                  forecast:
+                    inputs:
+                      request: *waef_pf
+                      members: *enfo_members
+                contains_zero:
+                  from_inputs: false
+                  forecast:
+                    inputs:
+                      - request:
+                          <<: *waef_cf
+                      - request: *waef_pf
+                        members: *enfo_members
+          climatology:
+            inputs:
+              request:
+                stream: "wehs"
+                time: "0000"
+            scheme: ecmwf-4days
+    od:
+      filter:stream:
+        oper:
+          filter:type:
+            fc/fcmean/fcstdev/fcmin/fcmax:
               forecast:
                 inputs:
-                  - request:
-                      <<: *waef_cf
+                  request: &oper_fc
+                    stream: oper
+                    type: fc
+        wave:
+          filter:type:
+            fc/fcmean/fcstdev/fcmin/fcmax:
+              forecast:
+                inputs:
+                  request: &wave_fc
+                    stream: wave
+                    type: fc
+        enfo:
+          filter:type:
+            "em/es/pb/efi/sot/ep":
+              forecast:
+                inputs:
+                  - request: *oper_fc
+                  - request: *enfo_pf
+                    members: *enfo_members
+            "cf/efic":
+              forecast:
+                inputs:
+                  request: *oper_fc
+            "pf":
+              forecast:
+                inputs:
+                  request: *enfo_pf
+                  members: *enfo_members
+            fcmean/fcstdev/fcmin/fcmax:
+              filter:members:
+                only_zero:
+                  forecast:
+                    inputs:
+                      request: *oper_fc
+                no_zero:
+                  forecast:
+                    inputs:
+                      request: *enfo_pf
+                      members: *enfo_members
+                contains_zero:
+                  from_inputs: false
+                  forecast:
+                    inputs:
+                      - request: *oper_fc
+                      - request: *enfo_pf
+                        members: *enfo_members
+          climatology:
+            inputs:
+              request:
+                stream: "efhs"
+                time: "0000"
+            scheme: ecmwf-4days
+        waef:
+          filter:type:
+            em/es/pb/efi/sot:
+              forecast:
+                inputs:
+                  - request: *wave_fc
                   - request: *waef_pf
                     members: *enfo_members
-      climatology:
-        inputs:
-          request:
-            stream: "wehs"
-            time: "0000"
-        scheme: ecmwf-4days
-    msmm:
-      filter:type:
-        "fcmean/fcstdev/fcmin/fcmax":
-          forecast:
-            inputs:
-              request:
-                stream: mmsf
-                type: "fc"
-              members:
-                start: 0
-                end: 50
-    swmm:
-      filter:type:
-        "fcmean/fcstdev/fcmin/fcmax":
-          forecast:
-            inputs:
-              request:
-                stream: wasf
-                type: "fc"
-              members:
-                start: 0
-                end: 50
-  filter:param:
-    "*":
-      filter:type:
-        "fc/cf/pf":
-          from_inputs: False
-          forecast:
-            inputs:
-              request:
-                param: "{param}"
-        "em/es/pb/fcmean/fcstdev/fcmin/fcmax/taem/taes":
-          forecast:
-            inputs:
-              request:
-                param: "{param}"
-        "ep":
-          filter:selection:
-            custom:
+            "cf/efic":
               forecast:
                 inputs:
-                  request:
-                    param: "{param}"
-    "10":
-      filter:type:
-        fc/cf/pf/em/es/pb/fcmean/fcstdev/fcmin/fcmax:
+                  request: *wave_fc
+            "pf/ep":
+              forecast:
+                inputs:
+                  request: *waef_pf
+                  members: *enfo_members
+            fcmean/fcstdev/fcmin/fcmax:
+              filter:members:
+                only_zero:
+                  forecast:
+                    inputs:
+                      request: *wave_fc
+                no_zero:
+                  forecast:
+                    inputs:
+                      request: *waef_pf
+                      members: *enfo_members
+                contains_zero:
+                  from_inputs: false
+                  forecast:
+                    inputs:
+                      - request: *wave_fc
+                      - request: *waef_pf
+                        members: *enfo_members
+          climatology:
+            inputs:
+              request:
+                stream: "wehs"
+                time: "0000"
+            scheme: ecmwf-4days
+  filter:type:
+    fc/cf/pf:
+      filter:param:
+        "10":
           forecast:
             inputs:
               request:
                 param: ["131", "132"]
-    "121/122":
-      filter:type:
-        em/es:
+        "121/122":
           forecast:
             inputs:
               request:
                 param: "167"
               derive_step:
                 type: deaccumulate
-    "207":
-      filter:type:
-        fc/cf/pf/em/es/pb/fcmean/fcstdev/fcmin/fcmax:
+        "207":
           forecast:
             inputs:
               request:
                 param: ["165", "166"]
-    "228249":
-      filter:type:
-        fc/cf/pf/em/es/pb/fcmean/fcstdev/fcmin/fcmax:
+        "228249":
           forecast:
             inputs:
               request:
                 param: ["228246", "228247"]
-    131060/131061/131062/131063/131064/131065/131066/131067/131098/131099/131085:
-      filter:type:
-        ep:
-          forecast:
-            inputs:
-              request:
-                param: "228228"
-              derive_step:
-                type: deaccumulate
-    "131068/131069":
-      filter:type:
-        ep:
-          forecast:
-            inputs:
-              request:
-                param: ["165", "166"]
-    "131073":
-      filter:type:
-        ep:
-          forecast:
-            inputs:
-              request:
-                param: "167"
-    131074/131075/131076/131077:
-      filter:type:
-        ep:
-          forecast:
-            inputs:
-              request:
-                param: "140229"
-    131078/131079/131080/131081:
-      filter:type:
-        ep:
-          forecast:
-            inputs:
-              request:
-                param: "140232"
-    "132044":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: ["228035", "228036"]
-          climatology:
-            inputs:
-              request:
-                param: "228044"
-    "132045":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: ["162071", "162072"]
-          climatology:
-            inputs:
-              request:
-                param: "162045"
-    "132049":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: "123"
-          climatology:
-            inputs:
-              request:
-                param: "49"
-    "132059":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: "228035"
-          climatology:
-            inputs:
-              request:
-                param: "59"
-    "132144":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: "144"
-          climatology:
-            inputs:
-              request:
-                param: "144"
-    "132165":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: "207"
-          climatology:
-            inputs:
-              request:
-                param: "228005"
-    "132167":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: "167"
-          climatology:
-            inputs:
-              request:
-                param: "228004"
-    "132201":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: "121"
-          climatology:
-            inputs:
-              request:
-                param: "201"
-    "132202":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: "122"
-          climatology:
-            inputs:
-              request:
-                param: "202"
-    "132216":
-      filter:type:
-        efi/efic/sot:
-          forecast:
-            inputs:
-              request:
-                param: "140229"
-          climatology:
-            inputs:
-              request:
-                param: "140200"
-    "132228":
-      filter:type:
-        efi/efic/sot:
-          filter:stream:
-            eefo:
-              forecast:
-                inputs:
-                  request:
-                    param: "172228"
-              climatology:
-                inputs:
-                  request:
-                    param: "228"
-            enfo:
-              forecast:
-                inputs:
-                  request:
-                    param: "228"
-              climatology:
-                inputs:
-                  request:
-                    param: "228"
-    "171001":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "1"
-          climatology:
-            inputs:
-              request:
-                param: "1"
-    "171002":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "2"
-          climatology:
-            inputs:
-              request:
-                param: "2"
-    "171006":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "228246"
-          climatology:
-            inputs:
-              request:
-                param: "228246"
-    "171007":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "228247"
-          climatology:
-            inputs:
-              request:
-                param: "228247"
-    "171033":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "33"
-          climatology:
-            inputs:
-              request:
-                param: "33"
-    "171034":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "34"
-          climatology:
-            inputs:
-              request:
-                param: "34"
-    "171078":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "78"
-          climatology:
-            inputs:
-              request:
-                param: "78"
-    "171079":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "79"
-          climatology:
-            inputs:
-              request:
-                param: "79"
-    "171121":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "121"
-          climatology:
-            inputs:
-              request:
-                param: "121"
-    "171122":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "122"
-          climatology:
-            inputs:
-              request:
-                param: "122"
-    "171129":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "129"
-          climatology:
-            inputs:
-              request:
-                param: "129"
-    "171130":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "130"
-          climatology:
-            inputs:
-              request:
-                param: "130"
-    "171131":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "131"
-          climatology:
-            inputs:
-              request:
-                param: "131"
-    "171132":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "132"
-          climatology:
-            inputs:
-              request:
-                param: "132"
-    "171133":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "133"
-          climatology:
-            inputs:
-              request:
-                param: "133"
-    "171136":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "136"
-          climatology:
-            inputs:
-              request:
-                param: "136"
-    "171137":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "137"
-          climatology:
-            inputs:
-              request:
-                param: "137"
-    "171139":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "139"
-          climatology:
-            inputs:
-              request:
-                param: "139"
-    "171141":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "141"
-          climatology:
-            inputs:
-              request:
-                param: "141"
-    "171151":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "151"
-          climatology:
-            inputs:
-              request:
-                param: "151"
-    "171164":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "164"
-          climatology:
-            inputs:
-              request:
-                param: "164"
-    "171165":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "165"
-          climatology:
-            inputs:
-              request:
-                param: "165"
-    "171166":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "166"
-          climatology:
-            inputs:
-              request:
-                param: "166"
-    "171167":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "167"
-          climatology:
-            inputs:
-              request:
-                param: "167"
-    "171168":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "168"
-          climatology:
-            inputs:
-              request:
-                param: "168"
-    "171201":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "201"
-          climatology:
-            inputs:
-              request:
-                param: "201"
-    "171202":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "202"
-          climatology:
-            inputs:
-              request:
-                param: "202"
-    "173142":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "172142"
-          climatology:
-            inputs:
-              request:
-                param: "172142"
-    "173143":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "172143"
-          climatology:
-            inputs:
-              request:
-                param: "172143"
-    "173144":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "172144"
-          climatology:
-            inputs:
-              request:
-                param: "172144"
-    "173189":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "172189"
-          climatology:
-            inputs:
-              request:
-                param: "172189"
-    "173228":
-      filter:type:
-        taem/fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "172228"
-          climatology:
-            inputs:
-              request:
-                param: "172228"
-    "200142":
-      from_inputs: false
-      forecast:
-        inputs:
-          request:
-            param: "142"
-          derive_step:
-            type: deaccumulate
-    "200143":
-      from_inputs: false
-      forecast:
-        inputs:
-          request:
-            param: "143"
-          derive_step:
-            type: deaccumulate
-    "200144":
-      from_inputs: false
-      forecast:
-        inputs:
-          request:
-            param: "144"
-          derive_step:
-            type: deaccumulate
-    "200189":
-      from_inputs: false
-      forecast:
-        inputs:
-          request:
-            param: "189"
-          derive_step:
-            type: deaccumulate
-    "200228":
-      from_inputs: false
-      forecast:
-        inputs:
-          request:
-            param: "228"
-          derive_step:
-            type: deaccumulate
-    "228216":
-      from_inputs: false
-      forecast:
-        inputs:
-          request:
-            param: "228216"
-          derive_step:
-            type: deaccumulate
-    "201":
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-            inputs:
-              request:
-                param: "121"
-        cd/em/es: # This case is handled below
-          filter:stream:
-            efhs/eehs: {}
-        taem/taes:
-          filter:stream:
-            efhs/eehs/eefo:
-              forecast:
-                inputs:
-                  request:
-                    param: "{param}"
-    "202":
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-            inputs:
-              request:
-                param: "122"
-        cd/em/es:
-          filter:stream:
-            efhs/eehs: {}
-        taem/taes:
-          filter:stream:
-            efhs/eehs/eefo:
-              forecast:
-                inputs:
-                  request:
-                    param: "{param}"
-    "140249":
-      from_inputs: false
-      filter:type:
-        fc/cf/pf/em/es/pb/fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-            inputs:
-              request:
-                param: ["165", "166"]
-        cd: {}
-    141220/143220/144220/145220:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "140220"
-    141221/143221/144221/145221:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-            inputs:
-              request:
-                param: "140221"
-    141229/143229/144229/145229:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param:  "140229"
-    141231/143231/144231/145231:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param:  "140231"
-    141232/143232/144232/145232:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "140232"
-    141233/143233/144233/145233:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "140233"
-    141244/143244/144244/145244:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "140244"
-    141245/143245/144245/145245:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "140245"
-    "234167":
-      filter:type:
-        taem:
-          forecast:
-            inputs:
-              request:
-                param: "171167"
-          climatology:
-            inputs:
-              request:
-                param: "167.128"
-    "234139":
-      filter:type:
-        taem:
-          forecast:
-            inputs:
-              request:
-                param: "171139"
-          climatology:
-            inputs:
-              request:
-                param: "139.128"
-    "234151":
-      filter:type:
-        taem:
-          forecast:
-            inputs:
-              request:
-                param: "171151"
-          climatology:
-            inputs:
-              request:
-                param: "151.128"
-    "234228":
-      filter:type:
-        taem:
-          forecast:
-            inputs:
-              request:
-                param: "173228"
-          climatology:
-            inputs:
-              request:
-                param: "228.172"
-    235029/237029/238029/239029:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "142"
-    235030/237030/238030/239030:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "143"
-    235031/237031/238031/239031:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "144"
-    235033/237033/238033/239033:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "146"
-    235034/237034/238034/239034:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "147"
-    235035/237035/238035/239035:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "169"
-    235036/237036/238036/239036:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "175"
-    235037/237037/238037/239037:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "176"
-    235038/237038/238038/239038:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "177"
-    235039/237039/238039/239039:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "178"
-    235040/237040/238040/239040:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "179"
-    235041/237041/238041/239041:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "229" # Also from 180
-    235042/237042/238042/239042:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "230" # Also from 181
-    235043/237043/238043/239043:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "182"
-    235048/237048/238048/239048:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "205"
-    235055/237055/238055/239055:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "228"
-    235078/237078/238078/239078:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "141"
-    235080/237080/238080/239080:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "33"
-    235083/237083/238083/239083:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "31"
-    235084/237084/238084/239084:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "34"
-    235087/237087/238087/239087:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "78"
-    235088/237088/238088/239088:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "79"
-    235090/237090/238090/239090:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "228008"
-    235108/237108/238108/239108:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "186"
-    "235117":
-      filter:type:
-        fcmean:
-          forecast:
-            inputs:
-              request:
-                param: "228235"
-        taem/taes:
-          forecast:
-            inputs:
-              request:
-                param: "235117"
-    237117/238117/239117:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "228235"
-    235129/237129/238129/239129:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "129"
-    235130/237130/238130/239130:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "130"
-    235131/237131/238131/239131:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "131"
-    235132/237132/238132/239132:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "132"
-    235133/237133/238133/239133:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "133"
-    235135/237135/238135/239135:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "135"
-    235137/237137/238137/239137:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "137"
-    235138/237138/238138/239138:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "138"
-    235155/237155/238155/239155:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "155"
-    235151/237151/238151/239151:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "151"
-    235165/237165/238165/239165:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "165"
-    235166/237166/238166/239166:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "166"
-    228004/237167/238167/239167:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "167"
-    235168/237168/238168/239168:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "168"
-    235189/237189/238189/239189:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "189"
-    235203/237203/238203/239203:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "203"
-    228005/237207/238207/239207:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: ["165", "166"]
-    235263/237263/238263/239263:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "243"
-    235244/237244/238244/239244:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "244"
-    235245/237245/238245/239245:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "245"
-    235288/237288/238288/239288:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "164"
-    235290/237290/238290/239290:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "206"
-    235309/237309/238309/239309:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "228014"
-    235318/237218/238218/239318:
-      filter:type:
-        fcmean/fcstdev/fcmin/fcmax:
-          forecast:
-              inputs:
-                request:
-                  param: "49"
-    "260033":
-      from_inputs: false
-      forecast:
-        inputs:
-          request:
-            param: ["228220", "228218"]
-    "260053":
-      from_inputs: false
-      forecast:
-        inputs:
-          request:
-            param: ["228220", "228221"]
-    "261001":
-      filter:type:
-        cf/pf/fc:
+        "261001":
           forecast:
             inputs:
               - request:
@@ -1829,14 +767,7 @@ inputs:
                   type: deaccumulate
               - request:
                   param: ["165", "166", "167", "168"]
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "261001"
-    "261014":
-      filter:type:
-        cf/pf/fc:
+        "261014":
           forecast:
             inputs:
               - request:
@@ -1845,14 +776,7 @@ inputs:
                   type: deaccumulate
               - request:
                   param: ["165", "166", "167", "168"]
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "261014"
-    "261015":
-      filter:type:
-        cf/pf/fc:
+        "261015":
           forecast:
             inputs:
               - request:
@@ -1861,86 +785,37 @@ inputs:
                   type: deaccumulate
               - request:
                   param: ["165", "166", "167", "168"]
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "261015"
-    "260004":
-      filter:type:
-        cf/pf/fc:
+        "260004":
           forecast:
             inputs:
               request:
                 param: ["167", "168"]
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "260004"
-    "260242":
-      filter:type:
-        cf/pf/fc:
+        "260242":
           forecast:
             inputs:
               request:
                 param: ["167", "168"]
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "260242"
-    "261016":
-      filter:type:
-        cf/pf/fc:
+        "261016":
           forecast:
             inputs:
               request:
                 param: ["167", "168"]
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "261016"
-    "260005":
-      filter:type:
-        cf/pf/fc:
+        "260005":
           forecast:
             inputs:
               request:
                 param:  ["165", "166", "167"]
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "260005"
-    "260255":
-      filter:type:
-        cf/pf/fc:
+        "260255":
           forecast:
             inputs:
               request:
                 param: ["165", "166", "167", "168"]
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "260255"
-    "261018":
-      filter:type:
-        cf/pf/fc:
+        "261018":
           forecast:
             inputs:
               request:
                 param: ["165", "166", "167", "168"]
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "261018"
-    "261002":
-      filter:type:
-        cf/pf/fc:
+        "261002":
           forecast:
             inputs:
               - request:
@@ -1949,585 +824,58 @@ inputs:
                   type: deaccumulate
               - request:
                   param: "167" # Required for metadata of cossza
-        "em/es/pb":
-          forecast:
-            inputs:
-              request:
-                param: "261002"
-    "261023":
-      filter:type:
-        cf/pf/fc:
+        "261023":
           forecast:
             inputs:
               request:
                 param: ["167", "168"]
-        "em/es/pb":
+    em/es/pb:
+      forecast:
+        inputs:
+          request:
+            param: "{param}"
+    ep:
+      filter:selection:
+        custom:
           forecast:
             inputs:
               request:
-                param: "261023"
-  filter:type:
-    fcmean:
-      filter:stream:
-        msmm/swmm:
+                param: "{param}"
+        default:
           filter:param:
-            228004/228005/235041/235042/235084/235151/235165/235166/235168/235288: # missing 139
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-            141220/141221/141229/141231/141232/141233/141244/141245/235078/235083/235080/235087/235088/235090/235108/235137/235263/235290/235309/235318: # 39/40/41/42/51/52/170/183/236
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 24
-            235029/235030/235031/235033/235034/235035/235036/235037/235038/235039/235040/235043/235048/235055/235189: #172008/172009/172180/172181/172212
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    include_start: true
-                    allow_missing_zero: true
-                    by: 24
-            235129/235130/235131/235132/235133/235135/235138/235155/235203:
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 12
-    fcmax:
-      filter:stream:
-        msmm/swmm:
-          filter:param:
-            237041/237042/237084/237151/237165/237166/237167/237168/237207/237288: # missing 139
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-            143220/143221/143229/143231/143232/143233/143244/143245/237078/237083/237080/237087/237088/237090/237108/237137/237263/237290/237309/237318: # 39/40/41/42/51/52/170/183/236
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 24
-            237029/237030/237031/237033/237034/237035/237036/237037/237038/237039/237040/237043/237048/237055/237189: #172008/172009/172180/172181/172212
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    include_start: true
-                    allow_missing_zero: true
-                    by: 24
-            237129/237130/237131/237132/237138/237135/237155:
-              from_inputs: false
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 12
-            237133/237203:
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 12
-    fcstdev:
-      filter:stream:
-        msmm/swmm:
-          filter:param:
-            239041/239042/239084/239151/239165/239166/239167/239168/239207/239288: # missing 139
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-            145220/145221/145229/145231/145232/145233/145244/145245/239078/239083/239080/239087/239088/239090/239108/239137/239263/239290/239309/239318: # 39/40/41/42/51/52/170/183/236
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 24
-            239029/239030/239031/239033/239034/239035/239036/239037/239038/239039/239040/239043/239048/239055/239189: #172008/172009/172180/172181/172212
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    include_start: true
-                    allow_missing_zero: true
-                    by: 24
-            239129/239130/239131/239132/239138/239135/239155:
-              from_inputs: false
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 12
-            239133/239203:
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 12
-    fcmin:
-      filter:stream:
-        msmm/swmm:
-          filter:param:
-            238041/238042/238084/238151/238165/238166/238167/238168/238207/238288: # missing 139
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-            144220/144221/144229/144231/144232/144233/144244/144245/238078/238083/238080/238087/238088/238090/238108/238137/238263/238290/238309/238318: # 39/40/41/42/51/52/170/183/236
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 24
-            238033/238034/238035/238036/238037/238038/238039/238040/238043/238048/238189: #172008/172009/172180/172181/172212
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    include_start: true
-                    allow_missing_zero: true
-                    by: 24
-            238029/238030/238031/238055:
-              from_inputs: false
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    include_start: true
-                    allow_missing_zero: true
-                    by: 24
-            238129/238130/238131/238132/238138/238135/238155:
-              from_inputs: false
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 12
-            238133/238203:
-              forecast:
-                inputs:
-                  derive_step:
-                    type: monthly
-                    by: 12
-    efi/efic/sot:
-      filter:stream:
-        "eefo/weef":
-          filter:param:
-            132044/132049/132059/132144/132045/132165/132167/132201/132202/132216/132228:
-              climatology:
-                required: true
-                inputs:
-                  request:
-                    type: cd
-                  derive_date:
-                    option: nearest
-                  derive_step:
-                    type: range
-        "enfo/waef":
-          climatology:
-            required: true
-            inputs:
-              request:
-                type: cd
-              derive_date:
-                - option: next
-                  sequence:
-                    type: daily
-                - option: previous
-                  strict: false
-              derive_step:
-                type: range
-          filter:param:
-            "132044/132049/132059/132045/132165/132167/132201/132202/132216":
-              forecast:
-                inputs:
-                  derive_step:
-                    type: default
-                    by: 6
-            132228/132144:
-              forecast:
-                inputs:
-                  derive_step:
-                    type: deaccumulate
-    taem/taes:
-      filter:stream:
-        eefo:
-          filter:param:
-            "*": {}
-            171001/171002/171006/171007/171078/171079/171033/171034/171121/171122/171129/171130/171131/171132/171133/171136/171137/171139/171141/171151/171164/171165/171166/171167/171168/171201/171202/173142/173143/173144/173189/173228:
-              forecast:
-                inputs:
-                  derive_step:
-                    type: precomputed
-              climatology:
-                inputs:
-                  request:
-                    type: taem
-                  derive_date:
-                    - option: nearest
-                    - option: bracket
-                      num: 2
-                      strict: False
-                  derive_step:
-                    type: range
-                required: true
-            234167/234139/234151/234228:
-              forecast:
-                inputs:
-                  derive_step:
-                    type: precomputed
-              climatology:
-                inputs:
-                  - request:
-                      stream: eefh
-                      type: fcmean
-                    members:
-                      start: 0
-                      end: 10
-                    derive_date:
-                      - option: nearest
-                      - option: bracket
-                        num: 1
-                        strict: False
-                    derive_step:
-                      type: range
-                  - request:
-                      type: taem
-                    derive_date:
-                      - option: nearest
-                      - option: bracket
-                        num: 1
-                        strict: False
-                    derive_step:
-                      type: range
-                required: true
-        efhs/wehs/eehs:
-          forecast:
-            inputs:
-              - request:
-                  type: "fcmean"
-                members:
-                  start: 0
-                  end: 0
-                derive_step:
-                  type: precomputed
-                derive_hdate:
-                  rstart: -20
-                  rend: 0
-                  recurrence: "yearly"
-                  include_endpoint: false
-              - request:
-                  type: "fcmean"
-                derive_step:
-                  type: precomputed
-                derive_hdate:
-                  rstart: -20
-                  rend: 0
-                  recurrence: "yearly"
-                  include_endpoint: false
-    cd:
-      filter:stream:
-        efhs/eehs:
-          from_inputs: false
-          forecast:
-            inputs:
-              - request:
-                  type: "fcmean"
-                members:
-                  start: 0
-                  end: 0
-                derive_step:
-                  type: precomputed
-              - request:
-                  type: "fcmean"
-                derive_step:
-                  type: precomputed
-          filter:steplength:
-            "*":
-              filter:stream:
-                efhs:
-                  forecast:
-                    inputs:
-                      derive_date:
-                        - option: bracket
-                          num: 4
-                          strict: False
-            "168":
-              forecast:
-                inputs:
-                  derive_date:
-                    - option: bracket
-                      num: 2
-                      strict: False
-          filter:param:
-            "228004":
-              forecast:
-                inputs:
-                  request:
-                    param: "167.128"
-            "49":
-              forecast:
-                inputs:
-                  request:
-                    param: "123.128"
-            "228005":
-              forecast:
-                inputs:
-                  request:
-                    param: "207.128"
-            "201":
-              forecast:
-                inputs:
-                  request:
-                    param: "121.128"
-            "202":
-              forecast:
-                inputs:
-                  request:
-                    param: "122.128"
-            "162045":
-              forecast:
-                inputs:
-                  request:
-                    param: "71.162"
-            "228006":
-              forecast:
-                inputs:
-                  request:
-                    param: "164.128"
-            "228":
-              filter:steplength:
-                "*":
+            131060/131061/131062/131063/131064/131065/131066/131067/131098/131099/131085:
+              filter:class:
+                ai:
                   forecast:
                     inputs:
                       request:
-                        param: "228.128"
-                "168":
+                        param: "228228"
+                      derive_step:
+                        type: deaccumulate
+                od:
                   forecast:
                     inputs:
                       request:
-                        param: "228.172"
-            "144":
+                        param: "228"
+                      derive_step:
+                        type: deaccumulate
+            131068/131069:
               forecast:
                 inputs:
                   request:
-                    param: "144.128"
-            "59":
+                    param: ["165", "166"]
+            "131073":
               forecast:
                 inputs:
                   request:
-                    param: "59.128"
-            "228044":
+                    param: "167"
+            131074/131075/131076/131077:
               forecast:
                 inputs:
                   request:
-                    param: "44.228"
-            "140249":
+                    param: "140229"
+            131078/131079/131080/131081:
               forecast:
                 inputs:
                   request:
-                    param: "249.140"
-                  members: null
-        "wehs":
-          from_inputs: false
-          forecast:
-            inputs:
-              - request:
-                  type: "fcmean"
-                members:
-                  start: 0
-                  end: 0
-                derive_step:
-                  type: precomputed
-              - request:
-                  type: "fcmean"
-                derive_step:
-                  type: precomputed
-          filter:steplength:
-            "*":
-              forecast:
-                inputs:
-                  derive_date:
-                    - option: bracket
-                      num: 4
-                      strict: False
-            "168":
-              forecast:
-                inputs:
-                  derive_date:
-                    - option: bracket
-                      num: 2
-                      strict: False
-          filter:param:
-            "140200":
-              forecast:
-                inputs:
-                  request:
-                    param: "229.140"
-    em/es:
-      filter:stream:
-        enfo/waef: {}
-        eefo/weef:
-          filter:steplength:
-            "168":
-              forecast:
-                inputs:
-                  - request:
-                      type: "fcmean"
-                    members:
-                      start: 0
-                      end: 0
-                    derive_step:
-                      type: precomputed
-                  - request:
-                      type: "fcmean"
-                    derive_step:
-                      type: precomputed
-            "*": {}
-        efhs/eehs:
-          filter:steptype:
-            range:
-              from_inputs: false
-              forecast:
-                inputs:
-                  - request:
-                      type: "fcmean"
-                    members:
-                      start: 0
-                      end: 0
-                    derive_step:
-                      type: precomputed
-                  - request:
-                      type: "fcmean"
-                    derive_step:
-                      type: precomputed
-              filter:steplength:
-                "*":
-                  filter:stream:
-                    efhs:
-                      forecast:
-                        inputs:
-                          derive_date:
-                            - option: bracket
-                              num: 4
-                              strict: False
-                "168":
-                  forecast:
-                    inputs:
-                      derive_date:
-                        - option: bracket
-                          num: 2
-                          strict: False
-              filter:param:
-                "228004":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "167.128"
-                "49":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "123.128"
-                "228005":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "207.128"
-                "201":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "121.128"
-                "202":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "122.128"
-                "162045":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "71.162"
-                "228006":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "164.128"
-                "228":
-                  filter:steplength:
-                    "*":
-                      forecast:
-                        inputs:
-                          request:
-                            param: "228.128"
-                    "168":
-                      forecast:
-                        inputs:
-                          request:
-                            param: "228.172"
-                "144":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "144.128"
-                "59":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "59.128"
-                "228044":
-                  forecast:
-                    inputs:
-                      request:
-                        param: "44.228"
-            instantaneous:
-              forecast:
-                inputs:
-                  derive_hdate:
-                    rstart: -20
-                    rend: 0
-                    recurrence: "yearly"
-                    include_endpoint: false
-        "wehs":
-          filter:steptype:
-            range:
-              from_inputs: false
-              filter:param:
-                "140200":
-                  forecast:
-                    inputs:
-                      - request:
-                          param: "229.140"
-                          type: "fcmean"
-                        members:
-                          start: 0
-                          end: 0
-                        derive_step:
-                          type: precomputed
-                        derive_date:
-                          - option: bracket
-                            num: 4
-                            strict: False
-                      - request:
-                          param: "229.140"
-                          type: "fcmean"
-                        derive_step:
-                          type: precomputed
-                        derive_date:
-                          - option: bracket
-                            num: 4
-                            strict: False
-            instantaneous:
-              forecast:
-                inputs:
-                  derive_hdate:
-                    rstart: -20
-                    rend: 0
-                    recurrence: "yearly"
-                    include_endpoint: false
-    fc/cf/pf/ep/pb: {}
+                    param: "140232"
