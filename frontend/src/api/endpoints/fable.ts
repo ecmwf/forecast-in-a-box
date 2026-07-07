@@ -42,6 +42,7 @@ import {
   GlyphFunctionsResponseSchema,
   GlyphListResponseSchema,
   normalizeCatalogueKeys,
+  serializeFable,
 } from '@/api/types/fable.types'
 
 /**
@@ -73,7 +74,7 @@ export async function getCatalogue(
 export async function expandFable(
   fable: FableBuilderV1,
 ): Promise<FableValidationExpansion> {
-  return apiClient.put(API_ENDPOINTS.fable.expand, fable, {
+  return apiClient.put(API_ENDPOINTS.fable.expand, serializeFable(fable), {
     schema: FableValidationExpansionSchema,
   })
 }
@@ -105,7 +106,11 @@ export async function upsertFable(
 ): Promise<FableUpsertResponse> {
   return apiClient.post(
     API_ENDPOINTS.fable.create,
-    { ...request, tags: request.tags.map((k) => ({ key: k })) },
+    {
+      ...request,
+      builder: serializeFable(request.builder),
+      tags: request.tags.map((k) => ({ key: k })),
+    },
     { schema: FableUpsertResponseSchema },
   )
 }
@@ -147,6 +152,7 @@ export async function updateBlueprint(
     API_ENDPOINTS.fable.update,
     {
       ...request,
+      builder: serializeFable(request.builder),
       tags: request.tags?.map((k) => ({ key: k })),
     },
     { schema: FableUpsertResponseSchema },

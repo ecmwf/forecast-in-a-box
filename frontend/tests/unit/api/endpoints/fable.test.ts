@@ -39,6 +39,21 @@ const mockFable: FableBuilderV1 = {
   },
 }
 
+/** API wire format for mockFable (new backend format with list-based blocks). */
+const mockApiFable = {
+  blocks: [
+    {
+      instance_id: 'block-1',
+      plugin: { store: 'ecmwf', local: 'core' },
+      factory: 'model',
+      instance: {
+        configuration_values: { param1: 'value1' },
+        input_ids: {},
+      },
+    },
+  ],
+}
+
 describe('getCatalogue', () => {
   afterEach(() => {
     worker.resetHandlers()
@@ -166,7 +181,7 @@ describe('expandFable', () => {
     )
 
     await expandFable(mockFable)
-    expect(capturedBody).toEqual(mockFable)
+    expect(capturedBody).toEqual(mockApiFable)
   })
 })
 
@@ -179,7 +194,7 @@ describe('retrieveFable', () => {
     const mockResponse = {
       blueprint_id: 'fable-123',
       version: 1,
-      builder: mockFable,
+      builder: mockApiFable,
       display_name: 'My Config',
       display_description: 'Some description',
       tags: [{ key: 'tag1', value: '' }],
@@ -209,7 +224,7 @@ describe('retrieveFable', () => {
         HttpResponse.json({
           blueprint_id: 'fable-oneoff',
           version: 1,
-          builder: mockFable,
+          builder: mockApiFable,
           display_name: 'One-off run',
           display_description: null,
           tags: [{ key: '__fiab:oneoff__', value: null }],
@@ -231,7 +246,7 @@ describe('retrieveFable', () => {
         HttpResponse.json({
           blueprint_id: 'fable-mismatch',
           version: 1,
-          builder: mockFable,
+          builder: mockApiFable,
           display_name: 'Stale config',
           display_description: null,
           tags: [
@@ -256,7 +271,7 @@ describe('retrieveFable', () => {
         return HttpResponse.json({
           blueprint_id: 'fable-456',
           version: 1,
-          builder: mockFable,
+          builder: mockApiFable,
           display_name: 'Test',
           display_description: '',
           tags: [],
@@ -298,7 +313,7 @@ describe('upsertFable', () => {
     expect(result.blueprint_id).toBe('new-fable-id')
     expect(result.version).toBe(1)
     expect(capturedBody).toMatchObject({
-      builder: mockFable,
+      builder: mockApiFable,
       display_name: 'My Config',
       display_description: 'Some notes',
     })

@@ -21,6 +21,7 @@ import {
 import type { QubeNode } from './artifacts.types'
 import type { LucideIcon } from 'lucide-react'
 import type { PluginCompositeId } from './plugins.types'
+import type { EnvironmentSpecification } from './job.types'
 
 export type PluginId = string
 export type BlockFactoryId = string
@@ -100,21 +101,49 @@ export const BlockFactoryCatalogueSchema = z.record(
 
 export type BlockFactoryCatalogue = z.infer<typeof BlockFactoryCatalogueSchema>
 
-export const BlockInstanceSchema = z.object({
-  factory_id: PluginBlockFactoryIdSchema,
-  configuration_values: z.record(z.string(), z.string()),
-  input_ids: z.record(z.string(), z.string()),
+export interface BlockInstance {
+  factory_id: PluginBlockFactoryId
+  configuration_values: Record<string, string>
+  input_ids: Record<string, string>
+}
+
+/** API-level block schema (what the backend sends and expects in BlueprintBuilder.blocks). */
+const RoutableBlockApiSchema = z.object({
+  instance_id: z.string(),
+  plugin: PluginCompositeIdSchema,
+  factory: z.string(),
+  instance: z.object({
+    configuration_values: z.record(z.string(), z.string()),
+    input_ids: z.record(z.string(), z.string()).optional().default({}),
+  }),
 })
 
-export type BlockInstance = z.infer<typeof BlockInstanceSchema>
-
+/**
+ * Parses the backend BlueprintBuilder into the internal dict-based representation.
+ * The backend sends blocks as a list of RoutableBlocks; the frontend stores them
+ * as a Record keyed by instance_id with factory_id hoisted onto each BlockInstance.
+ */
 export const FableBuilderV1Schema = z.object({
-  blocks: z.record(z.string(), BlockInstanceSchema),
+  blocks: z.array(RoutableBlockApiSchema).transform((routableBlocks) => {
+    const dict: Record<BlockInstanceId, BlockInstance> = {}
+    for (const b of routableBlocks) {
+      dict[b.instance_id] = {
+        factory_id: { plugin: b.plugin, factory: b.factory },
+        configuration_values: b.instance.configuration_values,
+        input_ids: b.instance.input_ids,
+      }
+    }
+    return dict
+  }),
   environment: EnvironmentSpecificationSchema.nullable().optional(),
   local_glyphs: z.record(z.string(), z.string()).optional(),
 })
 
-export type FableBuilderV1 = z.infer<typeof FableBuilderV1Schema>
+export type FableBuilderV1 = {
+  blocks: Record<BlockInstanceId, BlockInstance>
+  environment?: EnvironmentSpecification | null
+  local_glyphs?: Record<string, string>
+}
 
 /**
  * Intrinsic glyph item from GET /api/v1/blueprint/glyphs/list?glyph_type=intrinsic
@@ -498,6 +527,38 @@ export function createEmptyFable(): FableBuilderV1 {
   return {
     blocks: {},
     local_glyphs: {},
+  }
+}
+
+/**
+ * Serialize an internal FableBuilderV1 to the API wire format (BlueprintBuilder).
+ * The backend expects blocks as a list of RoutableBlocks, not a dict.
+ */
+export function serializeFable(fable: FableBuilderV1): {
+  blocks: Array<{
+    instance_id: string
+    plugin: PluginCompositeId
+    factory: string
+    instance: {
+      configuration_values: Record<string, string>
+      input_ids: Record<string, string>
+    }
+  }>
+  environment?: EnvironmentSpecification | null
+  local_glyphs?: Record<string, string>
+} {
+  return {
+    blocks: Object.entries(fable.blocks).map(([instanceId, instance]) => ({
+      instance_id: instanceId,
+      plugin: instance.factory_id.plugin,
+      factory: instance.factory_id.factory,
+      instance: {
+        configuration_values: instance.configuration_values,
+        input_ids: instance.input_ids,
+      },
+    })),
+    environment: fable.environment,
+    local_glyphs: fable.local_glyphs,
   }
 }
 
