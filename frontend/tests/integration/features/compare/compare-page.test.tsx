@@ -32,7 +32,11 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { z } from 'zod'
-import { resetJobsState } from '@tests/../mocks/data/job.data'
+import {
+  injectMockExecution,
+  resetJobsState,
+  secondGribRunExecution,
+} from '@tests/../mocks/data/job.data'
 import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
 import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
 import { ComparePage } from '@/features/compare/components/ComparePage'
@@ -94,7 +98,7 @@ const RUN_A = {
 
 const RUN_B = {
   kind: 'output',
-  jobId: 'job-completed-008',
+  jobId: 'job-grib-b-008',
   taskId: 'task-out-grib-b',
   blockId: 'block_sink_1',
   runName: 'Run B',
@@ -104,6 +108,7 @@ const RUN_B = {
 
 beforeEach(() => {
   resetJobsState()
+  injectMockExecution(secondGribRunExecution)
   resetLensState()
   // Mock lenses allocate ports from 54300 — serve WMS on the first few so
   // panels that reach `running` can load capabilities.
@@ -147,7 +152,7 @@ describe('ComparePage', () => {
       .sort()
     expect(paths).toEqual([
       '/data/output/job-completed-001_1',
-      '/data/output/job-completed-008_1',
+      '/data/output/job-grib-b-008_1',
     ])
   })
 
@@ -180,7 +185,7 @@ describe('ComparePage', () => {
     const kinds = useComparisonStore
       .getState()
       .entries.map((e) => e.kind === 'output' && e.jobId)
-    expect(kinds).toEqual(['job-completed-001', 'job-completed-008'])
+    expect(kinds).toEqual(['job-completed-001', 'job-grib-b-008'])
   })
 
   it('strips invalid refs from a shared URL instead of wedging', async () => {

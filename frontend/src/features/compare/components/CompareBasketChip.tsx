@@ -18,6 +18,7 @@
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryDisplayName } from '../entry-ref'
+import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
 import type { ComparisonEntry } from '../entry-ref'
 import { cn } from '@/lib/utils'
 import { formatInZone, useAppTimeZone } from '@/lib/datetime'
@@ -45,6 +46,9 @@ export function CompareBasketChip({
 }) {
   const { t } = useTranslation('compare')
   const timeZone = useAppTimeZone()
+  // Chips render for every basket entry, so they're the natural mount
+  // point for lazily upgrading stub display metadata.
+  useEnrichComparisonEntry(entry)
   const name = entryDisplayName(entry)
 
   const sub =

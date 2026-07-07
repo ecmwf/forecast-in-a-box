@@ -21,11 +21,11 @@
  * auto-start.
  */
 
-import { useEffect, useMemo, useState } from 'react'
-import { Plus, Square, Trash2 } from 'lucide-react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Loader2, Plus, Square, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
-import { entryRef } from '../entry-ref'
+import { entryDisplayName, entryRef } from '../entry-ref'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
@@ -33,6 +33,7 @@ import { CompareBasketChip } from './CompareBasketChip'
 import { ComparePanel } from './ComparePanel'
 import { ComparisonSourcePicker } from './ComparisonSourcePicker'
 import type { ComparisonEntry } from '../entry-ref'
+import type { CompareMode } from '@/features/viewer/compare/types'
 import { useStopLens } from '@/api/hooks/useLens'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -46,6 +47,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { showToast } from '@/lib/toast'
+
+const CompareViewer = lazy(() =>
+  import('@/features/viewer/compare/CompareViewer').then((m) => ({
+    default: m.CompareViewer,
+  })),
+)
 
 const route = getRouteApi('/_authenticated/compare')
 
@@ -110,11 +117,25 @@ function useActivePair(): ActivePair & {
 
 export function ComparePage() {
   const { t } = useTranslation('compare')
+  const search = route.useSearch()
+  const navigate = route.useNavigate()
   const entries = useComparisonStore((s) => s.entries)
   const removeEntry = useComparisonStore((s) => s.removeEntry)
   const clear = useComparisonStore((s) => s.clear)
   const { a, b, activateAsB } = useActivePair()
   useHydrateComparisonFromUrl()
+
+  const mode: CompareMode = search.mode ?? 'swipe'
+  const onModeChange = (next: CompareMode) => {
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        // Omit the default so a bare /compare?a=…&b=… stays clean.
+        mode: next === 'swipe' ? undefined : next,
+      }),
+      replace: true,
+    })
+  }
 
   const [pickerOpen, setPickerOpen] = useState(false)
   // "Stop lens servers" pauses auto-start so panels don't instantly
@@ -218,6 +239,23 @@ export function ComparePage() {
       {entries.length === 0 ? (
         <div className="mx-auto w-full max-w-xl rounded-lg border border-border bg-card p-5">
           <ComparisonSourcePicker />
+        </div>
+      ) : a && b && stateA.phase === 'running' && stateB.phase === 'running' ? (
+        <div className="h-[75vh] min-h-[560px]">
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            }
+          >
+            <CompareViewer
+              a={{ baseUrl: stateA.baseUrl, label: entryDisplayName(a) }}
+              b={{ baseUrl: stateB.baseUrl, label: entryDisplayName(b) }}
+              mode={mode}
+              onModeChange={onModeChange}
+            />
+          </Suspense>
         </div>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">

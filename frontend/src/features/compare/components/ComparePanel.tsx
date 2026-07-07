@@ -20,7 +20,6 @@ import { Suspense, lazy } from 'react'
 import { AlertTriangle, Loader2, Play, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryDisplayName } from '../entry-ref'
-import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
 import { SLOT_BADGE_CLASS } from './CompareBasketChip'
 import type { ComparisonEntry } from '../entry-ref'
 import type { ComparisonSourceState } from '../hooks/useComparisonSource'
@@ -59,17 +58,10 @@ export function ComparePanel({
         </P>
       </div>
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {entry && <PanelEnrichment entry={entry} />}
         <PanelBody slot={slot} state={state} />
       </div>
     </div>
   )
-}
-
-/** Null-rendering mount point for the per-entry enrichment hook. */
-function PanelEnrichment({ entry }: { entry: ComparisonEntry }) {
-  useEnrichComparisonEntry(entry)
-  return null
 }
 
 function PanelBody({

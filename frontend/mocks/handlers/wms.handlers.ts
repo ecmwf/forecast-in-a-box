@@ -38,14 +38,29 @@ function pngResponse() {
 }
 
 // Minimal valid Mapbox style so the Carto vector basemap fetch resolves
-// offline; a source-less background layer keeps ol-mapbox-style happy
-// without triggering follow-up tile or glyph requests.
+// offline. ol-mapbox-style's applyStyle(VectorTileLayer, …) requires at
+// least one layer with a vector source to derive the layer's source
+// config; the mock-tiles handler below answers any tile it requests.
 const EMPTY_MAPBOX_STYLE = {
   version: 8,
   name: 'test-basemap',
-  sources: {},
+  sources: {
+    'test-vector': {
+      type: 'vector',
+      tiles: ['http://localhost/mock-tiles/{z}/{x}/{y}.pbf'],
+      minzoom: 0,
+      maxzoom: 0,
+    },
+  },
   layers: [
     { id: 'bg', type: 'background', paint: { 'background-color': '#fff' } },
+    {
+      id: 'test-lines',
+      type: 'line',
+      source: 'test-vector',
+      'source-layer': 'none',
+      paint: {},
+    },
   ],
 }
 
@@ -75,5 +90,12 @@ export const wmsHandlers = [
   // Carto vector basemap style requested by the viewer on mount.
   http.get('https://basemaps.cartocdn.com/*', () =>
     HttpResponse.json(EMPTY_MAPBOX_STYLE),
+  ),
+
+  // Empty vector tiles for the stub style above.
+  http.get('*/mock-tiles/*', () =>
+    HttpResponse.arrayBuffer(new ArrayBuffer(0), {
+      headers: { ...CORS, 'Content-Type': 'application/x-protobuf' },
+    }),
   ),
 ]

@@ -10,7 +10,7 @@
 - [x] Phase 1 — Extract shared viewer core into `src/features/viewer/` (WmsViewer 2597→~630 lines; utils → hooks → components in three commits; characterization green throughout)
 - [x] Phase 2 — Comparison basket, entry points, contextual nav tab (+ initial /compare route with basket strip & A/B URL slots, so the nav link has a target)
 - [x] Phase 3 — `/compare` route, page shell, lens orchestration (incl. host-path source form; panels host the single-source viewer until Phase 4)
-- [ ] Phase 4 — Comparison viewer (side-by-side, swipe, experimental modes)
+- [x] Phase 4 — Comparison viewer (side-by-side, swipe, experimental modes; linked pairing, epoch-union timeline with availability tracks)
 - [ ] Phase 5 — External WMS URL sources (+ stretch: GeoJSON overlays)
 - [ ] Phase 6 — Polish + full verification
 
@@ -19,6 +19,18 @@
 - Host-path source form pulled forward from Phase 5 into Phase 3 so the page is
   manually testable with local GRIB dirs (e.g. `~/.fiab/jobs_output/...`) before
   any new runs are needed.
+- `time` stays a reserved (unused) URL param: the viewer re-locates the selected
+  epoch locally when the union changes; URL persistence of time can be added
+  cheaply later via `onTimeChange`.
+- Per-source `rebaseUrls` flag skipped for v1: `rebaseLensUrl` is an identity
+  transform for well-formed external servers (advertised legend origin ==
+  public origin), and compare v1 renders no legends yet. Revisit if an external
+  server serving legends from a second host shows up.
+- GeoJSON context overlays (stretch) deferred per user guidance ("only if
+  nearly free") — it is a new concept (file input, per-map vector layers,
+  styling, removal UI), not an increment on existing pieces.
+- Basket chip enrichment: `useEnrichComparisonEntry` mounts on the basket chips
+  (render for every entry) rather than the panels.
 
 ## Context
 
