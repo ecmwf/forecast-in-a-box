@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { ParsedLayer } from '@/features/executions/components/wms-capabilities'
+import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
   expandTimeSteps,
   groupLayers,
@@ -18,7 +18,7 @@ import {
   rebaseLensUrl,
   skinnyWmsBasemap,
   uniquePressureLevels,
-} from '@/features/executions/components/wms-capabilities'
+} from '@/features/viewer/wms-capabilities'
 
 /** Minimal WMS 1.3.0 capabilities document in the shape SkinnyWMS emits. */
 function capabilitiesXml({

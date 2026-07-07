@@ -66,10 +66,15 @@ import 'ol/ol.css'
 import OlMap from 'ol/Map'
 import View from 'ol/View'
 import ImageLayer from 'ol/layer/Image'
-import VectorTileLayer from 'ol/layer/VectorTile'
-import ImageWMS from 'ol/source/ImageWMS'
 import { fromLonLat, toLonLat, transformExtent } from 'ol/proj'
-import { applyStyle as applyMapboxStyle } from 'ol-mapbox-style'
+import type ImageWMS from 'ol/source/ImageWMS'
+import type MapBrowserEvent from 'ol/MapBrowserEvent'
+import type { BasemapLayer, BasemapOption } from '@/features/viewer/ol-layers'
+import type {
+  LayerGroup,
+  ParsedLayer,
+  PartitionedGroups,
+} from '@/features/viewer/wms-capabilities'
 import {
   expandTimeSteps,
   groupLayers,
@@ -78,14 +83,21 @@ import {
   rebaseLensUrl,
   skinnyWmsBasemap,
   uniquePressureLevels,
-} from './wms-capabilities'
-import type VectorTileSource from 'ol/source/VectorTile'
-import type MapBrowserEvent from 'ol/MapBrowserEvent'
-import type {
-  LayerGroup,
-  ParsedLayer,
-  PartitionedGroups,
-} from './wms-capabilities'
+} from '@/features/viewer/wms-capabilities'
+import {
+  BASEMAPS,
+  DEFAULT_BASEMAP_ID,
+  DEFAULT_LAYER_OPACITY,
+  INITIAL_VIEW_BBOX_WGS84,
+  REFERENCE_OVERLAY_Z,
+  SKINNYWMS_BASEMAP,
+  WEB_MERCATOR_EXTENT,
+  makeBasemapLayer,
+  makeDataLayerSource,
+  makeSkinnyWmsBasemap,
+} from '@/features/viewer/ol-layers'
+import { firstNumber, formatLatLon, formatStep } from '@/features/viewer/format'
+import { exportMapPng, loadLegendImages } from '@/features/viewer/map-export'
 import { showToast } from '@/lib/toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -109,101 +121,12 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('WmsViewer')
 
-// External web basemap (Carto vector); the SkinnyWMS native basemap is separate.
-interface ExternalBasemapOption {
-  type: 'vector'
-  id: string
-  label: string
-  // Mapbox-style JSON URL; ol-mapbox-style fetches it, builds the
-  // source from its `sources` block, and applies styling.
-  styleUrl: string
-}
-
-// SkinnyWMS's own map — `background` as the base, borders overlaid.
-interface SkinnyWmsBasemapOption {
-  type: 'skinnywms'
-  id: string
-  label: string
-}
-
-type BasemapOption = ExternalBasemapOption | SkinnyWmsBasemapOption
-
-const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
-  {
-    type: 'vector',
-    id: 'carto-positron-vector',
-    label: 'Carto Positron',
-    styleUrl: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-  },
-]
-
-// Fixed identity; the actual layers come from the lens capabilities.
-const SKINNYWMS_BASEMAP: SkinnyWmsBasemapOption = {
-  type: 'skinnywms',
-  id: 'skinnywms-native',
-  label: 'SkinnyWMS (native)',
-}
-
-const DEFAULT_BASEMAP_ID = BASEMAPS[0].id
-const DEFAULT_LAYER_OPACITY = 0.85
-// SkinnyWMS border overlay sits above every data layer (which use z 1…N).
-const REFERENCE_OVERLAY_Z = 1000
 // GetCapabilities retry — lens `running` precedes WMS-port readiness.
 const CAPABILITIES_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
 // Safety ceiling per prefetch image — server-hung loads shouldn't leak layers.
 const PREFETCH_LOAD_TIMEOUT_MS = 30_000
 // Hover-popover close delay — lets the cursor travel trigger→content.
 const LEGEND_HOVER_CLOSE_MS = 200
-
-// Standard Web Mercator world extent (projection asymptotes at ±85.0511°);
-// constrains panning to the basemap's coverage.
-const WEB_MERCATOR_EXTENT: [number, number, number, number] = [
-  ...fromLonLat([-180, -85.0511]),
-  ...fromLonLat([180, 85.0511]),
-] as [number, number, number, number]
-
-// Initial fit target — full longitude, latitude biased north so Antarctica
-// is cropped and Scandinavia gets proper screen real estate. "Fit to
-// globe" toolbar button overrides with the full WMS bbox.
-const INITIAL_VIEW_BBOX_WGS84: [number, number, number, number] = [
-  -180, -55, 180, 85,
-]
-
-type ExternalBasemapLayer = VectorTileLayer
-type BasemapLayer = ExternalBasemapLayer | ImageLayer<ImageWMS>
-
-function makeBasemapLayer(opt: ExternalBasemapOption): ExternalBasemapLayer {
-  // Vector tiles via Mapbox-style JSON. declutter: true prevents label
-  // overlap at low zoom.
-  const layer = new VectorTileLayer<VectorTileSource>({ declutter: true })
-  applyMapboxStyle(layer, opt.styleUrl).catch((err) =>
-    log.error('Failed to apply vector basemap style', { error: err }),
-  )
-  return layer
-}
-
-// SkinnyWMS's `background` layer as a basemap — ImageWMS, like the data layers.
-function makeSkinnyWmsBasemap(
-  baseUrl: string,
-  backgroundLayerName: string,
-): ImageLayer<ImageWMS> {
-  const source = new ImageWMS({
-    url: `${baseUrl}/wms`,
-    params: {
-      LAYERS: backgroundLayerName,
-      STYLES: '',
-      FORMAT: 'image/png',
-      // Opaque — it's the base layer.
-      TRANSPARENT: 'FALSE',
-    },
-    // hidpi/ratio mirror the data layers (see their ImageWMS for why).
-    serverType: 'mapserver',
-    crossOrigin: 'anonymous',
-    hidpi: false,
-    ratio: 1,
-  })
-  return new ImageLayer({ source })
-}
 
 interface WmsViewerProps {
   /** Absolute base URL of the lens, e.g. `http://127.0.0.1:51234`. */
@@ -473,18 +396,11 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
     if (!map) return
     if (basemapId !== SKINNYWMS_BASEMAP.id) return
     if (skinnyBasemap.reference.length === 0) return
-    const source = new ImageWMS({
-      url: `${baseUrl}/wms`,
-      params: {
-        LAYERS: skinnyBasemap.reference.map((l) => l.name).join(','),
-        STYLES: '',
-        FORMAT: 'image/png',
-        TRANSPARENT: 'TRUE',
-      },
-      serverType: 'mapserver',
-      crossOrigin: 'anonymous',
-      hidpi: false,
-      ratio: 1,
+    const source = makeDataLayerSource(baseUrl, {
+      LAYERS: skinnyBasemap.reference.map((l) => l.name).join(','),
+      STYLES: '',
+      FORMAT: 'image/png',
+      TRANSPARENT: 'TRUE',
     })
     source.on('imageloadstart', incLoading)
     source.on('imageloadend', decLoading)
@@ -532,18 +448,7 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
         existing.layer.setOpacity(effectiveOpacity)
         existing.layer.setZIndex(z)
       } else {
-        // hidpi: false keeps Magics-rendered symbols (wind barbs, contour
-        // widths, isobar labels) at full visual size on retina — the
-        // default 2× DPI request halves them. ratio: 1 disables the 1.5×
-        // pan-slack oversampling for cleaner cache keys.
-        const source = new ImageWMS({
-          url: `${baseUrl}/wms`,
-          params,
-          serverType: 'mapserver',
-          crossOrigin: 'anonymous',
-          hidpi: false,
-          ratio: 1,
-        })
+        const source = makeDataLayerSource(baseUrl, params)
         source.on('imageloadstart', incLoading)
         source.on('imageloadend', decLoading)
         source.on('imageloaderror', decLoading)
@@ -598,19 +503,12 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
     const prefetchOne = (layer: ParsedLayer, step: string) =>
       new Promise<void>((resolve) => {
         if (state.cancelled) return resolve()
-        const source = new ImageWMS({
-          url: `${baseUrl}/wms`,
-          params: {
-            LAYERS: layer.name,
-            STYLES: layer.styles[0].name,
-            FORMAT: 'image/png',
-            TRANSPARENT: 'TRUE',
-            TIME: step,
-          },
-          serverType: 'mapserver',
-          crossOrigin: 'anonymous',
-          hidpi: false,
-          ratio: 1,
+        const source = makeDataLayerSource(baseUrl, {
+          LAYERS: layer.name,
+          STYLES: layer.styles[0].name,
+          FORMAT: 'image/png',
+          TRANSPARENT: 'TRUE',
+          TIME: step,
         })
         const hidden = new ImageLayer({
           source,
@@ -746,9 +644,6 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
   const [titleBarEnabled, setTitleBarEnabled] = useState(true)
 
   // -------- Map export (PNG download / clipboard copy) --------
-  // OL composes all canvas-renderer layers onto a single canvas in the
-  // map target. With `crossOrigin: 'anonymous'` on the tile sources, the
-  // canvas is not tainted, so toBlob() returns a usable image.
 
   const exportPng = useCallback(async (): Promise<Blob | null> => {
     const map = mapRef.current
@@ -756,41 +651,12 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
     const titles = activeOrder
       .map((name) => layers.find((l) => l.name === name)?.title)
       .filter((title): title is string => !!title)
-    // Pre-load any pinned legend images now (cross-origin, anonymous) so
-    // they're ready to draw onto the export canvas. If the map render
-    // races ahead we'd draw an empty box.
     const legendItems = await loadLegendImages(layers, pinnedLegends, baseUrl)
-    return new Promise<Blob | null>((resolve) => {
-      map.once('rendercomplete', () => {
-        const target = map.getTargetElement()
-        const olCanvas = target.querySelector<HTMLCanvasElement>('canvas')
-        if (!olCanvas) return resolve(null)
-        // Composite OL canvas + (optionally) the title bar onto a fresh
-        // canvas. We can't draw text directly onto OL's canvas — it gets
-        // overwritten on the next render — and we also want the export to
-        // be at the same intrinsic dimensions as the viewer. If any pinned
-        // legends are present, the canvas extends downward to fit them in
-        // a balanced grid below the map.
-        const dpr = window.devicePixelRatio || 1
-        const stripHeight =
-          legendItems.length > 0
-            ? measureLegendStrip(legendItems, olCanvas.width, dpr)
-            : 0
-        const out = document.createElement('canvas')
-        out.width = olCanvas.width
-        out.height = olCanvas.height + stripHeight
-        const ctx = out.getContext('2d')
-        if (!ctx) return resolve(null)
-        ctx.drawImage(olCanvas, 0, 0)
-        if (titleBarEnabled && titles.length > 0) {
-          drawTitleBar(ctx, out.width, titles, activeTime)
-        }
-        if (stripHeight > 0) {
-          drawLegendStrip(ctx, legendItems, out.width, olCanvas.height, dpr)
-        }
-        out.toBlob((blob) => resolve(blob), 'image/png')
-      })
-      map.renderSync()
+    return exportMapPng(map, {
+      titles,
+      activeTime,
+      titleBarEnabled,
+      legendItems,
     })
   }, [activeOrder, layers, activeTime, titleBarEnabled, pinnedLegends, baseUrl])
 
@@ -2261,43 +2127,6 @@ function TimeSlider({
   )
 }
 
-// ============================================================
-// Helpers
-// ============================================================
-
-function firstNumber(
-  value: number | ReadonlyArray<number> | undefined,
-): number {
-  if (typeof value === 'number') return value
-  if (Array.isArray(value)) {
-    const v = value[0]
-    return typeof v === 'number' ? v : 0
-  }
-  return 0
-}
-
-/**
- * Format a longitude/latitude pair as `lat,lon` to 3 decimals — at the
- * equator that's roughly 100 m precision, plenty for hover read-out.
- * Wraps `lon` into [-180, 180] so antimeridian crossings stay readable.
- */
-function formatLatLon(lat: number, lon: number): string {
-  const wrapped = ((((lon + 180) % 360) + 360) % 360) - 180
-  return `${lat.toFixed(3)}°, ${wrapped.toFixed(3)}°`
-}
-
-function formatStep(iso: string): string {
-  if (!iso) return '—'
-  const ms = Date.parse(iso)
-  if (!Number.isFinite(ms)) return iso
-  const d = new Date(ms)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return (
-    `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
-    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}Z`
-  )
-}
-
 /**
  * Thin vertical strip rendered in place of a sidebar when the user
  * collapses it. Holds a single chevron button that re-expands the panel.
@@ -2331,266 +2160,4 @@ function CollapsedSidebarHandle({
       </Button>
     </div>
   )
-}
-
-/**
- * Paint the on-screen title bar onto the export canvas. The OL canvas is at
- * device pixel ratio (so on a 2× display we get a 2×-scaled bitmap), and we
- * scale font / padding accordingly so the baked-in title visually matches
- * what's on screen rather than appearing tiny on retina exports.
- *
- * Layout: pill at top-centre, 16 dpr-px from the top edge. Single line; long
- * titles truncate with an ellipsis rather than squeezing.
- */
-function drawTitleBar(
-  ctx: CanvasRenderingContext2D,
-  canvasWidth: number,
-  titles: ReadonlyArray<string>,
-  activeTime: string | null,
-): void {
-  const dpr = window.devicePixelRatio || 1
-  const fontPx = 14 * dpr
-  const padX = 16 * dpr
-  const padY = 8 * dpr
-  const top = 16 * dpr
-  const radius = 8 * dpr
-  const titleText = titles.join(' · ')
-  const timeText = activeTime ? formatStep(activeTime) : ''
-
-  ctx.save()
-  ctx.font = `500 ${fontPx}px system-ui, -apple-system, "Segoe UI", sans-serif`
-  ctx.textBaseline = 'middle'
-
-  const sepWidth = timeText
-    ? ctx.measureText('  ').width + 1 * dpr // small gap on either side of divider
-    : 0
-  const timeWidth = timeText ? ctx.measureText(timeText).width : 0
-  const maxBoxWidth = canvasWidth - 40 * dpr
-  const reservedForTime = timeText ? sepWidth + timeWidth : 0
-  const titleAvail = maxBoxWidth - padX * 2 - reservedForTime
-  const fitTitle = ellipsizeToWidth(ctx, titleText, titleAvail)
-  const fitTitleWidth = ctx.measureText(fitTitle).width
-  const innerWidth = fitTitleWidth + reservedForTime
-  const boxWidth = Math.min(innerWidth + padX * 2, maxBoxWidth)
-  const boxHeight = fontPx + padY * 2
-  const boxX = Math.round((canvasWidth - boxWidth) / 2)
-  const boxY = top
-  const centerY = boxY + boxHeight / 2
-
-  // Background pill
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.92)'
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)'
-  ctx.lineWidth = 1 * dpr
-  roundedRectPath(ctx, boxX, boxY, boxWidth, boxHeight, radius)
-  ctx.fill()
-  ctx.stroke()
-
-  let cursorX = boxX + padX
-  ctx.fillStyle = '#111'
-  ctx.textAlign = 'left'
-  ctx.fillText(fitTitle, cursorX, centerY)
-  cursorX += fitTitleWidth
-
-  if (timeText) {
-    cursorX += sepWidth / 2
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)'
-    ctx.beginPath()
-    ctx.moveTo(cursorX, boxY + padY)
-    ctx.lineTo(cursorX, boxY + boxHeight - padY)
-    ctx.stroke()
-    cursorX += sepWidth / 2
-    ctx.fillStyle = '#555'
-    ctx.fillText(timeText, cursorX, centerY)
-  }
-
-  ctx.restore()
-}
-
-function ellipsizeToWidth(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-): string {
-  if (maxWidth <= 0) return ''
-  if (ctx.measureText(text).width <= maxWidth) return text
-  const ellipsis = '…'
-  let lo = 0
-  let hi = text.length
-  while (lo < hi) {
-    const mid = Math.floor((lo + hi + 1) / 2)
-    if (ctx.measureText(text.slice(0, mid) + ellipsis).width <= maxWidth) {
-      lo = mid
-    } else {
-      hi = mid - 1
-    }
-  }
-  return text.slice(0, lo) + ellipsis
-}
-
-function roundedRectPath(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-): void {
-  const rr = Math.min(r, w / 2, h / 2)
-  ctx.beginPath()
-  ctx.moveTo(x + rr, y)
-  ctx.lineTo(x + w - rr, y)
-  ctx.quadraticCurveTo(x + w, y, x + w, y + rr)
-  ctx.lineTo(x + w, y + h - rr)
-  ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h)
-  ctx.lineTo(x + rr, y + h)
-  ctx.quadraticCurveTo(x, y + h, x, y + h - rr)
-  ctx.lineTo(x, y + rr)
-  ctx.quadraticCurveTo(x, y, x + rr, y)
-  ctx.closePath()
-}
-
-interface LegendExportItem {
-  title: string
-  image: HTMLImageElement
-}
-
-const LEGEND_STRIP_PAD = 16
-const LEGEND_CARD_PAD = 10
-const LEGEND_CARD_GAP = 8
-const LEGEND_TITLE_PX = 13
-const LEGEND_TITLE_GAP = 6
-const LEGEND_IMAGE_MAX_H = 110
-
-async function loadLegendImages(
-  layers: ReadonlyArray<ParsedLayer>,
-  pinned: ReadonlySet<string>,
-  baseUrl: string,
-): Promise<ReadonlyArray<LegendExportItem>> {
-  const items: Array<{ title: string; url: string }> = []
-  for (const name of pinned) {
-    const layer = layers.find((l) => l.name === name)
-    const url = layer?.styles[0]?.legendUrl
-    if (!layer || !url) continue
-    items.push({ title: layer.title, url: rebaseLensUrl(url, baseUrl) })
-  }
-  const loaded = await Promise.all(
-    items.map(
-      (it) =>
-        new Promise<LegendExportItem | null>((resolve) => {
-          const img = new Image()
-          img.crossOrigin = 'anonymous'
-          img.onload = () => resolve({ title: it.title, image: img })
-          img.onerror = () => resolve(null)
-          img.src = it.url
-        }),
-    ),
-  )
-  return loaded.filter((x): x is LegendExportItem => x !== null)
-}
-
-// Pick column count to mirror the visual grid logic in PinnedLegendsBar.
-function legendCols(n: number): number {
-  if (n === 1) return 1
-  if (n === 2 || n === 4) return 2
-  if (n === 3) return 3
-  return 3
-}
-
-function measureLegendStrip(
-  items: ReadonlyArray<LegendExportItem>,
-  canvasWidth: number,
-  dpr: number,
-): number {
-  const cols = legendCols(items.length)
-  const rows = Math.ceil(items.length / cols)
-  const pad = LEGEND_STRIP_PAD * dpr
-  const cardPad = LEGEND_CARD_PAD * dpr
-  const gap = LEGEND_CARD_GAP * dpr
-  const titlePx = LEGEND_TITLE_PX * dpr
-  const titleGap = LEGEND_TITLE_GAP * dpr
-  const cardWidth = (canvasWidth - pad * 2 - gap * (cols - 1)) / cols
-  // Each legend image is rendered preserving aspect ratio, scaled down to
-  // fit the card width, with a hard max height. Take the largest among the
-  // items as the row's height (so cards align).
-  const innerWidth = cardWidth - cardPad * 2
-  let imageH = 0
-  for (const item of items) {
-    const ar = item.image.height / Math.max(1, item.image.width)
-    const h = Math.min(innerWidth * ar, LEGEND_IMAGE_MAX_H * dpr)
-    if (h > imageH) imageH = h
-  }
-  const cardHeight = cardPad * 2 + titlePx + titleGap + imageH
-  return pad * 2 + cardHeight * rows + gap * (rows - 1)
-}
-
-function drawLegendStrip(
-  ctx: CanvasRenderingContext2D,
-  items: ReadonlyArray<LegendExportItem>,
-  canvasWidth: number,
-  yOffset: number,
-  dpr: number,
-): void {
-  const cols = legendCols(items.length)
-  const pad = LEGEND_STRIP_PAD * dpr
-  const cardPad = LEGEND_CARD_PAD * dpr
-  const gap = LEGEND_CARD_GAP * dpr
-  const titlePx = LEGEND_TITLE_PX * dpr
-  const titleGap = LEGEND_TITLE_GAP * dpr
-  const cardWidth = (canvasWidth - pad * 2 - gap * (cols - 1)) / cols
-  const innerWidth = cardWidth - cardPad * 2
-  let imageH = 0
-  for (const item of items) {
-    const ar = item.image.height / Math.max(1, item.image.width)
-    const h = Math.min(innerWidth * ar, LEGEND_IMAGE_MAX_H * dpr)
-    if (h > imageH) imageH = h
-  }
-  const cardHeight = cardPad * 2 + titlePx + titleGap + imageH
-  const radius = 6 * dpr
-
-  // Strip background — soft white with subtle border, matching the live UI
-  // pinned-legends bar.
-  ctx.save()
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.97)'
-  ctx.fillRect(
-    0,
-    yOffset,
-    canvasWidth,
-    pad * 2 +
-      cardHeight * Math.ceil(items.length / cols) +
-      gap * (Math.ceil(items.length / cols) - 1),
-  )
-
-  ctx.font = `500 ${titlePx}px system-ui, -apple-system, "Segoe UI", sans-serif`
-  ctx.textBaseline = 'top'
-
-  items.forEach((item, idx) => {
-    const col = idx % cols
-    const row = Math.floor(idx / cols)
-    const x = pad + col * (cardWidth + gap)
-    const y = yOffset + pad + row * (cardHeight + gap)
-
-    // Card outline
-    ctx.fillStyle = '#ffffff'
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)'
-    ctx.lineWidth = 1 * dpr
-    roundedRectPath(ctx, x, y, cardWidth, cardHeight, radius)
-    ctx.fill()
-    ctx.stroke()
-
-    // Title (ellipsised to card inner width)
-    ctx.fillStyle = '#111'
-    ctx.textAlign = 'left'
-    const fitTitle = ellipsizeToWidth(ctx, item.title, innerWidth)
-    ctx.fillText(fitTitle, x + cardPad, y + cardPad)
-
-    // Image (preserve aspect ratio, centred horizontally)
-    const ar = item.image.height / Math.max(1, item.image.width)
-    const targetW = Math.min(innerWidth, (LEGEND_IMAGE_MAX_H * dpr) / ar)
-    const targetH = targetW * ar
-    const imgX = x + cardPad + (innerWidth - targetW) / 2
-    const imgY = y + cardPad + titlePx + titleGap + (imageH - targetH) / 2
-    ctx.drawImage(item.image, imgX, imgY, targetW, targetH)
-  })
-
-  ctx.restore()
 }
