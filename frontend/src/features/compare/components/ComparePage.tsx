@@ -15,20 +15,37 @@
  * are active at a time as slots A and B, pinned in the URL (`?a=…&b=…`)
  * so a comparison is shareable. Clicking a basket chip activates it as
  * source B (clicking the current A swaps the pair) — the fastest gesture
- * for "compare everything against a reference A".
+ * for "compare everything against a reference A". Active sources resolve
+ * to lenses automatically (useComparisonSource); lenses are never stopped
+ * implicitly — the header offers an explicit stop that also pauses
+ * auto-start.
  */
 
-import { useEffect, useMemo } from 'react'
-import { Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Square, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
-import { entryDisplayName, entryRef } from '../entry-ref'
+import { entryRef } from '../entry-ref'
 import { useComparisonStore } from '../stores/comparisonStore'
+import { useComparisonSource } from '../hooks/useComparisonSource'
+import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
 import { CompareBasketChip } from './CompareBasketChip'
+import { ComparePanel } from './ComparePanel'
+import { ComparisonSourcePicker } from './ComparisonSourcePicker'
 import type { ComparisonEntry } from '../entry-ref'
+import { useStopLens } from '@/api/hooks/useLens'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { showToast } from '@/lib/toast'
 
 const route = getRouteApi('/_authenticated/compare')
 
@@ -52,32 +69,25 @@ function useActivePair(): ActivePair & {
   const aValid = search.a !== undefined && byRef.has(search.a)
   const bValid = search.b !== undefined && byRef.has(search.b)
 
-  // Materialize missing/stale slots from basket order (route file explains
-  // why the pair is always pinned in the URL). `replace` keeps history
-  // clean while chips are clicked around.
+  // Materialize missing slots from basket order (route file explains why
+  // the pair is always pinned in the URL). Unknown refs are left in place
+  // — useHydrateComparisonFromUrl owns them (adds or strips). `replace`
+  // keeps history clean while chips are clicked around.
   useEffect(() => {
-    if (entries.length === 0) {
-      if (search.a !== undefined || search.b !== undefined) {
-        void navigate({
-          search: (prev) => ({ ...prev, a: undefined, b: undefined }),
-          replace: true,
-        })
-      }
-      return
-    }
+    if (entries.length === 0) return
     const refs = entries.map((e) => entryRef(e))
-    const nextA = aValid ? search.a : refs.find((r) => r !== search.b)
-    const nextB = bValid
-      ? search.b
-      : (refs.find((r) => r !== nextA && r !== search.b) ??
-        refs.find((r) => r !== nextA))
+    const aMissing = search.a === undefined
+    const bMissing = search.b === undefined
+    if (!aMissing && !bMissing) return
+    const nextA = aMissing ? refs.find((r) => r !== search.b) : search.a
+    const nextB = bMissing ? refs.find((r) => r !== nextA) : search.b
     if (nextA !== search.a || nextB !== search.b) {
       void navigate({
         search: (prev) => ({ ...prev, a: nextA, b: nextB }),
         replace: true,
       })
     }
-  }, [entries, aValid, bValid, search.a, search.b, navigate])
+  }, [entries, search.a, search.b, navigate])
 
   const activateAsB = (ref: string) => {
     void navigate({
@@ -104,23 +114,79 @@ export function ComparePage() {
   const removeEntry = useComparisonStore((s) => s.removeEntry)
   const clear = useComparisonStore((s) => s.clear)
   const { a, b, activateAsB } = useActivePair()
+  useHydrateComparisonFromUrl()
+
+  const [pickerOpen, setPickerOpen] = useState(false)
+  // "Stop lens servers" pauses auto-start so panels don't instantly
+  // restart what the user just stopped; per-panel Start clears it.
+  const [lensesPaused, setLensesPaused] = useState(false)
+  const stateA = useComparisonSource(a, { autoStart: !lensesPaused })
+  const stateB = useComparisonSource(b, { autoStart: !lensesPaused })
+
+  const stopMutation = useStopLens()
+  const activeLensIds = [stateA, stateB].flatMap((s) =>
+    s.phase === 'running' && s.lensId ? [s.lensId] : [],
+  )
+  const stopLenses = () => {
+    setLensesPaused(true)
+    for (const lensInstanceId of new Set(activeLensIds)) {
+      stopMutation.mutate(
+        { lensInstanceId },
+        { onError: (err) => showToast.error(err.message) },
+      )
+    }
+    showToast.info(t('lens.stopped'))
+  }
 
   return (
-    <ListPageContainer>
+    <ListPageContainer className="space-y-5">
       <PageHeader
         title={t('page.title')}
         description={t('page.description')}
         actions={
           entries.length > 0 ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clear}
-              className="gap-1.5"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {t('basket.clear')}
-            </Button>
+            <>
+              <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+                <DialogTrigger
+                  render={
+                    <Button variant="outline" size="sm" className="gap-1.5" />
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t('basket.addSource')}
+                </DialogTrigger>
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>{t('picker.title')}</DialogTitle>
+                    <DialogDescription>
+                      {t('page.description')}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ComparisonSourcePicker />
+                </DialogContent>
+              </Dialog>
+              {activeLensIds.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={stopLenses}
+                  className="gap-1.5"
+                  title={t('lens.stopAllHint')}
+                >
+                  <Square className="h-3.5 w-3.5" />
+                  {t('lens.stopAll')}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clear}
+                className="gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {t('basket.clear')}
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -149,52 +215,16 @@ export function ComparePage() {
         </div>
       )}
 
-      <CompareContent a={a} b={b} entriesCount={entries.length} />
-    </ListPageContainer>
-  )
-}
-
-/**
- * Placeholder content — replaced by the source-orchestrated panels in the
- * next implementation phase (see GEO_COMPARISON_PLAN.md).
- */
-function CompareContent({
-  a,
-  b,
-  entriesCount,
-}: ActivePair & { entriesCount: number }) {
-  const { t } = useTranslation('compare')
-  if (entriesCount === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-        {t('picker.empty')}
-      </div>
-    )
-  }
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {[
-        { slot: 'A', entry: a },
-        { slot: 'B', entry: b },
-      ].map(({ slot, entry }) => (
-        <div
-          key={slot}
-          className="flex min-h-48 items-center justify-center rounded-lg border border-border bg-card p-6 text-sm"
-        >
-          {entry ? (
-            <span className="font-medium">
-              {t('panel.slotLabel', {
-                slot,
-                name: entryDisplayName(entry),
-              })}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">
-              {t('panel.emptySlot')}
-            </span>
-          )}
+      {entries.length === 0 ? (
+        <div className="mx-auto w-full max-w-xl rounded-lg border border-border bg-card p-5">
+          <ComparisonSourcePicker />
         </div>
-      ))}
-    </div>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <ComparePanel slot="A" entry={a} state={stateA} />
+          <ComparePanel slot="B" entry={b} state={stateB} />
+        </div>
+      )}
+    </ListPageContainer>
   )
 }

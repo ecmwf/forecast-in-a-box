@@ -9,14 +9,14 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { NewComparisonEntry } from '@/features/compare/entry-ref'
+import type { OutputComparisonEntry } from '@/features/compare/entry-ref'
 import { entryRef } from '@/features/compare/entry-ref'
 import {
   MAX_COMPARISON_ENTRIES,
   useComparisonStore,
 } from '@/features/compare/stores/comparisonStore'
 
-function outputEntry(n: number): NewComparisonEntry {
+function outputEntry(n: number): Omit<OutputComparisonEntry, 'addedAt'> {
   return {
     kind: 'output',
     jobId: `job-${n}`,
