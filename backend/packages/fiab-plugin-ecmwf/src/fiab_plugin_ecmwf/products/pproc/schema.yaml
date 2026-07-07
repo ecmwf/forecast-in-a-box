@@ -1,0 +1,881 @@
+config:
+  interp_keys:
+    intgrid: "none"
+    legendre-loader: "shmem"
+    matrix-loader: "file-io"
+  metadata_from_output: ["param", "stream", "date"]
+
+  filter:type:
+    fc/cf/pf:
+      filter:param:
+        "10/207/228249/228005/237207/238207/239207":
+          preprocessing:
+            - operation: norm
+        "121":
+          filter:type:
+            em/es:
+              accumulations:
+                step:
+                  operation: maximum
+                  metadata:
+                    stepType: max
+        "122":
+          filter:type:
+            em/es:
+              accumulations:
+                step:
+                  operation: minimum
+                  metadata:
+                    stepType: min
+    em/es:
+      entrypoint: "pproc-ensms"
+      metadata_from_output: ["param", "stream", "date", "type"]
+      filter:type:
+        em:
+          statistics:
+            operation: mean
+        es:
+          statistics:
+            operation: std
+      filter:stream:
+        enfo/waef/eefo/weef:
+          input:
+            dtype: float64
+          filter:param:
+            "*":
+              statistics:
+                metadata:
+                  edition: 2
+                  bitsPerValue: 16
+                  productDefinitionTemplateNumber: 2
+              filter:type:  
+                em:
+                  statistics:
+                    metadata:
+                      derivedForecast: 0
+                      typeOfProcessedData: 10
+                es:
+                  statistics:
+                    metadata:
+                      derivedForecast: 4
+                      typeOfProcessedData: 10
+            "121/122":
+              statistics:
+                metadata:
+                  edition: 2
+                  bitsPerValue: 16
+                  productDefinitionTemplateNumber: 12
+    ep:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      statistics:
+        operation: threshold_probability
+        metadata: 
+          edition: 2
+          type: ep
+          bitsPerValue: 24
+          typeOfProcessedData: 10
+      input:
+        dtype: float64
+      filter:steptype:
+        instantaneous:
+          accumulations:
+            step:
+              metadata:
+                productDefinitionTemplateNumber: 5
+                typeOfGeneratingProcess: 5
+        range:
+          accumulations:
+            step:
+              name:
+                type: default
+                length: "{steplength}:int"
+              metadata:
+                productDefinitionTemplateNumber: 9
+                typeOfGeneratingProcess: 5
+                typeOfTimeIncrement: 2
+      filter:selection:
+        "custom": 
+          statistics:
+            threshold:
+              comparison: "{comparison}"
+              value: "{threshold}"
+        "default":
+          filter:param:
+            "131060/131061/131062/131063/131064/131098/131099/131085":
+              filter:class:
+                ai:
+                  preprocessing:
+                    - operation: scale
+                      value: 0.001
+                "*": {}
+              accumulations:
+                step:
+                  operation: difference
+                  metadata:
+                    stepType: "accum"
+                    indicatorOfUnitForTimeIncrement: 1
+                    timeIncrement: 12
+              filter:param:
+                "131060":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.001
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131061":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.005
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131062":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.01
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131063":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.02
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131064":
+                  statistics:
+                    threshold:
+                      comparison: '<'
+                      value: 0.0001
+                      scale_factor: 4
+                    metadata:
+                      scaleFactorOfLowerLimit: 1
+                "131098":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.025
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131099":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.05
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+                "131085":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 0.1
+                      scale_factor: 3
+                    metadata:
+                      scaleFactorOfLowerLimit: 0
+            "131065/131066/131067":
+              filter:class:
+                ai:
+                  preprocessing:
+                    - operation: scale
+                      value: 0.001
+                "*": {}
+              accumulations:
+                step:
+                  operation: difference_rate
+                  factor: 0.041666666666666664
+                  metadata:
+                    stepType: "avg"
+                    indicatorOfUnitForTimeIncrement: 1
+                    timeIncrement: 12
+              filter:param:
+                "131065":
+                  statistics:
+                    threshold:
+                      comparison: '<'
+                      value: 0.001
+                      scale_factor: 4
+                    metadata:
+                      scaledValueOfLowerLimit: 115741
+                      scaleFactorOfLowerLimit: 10
+                "131066":
+                  statistics:
+                    threshold:
+                      comparison: '>='
+                      value: 0.003
+                      scale_factor: 4
+                    metadata:
+                      scaledValueOfLowerLimit: 347222
+                      scaleFactorOfLowerLimit: 10
+                "131067":
+                  statistics:
+                    threshold:
+                      comparison: '>='
+                      value: 0.005
+                      scale_factor: 4
+                    metadata:
+                      scaledValueOfLowerLimit: 578704
+                      scaleFactorOfLowerLimit: 10
+            "131068/131069/131073/131074/131075/131076/131077/131078/131079/131080/131081":
+              accumulations:
+                step:
+                  operation: maximum
+              filter:param:
+                "131068":
+                  preprocessing:
+                    - operation: norm
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 10
+                "131069":
+                  preprocessing:
+                    - operation: norm
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 15
+                "131074":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 2
+                "131075":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 4
+                "131076":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 6
+                "131077":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 8
+                "131078":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 8
+                "131079":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 10
+                "131080":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 12
+                "131081":
+                  statistics:
+                    threshold:
+                      comparison: ">="
+                      value: 15
+            "131073":
+              filter:steptype:
+                instantaneous: {}
+                range:
+                  accumulations:
+                    step:
+                      operation: minimum
+              statistics:
+                threshold:
+                  comparison: "<="
+                  value: 273.15
+                  scale_factor: 2
+windows:
+  filter:stream:
+    oper/wave/enfo/waef:
+      in_steps:
+        - from: 0
+          to: 360
+          by: 6
+  filter:type:
+    em/es/pb:
+      filter:stream:
+        enfo/waef:
+          filter:param:
+            "*":
+              out_steps:
+                - type: instantaneous
+                  end: 90
+                  interval: 3
+                - type: instantaneous
+                  start: 90
+        eefo/weef:
+          type: instantaneous
+        efhs/wehs/eehs:
+          out_steps:
+            type: instantaneous
+            interval: 12
+    fc/cf/pf:
+      filter:stream:
+        "*":
+          filter:param:
+            "*":
+              out_steps:
+                type: instantaneous
+            261001/261014/261015/261002:
+              out_steps:
+                type: instantaneous
+                deaccumulate: true
+    fcmean/fcstdev/fcmax/fcmin:
+      filter:stream:
+        "enfo/eefo/oper/eefh/weef":
+          out_steps:
+            type: range
+            interval: 24
+            width: 168
+        "enfh/enwh":
+          out_steps:
+            filter:param:
+              "*":
+                out_steps:
+                  - type: range
+                    width: 24
+                    interval: 24
+                  - type: range
+                    width: 72
+                    end: 240
+                    interval: 24
+                  - type: range
+                    width: 120
+                    end: 240
+                    interval: 24
+                  - "0-240"
+                  - "0-360"
+                  - "240-360"
+              121/122/123/140229/59/228044/140249/164:
+                out_steps:
+                  type: range
+                  end: 168
+                  width: 24
+                  interval: 24
+        "eefh/weeh":
+          filter:param:
+            "*":
+              out_steps:
+                type: range
+                interval: 24
+                width: 168
+    taem/taes:
+      filter:stream:
+        "enfo/eefo/oper/efhs/eehs":
+          out_steps:
+            type: range
+            interval: 24
+            width: 168
+    ep:
+      filter:param:
+        131060/131061/131062/131063/131098/131099/131085/131070/131071/131072/131100:
+          out_steps:
+            type: range
+            width: 24
+            interval: 12
+        131064/131065/131066/131067/131070/131071/131072/131100/131020/131021/131073:
+          out_steps:
+            - type: range
+              width: 120
+              start: 120
+              interval: 120
+            - "120-168"
+            - "168-240"
+        131068/131069/131073/131022/131023/131024/131025/133093/133094/133095/133096/133097/133098:
+          out_steps:
+            type: instantaneous
+            start: 12
+            interval: 12
+        131074/131075/131076/131077/131078/131079/131080/131081:
+          out_steps:
+            - type: instantaneous
+              start: 12
+              interval: 12
+            - type: range
+              width: 120
+              start: 120
+              interval: 120
+            - "120-168"
+            - "168-240"
+        "*": {}
+    efi/efic/sot:
+      filter:stream:
+        "eefo/weef":
+          out_steps:
+            type: range
+            interval: 24
+            width: 168
+        "enfo/waef":
+          filter:param:
+            "*":
+              filter:time:
+                "1200":
+                  out_steps:
+                    - type: range
+                      start: 12
+                      end: 240
+                      width: 24
+                      interval: 24
+                    - type: range
+                      start: 12
+                      end: 240
+                      width: 72
+                      interval: 24
+                    - type: range
+                      start: 12
+                      end: 240
+                      width: 120
+                      interval: 24
+                    - type: range
+                      start: 240
+                      width: 24
+                      interval: 24
+                    - "0-240"
+                    - "0-360"
+                    - "240-360"
+                "0000":
+                  out_steps:
+                    - type: range
+                      width: 24
+                      interval: 24
+                    - type: range
+                      width: 72
+                      end: 240
+                      interval: 24
+                    - type: range
+                      width: 120
+                      end: 240
+                      interval: 24
+                    - "0-240"
+                    - "0-360"
+                    - "240-360"
+                "0600/1800":
+                  out_steps:
+                    - type: range
+                      width: 24
+                      end: 144
+                      interval: 12
+            132201/132202/132049/132144/132216/132059/132044:
+              filter:time:
+                "1200":
+                  out_steps:
+                    type: range
+                    start: 12
+                    end: 180
+                    width: 24
+                    interval: 24
+                "0000":
+                  out_steps:
+                    type: range
+                    end: 168
+                    width: 24
+                    interval: 24
+                "0600/1800":
+                  out_steps:
+                    - type: range
+                      width: 24
+                      end: 144
+                      interval: 12
+    cd:
+      filter:stream:
+        efhs/wehs:
+          filter:param:
+            "*":
+              out_steps:
+                - type: range
+                  width: 24
+                  interval: 12
+                - type: range
+                  width: 72
+                  end: 240
+                  interval: 12
+                - type: range
+                  width: 120
+                  end: 240
+                  interval: 12
+                - "0-240"
+                - "0-360"
+                - "240-360"
+            "228004/228":
+              out_steps:
+                - type: range
+                  width: 24
+                  interval: 12
+                - type: range
+                  width: 72
+                  end: 240
+                  interval: 12
+                - type: range
+                  width: 120
+                  end: 240
+                  interval: 12
+                - type: range
+                  width: 168
+                  interval: 24
+                - "0-240"
+                - "0-360"
+                - "240-360"
+            "202/201/49/140200/59/228044/140249/228006":
+              out_steps:
+                type: range
+                width: 24
+                interval: 12
+        eehs:
+          out_steps:
+            type: range
+            width: 168
+            interval: 24
+inputs:
+  filter:class:
+    ai:
+      filter:stream:
+        enfo:
+          filter:type:
+            "em/es/pb/efi/sot/ep":
+              forecast:
+                inputs:
+                  - request: &enfo_cf
+                      stream: enfo
+                      type: cf
+                  - request: &enfo_pf
+                      stream: enfo
+                      type: "pf"
+                    members: &enfo_members
+                      start: 1
+                      end: 50
+            "cf/efic":
+              forecast:
+                inputs:
+                  request: *enfo_cf
+            "pf":
+              forecast:
+                inputs:
+                  request: *enfo_pf
+                  members: *enfo_members
+            fcmean/fcstdev/fcmin/fcmax:
+              filter:members:
+                only_zero:
+                  forecast:
+                    inputs:
+                      request: *enfo_cf
+                no_zero:
+                  forecast:
+                    inputs:
+                      request: *enfo_pf
+                      members: *enfo_members
+                contains_zero:
+                  from_inputs: false
+                  forecast:
+                    inputs:
+                      - request: *enfo_cf
+                      - request: *enfo_pf
+                        members: *enfo_members
+          climatology:
+            inputs:
+              request:
+                stream: "efhs"
+                time: "0000"
+            scheme: ecmwf-4days
+        waef:
+          filter:type:
+            em/es/pb/efi/sot:
+              forecast:
+                inputs:
+                  - request: &waef_cf
+                      stream: waef
+                      type: "cf"
+                  - request: &waef_pf
+                      stream: waef
+                      type: "pf"
+                    members: *enfo_members
+            "cf/efic":
+              forecast:
+                inputs:
+                  request: *waef_cf
+            "pf/ep":
+              forecast:
+                inputs:
+                  request: *waef_pf
+                  members: *enfo_members
+            fcmean/fcstdev/fcmin/fcmax:
+              filter:members:
+                only_zero:
+                  forecast:
+                    inputs:
+                      request:
+                        <<: *waef_cf
+                no_zero:
+                  forecast:
+                    inputs:
+                      request: *waef_pf
+                      members: *enfo_members
+                contains_zero:
+                  from_inputs: false
+                  forecast:
+                    inputs:
+                      - request:
+                          <<: *waef_cf
+                      - request: *waef_pf
+                        members: *enfo_members
+          climatology:
+            inputs:
+              request:
+                stream: "wehs"
+                time: "0000"
+            scheme: ecmwf-4days
+    od:
+      filter:stream:
+        oper:
+          filter:type:
+            fc/fcmean/fcstdev/fcmin/fcmax:
+              forecast:
+                inputs:
+                  request: &oper_fc
+                    stream: oper
+                    type: fc
+        wave:
+          filter:type:
+            fc/fcmean/fcstdev/fcmin/fcmax:
+              forecast:
+                inputs:
+                  request: &wave_fc
+                    stream: wave
+                    type: fc
+        enfo:
+          filter:type:
+            "em/es/pb/efi/sot/ep":
+              forecast:
+                inputs:
+                  - request: *oper_fc
+                  - request: *enfo_pf
+                    members: *enfo_members
+            "cf/efic":
+              forecast:
+                inputs:
+                  request: *oper_fc
+            "pf":
+              forecast:
+                inputs:
+                  request: *enfo_pf
+                  members: *enfo_members
+            fcmean/fcstdev/fcmin/fcmax:
+              filter:members:
+                only_zero:
+                  forecast:
+                    inputs:
+                      request: *oper_fc
+                no_zero:
+                  forecast:
+                    inputs:
+                      request: *enfo_pf
+                      members: *enfo_members
+                contains_zero:
+                  from_inputs: false
+                  forecast:
+                    inputs:
+                      - request: *oper_fc
+                      - request: *enfo_pf
+                        members: *enfo_members
+          climatology:
+            inputs:
+              request:
+                stream: "efhs"
+                time: "0000"
+            scheme: ecmwf-4days
+        waef:
+          filter:type:
+            em/es/pb/efi/sot:
+              forecast:
+                inputs:
+                  - request: *wave_fc
+                  - request: *waef_pf
+                    members: *enfo_members
+            "cf/efic":
+              forecast:
+                inputs:
+                  request: *wave_fc
+            "pf/ep":
+              forecast:
+                inputs:
+                  request: *waef_pf
+                  members: *enfo_members
+            fcmean/fcstdev/fcmin/fcmax:
+              filter:members:
+                only_zero:
+                  forecast:
+                    inputs:
+                      request: *wave_fc
+                no_zero:
+                  forecast:
+                    inputs:
+                      request: *waef_pf
+                      members: *enfo_members
+                contains_zero:
+                  from_inputs: false
+                  forecast:
+                    inputs:
+                      - request: *wave_fc
+                      - request: *waef_pf
+                        members: *enfo_members
+          climatology:
+            inputs:
+              request:
+                stream: "wehs"
+                time: "0000"
+            scheme: ecmwf-4days
+  filter:type:
+    fc/cf/pf:
+      filter:param:
+        "10":
+          forecast:
+            inputs:
+              request:
+                param: ["131", "132"]
+        "121/122":
+          forecast:
+            inputs:
+              request:
+                param: "167"
+              derive_step:
+                type: deaccumulate
+        "207":
+          forecast:
+            inputs:
+              request:
+                param: ["165", "166"]
+        "228249":
+          forecast:
+            inputs:
+              request:
+                param: ["228246", "228247"]
+        "261001":
+          forecast:
+            inputs:
+              - request:
+                  param: ["169", "175", "176", "177", "228021", "47"]
+                derive_step:
+                  type: deaccumulate
+              - request:
+                  param: ["165", "166", "167", "168"]
+        "261014":
+          forecast:
+            inputs:
+              - request:
+                  param: ["169", "175", "176", "177", "228021", "47"]
+                derive_step:
+                  type: deaccumulate
+              - request:
+                  param: ["165", "166", "167", "168"]
+        "261015":
+          forecast:
+            inputs:
+              - request:
+                  param: ["169", "175", "176", "177", "228021", "47"]
+                derive_step:
+                  type: deaccumulate
+              - request:
+                  param: ["165", "166", "167", "168"]
+        "260004":
+          forecast:
+            inputs:
+              request:
+                param: ["167", "168"]
+        "260242":
+          forecast:
+            inputs:
+              request:
+                param: ["167", "168"]
+        "261016":
+          forecast:
+            inputs:
+              request:
+                param: ["167", "168"]
+        "260005":
+          forecast:
+            inputs:
+              request:
+                param:  ["165", "166", "167"]
+        "260255":
+          forecast:
+            inputs:
+              request:
+                param: ["165", "166", "167", "168"]
+        "261018":
+          forecast:
+            inputs:
+              request:
+                param: ["165", "166", "167", "168"]
+        "261002":
+          forecast:
+            inputs:
+              - request:
+                  param: ["47", "228021", "169", "175", "176", "177"]
+                derive_step:
+                  type: deaccumulate
+              - request:
+                  param: "167" # Required for metadata of cossza
+        "261023":
+          forecast:
+            inputs:
+              request:
+                param: ["167", "168"]
+    em/es/pb:
+      forecast:
+        inputs:
+          request:
+            param: "{param}"
+    ep:
+      filter:selection:
+        custom:
+          forecast:
+            inputs:
+              request:
+                param: "{param}"
+        default:
+          filter:param:
+            131060/131061/131062/131063/131064/131065/131066/131067/131098/131099/131085:
+              filter:class:
+                ai:
+                  forecast:
+                    inputs:
+                      request:
+                        param: "228228"
+                      derive_step:
+                        type: deaccumulate
+                od:
+                  forecast:
+                    inputs:
+                      request:
+                        param: "228"
+                      derive_step:
+                        type: deaccumulate
+            131068/131069:
+              forecast:
+                inputs:
+                  request:
+                    param: ["165", "166"]
+            "131073":
+              forecast:
+                inputs:
+                  request:
+                    param: "167"
+            131074/131075/131076/131077:
+              forecast:
+                inputs:
+                  request:
+                    param: "140229"
+            131078/131079/131080/131081:
+              forecast:
+                inputs:
+                  request:
+                    param: "140232"

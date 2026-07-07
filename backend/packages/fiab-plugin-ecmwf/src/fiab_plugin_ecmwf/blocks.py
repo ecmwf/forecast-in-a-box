@@ -10,12 +10,12 @@
 import logging
 import os
 import re
-from typing import Any, cast
 
 import numpy as np
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, Payload, from_source, merge
 from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimension
+from earthkit.workflows.plugins.pproc.fluent import Action as PProcAction
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -26,29 +26,37 @@ from fiab_core.fable import (
     RawOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Product, Sink, Source, Transform
+from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Sink, Source, Transform
 from fiab_core.types import ClosedEnumType, ListType
 from qubed import Qube
 
+from .block_utils import (
+    BASETIME,
+    DIMENSION,
+    DOMAIN,
+    ENSEMBLE,
+    FORECAST,
+    FORMAT,
+    GROUPBY,
+    LEVEL,
+    LEVTYPE,
+    PARAM,
+    PATH,
+    SOURCE,
+    SPLITBY,
+    STEP,
+    VALUES,
+    _axis_value_strings,
+    _extract_dataset,
+    _is_empty_qube,
+    _param_id_to_param_key,
+    _param_key_to_param_id,
+    _parse_axis_value,
+)
 from .datasets import load_datasets
-from .qubed_utils import axes, common_dimensions, contains, coxpand, dimensions, select
+from .qubed_utils import axes, common_dimensions, contains, dimensions, select
 
-SOURCE = ConfigurationOptionId("source")
-BASETIME = ConfigurationOptionId("base_time")
-STATISTIC = ConfigurationOptionId("statistic")
-PATH = ConfigurationOptionId("path")
-DOMAIN = ConfigurationOptionId("domain")
-FORMAT = ConfigurationOptionId("format")
-PARAM = ConfigurationOptionId("param")
-ENSEMBLE = ConfigurationOptionId("number")
-STEP = ConfigurationOptionId("step")
-LEVTYPE = ConfigurationOptionId("levtype")
-LEVEL = ConfigurationOptionId("levelist")
-DIMENSION = ConfigurationOptionId("dimension")
-VALUES = ConfigurationOptionId("values")
-GROUPBY = ConfigurationOptionId("groupby")
-SPLITBY = ConfigurationOptionId("splitby")
-FORECAST = ConfigurationOptionId("forecast")
+logger = logging.getLogger(__name__)
 
 GRIB_ALIASES = {
     "shortName": PARAM,
@@ -59,8 +67,6 @@ GRIB_ALIASES = {
 
 GRIB_MIME = "text/plain; fiab-format=gribdir"
 
-logger = logging.getLogger(__name__)
-
 PLOT_FORMAT_TO_MIME: dict[str, str] = {
     "png": "image/png",
     "pdf": "application/pdf",
@@ -68,42 +74,6 @@ PLOT_FORMAT_TO_MIME: dict[str, str] = {
 }
 
 FORECAST_DATASETS = load_datasets()
-
-
-def _extract_dataset(inputs: dict[str, QubedOutput], name: str) -> QubedOutput:
-    input_dataset = inputs.get(name)
-    if not isinstance(input_dataset, QubedOutput):
-        actual_type = type(input_dataset).__name__ if input_dataset is not None else "None"
-        raise BlockInstanceConfigurationError(f"Unsupported input type for '{name}': expected QubedOutput, got {actual_type}")
-    return input_dataset
-
-
-def _is_empty_qube(qube: Qube) -> bool:
-    return next(iter(qube.datacubes()), None) is None
-
-
-def _restriction_value_strings(axis_values: set[Any], item_python_type: type[str] | type[int]) -> list[str]:
-    if item_python_type is str:
-        return sorted(value for value in axis_values if isinstance(value, str))
-    if item_python_type is int:
-        return [str(value) for value in sorted(value for value in axis_values if type(value) is int)]
-    raise TypeError(f"Unsupported select value type {item_python_type!r}")
-
-
-def _axis_value_strings(axis_values: set[Any]) -> list[str]:
-    if all(isinstance(value, str) for value in axis_values):
-        return _restriction_value_strings(axis_values, str)
-    if all(type(value) is int for value in axis_values):
-        return _restriction_value_strings(axis_values, int)
-    return sorted(str(value) for value in axis_values)
-
-
-def _parse_axis_value(value: str) -> str | int:
-    try:
-        int_value = int(value)
-    except ValueError:
-        return value
-    return int_value if str(int_value) == value else value
 
 
 class OperationalForecastSource(Source):
@@ -155,25 +125,22 @@ class OperationalForecastSource(Source):
         fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
 
         basetime = block.config_as_datetime(BASETIME)
-        date = basetime.date().isoformat()
+        date = basetime.strftime("%Y%m%d")
         time = self._convert_time(basetime.time().hour)
 
-        subqube = fc_qube.select({"time": time})
-        actions = {}
+        subqube = fc_qube.select({"time": time}).compress()
+        actions = []
         for levtype in subqube.axes()[LEVTYPE]:
             path = f"levtype={levtype}"
             levtype_actions = {}
             ens_branches = set()
             for index, datacube in enumerate(subqube.select({LEVTYPE: levtype}).datacubes()):
-                ens_branch = str(datacube[PARAM])
+                ens_branch = f"{path}/{datacube[PARAM]}"
+                datacube.update({"date": date, "time": time})
                 datacube_path = f"{ens_branch}/{index}"
-                expansion_datacube = datacube.copy()
-                coords = {PARAM: datacube[PARAM]}
-                if fc_preset.is_member_zero(datacube):
-                    coords[ENSEMBLE] = 0
                 ens_branches.add(ens_branch)
 
-                levtype_actions[datacube_path] = from_source(
+                new_action = from_source(
                     np.asarray(
                         [
                             Payload(
@@ -183,8 +150,6 @@ class OperationalForecastSource(Source):
                                     "requests": [
                                         dict(
                                             {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
-                                            date=date,
-                                            time=time,
                                             param=p,
                                         )
                                     ],
@@ -194,109 +159,20 @@ class OperationalForecastSource(Source):
                         ]
                     ),
                     dims=[PARAM],
-                    coords=coords,
-                ).expand_as_qube(Qube.from_datacube(expansion_datacube), dims=[STEP, ENSEMBLE, LEVTYPE, LEVEL])
+                    coords={PARAM: datacube[PARAM]},
+                ).expand_as_qube(
+                    Qube.from_datacube(datacube), dims=[dim for dim, values in datacube.items() if (len(values) > 1 and dim != PARAM)]
+                )
+                new_action.set_scalar_coords({dim: values[0] for dim, values in datacube.items() if len(values) == 1})
+                if fc_preset.is_member_zero(datacube):
+                    new_action.set_scalar_coords({ENSEMBLE: 0}, override=True, make_dim=True)
+                levtype_actions[datacube_path] = new_action
             merged = merge(**levtype_actions)
             for branch in ens_branches:
                 merged = merged.combine_branches(dim=ENSEMBLE, path=branch)
-            actions[path] = merged
-        final_action = merge(**actions)
+            actions.append(merged)
+        final_action = merge(*actions)
         return Either.ok(final_action)
-
-
-class EnsembleStatistics(Product):
-    title: str = "Ensemble Statistics"
-    description: str = "Computes ensemble mean or standard deviation"
-    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        PARAM: BlockConfigurationOption(title="Parameter", description="Parameter name like '2t'", value_type="str"),
-        STATISTIC: BlockConfigurationOption(
-            title="Statistic",
-            description="Statistic to compute over the ensemble",
-            value_type="enumClosed['mean', 'std']",
-        ),
-    }
-    inputs: list[str] = ["dataset"]
-
-    def validate(
-        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
-    ) -> BlockInstanceOutput:
-        input_dataset = _extract_dataset(inputs, "dataset")
-
-        param = block.config_as_str(PARAM)
-        if not contains(input_dataset, {PARAM: param}):
-            raise ValueError(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
-
-        output = coxpand(input_dataset, [PARAM, ENSEMBLE], {PARAM: [param]})
-        return output
-
-    def compile(
-        self,
-        inputs: ActionLookup,
-        block: BlockInstanceRich,
-    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_task = block.input_ids["dataset"]
-        input_task_action = inputs[input_task]
-        stat = block.config_as_str(STATISTIC)
-        param = input_task_action.select({PARAM: block.config_as_str(PARAM)})
-        if stat == "mean":
-            action = param.mean(dim=ENSEMBLE)
-        elif stat == "std":
-            action = param.std(dim=ENSEMBLE)
-        else:
-            return Either.error(f"Unsupported statistic '{stat}'")
-        return Either.ok(action)
-
-    def intersect(self, other: QubedOutput) -> bool:
-        return contains(other, ENSEMBLE) and contains(other, PARAM)
-
-
-class TemporalStatistics(Product):
-    title: str = "Temporal Statistics"
-    description: str = "Computes temporal statistics"
-    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        PARAM: BlockConfigurationOption(title=PARAM, description="Param name like '2t'", value_type="str"),
-        STATISTIC: BlockConfigurationOption(
-            title="Statistic",
-            description="Statistic to compute over steps",
-            value_type="enumClosed['mean', 'std', 'min', 'max']",
-        ),
-    }
-    inputs: list[str] = ["dataset"]
-
-    def validate(
-        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
-    ) -> BlockInstanceOutput:
-        input_dataset = _extract_dataset(inputs, "dataset")
-
-        param = block.config_as_str(PARAM)
-        if not contains(input_dataset, {PARAM: param}):
-            raise ValueError(f"param {param} is not in the input parameters: {axes(input_dataset).get(PARAM, [])}")
-        output = coxpand(input_dataset, [PARAM, STEP], {PARAM: [param]})
-        return output
-
-    def compile(
-        self,
-        inputs: ActionLookup,
-        block: BlockInstanceRich,
-    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
-        input_task = block.input_ids["dataset"]
-        input_task_action = inputs[input_task]
-        stat = block.config_as_str(STATISTIC)
-        param = input_task_action.select({PARAM: block.config_as_str(PARAM)})
-        if stat == "mean":
-            action = param.mean(dim=STEP)
-        elif stat == "std":
-            action = param.std(dim=STEP)
-        elif stat == "min":
-            action = param.min(dim=STEP)
-        elif stat == "max":
-            action = param.max(dim=STEP)
-        else:
-            return Either.error(f"Unsupported temporal statistic: {stat}")
-        return Either.ok(action)
-
-    def intersect(self, other: QubedOutput) -> bool:
-        return contains(other, STEP) and contains(other, PARAM)
 
 
 class ZarrSink(Sink):
@@ -375,18 +251,21 @@ class Select(Transform):
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
 
-        input_dimensions = sorted(dimensions(input_dataset))
+        input_axes = axes(input_dataset)
+        input_dimensions = sorted(dim for dim, values in input_axes.items() if len(values) > 1)
         if input_dimensions:
             restrictions[DIMENSION] = ClosedEnumType(input_dimensions)
 
         dimension = self._selected_dimension(block)
 
-        input_axes = axes(input_dataset)
         axis_values = input_axes.get(dimension)
         if axis_values is None:
             raise ValueError(f"dimension {dimension} is not in the input dimensions: {input_dimensions}")
 
         input_values = _axis_value_strings(axis_values)
+        if dimension == PARAM:
+            axis_values = [_param_id_to_param_key(paramid) for paramid in axis_values]
+            input_values = axis_values
         if input_values:
             restrictions[VALUES] = ListType(ClosedEnumType(input_values))
 
@@ -396,6 +275,8 @@ class Select(Transform):
         if missing_values:
             raise ValueError(f"values {missing_values} are not in dimension {dimension}: {input_values}")
 
+        if dimension == PARAM:
+            selected_values = [_param_key_to_param_id(str(value)) for value in selected_values]
         output = select(input_dataset, {dimension: selected_values})
         if output.dataqube is None or _is_empty_qube(output.dataqube):
             raise ValueError(f"selection of values {selected_values} from dimension {dimension} produced an empty dataset")
@@ -409,8 +290,12 @@ class Select(Transform):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         dimension = self._selected_dimension(block)
-        values = [_parse_axis_value(value) for value in self._selected_values(block)]
-        selected = inputs[input_task].select({dimension: values if len(values) > 1 else values[0]})
+        if dimension == PARAM:
+            values = [_param_key_to_param_id(value) for value in self._selected_values(block)]
+            selected = inputs[input_task].select({dimension: values if len(values) > 1 else values[0]}, expand=True)
+        else:
+            values = [_parse_axis_value(value) for value in self._selected_values(block)]
+            selected = inputs[input_task].select({dimension: values if len(values) > 1 else values[0]})
         return Either.ok(selected)
 
     def intersect(self, other: QubedOutput) -> bool:
@@ -525,7 +410,7 @@ class MapPlotSink(Sink):
 
         input_axes = axes(input_dataset)
         input_param_values = input_axes.get(PARAM, set())
-        param_values = [value for value in input_param_values if isinstance(value, str)]
+        param_values = [_param_id_to_param_key(x) for x in input_param_values]
         if param_values:
             restrictions[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
 
@@ -537,9 +422,9 @@ class MapPlotSink(Sink):
         splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
         fmt = block.config_as_str(FORMAT)
 
-        missing_params = [param for param in params if param not in input_param_values]
+        missing_params = [param for param in params if param not in param_values]
         if missing_params:
-            raise ValueError(f"params {missing_params} are not in the input parameters: {_axis_value_strings(input_param_values)}")
+            raise ValueError(f"params {missing_params} are not in the input parameters: {param_values}")
 
         if "none" in splitby_value and len(splitby_value) != 1:
             raise ValueError("Invalid splitby value: if none is selected, no other dimensions can be present")
@@ -555,7 +440,7 @@ class MapPlotSink(Sink):
         block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        params = block.config_as_list(PARAM, str, allow_empty=False)
+        params = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
         groupby = block.config_as_str(GROUPBY)
         splitby = block.config_as_list(SPLITBY, str, allow_empty=True)
         if "none" in splitby:

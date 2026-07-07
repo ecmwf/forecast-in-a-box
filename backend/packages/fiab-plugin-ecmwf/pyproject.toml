@@ -20,6 +20,8 @@ dependencies = [
     "fiab-core>=1,<2", # auto-updateable -- do not remove this comment
     "earthkit-workflows>=0.9.0",
     "earthkit-workflows-anemoi>=0.7.2",
+    "pproc-core @ git+https://git@github.com/ecmwf/pproc.git@feature/mono-repo#subdirectory=pproc-core",
+    "pymetkit @ git+https://git@github.com/ecmwf/metkit.git@feature/paramdb-api",
 ]
 
 optional-dependencies.runtime = [
