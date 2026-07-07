@@ -26,9 +26,9 @@ from fiab_core.fable import (
     BlockKind,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
+    Error,
     QubedOutput,
 )
-from fiab_core.plugin import Error
 from fiab_core.types import ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
 
 

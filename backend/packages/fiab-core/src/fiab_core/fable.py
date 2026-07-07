@@ -22,6 +22,9 @@ from typing_extensions import Self
 from fiab_core.pydantic_utils import FiabCoreBaseModel
 from fiab_core.types import FableType, NotFableType
 
+Error = str
+"""Compiler/validator error message type alias."""
+
 
 class BlockConfigurationOption(FiabCoreBaseModel):
     title: str

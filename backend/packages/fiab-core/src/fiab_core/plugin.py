@@ -26,9 +26,8 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     BlueprintTemplate,
     ConfigurationOptionRestriction,
+    Error,
 )
-
-Error = str
 
 
 @dataclass(frozen=True, eq=True, slots=True)
