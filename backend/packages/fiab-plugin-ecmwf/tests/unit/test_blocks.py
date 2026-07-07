@@ -595,7 +595,9 @@ class TestSelect:
     def test_validator_adds_dimension_restrictions(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        restrictions = plugin().validator(select_configuration, {"dataset": operational_forecast_source_output}).restrictions
+        restrictions = (
+            plugin().validator(BlockFactoryId("select"), select_configuration, {"dataset": operational_forecast_source_output}).restrictions
+        )
         restriction = restrictions[DIMENSION].serialize()
         assert restriction.startswith("enumClosed[")
         assert "param" in restriction
@@ -606,14 +608,14 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["0"]})})
-        restrictions = plugin().validator(config, {"dataset": operational_forecast_source_output}).restrictions
+        restrictions = plugin().validator(BlockFactoryId("select"), config, {"dataset": operational_forecast_source_output}).restrictions
         assert restrictions[VALUES].serialize() == "list[enumClosed[0,6,12]]"
 
     def test_validator_keeps_restrictions_when_configuration_is_missing(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step"})})
-        validation = plugin().validator(config, {"dataset": operational_forecast_source_output})
+        validation = plugin().validator(BlockFactoryId("select"), config, {"dataset": operational_forecast_source_output})
         assert validation.result.e is not None
         assert DIMENSION in validation.restrictions
         assert VALUES in validation.restrictions
@@ -809,7 +811,11 @@ class TestMapPlotSink:
     def test_validator_adds_parameters_restrictions(
         self, map_plot_sink_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        restrictions = plugin().validator(map_plot_sink_configuration, {"dataset": operational_forecast_source_output}).restrictions
+        restrictions = (
+            plugin()
+            .validator(BlockFactoryId("mapPlotSink"), map_plot_sink_configuration, {"dataset": operational_forecast_source_output})
+            .restrictions
+        )
         assert restrictions[PARAM].serialize() == "list[enumClosed[2t,msl,u]]"
 
     def test_expander_has_no_parameters_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
