@@ -242,6 +242,8 @@ export function CompareViewer({
           selection={selection}
           sourceA={sourceA}
           sourceB={sourceB}
+          baseUrlA={a.baseUrl}
+          baseUrlB={b.baseUrl}
         />
       </div>
       <CompareTimeSlider

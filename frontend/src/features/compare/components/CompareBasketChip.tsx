@@ -15,10 +15,12 @@
  * availability chips, and the time-availability tracks.
  */
 
-import { X } from 'lucide-react'
+import { useState } from 'react'
+import { Pencil, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { entryDisplayName } from '../entry-ref'
+import { entryDisplayName, entryRef } from '../entry-ref'
 import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
+import { useComparisonStore } from '../stores/comparisonStore'
 import type { ComparisonEntry } from '../entry-ref'
 import { cn } from '@/lib/utils'
 import { formatInZone, useAppTimeZone } from '@/lib/datetime'
@@ -49,7 +51,17 @@ export function CompareBasketChip({
   // Chips render for every basket entry, so they're the natural mount
   // point for lazily upgrading stub display metadata.
   useEnrichComparisonEntry(entry)
+  const renameEntry = useComparisonStore((s) => s.renameEntry)
+  const [editing, setEditing] = useState(false)
   const name = entryDisplayName(entry)
+  // path/wms labels are user-editable; output names come from the run.
+  const renameable = entry.kind === 'path' || entry.kind === 'wms'
+
+  const commitRename = (value: string) => {
+    setEditing(false)
+    const trimmed = value.trim()
+    if (trimmed && trimmed !== name) renameEntry(entryRef(entry), trimmed)
+  }
 
   const sub =
     entry.kind === 'output'
@@ -95,9 +107,26 @@ export function CompareBasketChip({
           </span>
         )}
         <span className="min-w-0">
-          <span className="block max-w-48 truncate font-medium" title={name}>
-            {name}
-          </span>
+          {editing ? (
+            <input
+              // Focus on entry — the field only appears via the edit action.
+              autoFocus
+              defaultValue={name}
+              aria-label={t('basket.editLabel')}
+              placeholder={t('basket.labelPlaceholder')}
+              className="block w-40 rounded border border-border bg-background px-1 text-sm outline-none focus:border-ring"
+              onClick={(e) => e.stopPropagation()}
+              onBlur={(e) => commitRename(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitRename(e.currentTarget.value)
+                if (e.key === 'Escape') setEditing(false)
+              }}
+            />
+          ) : (
+            <span className="block max-w-48 truncate font-medium" title={name}>
+              {name}
+            </span>
+          )}
           {sub && (
             <span className="block max-w-48 truncate text-xs text-muted-foreground">
               {sub}
@@ -110,6 +139,17 @@ export function CompareBasketChip({
           </span>
         )}
       </button>
+      {renameable && !editing && (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label={t('basket.editLabel')}
+          title={t('basket.editLabel')}
+          className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+      )}
       <button
         type="button"
         onClick={onRemove}

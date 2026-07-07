@@ -12,7 +12,31 @@
 - [x] Phase 3 — `/compare` route, page shell, lens orchestration (incl. host-path source form; panels host the single-source viewer until Phase 4)
 - [x] Phase 4 — Comparison viewer (side-by-side, swipe, experimental modes; linked pairing, epoch-union timeline with availability tracks)
 - [x] Phase 5 — External WMS URL sources (probe + form; GeoJSON overlays deferred — see deviation log)
-- [ ] Phase 6 — Polish + full verification
+- [x] Phase 6 — Polish + full verification (per-source legends on active pairs;
+  editable path/wms chip labels; mock lenses now serve a default WMS fixture so
+  the ENTIRE flow works offline in `npm run dev:mock`; verified live via
+  Playwright: add-from-run-detail → nav badge → /compare auto-start → swipe →
+  side-by-side → linked pair + union timeline. Deferred polish: PNG export on
+  the compare page (single-source viewer retains full export), side-by-side
+  composite export, snap-to-nearest time toggle.)
+
+### Remaining manual verification (needs the real backend — user checklist)
+
+1. 3-terminal dev layout up (`ulimit -n 65536` each tab), fresh
+   `feat/geo-comparison` build.
+2. `/compare` → Add source → host path → two dirs from `~/.fiab/jobs_output`
+   (e.g. `4af24cc6-…_1` and `c6e1901e-…_4`) → both lenses auto-start → compare
+   `2t`/`msl` in swipe and side-by-side; scrub time; check per-source TIME
+   strings in the network tab.
+3. Run detail → ⇄ on a stored output → badge → Compare → the running lens is
+   REUSED (no duplicate in Active Lenses).
+4. Copy the /compare URL into a fresh tab → entries hydrate.
+5. Flicker on a real pair: instant swap, no new GetMap requests (network tab).
+6. External WMS form: paste another local lens's base URL (simulates a foreign
+   server) → layers load; bogus URL → clear error.
+7. Evaluate the experimental modes (flicker/spy/blend) — each is one file
+   under `src/features/viewer/compare/` + one toolbar entry; removal is
+   trivial if they don't earn their keep.
 
 ### Deviation log
 
