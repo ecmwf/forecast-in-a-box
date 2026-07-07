@@ -547,7 +547,7 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "param", "values": ["2t", "msl"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "param", "values": ["2t", "msl"]}))
         output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert axes(output)[PARAM] == {"2t", "msl"}
@@ -556,7 +556,7 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["0", "6"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "step", "values": ["0", "6"]}))
         output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert axes(output)[STEP] == {0, 6}
@@ -565,7 +565,7 @@ class TestSelect:
         block = _select()
         broken_qube = Qube.make_root([Qube.make_node("step", [6, 12], Qube.from_datacube({"param": ["2t"]}).children)])
         input_dataset = QubedOutput(dataqube=broken_qube)
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["6"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "step", "values": ["6"]}))
 
         with pytest.raises(Exception, match="produced an empty dataset"):
             block.validate(block=config, inputs={"dataset": input_dataset}, restrictions={})
@@ -574,7 +574,7 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "missing", "values": ["2t"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "missing", "values": ["2t"]}))
         restrictions: ConfigurationOptionRestriction = {}
         with pytest.raises(Exception, match="dimension missing is not in the input dimensions"):
             block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions=restrictions)  # type: ignore[dict-item]
@@ -585,7 +585,7 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "param", "values": ["missing"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "param", "values": ["missing"]}))
         restrictions: ConfigurationOptionRestriction = {}
         with pytest.raises(Exception, match="values.*are not in dimension param"):
             block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions=restrictions)  # type: ignore[dict-item]
@@ -607,14 +607,14 @@ class TestSelect:
     def test_validator_adds_values_for_selected_dimension(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["0"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "step", "values": ["0"]}))
         restrictions = plugin().validator(BlockFactoryId("select"), config, {"dataset": operational_forecast_source_output}).restrictions
         assert restrictions[VALUES].serialize() == "list[enumClosed[0,6,12]]"
 
     def test_validator_keeps_restrictions_when_configuration_is_missing(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step"})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "step"}))
         validation = plugin().validator(BlockFactoryId("select"), config, {"dataset": operational_forecast_source_output})
         assert validation.result.e is not None
         assert DIMENSION in validation.restrictions
@@ -635,7 +635,7 @@ class TestSelect:
         input_action = MagicMock()
         selected_action = MagicMock()
         input_action.select.return_value = selected_action
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["0", "6"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "step", "values": ["0", "6"]}))
 
         result = block.compile(inputs={BlockInstanceId("source_output"): input_action}, block=config)  # type: ignore[dict-item]
         assert result.t is selected_action
