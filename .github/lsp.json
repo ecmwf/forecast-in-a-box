@@ -1,0 +1,12 @@
+{
+  "_comment": "it would make more sense to put this file to repo root lsp.json, instead of .github -- but copilot cli currently fails to utilize that correctly, hence we need to have it here. Even a symlink glitches. Additionally, we *dont* use the project's venv, because in container+mount agent setup, the venv is non-standard, and again copilot clean child spawning does not cooperate nicely with that",
+  "lspServers": {
+    "python": {
+      "command": "uvx",
+      "args": ["--directory", "backend", "ty", "server"],
+      "fileExtensions": {
+        ".py": "python"
+      }
+    }
+  }
+}
