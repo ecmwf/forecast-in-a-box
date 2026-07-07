@@ -27,6 +27,7 @@ import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import type { RunOutputs } from '@/api/types/job.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
+import { useComparisonStore } from '@/features/compare/stores/comparisonStore'
 import i18n from '@/lib/i18n'
 
 // Matches the job-completed-001 seed: its `task-out-grib` marker output's
@@ -52,14 +53,18 @@ const outputsWithMarkers: RunOutputs = {
   },
 }
 
-async function renderCard(outputs: RunOutputs | null) {
+async function renderCard(outputs: RunOutputs | null, runName?: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
   return await render(
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
-        <StoredOutputsCard jobId="job-completed-001" outputs={outputs} />
+        <StoredOutputsCard
+          jobId="job-completed-001"
+          outputs={outputs}
+          runName={runName}
+        />
       </I18nextProvider>
     </QueryClientProvider>,
   )
@@ -153,5 +158,41 @@ describe('StoredOutputsCard', () => {
       .element(screen.getByRole('button', { name: /start wms server/i }))
       .toBeVisible()
     await expect.poll(() => listMockLenses()).toHaveLength(0)
+  })
+
+  it('adds the stored output to the comparison basket and toggles back', async () => {
+    const screen = await renderCard(outputsWithMarkers, 'My Forecast Run')
+
+    await screen.getByRole('button', { name: /add to comparison/i }).click()
+    expect(useComparisonStore.getState().entries).toEqual([
+      expect.objectContaining({
+        kind: 'output',
+        jobId: 'job-completed-001',
+        taskId: 'task-out-grib',
+        blockId: 'block_sink_1',
+        runName: 'My Forecast Run',
+      }),
+    ])
+
+    // Button flips to the in-basket state; clicking again removes.
+    const removeButton = screen.getByRole('button', {
+      name: /remove from comparison/i,
+    })
+    await expect.element(removeButton).toHaveAttribute('aria-pressed', 'true')
+    await removeButton.click()
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+  })
+
+  it('disables Add to comparison while the marker output is unavailable', async () => {
+    const screen = await renderCard({
+      'task-out-grib': {
+        mime_type: GRIB_DIR_MIME,
+        original_block: 'block_sink_1',
+        is_available: false,
+      },
+    })
+    await expect
+      .element(screen.getByRole('button', { name: /add to comparison/i }))
+      .toBeDisabled()
   })
 })

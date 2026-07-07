@@ -28,6 +28,7 @@ import {
   resetLensState,
 } from '@tests/../mocks/data/lens.data'
 import { ActiveLensesCard } from '@/features/executions/components/ActiveLensesCard'
+import { useComparisonStore } from '@/features/compare/stores/comparisonStore'
 import i18n from '@/lib/i18n'
 
 async function renderCard() {
@@ -91,6 +92,49 @@ describe('ActiveLensesCard', () => {
       .toBeDisabled()
     await expect
       .element(screen.getByRole('button', { name: /copy wms url/i }))
+      .toBeDisabled()
+  })
+
+  it('adds a path-matched lens to the comparison basket as its stored output', async () => {
+    // job-completed-001's task-out-grib marker payload resolves to this path.
+    injectMockLens({
+      lens_instance_id: 'lens-matched',
+      status: 'running',
+      lens_name: 'skinnyWMS',
+      lens_params: { local_path: '/data/output/job-completed-001_1' },
+      ports: [54501],
+    })
+    const screen = await renderCard()
+
+    const addButton = screen.getByRole('button', {
+      name: /add to comparison/i,
+    })
+    // Enabled once the path index resolved the marker payloads.
+    await expect.element(addButton).toBeEnabled()
+    await addButton.click()
+
+    expect(useComparisonStore.getState().entries).toEqual([
+      expect.objectContaining({
+        kind: 'output',
+        jobId: 'job-completed-001',
+        taskId: 'task-out-grib',
+      }),
+    ])
+  })
+
+  it('keeps Add to comparison disabled for lenses with unmatched paths', async () => {
+    injectMockLens({
+      lens_instance_id: 'lens-unmatched',
+      status: 'running',
+      lens_name: 'skinnyWMS',
+      lens_params: { local_path: '/somewhere/else' },
+      ports: [54502],
+    })
+    const screen = await renderCard()
+
+    await expect.element(screen.getByText(':54502')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: /add to comparison/i }))
       .toBeDisabled()
   })
 

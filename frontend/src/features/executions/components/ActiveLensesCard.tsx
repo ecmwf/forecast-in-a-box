@@ -26,6 +26,7 @@ import type {
   LensInstanceDetailResponse,
   LensStatus,
 } from '@/api/types/lens.types'
+import type { LensPathMatch } from '@/features/compare/hooks/useLensPathIndex'
 import { useLensList, useStopLens } from '@/api/hooks/useLens'
 import { buildLensBaseUrl, buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import { showToast } from '@/lib/toast'
@@ -41,6 +42,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { P } from '@/components/base/typography'
+import { AddToComparisonButton } from '@/features/compare/components/AddToComparisonButton'
+import { useLensPathIndex } from '@/features/compare/hooks/useLensPathIndex'
 
 const WmsViewer = lazy(() => import('./WmsViewer'))
 
@@ -58,6 +61,9 @@ export function ActiveLensesCard() {
   const { t } = useTranslation('executions')
   const { data: lenses } = useLensList()
   const stopMutation = useStopLens()
+  // Path→output index so a running lens can be added to the comparison
+  // basket as the stored output it serves.
+  const pathIndex = useLensPathIndex()
   const [active, setActive] = useState<{
     baseUrl: string
     title: string
@@ -78,6 +84,11 @@ export function ActiveLensesCard() {
             <ActiveLensRow
               key={lens.lens_instance_id}
               lens={lens}
+              outputMatch={
+                typeof lens.lens_params.local_path === 'string'
+                  ? pathIndex.get(lens.lens_params.local_path)
+                  : undefined
+              }
               onOpen={(baseUrl, title) => setActive({ baseUrl, title })}
               onStop={(id) => {
                 stopMutation.mutate(
@@ -154,16 +165,20 @@ export function ActiveLensesCard() {
 
 function ActiveLensRow({
   lens,
+  outputMatch,
   onOpen,
   onStop,
   isStopping,
 }: {
   lens: LensInstanceDetailResponse
+  /** Stored output this lens serves, when its path could be matched. */
+  outputMatch?: LensPathMatch
   onOpen: (baseUrl: string, title: string) => void
   onStop: (lensInstanceId: string) => void
   isStopping: boolean
 }) {
   const { t } = useTranslation('executions')
+  const { t: tCompare } = useTranslation('compare')
   const path =
     typeof lens.lens_params.local_path === 'string'
       ? lens.lens_params.local_path
@@ -207,6 +222,24 @@ function ActiveLensRow({
           {path}
         </P>
       </div>
+      <AddToComparisonButton
+        iconOnly
+        disabled={!outputMatch}
+        disabledReason={tCompare('entry.noMatch')}
+        entry={
+          outputMatch
+            ? {
+                kind: 'output',
+                jobId: outputMatch.jobId,
+                taskId: outputMatch.taskId,
+                blockId: outputMatch.blockId,
+                runName: '',
+                blockTitle: outputMatch.blockId,
+                runCreatedAt: outputMatch.runCreatedAt,
+              }
+            : { kind: 'path', path, label: path }
+        }
+      />
       <Button
         size="sm"
         variant="outline"

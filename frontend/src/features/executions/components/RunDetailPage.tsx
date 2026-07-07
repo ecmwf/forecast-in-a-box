@@ -311,6 +311,7 @@ export function RunDetailPage() {
                 outputs={jobData.outputs}
                 fable={fableData?.builder}
                 catalogue={catalogue}
+                runName={fableData?.display_name ?? undefined}
               />
               <OutputsPanel
                 jobId={jobId}

@@ -30,6 +30,7 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { NavToggle } from '@/components/layout/NavToggle'
+import { useComparisonStore } from '@/features/compare/stores/comparisonStore'
 import i18n from '@/lib/i18n'
 
 function createTestQueryClient() {
@@ -48,12 +49,13 @@ function createTestQueryClient() {
 function renderNavToggle(initialPath: string) {
   const rootRoute = createRootRoute({ component: () => <Outlet /> })
 
-  const routes = ['/dashboard', '/configure', '/executions'].map((path) =>
-    createRoute({
-      getParentRoute: () => rootRoute,
-      path,
-      component: () => <NavToggle />,
-    }),
+  const routes = ['/dashboard', '/configure', '/executions', '/compare'].map(
+    (path) =>
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path,
+        component: () => <NavToggle />,
+      }),
   )
 
   const routeTree = rootRoute.addChildren(routes)
@@ -109,5 +111,27 @@ describe('NavToggle', () => {
     const execLink = screen.getByText('Executions')
     await expect.element(configLink).not.toHaveAttribute('aria-current')
     await expect.element(execLink).not.toHaveAttribute('aria-current')
+  })
+
+  it('hides the Compare item while the basket is empty', async () => {
+    const screen = await renderNavToggle('/dashboard')
+    await expect.element(screen.getByText('Overview')).toBeVisible()
+    expect(screen.getByText('Compare').elements()).toHaveLength(0)
+  })
+
+  it('shows Compare with a count badge once sources are collected', async () => {
+    useComparisonStore.getState().addEntry({
+      kind: 'path',
+      path: '/data/a',
+      label: 'A',
+    })
+    useComparisonStore.getState().addEntry({
+      kind: 'path',
+      path: '/data/b',
+      label: 'B',
+    })
+    const screen = await renderNavToggle('/dashboard')
+    await expect.element(screen.getByText('Compare')).toBeVisible()
+    await expect.element(screen.getByText('2')).toBeVisible()
   })
 })
