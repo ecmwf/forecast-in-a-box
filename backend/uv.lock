@@ -3307,8 +3307,8 @@ wheels = [
 
 [[package]]
 name = "pproc-core"
-version = "2.0.1.dev39"
-source = { git = "https://github.com/ecmwf/pproc.git?subdirectory=pproc-core&rev=feature%2Fmono-repo#f710dae6456701fdb781c962a6cfdb26903c2e4d" }
+version = "2.0.1.dev40"
+source = { git = "https://github.com/ecmwf/pproc.git?subdirectory=pproc-core&rev=feature%2Fmono-repo#f3a3186fb516dcf9ff483674c0e41314554ac7a2" }
 dependencies = [
     { name = "code-meters", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "conflator", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
