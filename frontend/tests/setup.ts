@@ -23,6 +23,7 @@ import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 import { cleanup } from 'vitest-browser-react'
 import { worker } from '../mocks/browser'
 import { resetJobsState } from '../mocks/data/job.data'
+import { resetWmsState } from '../mocks/data/wms.data'
 import { resetArtifactsHandlerState } from '../mocks/handlers/artifacts.handlers'
 import { resetFableHandlerState } from '../mocks/handlers/fable.handlers'
 import { resetPluginsHandlerState } from '../mocks/handlers/plugins.handlers'
@@ -52,6 +53,7 @@ function resetSharedState(): void {
   resetPluginsHandlerState()
   resetArtifactsHandlerState()
   resetJobsState()
+  resetWmsState()
 
   // Zustand stores that tests write to
   useFableBuilderStore.getState().reset()
