@@ -53,7 +53,6 @@ def test_block_configuration_option_rejects_invalid_value_type() -> None:
 # BlueprintTemplate
 # ---------------------------------------------------------------------------
 
-_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("s"), local=PluginId("p"))
 _BLOCK_ID = BlockInstanceId("b1")
 _TEXT = ConfigurationOptionId("text")
 
