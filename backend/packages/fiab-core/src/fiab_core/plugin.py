@@ -52,7 +52,7 @@ class BlockValidation:
 
 
 Validator = Callable[[BlockFactoryId, BlockInstance, dict[str, BlockInstanceOutput]], BlockValidation]
-"""Given a factory id, a block instance, and its inputs, return either error or output and configuration restrictions"""
+"""Given a factory id from this PLugin, a block instance corresponding to it, and its inputs, return either error or output and configuration restrictions"""
 
 Expander = Callable[[BlockInstanceOutput], list[BlockExpansion]]
 """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""

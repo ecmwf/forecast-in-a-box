@@ -132,6 +132,7 @@ class BlockInstance(FiabCoreBaseModel):
 
     configuration_values: dict[ConfigurationOptionId, Any]
     """Keys come from factory's `configuration_options`, values are either str-serialized (frontend2backend) or deserialized (backend2plugin)"""
+    # TODO separate the backend class to have a str type there
     input_ids: dict[str, BlockInstanceId] = Field(default_factory=dict)
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
