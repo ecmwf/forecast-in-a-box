@@ -365,7 +365,7 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             PluginManager.updater_error = repr(e)
 
 
-def unload_single(pluginId: PluginCompositeId) -> None:
+async def unload_single(pluginId: PluginCompositeId) -> None:
     plugin_id_str = PluginCompositeId.to_str(pluginId)
     with timed_acquire(PluginManager.lock, 5) as result:
         if not result:
@@ -380,7 +380,7 @@ def unload_single(pluginId: PluginCompositeId) -> None:
     # on blueprint domain), and will be fixed later by refactoring into events.
     from forecastbox.domain.blueprint.db import soft_delete_all_plugin_templates
 
-    _run_async_from_thread(soft_delete_all_plugin_templates(created_by=plugin_id_str))
+    await soft_delete_all_plugin_templates(created_by=plugin_id_str)
 
 
 def submit_load_plugins(start_after: Future[None]) -> None:
@@ -509,7 +509,7 @@ def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Ve
     return ""
 
 
-def uninstall_plugin(pluginId: PluginCompositeId) -> None:
+async def uninstall_plugin(pluginId: PluginCompositeId) -> None:
     if pluginId not in config.external.plugins:
         raise ValueError(f"plugin {pluginId} not installed")
     with timed_acquire(config_edit_lock, 5) as result:
@@ -517,7 +517,7 @@ def uninstall_plugin(pluginId: PluginCompositeId) -> None:
             raise ValueError("failed to acquire the shared lock")
         config.external.plugins.pop(pluginId)
         config.save_to_file()
-    unload_single(pluginId)
+    await unload_single(pluginId)
 
 
 def join_updater_thread(timeout_sec: int) -> None:

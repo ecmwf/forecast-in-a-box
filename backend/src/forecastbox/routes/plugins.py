@@ -14,6 +14,7 @@ Contains:
  - complete CRUD+List routes for the Plugin entity.
 """
 
+import logging
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -26,6 +27,7 @@ from forecastbox.domain.glyphs.resolution import remap_glyph_names
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.db import get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.errors import PluginErrors
+from forecastbox.domain.plugin.exceptions import PluginNotFound
 from forecastbox.domain.plugin.manager import (
     PluginManager,
     PluginsStatus,
@@ -39,6 +41,8 @@ from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.config import PluginSettings, config
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
+
+logger = logging.getLogger(__name__)
 
 PREFIX = "/api/v1/plugin"
 
@@ -196,10 +200,10 @@ def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin
 
 
 @router.post("/uninstall")
-def uninstall_plugin_endpoint(
+async def uninstall_plugin_endpoint(
     request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
 ) -> Response:
-    uninstall_plugin(pluginCompositeId)
+    await uninstall_plugin(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 
@@ -223,14 +227,17 @@ async def update_plugin_settings_endpoint(
 ) -> Response:
     """Persist plugin settings (enabled flag, exclusions, remapping) and trigger a re-ingest."""
     plugin_id_str = PluginCompositeId.to_str(body.pluginCompositeId)
-    await upsert_plugin_state(
-        plugin_id=plugin_id_str,
-        enabled=body.isEnabled,
-        excluded_templates=body.excluded_templates,
-        glyph_remapping=body.glyph_remapping,
-    )
+    try:
+        await upsert_plugin_state(
+            plugin_id=plugin_id_str,
+            enabled=body.isEnabled,
+            excluded_templates=body.excluded_templates,
+            glyph_remapping=body.glyph_remapping,
+        )
+    except PluginNotFound:
+        raise HTTPException(status_code=404, detail=f"Plugin {plugin_id_str} not found")
     if body.isEnabled is False:
-        unload_single(body.pluginCompositeId)
+        await unload_single(body.pluginCompositeId)
     result = submit_update_single(body.pluginCompositeId, install=False, version=None)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)

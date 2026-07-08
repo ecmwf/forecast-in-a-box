@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 import forecastbox.domain.plugin.db as plugin_db
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.plugin.errors import PluginError
+from forecastbox.domain.plugin.exceptions import PluginNotFound
 from forecastbox.schemata.jobs import Base
 
 
@@ -115,7 +116,7 @@ async def test_upsert_reenable_sets_ingest(mem_session_maker: async_sessionmaker
 @pytest.mark.asyncio
 async def test_upsert_none_version_on_missing_row_raises(mem_session_maker: async_sessionmaker[AsyncSession]) -> None:
     """upsert_plugin_state with version=None and no existing row is a programming error."""
-    with pytest.raises(RuntimeError, match="no prior DB row"):
+    with pytest.raises(PluginNotFound):
         await plugin_db.upsert_plugin_state(plugin_id="never:seen", version=None, enabled=True)
 
 
