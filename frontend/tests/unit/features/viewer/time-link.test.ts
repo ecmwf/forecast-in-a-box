@@ -25,8 +25,8 @@ const sixHourly = buildSourceTimeIndex(
       name: '2t',
       title: '2t',
       styles: [],
-      time: '2026-07-06T00:00:00Z/2026-07-07T00:00:00Z/PT6H',
-    } as ParsedLayer,
+      time: { raw: '2026-07-06T00:00:00Z/2026-07-07T00:00:00Z/PT6H' },
+    } satisfies ParsedLayer,
   ],
   ['2t'],
 )
@@ -65,9 +65,7 @@ describe('resolveSourceTime', () => {
   it('handles empty indexes and null targets as unresolved-visible', () => {
     const empty = buildSourceTimeIndex([], [])
     expect(resolveSourceTime(empty, T00, 'nearest', HOUR).hidden).toBe(false)
-    expect(resolveSourceTime(sixHourly, null, 'exact', HOUR).hidden).toBe(
-      false,
-    )
+    expect(resolveSourceTime(sixHourly, null, 'exact', HOUR).hidden).toBe(false)
   })
 })
 
