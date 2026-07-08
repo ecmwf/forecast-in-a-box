@@ -64,7 +64,8 @@
       "title": "Reference imagery (one click)",
       "add": "Add",
       "probing": "Checking…"
-    }
+    },
+    "collected": "Collected sources"
   },
   "lens": {
     "resolving": "Locating output directory…",

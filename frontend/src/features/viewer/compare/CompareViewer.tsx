@@ -41,6 +41,7 @@ import { CompareExportDialog } from './CompareExportDialog'
 import type { ContextOverlay } from './overlays'
 import { CompareTimeSlider } from './CompareTimeSlider'
 import { CompareActiveLayersPanel } from './CompareActiveLayersPanel'
+import { CollapsedSidebarHandle } from '../components/CollapsedSidebarHandle'
 import { CompareLayerBrowser } from './CompareLayerBrowser'
 import { DualMapCompare } from './DualMapCompare'
 import { SingleMapCompare } from './SingleMapCompare'
@@ -264,6 +265,10 @@ export function CompareViewer({
   )
   const [exportOpen, setExportOpen] = useState(false)
 
+  // Sidebar collapse — same affordance as the embedded viewer.
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const [rightCollapsed, setRightCollapsed] = useState(false)
+
   // -------- User-uploaded GeoJSON context overlays --------
   const [overlays, setOverlays] = useState<Array<ContextOverlay>>([])
   const addOverlay = useCallback(
@@ -372,26 +377,34 @@ export function CompareViewer({
         }}
       />
       <div className="flex min-h-0 flex-1 gap-2">
-        <CompareActiveLayersPanel
-          pairs={pairing.pairs}
-          selection={selection}
-          overlays={{
-            items: overlays,
-            add: addOverlay,
-            toggle: toggleOverlay,
-            remove: removeOverlay,
-          }}
-          opacity={{
-            global: globalOpacity,
-            setGlobal: setGlobalOpacity,
-            source: sourceOpacity,
-            setSource: setSourceOpacityFor,
-          }}
-          sources={{
-            a: { label: a.label, baseUrl: a.baseUrl, lens: sourceA },
-            b: { label: b.label, baseUrl: b.baseUrl, lens: sourceB },
-          }}
-        />
+        {leftCollapsed ? (
+          <CollapsedSidebarHandle
+            side="left"
+            onExpand={() => setLeftCollapsed(false)}
+          />
+        ) : (
+          <CompareActiveLayersPanel
+            pairs={pairing.pairs}
+            selection={selection}
+            overlays={{
+              items: overlays,
+              add: addOverlay,
+              toggle: toggleOverlay,
+              remove: removeOverlay,
+            }}
+            opacity={{
+              global: globalOpacity,
+              setGlobal: setGlobalOpacity,
+              source: sourceOpacity,
+              setSource: setSourceOpacityFor,
+            }}
+            sources={{
+              a: { label: a.label, baseUrl: a.baseUrl, lens: sourceA },
+              b: { label: b.label, baseUrl: b.baseUrl, lens: sourceB },
+            }}
+            onCollapse={() => setLeftCollapsed(true)}
+          />
+        )}
         <div className="min-h-0 min-w-0 flex-1">
           {mode === 'side' ? (
             <DualMapCompare
@@ -419,12 +432,20 @@ export function CompareViewer({
             />
           )}
         </div>
-        <CompareLayerBrowser
-          pairs={pairing.pairs}
-          selection={selection}
-          sourceA={sourceA}
-          sourceB={sourceB}
-        />
+        {rightCollapsed ? (
+          <CollapsedSidebarHandle
+            side="right"
+            onExpand={() => setRightCollapsed(false)}
+          />
+        ) : (
+          <CompareLayerBrowser
+            pairs={pairing.pairs}
+            selection={selection}
+            sourceA={sourceA}
+            sourceB={sourceB}
+            onCollapse={() => setRightCollapsed(true)}
+          />
+        )}
       </div>
       <CompareTimeSlider
         timeline={timeline}

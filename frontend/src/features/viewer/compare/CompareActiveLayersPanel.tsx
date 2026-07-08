@@ -18,7 +18,7 @@
 
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Eye, EyeOff, Upload, X } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, Upload, X } from 'lucide-react'
 import { firstNumber } from '../format'
 import { rebaseLensUrl } from '../wms-capabilities'
 import { LegendImage } from '../components/LegendImage'
@@ -57,6 +57,7 @@ export function CompareActiveLayersPanel({
   opacity,
   sources,
   overlays,
+  onCollapse,
 }: {
   pairs: ReadonlyArray<PairedLayer>
   selection: CompareSelection
@@ -66,8 +67,10 @@ export function CompareActiveLayersPanel({
     { label: string; baseUrl: string; lens: LensSource }
   >
   overlays: OverlayControls
+  onCollapse: () => void
 }) {
   const { t } = useTranslation('compare')
+  const { t: tExec } = useTranslation('executions')
   const pairByKey = new Map(pairs.map((p) => [p.key, p]))
   const activePairs = selection.linkedOrder
     .map((key) => pairByKey.get(key))
@@ -76,9 +79,20 @@ export function CompareActiveLayersPanel({
   return (
     <aside className="flex w-64 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
       <div className="space-y-2.5 border-b border-border bg-muted/40 px-3 pt-2.5 pb-3">
-        <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {t('sidebar.active')}
-        </P>
+        <div className="flex items-center justify-between">
+          <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            {t('sidebar.active')}
+          </P>
+          <button
+            type="button"
+            onClick={onCollapse}
+            title={tExec('lens.collapseSidebar')}
+            aria-label={tExec('lens.collapseSidebar')}
+            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+        </div>
         <OpacityRow
           label={t('sidebar.globalOpacity')}
           value={opacity.global}

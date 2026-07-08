@@ -28,6 +28,8 @@ import { probeWmsEndpoint } from '../wms-probe'
 import { EXTERNAL_WMS_PRESETS } from '../wms-presets'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { AddToComparisonButton } from './AddToComparisonButton'
+import { CompareBasketChip } from './CompareBasketChip'
+import { entryRef } from '../entry-ref'
 import type { GribMarkerRow } from '../hooks/useLensPathIndex'
 import type { NewComparisonEntry } from '../entry-ref'
 import { useJobsStatus } from '@/api/hooks/useJobs'
@@ -59,6 +61,7 @@ export function ComparisonSourcePicker() {
     // min-w-0: as a dialog-grid item the picker must not let unbreakable
     // path strings dictate its track width (grid items min-width:auto).
     <div className="min-w-0 space-y-5">
+      <CollectedSources />
       <Input
         type="search"
         value={search}
@@ -407,5 +410,33 @@ function PresetList() {
         ))}
       </ul>
     </div>
+  )
+}
+
+/** Manage what's already in the basket (rename path/wms, remove). */
+function CollectedSources() {
+  const { t } = useTranslation('compare')
+  const entries = useComparisonStore((s) => s.entries)
+  const removeEntry = useComparisonStore((s) => s.removeEntry)
+  if (entries.length === 0) return null
+  return (
+    <section className="space-y-1.5">
+      <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {t('picker.collected')}
+      </P>
+      <div className="flex flex-wrap items-center gap-2">
+        {entries.map((entry) => {
+          const ref = entryRef(entry)
+          return (
+            <CompareBasketChip
+              key={ref}
+              entry={entry}
+              slot={null}
+              onRemove={() => removeEntry(ref)}
+            />
+          )
+        })}
+      </div>
+    </section>
   )
 }
