@@ -51,6 +51,7 @@
       "probing": "Checking server…",
       "errorInvalidUrl": "Enter a valid http(s) URL",
       "errorUnreachable": "Server not reachable — check the URL, and that it allows cross-origin (CORS) requests from this app",
+      "errorHttp": "The server responded with HTTP {{status}} — check the URL path and any token",
       "errorParse": "The server responded, but not with a readable WMS capabilities document"
     },
     "hostPath": {

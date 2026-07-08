@@ -514,3 +514,27 @@ export function rebaseLensUrl(url: string, baseUrl: string): string {
     return url
   }
 }
+
+/**
+ * Resolve a source's WMS request endpoint. Lens sources are bare origins
+ * (`http://host:port`) whose service lives at `/wms`; external servers
+ * arrive as full endpoints that may carry a path and/or query (e.g.
+ * `https://eccharts.ecmwf.int/wms/?token=…`) and must be used verbatim —
+ * appending `/wms` to those produces garbage URLs.
+ */
+export function toWmsEndpoint(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl)
+    if (url.pathname !== '/' || url.search !== '') return baseUrl
+    return `${baseUrl.replace(/\/+$/, '')}/wms`
+  } catch {
+    return baseUrl
+  }
+}
+
+/** Append WMS query params with the correct `?`/`&` separator. */
+export function appendWmsParams(endpoint: string, query: string): string {
+  return endpoint.includes('?')
+    ? `${endpoint}&${query}`
+    : `${endpoint}?${query}`
+}

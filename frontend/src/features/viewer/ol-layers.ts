@@ -25,6 +25,7 @@ import VectorTileLayer from 'ol/layer/VectorTile'
 import ImageWMS from 'ol/source/ImageWMS'
 import { fromLonLat } from 'ol/proj'
 import { applyStyle as applyMapboxStyle } from 'ol-mapbox-style'
+import { toWmsEndpoint } from './wms-capabilities'
 import type VectorTileSource from 'ol/source/VectorTile'
 import { createLogger } from '@/lib/logger'
 
@@ -116,7 +117,9 @@ export function makeDataLayerSource(
   params: Record<string, string>,
 ): ImageWMS {
   return new ImageWMS({
-    url: `${baseUrl}/wms`,
+    // OL appends its own params with the correct separator, so full
+    // endpoints with an existing query string are safe here.
+    url: toWmsEndpoint(baseUrl),
     params,
     serverType: 'mapserver',
     crossOrigin: 'anonymous',

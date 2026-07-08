@@ -67,6 +67,15 @@
   paths (their distinguishing part is the tail), `shrink-0` on the Add button.
   (3) Mock GetMap now serves translucent red/blue per port so clip leaks are
   visible in dev:mock at a glance (any color blending = leaking clip).
+  (4) External WMS URLs are now kept VERBATIM (path + query): the probe used
+  to normalize to origin + `/wms`, which mangled real endpoints like
+  `https://eccharts.ecmwf.int/wms/?token=public` (token swallowed, double
+  query) and then blamed CORS. `toWmsEndpoint` appends `/wms` only to bare
+  origins (lens convention); `appendWmsParams` joins with the right
+  separator; a reachable-but-rejecting server now reports its HTTP status
+  instead of the misleading CORS hint. Verified via curl that ecCharts
+  echoes any Origin (full CORS) — it works as an external source once the
+  URL is used correctly.
 
 ## Context
 
@@ -465,9 +474,13 @@ each with `2t.grib2`, `msl.grib2`, …).
 - `RunOutputMetadata` lacks base/valid time and sink-type info → basket shows
   `created_at` only; times come from GetCapabilities.
 - No "has GRIB outputs" filter on `/run/list` → picker scans page 1 only.
-- External WMS in **prod**: CSP allowlists loopback lens ports only →
-  arbitrary external domains need a CSP config knob or a backend same-origin
-  WMS proxy (known deferred item). v1 documents the limitation; dev works.
+- External WMS CSP: the `index.html` meta CSP allowed loopback lens ports
+  only — in EVERY build, dev included (discovered during user testing:
+  ecCharts was CSP-blocked before the request left the browser). Now: dev
+  allows `https:`/`http:` wholesale; prod stays loopback-only unless the
+  operator sets `FIAB_CSP_EXTRA_HOSTS` (space-separated CSP source
+  expressions, e.g. `https://eccharts.ecmwf.int`) at build time. A backend
+  same-origin WMS proxy remains the cleaner long-term fix for prod.
 - Browser file upload → lens (deferred v1 decision).
 
 ## Top risks

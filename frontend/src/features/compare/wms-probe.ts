@@ -10,18 +10,25 @@
 
 /**
  * Validate an external WMS endpoint before adding it as a comparison
- * source: normalize the URL to the viewer's base form (no trailing
- * slash / `/wms` suffix — the viewer appends `/wms` itself), then fetch
- * and parse GetCapabilities. Distinguishes bad input, unreachable/CORS
- * failures (indistinguishable from the browser), and non-WMS responses so
- * the form can give actionable errors.
+ * source. The pasted URL is kept VERBATIM (path and query included —
+ * real-world endpoints look like `https://eccharts.ecmwf.int/wms/?token=…`
+ * or `…/geoserver/ows`); only a bare origin gets `/wms` appended (the
+ * lens convention), via toWmsEndpoint. Errors are distinguishable so the
+ * form can be actionable: bad input, an HTTP error status (reachable
+ * server rejecting the request — wrong path or token), a non-WMS
+ * response, or a network/CORS failure (indistinguishable in a browser).
  */
 
-import { parseCapabilities } from '@/features/viewer/wms-capabilities'
+import {
+  appendWmsParams,
+  parseCapabilities,
+  toWmsEndpoint,
+} from '@/features/viewer/wms-capabilities'
 
 export type WmsProbeResult =
   | { ok: true; baseUrl: string; label: string }
   | { ok: false; reason: 'invalid-url' | 'unreachable' | 'parse' }
+  | { ok: false; reason: 'http'; status: number }
 
 export async function probeWmsEndpoint(raw: string): Promise<WmsProbeResult> {
   let parsed: URL
@@ -33,16 +40,16 @@ export async function probeWmsEndpoint(raw: string): Promise<WmsProbeResult> {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return { ok: false, reason: 'invalid-url' }
   }
-  const baseUrl = parsed
-    .toString()
-    .replace(/\/+$/, '')
-    .replace(/\/wms$/i, '')
+  const baseUrl = parsed.toString()
 
   try {
     const res = await fetch(
-      `${baseUrl}/wms?service=WMS&version=1.3.0&request=GetCapabilities`,
+      appendWmsParams(
+        toWmsEndpoint(baseUrl),
+        'service=WMS&version=1.3.0&request=GetCapabilities',
+      ),
     )
-    if (!res.ok) return { ok: false, reason: 'unreachable' }
+    if (!res.ok) return { ok: false, reason: 'http', status: res.status }
     const xml = await res.text()
     try {
       parseCapabilities(xml)

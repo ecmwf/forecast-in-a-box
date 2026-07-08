@@ -259,7 +259,10 @@ function HostPathForm() {
   )
 }
 
-type WmsFormError = 'invalid-url' | 'unreachable' | 'parse' | null
+type WmsFormError =
+  | { reason: 'invalid-url' | 'unreachable' | 'parse' }
+  | { reason: 'http'; status: number }
+  | null
 
 function WmsUrlForm() {
   const { t } = useTranslation('compare')
@@ -275,7 +278,11 @@ function WmsUrlForm() {
     const result = await probeWmsEndpoint(url)
     setProbing(false)
     if (!result.ok) {
-      setError(result.reason)
+      setError(
+        result.reason === 'http'
+          ? { reason: 'http', status: result.status }
+          : { reason: result.reason },
+      )
       return
     }
     const added = addEntry({
@@ -292,13 +299,15 @@ function WmsUrlForm() {
   }
 
   const errorText =
-    error === 'invalid-url'
-      ? t('picker.wmsUrl.errorInvalidUrl')
-      : error === 'unreachable'
-        ? t('picker.wmsUrl.errorUnreachable')
-        : error === 'parse'
-          ? t('picker.wmsUrl.errorParse')
-          : null
+    error === null
+      ? null
+      : error.reason === 'invalid-url'
+        ? t('picker.wmsUrl.errorInvalidUrl')
+        : error.reason === 'unreachable'
+          ? t('picker.wmsUrl.errorUnreachable')
+          : error.reason === 'http'
+            ? t('picker.wmsUrl.errorHttp', { status: error.status })
+            : t('picker.wmsUrl.errorParse')
 
   return (
     <div className="space-y-2 rounded-md border border-dashed border-border p-3">

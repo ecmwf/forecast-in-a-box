@@ -55,7 +55,7 @@ describe('External WMS form', () => {
 
     await screen
       .getByPlaceholder('https://maps.example.org/wms')
-      .fill(`http://localhost:${port}/wms`)
+      .fill(`http://localhost:${port}/wms?token=public`)
     await screen.getByRole('button', { name: 'Connect & add' }).click()
 
     await expect
@@ -63,10 +63,27 @@ describe('External WMS form', () => {
       .toHaveLength(1)
     expect(useComparisonStore.getState().entries[0]).toMatchObject({
       kind: 'wms',
-      // Normalized: no trailing /wms — the viewer appends it itself.
-      url: `http://localhost:${port}`,
+      // Kept VERBATIM — path and query (tokens!) are part of the endpoint.
+      url: `http://localhost:${port}/wms?token=public`,
       label: `localhost:${port}`,
     })
+  })
+
+  it('accepts a bare origin by probing the /wms lens convention', async () => {
+    const port = nextPort++
+    registerMockWmsServer(port, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    const screen = await renderPicker()
+
+    await screen
+      .getByPlaceholder('https://maps.example.org/wms')
+      .fill(`http://localhost:${port}`)
+    await screen.getByRole('button', { name: 'Connect & add' }).click()
+
+    await expect
+      .poll(() => useComparisonStore.getState().entries)
+      .toHaveLength(1)
   })
 
   it('rejects unparsable input without touching the basket', async () => {
@@ -82,7 +99,7 @@ describe('External WMS form', () => {
     expect(useComparisonStore.getState().entries).toHaveLength(0)
   })
 
-  it('reports unreachable servers with the CORS hint', async () => {
+  it('reports an HTTP error status for reachable-but-rejecting servers', async () => {
     const port = nextPort++ // never registered → 503
     const screen = await renderPicker()
     await screen
@@ -90,7 +107,9 @@ describe('External WMS form', () => {
       .fill(`http://localhost:${port}`)
     await screen.getByRole('button', { name: 'Connect & add' }).click()
 
-    await expect.element(screen.getByText(/Server not reachable/)).toBeVisible()
+    await expect
+      .element(screen.getByText(/responded with HTTP 503/))
+      .toBeVisible()
     expect(useComparisonStore.getState().entries).toHaveLength(0)
   })
 })

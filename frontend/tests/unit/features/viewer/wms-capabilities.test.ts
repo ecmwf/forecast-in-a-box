@@ -11,12 +11,14 @@
 import { describe, expect, it } from 'vitest'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
+  appendWmsParams,
   expandTimeSteps,
   groupLayers,
   parseCapabilities,
   partitionGroups,
   rebaseLensUrl,
   skinnyWmsBasemap,
+  toWmsEndpoint,
   uniquePressureLevels,
 } from '@/features/viewer/wms-capabilities'
 
@@ -295,5 +297,41 @@ describe('partitionGroups / uniquePressureLevels', () => {
 
   it('collects the union of pressure levels, descending', () => {
     expect(uniquePressureLevels(groups)).toEqual([850, 500, 300])
+  })
+})
+
+describe('toWmsEndpoint / appendWmsParams', () => {
+  it('appends /wms to bare origins (the lens convention)', () => {
+    expect(toWmsEndpoint('http://localhost:19000')).toBe(
+      'http://localhost:19000/wms',
+    )
+    expect(toWmsEndpoint('http://localhost:19000/')).toBe(
+      'http://localhost:19000/wms',
+    )
+  })
+
+  it('keeps full endpoints with a path and/or query verbatim', () => {
+    expect(toWmsEndpoint('https://eccharts.ecmwf.int/wms/?token=public')).toBe(
+      'https://eccharts.ecmwf.int/wms/?token=public',
+    )
+    expect(toWmsEndpoint('https://geo.example.org/geoserver/ows')).toBe(
+      'https://geo.example.org/geoserver/ows',
+    )
+    expect(toWmsEndpoint('http://host:1/?foo=bar')).toBe(
+      'http://host:1/?foo=bar',
+    )
+  })
+
+  it('passes non-URL input through unchanged', () => {
+    expect(toWmsEndpoint('not a url')).toBe('not a url')
+  })
+
+  it('joins params with the correct separator', () => {
+    expect(appendWmsParams('http://h/wms', 'request=GetCapabilities')).toBe(
+      'http://h/wms?request=GetCapabilities',
+    )
+    expect(
+      appendWmsParams('http://h/wms?token=x', 'request=GetCapabilities'),
+    ).toBe('http://h/wms?token=x&request=GetCapabilities')
   })
 })
