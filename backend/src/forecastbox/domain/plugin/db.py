@@ -29,6 +29,7 @@ from sqlalchemy import select, update
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.plugin.errors import PluginErrors
+from forecastbox.domain.plugin.exceptions import PluginNotFound
 from forecastbox.schemata.jobs import PluginState
 from forecastbox.utility.db import dbRetry, querySingle
 from forecastbox.utility.time import current_time
@@ -60,8 +61,8 @@ async def upsert_plugin_state(
     an existing row: the flag was already set, the version changed, the plugin is
     being re-enabled, ``excluded_templates`` changed, or ``glyph_remapping`` changed.
 
-    Raises ``RuntimeError`` if ``version`` is ``None`` and no existing row is found,
-    as that indicates a programming error (updating a plugin that was never installed).
+    Raises ``PluginNotFoundError`` if ``version`` is ``None`` and no existing row is found,
+    as that indicates a user error (updating a plugin that was never installed).
     """
     ref_time = current_time("dbref")
     plugin_errors_raw = [e.model_dump() for e in plugin_errors] if plugin_errors is not None else None
@@ -72,7 +73,7 @@ async def upsert_plugin_state(
             existing = result.scalar_one_or_none()
             if existing is None:
                 if version is None:
-                    raise RuntimeError(
+                    raise PluginNotFound(
                         f"upsert_plugin_state called with version=None for unknown plugin {plugin_id!r}; "
                         "this plugin has no prior DB row and cannot be upserted without a version"
                     )

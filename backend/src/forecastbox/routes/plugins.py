@@ -26,6 +26,7 @@ from forecastbox.domain.glyphs.resolution import remap_glyph_names
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.db import get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.errors import PluginErrors
+from forecastbox.domain.plugin.exceptions import PluginNotFound
 from forecastbox.domain.plugin.manager import (
     PluginManager,
     PluginsStatus,
@@ -223,12 +224,15 @@ async def update_plugin_settings_endpoint(
 ) -> Response:
     """Persist plugin settings (enabled flag, exclusions, remapping) and trigger a re-ingest."""
     plugin_id_str = PluginCompositeId.to_str(body.pluginCompositeId)
-    await upsert_plugin_state(
-        plugin_id=plugin_id_str,
-        enabled=body.isEnabled,
-        excluded_templates=body.excluded_templates,
-        glyph_remapping=body.glyph_remapping,
-    )
+    try:
+        await upsert_plugin_state(
+            plugin_id=plugin_id_str,
+            enabled=body.isEnabled,
+            excluded_templates=body.excluded_templates,
+            glyph_remapping=body.glyph_remapping,
+        )
+    except PluginNotFound:
+        raise HTTPException(status_code=404, detail=f"Plugin {plugin_id_str} not found")
     if body.isEnabled is False:
         unload_single(body.pluginCompositeId)
     result = submit_update_single(body.pluginCompositeId, install=False, version=None)
