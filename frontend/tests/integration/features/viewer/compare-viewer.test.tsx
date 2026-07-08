@@ -257,6 +257,42 @@ describe('CompareViewer', () => {
     await expect.element(screen.getByText('Hold Z to magnify')).toBeVisible()
   })
 
+  it('exposes export and overlay-upload entry points', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    await screen.getByRole('button', { name: 'Export' }).click()
+    await expect
+      .element(screen.getByRole('button', { name: 'Download PNG' }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: 'Print / PDF' }))
+      .toBeVisible()
+    // Close the dialog again (Escape).
+    await screen.getByRole('button', { name: 'Download PNG' })
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    )
+
+    await expect.element(screen.getByText('Add GeoJSON')).toBeVisible()
+  })
+
+  it('offers measure tools that toggle exclusively', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    const line = screen.getByRole('button', { name: 'Measure distance' })
+    const area = screen.getByRole('button', { name: 'Measure area' })
+    await expect.element(line).toHaveAttribute('aria-pressed', 'false')
+    await line.click()
+    await expect.element(line).toHaveAttribute('aria-pressed', 'true')
+    await area.click()
+    await expect.element(line).toHaveAttribute('aria-pressed', 'false')
+    await expect.element(area).toHaveAttribute('aria-pressed', 'true')
+    // Clear is always available.
+    await screen.getByRole('button', { name: 'Clear measurements' }).click()
+  })
+
   it('nearest time-link snaps within tolerance and tags the offset', async () => {
     const portA = nextPort++
     const portB = nextPort++

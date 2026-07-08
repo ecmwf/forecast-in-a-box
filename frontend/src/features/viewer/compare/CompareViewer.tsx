@@ -37,6 +37,8 @@ import {
   resolveSourceTime,
 } from './time-link'
 import { CompareToolbar } from './CompareToolbar'
+import { CompareExportDialog } from './CompareExportDialog'
+import type { ContextOverlay } from './overlays'
 import { CompareTimeSlider } from './CompareTimeSlider'
 import { CompareActiveLayersPanel } from './CompareActiveLayersPanel'
 import { CompareLayerBrowser } from './CompareLayerBrowser'
@@ -45,7 +47,12 @@ import { SingleMapCompare } from './SingleMapCompare'
 import type View from 'ol/View'
 import type { ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
-import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
+import type {
+  CaptureResult,
+  CompareMapSource,
+  CompareMode,
+  CompareModeOptions,
+} from './types'
 import type { TimeLinkMode } from './time-link'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
@@ -147,6 +154,12 @@ export function CompareViewer({
   const currentEpoch: number | null =
     timeline.epochs.length > 0 ? timeline.epochs[safeStep] : null
 
+  // Measure tools (mode-independent): current tool + clear signal.
+  const [measureMode, setMeasureMode] = useState<'none' | 'line' | 'area'>(
+    'none',
+  )
+  const [measureClearNonce, setMeasureClearNonce] = useState(0)
+
   // Per-mode tuning surfaced in the toolbar's action row.
   const [modeOptions, setModeOptions] = useState<CompareModeOptions>({
     swipeOrientation: 'vertical',
@@ -240,6 +253,35 @@ export function CompareViewer({
     [],
   )
 
+  // -------- Export (map components register their capture action) ------
+  const [captureAction, setCaptureAction] = useState<
+    (() => Promise<Array<CaptureResult>>) | null
+  >(null)
+  const onRegisterCapture = useCallback(
+    (capture: (() => Promise<Array<CaptureResult>>) | null) =>
+      setCaptureAction(() => capture),
+    [],
+  )
+  const [exportOpen, setExportOpen] = useState(false)
+
+  // -------- User-uploaded GeoJSON context overlays --------
+  const [overlays, setOverlays] = useState<Array<ContextOverlay>>([])
+  const addOverlay = useCallback(
+    (overlay: ContextOverlay) => setOverlays((prev) => [...prev, overlay]),
+    [],
+  )
+  const toggleOverlay = useCallback(
+    (id: string) =>
+      setOverlays((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, visible: !o.visible } : o)),
+      ),
+    [],
+  )
+  const removeOverlay = useCallback(
+    (id: string) => setOverlays((prev) => prev.filter((o) => o.id !== id)),
+    [],
+  )
+
   // -------- Source view-model for the map components --------
   const mapSourceA: CompareMapSource = {
     slot: 'a',
@@ -312,11 +354,33 @@ export function CompareViewer({
         onOptionsChange={(patch) =>
           setModeOptions((prev) => ({ ...prev, ...patch }))
         }
+        measureMode={measureMode}
+        onMeasureMode={setMeasureMode}
+        onMeasureClear={() => setMeasureClearNonce((n) => n + 1)}
+        onExport={() => setExportOpen(true)}
+      />
+      <CompareExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        capture={captureAction}
+        meta={{
+          labelA: a.label,
+          labelB: b.label,
+          modeLabel: t(`modes.${mode}`),
+          validTime:
+            currentEpoch !== null ? new Date(currentEpoch).toISOString() : null,
+        }}
       />
       <div className="flex min-h-0 flex-1 gap-2">
         <CompareActiveLayersPanel
           pairs={pairing.pairs}
           selection={selection}
+          overlays={{
+            items: overlays,
+            add: addOverlay,
+            toggle: toggleOverlay,
+            remove: removeOverlay,
+          }}
           opacity={{
             global: globalOpacity,
             setGlobal: setGlobalOpacity,
@@ -334,7 +398,11 @@ export function CompareViewer({
               view={viewRef.current}
               a={mapSourceA}
               b={mapSourceB}
+              measureMode={measureMode}
+              measureClearNonce={measureClearNonce}
+              overlays={overlays}
               onRegisterFit={onRegisterFit}
+              onRegisterCapture={onRegisterCapture}
             />
           ) : (
             <SingleMapCompare
@@ -343,7 +411,11 @@ export function CompareViewer({
               b={mapSourceB}
               mode={mode}
               options={modeOptions}
+              measureMode={measureMode}
+              measureClearNonce={measureClearNonce}
+              overlays={overlays}
               onRegisterFit={onRegisterFit}
+              onRegisterCapture={onRegisterCapture}
             />
           )}
         </div>

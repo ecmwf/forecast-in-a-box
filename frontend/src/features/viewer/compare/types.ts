@@ -48,3 +48,9 @@ export interface CompareModeOptions {
   /** B-over-A weight in blend mode (0..1). */
   blend: number
 }
+
+/** One captured map image for export. */
+export interface CaptureResult {
+  label: string
+  dataUrl: string
+}
