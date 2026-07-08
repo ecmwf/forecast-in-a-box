@@ -14,6 +14,7 @@ Contains:
  - complete CRUD+List routes for the Plugin entity.
 """
 
+import logging
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -40,6 +41,8 @@ from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.config import PluginSettings, config
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
+
+logger = logging.getLogger(__name__)
 
 PREFIX = "/api/v1/plugin"
 
@@ -197,10 +200,10 @@ def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin
 
 
 @router.post("/uninstall")
-def uninstall_plugin_endpoint(
+async def uninstall_plugin_endpoint(
     request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
 ) -> Response:
-    uninstall_plugin(pluginCompositeId)
+    await uninstall_plugin(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 
@@ -234,7 +237,7 @@ async def update_plugin_settings_endpoint(
     except PluginNotFound:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id_str} not found")
     if body.isEnabled is False:
-        unload_single(body.pluginCompositeId)
+        await unload_single(body.pluginCompositeId)
     result = submit_update_single(body.pluginCompositeId, install=False, version=None)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
