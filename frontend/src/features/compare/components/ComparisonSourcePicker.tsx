@@ -55,7 +55,9 @@ export function ComparisonSourcePicker() {
   const query = search.trim().toLowerCase()
 
   return (
-    <div className="space-y-5">
+    // min-w-0: as a dialog-grid item the picker must not let unbreakable
+    // path strings dictate its track width (grid items min-width:auto).
+    <div className="min-w-0 space-y-5">
       <Input
         type="search"
         value={search}
@@ -113,10 +115,7 @@ export function ComparisonSourcePicker() {
                 >
                   <div className="min-w-0 flex-1">
                     <P className="text-sm font-medium">{lens.lens_name}</P>
-                    <P
-                      className="truncate font-mono text-xs text-muted-foreground"
-                      title={path}
-                    >
+                    <P className="font-mono text-xs break-all text-muted-foreground">
                       {path}
                     </P>
                   </div>
