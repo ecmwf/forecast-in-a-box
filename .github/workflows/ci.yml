@@ -81,7 +81,7 @@ jobs:
       fail-fast: true
       matrix:
         arch_type: [ARM64] # NOTE: we dont run on X64 anymore as it does not support eg newer pytorches
-        python_version: ["3.11", "3.12", "3.13"]
+        python_version: ["3.11", "3.12", "3.13", "3.14"]
     runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
     # NOTE we want to trigger this only in origin2origin or fork2origin scenarios, not in fork2fork scenarios
     timeout-minutes: 20
@@ -114,7 +114,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python_version: ["3.11", "3.12", "3.13"]
+        python_version: ["3.11", "3.12", "3.13", "3.14"]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # NOTE we trigger this for both fork- and origin- targeting PRs, as those are github runners
