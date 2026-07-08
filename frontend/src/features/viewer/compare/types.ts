@@ -27,8 +27,24 @@ export interface CompareMapSource {
   /** True when the source lacks data at the selected valid time —
    *  its stack is hidden and the panel shows a gap badge. */
   hiddenAtTime: boolean
+  /** Signed offset tag ("+2 h") when the shown instant differs from the
+   *  requested one (nearest/offset time-link modes). */
+  timeTag: string | null
   bbox: [number, number, number, number] | null
 }
 
 export type SingleMapMode = 'swipe' | 'flicker' | 'spy' | 'blend'
 export type CompareMode = SingleMapMode | 'side'
+
+export type SwipeOrientation = 'vertical' | 'horizontal'
+export type SpyShape = 'circle' | 'rectangle'
+
+/** Per-mode tuning owned by the viewer, edited in the toolbar action row. */
+export interface CompareModeOptions {
+  swipeOrientation: SwipeOrientation
+  spyShape: SpyShape
+  /** Spy lens radius / half-extent in CSS pixels. */
+  spySizePx: number
+  /** B-over-A weight in blend mode (0..1). */
+  blend: number
+}

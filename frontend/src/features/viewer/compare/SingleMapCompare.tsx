@@ -36,43 +36,50 @@ import { useOlMapBase } from '../hooks/useOlMapBase'
 import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { DEFAULT_BASEMAP_ID } from '../ol-layers'
-import { firstNumber } from '../format'
 import { CompareSlotTag } from './CompareSlotTag'
+import { cn } from '@/lib/utils'
 import type RenderEvent from 'ol/render/Event'
 import type View from 'ol/View'
 import type { ParsedLayer } from '../wms-capabilities'
-import type { CompareMapSource, SingleMapMode } from './types'
-import { Slider } from '@/components/ui/slider'
+import type {
+  CompareMapSource,
+  CompareModeOptions,
+  SingleMapMode,
+} from './types'
 
 const noop = () => {}
 const NO_DECORATIONS: ReadonlyArray<ParsedLayer> = []
-/** Spy-glass radius in CSS pixels. */
-const SPY_RADIUS_PX = 90
-/** Swipe keyboard step as a fraction of the map width. */
+/** Swipe keyboard step as a fraction of the map span. */
 const SWIPE_KEY_STEP = 0.02
+/** Loupe: rendered size and magnification. */
+const LOUPE_SIZE_PX = 180
+const LOUPE_ZOOM = 2
 
 export function SingleMapCompare({
   view,
   a,
   b,
   mode,
+  options,
   onRegisterFit,
 }: {
   view: View
   a: CompareMapSource
   b: CompareMapSource
   mode: SingleMapMode
+  options: CompareModeOptions
   onRegisterFit: (fit: (() => void) | null) => void
 }) {
   const { t } = useTranslation('compare')
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Mode-owned reveal state.
+  // Mode-owned reveal state; tuning (orientation/shape/size/blend) comes
+  // from the toolbar via `options`.
   const [swipeFraction, setSwipeFraction] = useState(0.5)
   const swipeFractionRef = useRef(swipeFraction)
   const [flickerFrame, setFlickerFrame] = useState<'a' | 'b'>('a')
-  const [blend, setBlend] = useState(0.6)
   const spyPixelRef = useRef<[number, number] | null>(null)
+  const { swipeOrientation, spyShape, spySizePx, blend } = options
 
   const { mapRef, basemapLayerRef, tryFit, setFitBbox } = useOlMapBase(
     containerRef,
@@ -159,34 +166,48 @@ export function SingleMapCompare({
     const layersB = [...stackB.stackRef.current]
     if (layersA.length === 0 && layersB.length === 0) return
 
-    /** Corner path for the CSS-pixel span [x0, x1] across the full height.
-     *  getRenderPixel maps CSS pixels through OL's transform — never
-     *  multiply by DPR. */
-    const traceSpan = (
+    /** Corner path for a CSS-pixel rectangle. getRenderPixel maps CSS
+     *  pixels through OL's transform — never multiply by DPR. */
+    const traceRegion = (
       ctx: CanvasRenderingContext2D,
       evt: RenderEvent,
       x0: number,
+      y0: number,
       x1: number,
-      height: number,
+      y1: number,
     ) => {
-      const topLeft = getRenderPixel(evt, [x0, 0])
-      const topRight = getRenderPixel(evt, [x1, 0])
-      const bottomLeft = getRenderPixel(evt, [x0, height])
-      const bottomRight = getRenderPixel(evt, [x1, height])
-      ctx.moveTo(topLeft[0], topLeft[1])
-      ctx.lineTo(bottomLeft[0], bottomLeft[1])
-      ctx.lineTo(bottomRight[0], bottomRight[1])
-      ctx.lineTo(topRight[0], topRight[1])
+      const p1 = getRenderPixel(evt, [x0, y0])
+      const p2 = getRenderPixel(evt, [x0, y1])
+      const p3 = getRenderPixel(evt, [x1, y1])
+      const p4 = getRenderPixel(evt, [x1, y0])
+      ctx.moveTo(p1[0], p1[1])
+      ctx.lineTo(p2[0], p2[1])
+      ctx.lineTo(p3[0], p3[1])
+      ctx.lineTo(p4[0], p4[1])
       ctx.closePath()
     }
 
-    const traceSpyCircle = (
+    const traceSpyLens = (
       ctx: CanvasRenderingContext2D,
       evt: RenderEvent,
       pos: [number, number],
+      shape: 'circle' | 'rectangle',
+      sizePx: number,
     ) => {
+      if (shape === 'rectangle') {
+        // 16:10-ish window centred on the cursor.
+        traceRegion(
+          ctx,
+          evt,
+          pos[0] - sizePx,
+          pos[1] - sizePx * 0.62,
+          pos[0] + sizePx,
+          pos[1] + sizePx * 0.62,
+        )
+        return
+      }
       const center = getRenderPixel(evt, pos)
-      const edge = getRenderPixel(evt, [pos[0] + SPY_RADIUS_PX, pos[1]])
+      const edge = getRenderPixel(evt, [pos[0] + sizePx, pos[1]])
       const radius = Math.hypot(edge[0] - center[0], edge[1] - center[1])
       ctx.moveTo(center[0] + radius, center[1])
       ctx.arc(center[0], center[1], radius, 0, 2 * Math.PI)
@@ -199,11 +220,20 @@ export function SingleMapCompare({
       ctx.save()
       ctx.beginPath()
       if (mode === 'swipe') {
-        const x = size[0] * swipeFractionRef.current
-        if (slot === 'a') {
-          traceSpan(ctx, evt, 0, x, size[1]) // A left of the divider
+        if (swipeOrientation === 'vertical') {
+          const x = size[0] * swipeFractionRef.current
+          if (slot === 'a') {
+            traceRegion(ctx, evt, 0, 0, x, size[1]) // A left of the divider
+          } else {
+            traceRegion(ctx, evt, x, 0, size[0], size[1]) // B right of it
+          }
         } else {
-          traceSpan(ctx, evt, x, size[0], size[1]) // B right of it
+          const y = size[1] * swipeFractionRef.current
+          if (slot === 'a') {
+            traceRegion(ctx, evt, 0, 0, size[0], y) // A above the divider
+          } else {
+            traceRegion(ctx, evt, 0, y, size[0], size[1]) // B below it
+          }
         }
         ctx.clip()
       } else {
@@ -212,11 +242,11 @@ export function SingleMapCompare({
         // empty B path hides B; A keeps the full span.
         const pos = spyPixelRef.current
         if (slot === 'a') {
-          traceSpan(ctx, evt, 0, size[0], size[1])
-          if (pos) traceSpyCircle(ctx, evt, pos)
+          traceRegion(ctx, evt, 0, 0, size[0], size[1])
+          if (pos) traceSpyLens(ctx, evt, pos, spyShape, spySizePx)
           ctx.clip('evenodd')
         } else {
-          if (pos) traceSpyCircle(ctx, evt, pos)
+          if (pos) traceSpyLens(ctx, evt, pos, spyShape, spySizePx)
           ctx.clip()
         }
       }
@@ -250,6 +280,9 @@ export function SingleMapCompare({
   }, [
     needsClip,
     mode,
+    swipeOrientation,
+    spyShape,
+    spySizePx,
     stackA.revision,
     stackA.stackRef,
     stackB.revision,
@@ -318,7 +351,11 @@ export function SingleMapCompare({
     const container = containerRef.current
     if (!container) return
     const rect = container.getBoundingClientRect()
-    updateSwipe((e.clientX - rect.left) / rect.width)
+    updateSwipe(
+      swipeOrientation === 'vertical'
+        ? (e.clientX - rect.left) / rect.width
+        : (e.clientY - rect.top) / rect.height,
+    )
   }
 
   return (
@@ -333,11 +370,16 @@ export function SingleMapCompare({
 
       {a.hiddenAtTime && <GapBadge slot="A" side="left" />}
       {b.hiddenAtTime && <GapBadge slot="B" side="right" />}
+      {a.timeTag && <TimeTagBadge slot="A" tag={a.timeTag} side="left" />}
+      {b.timeTag && <TimeTagBadge slot="B" tag={b.timeTag} side="right" />}
 
       {mode === 'swipe' && (
         <div
           role="slider"
           aria-label={t('modes.swipeHandle')}
+          aria-orientation={
+            swipeOrientation === 'vertical' ? 'horizontal' : 'vertical'
+          }
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(swipeFraction * 100)}
@@ -345,21 +387,43 @@ export function SingleMapCompare({
           onPointerDown={onDividerPointerDown}
           onPointerMove={onDividerPointerMove}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowLeft') {
+            const dec =
+              swipeOrientation === 'vertical' ? 'ArrowLeft' : 'ArrowUp'
+            const inc =
+              swipeOrientation === 'vertical' ? 'ArrowRight' : 'ArrowDown'
+            if (e.key === dec) {
               updateSwipe(swipeFractionRef.current - SWIPE_KEY_STEP)
-            } else if (e.key === 'ArrowRight') {
+            } else if (e.key === inc) {
               updateSwipe(swipeFractionRef.current + SWIPE_KEY_STEP)
             }
           }}
-          className="absolute inset-y-0 z-20 w-6 -translate-x-1/2 cursor-ew-resize touch-none outline-none"
-          style={{ left: `${swipeFraction * 100}%` }}
+          className={cn(
+            'absolute z-20 touch-none outline-none',
+            swipeOrientation === 'vertical'
+              ? 'inset-y-0 w-6 -translate-x-1/2 cursor-ew-resize'
+              : 'inset-x-0 h-6 -translate-y-1/2 cursor-ns-resize',
+          )}
+          style={
+            swipeOrientation === 'vertical'
+              ? { left: `${swipeFraction * 100}%` }
+              : { top: `${swipeFraction * 100}%` }
+          }
         >
-          <div className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-background shadow-[0_0_4px_rgba(0,0,0,0.5)]" />
+          <div
+            className={cn(
+              'absolute bg-background shadow-[0_0_4px_rgba(0,0,0,0.5)]',
+              swipeOrientation === 'vertical'
+                ? 'inset-y-0 left-1/2 w-0.5 -translate-x-1/2'
+                : 'inset-x-0 top-1/2 h-0.5 -translate-y-1/2',
+            )}
+          />
           <div className="absolute top-1/2 left-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background font-mono text-[10px] font-bold shadow-md">
-            ⇄
+            {swipeOrientation === 'vertical' ? '⇄' : '⇅'}
           </div>
         </div>
       )}
+
+      <LoupeOverlay containerRef={containerRef} />
 
       {mode === 'flicker' && (
         <div className="absolute top-2 left-1/2 z-20 -translate-x-1/2 space-y-1 text-center">
@@ -376,21 +440,32 @@ export function SingleMapCompare({
           </p>
         </div>
       )}
+    </div>
+  )
+}
 
-      {mode === 'blend' && (
-        <div className="absolute top-2 left-1/2 z-20 flex w-56 -translate-x-1/2 items-center gap-2 rounded-md border border-border bg-background/90 px-3 py-2 shadow-sm backdrop-blur-sm">
-          <span className="font-mono text-xs font-bold">A</span>
-          <Slider
-            value={[Math.round(blend * 100)]}
-            min={0}
-            max={100}
-            step={1}
-            aria-label={t('modes.blendLabel')}
-            onValueChange={(v) => setBlend(firstNumber(v) / 100)}
-          />
-          <span className="font-mono text-xs font-bold">B</span>
-        </div>
-      )}
+/** Nearest/offset resolution indicator, e.g. "B +6 h". */
+function TimeTagBadge({
+  slot,
+  tag,
+  side,
+}: {
+  slot: string
+  tag: string
+  side: 'left' | 'right'
+}) {
+  const { t } = useTranslation('compare')
+  return (
+    <div
+      className={
+        side === 'left'
+          ? 'absolute top-10 left-2 z-10'
+          : 'absolute top-10 right-2 z-10'
+      }
+    >
+      <div className="rounded-md border border-border bg-background/90 px-2 py-1 font-mono text-xs font-medium shadow-sm backdrop-blur-sm">
+        {t('timeline.offsetBadge', { slot, tag })}
+      </div>
     </div>
   )
 }
@@ -408,6 +483,106 @@ function GapBadge({ slot, side }: { slot: string; side: 'left' | 'right' }) {
       <div className="rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
         {t('timeline.gap', { slot })}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Hold-Z magnifier: a circular loupe following the cursor, drawn from the
+ * map's composited canvas (raster zoom — cheap and honest about pixels).
+ */
+function LoupeOverlay({
+  containerRef,
+}: {
+  containerRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const [active, setActive] = useState(false)
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'z' || e.repeat) return
+      const target = e.target as HTMLElement | null
+      if (target && target.closest('input, textarea, select')) return
+      setActive(true)
+    }
+    const up = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'z') setActive(false)
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!active) {
+      setPos(null)
+      return
+    }
+    const container = containerRef.current
+    if (!container) return
+    const onMove = (e: PointerEvent) => {
+      const rect = container.getBoundingClientRect()
+      setPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    }
+    container.addEventListener('pointermove', onMove)
+    return () => container.removeEventListener('pointermove', onMove)
+  }, [active, containerRef])
+
+  useEffect(() => {
+    if (!active || !pos) return
+    const container = containerRef.current
+    const loupe = canvasRef.current
+    if (!container || !loupe) return
+    let raf = 0
+    const draw = () => {
+      const src = container.querySelector('canvas')
+      const ctx = loupe.getContext('2d')
+      if (src && ctx) {
+        const scale = src.width / container.clientWidth // device-pixel ratio
+        const srcSize = (LOUPE_SIZE_PX / LOUPE_ZOOM) * scale
+        ctx.clearRect(0, 0, loupe.width, loupe.height)
+        ctx.drawImage(
+          src,
+          pos.x * scale - srcSize / 2,
+          pos.y * scale - srcSize / 2,
+          srcSize,
+          srcSize,
+          0,
+          0,
+          loupe.width,
+          loupe.height,
+        )
+      }
+      raf = requestAnimationFrame(draw)
+    }
+    raf = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(raf)
+  }, [active, pos, containerRef])
+
+  if (!active || !pos) return null
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute z-30 overflow-hidden rounded-full border-2 border-background shadow-lg ring-1 ring-border"
+      style={{
+        width: LOUPE_SIZE_PX,
+        height: LOUPE_SIZE_PX,
+        left: pos.x,
+        top: pos.y,
+        transform: 'translate(-50%, -115%)',
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        width={LOUPE_SIZE_PX * 2}
+        height={LOUPE_SIZE_PX * 2}
+        className="h-full w-full"
+      />
     </div>
   )
 }

@@ -89,12 +89,34 @@
     "swipeHandle": "Comparison divider",
     "flickerHint": "Click the map or press Space to flip between A and B",
     "showing": "Showing: {{slot}}",
-    "blendLabel": "Blend B over A"
+    "blendLabel": "Blend B over A",
+    "orientationAria": "Swipe divider orientation",
+    "orientation": {
+      "vertical": "Vertical",
+      "horizontal": "Horizontal"
+    },
+    "spyShapeAria": "Spy lens shape",
+    "spyShape": {
+      "circle": "Circle",
+      "rectangle": "Rectangle"
+    },
+    "spySize": "Spy size",
+    "loupeHint": "Hold Z to magnify"
   },
   "timeline": {
     "label": "Valid time",
     "gap": "No data at this time — {{slot}}",
-    "trackAria": "Availability for source {{slot}}"
+    "trackAria": "Availability for source {{slot}}",
+    "linkAria": "Time link mode",
+    "link": {
+      "exact": "Linked (exact)",
+      "nearest": "Nearest step",
+      "offset": "Fixed offset",
+      "independent": "Independent"
+    },
+    "offsetLabel": "B offset",
+    "independentAria": "Valid time for source {{slot}}",
+    "offsetBadge": "{{slot}} {{tag}}"
   },
   "link": {
     "linked": "Linked layers",
