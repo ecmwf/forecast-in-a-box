@@ -172,6 +172,22 @@ describe('ComparePage', () => {
     expect(listMockLenses()).toHaveLength(1)
   })
 
+  it('assigns slots via the slot bar and swaps them', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderComparePage()
+
+    // Normalization fills A/B from basket order.
+    const pickerA = screen.getByLabelText('Source for slot A')
+    const pickerB = screen.getByLabelText('Source for slot B')
+    await expect.element(pickerA).toHaveTextContent('Run A')
+    await expect.element(pickerB).toHaveTextContent('Run B')
+
+    await screen.getByRole('button', { name: 'Swap A and B' }).click()
+    await expect.element(pickerA).toHaveTextContent('Run B')
+    await expect.element(pickerB).toHaveTextContent('Run A')
+  })
+
   it('hydrates basket entries from a shared URL', async () => {
     const a = `run:${RUN_A.jobId}~${RUN_A.taskId}`
     const b = `run:${RUN_B.jobId}~${RUN_B.taskId}`
