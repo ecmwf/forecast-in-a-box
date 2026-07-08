@@ -45,6 +45,8 @@ export interface CompareSelection {
   pairOpacity: (key: string) => number
   isLayerActive: (slot: SourceSlot, name: string) => boolean
   toggleLayer: (slot: SourceSlot, name: string) => void
+  setLayerOpacity: (slot: SourceSlot, name: string, opacity: number) => void
+  layerOpacity: (slot: SourceSlot, name: string) => number
   setLinkMode: (mode: LinkMode, options?: { auto?: boolean }) => void
   clear: () => void
 }
@@ -123,6 +125,17 @@ export function useCompareSelection(
       return next
     })
   }, [])
+
+  const setLayerOpacity = useCallback(
+    (slot: SourceSlot, name: string, opacity: number) => {
+      setPerSource((prev) => {
+        const layerOpacities = new Map(prev[slot].layerOpacities)
+        layerOpacities.set(name, opacity)
+        return { ...prev, [slot]: { ...prev[slot], layerOpacities } }
+      })
+    },
+    [],
+  )
 
   const toggleLayer = useCallback((slot: SourceSlot, name: string) => {
     setPerSource((prev) => {
@@ -203,6 +216,9 @@ export function useCompareSelection(
     pairOpacity: (key) => linkedOpacities.get(key) ?? DEFAULT_LAYER_OPACITY,
     isLayerActive: (slot, name) => perSource[slot].activeOrder.includes(name),
     toggleLayer,
+    setLayerOpacity,
+    layerOpacity: (slot, name) =>
+      perSource[slot].layerOpacities.get(name) ?? DEFAULT_LAYER_OPACITY,
     setLinkMode,
     clear,
   }

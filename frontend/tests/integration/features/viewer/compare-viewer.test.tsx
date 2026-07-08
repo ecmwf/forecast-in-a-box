@@ -26,7 +26,8 @@ import i18n from '@/lib/i18n'
 
 let nextPort = 19800
 
-/** A: 2t (T00,T06) + msl + tp · B: 2t (T06,T12) + msl — overlap 2t/msl. */
+/** A: 2t (T00,T06) + msl + tp + q@500/850 · B: 2t (T06,T12) + msl +
+ *  q@500/700 — overlap 2t/msl/q@500. */
 function registerDefaultPair(): { portA: number; portB: number } {
   const portA = nextPort++
   const portB = nextPort++
@@ -39,6 +40,8 @@ function registerDefaultPair(): { portA: number; portB: number } {
       },
       { name: 'msl', title: 'Mean sea level pressure' },
       { name: 'tp', title: 'Total precipitation' },
+      { name: 'q@pl_500', title: 'Specific humidity at 500 hPa' },
+      { name: 'q@pl_850', title: 'Specific humidity at 850 hPa' },
     ],
   })
   registerMockWmsServer(portB, {
@@ -49,6 +52,8 @@ function registerDefaultPair(): { portA: number; portB: number } {
         time: '2026-07-06T06:00:00Z,2026-07-06T12:00:00Z',
       },
       { name: 'msl', title: 'Mean sea level pressure' },
+      { name: 'q@pl_500', title: 'Specific humidity at 500 hPa' },
+      { name: 'q@pl_700', title: 'Specific humidity at 700 hPa' },
     ],
   })
   return { portA, portB }
@@ -99,7 +104,7 @@ describe('CompareViewer', () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
 
-    await screen.getByText('2 m temperature').click()
+    await screen.getByText('2 m temperature').first().click()
 
     // Union of T00/T06 (A) and T06/T12 (B) → three steps.
     await expect.element(screen.getByText('1 / 3')).toBeVisible()
@@ -123,7 +128,7 @@ describe('CompareViewer', () => {
   it('exposes the swipe divider as an accessible slider', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
-    await screen.getByText('2 m temperature').click()
+    await screen.getByText('2 m temperature').first().click()
 
     const divider = screen.getByRole('slider', {
       name: 'Comparison divider',
@@ -141,7 +146,7 @@ describe('CompareViewer', () => {
   it('switches modes; flicker toggles the visible source', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
-    await screen.getByText('2 m temperature').click()
+    await screen.getByText('2 m temperature').first().click()
 
     await screen.getByRole('button', { name: /flicker/i }).click()
     const toggle = screen.getByRole('button', { name: 'Showing: A' })
@@ -155,6 +160,69 @@ describe('CompareViewer', () => {
     await screen.getByRole('button', { name: /side by side/i }).click()
     expect(screen.getByText('Run A').elements()).toHaveLength(1)
     expect(screen.getByText('Run B').elements()).toHaveLength(1)
+  })
+
+  it('groups pressure levels and activates one entry on both sources', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    // Collapsible group with the level union (500 shared, 700 B, 850 A).
+    const group = screen.getByRole('button', { name: /Specific humidity/ })
+    await expect.element(group).toBeVisible()
+    await expect.element(screen.getByText('3 levels')).toBeVisible()
+    await group.click()
+    await expect
+      .element(screen.getByRole('button', { name: /850 hPa/ }))
+      .toBeVisible()
+
+    // 500 hPa exists in both sources → activating shows it in the active
+    // panel with an opacity slider.
+    await screen.getByRole('button', { name: /500 hPa/ }).click()
+    await expect
+      .element(
+        screen.getByRole('slider', {
+          name: /Specific humidity · 500 hPa opacity/,
+        }),
+      )
+      .toBeInTheDocument()
+  })
+
+  it('filters the browser by slot availability', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    await expect.element(screen.getByText('Total precipitation')).toBeVisible()
+    // Show only layers available in B → the A-only parameter disappears.
+    await screen.getByRole('button', { name: 'B', exact: true }).click()
+    await expect
+      .element(screen.getByText('Total precipitation'))
+      .not.toBeInTheDocument()
+    await expect
+      .element(screen.getByText('2 m temperature').first())
+      .toBeVisible()
+    // Back to all.
+    await screen.getByRole('button', { name: 'All' }).click()
+    await expect.element(screen.getByText('Total precipitation')).toBeVisible()
+  })
+
+  it('exposes the opacity hierarchy: global, per-source, per-layer', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    await expect
+      .element(screen.getByRole('slider', { name: /Global opacity/ }))
+      .toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('slider', { name: /All of A/ }))
+      .toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('slider', { name: /All of B/ }))
+      .toBeInTheDocument()
+
+    await screen.getByText('2 m temperature').first().click()
+    await expect
+      .element(screen.getByRole('slider', { name: /2 m temperature opacity/ }))
+      .toBeInTheDocument()
   })
 
   it('auto-unlinks with a notice when the sources share no layers', async () => {

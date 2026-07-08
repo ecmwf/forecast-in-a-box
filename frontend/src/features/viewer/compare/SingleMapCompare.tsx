@@ -88,14 +88,15 @@ export function SingleMapCompare({
     decLoading: noop,
   })
 
-  // Master opacities per mode; a time gap hides the stack outright.
-  let masterA = 1
-  let masterB = 1
+  // Stack opacity = base tier (global × source) × mode factor; a time gap
+  // hides the stack outright.
+  let masterA = a.masterOpacity
+  let masterB = b.masterOpacity
   if (mode === 'flicker') {
-    masterA = flickerFrame === 'a' ? 1 : 0
-    masterB = flickerFrame === 'b' ? 1 : 0
+    masterA = flickerFrame === 'a' ? masterA : 0
+    masterB = flickerFrame === 'b' ? masterB : 0
   } else if (mode === 'blend') {
-    masterB = blend
+    masterB *= blend
   }
   if (a.hiddenAtTime) masterA = 0
   if (b.hiddenAtTime) masterB = 0
