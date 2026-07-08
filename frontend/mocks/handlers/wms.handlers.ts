@@ -21,18 +21,28 @@
 import { HttpResponse, http } from 'msw'
 import { serveCapabilities } from '../data/wms.data'
 
-// 1×1 transparent PNG.
-const PNG_1X1 = Uint8Array.from(
+// Translucent 1×1 PNGs (red / blue) — GetMap alternates the color by
+// port so two mock lenses are visually distinguishable and comparison
+// partitions (swipe/spy) can be eyeballed in dev:mock: any red/blue
+// blending would mean a leaking clip.
+const PNG_RED = Uint8Array.from(
   atob(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGO4Y2OTBwAFDwHDQJlGHgAAAABJRU5ErkJggg==',
+  ),
+  (c) => c.charCodeAt(0),
+)
+const PNG_BLUE = Uint8Array.from(
+  atob(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGOwibqTBwAEKQHhtBh8ewAAAABJRU5ErkJggg==',
   ),
   (c) => c.charCodeAt(0),
 )
 
 const CORS = { 'Access-Control-Allow-Origin': '*' }
 
-function pngResponse() {
-  return new HttpResponse(PNG_1X1.slice().buffer, {
+function pngResponse(port = 0) {
+  const png = port % 2 === 0 ? PNG_RED : PNG_BLUE
+  return new HttpResponse(png.slice().buffer, {
     headers: { ...CORS, 'Content-Type': 'image/png' },
   })
 }
@@ -80,7 +90,7 @@ export const wmsHandlers = [
       })
     }
     // GetMap and anything else image-like.
-    return pngResponse()
+    return pngResponse(port)
   }),
 
   // Legend images — capabilities advertise them on the lens's internal bind

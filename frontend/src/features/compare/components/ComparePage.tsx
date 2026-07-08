@@ -176,7 +176,7 @@ export function ComparePage() {
                   <Plus className="h-3.5 w-3.5" />
                   {t('basket.addSource')}
                 </DialogTrigger>
-                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+                <DialogContent className="max-h-[85vh] overflow-x-hidden overflow-y-auto sm:max-w-xl">
                   <DialogHeader>
                     <DialogTitle>{t('picker.title')}</DialogTitle>
                     <DialogDescription>

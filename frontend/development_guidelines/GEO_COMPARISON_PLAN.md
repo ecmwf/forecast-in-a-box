@@ -55,6 +55,18 @@
   styling, removal UI), not an increment on existing pieces.
 - Basket chip enrichment: `useEnrichComparisonEntry` mounts on the basket chips
   (render for every entry) rather than the panels.
+- **2026-07-08 user-testing fixes:** (1) swipe/spy are now TRUE partitions —
+  originally only the B stack was clipped, so A leaked through B's transparent
+  pixels on sparse fields (convective precipitation), reading as bogus
+  agreement; both stacks now clip to complementary regions (spy uses an
+  even-odd clip for A). Blend intentionally keeps the overlay semantics;
+  flicker/side-by-side were already exclusive. (2) The Add-source dialog
+  overflowed horizontally: DialogContent is a CSS grid and grid items default
+  to `min-width: auto`, so long unbreakable lens paths widened the picker past
+  the dialog — fixed with `min-w-0` on the picker root, `break-all` on lens
+  paths (their distinguishing part is the tail), `shrink-0` on the Add button.
+  (3) Mock GetMap now serves translucent red/blue per port so clip leaks are
+  visible in dev:mock at a glance (any color blending = leaking clip).
 
 ## Context
 

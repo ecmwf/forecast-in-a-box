@@ -13,10 +13,12 @@
  * two z-banded layer stacks (A: 100+, B: 200+ — B on top). The active
  * mode decides how B is revealed:
  *
- *  - swipe   — every B layer is canvas-clipped right of a draggable
- *              divider (prerender clip / postrender restore, coordinates
- *              via getRenderPixel so DPR never leaks in)
- *  - spy     — same clip, but a circle around the cursor
+ *  - swipe   — a TRUE partition at a draggable divider: A's layers are
+ *              canvas-clipped to the left region and B's to the right
+ *              (prerender clip / postrender restore, coordinates via
+ *              getRenderPixel so DPR never leaks in) — never both
+ *  - spy     — same idea: B only inside the cursor circle, A only
+ *              outside it (even-odd clip)
  *  - flicker — A/B master opacities swap 1↔0 (opacity keeps the decoded
  *              image, unlike `visible: false`, so the swap is instant
  *              with zero requests); map click or Space toggles
@@ -100,7 +102,7 @@ export function SingleMapCompare({
 
   const needsClip = mode === 'swipe' || mode === 'spy'
 
-  useWmsLayerStack(mapRef, a.baseUrl, a.layers, {
+  const stackA = useWmsLayerStack(mapRef, a.baseUrl, a.layers, {
     zBase: 100,
     masterOpacity: masterA,
     activeOrder: a.activeOrder,
@@ -108,6 +110,7 @@ export function SingleMapCompare({
     resolveTime: a.resolveTime,
     incLoading: noop,
     decLoading: noop,
+    trackRevision: true,
   })
   const stackB = useWmsLayerStack(mapRef, b.baseUrl, b.layers, {
     zBase: 200,
@@ -141,62 +144,117 @@ export function SingleMapCompare({
     return () => onRegisterFit(null)
   }, [tryFit, onRegisterFit])
 
-  // -------- Canvas clip on the B stack (swipe / spy) --------
+  // -------- Canvas clips (swipe / spy) --------
+  // BOTH stacks are clipped to complementary regions so the comparison is
+  // a true partition — pure A on one side, pure B on the other. Clipping
+  // only B would leave A visible underneath wherever B's raster is
+  // transparent (sparse fields like precipitation), which reads as bogus
+  // agreement between the sources.
   useEffect(() => {
     if (!needsClip) return
     const map = mapRef.current
     if (!map) return
-    const layers = [...stackB.stackRef.current]
-    if (layers.length === 0) return
+    const layersA = [...stackA.stackRef.current]
+    const layersB = [...stackB.stackRef.current]
+    if (layersA.length === 0 && layersB.length === 0) return
 
-    const prerender = (evt: RenderEvent) => {
+    /** Corner path for the CSS-pixel span [x0, x1] across the full height.
+     *  getRenderPixel maps CSS pixels through OL's transform — never
+     *  multiply by DPR. */
+    const traceSpan = (
+      ctx: CanvasRenderingContext2D,
+      evt: RenderEvent,
+      x0: number,
+      x1: number,
+      height: number,
+    ) => {
+      const topLeft = getRenderPixel(evt, [x0, 0])
+      const topRight = getRenderPixel(evt, [x1, 0])
+      const bottomLeft = getRenderPixel(evt, [x0, height])
+      const bottomRight = getRenderPixel(evt, [x1, height])
+      ctx.moveTo(topLeft[0], topLeft[1])
+      ctx.lineTo(bottomLeft[0], bottomLeft[1])
+      ctx.lineTo(bottomRight[0], bottomRight[1])
+      ctx.lineTo(topRight[0], topRight[1])
+      ctx.closePath()
+    }
+
+    const traceSpyCircle = (
+      ctx: CanvasRenderingContext2D,
+      evt: RenderEvent,
+      pos: [number, number],
+    ) => {
+      const center = getRenderPixel(evt, pos)
+      const edge = getRenderPixel(evt, [pos[0] + SPY_RADIUS_PX, pos[1]])
+      const radius = Math.hypot(edge[0] - center[0], edge[1] - center[1])
+      ctx.moveTo(center[0] + radius, center[1])
+      ctx.arc(center[0], center[1], radius, 0, 2 * Math.PI)
+    }
+
+    const prerenderFor = (slot: 'a' | 'b') => (evt: RenderEvent) => {
       const ctx = evt.context as CanvasRenderingContext2D
       const size = map.getSize()
       if (!size) return
       ctx.save()
       ctx.beginPath()
       if (mode === 'swipe') {
-        // Clip to the region right of the divider. getRenderPixel maps
-        // CSS pixels through OL's transform — never multiply by DPR.
         const x = size[0] * swipeFractionRef.current
-        const topLeft = getRenderPixel(evt, [x, 0])
-        const topRight = getRenderPixel(evt, [size[0], 0])
-        const bottomLeft = getRenderPixel(evt, [x, size[1]])
-        const bottomRight = getRenderPixel(evt, [size[0], size[1]])
-        ctx.moveTo(topLeft[0], topLeft[1])
-        ctx.lineTo(bottomLeft[0], bottomLeft[1])
-        ctx.lineTo(bottomRight[0], bottomRight[1])
-        ctx.lineTo(topRight[0], topRight[1])
-      } else {
-        const pos = spyPixelRef.current
-        if (pos) {
-          const center = getRenderPixel(evt, pos)
-          const edge = getRenderPixel(evt, [pos[0] + SPY_RADIUS_PX, pos[1]])
-          const radius = Math.hypot(edge[0] - center[0], edge[1] - center[1])
-          ctx.arc(center[0], center[1], radius, 0, 2 * Math.PI)
+        if (slot === 'a') {
+          traceSpan(ctx, evt, 0, x, size[1]) // A left of the divider
+        } else {
+          traceSpan(ctx, evt, x, size[0], size[1]) // B right of it
         }
-        // No cursor → empty path → B fully hidden.
+        ctx.clip()
+      } else {
+        // Spy: B only inside the circle, A only outside it (even-odd
+        // punches the circle out of the full-canvas span). No cursor →
+        // empty B path hides B; A keeps the full span.
+        const pos = spyPixelRef.current
+        if (slot === 'a') {
+          traceSpan(ctx, evt, 0, size[0], size[1])
+          if (pos) traceSpyCircle(ctx, evt, pos)
+          ctx.clip('evenodd')
+        } else {
+          if (pos) traceSpyCircle(ctx, evt, pos)
+          ctx.clip()
+        }
       }
-      ctx.closePath()
-      ctx.clip()
     }
     const postrender = (evt: RenderEvent) => {
       ;(evt.context as CanvasRenderingContext2D).restore()
     }
 
-    for (const layer of layers) {
-      layer.on('prerender', prerender)
+    const prerenderA = prerenderFor('a')
+    const prerenderB = prerenderFor('b')
+    for (const layer of layersA) {
+      layer.on('prerender', prerenderA)
+      layer.on('postrender', postrender)
+    }
+    for (const layer of layersB) {
+      layer.on('prerender', prerenderB)
       layer.on('postrender', postrender)
     }
     map.render()
     return () => {
-      for (const layer of layers) {
-        layer.un('prerender', prerender)
+      for (const layer of layersA) {
+        layer.un('prerender', prerenderA)
+        layer.un('postrender', postrender)
+      }
+      for (const layer of layersB) {
+        layer.un('prerender', prerenderB)
         layer.un('postrender', postrender)
       }
       map.render()
     }
-  }, [needsClip, mode, stackB.revision, stackB.stackRef, mapRef])
+  }, [
+    needsClip,
+    mode,
+    stackA.revision,
+    stackA.stackRef,
+    stackB.revision,
+    stackB.stackRef,
+    mapRef,
+  ])
 
   // Spy cursor tracking.
   useEffect(() => {

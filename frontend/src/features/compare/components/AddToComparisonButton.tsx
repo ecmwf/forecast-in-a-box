@@ -67,7 +67,7 @@ export function AddToComparisonButton({
     <Button
       variant={inBasket ? 'secondary' : 'outline'}
       size={iconOnly ? 'icon' : 'sm'}
-      className={iconOnly ? 'h-8 w-8' : 'h-8 gap-1.5'}
+      className={iconOnly ? 'h-8 w-8 shrink-0' : 'h-8 shrink-0 gap-1.5'}
       disabled={disabled}
       aria-pressed={inBasket}
       aria-label={aria}
