@@ -30,6 +30,7 @@ import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
 import { CompareBasketChip } from './CompareBasketChip'
+import { CompareSlotBar } from './CompareSlotBar'
 import { ComparePanel } from './ComparePanel'
 import { ComparisonSourcePicker } from './ComparisonSourcePicker'
 import type { ComparisonEntry } from '../entry-ref'
@@ -63,7 +64,8 @@ export interface ActivePair {
 
 /** Resolve + normalize the active pair from URL refs and the basket. */
 function useActivePair(): ActivePair & {
-  activateAsB: (ref: string) => void
+  assignSlot: (slot: 'a' | 'b', ref: string) => void
+  swapSlots: () => void
 } {
   const search = route.useSearch()
   const navigate = route.useNavigate()
@@ -96,14 +98,23 @@ function useActivePair(): ActivePair & {
     }
   }, [entries, search.a, search.b, navigate])
 
-  const activateAsB = (ref: string) => {
+  // Assigning the OTHER slot's current source swaps the pair — the only
+  // sensible reading of that intent.
+  const assignSlot = (slot: 'a' | 'b', ref: string) => {
     void navigate({
-      search: (prev) =>
-        prev.a === ref
-          ? { ...prev, a: prev.b, b: ref }
-          : prev.b === ref
-            ? prev
-            : { ...prev, b: ref },
+      search: (prev) => {
+        const other = slot === 'a' ? 'b' : 'a'
+        if (prev[other] === ref) {
+          return { ...prev, [slot]: ref, [other]: prev[slot] }
+        }
+        return { ...prev, [slot]: ref }
+      },
+      replace: true,
+    })
+  }
+  const swapSlots = () => {
+    void navigate({
+      search: (prev) => ({ ...prev, a: prev.b, b: prev.a }),
       replace: true,
     })
   }
@@ -111,7 +122,8 @@ function useActivePair(): ActivePair & {
   return {
     a: aValid ? (byRef.get(search.a!) ?? null) : null,
     b: bValid ? (byRef.get(search.b!) ?? null) : null,
-    activateAsB,
+    assignSlot,
+    swapSlots,
   }
 }
 
@@ -122,7 +134,7 @@ export function ComparePage() {
   const entries = useComparisonStore((s) => s.entries)
   const removeEntry = useComparisonStore((s) => s.removeEntry)
   const clear = useComparisonStore((s) => s.clear)
-  const { a, b, activateAsB } = useActivePair()
+  const { a, b, assignSlot, swapSlots } = useActivePair()
   useHydrateComparisonFromUrl()
 
   const mode: CompareMode = search.mode ?? 'swipe'
@@ -212,27 +224,35 @@ export function ComparePage() {
         }
       />
 
-      {/* Basket strip */}
+      {/* Slot assignment + collected-sources library */}
       {entries.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          {entries.map((entry) => {
-            const ref = entryRef(entry)
-            return (
-              <CompareBasketChip
-                key={ref}
-                entry={entry}
-                slot={
-                  a && entryRef(a) === ref
-                    ? 'A'
-                    : b && entryRef(b) === ref
-                      ? 'B'
-                      : null
-                }
-                onActivate={() => activateAsB(ref)}
-                onRemove={() => removeEntry(ref)}
-              />
-            )
-          })}
+        <div className="space-y-2.5">
+          <CompareSlotBar
+            entries={entries}
+            aRef={a ? entryRef(a) : undefined}
+            bRef={b ? entryRef(b) : undefined}
+            onAssign={assignSlot}
+            onSwap={swapSlots}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            {entries.map((entry) => {
+              const ref = entryRef(entry)
+              return (
+                <CompareBasketChip
+                  key={ref}
+                  entry={entry}
+                  slot={
+                    a && entryRef(a) === ref
+                      ? 'A'
+                      : b && entryRef(b) === ref
+                        ? 'B'
+                        : null
+                  }
+                  onRemove={() => removeEntry(ref)}
+                />
+              )
+            })}
+          </div>
         </div>
       )}
 

@@ -38,12 +38,10 @@ const SLOT_RING_CLASS = {
 export function CompareBasketChip({
   entry,
   slot,
-  onActivate,
   onRemove,
 }: {
   entry: ComparisonEntry
   slot: 'A' | 'B' | null
-  onActivate: () => void
   onRemove: () => void
 }) {
   const { t } = useTranslation('compare')
@@ -90,12 +88,7 @@ export function CompareBasketChip({
         slot ? SLOT_RING_CLASS[slot] : 'border-border hover:border-primary/40',
       )}
     >
-      <button
-        type="button"
-        onClick={onActivate}
-        className="flex min-w-0 items-center gap-2 text-left"
-        title={t('basket.setActive')}
-      >
+      <span className="flex min-w-0 items-center gap-2 text-left">
         {slot && (
           <span
             className={cn(
@@ -138,7 +131,7 @@ export function CompareBasketChip({
             {kindTag}
           </span>
         )}
-      </button>
+      </span>
       {renameable && !editing && (
         <button
           type="button"
