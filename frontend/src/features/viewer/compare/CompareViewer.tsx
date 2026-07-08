@@ -31,6 +31,11 @@ import {
   locateEpoch,
 } from './compare-timeline'
 import { useCompareSelection } from './useCompareSelection'
+import {
+  defaultToleranceMs,
+  formatOffset,
+  resolveSourceTime,
+} from './time-link'
 import { CompareToolbar } from './CompareToolbar'
 import { CompareTimeSlider } from './CompareTimeSlider'
 import { CompareActiveLayersPanel } from './CompareActiveLayersPanel'
@@ -40,7 +45,8 @@ import { SingleMapCompare } from './SingleMapCompare'
 import type View from 'ol/View'
 import type { ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
-import type { CompareMapSource, CompareMode } from './types'
+import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
+import type { TimeLinkMode } from './time-link'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 
@@ -141,22 +147,90 @@ export function CompareViewer({
   const currentEpoch: number | null =
     timeline.epochs.length > 0 ? timeline.epochs[safeStep] : null
 
+  // Per-mode tuning surfaced in the toolbar's action row.
+  const [modeOptions, setModeOptions] = useState<CompareModeOptions>({
+    swipeOrientation: 'vertical',
+    spyShape: 'circle',
+    spySizePx: 90,
+    blend: 0.6,
+  })
+
+  // -------- Time-link policy (exact / nearest / offset / independent) --
+  const [timeLinkMode, setTimeLinkMode] = useState<TimeLinkMode>('exact')
+  const [offsetMs, setOffsetMs] = useState(0)
+  const [indepIndex, setIndepIndex] = useState<Record<SourceSlot, number>>({
+    a: 0,
+    b: 0,
+  })
+
+  const resolvedA = useMemo(() => {
+    if (timeLinkMode === 'independent') {
+      const i = Math.max(
+        0,
+        Math.min(indepIndex.a, timeIndexA.epochs.length - 1),
+      )
+      const epoch = timeIndexA.epochs.length > 0 ? timeIndexA.epochs[i] : null
+      return {
+        raw: epoch !== null ? (timeIndexA.rawByEpoch.get(epoch) ?? null) : null,
+        epoch,
+        offsetMs: null,
+        hidden: false,
+      }
+    }
+    return resolveSourceTime(
+      timeIndexA,
+      currentEpoch,
+      timeLinkMode === 'exact' ? 'exact' : 'nearest',
+      defaultToleranceMs(timeIndexA),
+    )
+  }, [timeLinkMode, indepIndex.a, timeIndexA, currentEpoch])
+
+  const resolvedB = useMemo(() => {
+    if (timeLinkMode === 'independent') {
+      const i = Math.max(
+        0,
+        Math.min(indepIndex.b, timeIndexB.epochs.length - 1),
+      )
+      const epoch = timeIndexB.epochs.length > 0 ? timeIndexB.epochs[i] : null
+      return {
+        raw: epoch !== null ? (timeIndexB.rawByEpoch.get(epoch) ?? null) : null,
+        epoch,
+        offsetMs: null,
+        hidden: false,
+      }
+    }
+    const target =
+      timeLinkMode === 'offset' && currentEpoch !== null
+        ? currentEpoch + offsetMs
+        : currentEpoch
+    return resolveSourceTime(
+      timeIndexB,
+      target,
+      timeLinkMode === 'exact' ? 'exact' : 'nearest',
+      defaultToleranceMs(timeIndexB),
+    )
+  }, [timeLinkMode, indepIndex.b, timeIndexB, currentEpoch, offsetMs])
+
+  const resolvedFor = (slot: SourceSlot) =>
+    slot === 'a' ? resolvedA : resolvedB
+
   const resolveTimeFor = useCallback(
     (slot: SourceSlot) => {
-      const index = slot === 'a' ? timeIndexA : timeIndexB
-      return (layer: ParsedLayer): string | null => {
-        if (!layer.time || currentEpoch === null) return null
-        // Exact-only v1: gaps hide the source (never silently substitute).
-        return index.rawByEpoch.get(currentEpoch) ?? null
-      }
+      const resolved = slot === 'a' ? resolvedA : resolvedB
+      return (layer: ParsedLayer): string | null =>
+        layer.time ? resolved.raw : null
     },
-    [timeIndexA, timeIndexB, currentEpoch],
+    [resolvedA, resolvedB],
   )
 
-  const hiddenAtTime = (slot: SourceSlot): boolean => {
-    if (currentEpoch === null) return false
-    const index = slot === 'a' ? timeIndexA : timeIndexB
-    return index.epochs.length > 0 && !index.rawByEpoch.has(currentEpoch)
+  // Offset tag relative to the SHARED axis (A's requested instant), so a
+  // fixed-Δ B honestly reads e.g. "B +6 h".
+  const timeTagFor = (slot: SourceSlot): string | null => {
+    if (timeLinkMode === 'independent') return null
+    const resolved = resolvedFor(slot)
+    if (resolved.epoch === null || currentEpoch === null) return null
+    const delta = resolved.epoch - currentEpoch
+    return delta === 0 ? null : formatOffset(delta)
   }
 
   // -------- Fit plumbing (map components register their fit action) ----
@@ -175,7 +249,8 @@ export function CompareViewer({
     activeOrder: activeOrderA,
     layerOpacities: selection.opacitiesFor('a'),
     resolveTime: resolveTimeFor('a'),
-    hiddenAtTime: hiddenAtTime('a'),
+    hiddenAtTime: resolvedA.hidden,
+    timeTag: timeTagFor('a'),
     masterOpacity: globalOpacity * sourceOpacity.a,
     bbox: sourceA.bbox,
   }
@@ -187,7 +262,8 @@ export function CompareViewer({
     activeOrder: activeOrderB,
     layerOpacities: selection.opacitiesFor('b'),
     resolveTime: resolveTimeFor('b'),
-    hiddenAtTime: hiddenAtTime('b'),
+    hiddenAtTime: resolvedB.hidden,
+    timeTag: timeTagFor('b'),
     masterOpacity: globalOpacity * sourceOpacity.b,
     bbox: sourceB.bbox,
   }
@@ -232,6 +308,10 @@ export function CompareViewer({
         onLinkModeChange={(next) => selection.setLinkMode(next)}
         linkDisabled={zeroOverlap}
         onFit={fitAction}
+        options={modeOptions}
+        onOptionsChange={(patch) =>
+          setModeOptions((prev) => ({ ...prev, ...patch }))
+        }
       />
       <div className="flex min-h-0 flex-1 gap-2">
         <CompareActiveLayersPanel
@@ -262,6 +342,7 @@ export function CompareViewer({
               a={mapSourceA}
               b={mapSourceB}
               mode={mode}
+              options={modeOptions}
               onRegisterFit={onRegisterFit}
             />
           )}
@@ -277,6 +358,22 @@ export function CompareViewer({
         timeline={timeline}
         index={safeStep}
         onChange={onTimeChange}
+        linkMode={timeLinkMode}
+        onLinkModeChange={setTimeLinkMode}
+        offsetMs={offsetMs}
+        onOffsetChange={setOffsetMs}
+        independent={{
+          a: {
+            epochs: timeIndexA.epochs,
+            index: indepIndex.a,
+            onChange: (i) => setIndepIndex((prev) => ({ ...prev, a: i })),
+          },
+          b: {
+            epochs: timeIndexB.epochs,
+            index: indepIndex.b,
+            onChange: (i) => setIndepIndex((prev) => ({ ...prev, b: i })),
+          },
+        }}
       />
     </div>
   )

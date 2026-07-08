@@ -153,6 +153,14 @@ function DualMapPanel({
           {t('timeline.gap', { slot: source.slot.toUpperCase() })}
         </div>
       )}
+      {source.timeTag && (
+        <div className="absolute top-10 left-2 z-10 rounded-md border border-border bg-background/90 px-2 py-1 font-mono text-xs font-medium shadow-sm backdrop-blur-sm">
+          {t('timeline.offsetBadge', {
+            slot: source.slot.toUpperCase(),
+            tag: source.timeTag,
+          })}
+        </div>
+      )}
       {cross && (
         <>
           <div

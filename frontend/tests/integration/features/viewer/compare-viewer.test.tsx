@@ -225,6 +225,77 @@ describe('CompareViewer', () => {
       .toBeInTheDocument()
   })
 
+  it('shows contextual mode controls in the toolbar action row', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    // Swipe: orientation control; switching keeps the divider accessible.
+    await expect
+      .element(screen.getByRole('button', { name: 'Horizontal' }))
+      .toBeVisible()
+    await screen.getByRole('button', { name: 'Horizontal' }).click()
+    await expect
+      .element(screen.getByRole('slider', { name: 'Comparison divider' }))
+      .toHaveAttribute('aria-orientation', 'vertical')
+
+    // Spy: shape + size controls.
+    await screen.getByRole('button', { name: /^Spy/ }).click()
+    await expect
+      .element(screen.getByRole('button', { name: 'Rectangle' }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('slider', { name: /Spy size/ }))
+      .toBeInTheDocument()
+
+    // Blend: the weight slider lives in the action row now.
+    await screen.getByRole('button', { name: /blend/i }).click()
+    await expect
+      .element(screen.getByRole('slider', { name: /Blend B over A/ }))
+      .toBeInTheDocument()
+    // Loupe hint is visible for single-map modes.
+    await expect.element(screen.getByText('Hold Z to magnify')).toBeVisible()
+  })
+
+  it('nearest time-link snaps within tolerance and tags the offset', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          time: '2026-07-06T00:00:00Z,2026-07-06T06:00:00Z',
+        },
+      ],
+    })
+    // B runs on an hour-shifted rhythm — classic external-server case.
+    registerMockWmsServer(portB, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          time: '2026-07-06T01:00:00Z,2026-07-06T07:00:00Z',
+        },
+      ],
+    })
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    // Exact mode: B has nothing at T00 → hidden with a gap badge.
+    await expect
+      .element(screen.getByText('No data at this time — B'))
+      .toBeVisible()
+
+    // Switch to nearest: B snaps to T01 and shows an honest "+1 h" tag.
+    await screen.getByLabelText('Time link mode').click()
+    await screen.getByRole('option', { name: 'Nearest step' }).click()
+    await expect.element(screen.getByText('B +1 h')).toBeVisible()
+    expect(
+      screen.getByText('No data at this time — B').elements(),
+    ).toHaveLength(0)
+  })
+
   it('auto-unlinks with a notice when the sources share no layers', async () => {
     const portA = nextPort++
     const portB = nextPort++
