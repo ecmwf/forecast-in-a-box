@@ -34,7 +34,7 @@ concurrency:
 jobs:
   changes:
     name: Detect changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     permissions:
       pull-requests: read
     outputs:
@@ -115,7 +115,7 @@ jobs:
       fail-fast: true
       matrix:
         python_version: ["3.11", "3.12", "3.13", "3.14"]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, platform-builder-Rocky-8.6]
     timeout-minutes: 20
     # NOTE we trigger this for both fork- and origin- targeting PRs, as those are github runners
     steps:
