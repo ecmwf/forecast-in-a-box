@@ -31,13 +31,22 @@ export default defineConfig(({ mode }) => {
       viteReact(),
       tailwindcss(),
       // The WMS lens runs on a dynamic loopback port; CSP must let the page
-      // reach it in all builds, not just dev.
+      // reach it in all builds, not just dev. External WMS comparison
+      // sources are user-entered arbitrary hosts: allowed wholesale in dev,
+      // opt-in per deployment via FIAB_CSP_EXTRA_HOSTS (space-separated
+      // source expressions, e.g. "https://eccharts.ecmwf.int") in prod.
       {
         name: 'csp-loopback-hosts',
         transformIndexHtml(html) {
+          const hosts = [
+            'http://localhost:*',
+            'http://127.0.0.1:*',
+            ...(isDev ? ['https:', 'http:'] : []),
+            ...(env.FIAB_CSP_EXTRA_HOSTS ? [env.FIAB_CSP_EXTRA_HOSTS] : []),
+          ]
           return html.replaceAll(
             '<!--CSP_LOOPBACK_HOSTS-->',
-            'http://localhost:* http://127.0.0.1:*',
+            hosts.join(' ').trim(),
           )
         },
       },

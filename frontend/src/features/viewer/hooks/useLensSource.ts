@@ -17,9 +17,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  appendWmsParams,
   groupLayers,
   parseCapabilities,
   partitionGroups,
+  toWmsEndpoint,
   uniquePressureLevels,
 } from '../wms-capabilities'
 import type {
@@ -76,7 +78,10 @@ export function useLensSource(baseUrl: string): LensSource {
         if (ac.signal.aborted) return
         try {
           const res = await fetch(
-            `${baseUrl}/wms?service=WMS&version=1.3.0&request=GetCapabilities`,
+            appendWmsParams(
+              toWmsEndpoint(baseUrl),
+              'service=WMS&version=1.3.0&request=GetCapabilities',
+            ),
             { signal: ac.signal },
           )
           if (!res.ok) throw new Error(`GetCapabilities ${res.status}`)
