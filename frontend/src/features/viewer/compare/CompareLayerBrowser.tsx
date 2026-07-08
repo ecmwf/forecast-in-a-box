@@ -18,7 +18,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, Plus, Search, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { groupPairs } from './pair-grouping'
 import type { SlotFilter } from './pair-grouping'
@@ -50,13 +50,16 @@ export function CompareLayerBrowser({
   selection,
   sourceA,
   sourceB,
+  onCollapse,
 }: {
   pairs: ReadonlyArray<PairedLayer>
   selection: CompareSelection
   sourceA: LensSource
   sourceB: LensSource
+  onCollapse: () => void
 }) {
   const { t } = useTranslation('compare')
+  const { t: tExec } = useTranslation('executions')
   const [search, setSearch] = useState('')
   const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
   const [selectedLevels, setSelectedLevels] = useState<Set<number>>(new Set())
@@ -83,6 +86,20 @@ export function CompareLayerBrowser({
   return (
     <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
       <div className="space-y-2 border-b border-border bg-muted/40 px-3 pt-2.5 pb-2.5">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onCollapse}
+            title={tExec('lens.collapseSidebar')}
+            aria-label={tExec('lens.collapseSidebar')}
+            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+          <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            {tExec('lens.layers')}
+          </P>
+        </div>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input

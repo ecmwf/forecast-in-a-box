@@ -257,6 +257,32 @@ describe('CompareViewer', () => {
     await expect.element(screen.getByText('Hold Z to magnify')).toBeVisible()
   })
 
+  it('collapses and restores both sidebars like the embedded viewer', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    await expect.element(screen.getByText('Active layers')).toBeVisible()
+    // Left first in DOM, right second.
+    await screen
+      .getByRole('button', { name: 'Collapse sidebar' })
+      .first()
+      .click()
+    await expect
+      .element(screen.getByText('Active layers'))
+      .not.toBeInTheDocument()
+    await screen.getByRole('button', { name: 'Collapse sidebar' }).click()
+    await expect
+      .element(screen.getByText('Total precipitation'))
+      .not.toBeInTheDocument()
+
+    const handles = screen.getByRole('button', { name: 'Expand sidebar' })
+    expect(handles.elements()).toHaveLength(2)
+    await handles.first().click()
+    await expect.element(screen.getByText('Active layers')).toBeVisible()
+    await handles.click()
+    await expect.element(screen.getByText('Total precipitation')).toBeVisible()
+  })
+
   it('exposes export and overlay-upload entry points', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)

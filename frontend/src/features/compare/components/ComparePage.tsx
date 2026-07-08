@@ -29,15 +29,15 @@ import { entryDisplayName, entryRef } from '../entry-ref'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
-import { CompareBasketChip } from './CompareBasketChip'
 import { CompareSlotBar } from './CompareSlotBar'
+import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
 import { ComparePanel } from './ComparePanel'
 import { ComparisonSourcePicker } from './ComparisonSourcePicker'
 import type { ComparisonEntry } from '../entry-ref'
 import type { CompareMode } from '@/features/viewer/compare/types'
 import { useStopLens } from '@/api/hooks/useLens'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
-import { PageHeader } from '@/components/common/PageHeader'
+import { H1 } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -132,7 +132,6 @@ export function ComparePage() {
   const search = route.useSearch()
   const navigate = route.useNavigate()
   const entries = useComparisonStore((s) => s.entries)
-  const removeEntry = useComparisonStore((s) => s.removeEntry)
   const clear = useComparisonStore((s) => s.clear)
   const { a, b, assignSlot, swapSlots } = useActivePair()
   useHydrateComparisonFromUrl()
@@ -172,89 +171,72 @@ export function ComparePage() {
   }
 
   return (
-    <ListPageContainer className="space-y-5">
-      <PageHeader
-        title={t('page.title')}
-        description={t('page.description')}
-        actions={
-          entries.length > 0 ? (
-            <>
-              <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-                <DialogTrigger
-                  render={
-                    <Button variant="outline" size="sm" className="gap-1.5" />
-                  }
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {t('basket.addSource')}
-                </DialogTrigger>
-                <DialogContent className="max-h-[85vh] overflow-x-hidden overflow-y-auto sm:max-w-xl">
-                  <DialogHeader>
-                    <DialogTitle>{t('picker.title')}</DialogTitle>
-                    <DialogDescription>
-                      {t('page.description')}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <ComparisonSourcePicker />
-                </DialogContent>
-              </Dialog>
-              {activeLensIds.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={stopLenses}
-                  className="gap-1.5"
-                  title={t('lens.stopAllHint')}
-                >
-                  <Square className="h-3.5 w-3.5" />
-                  {t('lens.stopAll')}
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clear}
-                className="gap-1.5"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {t('basket.clear')}
-              </Button>
-            </>
-          ) : undefined
-        }
-      />
+    <ListPageContainer className="space-y-4">
+      {/* Stub entries (hydrated links, lens rows) upgrade their display
+          metadata here — chips used to host this, but they now live in
+          the manage dialog and may never mount. */}
+      {entries.map((entry) => (
+        <EnrichmentMount key={entryRef(entry)} entry={entry} />
+      ))}
 
-      {/* Slot assignment + collected-sources library */}
-      {entries.length > 0 && (
-        <div className="space-y-2.5">
-          <CompareSlotBar
-            entries={entries}
-            aRef={a ? entryRef(a) : undefined}
-            bRef={b ? entryRef(b) : undefined}
-            onAssign={assignSlot}
-            onSwap={swapSlots}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            {entries.map((entry) => {
-              const ref = entryRef(entry)
-              return (
-                <CompareBasketChip
-                  key={ref}
-                  entry={entry}
-                  slot={
-                    a && entryRef(a) === ref
-                      ? 'A'
-                      : b && entryRef(b) === ref
-                        ? 'B'
-                        : null
-                  }
-                  onRemove={() => removeEntry(ref)}
-                />
-              )
-            })}
+      {/* One compact header row: title · A⇄B slot pickers · actions. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <H1 className="text-xl">{t('page.title')}</H1>
+        {entries.length > 0 && (
+          <div className="min-w-0 flex-1">
+            <CompareSlotBar
+              entries={entries}
+              aRef={a ? entryRef(a) : undefined}
+              bRef={b ? entryRef(b) : undefined}
+              onAssign={assignSlot}
+              onSwap={swapSlots}
+            />
           </div>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+            <DialogTrigger
+              render={
+                <Button variant="outline" size="sm" className="gap-1.5" />
+              }
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t('basket.addSource')}
+            </DialogTrigger>
+            <DialogContent className="max-h-[85vh] overflow-x-hidden overflow-y-auto sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>{t('picker.title')}</DialogTitle>
+                <DialogDescription>{t('page.description')}</DialogDescription>
+              </DialogHeader>
+              <ComparisonSourcePicker />
+            </DialogContent>
+          </Dialog>
+          {activeLensIds.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={stopLenses}
+              className="gap-1.5"
+              title={t('lens.stopAllHint')}
+            >
+              <Square className="h-3.5 w-3.5" />
+              {t('lens.stopAll')}
+            </Button>
+          )}
+          {entries.length > 0 && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={clear}
+              className="h-8 w-8"
+              title={t('basket.clear')}
+              aria-label={t('basket.clear')}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
-      )}
+      </div>
 
       {entries.length === 0 ? (
         <div className="mx-auto w-full max-w-xl rounded-lg border border-border bg-card p-5">
@@ -285,4 +267,10 @@ export function ComparePage() {
       )}
     </ListPageContainer>
   )
+}
+
+/** Null-rendering mount point for per-entry metadata enrichment. */
+function EnrichmentMount({ entry }: { entry: ComparisonEntry }) {
+  useEnrichComparisonEntry(entry)
+  return null
 }
