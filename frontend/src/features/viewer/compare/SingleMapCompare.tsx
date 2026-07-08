@@ -35,6 +35,10 @@ import { getRenderPixel } from 'ol/render'
 import { useOlMapBase } from '../hooks/useOlMapBase'
 import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
+import { useMeasure } from '../hooks/useMeasure'
+import { useContextOverlays } from './overlays'
+import type { ContextOverlay } from './overlays'
+import type { MeasureMode } from '../hooks/useMeasure'
 import { DEFAULT_BASEMAP_ID } from '../ol-layers'
 import { CompareSlotTag } from './CompareSlotTag'
 import { cn } from '@/lib/utils'
@@ -42,6 +46,7 @@ import type RenderEvent from 'ol/render/Event'
 import type View from 'ol/View'
 import type { ParsedLayer } from '../wms-capabilities'
 import type {
+  CaptureResult,
   CompareMapSource,
   CompareModeOptions,
   SingleMapMode,
@@ -61,14 +66,24 @@ export function SingleMapCompare({
   b,
   mode,
   options,
+  measureMode,
+  measureClearNonce,
+  overlays,
   onRegisterFit,
+  onRegisterCapture,
 }: {
   view: View
   a: CompareMapSource
   b: CompareMapSource
   mode: SingleMapMode
   options: CompareModeOptions
+  measureMode: MeasureMode
+  measureClearNonce: number
+  overlays: ReadonlyArray<ContextOverlay>
   onRegisterFit: (fit: (() => void) | null) => void
+  onRegisterCapture: (
+    capture: (() => Promise<Array<CaptureResult>>) | null,
+  ) => void
 }) {
   const { t } = useTranslation('compare')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -131,6 +146,9 @@ export function SingleMapCompare({
     trackRevision: true,
   })
 
+  useMeasure(mapRef, measureMode, measureClearNonce)
+  useContextOverlays(mapRef, overlays)
+
   // Fit plumbing (union bbox of both sources).
   useEffect(() => {
     const boxes = [a.bbox, b.bbox].filter(
@@ -151,6 +169,34 @@ export function SingleMapCompare({
     onRegisterFit(() => tryFit(true))
     return () => onRegisterFit(null)
   }, [tryFit, onRegisterFit])
+
+  // Export capture: the composited canvas already bakes in the active
+  // mode's clipping (swipe/spy) — WYSIWYG.
+  useEffect(() => {
+    onRegisterCapture(() => {
+      const map = mapRef.current
+      if (!map) return Promise.resolve([])
+      return new Promise((resolve) => {
+        map.once('rendercomplete', () => {
+          const canvas = map
+            .getTargetElement()
+            .querySelector<HTMLCanvasElement>('canvas')
+          resolve(
+            canvas
+              ? [
+                  {
+                    label: `A · ${a.label}  |  B · ${b.label}`,
+                    dataUrl: canvas.toDataURL('image/png'),
+                  },
+                ]
+              : [],
+          )
+        })
+        map.renderSync()
+      })
+    })
+    return () => onRegisterCapture(null)
+  }, [mapRef, a.label, b.label, onRegisterCapture])
 
   // -------- Canvas clips (swipe / spy) --------
   // BOTH stacks are clipped to complementary regions so the comparison is

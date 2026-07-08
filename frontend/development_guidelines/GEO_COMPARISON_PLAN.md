@@ -82,7 +82,13 @@
 Real-backend testing feedback (5 sources incl. ecCharts/FMI/DWD, 52-step
 union). Implementation order I1→I7, same per-phase gate + commit protocol.
 
-- [ ] **I1 — Sidebar restructure** *(first — biggest usability win)*:
+All I-phases implemented 2026-07-08 (per-phase notes below); deviations:
+`time`-link mode is session state (not URL-persisted yet); loupe works in
+single-map modes (dual panels pending); measure/overlays live in compare
+only — porting to the embedded viewer is a follow-up; token-based
+Copernicus/Sentinel presets need per-deployment credentials (follow-up).
+
+- [x] **I1 — Sidebar restructure** *(first — biggest usability win)*:
   embedded-viewer symmetry. LEFT: active layers — global opacity, per-source
   (all-A / all-B) master opacity, per-layer cards (opacity, legends, remove);
   RIGHT: browser with the embedded viewer's grouping (collapsible parameter
@@ -91,28 +97,28 @@ union). Implementation order I1→I7, same per-phase gate + commit protocol.
   global × source × layer (multiply in CompareViewer; useWmsLayerStack API
   unchanged). Fixes: flat 200-layer ecCharts list, truncated labels, "which
   side has this layer".
-- [ ] **I2 — A/B slot bar**: explicit `[A: picker] ⇄ [B: picker]` dropdowns
+- [x] **I2 — A/B slot bar**: explicit `[A: picker] ⇄ [B: picker]` dropdowns
   + swap button; basket chips demoted to a collected-sources library
   (remove/edit only). URL `a`/`b` semantics unchanged. Drag-chip-onto-panel
   deferred.
-- [ ] **I3 — Time-link modes**: control mirroring the layer-link switch —
+- [x] **I3 — Time-link modes**: control mirroring the layer-link switch —
   `exact` (today) | `nearest` (snap within tolerance, per-panel "+2 h" offset
   tag; likely best default with external servers) | `offset` (user-set Δ, one
   slider drives both) | `independent` (per-source mini sliders). Resolver
   plugs into the existing epoch-keyed timeline. Also: availability tracks
   render contiguous runs, not per-step segments (52+ steps legible).
-- [ ] **I4 — Mode action bar + spy + loupe**: secondary contextual toolbar —
+- [x] **I4 — Mode action bar + spy + loupe**: secondary contextual toolbar —
   swipe orientation (vertical/horizontal), spy shape (circle/rectangle) +
   size, flicker interval, blend slider (out of the map overlay). Hold-Z
   magnifier loupe (canvas-snapshot zoom, experimental).
-- [ ] **I5 — Presets + measure**: curated external presets (EOX Sentinel-2
+- [x] **I5 — Presets + measure**: curated external presets (EOX Sentinel-2
   cloudless; NASA GIBS daily imagery with real TIME dimension) reusing the
   probe flow, with attribution; measure distance/area (OL draw + geodesic
   sphere) with tooltips.
-- [ ] **I6 — Export/report**: dialog with editable title/description; PNG
+- [x] **I6 — Export/report**: dialog with editable title/description; PNG
   (single-map direct; side-by-side composed) + print-CSS report page →
   browser print-to-PDF (no new PDF dependency).
-- [ ] **I7 — GeoJSON overlays**: upload → context vector layer on all panels
+- [x] **I7 — GeoJSON overlays**: upload → context vector layer on all panels
   (z above data, below reference), overlay list with visibility/remove.
 
 Open items noted for the user: Sentinel — reference imagery vs. true scene

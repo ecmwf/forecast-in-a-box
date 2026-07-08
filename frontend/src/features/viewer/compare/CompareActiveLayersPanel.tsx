@@ -16,18 +16,33 @@
  * legends and removal.
  */
 
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { Eye, EyeOff, Upload, X } from 'lucide-react'
 import { firstNumber } from '../format'
 import { rebaseLensUrl } from '../wms-capabilities'
 import { LegendImage } from '../components/LegendImage'
 import { SLOT_CHIP_CLASS } from './CompareLayerBrowser'
+import { parseGeojsonOverlay } from './overlays'
+import type { ContextOverlay } from './overlays'
+import { Button } from '@/components/ui/button'
+import { showToast } from '@/lib/toast'
+import { createLogger } from '@/lib/logger'
 import type { PairedLayer, SourceSlot } from './layer-pairing'
 import type { CompareSelection } from './useCompareSelection'
 import type { LensSource } from '../hooks/useLensSource'
 import { Slider } from '@/components/ui/slider'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
+
+const log = createLogger('CompareActiveLayersPanel')
+
+export interface OverlayControls {
+  items: ReadonlyArray<ContextOverlay>
+  add: (overlay: ContextOverlay) => void
+  toggle: (id: string) => void
+  remove: (id: string) => void
+}
 
 export interface OpacityTiers {
   global: number
@@ -41,6 +56,7 @@ export function CompareActiveLayersPanel({
   selection,
   opacity,
   sources,
+  overlays,
 }: {
   pairs: ReadonlyArray<PairedLayer>
   selection: CompareSelection
@@ -49,6 +65,7 @@ export function CompareActiveLayersPanel({
     SourceSlot,
     { label: string; baseUrl: string; lens: LensSource }
   >
+  overlays: OverlayControls
 }) {
   const { t } = useTranslation('compare')
   const pairByKey = new Map(pairs.map((p) => [p.key, p]))
@@ -109,7 +126,97 @@ export function CompareActiveLayersPanel({
           </>
         )}
       </div>
+
+      <OverlaysSection overlays={overlays} />
     </aside>
+  )
+}
+
+/** Uploaded GeoJSON context overlays: upload, visibility, removal. */
+function OverlaysSection({ overlays }: { overlays: OverlayControls }) {
+  const { t } = useTranslation('compare')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const onFiles = async (files: FileList | null) => {
+    const file = files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      overlays.add(parseGeojsonOverlay(file.name, text))
+    } catch (err) {
+      log.error('GeoJSON overlay parse failed', { error: err })
+      showToast.error(t('overlays.invalid'))
+    }
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  return (
+    <div className="space-y-2 border-t border-border bg-muted/30 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          {t('overlays.title')}
+        </P>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload className="h-3 w-3" />
+          {t('overlays.upload')}
+        </Button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".json,.geojson,application/geo+json,application/json"
+          className="hidden"
+          aria-label={t('overlays.upload')}
+          onChange={(e) => void onFiles(e.target.files)}
+        />
+      </div>
+      {overlays.items.length > 0 && (
+        <ul className="space-y-1">
+          {overlays.items.map((overlay) => (
+            <li key={overlay.id} className="flex items-center gap-1.5 text-sm">
+              <button
+                type="button"
+                onClick={() => overlays.toggle(overlay.id)}
+                aria-pressed={overlay.visible}
+                aria-label={
+                  overlay.visible
+                    ? t('overlays.hide', { name: overlay.name })
+                    : t('overlays.show', { name: overlay.name })
+                }
+                className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {overlay.visible ? (
+                  <Eye className="h-3.5 w-3.5" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5" />
+                )}
+              </button>
+              <span
+                className="min-w-0 flex-1 truncate text-xs"
+                title={overlay.name}
+              >
+                {overlay.name}
+                <span className="ml-1 text-muted-foreground">
+                  {t('overlays.features', { count: overlay.featureCount })}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => overlays.remove(overlay.id)}
+                aria-label={t('overlays.remove', { name: overlay.name })}
+                className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

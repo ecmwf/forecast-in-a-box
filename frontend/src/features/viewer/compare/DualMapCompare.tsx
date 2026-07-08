@@ -20,11 +20,15 @@ import { useTranslation } from 'react-i18next'
 import { useOlMapBase } from '../hooks/useOlMapBase'
 import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
+import { useMeasure } from '../hooks/useMeasure'
+import { useContextOverlays } from './overlays'
+import type { ContextOverlay } from './overlays'
+import type { MeasureMode } from '../hooks/useMeasure'
 import { DEFAULT_BASEMAP_ID } from '../ol-layers'
 import { CompareSlotTag } from './CompareSlotTag'
 import type View from 'ol/View'
 import type { ParsedLayer } from '../wms-capabilities'
-import type { CompareMapSource } from './types'
+import type { CaptureResult, CompareMapSource } from './types'
 
 const noop = () => {}
 const NO_DECORATIONS: ReadonlyArray<ParsedLayer> = []
@@ -36,16 +40,47 @@ export function DualMapCompare({
   view,
   a,
   b,
+  measureMode,
+  measureClearNonce,
+  overlays,
   onRegisterFit,
+  onRegisterCapture,
 }: {
   view: View
   a: CompareMapSource
   b: CompareMapSource
+  measureMode: MeasureMode
+  measureClearNonce: number
+  overlays: ReadonlyArray<ContextOverlay>
   /** Register this component's fit-to-bbox action with the toolbar. */
   onRegisterFit: (fit: (() => void) | null) => void
+  onRegisterCapture: (
+    capture: (() => Promise<Array<CaptureResult>>) | null,
+  ) => void
 }) {
   const [cross, setCross] = useState<CrossPosition>(null)
   const fitsRef = useRef<Map<string, () => void>>(new Map())
+  const capturesRef = useRef<Map<string, () => Promise<CaptureResult | null>>>(
+    new Map(),
+  )
+
+  useEffect(() => {
+    onRegisterCapture(async () => {
+      const results = await Promise.all(
+        [...capturesRef.current.values()].map((capture) => capture()),
+      )
+      return results.filter((r): r is CaptureResult => r !== null)
+    })
+    return () => onRegisterCapture(null)
+  }, [onRegisterCapture])
+
+  const registerCapture = useCallback(
+    (slot: string, capture: (() => Promise<CaptureResult | null>) | null) => {
+      if (capture) capturesRef.current.set(slot, capture)
+      else capturesRef.current.delete(slot)
+    },
+    [],
+  )
 
   const registerFit = useCallback(
     (slot: string, fit: (() => void) | null) => {
@@ -67,14 +102,22 @@ export function DualMapCompare({
         view={view}
         cross={cross}
         onCross={setCross}
+        measureMode={measureMode}
+        measureClearNonce={measureClearNonce}
+        overlays={overlays}
         onRegisterFit={registerFit}
+        onRegisterCapture={registerCapture}
       />
       <DualMapPanel
         source={b}
         view={view}
         cross={cross}
         onCross={setCross}
+        measureMode={measureMode}
+        measureClearNonce={measureClearNonce}
+        overlays={overlays}
         onRegisterFit={registerFit}
+        onRegisterCapture={registerCapture}
       />
     </div>
   )
@@ -85,13 +128,24 @@ function DualMapPanel({
   view,
   cross,
   onCross,
+  measureMode,
+  measureClearNonce,
+  overlays,
   onRegisterFit,
+  onRegisterCapture,
 }: {
   source: CompareMapSource
   view: View
   cross: CrossPosition
   onCross: (pos: CrossPosition) => void
+  measureMode: MeasureMode
+  measureClearNonce: number
+  overlays: ReadonlyArray<ContextOverlay>
   onRegisterFit: (slot: string, fit: (() => void) | null) => void
+  onRegisterCapture: (
+    slot: string,
+    capture: (() => Promise<CaptureResult | null>) | null,
+  ) => void
 }) {
   const { t } = useTranslation('compare')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -123,6 +177,9 @@ function DualMapPanel({
     decLoading: noop,
   })
 
+  useMeasure(mapRef, measureMode, measureClearNonce)
+  useContextOverlays(mapRef, overlays)
+
   useEffect(() => {
     setFitBbox(source.bbox)
   }, [source.bbox, setFitBbox])
@@ -131,6 +188,30 @@ function DualMapPanel({
     onRegisterFit(source.slot, () => tryFit(true))
     return () => onRegisterFit(source.slot, null)
   }, [source.slot, tryFit, onRegisterFit])
+
+  useEffect(() => {
+    onRegisterCapture(source.slot, () => {
+      const map = mapRef.current
+      if (!map) return Promise.resolve(null)
+      return new Promise((resolve) => {
+        map.once('rendercomplete', () => {
+          const canvas = map
+            .getTargetElement()
+            .querySelector<HTMLCanvasElement>('canvas')
+          resolve(
+            canvas
+              ? {
+                  label: `${source.slot.toUpperCase()} · ${source.label}`,
+                  dataUrl: canvas.toDataURL('image/png'),
+                }
+              : null,
+          )
+        })
+        map.renderSync()
+      })
+    })
+    return () => onRegisterCapture(source.slot, null)
+  }, [source.slot, source.label, mapRef, onRegisterCapture])
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()

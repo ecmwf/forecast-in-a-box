@@ -15,7 +15,15 @@
  * and are marked as such.
  */
 
-import { FlaskConical, Globe2, ZoomIn } from 'lucide-react'
+import {
+  Download,
+  Eraser,
+  FlaskConical,
+  Globe2,
+  Ruler,
+  SquareDashed,
+  ZoomIn,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber } from '../format'
 import type { LinkMode } from './useCompareSelection'
@@ -42,6 +50,10 @@ export function CompareToolbar({
   onFit,
   options,
   onOptionsChange,
+  measureMode,
+  onMeasureMode,
+  onMeasureClear,
+  onExport,
 }: {
   mode: CompareMode
   onModeChange: (mode: CompareMode) => void
@@ -52,6 +64,10 @@ export function CompareToolbar({
   onFit: (() => void) | null
   options: CompareModeOptions
   onOptionsChange: (patch: Partial<CompareModeOptions>) => void
+  measureMode: 'none' | 'line' | 'area'
+  onMeasureMode: (mode: 'none' | 'line' | 'area') => void
+  onMeasureClear: () => void
+  onExport: () => void
 }) {
   const { t } = useTranslation('compare')
   const { t: tExec } = useTranslation('executions')
@@ -114,6 +130,54 @@ export function CompareToolbar({
             aria-label={tExec('lens.fitGlobe')}
           >
             <Globe2 className="h-4 w-4" />
+          </Button>
+          <span className="mx-1 h-5 w-px bg-border" />
+          <Button
+            variant={measureMode === 'line' ? 'secondary' : 'ghost'}
+            size="icon"
+            className="h-7 w-7"
+            aria-pressed={measureMode === 'line'}
+            onClick={() =>
+              onMeasureMode(measureMode === 'line' ? 'none' : 'line')
+            }
+            title={t('measure.line')}
+            aria-label={t('measure.line')}
+          >
+            <Ruler className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={measureMode === 'area' ? 'secondary' : 'ghost'}
+            size="icon"
+            className="h-7 w-7"
+            aria-pressed={measureMode === 'area'}
+            onClick={() =>
+              onMeasureMode(measureMode === 'area' ? 'none' : 'area')
+            }
+            title={t('measure.area')}
+            aria-label={t('measure.area')}
+          >
+            <SquareDashed className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onMeasureClear}
+            title={t('measure.clear')}
+            aria-label={t('measure.clear')}
+          >
+            <Eraser className="h-4 w-4" />
+          </Button>
+          <span className="mx-1 h-5 w-px bg-border" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onExport}
+            title={t('export.open')}
+            aria-label={t('export.open')}
+          >
+            <Download className="h-4 w-4" />
           </Button>
         </div>
       </div>
