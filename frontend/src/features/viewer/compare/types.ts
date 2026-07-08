@@ -21,6 +21,9 @@ export interface CompareMapSource {
   layerOpacities: ReadonlyMap<string, number>
   /** Raw TIME string THIS server advertised for the current instant. */
   resolveTime: (layer: ParsedLayer) => string | null
+  /** Base stack opacity: global × per-source tier (mode factors and
+   *  time-gap hiding are applied by the map components on top). */
+  masterOpacity: number
   /** True when the source lacks data at the selected valid time —
    *  its stack is hidden and the panel shows a gap badge. */
   hiddenAtTime: boolean

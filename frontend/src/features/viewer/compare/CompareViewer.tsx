@@ -33,8 +33,9 @@ import {
 import { useCompareSelection } from './useCompareSelection'
 import { CompareToolbar } from './CompareToolbar'
 import { CompareTimeSlider } from './CompareTimeSlider'
+import { CompareActiveLayersPanel } from './CompareActiveLayersPanel'
+import { CompareLayerBrowser } from './CompareLayerBrowser'
 import { DualMapCompare } from './DualMapCompare'
-import { LinkedLayerBrowser } from './LinkedLayerBrowser'
 import { SingleMapCompare } from './SingleMapCompare'
 import type View from 'ol/View'
 import type { ParsedLayer } from '../wms-capabilities'
@@ -89,6 +90,18 @@ export function CompareViewer({
 
   const activeOrderA = selection.activeOrderFor('a')
   const activeOrderB = selection.activeOrderFor('b')
+
+  // Opacity hierarchy: global × per-source × per-layer (per-layer lives in
+  // the selection; the product of the first two feeds the map stacks).
+  const [globalOpacity, setGlobalOpacity] = useState(1)
+  const [sourceOpacity, setSourceOpacity] = useState<
+    Record<SourceSlot, number>
+  >({ a: 1, b: 1 })
+  const setSourceOpacityFor = useCallback(
+    (slot: SourceSlot, value: number) =>
+      setSourceOpacity((prev) => ({ ...prev, [slot]: value })),
+    [],
+  )
 
   // -------- Valid-time alignment (epoch-keyed union) --------
   const timeIndexA = useMemo(
@@ -163,6 +176,7 @@ export function CompareViewer({
     layerOpacities: selection.opacitiesFor('a'),
     resolveTime: resolveTimeFor('a'),
     hiddenAtTime: hiddenAtTime('a'),
+    masterOpacity: globalOpacity * sourceOpacity.a,
     bbox: sourceA.bbox,
   }
   const mapSourceB: CompareMapSource = {
@@ -174,6 +188,7 @@ export function CompareViewer({
     layerOpacities: selection.opacitiesFor('b'),
     resolveTime: resolveTimeFor('b'),
     hiddenAtTime: hiddenAtTime('b'),
+    masterOpacity: globalOpacity * sourceOpacity.b,
     bbox: sourceB.bbox,
   }
 
@@ -219,6 +234,20 @@ export function CompareViewer({
         onFit={fitAction}
       />
       <div className="flex min-h-0 flex-1 gap-2">
+        <CompareActiveLayersPanel
+          pairs={pairing.pairs}
+          selection={selection}
+          opacity={{
+            global: globalOpacity,
+            setGlobal: setGlobalOpacity,
+            source: sourceOpacity,
+            setSource: setSourceOpacityFor,
+          }}
+          sources={{
+            a: { label: a.label, baseUrl: a.baseUrl, lens: sourceA },
+            b: { label: b.label, baseUrl: b.baseUrl, lens: sourceB },
+          }}
+        />
         <div className="min-h-0 min-w-0 flex-1">
           {mode === 'side' ? (
             <DualMapCompare
@@ -237,13 +266,11 @@ export function CompareViewer({
             />
           )}
         </div>
-        <LinkedLayerBrowser
+        <CompareLayerBrowser
           pairs={pairing.pairs}
           selection={selection}
           sourceA={sourceA}
           sourceB={sourceB}
-          baseUrlA={a.baseUrl}
-          baseUrlB={b.baseUrl}
         />
       </div>
       <CompareTimeSlider

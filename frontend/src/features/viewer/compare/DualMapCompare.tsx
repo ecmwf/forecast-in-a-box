@@ -115,7 +115,7 @@ function DualMapPanel({
   })
   useWmsLayerStack(mapRef, source.baseUrl, source.layers, {
     zBase: 100,
-    masterOpacity: source.hiddenAtTime ? 0 : 1,
+    masterOpacity: source.hiddenAtTime ? 0 : source.masterOpacity,
     activeOrder: source.activeOrder,
     layerOpacities: source.layerOpacities,
     resolveTime: source.resolveTime,

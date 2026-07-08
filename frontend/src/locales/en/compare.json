@@ -103,5 +103,25 @@
     "autoUnlinked": "The two sources share no common layers — selection is per panel.",
     "availableIn": "Available in {{slots}}",
     "notAvailableIn": "Not available in {{slot}}"
+  },
+  "browser": {
+    "filterAria": "Filter layers by source availability",
+    "all": "All",
+    "surface": "Surface (sfc)",
+    "pressure": "Pressure level (pl)",
+    "levels_one": "{{count}} level",
+    "levels_other": "{{count}} levels"
+  },
+  "sidebar": {
+    "active": "Active layers",
+    "globalOpacity": "Global opacity",
+    "sourceOpacity": "All of {{slot}}",
+    "removeLayer": "Remove {{name}}",
+    "empty": "Add layers from the browser on the right."
+  },
+  "slots": {
+    "swap": "Swap A and B",
+    "placeholder": "Pick a source…",
+    "pickerAria": "Source for slot {{slot}}"
   }
 }
