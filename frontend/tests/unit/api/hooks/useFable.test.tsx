@@ -60,6 +60,21 @@ const mockFable: FableBuilderV1 = {
   },
 }
 
+/** API wire format for mockFable (new backend format with list-based blocks). */
+const mockApiFable = {
+  blocks: [
+    {
+      instance_id: 'block-1',
+      plugin: { store: 'ecmwf', local: 'core-plugin' },
+      factory: 'model',
+      instance: {
+        configuration_values: { param1: 'value1' },
+        input_ids: {},
+      },
+    },
+  ],
+}
+
 const mockExpansion = {
   global_errors: [],
   block_errors: {},
@@ -200,7 +215,7 @@ describe('useFable', () => {
     const mockRetrieveResponse = {
       blueprint_id: 'test-fable-id',
       version: 1,
-      builder: mockFable,
+      builder: mockApiFable,
       display_name: 'Test Config',
       display_description: '',
       tags: [],

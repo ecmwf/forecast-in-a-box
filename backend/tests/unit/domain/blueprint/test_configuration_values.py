@@ -6,8 +6,6 @@ from fiab_core.fable import (
     BlockFactoryId,
     BlockInstance,
     ConfigurationOptionId,
-    PluginBlockFactoryId,
-    PluginCompositeId,
 )
 
 from forecastbox.domain.blueprint.configuration_values import convert_known_configuration_values
@@ -18,7 +16,6 @@ TEXT = ConfigurationOptionId("text")
 
 def _make_block(config: dict[ConfigurationOptionId, Any]) -> BlockInstance:
     return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("local:test"), factory=BlockFactoryId("transform_increment")),
         configuration_values=config,
         input_ids={},
     )

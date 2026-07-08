@@ -34,11 +34,8 @@ from fiab_core.fable import (
     BlueprintTemplate,
     ConfigurationOptionId,
     NoOutput,
-    PluginBlockExpansion,
-    PluginBlockFactoryId,
     PluginCompositeId,
     QubedOutput,
-    SelfPluginId,
 )
 from pydantic import Field
 
@@ -71,9 +68,47 @@ class Tag(FiabBaseModel):
     value: str | None = None
 
 
+class PluginBlockFactoryId(FiabBaseModel):
+    """Routing key combining plugin identity with a local factory id.
+
+    Used in API responses (possible_sources) and expansion results to give
+    clients the full address of a block factory across all installed plugins.
+    Plugin authors never construct or consume this class directly.
+    """
+
+    plugin: PluginCompositeId
+    factory: BlockFactoryId
+
+
+class SerializedBlockExpansion(FiabBaseModel):
+    """Expansion result as returned to clients, combining plugin identity with restrictions.
+
+    This is the service-level representation sent to API consumers, containing
+    the full plugin composite id, factory id, and serialized restriction types.
+    """
+
+    plugin: PluginCompositeId
+    factory: BlockFactoryId
+    restrictions: dict[ConfigurationOptionId, str] = Field(default_factory=dict)
+    """Serialized FableType restrictions (e.g., 'int', 'enumClosed[a,b]')"""
+
+
+class RoutableBlock(FiabBaseModel):
+    """A block as stored and transmitted via the API.
+
+    Flat structure: carries the block's own identity (instance_id), its full
+    routing address (plugin + factory), and its content (instance).
+    """
+
+    instance_id: BlockInstanceId
+    plugin: PluginCompositeId
+    factory: BlockFactoryId
+    instance: BlockInstance
+
+
 class BlueprintBuilder(FiabBaseModel):
     # NOTE warning -- this class is used by the web api. Be careful about changes here
-    blocks: dict[BlockInstanceId, BlockInstance]
+    blocks: list[RoutableBlock] = Field(default_factory=list)
     environment: EnvironmentSpecification | None = None
     local_glyphs: dict[str, str] = Field(default_factory=dict)
 
@@ -104,7 +139,7 @@ class BlueprintValidationExpansion(FiabBaseModel):
     global_errors: list[str]
     block_errors: dict[BlockInstanceId, list[str]]
     possible_sources: list[PluginBlockFactoryId]
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]]
+    possible_expansions: dict[BlockInstanceId, list[SerializedBlockExpansion]]
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = Field(default_factory=dict)
@@ -159,7 +194,7 @@ async def validate_expand(
             if block_factory.kind == "source" and not block_factory.inputs
         ]
     )
-    possible_expansions: dict[BlockInstanceId, list[PluginBlockExpansion]] = {}
+    possible_expansions: dict[BlockInstanceId, list[SerializedBlockExpansion]] = {}
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
@@ -187,6 +222,14 @@ async def validate_expand(
     for key in sorted(colliding_keys):
         global_errors.append(f"Local glyph key {key!r} is reserved as an intrinsic glyph and cannot be overridden.")
 
+    # Build lookup and detect duplicate instance ids.
+    block_lookup: dict[BlockInstanceId, RoutableBlock] = {}
+    for routable in blueprint.blocks:
+        if routable.instance_id in block_lookup:
+            global_errors.append(f"Duplicate block instance id: {routable.instance_id!r}")
+        else:
+            block_lookup[routable.instance_id] = routable
+
     try:
         all_glyphs = expand_glyph_values(all_glyphs_raw)
     except GlyphCircularReferenceError as e:
@@ -196,23 +239,23 @@ async def validate_expand(
     invalidable: set[BlockInstanceId] = set()
     visited: set[BlockInstanceId] = set()
 
-    for blockId in topological_order(blueprint.blocks.items(), lambda block: block.input_ids.values()):
+    for blockId in topological_order(block_lookup.items(), lambda block: block.instance.input_ids.values()):
         visited.add(blockId)
-        blockInstance = blueprint.blocks[blockId]
-        plugin = plugins.get(blockInstance.factory_id.plugin, None)
+        routable = block_lookup[blockId]
+        plugin = plugins.get(routable.plugin, None)
         if not plugin:
             block_errors[blockId] += ["Plugin not found"]
             invalidable.add(blockId)
             continue
-        blockFactory = plugin.catalogue.factories.get(blockInstance.factory_id.factory, None)
+        blockFactory = plugin.catalogue.factories.get(routable.factory, None)
         if not blockFactory:
             block_errors[blockId] += ["BlockFactory not found in the catalogue"]
             invalidable.add(blockId)
             continue
-        extraConfig = blockInstance.configuration_values.keys() - blockFactory.configuration_options.keys()
+        extraConfig = routable.instance.configuration_values.keys() - blockFactory.configuration_options.keys()
         if extraConfig:
             block_errors[blockId] += [f"Block contains extra config: {extraConfig}"]
-        extract_result = resolution.extract_glyphs(blockInstance)
+        extract_result = resolution.extract_glyphs(routable.instance)
         if extract_result.e is not None:
             block_errors[blockId] += extract_result.e
             invalidable.add(blockId)
@@ -222,21 +265,21 @@ async def validate_expand(
         if unknown_glyphs:
             # Soft path: omit options referencing unknown glyphs and record them,
             # rather than failing the whole block.
-            option_glyph_map = resolution.extract_glyphs_per_option(blockInstance)
+            option_glyph_map = resolution.extract_glyphs_per_option(routable.instance)
             for opt_id, opt_glyphs in option_glyph_map.items():
                 opt_unknown = opt_glyphs & unknown_glyphs
                 if opt_unknown:
                     missing_glyphs_result.setdefault(blockId, {})[opt_id] = sorted(opt_unknown)
-                    del blockInstance.configuration_values[opt_id]
+                    del routable.instance.configuration_values[opt_id]
             # Re-extract after removing affected options to get an accurate extracted state.
-            extract_result = resolution.extract_glyphs(blockInstance)
+            extract_result = resolution.extract_glyphs(routable.instance)
             if extract_result.e is not None:
                 block_errors[blockId] += extract_result.e
                 invalidable.add(blockId)
                 continue
             extracted = cast(ExtractedGlyphs, extract_result.t)
         try:
-            resolution.resolve_configurations(blockInstance, all_glyphs)
+            resolution.resolve_configurations(routable.instance, all_glyphs)
         except Exception as exc:
             block_errors[blockId] += [f"Jinja expression error: {exc}"]
             invalidable.add(blockId)
@@ -244,36 +287,36 @@ async def validate_expand(
         # A glyph value may itself reference an unknown glyph (e.g. myPath="${root}/${missing}").
         # After substitution those unresolved ${...} patterns survive in the config values;
         # a second extract_glyphs pass surfaces them.
-        extract_after = resolution.extract_glyphs(blockInstance)
+        extract_after = resolution.extract_glyphs(routable.instance)
         nested_unknowns = cast(ExtractedGlyphs, extract_after.t).glyphs
         if nested_unknowns:
             # Soft path: omit options with unresolved nested glyph references.
-            option_glyph_map_after = resolution.extract_glyphs_per_option(blockInstance)
+            option_glyph_map_after = resolution.extract_glyphs_per_option(routable.instance)
             for opt_id, opt_glyphs in option_glyph_map_after.items():
                 opt_nested = opt_glyphs & nested_unknowns
                 if opt_nested:
                     block_opts = missing_glyphs_result.setdefault(blockId, {})
                     existing = set(block_opts.get(opt_id, []))
                     block_opts[opt_id] = sorted(existing | opt_nested)
-                    del blockInstance.configuration_values[opt_id]
+                    del routable.instance.configuration_values[opt_id]
         # We dont want to return resolutions of nested glyphs, just the top levels. For this reason
         # we need to run the extraction twice, not just once after the substitution
         resolved_configuration_options[blockId] = {
-            k: blockInstance.configuration_values[k] for k in extracted.glyphed_options if k in blockInstance.configuration_values
+            k: routable.instance.configuration_values[k] for k in extracted.glyphed_options if k in routable.instance.configuration_values
         }
-        converted_values = convert_known_configuration_values(blockInstance, blockFactory)
+        converted_values = convert_known_configuration_values(routable.instance, blockFactory)
         if converted_values.t is None:
             block_errors[blockId] += converted_values.e
             invalidable.add(blockId)
             continue
-        blockInstance.configuration_values = converted_values.t
+        routable.instance.configuration_values = converted_values.t
 
-        if any(source_id in invalidable for source_id in blockInstance.input_ids.values()):
+        if any(source_id in invalidable for source_id in routable.instance.input_ids.values()):
             invalidable.add(blockId)
             continue
 
-        inputs = {input_id: outputs[source_id] for input_id, source_id in blockInstance.input_ids.items()}
-        validation = plugin.validator(blockInstance, inputs)
+        inputs = {input_id: outputs[source_id] for input_id, source_id in routable.instance.input_ids.items()}
+        validation = plugin.validator(routable.factory, routable.instance, inputs)
         output_or_error = validation.result
         restrictions = validation.restrictions
         if not validate_only and restrictions:
@@ -295,7 +338,7 @@ async def validate_expand(
         if not validate_only:
             possible_expansions[blockId] = (
                 [
-                    PluginBlockExpansion(
+                    SerializedBlockExpansion(
                         plugin=any_plugin_id,
                         factory=expansion.factory,
                         restrictions={k: v.serialize() for k, v in expansion.restrictions.items()},
@@ -308,9 +351,9 @@ async def validate_expand(
             )
 
     # the topological search *omits* nodes in cycles or with missing ancestors -- thus we need to report and detect them
-    for blockId, blockInstance in blueprint.blocks.items():
+    for blockId, routable in block_lookup.items():
         if blockId not in visited:
-            missing = [source_id for source_id in blockInstance.input_ids.values() if source_id not in blueprint.blocks]
+            missing = [source_id for source_id in routable.instance.input_ids.values() if source_id not in block_lookup]
             if missing:
                 block_errors[blockId] += [f"References non-existent block(s): {missing}"]
                 invalidable.add(blockId)
@@ -330,20 +373,23 @@ async def validate_expand(
 def template_to_builder(template: BlueprintTemplate, plugin_id: PluginCompositeId) -> BlueprintBuilder:
     """Convert a ``BlueprintTemplate`` to a ``BlueprintBuilder`` suitable for persistence.
 
-    ``SelfPluginId`` sentinels in block factory IDs are replaced with the real
-    plugin composite ID.  ``example_values`` and ``example_glyphs`` are
+    The local factory ids in template blocks are combined with the real plugin composite
+    ID to produce routed blocks.  ``example_values`` and ``example_glyphs`` are
     intentionally not copied -- they are guiding-only data and must not appear
     in ``configuration_values``.
     """
-    blocks: dict[BlockInstanceId, BlockInstance] = {}
-    for block_id, block in template.blocks.items():
-        factory = block.factory_id
-        if factory.plugin == SelfPluginId:
-            factory = PluginBlockFactoryId(plugin=plugin_id, factory=factory.factory)
-        blocks[block_id] = BlockInstance(
-            factory_id=factory,
-            configuration_values=dict(block.configuration_values),
-            input_ids=dict(block.input_ids),
+    blocks: list[RoutableBlock] = []
+    for block_id, template_block in template.blocks.items():
+        blocks.append(
+            RoutableBlock(
+                instance_id=block_id,
+                plugin=plugin_id,
+                factory=template_block.factory_id,
+                instance=BlockInstance(
+                    configuration_values=dict(template_block.instance.configuration_values),
+                    input_ids=dict(template_block.instance.input_ids),
+                ),
+            )
         )
     environment: EnvironmentSpecification | None = None
     if template.environment is not None:
@@ -379,14 +425,16 @@ def resolve_builder_with_examples(
     """
     copy = builder.model_copy(deep=True)
 
-    new_blocks: dict[BlockInstanceId, BlockInstance] = {}
-    for block_id, block in copy.blocks.items():
-        if block_id in example_values:
+    new_blocks: list[RoutableBlock] = []
+    for routable in copy.blocks:
+        if routable.instance_id in example_values:
             # Merge: example values override existing template configuration values.
-            merged_config = {**block.configuration_values, **example_values[block_id]}
-            new_blocks[block_id] = block.model_copy(update={"configuration_values": merged_config})
+            merged_config = {**routable.instance.configuration_values, **example_values[routable.instance_id]}
+            new_blocks.append(
+                routable.model_copy(update={"instance": routable.instance.model_copy(update={"configuration_values": merged_config})})
+            )
         else:
-            new_blocks[block_id] = block
+            new_blocks.append(routable)
 
     # Merge example_glyphs into local_glyphs; example glyphs take precedence.
     merged_local_glyphs: dict[str, str] = {**copy.local_glyphs, **example_glyphs}
@@ -410,10 +458,12 @@ def remap_builder_glyphs(builder: BlueprintBuilder, mapping: dict[str, str]) -> 
     if not mapping:
         return builder
 
-    new_blocks: dict[BlockInstanceId, BlockInstance] = {}
-    for block_id, block in builder.blocks.items():
-        new_config = {opt_id: remap_glyph_names(val, mapping) for opt_id, val in block.configuration_values.items()}
-        new_blocks[block_id] = block.model_copy(update={"configuration_values": new_config})
+    new_blocks: list[RoutableBlock] = []
+    for routable in builder.blocks:
+        new_config = {opt_id: remap_glyph_names(val, mapping) for opt_id, val in routable.instance.configuration_values.items()}
+        new_blocks.append(
+            routable.model_copy(update={"instance": routable.instance.model_copy(update={"configuration_values": new_config})})
+        )
 
     new_local_glyphs: dict[str, str] = {}
     for key, val in builder.local_glyphs.items():

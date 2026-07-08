@@ -13,13 +13,8 @@ import datetime as dt
 
 import pytest
 from fiab_core.fable import (
-    BlockFactoryId,
     BlockInstance,
     ConfigurationOptionId,
-    PluginBlockFactoryId,
-    PluginCompositeId,
-    PluginId,
-    PluginStoreId,
 )
 
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
@@ -35,10 +30,6 @@ from forecastbox.utility.time import value_dt2str
 
 def _block(config: dict[str, str]) -> BlockInstance:
     return BlockInstance(
-        factory_id=PluginBlockFactoryId(
-            plugin=PluginCompositeId(store=PluginStoreId("test"), local=PluginId("test")),
-            factory=BlockFactoryId("test_factory"),
-        ),
         configuration_values={ConfigurationOptionId(key): value for key, value in config.items()},
         input_ids={},
     )

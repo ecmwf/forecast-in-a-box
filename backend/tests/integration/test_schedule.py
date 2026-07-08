@@ -17,9 +17,9 @@ import time
 from typing import Any
 
 import httpx
-from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, ConfigurationOptionId, PluginBlockFactoryId
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, ConfigurationOptionId
 
-from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.blueprint.service import BlueprintBuilder, RoutableBlock
 from forecastbox.domain.blueprint.service import BlueprintSaveCommand as BlueprintSaveRequest
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
@@ -59,12 +59,20 @@ def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float 
 
 def _save_blueprint(client: httpx.Client) -> tuple[BlueprintId, int]:
     """Save a minimal BlueprintBuilder and return (blueprint_id, version)."""
-    source = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source = RoutableBlock(
+        instance_id=BlockInstanceId("source"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    builder = BlueprintBuilder(blocks={BlockInstanceId("source1"): source})
+    builder = BlueprintBuilder(
+        blocks=[
+            source.model_copy(update={"instance_id": BlockInstanceId("source1")}),
+        ]
+    )
     resp = client.post("/blueprint/create", json=BlueprintSaveRequest(builder=builder, display_name="sched-v2 test").model_dump())
     assert resp.is_success, resp.text
     data = resp.json()
@@ -73,45 +81,69 @@ def _save_blueprint(client: httpx.Client) -> tuple[BlueprintId, int]:
 
 def _save_full_blueprint(client: httpx.Client, output_path: str, time_output_path: str) -> tuple[BlueprintId, int]:
     """Save a full BlueprintBuilder (with sink) and return (blueprint_id, version)."""
-    source_42 = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_42")),
-        configuration_values={},
-        input_ids={},
+    source_42 = RoutableBlock(
+        instance_id=BlockInstanceId("source_42"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_42"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={},
+        ),
     )
-    transform_increment = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("transform_increment")),
-        configuration_values=_config({"amount": "1"}),
-        input_ids={"a": BlockInstanceId("source_42")},
+    transform_increment = RoutableBlock(
+        instance_id=BlockInstanceId("transform_increment"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("transform_increment"),
+        instance=BlockInstance(
+            configuration_values=_config({"amount": "1"}),
+            input_ids={"a": BlockInstanceId("source_42")},
+        ),
     )
-    product_join = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("product_join")),
-        configuration_values={},
-        input_ids={"a": BlockInstanceId("transform_increment"), "b": BlockInstanceId("source_42")},
+    product_join = RoutableBlock(
+        instance_id=BlockInstanceId("product_join"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("product_join"),
+        instance=BlockInstance(
+            configuration_values={},
+            input_ids={"a": BlockInstanceId("transform_increment"), "b": BlockInstanceId("source_42")},
+        ),
     )
-    sink_file = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": output_path}),
-        input_ids={"data": BlockInstanceId("product_join")},
+    sink_file = RoutableBlock(
+        instance_id=BlockInstanceId("sink_file"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": output_path}),
+            input_ids={"data": BlockInstanceId("product_join")},
+        ),
     )
-    source_time = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values=_config({"text": "${submitDatetime};${startDatetime}"}),
-        input_ids={},
+    source_time = RoutableBlock(
+        instance_id=BlockInstanceId("source_time"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_text"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "${submitDatetime};${startDatetime}"}),
+            input_ids={},
+        ),
     )
-    sink_time = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=testPluginId, factory=BlockFactoryId("sink_file")),
-        configuration_values=_config({"fname": time_output_path}),
-        input_ids={"data": BlockInstanceId("source_time")},
+    sink_time = RoutableBlock(
+        instance_id=BlockInstanceId("sink_time"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": time_output_path}),
+            input_ids={"data": BlockInstanceId("source_time")},
+        ),
     )
     builder = BlueprintBuilder(
-        blocks={
-            BlockInstanceId("source_42"): source_42,
-            BlockInstanceId("transform_increment"): transform_increment,
-            BlockInstanceId("product_join"): product_join,
-            BlockInstanceId("sink_file"): sink_file,
-            BlockInstanceId("source_time"): source_time,
-            BlockInstanceId("sink_time"): sink_time,
-        }
+        blocks=[
+            source_42,
+            transform_increment,
+            product_join,
+            sink_file,
+            source_time,
+            sink_time,
+        ]
     )
     resp = client.post("/blueprint/create", json=BlueprintSaveRequest(builder=builder).model_dump())
     assert resp.is_success, resp.text

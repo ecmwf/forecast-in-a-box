@@ -345,7 +345,7 @@ describe('PresetsPage — template lineage', () => {
           return HttpResponse.json({
             blueprint_id: 'bp-001',
             version: 1,
-            builder: { blocks: {} },
+            builder: { blocks: [] },
             display_name: 'European Forecast',
             display_description: null,
             tags: [],
@@ -356,7 +356,7 @@ describe('PresetsPage — template lineage', () => {
           return HttpResponse.json({
             blueprint_id: 'tpl-001',
             version: 1,
-            builder: { blocks: {} },
+            builder: { blocks: [] },
             display_name: 'Fast Map',
             display_description: null,
             tags: [],
@@ -396,7 +396,7 @@ describe('PresetsPage — delete preset', () => {
           return HttpResponse.json({
             blueprint_id: 'bp-001',
             version: 1,
-            builder: { blocks: {} },
+            builder: { blocks: [] },
             display_name: 'European Forecast',
             display_description: null,
             tags: [],

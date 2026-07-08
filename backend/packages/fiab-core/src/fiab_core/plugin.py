@@ -21,13 +21,13 @@ from fiab_core.fable import (
     ActionLookup,
     BlockExpansion,
     BlockFactoryCatalogue,
+    BlockFactoryId,
     BlockInstance,
     BlockInstanceOutput,
     BlueprintTemplate,
     ConfigurationOptionRestriction,
+    Error,
 )
-
-Error = str
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -51,14 +51,14 @@ class BlockValidation:
     restrictions: ConfigurationOptionRestriction = field(default_factory=dict)
 
 
-Validator = Callable[[BlockInstance, dict[str, BlockInstanceOutput]], BlockValidation]
-"""Given a block instance and its inputs, return either error or output and configuration restrictions"""
+Validator = Callable[[BlockFactoryId, BlockInstance, dict[str, BlockInstanceOutput]], BlockValidation]
+"""Given a factory id from this PLugin, a block instance corresponding to it, and its inputs, return either error or output and configuration restrictions"""
 
 Expander = Callable[[BlockInstanceOutput], list[BlockExpansion]]
 """Given a block instance output (including from other plugin), provide which block factories from this plugin can expand it"""
 
-Compiler = Callable[[ActionLookup, BlockInstance], Either[Action, Error]]  # ty:ignore[invalid-type-arguments] # semigroup
-"""Given a cascade builder, represented as lookup of fluent actions, and a block instance corresponding to this plugin's Factory, either return the fluent action resulting from this block or an error"""
+Compiler = Callable[[ActionLookup, BlockFactoryId, BlockInstance], Either[Action, Error]]  # ty:ignore[invalid-type-arguments] # semigroup
+"""Given a cascade builder, represented as lookup of fluent actions, a factory id from this Plugin, and a block instance corresponding to it, either return the fluent action resulting from this block or an error"""
 
 
 @dataclass(frozen=True, eq=True, slots=True)

@@ -5,11 +5,12 @@ import socketserver
 import tempfile
 import time
 from http.server import SimpleHTTPRequestHandler
-from multiprocessing import Event, Process
+from multiprocessing import Event, Process, get_context
 from typing import Any, Generator
 
 import httpx
 import pytest
+from cascade.executor.platform import get_mp_ctx
 from fiab_core.artifacts import ArtifactStoreId
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 from pydantic import SecretStr
@@ -185,7 +186,8 @@ def backend_client() -> Generator[httpx.Client, None, None]:
 
         # Start fake artifact registry before launching the app
         shutdown_event_artifacts = Event()
-        p_artifacts = Process(target=run_artifact_registry, args=(shutdown_event_artifacts,))
+        # NOTE we basically need a `fork/spawn` here, as forkserver makes us lose the envvars
+        p_artifacts = get_mp_ctx("other").Process(target=run_artifact_registry, args=(shutdown_event_artifacts,))
         p_artifacts.start()
 
         validate_runtime(config)

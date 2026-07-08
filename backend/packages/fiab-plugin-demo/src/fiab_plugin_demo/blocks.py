@@ -12,7 +12,6 @@ from earthkit.workflows.fluent import Action
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
-    BlockInstance,
     BlockInstanceOutput,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
@@ -20,7 +19,7 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import Product, Sink, Transform
+from fiab_core.tools.blocks import BlockInstanceRich, Product, Sink, Transform
 
 DIR = ConfigurationOptionId("dir")
 PARAM = ConfigurationOptionId("param")
@@ -31,7 +30,7 @@ class _DemoTransform(Transform):
     inputs: list[str] = ["dataset"]
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         dataset = inputs.get("dataset")
         if dataset is None:
@@ -41,7 +40,7 @@ class _DemoTransform(Transform):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(inputs[block.input_ids["dataset"]])
 
@@ -54,7 +53,7 @@ class _DemoProduct(Product):
     inputs: list[str] = ["dataset"]
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         dataset = inputs.get("dataset")
         if dataset is None:
@@ -64,7 +63,7 @@ class _DemoProduct(Product):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(inputs[block.input_ids["dataset"]])
 
@@ -77,7 +76,7 @@ class _DemoSink(Sink):
     inputs: list[str] = ["dataset"]
 
     def validate(
-        self, block: BlockInstance, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         if "dataset" not in inputs:
             raise ValueError("Missing input 'dataset'")
@@ -86,7 +85,7 @@ class _DemoSink(Sink):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         return Either.ok(inputs[block.input_ids["dataset"]])
 

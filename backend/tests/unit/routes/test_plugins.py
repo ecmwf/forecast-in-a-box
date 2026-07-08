@@ -21,12 +21,11 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlueprintTemplate,
+    BlueprintTemplateBlock,
     ConfigurationOptionId,
-    PluginBlockFactoryId,
     PluginCompositeId,
     PluginId,
     PluginStoreId,
-    SelfPluginId,
 )
 from fiab_core.plugin import Plugin
 from packaging.specifiers import SpecifierSet
@@ -198,10 +197,9 @@ _TEMPLATE_WITH_EXAMPLES = BlueprintTemplate(
     display_name="myTemplate",
     display_description="desc",
     blocks={
-        _BLOCK_A: BlockInstance(
-            factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("source_text")),
-            configuration_values={_TEXT: "fixed"},
-            input_ids={},
+        _BLOCK_A: BlueprintTemplateBlock(
+            factory_id=BlockFactoryId("source_text"),
+            instance=BlockInstance(configuration_values={_TEXT: "fixed"}, input_ids={}),
         ),
     },
     example_values={_BLOCK_A: {_TEXT: "${exampleGlyph}"}},
@@ -218,9 +216,9 @@ _TEMPLATE_NO_EXAMPLES = BlueprintTemplate(
 def _make_plugin(*templates: BlueprintTemplate) -> Plugin:
     return Plugin(
         catalogue=BlockFactoryCatalogue(factories={}),
-        validator=lambda inst, inputs: (_ for _ in ()).throw(NotImplementedError),  # type: ignore[return-value]
+        validator=lambda factory_id, inst, inputs: (_ for _ in ()).throw(NotImplementedError),  # type: ignore[return-value]
         expander=lambda output: [],
-        compiler=lambda lookup, inst: (_ for _ in ()).throw(NotImplementedError),  # type: ignore[return-value]
+        compiler=lambda lookup, factory_id, inst: (_ for _ in ()).throw(NotImplementedError),  # type: ignore[return-value]
         blueprint_templates=templates,
     )
 

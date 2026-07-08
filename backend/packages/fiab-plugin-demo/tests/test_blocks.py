@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import pytest
-from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, NoOutput, PluginBlockFactoryId, PluginCompositeId, QubedOutput
+from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, NoOutput, QubedOutput
 from fiab_core.tools.blocks import BlockInstanceRich, QubedBlockBuilder
 
 from fiab_plugin_demo import plugin
@@ -39,14 +39,13 @@ EXPECTED_FACTORY_IDS = {
 
 def _block(factory_id: BlockFactoryId) -> BlockInstance:
     return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("demo:demo"), factory=factory_id),
         input_ids={"dataset": BlockInstanceId("source_output")},
         configuration_values={},
     )
 
 
 def _rich_block(factory_id: BlockFactoryId, builder: QubedBlockBuilder) -> BlockInstanceRich:
-    return BlockInstanceRich.from_block(_block(factory_id), builder.configuration_options)
+    return BlockInstanceRich.from_block(factory_id, _block(factory_id), builder.configuration_options)
 
 
 @pytest.fixture

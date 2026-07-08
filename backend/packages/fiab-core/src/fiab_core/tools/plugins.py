@@ -52,10 +52,10 @@ class QubedPluginBuilder:
         self.block_builders = block_builders
         self.base_environment = [_detect_editable_install(e) for e in base_environment]
 
-    def validate(self, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
-        """Given a block instance and its inputs, return either error or output and configuration restrictions."""
-        factory = self.block_builders[block.factory_id.factory]
-        rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
+    def validate(self, factory_id: BlockFactoryId, block: BlockInstance, inputs: dict[str, QubedOutput]) -> BlockValidation:
+        """Given a factory id from this Plugin, a block instance corresponding to it, and its inputs, return either error or output and configuration restrictions."""
+        factory = self.block_builders[factory_id]
+        rich_block = BlockInstanceRich.from_block(factory_id, block, factory.configuration_options)
         restrictions: ConfigurationOptionRestriction = {}
         try:
             result = factory.validate(rich_block, inputs, restrictions)
@@ -74,12 +74,13 @@ class QubedPluginBuilder:
     def compile(
         self,
         inputs: ActionLookup,
+        factory_id: BlockFactoryId,
         block: BlockInstance,
     ) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
-        """Given a cascade builder and a block instance corresponding to this plugin's Factory, either update the builder with corresponding tasks or provide error"""
+        """Given a cascade builder of ActionLookup, a factory id from this Plugin, and a block instance corresponding to it, either update the builder with corresponding tasks or provide error"""
         with PayloadBuildingContext(environment=self.base_environment):
-            factory = self.block_builders[block.factory_id.factory]
-            rich_block = BlockInstanceRich.from_block(block, factory.configuration_options)
+            factory = self.block_builders[factory_id]
+            rich_block = BlockInstanceRich.from_block(factory_id, block, factory.configuration_options)
             try:
                 return factory.compile(inputs, rich_block)
             except BlockInstanceConfigurationError as exc:
@@ -92,7 +93,7 @@ class QubedPluginBuilder:
             else:
                 return []
 
-        def _generic_validate(block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
+        def _generic_validate(factory_id: BlockFactoryId, block: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
             invalid = [f"{key}->{value.__class__.__name__}" for key, value in inputs.items() if not isinstance(value, QubedOutput)]
             if any(invalid):
                 return BlockValidation(
@@ -102,7 +103,7 @@ class QubedPluginBuilder:
                 )
             else:
                 inputs_validated = cast(dict[str, QubedOutput], inputs)
-                return self.validate(block, inputs_validated)
+                return self.validate(factory_id, block, inputs_validated)
 
         return lambda: Plugin(
             catalogue=BlockFactoryCatalogue(

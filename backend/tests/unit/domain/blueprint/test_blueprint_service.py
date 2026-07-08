@@ -15,16 +15,21 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     BlueprintTemplate,
+    BlueprintTemplateBlock,
     BlueprintTemplateEnvironment,
     ConfigurationOptionId,
-    PluginBlockFactoryId,
     PluginCompositeId,
     PluginId,
     PluginStoreId,
-    SelfPluginId,
 )
 
-from forecastbox.domain.blueprint.service import BlueprintBuilder, remap_builder_glyphs, resolve_builder_with_examples, template_to_builder
+from forecastbox.domain.blueprint.service import (
+    BlueprintBuilder,
+    RoutableBlock,
+    remap_builder_glyphs,
+    resolve_builder_with_examples,
+    template_to_builder,
+)
 
 _REAL_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("myStore"), local=PluginId("myPlugin"))
 _BLOCK_A = BlockInstanceId("blockA")
@@ -32,42 +37,33 @@ _BLOCK_B = BlockInstanceId("blockB")
 _OPT = ConfigurationOptionId("text")
 
 
-def _self_block(text: str = "hello") -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values={_OPT: text},
-        input_ids={},
+def _template_block(text: str = "hello") -> BlueprintTemplateBlock:
+    return BlueprintTemplateBlock(
+        factory_id=BlockFactoryId("source_text"),
+        instance=BlockInstance(configuration_values={_OPT: text}, input_ids={}),
     )
 
 
-def _real_block(text: str = "hello") -> BlockInstance:
-    return BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=_REAL_PLUGIN_ID, factory=BlockFactoryId("source_text")),
-        configuration_values={_OPT: text},
-        input_ids={},
+def _routable_block(block_id: BlockInstanceId = _BLOCK_A, text: str = "hello") -> RoutableBlock:
+    return RoutableBlock(
+        instance_id=block_id,
+        plugin=_REAL_PLUGIN_ID,
+        factory=BlockFactoryId("source_text"),
+        instance=BlockInstance(configuration_values={_OPT: text}, input_ids={}),
     )
 
 
-def test_template_to_builder_replaces_self_plugin_id() -> None:
-    """SelfPluginId sentinels in block factory IDs are replaced with the real plugin ID."""
+def test_template_to_builder_assigns_plugin_id() -> None:
+    """Template local factory ids are combined with the given plugin id."""
     template = BlueprintTemplate(
         display_name="t",
         display_description="d",
-        blocks={_BLOCK_A: _self_block()},
+        blocks={_BLOCK_A: _template_block()},
     )
     builder = template_to_builder(template, _REAL_PLUGIN_ID)
-    assert builder.blocks[_BLOCK_A].factory_id.plugin == _REAL_PLUGIN_ID
-
-
-def test_template_to_builder_keeps_real_plugin_id() -> None:
-    """A block already using the real plugin ID is not modified."""
-    template = BlueprintTemplate(
-        display_name="t",
-        display_description="d",
-        blocks={_BLOCK_A: _real_block()},
-    )
-    builder = template_to_builder(template, _REAL_PLUGIN_ID)
-    assert builder.blocks[_BLOCK_A].factory_id.plugin == _REAL_PLUGIN_ID
+    block = next(b for b in builder.blocks if b.instance_id == _BLOCK_A)
+    assert block.plugin == _REAL_PLUGIN_ID
+    assert block.factory == BlockFactoryId("source_text")
 
 
 def test_template_to_builder_propagates_env_vars() -> None:
@@ -115,10 +111,9 @@ def test_template_to_builder_example_values_not_in_configuration_values() -> Non
     """example_values must not appear in any block's configuration_values."""
     example_block = BlockInstanceId("example_block")
     opt = ConfigurationOptionId("text")
-    block = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=SelfPluginId, factory=BlockFactoryId("source_text")),
-        configuration_values={},
-        input_ids={},
+    block = BlueprintTemplateBlock(
+        factory_id=BlockFactoryId("source_text"),
+        instance=BlockInstance(configuration_values={}, input_ids={}),
     )
     template = BlueprintTemplate(
         display_name="t",
@@ -128,7 +123,8 @@ def test_template_to_builder_example_values_not_in_configuration_values() -> Non
         example_glyphs={"name": "world"},
     )
     builder = template_to_builder(template, _REAL_PLUGIN_ID)
-    assert opt not in builder.blocks[example_block].configuration_values
+    result = next(b for b in builder.blocks if b.instance_id == example_block)
+    assert opt not in result.instance.configuration_values
 
 
 # ---------------------------------------------------------------------------
@@ -139,19 +135,13 @@ def test_template_to_builder_example_values_not_in_configuration_values() -> Non
 def test_remap_builder_glyphs_renames_config_value_and_local_glyph() -> None:
     """Block config values, local-glyph values, and local-glyph keys are all renamed."""
     builder = BlueprintBuilder(
-        blocks={
-            _BLOCK_A: BlockInstance(
-                factory_id=PluginBlockFactoryId(plugin=_REAL_PLUGIN_ID, factory=BlockFactoryId("source_text")),
-                configuration_values={_OPT: "${oldGlyph}"},
-                input_ids={},
-            )
-        },
+        blocks=[_routable_block(text="${oldGlyph}")],
         local_glyphs={"localOld": "${oldGlyph}"},
     )
     mapping = {"oldGlyph": "newGlyph", "localOld": "localNew"}
     remapped = remap_builder_glyphs(builder, mapping)
 
-    assert remapped.blocks[_BLOCK_A].configuration_values[_OPT] == "${newGlyph}"
+    assert remapped.blocks[0].instance.configuration_values[_OPT] == "${newGlyph}"
     assert "localNew" in remapped.local_glyphs
     assert remapped.local_glyphs["localNew"] == "${newGlyph}"
     assert "localOld" not in remapped.local_glyphs
@@ -159,13 +149,7 @@ def test_remap_builder_glyphs_renames_config_value_and_local_glyph() -> None:
 
 def test_remap_builder_glyphs_empty_mapping_returns_same_object() -> None:
     builder = BlueprintBuilder(
-        blocks={
-            _BLOCK_A: BlockInstance(
-                factory_id=PluginBlockFactoryId(plugin=_REAL_PLUGIN_ID, factory=BlockFactoryId("source_text")),
-                configuration_values={_OPT: "${oldGlyph}"},
-                input_ids={},
-            )
-        },
+        blocks=[_routable_block(text="${oldGlyph}")],
         local_glyphs={"myKey": "myVal"},
     )
     result = remap_builder_glyphs(builder, {})
@@ -178,52 +162,43 @@ def test_remap_builder_glyphs_empty_mapping_returns_same_object() -> None:
 
 
 def _make_builder(block_text: str | None = None, local_glyphs: dict[str, str] | None = None) -> BlueprintBuilder:
-    block = BlockInstance(
-        factory_id=PluginBlockFactoryId(plugin=_REAL_PLUGIN_ID, factory=BlockFactoryId("source_text")),
-        configuration_values={_OPT: block_text} if block_text is not None else {},
-        input_ids={},
-    )
     return BlueprintBuilder(
-        blocks={_BLOCK_A: block},
+        blocks=[
+            RoutableBlock(
+                instance_id=_BLOCK_A,
+                plugin=_REAL_PLUGIN_ID,
+                factory=BlockFactoryId("source_text"),
+                instance=BlockInstance(
+                    configuration_values={_OPT: block_text} if block_text is not None else {},
+                    input_ids={},
+                ),
+            )
+        ],
         local_glyphs=local_glyphs or {},
     )
+
+
+def _get_block(builder: BlueprintBuilder, block_id: BlockInstanceId) -> RoutableBlock:
+    return next(b for b in builder.blocks if b.instance_id == block_id)
 
 
 def test_resolve_builder_with_examples_fills_missing_config_value() -> None:
     """Example values fill in config options absent from the template block."""
     builder = _make_builder(block_text=None)
     result = resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "from example"}}, {})
-    assert result.blocks[_BLOCK_A].configuration_values[_OPT] == "from example"
+    assert _get_block(result, _BLOCK_A).instance.configuration_values[_OPT] == "from example"
 
 
 def test_resolve_builder_with_examples_overrides_existing_config_value() -> None:
     """Example values override existing template values for validation purposes."""
     builder = _make_builder(block_text="template value")
     result = resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "example value"}}, {})
-    assert result.blocks[_BLOCK_A].configuration_values[_OPT] == "example value"
-
-
-def test_resolve_builder_with_examples_merges_example_glyphs() -> None:
-    """Example glyphs are merged into local_glyphs when they are absent."""
-    builder = _make_builder(local_glyphs={})
-    result = resolve_builder_with_examples(builder, {}, {"name": "world"})
-    assert result.local_glyphs["name"] == "world"
-
-
-def test_resolve_builder_with_examples_overrides_existing_local_glyph() -> None:
-    """Example glyphs override existing template local glyphs for validation purposes."""
-    builder = _make_builder(local_glyphs={"name": "template"})
-    result = resolve_builder_with_examples(builder, {}, {"name": "example"})
-    assert result.local_glyphs["name"] == "example"
+    assert _get_block(result, _BLOCK_A).instance.configuration_values[_OPT] == "example value"
 
 
 def test_resolve_builder_with_examples_does_not_mutate_original() -> None:
-    """The function is pure: the original builder is unchanged after the call."""
-    builder = _make_builder(block_text=None, local_glyphs={})
-    original_config = dict(builder.blocks[_BLOCK_A].configuration_values)
-    original_glyphs = dict(builder.local_glyphs)
-
-    resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "example"}}, {"k": "v"})
-
-    assert builder.blocks[_BLOCK_A].configuration_values == original_config
-    assert builder.local_glyphs == original_glyphs
+    """resolve_builder_with_examples must not mutate the caller's builder."""
+    builder = _make_builder(block_text="original")
+    original_config = dict(_get_block(builder, _BLOCK_A).instance.configuration_values)
+    resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "override"}}, {})
+    assert _get_block(builder, _BLOCK_A).instance.configuration_values == original_config

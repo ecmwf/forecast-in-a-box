@@ -90,7 +90,14 @@ describe('Fable Builder — base time wire contract', () => {
       .poll(() => useFableBuilderStore.getState().isDirty, { timeout: 3000 })
       .toBe(false)
 
-    expect(body()?.builder.blocks.source1.configuration_values.base_time).toBe(
+    const blocks1 = body()?.builder.blocks as
+      | Array<{
+          instance_id: string
+          instance: { configuration_values: Record<string, string> }
+        }>
+      | undefined
+    const source1Block1 = blocks1?.find((b) => b.instance_id === 'source1')
+    expect(source1Block1?.instance.configuration_values.base_time).toBe(
       '2026-05-15T00:00:00',
     )
   })
@@ -115,7 +122,14 @@ describe('Fable Builder — base time wire contract', () => {
       .poll(() => useFableBuilderStore.getState().isDirty, { timeout: 3000 })
       .toBe(false)
 
-    expect(body()?.builder.blocks.source1.configuration_values.base_time).toBe(
+    const blocks2 = body()?.builder.blocks as
+      | Array<{
+          instance_id: string
+          instance: { configuration_values: Record<string, string> }
+        }>
+      | undefined
+    const source1Block2 = blocks2?.find((b) => b.instance_id === 'source1')
+    expect(source1Block2?.instance.configuration_values.base_time).toBe(
       '2026-05-14T22:00:00',
     )
   })

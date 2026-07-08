@@ -8,26 +8,27 @@
 # nor does it submit to any jurisdiction.
 
 import abc
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from typing import Any, Callable, Literal, TypeVar, cast
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
-from pydantic import PrivateAttr
-from typing_extensions import Self
 
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
     BlockFactory,
+    BlockFactoryId,
     BlockInstance,
+    BlockInstanceId,
     BlockInstanceOutput,
     BlockKind,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
+    Error,
     QubedOutput,
 )
-from fiab_core.plugin import Error
 from fiab_core.types import ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
 
 
@@ -38,34 +39,49 @@ class BlockInstanceConfigurationError(ValueError):
 T = TypeVar("T")
 
 
-class BlockInstanceRich(BlockInstance):
-    _configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = PrivateAttr(default_factory=dict)
+@dataclass(frozen=True)
+class BlockInstanceRich:
+    """Wraps a BlockInstance with typed configuration accessors and the factory context needed for error messages.
+
+    Plugin authors receive this in validate/compile callbacks instead of the raw BlockInstance.
+    All field reads go through typed methods (config_as_str, config_as_int, ...) or the input_ids property.
+    """
+
+    factory_id: BlockFactoryId
+    block: BlockInstance
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = field(default_factory=dict)
 
     @classmethod
     def from_block(
         cls,
+        factory_id: BlockFactoryId,
         block: BlockInstance,
         configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption],
-    ) -> Self:
-        rich = cls.model_validate(block.model_dump(mode="python"))
-        rich._configuration_options = configuration_options
-        return rich
+    ) -> "BlockInstanceRich":
+        return cls(factory_id=factory_id, block=block, configuration_options=configuration_options)
+
+    @property
+    def input_ids(self) -> dict[str, BlockInstanceId]:
+        """The input slot names mapped to the upstream block instance ids."""
+        return self.block.input_ids
+
+    def with_configuration_values(self, values: dict[ConfigurationOptionId, object]) -> "BlockInstanceRich":
+        """Return a copy with the given configuration_values replacing the block's current ones."""
+        return replace(self, block=self.block.model_copy(update={"configuration_values": values}))
 
     def _get_configuration_option(self, key: str | ConfigurationOptionId) -> tuple[ConfigurationOptionId, BlockConfigurationOption]:
         option_id = ConfigurationOptionId(key)
-        option = self._configuration_options.get(option_id)
+        option = self.configuration_options.get(option_id)
         if option is None:
             raise BlockInstanceConfigurationError(
-                f"Configuration option {option_id!r} is not declared for block factory {self.factory_id.factory!r}"
+                f"Configuration option {option_id!r} is not declared for block factory {self.factory_id!r}"
             )
         return option_id, option
 
     def _get_raw_value(self, option_id: ConfigurationOptionId) -> object:
-        if option_id in self.configuration_values:
-            return self.configuration_values[option_id]
-        raise BlockInstanceConfigurationError(
-            f"Configuration option {option_id!r} is missing for block factory {self.factory_id.factory!r}"
-        )
+        if option_id in self.block.configuration_values:
+            return self.block.configuration_values[option_id]
+        raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} is missing for block factory {self.factory_id!r}")
 
     def config_as_str(self, key: str | ConfigurationOptionId, *, validator: Callable[[str, str], None] | None = None) -> str:
         option_id, option = self._get_configuration_option(key)
@@ -181,7 +197,7 @@ class QubedBlockBuilder(abc.ABC):
     def compile(
         self,
         inputs: ActionLookup,
-        block: BlockInstance,
+        block: "BlockInstanceRich",
     ) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
         raise NotImplementedError
 

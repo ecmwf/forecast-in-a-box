@@ -9,14 +9,13 @@ from fiab_core.fable import (
     BlockInstance,
     BlockInstanceId,
     ConfigurationOptionId,
-    PluginBlockFactoryId,
     PluginCompositeId,
     PluginId,
     PluginStoreId,
 )
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
-from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.blueprint.service import BlueprintBuilder, RoutableBlock
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob
 from forecastbox.entrypoint.main import launch_all
 from forecastbox.utility.config import FIABConfig, UnmanagedGateway
@@ -69,37 +68,55 @@ if __name__ == "__main__":
             assert len(response.json()) > 0
 
             pluginId = PluginCompositeId(store=PluginStoreId("ecmwf"), local=PluginId("ecmwf-base"))
-            blocks: dict[BlockInstanceId, BlockInstance] = {
-                BlockInstanceId("source1"): BlockInstance(
-                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("ekdSource")),
-                    configuration_values=_config(
-                        {
-                            "source": "ecmwf-open-data",
-                            "date": (current_time("scheduling") - timedelta(days=1)).strftime("%Y-%m-%d"),
-                            "expver": "0001",
-                        }
+            blocks: list[RoutableBlock] = [
+                RoutableBlock(
+                    instance_id=BlockInstanceId("source1"),
+                    plugin=pluginId,
+                    factory=BlockFactoryId("ekdSource"),
+                    instance=BlockInstance(
+                        configuration_values=_config(
+                            {
+                                "source": "ecmwf-open-data",
+                                "date": (current_time("scheduling") - timedelta(days=1)).strftime("%Y-%m-%d"),
+                                "expver": "0001",
+                            }
+                        ),
+                        input_ids={},
                     ),
-                    input_ids={},
                 ),
-                BlockInstanceId("temporalMean"): BlockInstance(
-                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("temporalStatistics")),
-                    configuration_values=_config({"param": "2t", "statistic": "mean"}),
-                    input_ids={"dataset": BlockInstanceId("source1")},
+                RoutableBlock(
+                    instance_id=BlockInstanceId("temporalMean"),
+                    plugin=pluginId,
+                    factory=BlockFactoryId("temporalStatistics"),
+                    instance=BlockInstance(
+                        configuration_values=_config({"param": "2t", "statistic": "mean"}),
+                        input_ids={"dataset": BlockInstanceId("source1")},
+                    ),
                 ),
-            }
+            ]
             for statistic in ["mean", "std"]:
-                block = BlockInstance(
-                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("ensembleStatistics")),
-                    configuration_values=_config({"param": "2t", "statistic": statistic}),
-                    input_ids={"dataset": BlockInstanceId("temporalMean")},
+                blocks.append(
+                    RoutableBlock(
+                        instance_id=BlockInstanceId(f"ensemble{statistic.capitalize()}"),
+                        plugin=pluginId,
+                        factory=BlockFactoryId("ensembleStatistics"),
+                        instance=BlockInstance(
+                            configuration_values=_config({"param": "2t", "statistic": statistic}),
+                            input_ids={"dataset": BlockInstanceId("temporalMean")},
+                        ),
+                    )
                 )
-                sink = BlockInstance(
-                    factory_id=PluginBlockFactoryId(plugin=pluginId, factory=BlockFactoryId("zarrSink")),
-                    configuration_values=_config({"path": f"{tmpdir}/output{statistic.capitalize()}.zarr"}),
-                    input_ids={"dataset": BlockInstanceId(f"ensemble{statistic.capitalize()}")},
+                blocks.append(
+                    RoutableBlock(
+                        instance_id=BlockInstanceId(f"sink{statistic.capitalize()}"),
+                        plugin=pluginId,
+                        factory=BlockFactoryId("zarrSink"),
+                        instance=BlockInstance(
+                            configuration_values=_config({"path": f"{tmpdir}/output{statistic.capitalize()}.zarr"}),
+                            input_ids={"dataset": BlockInstanceId(f"ensemble{statistic.capitalize()}")},
+                        ),
+                    )
                 )
-                blocks[BlockInstanceId(f"ensemble{statistic.capitalize()}")] = block
-                blocks[BlockInstanceId(f"sink{statistic.capitalize()}")] = sink
 
             builder = BlueprintBuilder(blocks=blocks)
             response = client.request(url="/blueprint/compile", method="put", json=builder.model_dump()).json()

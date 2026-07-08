@@ -20,7 +20,11 @@ import type {
   FableBuilderV1,
   FableUpsertRequest,
 } from '@/api/types/fable.types'
-import { getFactory } from '@/api/types/fable.types'
+import {
+  FableBuilderV1Schema,
+  getFactory,
+  serializeFable,
+} from '@/api/types/fable.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
 interface SavedFableEntry {
@@ -154,7 +158,7 @@ export const fableHandlers = [
 
     let fable: FableBuilderV1
     try {
-      fable = (await request.json()) as FableBuilderV1
+      fable = FableBuilderV1Schema.parse(await request.json())
     } catch {
       return HttpResponse.json(
         { message: 'Invalid request body' },
@@ -180,7 +184,16 @@ export const fableHandlers = [
       )
     }
 
-    const { builder, display_name, display_description, tags, parent_id } = body
+    const {
+      builder: rawBuilder,
+      display_name,
+      display_description,
+      tags,
+      parent_id,
+    } = body
+
+    // Parse API-format builder (list of routable blocks) to internal format.
+    const builder = FableBuilderV1Schema.parse(rawBuilder)
 
     // Tags are now sent as {key, value} objects; extract the key for internal storage.
     const storedTags = (tags as Array<string | { key: string }>).map((t) =>
@@ -255,7 +268,7 @@ export const fableHandlers = [
 
     savedFablesState[body.blueprint_id] = {
       ...existing,
-      fable: body.builder,
+      fable: FableBuilderV1Schema.parse(body.builder),
       display_name: body.display_name ?? existing.display_name,
       display_description:
         body.display_description ?? existing.display_description,
@@ -518,7 +531,7 @@ export const fableHandlers = [
     return HttpResponse.json({
       blueprint_id: fableId,
       version: fableVersions[fableId] ?? 1,
-      builder: saved.fable,
+      builder: serializeFable(saved.fable),
       display_name: saved.display_name,
       display_description: saved.display_description,
       tags: saved.tags.map((k) => ({ key: k, value: '' })),

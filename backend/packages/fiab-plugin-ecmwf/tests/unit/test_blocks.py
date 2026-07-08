@@ -20,8 +20,6 @@ from fiab_core.fable import (
     BlockInstanceId,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
-    PluginBlockFactoryId,
-    PluginCompositeId,
     QubedOutput,
     RawOutput,
 )
@@ -71,7 +69,6 @@ def _block_instance(
     factory_id: str, values: dict[str, object], *, input_ids: dict[str, BlockInstanceId] | None = None
 ) -> BlockInstanceBase:
     return BlockInstanceBase(
-        factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId(factory_id)),
         input_ids=input_ids or {},
         configuration_values=_config(values),
     )
@@ -99,6 +96,7 @@ class _TinyForecastPreset:
 @pytest.fixture
 def dummy_blockinstance() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("dummy"),
         _block_instance(
             "dummy",
             {
@@ -119,6 +117,7 @@ def dummy_blockinstance_output() -> QubedOutput:
 @pytest.fixture
 def operational_forecast_source_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("operationalForecastSource"),
         _block_instance(
             "operationalForecastSource",
             {
@@ -155,8 +154,8 @@ def operational_forecast_source_action(operational_forecast_source_output: Qubed
 @pytest.fixture
 def ensemble_statistics_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("ensembleStatistics"),
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EnsembleStatistics"),  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values=_config(
                 {
@@ -172,8 +171,8 @@ def ensemble_statistics_configuration() -> BlockInstance:
 @pytest.fixture
 def temporal_statistics_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("temporalStatistics"),
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="TemporalStatistics"),  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values=_config(
                 {
@@ -189,6 +188,7 @@ def temporal_statistics_configuration() -> BlockInstance:
 @pytest.fixture
 def select_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("select"),
         _block_instance(
             "select",
             {
@@ -204,8 +204,8 @@ def select_configuration() -> BlockInstance:
 @pytest.fixture
 def zarr_sink_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("zarrSink"),
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="ZarrSink"),  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values=_config(
                 {
@@ -220,8 +220,8 @@ def zarr_sink_configuration() -> BlockInstance:
 @pytest.fixture
 def grib_sink_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("gribSink"),
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values=_config(
                 {
@@ -236,8 +236,8 @@ def grib_sink_configuration() -> BlockInstance:
 @pytest.fixture
 def map_plot_sink_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("mapPlotSink"),
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("mapPlotSink")),
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values=_config(
                 {
@@ -260,8 +260,8 @@ class TestOperationalForecastSource:
 
         assert not block.intersect(other=dummy_blockinstance_output)  # type: ignore[arg-type]
         block_instance = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="OperationalForecastSource"),  # type: ignore
                 input_ids={},
                 configuration_values=_config(
                     dict(
@@ -286,6 +286,7 @@ class TestOperationalForecastSource:
         monkeypatch.setitem(FORECAST_DATASETS, "aifs-ens", _TinyForecastPreset())
         block = OperationalForecastSource()
         block_instance = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             _block_instance(
                 "operationalForecastSource",
                 {
@@ -311,8 +312,8 @@ class TestOperationalForecastSource:
     def test_validate(self, config: dict, error: str) -> None:
         block = OperationalForecastSource()
         block_instance = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="OperationalForecastSource"),  # type: ignore
                 input_ids={},
                 configuration_values=_config(
                     dict(
@@ -546,7 +547,7 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "param", "values": ["2t", "msl"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "param", "values": ["2t", "msl"]}))
         output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert axes(output)[PARAM] == {"2t", "msl"}
@@ -555,7 +556,7 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["0", "6"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "step", "values": ["0", "6"]}))
         output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
         assert axes(output)[STEP] == {0, 6}
@@ -564,7 +565,7 @@ class TestSelect:
         block = _select()
         broken_qube = Qube.make_root([Qube.make_node("step", [6, 12], Qube.from_datacube({"param": ["2t"]}).children)])
         input_dataset = QubedOutput(dataqube=broken_qube)
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["6"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "step", "values": ["6"]}))
 
         with pytest.raises(Exception, match="produced an empty dataset"):
             block.validate(block=config, inputs={"dataset": input_dataset}, restrictions={})
@@ -573,7 +574,7 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "missing", "values": ["2t"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "missing", "values": ["2t"]}))
         restrictions: ConfigurationOptionRestriction = {}
         with pytest.raises(Exception, match="dimension missing is not in the input dimensions"):
             block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions=restrictions)  # type: ignore[dict-item]
@@ -584,7 +585,7 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "param", "values": ["missing"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "param", "values": ["missing"]}))
         restrictions: ConfigurationOptionRestriction = {}
         with pytest.raises(Exception, match="values.*are not in dimension param"):
             block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions=restrictions)  # type: ignore[dict-item]
@@ -594,7 +595,11 @@ class TestSelect:
     def test_validator_adds_dimension_restrictions(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        restrictions = plugin().validator(select_configuration, {"dataset": operational_forecast_source_output}).restrictions
+        restrictions = (
+            plugin()
+            .validator(BlockFactoryId("select"), select_configuration.block, {"dataset": operational_forecast_source_output})
+            .restrictions
+        )
         restriction = restrictions[DIMENSION].serialize()
         assert restriction.startswith("enumClosed[")
         assert "param" in restriction
@@ -604,15 +609,17 @@ class TestSelect:
     def test_validator_adds_values_for_selected_dimension(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["0"]})})
-        restrictions = plugin().validator(config, {"dataset": operational_forecast_source_output}).restrictions
+        config = select_configuration.with_configuration_values(_config({"dimension": "step", "values": ["0"]}))
+        restrictions = (
+            plugin().validator(BlockFactoryId("select"), config.block, {"dataset": operational_forecast_source_output}).restrictions
+        )
         assert restrictions[VALUES].serialize() == "list[enumClosed[0,6,12]]"
 
     def test_validator_keeps_restrictions_when_configuration_is_missing(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step"})})
-        validation = plugin().validator(config, {"dataset": operational_forecast_source_output})
+        config = select_configuration.with_configuration_values(_config({"dimension": "step"}))
+        validation = plugin().validator(BlockFactoryId("select"), config.block, {"dataset": operational_forecast_source_output})
         assert validation.result.e is not None
         assert DIMENSION in validation.restrictions
         assert VALUES in validation.restrictions
@@ -632,7 +639,7 @@ class TestSelect:
         input_action = MagicMock()
         selected_action = MagicMock()
         input_action.select.return_value = selected_action
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "step", "values": ["0", "6"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "step", "values": ["0", "6"]}))
 
         result = block.compile(inputs={BlockInstanceId("source_output"): input_action}, block=config)  # type: ignore[dict-item]
         assert result.t is selected_action
@@ -718,8 +725,8 @@ class TestGribSink:
     def test_validate_template_values(self, operational_forecast_source_output: QubedOutput, filepath: str) -> None:
         block = GribSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
@@ -739,8 +746,8 @@ class TestGribSink:
     def test_invalid_path(self, operational_forecast_source_output: QubedOutput) -> None:
         block = GribSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
@@ -775,8 +782,8 @@ class TestGribSink:
     ) -> None:
         block = GribSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="GribSink"),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
@@ -808,7 +815,11 @@ class TestMapPlotSink:
     def test_validator_adds_parameters_restrictions(
         self, map_plot_sink_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        restrictions = plugin().validator(map_plot_sink_configuration, {"dataset": operational_forecast_source_output}).restrictions
+        restrictions = (
+            plugin()
+            .validator(BlockFactoryId("mapPlotSink"), map_plot_sink_configuration.block, {"dataset": operational_forecast_source_output})
+            .restrictions
+        )
         assert restrictions[PARAM].serialize() == "list[enumClosed[2t,msl,u]]"
 
     def test_expander_has_no_parameters_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
@@ -846,8 +857,8 @@ class TestMapPlotSink:
     def test_validate_sets_mime_from_format(self, fmt: str, expected_mime: str, operational_forecast_source_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
@@ -869,8 +880,8 @@ class TestMapPlotSink:
     def test_validate_multi_param(self, operational_forecast_source_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
@@ -890,8 +901,8 @@ class TestMapPlotSink:
     def test_validate_rejects_unknown_param(self, operational_forecast_source_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
@@ -913,8 +924,8 @@ class TestMapPlotSink:
     def test_validate_rejects_partial_unknown_params(self, operational_forecast_source_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
@@ -956,8 +967,8 @@ class TestMapPlotSink:
     ) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
@@ -978,8 +989,8 @@ class TestMapPlotSink:
     def test_validate_splitby(self, operational_forecast_source_output: QubedOutput) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
@@ -1008,8 +1019,8 @@ class TestMapPlotSink:
     ) -> None:
         block = MapPlotSink()
         config = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
             BlockInstanceBase(
-                factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("MapPlotSink")),  # type: ignore
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {

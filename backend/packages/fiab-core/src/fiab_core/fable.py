@@ -22,6 +22,9 @@ from typing_extensions import Self
 from fiab_core.pydantic_utils import FiabCoreBaseModel
 from fiab_core.types import FableType, NotFableType
 
+Error = str
+"""Compiler/validator error message type alias."""
+
 
 class BlockConfigurationOption(FiabCoreBaseModel):
     title: str
@@ -100,17 +103,6 @@ class PluginCompositeId(FiabCoreBaseModel):
         return f"{k.store}:{k.local}"
 
 
-class PluginBlockFactoryId(FiabCoreBaseModel):
-    """Note to plugin authors: This is a routing class. When you implement your BlockFactories for the catalogue,
-    you dont use this, you only need to declare a BlockFactoryId unique inside your plugin. Similarly, when you
-    return which BlockFactories are possible in the expand method, you only return your BlockFactoryIds. This
-    appears only when you receive BlockInstances in the compile/validate -- and again, you just need to use the
-    BlockFactoryId part of this class, as the PluginCompositeId is guaranteed to correspond to your plugin"""
-
-    plugin: PluginCompositeId
-    factory: BlockFactoryId
-
-
 class BlockFactoryCatalogue(FiabCoreBaseModel):
     factories: dict[BlockFactoryId, BlockFactory]
 
@@ -135,27 +127,13 @@ class BlockExpansion(FiabCoreBaseModel):
     """Restrictions on configuration options for this expansion"""
 
 
-class PluginBlockExpansion(FiabCoreBaseModel):
-    """Expansion result as returned to clients, combining plugin identity with restrictions.
-
-    This is the service-level representation sent to API consumers, containing
-    the full PluginBlockFactoryId and serialized restriction types.
-    """
-
-    plugin: PluginCompositeId
-    factory: BlockFactoryId
-    restrictions: dict[ConfigurationOptionId, str] = Field(default_factory=dict)
-    """Serialized FableType restrictions (e.g., 'int', 'enumClosed[a,b]')"""
-
-
 class BlockInstance(FiabCoreBaseModel):
-    """As produced by BlockFactory *by the client* -- basically the configuration/inputs values"""
+    """Configuration values and input wiring, as specified by a client when building a Fable."""
 
-    factory_id: PluginBlockFactoryId
-    # TODO separe into two classes with BlockInstanceRequest containing str, to improve the backend codebase typing etc
     configuration_values: dict[ConfigurationOptionId, Any]
-    """Keys come frome factory's `configuration_options`, values are either str-serialized (frontend2backend) or deserialized (backend2plugin)"""
-    input_ids: dict[str, BlockInstanceId]
+    """Keys come from factory's `configuration_options`, values are either str-serialized (frontend2backend) or deserialized (backend2plugin)"""
+    # TODO separate the backend class to have a str type there
+    input_ids: dict[str, BlockInstanceId] = Field(default_factory=dict)
     """Keys come from factory's `inputs`, values are other blocks in the (partial) fable"""
 
 
@@ -188,6 +166,13 @@ class BlueprintTemplateEnvironment(FiabCoreBaseModel):
     environment_variables: dict[str, str] = Field(default_factory=dict)
 
 
+class BlueprintTemplateBlock(FiabCoreBaseModel):
+    """A routing-equipped wrapper around a BlockInstance"""
+
+    factory_id: BlockFactoryId
+    instance: BlockInstance
+
+
 class BlueprintTemplate(FiabCoreBaseModel):
     """A partial, ready-to-customise blueprint shipped by a plugin.
 
@@ -199,16 +184,8 @@ class BlueprintTemplate(FiabCoreBaseModel):
 
     display_name: str
     display_description: str
-    blocks: dict[BlockInstanceId, BlockInstance]
+    blocks: dict[BlockInstanceId, BlueprintTemplateBlock]
     environment: BlueprintTemplateEnvironment | None = None
     local_glyphs: dict[str, str] = Field(default_factory=dict)
     example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
     example_glyphs: dict[str, str] = Field(default_factory=dict)
-
-
-SelfPluginId = PluginCompositeId(store=PluginStoreId("__self__"), local=PluginId("__self__"))
-"""Use this when building the blueprint templates shipped by a plugin.
-
-The backend substitutes the real plugin composite ID at install time.
-"""
-# TODO this class shows some awkwardness -- ideally, we'll make the existence of PluginCompositeId completely unknown to the insides of the plugins, at the expense of the backend mutating the classes at the routing time
