@@ -492,11 +492,14 @@ function TimeClipRow({
       </span>
       <label className="min-w-0 flex-1">
         <span className="sr-only">{t('timeline.clipAria')}</span>
+        {/* Neutral styling — a primary-colored fill reads as "layer A
+            blue" next to the availability tracks. */}
         <Slider
           value={[rangeStart, rangeEnd]}
           min={0}
           max={last}
           step={1}
+          className="[&_[data-slot=slider-range]]:bg-muted-foreground/50 [&_[data-slot=slider-thumb]]:border-muted-foreground [&_[data-slot=slider-thumb]]:bg-muted"
           onValueChange={(v) => {
             if (Array.isArray(v) && v.length === 2) {
               apply([Math.min(v[0], v[1]), Math.max(v[0], v[1])])

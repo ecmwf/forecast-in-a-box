@@ -271,10 +271,11 @@ describe('CompareViewer', () => {
       document.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }))
     }
 
-    // S toggles both sidebars (hidden, not unmounted — state persists).
-    press('s')
+    // B toggles both sidebars (hidden, not unmounted — state persists).
+    // S belongs to WASD panning now.
+    press('b')
     await expect.element(screen.getByText('Active layers')).not.toBeVisible()
-    press('s')
+    press('b')
     await expect.element(screen.getByText('Active layers')).toBeVisible()
 
     // 2 → side-by-side (both slot tags visible as separate panels).

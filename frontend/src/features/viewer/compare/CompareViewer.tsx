@@ -329,6 +329,18 @@ export function CompareViewer({
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
 
+  const onPan = useCallback((dx: number, dy: number) => {
+    const view = viewRef.current
+    if (!view) return
+    const center = view.getCenter()
+    const resolution = view.getResolution()
+    if (!center || resolution === undefined) return
+    view.animate({
+      center: [center[0] + dx * resolution, center[1] - dy * resolution],
+      duration: 100,
+    })
+  }, [])
+
   useCompareShortcuts({
     // Any sidebar open → collapse both; both collapsed → restore both.
     onToggleSidebars: () => {
@@ -340,6 +352,7 @@ export function CompareViewer({
     onFit: fitAction,
     onExport: () => setExportOpen(true),
     onHelp: () => setHelpOpen((v) => !v),
+    onPan,
   })
 
   // -------- User-uploaded GeoJSON context overlays --------
