@@ -16,6 +16,7 @@
  *   F          fit to globe
  *   E          export dialog
  *   H          help dialog
+ *   N          toggle the annotate tool
  *   W/A/S/D    pan the map (arrow keys too)
  * Space (flicker) and hold-Z (loupe) live with their features; the swipe
  * divider consumes its own arrow keys while focused (the pan guard
@@ -36,6 +37,7 @@ export const COMPARE_KEYS = {
   fit: 'F',
   export: 'E',
   help: 'H',
+  annotate: 'N',
   modes: ['1', '2', '3', '4', '5'],
   pan: ['W', 'A', 'S', 'D'],
 } as const
@@ -69,10 +71,19 @@ export function useCompareShortcuts(handlers: {
   onFit: (() => void) | null
   onExport: () => void
   onHelp: () => void
+  onAnnotate: () => void
   /** Pan the shared camera by (dx, dy) screen pixels. */
   onPan: (dx: number, dy: number) => void
 }): void {
-  const { onToggleSidebars, onMode, onFit, onExport, onHelp, onPan } = handlers
+  const {
+    onToggleSidebars,
+    onMode,
+    onFit,
+    onExport,
+    onHelp,
+    onAnnotate,
+    onPan,
+  } = handlers
   const opts = { ignoreInputs: true }
   const pan = (dx: number, dy: number) => {
     if (!panBlocked()) onPan(dx * PAN_STEP_PX, dy * PAN_STEP_PX)
@@ -87,6 +98,7 @@ export function useCompareShortcuts(handlers: {
   useHotkey(COMPARE_KEYS.fit, () => onFit?.(), opts)
   useHotkey(COMPARE_KEYS.export, () => onExport(), opts)
   useHotkey(COMPARE_KEYS.help, () => onHelp(), opts)
+  useHotkey(COMPARE_KEYS.annotate, () => onAnnotate(), opts)
   useHotkey(COMPARE_KEYS.pan[0], () => pan(0, -1), opts)
   useHotkey(COMPARE_KEYS.pan[1], () => pan(-1, 0), opts)
   useHotkey(COMPARE_KEYS.pan[2], () => pan(0, 1), opts)

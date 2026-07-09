@@ -19,7 +19,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { composeExportCanvas, loadLegendImage } from '../map-export'
-import type { LegendExportItem } from '../map-export'
+import { annotationVisibleOn } from './annotations'
+import type { MapAnnotation } from './annotations'
+import type { ExportNote, LegendExportItem } from '../map-export'
 import type { SourceSlot } from './layer-pairing'
 import type { CaptureResult } from './types'
 import { Button } from '@/components/ui/button'
@@ -60,11 +62,25 @@ function legendsFor(
   return legends.filter((l) => capture.slot === null || l.slot === capture.slot)
 }
 
+/** Notes for one capture — the annotations its panel actually shows,
+ *  keeping their global numbering. */
+function notesFor(
+  capture: CaptureResult,
+  annotations: ReadonlyArray<MapAnnotation>,
+): Array<ExportNote> {
+  return annotations.flatMap((a, i) =>
+    annotationVisibleOn(a, capture.slot)
+      ? [{ number: i + 1, text: a.text }]
+      : [],
+  )
+}
+
 export function CompareExportDialog({
   open,
   onOpenChange,
   capture,
   legends,
+  annotations,
   meta,
 }: {
   open: boolean
@@ -73,6 +89,8 @@ export function CompareExportDialog({
   capture: (() => Promise<Array<CaptureResult>>) | null
   /** Active layers' legend images, baked into PNGs and the report. */
   legends: ReadonlyArray<ExportLegendSpec>
+  /** Findings pinned to the map — texts baked as a numbered strip. */
+  annotations: ReadonlyArray<MapAnnotation>
   meta: CompareExportMeta
 }) {
   const { t } = useTranslation('compare')
@@ -125,6 +143,7 @@ export function CompareExportDialog({
           timeText: c.timeLabel,
           titleBarEnabled: true,
           legendItems: legendsFor(c, loadedLegends),
+          notes: notesFor(c, annotations),
         })
         if (!composed) return
         const a = document.createElement('a')

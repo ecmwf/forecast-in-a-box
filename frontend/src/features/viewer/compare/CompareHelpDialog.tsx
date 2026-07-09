@@ -31,6 +31,7 @@ type ShortcutId =
   | 'sidebars'
   | 'modes'
   | 'pan'
+  | 'annotate'
   | 'fit'
   | 'export'
   | 'flicker'
@@ -52,6 +53,7 @@ const SHORTCUTS: ReadonlyArray<{
     id: 'modes',
   },
   { keys: COMPARE_KEYS.pan.map(keyLabel), id: 'pan' },
+  { keys: [keyLabel(COMPARE_KEYS.annotate)], id: 'annotate' },
   { keys: [keyLabel(COMPARE_KEYS.fit)], id: 'fit' },
   { keys: [keyLabel(COMPARE_KEYS.export)], id: 'export' },
   { keys: [keyLabel('Space')], id: 'flicker' },

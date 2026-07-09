@@ -18,6 +18,7 @@
 import {
   Download,
   Eraser,
+  MessageSquarePlus,
   FlaskConical,
   Globe2,
   HelpCircle,
@@ -76,6 +77,8 @@ export function CompareToolbar({
   measureMode,
   onMeasureMode,
   onMeasureClear,
+  annotateArmed,
+  onAnnotateToggle,
   onExport,
   basemapId,
   onBasemapChange,
@@ -96,6 +99,8 @@ export function CompareToolbar({
   measureMode: 'none' | 'line' | 'area'
   onMeasureMode: (mode: 'none' | 'line' | 'area') => void
   onMeasureClear: () => void
+  annotateArmed: boolean
+  onAnnotateToggle: () => void
   onExport: () => void
   basemapId: string
   onBasemapChange: (id: string) => void
@@ -268,6 +273,18 @@ export function CompareToolbar({
             aria-label={t('measure.clear')}
           >
             <Eraser className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={annotateArmed ? 'secondary' : 'ghost'}
+            size="icon"
+            className="relative h-7 w-7"
+            aria-pressed={annotateArmed}
+            onClick={onAnnotateToggle}
+            title={`${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`}
+            aria-label={t('annotations.tool')}
+          >
+            <KeyBadge label={keyLabel(COMPARE_KEYS.annotate)} show={reveal} />
+            <MessageSquarePlus className="h-4 w-4" />
           </Button>
           <span className="mx-1 h-5 w-px bg-border" />
           <Button

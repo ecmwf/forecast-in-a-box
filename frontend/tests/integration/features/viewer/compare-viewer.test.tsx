@@ -17,6 +17,7 @@
 
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
+import { page } from '@vitest/browser/context'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
@@ -375,6 +376,50 @@ describe('CompareViewer', () => {
     await expect.element(area).toHaveAttribute('aria-pressed', 'true')
     // Clear is always available.
     await screen.getByRole('button', { name: 'Clear measurements' }).click()
+  })
+
+  it('creates, lists, edits, and deletes annotations', async () => {
+    // Unstyled tests: Base UI's inert backdrop overlays the dialog unless
+    // the dialog keeps its production positioning (see CommandPalette
+    // tests for the same workaround).
+    const style = document.createElement('style')
+    style.textContent =
+      '[data-slot="dialog-content"]{position:fixed;z-index:50}'
+    document.head.appendChild(style)
+
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    // Arm the tool, click the map, record a finding.
+    await screen.getByRole('button', { name: /Annotate/ }).click()
+    await screen.getByText('2 m temperature').first().click()
+    // Tests run unstyled (no Tailwind), so the map container collapses to
+    // zero size — give it real dimensions; OL's ResizeObserver follows.
+    const map = document.querySelector('.ol-viewport')
+    expect(map).not.toBeNull()
+    const container = (map as HTMLElement).parentElement!
+    container.style.cssText = 'position:relative;width:800px;height:400px'
+    const viewport = page.elementLocator(map as Element)
+    // x=200 keeps clear of the swipe divider at the 50% mark.
+    await viewport.click({ position: { x: 200, y: 200 } })
+    await expect.element(screen.getByText('Annotation 1')).toBeVisible()
+    await screen
+      .getByPlaceholder('Record your finding…')
+      .fill('Deep low over the gulf')
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+
+    // Listed in the left sidebar with its number.
+    await expect
+      .element(screen.getByText('Deep low over the gulf'))
+      .toBeVisible()
+
+    // Edit via the list, then delete from the editor.
+    await screen.getByText('Deep low over the gulf').click()
+    await expect.element(screen.getByText('Annotation 1')).toBeVisible()
+    await screen.getByRole('button', { name: 'Delete' }).click()
+    await expect
+      .element(screen.getByText('Deep low over the gulf'))
+      .not.toBeInTheDocument()
   })
 
   it('clips the timeline to a source range via presets', async () => {

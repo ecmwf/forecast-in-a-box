@@ -47,6 +47,10 @@ import { rebaseLensUrl, skinnyWmsBasemap } from '../wms-capabilities'
 import { CompareToolbar } from './CompareToolbar'
 import { CompareExportDialog } from './CompareExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
+import { AnnotationEditorDialog } from './AnnotationEditorDialog'
+import { nextAnnotationId } from './annotations'
+import type { MapAnnotation } from './annotations'
+import type { AnnotationDraft } from './AnnotationEditorDialog'
 import { useCompareShortcuts } from './useCompareShortcuts'
 import type { ContextOverlay } from './overlays'
 import { CompareTimeSlider } from './CompareTimeSlider'
@@ -352,8 +356,65 @@ export function CompareViewer({
     onFit: fitAction,
     onExport: () => setExportOpen(true),
     onHelp: () => setHelpOpen((v) => !v),
+    onAnnotate: () => setAnnotateArmed((v) => !v),
     onPan,
   })
+
+  // -------- Annotations: numbered findings pinned to the map ---------
+  const [annotations, setAnnotations] = useState<Array<MapAnnotation>>([])
+  const [annotateArmed, setAnnotateArmed] = useState(false)
+  const [annotationDraft, setAnnotationDraft] =
+    useState<AnnotationDraft | null>(null)
+  // Where a new annotation will land, captured at map-click time.
+  const pendingRef = useRef<{
+    coordinate: [number, number]
+    slot: SourceSlot | null
+  } | null>(null)
+
+  const onAnnotationCreate = useCallback(
+    (coordinate: [number, number], slot: SourceSlot | null) => {
+      pendingRef.current = { coordinate, slot }
+      setAnnotationDraft({ id: null, text: '', number: -1 })
+    },
+    [],
+  )
+  const onAnnotationEdit = useCallback(
+    (id: string) => {
+      const index = annotations.findIndex((a) => a.id === id)
+      if (index === -1) return
+      setAnnotationDraft({
+        id,
+        text: annotations[index].text,
+        number: index + 1,
+      })
+    },
+    [annotations],
+  )
+  const saveAnnotation = (text: string) => {
+    if (annotationDraft?.id) {
+      setAnnotations((prev) =>
+        prev.map((a) => (a.id === annotationDraft.id ? { ...a, text } : a)),
+      )
+    } else if (pendingRef.current) {
+      const { coordinate, slot } = pendingRef.current
+      setAnnotations((prev) => [
+        ...prev,
+        { id: nextAnnotationId(), coordinate, text, slot },
+      ])
+      pendingRef.current = null
+    }
+    setAnnotationDraft(null)
+  }
+  const deleteAnnotation = () => {
+    if (annotationDraft?.id) {
+      setAnnotations((prev) => prev.filter((a) => a.id !== annotationDraft.id))
+    }
+    setAnnotationDraft(null)
+  }
+  const removeAnnotationById = useCallback(
+    (id: string) => setAnnotations((prev) => prev.filter((a) => a.id !== id)),
+    [],
+  )
 
   // -------- User-uploaded GeoJSON context overlays --------
   const [overlays, setOverlays] = useState<Array<ContextOverlay>>([])
@@ -458,6 +519,8 @@ export function CompareViewer({
         measureMode={measureMode}
         onMeasureMode={setMeasureMode}
         onMeasureClear={() => setMeasureClearNonce((n) => n + 1)}
+        annotateArmed={annotateArmed}
+        onAnnotateToggle={() => setAnnotateArmed((v) => !v)}
         onExport={() => setExportOpen(true)}
         basemapId={basemapId}
         onBasemapChange={setBasemapId}
@@ -467,11 +530,31 @@ export function CompareViewer({
         onHelp={() => setHelpOpen(true)}
       />
       <CompareHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
+      <AnnotationEditorDialog
+        draft={
+          annotationDraft
+            ? {
+                ...annotationDraft,
+                number:
+                  annotationDraft.number === -1
+                    ? annotations.length + 1
+                    : annotationDraft.number,
+              }
+            : null
+        }
+        onSave={saveAnnotation}
+        onDelete={deleteAnnotation}
+        onClose={() => {
+          pendingRef.current = null
+          setAnnotationDraft(null)
+        }}
+      />
       <CompareExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
         capture={captureAction}
         legends={exportLegends}
+        annotations={annotations}
         meta={{ labelA: a.label, labelB: b.label }}
       />
       <div className="flex min-h-0 flex-1 gap-2">
@@ -493,6 +576,11 @@ export function CompareViewer({
               add: addOverlay,
               toggle: toggleOverlay,
               remove: removeOverlay,
+            }}
+            annotations={{
+              items: annotations,
+              edit: onAnnotationEdit,
+              remove: removeAnnotationById,
             }}
             opacity={{
               global: globalOpacity,
@@ -516,6 +604,10 @@ export function CompareViewer({
               measureMode={measureMode}
               measureClearNonce={measureClearNonce}
               overlays={overlays}
+              annotations={annotations}
+              annotateArmed={annotateArmed}
+              onAnnotationCreate={onAnnotationCreate}
+              onAnnotationEdit={onAnnotationEdit}
               basemapId={basemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
@@ -531,6 +623,10 @@ export function CompareViewer({
               measureMode={measureMode}
               measureClearNonce={measureClearNonce}
               overlays={overlays}
+              annotations={annotations}
+              annotateArmed={annotateArmed}
+              onAnnotationCreate={onAnnotationCreate}
+              onAnnotationEdit={onAnnotationEdit}
               basemapId={basemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
