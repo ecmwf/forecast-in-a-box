@@ -20,7 +20,7 @@ from qubed import Qube
 from typing_extensions import Self
 
 from fiab_core.pydantic_utils import FiabCoreBaseModel
-from fiab_core.types import FableType, NotFableType
+from fiab_core.types import FableType, NotFableType, parse
 
 Error = str
 """Compiler/validator error message type alias."""
@@ -45,7 +45,7 @@ class BlockConfigurationOption(FiabCoreBaseModel):
     @model_validator(mode="after")
     def _validate_and_cache_value_type(self) -> Self:
         try:
-            parsed, remainder = FableType.parse(self.value_type)
+            parsed, remainder = parse(self.value_type)
             if remainder.strip():
                 raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
             self._value_type = parsed

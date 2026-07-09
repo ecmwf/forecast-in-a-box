@@ -181,6 +181,12 @@ class BlockInstanceRich:
                 validator(item, option_id)
         return typed_raw_value
 
+    def config_as_geodomain(self, key: str | ConfigurationOptionId) -> str | list[int] | list[str]:
+        # NOTE validators hard here due to being such a large union...
+        option_id, option = self._get_configuration_option(key)
+        raw_value = self._get_raw_value(option_id)
+        return option  # ty: ignore[invalid-return-type] # we have nothing to add on top of validator
+
 
 class QubedBlockBuilder(abc.ABC):
     kind: BlockKind

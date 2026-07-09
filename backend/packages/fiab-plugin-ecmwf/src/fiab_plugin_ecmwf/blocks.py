@@ -573,7 +573,7 @@ class MapPlotSink(Sink):
             Payload(
                 "fiab_plugin_ecmwf.runtime.plots.map_plot",
                 kwargs={
-                    "domain": block.config_as_list(DOMAIN, str) or None,
+                    "domain": block.config_as_geodomain(DOMAIN) or None,
                     "format": block.config_as_str(FORMAT),
                     "groupby": None if groupby == "none" else groupby,
                     # "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",

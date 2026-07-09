@@ -16,11 +16,11 @@ import pytest
 from fiab_core.types import (
     BoundingBoxType,
     ClosedEnumType,
-    CountryType,
     DatetimeType,
     DateType,
     FableType,
     FloatType,
+    GeoDomainSingleType,
     GeoDomainType,
     IntType,
     ListType,
@@ -30,12 +30,13 @@ from fiab_core.types import (
     StringType,
     UnionType,
     WrongType,
+    parse,
 )
 
 
 def _parse(expr: str) -> FableType:
     """Parse a complete type expression, asserting there is no non-whitespace remainder."""
-    t, remainder = FableType.parse(expr)
+    t, remainder = parse(expr)
     assert not remainder.strip(), f"Expected empty remainder for {expr!r}, got {remainder!r}"
     return t
 
@@ -264,7 +265,7 @@ class TestGeoDomainType:
     def test_parses_as_a_list_type(self) -> None:
         t = _parse("geodomain")
         assert isinstance(t, GeoDomainType)
-        assert isinstance(t, ListType)
+        assert isinstance(t, UnionType)
 
     def test_serialize(self) -> None:
         assert GeoDomainType().serialize() == "geodomain"
@@ -273,42 +274,42 @@ class TestGeoDomainType:
     def test_convert_names(self) -> None:
         assert GeoDomainType().validate_convert("Germany,France,Italy") == ["Germany", "France", "Italy"]
 
-    def test_convert_bbox_keeps_string_tokens(self) -> None:
+    def test_convert_bbox(self) -> None:
         # west,south,east,north
-        assert GeoDomainType().validate_convert("-10,35,30,60") == ["-10", "35", "30", "60"]
+        assert GeoDomainType().validate_convert("-10,35,30,60") == [-10, 35, 30, 60]
 
     def test_bbox_crossing_antimeridian_is_valid(self) -> None:
         # west > east is a valid box crossing the antimeridian
-        assert GeoDomainType().validate_convert("170,-10,-170,10") == ["170", "-10", "-170", "10"]
+        assert GeoDomainType().validate_convert("170,-10,-170,10") == [170, -10, -170, 10]
 
     def test_bbox_south_greater_than_north_raises(self) -> None:
-        with pytest.raises(WrongType, match="south"):
+        with pytest.raises(WrongType, match="Cannot convert"):
             GeoDomainType().validate_convert("-10,60,30,35")
 
     def test_bbox_latitude_out_of_range_raises(self) -> None:
-        with pytest.raises(WrongType, match="latitudes"):
+        with pytest.raises(WrongType, match="Cannot convert"):
             GeoDomainType().validate_convert("-10,-100,30,60")
 
     def test_numeric_but_not_integer_bbox_raises(self) -> None:
         # an almost-bbox must fail loudly instead of being resolved as four region names
-        with pytest.raises(WrongType, match="whole-degree"):
+        with pytest.raises(WrongType, match="Cannot convert"):
             GeoDomainType().validate_convert("-10.25,35.5,30,60")
-        with pytest.raises(WrongType, match="whole-degree"):
+        with pytest.raises(WrongType, match="Cannot convert"):
             GeoDomainType().validate_convert("nan,35,30,60")
-        with pytest.raises(WrongType, match="whole-degree"):
+        with pytest.raises(WrongType, match="Cannot convert"):
             GeoDomainType().validate_convert("-10,35,inf,60")
 
     def test_four_non_numeric_tokens_are_names(self) -> None:
         value = "Germany,France,Italy,Spain"
         assert GeoDomainType().validate_convert(value) == ["Germany", "France", "Italy", "Spain"]
 
-    @pytest.mark.parametrize("value", ["auto", "Auto", "global", "DataDefined"])
+    @pytest.mark.parametrize("value", ["auto", "global", "datadefined"])
     def test_no_restriction_sentinel_alone_is_valid(self, value: str) -> None:
-        assert GeoDomainType().validate_convert(value) == [value]
+        assert GeoDomainType().validate_convert(value) == value
 
     @pytest.mark.parametrize("value", ["auto,Germany", "Germany,auto", "global,Europe"])
     def test_no_restriction_sentinel_is_exclusive(self, value: str) -> None:
-        with pytest.raises(WrongType, match="cannot be combined"):
+        with pytest.raises(WrongType, match=r"Cannot convert.*to any of.*"):
             GeoDomainType().validate_convert(value)
 
     def test_convert_empty_string_to_empty_list(self) -> None:
@@ -320,7 +321,7 @@ class TestGeoDomainType:
 
 
 class TestFableTypeParse:
-    """Tests for FableType.parse"""
+    """Tests for parse"""
 
     def test_parse_atomic_types(self) -> None:
         assert isinstance(_parse("str"), StringType)
@@ -371,16 +372,16 @@ class TestFableTypeParse:
 
     def test_parse_invalid_type_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            FableType.parse("invalid_type")
+            parse("invalid_type")
         # "string" parses as str with "ing" as remainder; the outer callsite rejects it
-        _, remainder = FableType.parse("string")
+        _, remainder = parse("string")
         assert remainder == "ing"
 
     def test_parse_empty_enum_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            FableType.parse("enumClosed[]")
+            parse("enumClosed[]")
         with pytest.raises(NotFableType):
-            FableType.parse("enumOpen[]")
+            parse("enumOpen[]")
 
     def test_parse_list_with_whitespace(self) -> None:
         t = _parse("list[ int ]")
@@ -428,30 +429,35 @@ class TestValidateConvertIntegration:
             t.validate_convert(123)
 
 
-class TestCountryType:
-    """Tests for CountryType"""
+class TestGeoDomainSingleType:
+    """Tests for GeoDomainSingleType"""
 
     def test_convert_valid_string(self) -> None:
-        t = CountryType()
+        t = GeoDomainSingleType()
         assert t.validate_convert("France") == "France"
         assert t.validate_convert("GB") == "GB"
         assert t.validate_convert("") == ""
 
     def test_convert_non_string_raises_type_error(self) -> None:
-        t = CountryType()
+        t = GeoDomainSingleType()
         with pytest.raises(NotStringInput):
             t.validate_convert(123)
         with pytest.raises(NotStringInput):
             t.validate_convert(None)
 
+    def test_convert_unrestricted_raises_wrong_type(self) -> None:
+        t = GeoDomainSingleType()
+        with pytest.raises(WrongType):
+            t.validate_convert("auto")
+
     def test_serialize(self) -> None:
-        assert CountryType().serialize() == "country"
+        assert GeoDomainSingleType().serialize() == "geodomainSingle"
 
     def test_parse_and_round_trip(self) -> None:
-        t = _parse("country")
-        assert isinstance(t, CountryType)
+        t = _parse("geodomainSingle")
+        assert isinstance(t, GeoDomainSingleType)
         assert t.validate_convert("Germany") == "Germany"
-        assert t.serialize() == "country"
+        assert t.serialize() == "geodomainSingle"
 
 
 class TestBoundingBoxType:
@@ -550,14 +556,14 @@ class TestUnionType:
         assert t.validate_convert("2026-05-08T10:30:45") == datetime(2026, 5, 8, 10, 30, 45)
 
     def test_parse_union_with_country(self) -> None:
-        t = _parse("union[int,country]")
+        t = _parse("union[int,geodomainSingle]")
         assert isinstance(t, UnionType)
         assert t.validate_convert("42") == 42
         assert t.validate_convert("France") == "France"
 
     def test_parse_empty_union_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            FableType.parse("union[]")
+            parse("union[]")
 
     def test_parse_union_of_unions_now_supported(self) -> None:
         t = _parse("union[union[int,str],float]")
@@ -607,48 +613,48 @@ class TestUnionType:
 
 
 class TestFableTypeParseRemainder:
-    """Tests for the remainder returned by FableType.parse"""
+    """Tests for the remainder returned by parse"""
 
     def test_atomic_type_returns_remainder(self) -> None:
-        t, remainder = FableType.parse("int,str")
+        t, remainder = parse("int,str")
         assert isinstance(t, IntType)
         assert remainder == ",str"
 
     def test_list_type_returns_remainder(self) -> None:
-        t, remainder = FableType.parse("list[int],more")
+        t, remainder = parse("list[int],more")
         assert isinstance(t, ListType)
         assert remainder == ",more"
 
     def test_enum_type_returns_remainder(self) -> None:
-        t, remainder = FableType.parse("enumClosed[a,b],extra")
+        t, remainder = parse("enumClosed[a,b],extra")
         assert isinstance(t, ClosedEnumType)
         assert remainder == ",extra"
 
     def test_union_type_returns_remainder(self) -> None:
-        t, remainder = FableType.parse("union[int,str],extra")
+        t, remainder = parse("union[int,str],extra")
         assert isinstance(t, UnionType)
         assert remainder == ",extra"
 
     def test_nested_brackets_in_list_parsed_correctly(self) -> None:
-        t, remainder = FableType.parse("list[enumClosed[a,b]]suffix")
+        t, remainder = parse("list[enumClosed[a,b]]suffix")
         assert isinstance(t, ListType)
         assert isinstance(t.item_type, ClosedEnumType)
         assert remainder == "suffix"
 
     def test_unmatched_bracket_in_list_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            FableType.parse("list[int")
+            parse("list[int")
 
     def test_unmatched_bracket_in_union_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            FableType.parse("union[int,str")
+            parse("union[int,str")
 
     def test_unmatched_bracket_in_enum_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            FableType.parse("enumClosed[a,b")
+            parse("enumClosed[a,b")
 
     def test_union_with_enum_member(self) -> None:
-        t, remainder = FableType.parse("union[enumClosed[x,y],int]")
+        t, remainder = parse("union[enumClosed[x,y],int]")
         assert isinstance(t, UnionType)
         assert remainder == ""
         assert isinstance(t.types[0], ClosedEnumType)
@@ -658,4 +664,4 @@ class TestFableTypeParseRemainder:
 
     def test_extra_content_in_list_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            FableType.parse("list[int garbage]")
+            parse("list[int garbage]")
