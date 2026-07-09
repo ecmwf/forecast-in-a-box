@@ -9,18 +9,109 @@
  */
 
 /**
- * PNG export for the WMS viewers. OL composes all canvas-renderer layers
- * onto a single canvas in the map target (as long as no layer sets
- * `className` — see ol-layers.ts invariants). With `crossOrigin:
- * 'anonymous'` on the sources the canvas is not tainted, so toBlob()
- * returns a usable image. Title bar and pinned legends are composited onto
- * a fresh canvas so the export matches the on-screen viewer.
+ * PNG export for the WMS viewers. An OL map is SEVERAL stacked canvases —
+ * consecutive default-class layers share one, but the vector basemap,
+ * vector overlays (measure sketches, GeoJSON) and any interleaving split
+ * the stack — each positioned by its own CSS transform, with layer
+ * opacity applied on the DOM element rather than baked into pixels.
+ * `drawCompositedViewport` walks them all (the official OL export
+ * recipe), so exports and the loupe match the screen exactly. With
+ * `crossOrigin: 'anonymous'` on the sources the canvases are untainted.
  */
 
 import { formatStep } from './format'
 import { rebaseLensUrl } from './wms-capabilities'
 import type OlMap from 'ol/Map'
 import type { ParsedLayer } from './wms-capabilities'
+
+const CANVAS_MATRIX_RE = /^matrix\(([^)]*)\)$/
+
+/**
+ * Composite every OL layer canvas under `container` into `ctx`, honoring
+ * each canvas's CSS transform (canvas px → CSS px), its layer's DOM
+ * opacity, and any layer background. The viewport region starting at
+ * (originX, originY) CSS px is drawn scaled by `scale` (destination px
+ * per CSS px). Resets ctx transform/alpha when done.
+ */
+export function drawCompositedViewport(
+  container: HTMLElement,
+  ctx: CanvasRenderingContext2D,
+  opts: { originX: number; originY: number; scale: number },
+): void {
+  const { originX, originY, scale } = opts
+  const canvases = container.querySelectorAll<HTMLCanvasElement>(
+    '.ol-layer canvas, canvas.ol-layer',
+  )
+  canvases.forEach((canvas) => {
+    if (canvas.width === 0) return
+    const parent = canvas.parentElement
+    const opacityStr = parent?.style.opacity || canvas.style.opacity
+    const alpha = opacityStr ? Number(opacityStr) : 1
+    if (alpha === 0) return
+    ctx.globalAlpha = Number.isFinite(alpha) ? alpha : 1
+
+    const bg = parent?.style.backgroundColor
+    if (bg) {
+      ctx.save()
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+      ctx.restore()
+    }
+
+    // Canvas px → CSS px: the CSS matrix when set, else the client/backing
+    // ratio (identity transform, DPR-scaled backing store).
+    let m: ReadonlyArray<number> = [1, 0, 0, 1, 0, 0]
+    const match = CANVAS_MATRIX_RE.exec(canvas.style.transform)
+    if (match) {
+      const parts = match[1].split(',').map(Number)
+      if (parts.length === 6 && parts.every(Number.isFinite)) m = parts
+    } else if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+      m = [
+        canvas.clientWidth / canvas.width,
+        0,
+        0,
+        canvas.clientHeight / canvas.height,
+        0,
+        0,
+      ]
+    }
+    ctx.setTransform(
+      scale * m[0],
+      scale * m[1],
+      scale * m[2],
+      scale * m[3],
+      scale * (m[4] - originX),
+      scale * (m[5] - originY),
+    )
+    ctx.drawImage(canvas, 0, 0)
+  })
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.globalAlpha = 1
+}
+
+/**
+ * Full-viewport composite of a rendered OL map onto a fresh canvas at
+ * device-pixel resolution, on a white ground. Null when the container has
+ * no size yet.
+ */
+export function compositeMapToCanvas(
+  container: HTMLElement,
+): HTMLCanvasElement | null {
+  const width = container.clientWidth
+  const height = container.clientHeight
+  if (width === 0 || height === 0) return null
+  const dpr = window.devicePixelRatio || 1
+  const out = document.createElement('canvas')
+  out.width = Math.round(width * dpr)
+  out.height = Math.round(height * dpr)
+  const ctx = out.getContext('2d')
+  if (!ctx) return null
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, out.width, out.height)
+  drawCompositedViewport(container, ctx, { originX: 0, originY: 0, scale: dpr })
+  return out
+}
 
 export interface LegendExportItem {
   title: string
@@ -51,30 +142,28 @@ export async function exportMapPng(
   return new Promise<Blob | null>((resolve) => {
     map.once('rendercomplete', () => {
       const target = map.getTargetElement()
-      const olCanvas = target.querySelector<HTMLCanvasElement>('canvas')
-      if (!olCanvas) return resolve(null)
-      // Composite OL canvas + (optionally) the title bar onto a fresh
-      // canvas. We can't draw text directly onto OL's canvas — it gets
-      // overwritten on the next render — and we also want the export to
-      // be at the same intrinsic dimensions as the viewer. If any pinned
-      // legends are present, the canvas extends downward to fit them in
-      // a balanced grid below the map.
+      const mapCanvas = compositeMapToCanvas(target)
+      if (!mapCanvas) return resolve(null)
+      // Title bar / legends go on a fresh canvas — OL's own canvases get
+      // overwritten on the next render. If any pinned legends are
+      // present, the canvas extends downward to fit them in a balanced
+      // grid below the map.
       const dpr = window.devicePixelRatio || 1
       const stripHeight =
         legendItems.length > 0
-          ? measureLegendStrip(legendItems, olCanvas.width, dpr)
+          ? measureLegendStrip(legendItems, mapCanvas.width, dpr)
           : 0
       const out = document.createElement('canvas')
-      out.width = olCanvas.width
-      out.height = olCanvas.height + stripHeight
+      out.width = mapCanvas.width
+      out.height = mapCanvas.height + stripHeight
       const ctx = out.getContext('2d')
       if (!ctx) return resolve(null)
-      ctx.drawImage(olCanvas, 0, 0)
+      ctx.drawImage(mapCanvas, 0, 0)
       if (titleBarEnabled && titles.length > 0) {
         drawTitleBar(ctx, out.width, titles, activeTime)
       }
       if (stripHeight > 0) {
-        drawLegendStrip(ctx, legendItems, out.width, olCanvas.height, dpr)
+        drawLegendStrip(ctx, legendItems, out.width, mapCanvas.height, dpr)
       }
       out.toBlob((blob) => resolve(blob), 'image/png')
     })

@@ -24,6 +24,7 @@ import { useMeasure } from '../hooks/useMeasure'
 import { useContextOverlays } from './overlays'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
+import { compositeMapToCanvas } from '../map-export'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
 import type View from 'ol/View'
@@ -205,9 +206,7 @@ function DualMapPanel({
       if (!map) return Promise.resolve(null)
       return new Promise((resolve) => {
         map.once('rendercomplete', () => {
-          const canvas = map
-            .getTargetElement()
-            .querySelector<HTMLCanvasElement>('canvas')
+          const canvas = compositeMapToCanvas(map.getTargetElement())
           resolve(
             canvas
               ? {

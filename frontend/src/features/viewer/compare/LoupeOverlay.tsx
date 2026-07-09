@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { drawCompositedViewport } from '../map-export'
 import type { RefObject } from 'react'
 
 const LOUPE_SIZE_PX = 180
@@ -70,23 +71,20 @@ export function LoupeOverlay({
     if (!container || !loupe) return
     let raf = 0
     const draw = () => {
-      const src = container.querySelector('canvas')
       const ctx = loupe.getContext('2d')
-      if (src && ctx) {
-        const scale = src.width / container.clientWidth // device-pixel ratio
-        const srcSize = SOURCE_SIZE_PX * scale
-        ctx.clearRect(0, 0, loupe.width, loupe.height)
-        ctx.drawImage(
-          src,
-          pos.x * scale - srcSize / 2,
-          pos.y * scale - srcSize / 2,
-          srcSize,
-          srcSize,
-          0,
-          0,
-          loupe.width,
-          loupe.height,
-        )
+      if (ctx) {
+        // The map is several stacked canvases (vector basemap, WMS image
+        // group, vector overlays), each with its own CSS transform and
+        // DOM-level opacity — composite them all, or the loupe shows the
+        // wrong layers at the wrong place and darkness.
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, loupe.width, loupe.height)
+        drawCompositedViewport(container, ctx, {
+          originX: pos.x - SOURCE_SIZE_PX / 2,
+          originY: pos.y - SOURCE_SIZE_PX / 2,
+          scale: loupe.width / SOURCE_SIZE_PX,
+        })
         // Crosshair through the magnified centre.
         ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)'
         ctx.lineWidth = 1
