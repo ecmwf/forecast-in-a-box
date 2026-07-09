@@ -17,6 +17,10 @@
 
 import { defineConfig, devices } from '@playwright/test'
 
+// Overridable so e2e can run beside a live dev server on 3000 (which
+// reuseExistingServer would otherwise hijack): VITE_PORT=3100 npm run test:e2e
+const port = Number(process.env.VITE_PORT ?? 3000)
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -27,14 +31,14 @@ export default defineConfig({
   timeout: 30000,
 
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
 
   webServer: {
     command: 'npm run dev:mock',
-    port: 3000,
+    port,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
