@@ -447,13 +447,7 @@ export function CompareViewer({
         onOpenChange={setExportOpen}
         capture={captureAction}
         legends={exportLegends}
-        meta={{
-          labelA: a.label,
-          labelB: b.label,
-          modeLabel: t(`modes.${mode}`),
-          validTime:
-            currentEpoch !== null ? new Date(currentEpoch).toISOString() : null,
-        }}
+        meta={{ labelA: a.label, labelB: b.label }}
       />
       <div className="flex min-h-0 flex-1 gap-2">
         {leftCollapsed ? (

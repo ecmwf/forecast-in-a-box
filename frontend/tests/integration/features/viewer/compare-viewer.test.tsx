@@ -343,9 +343,6 @@ describe('CompareViewer', () => {
     await expect
       .element(screen.getByRole('button', { name: 'Download PNG' }))
       .toBeVisible()
-    await expect
-      .element(screen.getByRole('button', { name: 'Print / PDF' }))
-      .toBeVisible()
     // Close the dialog again (Escape).
     await screen.getByRole('button', { name: 'Download PNG' })
     document.dispatchEvent(

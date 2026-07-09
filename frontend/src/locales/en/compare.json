@@ -157,16 +157,11 @@
   },
   "export": {
     "title": "Export comparison",
-    "description": "Download the current view as PNG, or open a print-ready report for PDF.",
+    "description": "Download the current view as PNG — title, valid time, and legends are baked in.",
     "titleLabel": "Title",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Optional notes shown on the report…",
     "png": "Download PNG",
-    "print": "Print / PDF",
     "failed": "Could not capture the map view",
-    "popupBlocked": "The report window was blocked — allow pop-ups for this site",
-    "open": "Export",
-    "legendsTitle": "Legends"
+    "open": "Export"
   },
   "overlays": {
     "title": "Context overlays",
@@ -201,7 +196,7 @@
       },
       "export": {
         "title": "Export",
-        "body": "The download icon captures the current view as PNG or opens a print-ready report (title and description editable) for the browser’s print-to-PDF."
+        "body": "The download icon captures the current view as PNG — with the title, valid time, and the active layers’ legends baked in. Side by side saves one image per panel."
       }
     },
     "shortcuts": {
