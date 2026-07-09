@@ -195,7 +195,7 @@ function RunSourceRow({ row, filter }: { row: GribMarkerRow; filter: string }) {
     <li className="flex items-center gap-3 py-2">
       <div className="min-w-0 flex-1">
         <P className="truncate text-sm font-medium">{name}</P>
-        <P className="truncate font-mono text-xs text-muted-foreground">
+        <P className="truncate font-mono text-[11px] text-muted-foreground/70">
           {row.blockId}
           {row.runCreatedAt
             ? ` · ${formatInZone(new Date(row.runCreatedAt), timeZone, 'yyyy-MM-dd HH:mm')}`
@@ -232,7 +232,7 @@ function HostPathForm() {
   }
 
   return (
-    <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+    <div className="space-y-1.5">
       <P className="text-sm font-medium">{t('picker.hostPath.title')}</P>
       <P className="text-xs text-muted-foreground">
         {t('picker.hostPath.description')}
@@ -312,7 +312,7 @@ function WmsUrlForm() {
             : t('picker.wmsUrl.errorParse')
 
   return (
-    <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+    <div className="space-y-1.5">
       <P className="flex items-center gap-1.5 text-sm font-medium">
         <Globe className="h-3.5 w-3.5 text-muted-foreground" />
         {t('picker.wmsUrl.title')}
@@ -360,7 +360,7 @@ function CollectedSources() {
       <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {t('picker.collected')}
       </P>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-1.5">
         {entries.map((entry) => {
           const ref = entryRef(entry)
           return (
