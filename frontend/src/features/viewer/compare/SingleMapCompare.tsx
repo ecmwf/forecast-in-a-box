@@ -40,6 +40,7 @@ import { useContextOverlays } from './overlays'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { SourceSlot } from './layer-pairing'
+import { compositeMapToCanvas } from '../map-export'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
 import { cn } from '@/lib/utils'
@@ -191,17 +192,16 @@ export function SingleMapCompare({
     return () => onRegisterFit(null)
   }, [tryFit, onRegisterFit])
 
-  // Export capture: the composited canvas already bakes in the active
-  // mode's clipping (swipe/spy) — WYSIWYG.
+  // Export capture: composite all layer canvases (basemap, WMS stacks,
+  // overlays) — the mode's clipping is baked into the WMS canvas, so the
+  // result is WYSIWYG.
   useEffect(() => {
     onRegisterCapture(() => {
       const map = mapRef.current
       if (!map) return Promise.resolve([])
       return new Promise((resolve) => {
         map.once('rendercomplete', () => {
-          const canvas = map
-            .getTargetElement()
-            .querySelector<HTMLCanvasElement>('canvas')
+          const canvas = compositeMapToCanvas(map.getTargetElement())
           resolve(
             canvas
               ? [
