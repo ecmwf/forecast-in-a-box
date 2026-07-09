@@ -143,19 +143,11 @@ export function CompareTimeSlider({
             </SelectContent>
           </Select>
           {linkMode === 'offset' && (
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {tCompare('timeline.offsetLabel')}
-              <Input
-                type="number"
-                step={1}
-                value={Math.round(offsetMs / HOUR_MS)}
-                onChange={(e) =>
-                  onOffsetChange(Number(e.target.value) * HOUR_MS)
-                }
-                className="h-7 w-16 text-xs"
-              />
-              h
-            </label>
+            <OffsetField
+              label={tCompare('timeline.offsetLabel')}
+              offsetMs={offsetMs}
+              onOffsetChange={onOffsetChange}
+            />
           )}
           {hasSharedAxis && (
             <span className="font-mono text-xs tabular-nums">
@@ -326,6 +318,42 @@ function IndependentSlider({
   )
 }
 
+/**
+ * Offset entry as a plain numeric-mode text field — type=number fights
+ * partial edits ('048', hard to clear). Focus selects all for instant
+ * overwrite; empty means 0 while staying visually empty.
+ */
+function OffsetField({
+  label,
+  offsetMs,
+  onOffsetChange,
+}: {
+  label: string
+  offsetMs: number
+  onOffsetChange: (ms: number) => void
+}) {
+  const [text, setText] = useState(() => String(Math.round(offsetMs / HOUR_MS)))
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {label}
+      <Input
+        type="text"
+        inputMode="numeric"
+        value={text}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => {
+          const value = e.target.value
+          if (!/^-?\d*$/.test(value)) return
+          setText(value)
+          onOffsetChange((Number(value) || 0) * HOUR_MS)
+        }}
+        className="h-7 w-16 text-xs"
+      />
+      h
+    </label>
+  )
+}
+
 /** Edge-aware translate class for a cursor-anchored label. */
 function anchorClass(fraction: number): string {
   return fraction < 0.08
@@ -412,7 +440,6 @@ function SlotRunTrack({
       <div
         role="img"
         aria-label={t('timeline.trackAria', { slot: slot.toUpperCase() })}
-        title={t('timeline.trackHint')}
         className="relative flex h-2 cursor-pointer items-stretch gap-px py-0"
         onPointerMove={(e) => onHover(indexFromPointer(e))}
         onPointerLeave={() => onHover(null)}

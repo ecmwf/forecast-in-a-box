@@ -188,6 +188,22 @@ describe('ComparePage', () => {
     await expect.element(pickerB).toHaveTextContent('Run A')
   })
 
+  it('guides the first-source state and offers self-comparison', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    const screen = await renderComparePage()
+
+    await expect
+      .element(screen.getByText('Choose what to compare against'))
+      .toBeVisible()
+    await screen.getByRole('button', { name: 'Compare with itself' }).click()
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toHaveTextContent('Run A')
+    expect(
+      screen.getByText('Choose what to compare against').elements(),
+    ).toHaveLength(0)
+  })
+
   it('allows the same source in both slots', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
     useComparisonStore.getState().addEntry(RUN_B)
