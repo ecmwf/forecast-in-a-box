@@ -271,11 +271,9 @@ describe('CompareViewer', () => {
       document.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }))
     }
 
-    // S toggles both sidebars.
+    // S toggles both sidebars (hidden, not unmounted — state persists).
     press('s')
-    await expect
-      .element(screen.getByText('Active layers'))
-      .not.toBeInTheDocument()
+    await expect.element(screen.getByText('Active layers')).not.toBeVisible()
     press('s')
     await expect.element(screen.getByText('Active layers')).toBeVisible()
 
@@ -309,30 +307,40 @@ describe('CompareViewer', () => {
       .toBeInTheDocument()
   })
 
-  it('collapses and restores both sidebars like the embedded viewer', async () => {
+  it('collapses and restores both sidebars, preserving their state', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
 
     await expect.element(screen.getByText('Active layers')).toBeVisible()
+    // Pick a non-default filter — it must survive collapse/expand
+    // (panels are hidden, not unmounted).
+    await screen.getByRole('button', { name: 'B', exact: true }).click()
+
     // Left first in DOM, right second.
     await screen
       .getByRole('button', { name: 'Collapse sidebar' })
       .first()
       .click()
+    await expect.element(screen.getByText('Active layers')).not.toBeVisible()
+    await screen
+      .getByRole('button', { name: 'Collapse sidebar' })
+      .first()
+      .click()
     await expect
-      .element(screen.getByText('Active layers'))
-      .not.toBeInTheDocument()
-    await screen.getByRole('button', { name: 'Collapse sidebar' }).click()
-    await expect
-      .element(screen.getByText('Total precipitation'))
-      .not.toBeInTheDocument()
+      .element(screen.getByText('2 m temperature').first())
+      .not.toBeVisible()
 
     const handles = screen.getByRole('button', { name: 'Expand sidebar' })
     expect(handles.elements()).toHaveLength(2)
     await handles.first().click()
     await expect.element(screen.getByText('Active layers')).toBeVisible()
     await handles.click()
-    await expect.element(screen.getByText('Total precipitation')).toBeVisible()
+    await expect
+      .element(screen.getByText('2 m temperature').first())
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: 'B', exact: true }))
+      .toHaveAttribute('aria-pressed', 'true')
   })
 
   it('exposes export and overlay-upload entry points', async () => {
