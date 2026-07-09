@@ -16,7 +16,7 @@
  *   F          fit to globe
  *   E          export dialog
  *   H          help dialog
- *   N          toggle the annotate tool
+ *   N          toggle the annotate tool (Esc disarms)
  *   W/A/S/D    pan the map (arrow keys too)
  * Space (flicker) and hold-Z (loupe) live with their features; the swipe
  * divider consumes its own arrow keys while focused (the pan guard
@@ -72,6 +72,9 @@ export function useCompareShortcuts(handlers: {
   onExport: () => void
   onHelp: () => void
   onAnnotate: () => void
+  /** Disarm the annotate tool; active only while it's armed (and the
+   *  editor dialog is closed — the dialog owns Escape when open). */
+  onAnnotateDisarm: { enabled: boolean; disarm: () => void }
   /** Pan the shared camera by (dx, dy) screen pixels. */
   onPan: (dx: number, dy: number) => void
 }): void {
@@ -82,6 +85,7 @@ export function useCompareShortcuts(handlers: {
     onExport,
     onHelp,
     onAnnotate,
+    onAnnotateDisarm,
     onPan,
   } = handlers
   const opts = { ignoreInputs: true }
@@ -99,6 +103,10 @@ export function useCompareShortcuts(handlers: {
   useHotkey(COMPARE_KEYS.export, () => onExport(), opts)
   useHotkey(COMPARE_KEYS.help, () => onHelp(), opts)
   useHotkey(COMPARE_KEYS.annotate, () => onAnnotate(), opts)
+  useHotkey('Escape', () => onAnnotateDisarm.disarm(), {
+    ...opts,
+    enabled: onAnnotateDisarm.enabled,
+  })
   useHotkey(COMPARE_KEYS.pan[0], () => pan(0, -1), opts)
   useHotkey(COMPARE_KEYS.pan[1], () => pan(-1, 0), opts)
   useHotkey(COMPARE_KEYS.pan[2], () => pan(0, 1), opts)

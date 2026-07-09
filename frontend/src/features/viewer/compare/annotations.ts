@@ -140,7 +140,10 @@ export function useAnnotationLayer(
     const layer = new VectorLayer({ source, zIndex: ANNOTATION_Z })
     map.addLayer(layer)
 
-    const onClick = (evt: { pixel: number[]; coordinate: number[] }) => {
+    const onClick = (evt: {
+      pixel: Array<number>
+      coordinate: Array<number>
+    }) => {
       const hit = map.forEachFeatureAtPixel(
         evt.pixel,
         (feature) => feature.getId(),

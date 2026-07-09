@@ -217,7 +217,7 @@
       "swipe": "Nudge the swipe divider (when focused)",
       "help": "Open this help",
       "pan": "Pan the map (arrow keys too)",
-      "annotate": "Toggle the annotate tool"
+      "annotate": "Toggle the annotate tool (Esc disarms)"
     }
   },
   "annotations": {
@@ -230,6 +230,7 @@
     "delete": "Delete",
     "remove": "Remove annotation {{number}}",
     "empty": "Arm the annotate tool and click the map to record findings.",
-    "slotShared": "Both"
+    "slotShared": "Both",
+    "armedHint": "Click the map to add a note · Esc exits"
   }
 }

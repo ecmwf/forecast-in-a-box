@@ -289,6 +289,15 @@ describe('CompareViewer', () => {
       .element(screen.getByRole('button', { name: /swipe/i }))
       .toHaveAttribute('aria-pressed', 'true')
 
+    // N arms the annotate tool; Escape disarms it.
+    const annotateButton = screen.getByRole('button', { name: /Annotate/ })
+    press('n')
+    await expect.element(annotateButton).toHaveAttribute('aria-pressed', 'true')
+    press('Escape')
+    await expect
+      .element(annotateButton)
+      .toHaveAttribute('aria-pressed', 'false')
+
     // H opens the help dialog with the shortcut table.
     press('h')
     await expect.element(screen.getByText('Keyboard shortcuts')).toBeVisible()
@@ -442,7 +451,7 @@ describe('CompareViewer', () => {
     }
     // Click panel B (second map).
     await page
-      .elementLocator(viewports[1] as Element)
+      .elementLocator(viewports[1])
       .click({ position: { x: 250, y: 200 } })
     await expect.element(screen.getByText('Annotation 1')).toBeVisible()
     await screen.getByPlaceholder('Record your finding…').fill('B-side eddy')

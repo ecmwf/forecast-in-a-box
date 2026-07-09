@@ -25,11 +25,11 @@ import { Fill, Stroke, Style, Text } from 'ol/style'
 import CircleStyle from 'ol/style/Circle'
 import Point from 'ol/geom/Point'
 import { getArea, getLength } from 'ol/sphere'
+import { unByKey } from 'ol/Observable'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type Geometry from 'ol/geom/Geometry'
 import type { EventsKey } from 'ol/events'
-import { unByKey } from 'ol/Observable'
 
 export type MeasureMode = 'none' | 'line' | 'area'
 

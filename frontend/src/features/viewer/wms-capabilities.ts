@@ -285,7 +285,7 @@ function expandSingleTimeSegment(seg: string): Array<string> {
 function parseWholeMonthPeriod(input: string): number | null {
   const m = /^P(?:(\d+)Y)?(?:(\d+)M)?$/.exec(input)
   if (!m || (!m[1] && !m[2])) return null
-  return Number(m[1] ?? 0) * 12 + Number(m[2] ?? 0)
+  return (m[1] ? Number(m[1]) : 0) * 12 + (m[2] ? Number(m[2]) : 0)
 }
 
 const PERIOD_RE =

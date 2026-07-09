@@ -121,9 +121,7 @@ export function CompareTimeSlider({
           <Select
             value={linkMode}
             onValueChange={(v) => {
-              if (typeof v === 'string' && v) {
-                onLinkModeChange(v as TimeLinkMode)
-              }
+              if (v !== null) onLinkModeChange(v)
             }}
           >
             <SelectTrigger
@@ -185,7 +183,7 @@ export function CompareTimeSlider({
           {/* Per-source availability tracks. Hover shows the instant and
               a shared cursor; click jumps to that step. */}
           <div className="relative grid grid-cols-[14px_1fr] items-center gap-x-2 gap-y-1">
-            {hoverIndex !== null && steps[hoverIndex] !== undefined && (
+            {hoverIndex !== null && hoverIndex < steps.length && (
               <div
                 className="pointer-events-none absolute -top-7 z-10 -translate-x-1/2 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs whitespace-nowrap shadow-sm"
                 style={{
@@ -343,7 +341,7 @@ function SlotRunTrack({
     if (cells) return null
     const out: Array<{ available: boolean; length: number }> = []
     for (const available of availability) {
-      const last = out[out.length - 1]
+      const last = out.at(-1)
       if (last && last.available === available) last.length++
       else out.push({ available, length: 1 })
     }

@@ -9,13 +9,13 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import { buildSourceTimeIndex } from '@/features/viewer/compare/compare-timeline'
 import {
   defaultToleranceMs,
   formatOffset,
   resolveSourceTime,
 } from '@/features/viewer/compare/time-link'
-import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 
 const HOUR = 3600_000
 
