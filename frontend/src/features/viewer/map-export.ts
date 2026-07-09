@@ -124,6 +124,11 @@ export interface LegendExportItem {
  * map. Shared by the embedded viewer's PNG export and the compare
  * captures.
  */
+export interface ExportNote {
+  number: number
+  text: string
+}
+
 export function composeExportCanvas(
   mapCanvas: HTMLCanvasElement,
   opts: {
@@ -132,27 +137,121 @@ export function composeExportCanvas(
     timeText: string | null
     titleBarEnabled: boolean
     legendItems: ReadonlyArray<LegendExportItem>
+    /** Annotation texts, baked as a numbered strip below the legends. */
+    notes?: ReadonlyArray<ExportNote>
   },
 ): HTMLCanvasElement | null {
-  const { titles, timeText, titleBarEnabled, legendItems } = opts
+  const { titles, timeText, titleBarEnabled, legendItems, notes = [] } = opts
   const dpr = window.devicePixelRatio || 1
-  const stripHeight =
+  const legendHeight =
     legendItems.length > 0
       ? measureLegendStrip(legendItems, mapCanvas.width, dpr)
       : 0
+  const probe = document.createElement('canvas').getContext('2d')
+  const notesHeight =
+    notes.length > 0 && probe
+      ? measureNotesStrip(probe, notes, mapCanvas.width, dpr)
+      : 0
   const out = document.createElement('canvas')
   out.width = mapCanvas.width
-  out.height = mapCanvas.height + stripHeight
+  out.height = mapCanvas.height + legendHeight + notesHeight
   const ctx = out.getContext('2d')
   if (!ctx) return null
   ctx.drawImage(mapCanvas, 0, 0)
   if (titleBarEnabled && titles.length > 0) {
     drawTitleBar(ctx, out.width, titles, timeText)
   }
-  if (stripHeight > 0) {
+  if (legendHeight > 0) {
     drawLegendStrip(ctx, legendItems, out.width, mapCanvas.height, dpr)
   }
+  if (notesHeight > 0) {
+    drawNotesStrip(ctx, notes, out.width, mapCanvas.height + legendHeight, dpr)
+  }
   return out
+}
+
+const NOTES_PAD = 16
+const NOTES_FONT_PX = 13
+const NOTES_LINE_HEIGHT = 1.45
+const NOTES_NUMBER_COL = 26
+
+function notesFont(dpr: number): string {
+  return `${NOTES_FONT_PX * dpr}px system-ui, -apple-system, "Segoe UI", sans-serif`
+}
+
+/** Word-wrap one note's text to the strip's inner width. */
+function wrapNoteLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): Array<string> {
+  const lines: Array<string> = []
+  for (const paragraph of text.split('\n')) {
+    let line = ''
+    for (const word of paragraph.split(/\s+/)) {
+      const candidate = line ? `${line} ${word}` : word
+      if (line && ctx.measureText(candidate).width > maxWidth) {
+        lines.push(line)
+        line = word
+      } else {
+        line = candidate
+      }
+    }
+    lines.push(line)
+  }
+  return lines
+}
+
+function measureNotesStrip(
+  ctx: CanvasRenderingContext2D,
+  notes: ReadonlyArray<ExportNote>,
+  canvasWidth: number,
+  dpr: number,
+): number {
+  ctx.font = notesFont(dpr)
+  const pad = NOTES_PAD * dpr
+  const innerWidth = canvasWidth - pad * 2 - NOTES_NUMBER_COL * dpr
+  const lineHeight = NOTES_FONT_PX * NOTES_LINE_HEIGHT * dpr
+  let lines = 0
+  for (const note of notes) {
+    lines += wrapNoteLines(ctx, note.text, innerWidth).length
+  }
+  return pad * 2 + lines * lineHeight + (notes.length - 1) * lineHeight * 0.35
+}
+
+function drawNotesStrip(
+  ctx: CanvasRenderingContext2D,
+  notes: ReadonlyArray<ExportNote>,
+  canvasWidth: number,
+  yOffset: number,
+  dpr: number,
+): void {
+  const pad = NOTES_PAD * dpr
+  const numberCol = NOTES_NUMBER_COL * dpr
+  const innerWidth = canvasWidth - pad * 2 - numberCol
+  const lineHeight = NOTES_FONT_PX * NOTES_LINE_HEIGHT * dpr
+  const totalHeight = measureNotesStrip(ctx, notes, canvasWidth, dpr)
+
+  ctx.save()
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.97)'
+  ctx.fillRect(0, yOffset, canvasWidth, totalHeight)
+  ctx.font = notesFont(dpr)
+  ctx.textBaseline = 'top'
+
+  let y = yOffset + pad
+  notes.forEach((note, i) => {
+    if (i > 0) y += lineHeight * 0.35
+    ctx.fillStyle = '#111'
+    ctx.textAlign = 'right'
+    ctx.fillText(`${note.number}.`, pad + numberCol - 8 * dpr, y)
+    ctx.textAlign = 'left'
+    ctx.fillStyle = '#333'
+    for (const line of wrapNoteLines(ctx, note.text, innerWidth)) {
+      ctx.fillText(line, pad + numberCol, y)
+      y += lineHeight
+    }
+  })
+  ctx.restore()
 }
 
 /** Load one legend image (anonymous CORS); null on failure. */

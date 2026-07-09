@@ -25,6 +25,7 @@ import { LegendImage } from '../components/LegendImage'
 import { SLOT_CHIP_CLASS } from './CompareLayerBrowser'
 import { parseGeojsonOverlay } from './overlays'
 import type { ContextOverlay } from './overlays'
+import type { MapAnnotation } from './annotations'
 import { Button } from '@/components/ui/button'
 import { showToast } from '@/lib/toast'
 import { createLogger } from '@/lib/logger'
@@ -44,6 +45,12 @@ export interface OverlayControls {
   remove: (id: string) => void
 }
 
+export interface AnnotationControls {
+  items: ReadonlyArray<MapAnnotation>
+  edit: (id: string) => void
+  remove: (id: string) => void
+}
+
 export interface OpacityTiers {
   global: number
   setGlobal: (v: number) => void
@@ -57,6 +64,7 @@ export function CompareActiveLayersPanel({
   opacity,
   sources,
   overlays,
+  annotations,
   onCollapse,
 }: {
   pairs: ReadonlyArray<PairedLayer>
@@ -67,6 +75,7 @@ export function CompareActiveLayersPanel({
     { label: string; baseUrl: string; lens: LensSource }
   >
   overlays: OverlayControls
+  annotations: AnnotationControls
   onCollapse: () => void
 }) {
   const { t } = useTranslation('compare')
@@ -141,8 +150,65 @@ export function CompareActiveLayersPanel({
         )}
       </div>
 
+      <AnnotationsSection annotations={annotations} />
       <OverlaysSection overlays={overlays} />
     </aside>
+  )
+}
+
+/** Numbered findings pinned to the map: click to edit, X to remove. */
+function AnnotationsSection({
+  annotations,
+}: {
+  annotations: AnnotationControls
+}) {
+  const { t } = useTranslation('compare')
+  if (annotations.items.length === 0) return null
+  return (
+    <div className="space-y-1.5 border-t border-border bg-muted/30 px-3 py-2.5">
+      <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {t('annotations.title')}
+      </P>
+      <ul className="space-y-1">
+        {annotations.items.map((annotation, index) => (
+          <li key={annotation.id} className="flex items-start gap-1.5">
+            <span
+              className={cn(
+                'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold text-white',
+                annotation.slot === 'a'
+                  ? 'bg-blue-600 dark:bg-blue-500'
+                  : annotation.slot === 'b'
+                    ? 'bg-orange-600 dark:bg-orange-500'
+                    : 'bg-slate-700 dark:bg-slate-500',
+              )}
+              title={
+                annotation.slot
+                  ? annotation.slot.toUpperCase()
+                  : t('annotations.slotShared')
+              }
+            >
+              {index + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => annotations.edit(annotation.id)}
+              className="min-w-0 flex-1 rounded text-left text-xs leading-snug hover:bg-accent"
+              title={annotation.text}
+            >
+              <span className="line-clamp-2">{annotation.text}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => annotations.remove(annotation.id)}
+              aria-label={t('annotations.remove', { number: index + 1 })}
+              className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

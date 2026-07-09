@@ -37,6 +37,8 @@ import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
 import { useContextOverlays } from './overlays'
+import { useAnnotationLayer } from './annotations'
+import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { SourceSlot } from './layer-pairing'
@@ -68,6 +70,10 @@ export function SingleMapCompare({
   measureMode,
   measureClearNonce,
   overlays,
+  annotations,
+  annotateArmed,
+  onAnnotationCreate,
+  onAnnotationEdit,
   onRegisterFit,
   onRegisterCapture,
 }: {
@@ -81,6 +87,13 @@ export function SingleMapCompare({
   measureMode: MeasureMode
   measureClearNonce: number
   overlays: ReadonlyArray<ContextOverlay>
+  annotations: ReadonlyArray<MapAnnotation>
+  annotateArmed: boolean
+  onAnnotationCreate: (
+    coordinate: [number, number],
+    slot: SourceSlot | null,
+  ) => void
+  onAnnotationEdit: (id: string) => void
   onRegisterFit: (fit: (() => void) | null) => void
   onRegisterCapture: (
     capture: (() => Promise<Array<CaptureResult>>) | null,
@@ -173,6 +186,10 @@ export function SingleMapCompare({
 
   useMeasure(mapRef, measureMode, measureClearNonce)
   useContextOverlays(mapRef, overlays)
+  useAnnotationLayer(mapRef, annotations, null, annotateArmed, {
+    onCreate: onAnnotationCreate,
+    onEdit: onAnnotationEdit,
+  })
 
   // Fit plumbing (union bbox of both sources).
   useEffect(() => {
@@ -443,8 +460,10 @@ export function SingleMapCompare({
     <div className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/20">
       <div
         ref={containerRef}
-        className="absolute inset-0"
-        onClick={mode === 'flicker' ? toggleFlicker : undefined}
+        className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
+        onClick={
+          mode === 'flicker' && !annotateArmed ? toggleFlicker : undefined
+        }
       />
       <CompareSlotTag
         slot="a"

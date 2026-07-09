@@ -95,6 +95,19 @@
   remove the base entirely; same control added to the embedded viewer
   (`useBasemap` gained an `opacity` option).
 
+## Annotations (user request 2026-07-09)
+
+- [x] **Slot-aware map annotations**: toolbar tool (N) arms click-to-
+  annotate; a pin placed on side-by-side panel A/B belongs to that slot
+  and renders only there (blue/orange pin), single-map pins (slate) show
+  everywhere. Pins are canvas-native (numbered circle + truncated label
+  via OL Text) so loupe and PNG exports include them automatically;
+  clicking a pin reopens the editor (edit/delete). Left sidebar lists the
+  numbered findings (click-to-edit, remove). Exports bake the full texts
+  as a numbered notes strip below the legends, filtered per capture's
+  slot in side-by-side. Session-state only — persistence (URL/journal) is
+  a follow-up.
+
 ## Improvement round 3 (user feedback 2026-07-09, screenshot-driven)
 
 All six items implemented same day:

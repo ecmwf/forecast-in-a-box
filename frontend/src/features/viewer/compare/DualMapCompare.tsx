@@ -22,12 +22,15 @@ import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
 import { useContextOverlays } from './overlays'
+import { useAnnotationLayer } from './annotations'
+import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
 import { compositeMapToCanvas } from '../map-export'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
 import type View from 'ol/View'
+import type { SourceSlot } from './layer-pairing'
 import type { CaptureResult, CompareMapSource } from './types'
 
 const noop = () => {}
@@ -44,6 +47,10 @@ export function DualMapCompare({
   measureMode,
   measureClearNonce,
   overlays,
+  annotations,
+  annotateArmed,
+  onAnnotationCreate,
+  onAnnotationEdit,
   onRegisterFit,
   onRegisterCapture,
 }: {
@@ -55,6 +62,13 @@ export function DualMapCompare({
   measureMode: MeasureMode
   measureClearNonce: number
   overlays: ReadonlyArray<ContextOverlay>
+  annotations: ReadonlyArray<MapAnnotation>
+  annotateArmed: boolean
+  onAnnotationCreate: (
+    coordinate: [number, number],
+    slot: SourceSlot | null,
+  ) => void
+  onAnnotationEdit: (id: string) => void
   /** Register this component's fit-to-bbox action with the toolbar. */
   onRegisterFit: (fit: (() => void) | null) => void
   onRegisterCapture: (
@@ -110,6 +124,10 @@ export function DualMapCompare({
         measureMode={measureMode}
         measureClearNonce={measureClearNonce}
         overlays={overlays}
+        annotations={annotations}
+        annotateArmed={annotateArmed}
+        onAnnotationCreate={onAnnotationCreate}
+        onAnnotationEdit={onAnnotationEdit}
         onRegisterFit={registerFit}
         onRegisterCapture={registerCapture}
       />
@@ -123,6 +141,10 @@ export function DualMapCompare({
         measureMode={measureMode}
         measureClearNonce={measureClearNonce}
         overlays={overlays}
+        annotations={annotations}
+        annotateArmed={annotateArmed}
+        onAnnotationCreate={onAnnotationCreate}
+        onAnnotationEdit={onAnnotationEdit}
         onRegisterFit={registerFit}
         onRegisterCapture={registerCapture}
       />
@@ -140,6 +162,10 @@ function DualMapPanel({
   measureMode,
   measureClearNonce,
   overlays,
+  annotations,
+  annotateArmed,
+  onAnnotationCreate,
+  onAnnotationEdit,
   onRegisterFit,
   onRegisterCapture,
 }: {
@@ -152,6 +178,13 @@ function DualMapPanel({
   measureMode: MeasureMode
   measureClearNonce: number
   overlays: ReadonlyArray<ContextOverlay>
+  annotations: ReadonlyArray<MapAnnotation>
+  annotateArmed: boolean
+  onAnnotationCreate: (
+    coordinate: [number, number],
+    slot: SourceSlot | null,
+  ) => void
+  onAnnotationEdit: (id: string) => void
   onRegisterFit: (slot: string, fit: (() => void) | null) => void
   onRegisterCapture: (
     slot: string,
@@ -197,6 +230,10 @@ function DualMapPanel({
 
   useMeasure(mapRef, measureMode, measureClearNonce)
   useContextOverlays(mapRef, overlays)
+  useAnnotationLayer(mapRef, annotations, source.slot, annotateArmed, {
+    onCreate: onAnnotationCreate,
+    onEdit: onAnnotationEdit,
+  })
 
   useEffect(() => {
     setFitBbox(source.bbox)

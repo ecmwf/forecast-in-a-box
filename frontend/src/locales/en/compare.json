@@ -198,7 +198,7 @@
       },
       "tools": {
         "title": "Tools",
-        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The layers icon switches the basemap (Carto, satellite imagery, SkinnyWMS native) and its opacity. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
+        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The annotate tool (N) records numbered findings pinned to the map — per panel in side-by-side — and they are baked into exports. The layers icon switches the basemap and its opacity. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
       },
       "export": {
         "title": "Export",
@@ -216,7 +216,20 @@
       "loupe": "Magnifier loupe (hold)",
       "swipe": "Nudge the swipe divider (when focused)",
       "help": "Open this help",
-      "pan": "Pan the map (arrow keys too)"
+      "pan": "Pan the map (arrow keys too)",
+      "annotate": "Toggle the annotate tool"
     }
+  },
+  "annotations": {
+    "title": "Annotations",
+    "tool": "Annotate — click the map to add a note",
+    "editorTitle": "Annotation {{number}}",
+    "placeholder": "Record your finding…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "remove": "Remove annotation {{number}}",
+    "empty": "Arm the annotate tool and click the map to record findings.",
+    "slotShared": "Both"
   }
 }
