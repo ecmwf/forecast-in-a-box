@@ -24,6 +24,8 @@ from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Any
 
+# PSEUDO TYPES / EXCEPTIONS
+
 
 class NotFableType(Exception):
     """Raised when a type expression cannot be parsed."""
@@ -35,6 +37,9 @@ class NotStringInput(TypeError):
 
 class WrongType(Exception):
     """Raised when a value cannot be converted to the target type."""
+
+
+# BASE CLASS FOR ALL REAL TYPES
 
 
 class FableType(ABC):
@@ -51,85 +56,7 @@ class FableType(ABC):
 
     @abstractmethod
     def serialize(self) -> str:
-        """Serialize this type to a string expression that can be parsed back via FableType.parse()."""
-
-    @staticmethod
-    def parse(type_expr: str) -> "tuple[FableType, str]":
-        """Parse a type expression from the start of type_expr.
-
-        Returns ``(parsed_type, remainder)`` where ``remainder`` is the unparsed
-        tail of the input string. At the outer call site, verify that the
-        remainder is empty (or whitespace-only) to ensure the full expression
-        was consumed.
-
-        Supports:
-        - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'country', 'bbox'
-        - Enumerations: 'enumClosed[item1,item2]', 'enumOpen[item1,item2]'
-        - Lists: 'list[int]', 'list[enumClosed[...]]', etc.
-        - Union: 'union[int,str]', 'union[enumClosed[a,b],date]', etc.
-
-        Raises NotFableType if the expression cannot be parsed.
-        """
-        type_expr = type_expr.lstrip()
-
-        # Atomic types: "datetime" must precede "date" to avoid prefix ambiguity.
-        _ATOMIC = [
-            ("datetime", DatetimeType),
-            ("date", DateType),
-            ("float", FloatType),
-            ("int", IntType),
-            ("str", StringType),
-            ("country", CountryType),
-            ("bbox", BoundingBoxType),
-            ("geodomain", GeoDomainType),
-        ]
-        for name, factory in _ATOMIC:
-            n = len(name)
-            if type_expr.startswith(name):
-                return (factory(), type_expr[n:])
-
-        # Enum types (enumClosed and enumOpen share identical logic)
-        _ENUMS = {"enumClosed": ClosedEnumType, "enumOpen": OpenEnumType}
-        for prefix, factory in _ENUMS.items():
-            if type_expr.startswith(prefix):
-                _, inner, remainder = _split_by_brackets(type_expr)
-                items = [_normalize_enum_item(item) for item in inner.split(",") if item.strip()]
-                if not items:
-                    raise NotFableType(f"{prefix} must contain at least one item")
-                return (factory(items), remainder)
-
-        # list[...]
-        if type_expr.startswith("list["):
-            _, inner, remainder = _split_by_brackets(type_expr)
-            inner_type, inner_remainder = FableType.parse(inner)
-            if inner_remainder.strip():
-                raise NotFableType(f"Unexpected content after inner type in list: {inner_remainder!r}")
-            return (ListType(inner_type), remainder)
-
-        # union[...]
-        if type_expr.startswith("union["):
-            _, inner, remainder = _split_by_brackets(type_expr)
-            member_types: list[FableType] = []
-            remaining = inner
-            first = True
-            while remaining:
-                if not first:
-                    if not remaining.startswith(","):
-                        raise NotFableType(f"Expected ',' between union member types, got {remaining!r}")
-                    remaining = remaining[1:].lstrip()
-                first = False
-                t, remaining = FableType.parse(remaining)
-                remaining = remaining.lstrip()
-                member_types.append(t)
-            if not member_types:
-                raise NotFableType("union must contain at least one type")
-            return (UnionType(member_types), remainder)
-
-        raise NotFableType(
-            f"Invalid type expression: {type_expr!r}. "
-            "Expected one of: str, int, float, date, datetime, country, bbox, geodomain, "
-            "enumClosed[...], enumOpen[...], list[...], union[...]"
-        )
+        """Serialize this type to a string expression that can be parsed back via parse()."""
 
 
 def _split_by_brackets(s: str) -> tuple[str, str, str]:
@@ -159,6 +86,9 @@ def _normalize_enum_item(item: str) -> str:
     if len(item) >= 2 and item[0] == item[-1] and item[0] in ("'", '"'):
         return item[1:-1]
     return item
+
+
+# PRIMITIVE TYPES
 
 
 class StringType(FableType):
@@ -245,6 +175,9 @@ class DatetimeType(FableType):
         return "datetime"
 
 
+# GENERIC TYPES
+
+
 class ClosedEnumType(FableType):
     """Closed enumeration type. Validates membership in the enum; conversion is a no-op."""
 
@@ -311,83 +244,6 @@ class ListType(FableType):
         return f"list[{self.item_type.serialize()}]"
 
 
-class BoundingBoxType(ListType):
-    """Bounding box type. A list of exactly four integers: [west, south, east, north]."""
-
-    def __init__(self) -> None:
-        super().__init__(IntType())
-
-    def validate_convert(self, value: Any) -> list[int]:
-        result = super().validate_convert(value)
-        if len(result) != 4:
-            raise WrongType(f"BoundingBox must have exactly 4 elements, got {len(result)}")
-        return result
-
-    def serialize(self) -> str:
-        return "bbox"
-
-
-class CountryType(StringType):
-    """Country type. A string representing a country (detailed validation to be added later)."""
-
-    def serialize(self) -> str:
-        return "country"
-
-
-def _all_parse_as_float(items: list[Any]) -> bool:
-    try:
-        [float(item) for item in items]
-    except (TypeError, ValueError):
-        return False
-    return True
-
-
-# Single-token geodomain values meaning "no restriction -- use the data's own extent"
-# (compared case-insensitively). Exclusive: they cannot be combined with other values.
-GEODOMAIN_NO_RESTRICTION = frozenset({"auto", "global", "datadefined"})
-
-
-class GeoDomainType(ListType):
-    """Geographic-domain type: a bounding box, region/country names, or a no-restriction sentinel.
-
-    The wire value is a comma-separated string (same encoding as ``list[str]``) and the
-    conversion always returns the string tokens; the distinct serialized name lets the
-    frontend dispatch a map/region picker. Union-style semantics over the geo vocabulary:
-
-    - a single ``auto``/``global``/``DataDefined`` token (case-insensitive) means no
-      restriction -- the consumer uses the data's own extent. It must be the only value.
-    - exactly four integer items are a bounding box ``west,south,east,north`` in whole
-      degrees (validated via ``BoundingBoxType``; latitudes within [-90, 90],
-      south <= north; west > east is allowed and means the box crosses the antimeridian).
-      Four numeric-but-not-integer items are rejected rather than treated as names.
-    - anything else is region/country names (e.g. ``Europe``, or ``Germany,France,Italy``
-      to union), resolved by the consuming runtime. Names are deliberately not ``country``
-      values: presets like ``Europe`` or ``Arctic`` are valid geodomain names.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(StringType())
-
-    def validate_convert(self, value: Any) -> list[str]:
-        items = super().validate_convert(value)
-        try:
-            west, south, east, north = BoundingBoxType().validate_convert(value)
-        except WrongType:
-            if len(items) == 4 and _all_parse_as_float(items):
-                raise WrongType(f"Invalid bounding box {value!r}: coordinates must be whole-degree integers")
-            if len(items) > 1 and any(item.lower() in GEODOMAIN_NO_RESTRICTION for item in items):
-                raise WrongType(f"Invalid domain {value!r}: 'auto'/'global' cannot be combined with other values")
-            return items  # not a bbox -> no-restriction sentinel or region/country names
-        if not (-90 <= south <= 90 and -90 <= north <= 90):
-            raise WrongType(f"Invalid bounding box latitudes south={south}, north={north} (must be within [-90, 90])")
-        if south > north:
-            raise WrongType(f"Invalid bounding box: south ({south}) must be <= north ({north})")
-        return items
-
-    def serialize(self) -> str:
-        return "geodomain"
-
-
 class UnionType(FableType):
     """Union type. Tries each member type in order and returns the first successful conversion."""
 
@@ -406,3 +262,141 @@ class UnionType(FableType):
 
     def serialize(self) -> str:
         return f"union[{','.join(t.serialize() for t in self.types)}]"
+
+
+# DOMAIN TYPES
+
+
+class BoundingBoxType(ListType):
+    """Bounding box type. A list of exactly four integers: [west, south, east, north]. Validates eg:
+    - latitudes are [-90, 90],
+    - south <= north;
+    - west > east is allowed and means the box crosses the antimeridian."""
+
+    def __init__(self) -> None:
+        super().__init__(IntType())
+
+    def validate_convert(self, value: Any) -> list[int]:
+        result = super().validate_convert(value)
+        if len(result) != 4:
+            raise WrongType(f"BoundingBox must have exactly 4 elements, got {len(result)}")
+        west, south, east, north = result
+        if not (-90 <= south <= 90 and -90 <= north <= 90):
+            raise WrongType(f"Invalid bounding box latitudes south={south}, north={north} (must be within [-90, 90])")
+        if south > north:
+            raise WrongType(f"Invalid bounding box: south ({south}) must be <= north ({north})")
+        return result
+
+    def serialize(self) -> str:
+        return "bbox"
+
+
+# NOTE convert to Type class if ever needs to be `serialize`d
+UnrestrictedGeoDomainAlias = ClosedEnumType(["auto", "global", "datadefined"])
+
+
+class GeoDomainSingleType(StringType):
+    """Country/domain type. A string representing a country or preset area like Europe or Arctic (detailed validation to be added later)."""
+
+    def validate_convert(self, value: Any) -> str:
+        v = super().validate_convert(value)
+        if v in UnrestrictedGeoDomainAlias.items:
+            raise WrongType("cannot use {v} within country/domain, as that is a special value")
+        try:
+            float(v)
+            raise WrongType(f"a number '{v}' is not a geo domain")
+        except ValueError:
+            pass
+        return v
+
+    def serialize(self) -> str:
+        return "geodomainSingle"
+
+
+class GeoDomainType(UnionType):
+    """An alias for a union over bounding box, list of single geo domains, and a single geo domain type."""
+
+    def __init__(self) -> None:
+        super().__init__([BoundingBoxType(), UnrestrictedGeoDomainAlias, ListType(GeoDomainSingleType())])
+
+    def serialize(self) -> str:
+        return "geodomain"
+
+
+def parse(type_expr: str) -> tuple[FableType, str]:
+    """Parse a type expression from the start of type_expr.
+
+    Returns ``(parsed_type, remainder)`` where ``remainder`` is the unparsed
+    tail of the input string. At the outer call site, verify that the
+    remainder is empty (or whitespace-only) to ensure the full expression
+    was consumed.
+
+    Supports:
+    - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'country', 'bbox'
+    - Enumerations: 'enumClosed[item1,item2]', 'enumOpen[item1,item2]'
+    - Lists: 'list[int]', 'list[enumClosed[...]]', etc.
+    - Union: 'union[int,str]', 'union[enumClosed[a,b],date]', etc.
+
+    Raises NotFableType if the expression cannot be parsed.
+    """
+    type_expr = type_expr.lstrip()
+
+    # Atomic types (no generics)
+    # NOTE be careful about prefixes! datetime must come before date, similarly for geodomain/Single
+    _ATOMIC = [
+        ("datetime", DatetimeType),
+        ("date", DateType),
+        ("float", FloatType),
+        ("int", IntType),
+        ("str", StringType),
+        ("geodomainSingle", GeoDomainSingleType),
+        ("bbox", BoundingBoxType),
+        ("geodomain", GeoDomainType),
+    ]
+    for name, factory in _ATOMIC:
+        n = len(name)
+        if type_expr.startswith(name):
+            return (factory(), type_expr[n:])
+
+    # Enum types (enumClosed and enumOpen share identical logic)
+    _ENUMS = {"enumClosed": ClosedEnumType, "enumOpen": OpenEnumType}
+    for prefix, factory in _ENUMS.items():
+        if type_expr.startswith(prefix):
+            _, inner, remainder = _split_by_brackets(type_expr)
+            items = [_normalize_enum_item(item) for item in inner.split(",") if item.strip()]
+            if not items:
+                raise NotFableType(f"{prefix} must contain at least one item")
+            return (factory(items), remainder)
+
+    # list[...]
+    if type_expr.startswith("list["):
+        _, inner, remainder = _split_by_brackets(type_expr)
+        inner_type, inner_remainder = parse(inner)
+        if inner_remainder.strip():
+            raise NotFableType(f"Unexpected content after inner type in list: {inner_remainder!r}")
+        return (ListType(inner_type), remainder)
+
+    # union[...]
+    if type_expr.startswith("union["):
+        _, inner, remainder = _split_by_brackets(type_expr)
+        member_types: list[FableType] = []
+        remaining = inner
+        first = True
+        while remaining:
+            if not first:
+                if not remaining.startswith(","):
+                    raise NotFableType(f"Expected ',' between union member types, got {remaining!r}")
+                remaining = remaining[1:].lstrip()
+            first = False
+            t, remaining = parse(remaining)
+            remaining = remaining.lstrip()
+            member_types.append(t)
+        if not member_types:
+            raise NotFableType("union must contain at least one type")
+        return (UnionType(member_types), remainder)
+
+    raise NotFableType(
+        f"Invalid type expression: {type_expr!r}. "
+        "Expected one of: str, int, float, date, datetime, country, bbox, geodomain, "
+        "enumClosed[...], enumOpen[...], list[...], union[...]"
+    )

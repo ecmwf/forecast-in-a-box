@@ -13,8 +13,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 import earthkit.data as ekd
-
-from .geo import parse_geodomain
+from fiab_core.types import UnrestrictedGeoDomainAlias
 
 if TYPE_CHECKING:
     from earthkit.plots import Figure, Subplot  # type: ignore[unresolved-import]
@@ -71,7 +70,7 @@ def _export_figure(figure: "Figure", fmt: str = "png", dpi: int = 100) -> bytes:
 
 def map_plot(
     fields: ekd.FieldList,
-    domain: list[str] | None = None,
+    domain: str | list[int] | list[str] | None = None,
     format: str = "png",
     groupby: str = "none",
     style_schema: str = "default",
@@ -90,7 +89,7 @@ def map_plot(
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
 
-    resolved_domain = parse_geodomain(domain)
+    resolved_domain = None if (isinstance(domain, str) and domain in UnrestrictedGeoDomainAlias.items) else domain
 
     if groupby and groupby != "none":
         unique_values = iter_utils.flatten(arg.metadata(groupby) for arg in fields)
