@@ -174,6 +174,12 @@ export function CompareLayerBrowser({
             selectedLevels={selectedLevels}
             selection={selection}
           />
+        ) : slotFilter === 'both' ? (
+          // Unlinked = no pairing, so "available in both" is by definition
+          // empty — say so instead of silently showing everything.
+          <P className="p-2 text-sm text-muted-foreground">
+            {t('browser.bothEmpty')}
+          </P>
         ) : (
           <>
             <UnlinkedSourceSection
@@ -423,7 +429,7 @@ function UnlinkedSourceSection({
   selectedLevels: ReadonlySet<number>
 }) {
   const { t } = useTranslation('compare')
-  // 'both' has no meaning without pairing — show everything.
+  // 'both' never reaches here (handled as an empty state upstream).
   if (slotFilter === 'a' || slotFilter === 'b') {
     if (slotFilter !== slot) return null
   }

@@ -432,5 +432,11 @@ describe('CompareViewer', () => {
     // Per-source sections list each side's own layers.
     await expect.element(screen.getByText('2 m temperature')).toBeVisible()
     await expect.element(screen.getByText('Total precipitation')).toBeVisible()
+    // A∩B with zero overlap → explicit empty panel, not a full listing.
+    await screen.getByRole('button', { name: 'A∩B' }).click()
+    await expect
+      .element(screen.getByText('No layers are available in both sources.'))
+      .toBeVisible()
+    expect(screen.getByText('2 m temperature').elements()).toHaveLength(0)
   })
 })
