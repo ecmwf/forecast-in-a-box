@@ -18,6 +18,7 @@ You have full power to run git commands, view files, make direct code edits, run
 2. **Trace Impact on Frontend:**
    - Search the `frontend/` codebase for whether they use affected routes and Request/Response classes, and note all affected files.
    - Note that you need to cover *both* the production code as well as the mock tests which simulate the backend.
+   - When a change touches a *shared* symbol (a zod schema, exported type, or (de)serializer), grep for *every* usage across `frontend/`, not just the route/API callers -- these get reused by non-route consumers (URL-state, `localStorage`/drafts, stores) that break just as silently. A passing type-check won't reveal it.
    - You may notice at this stage that despite the change on the backend is formally breaking, the frontend was actually not using that -- you can then ignore those.
 
 3. **Formulate and Execute Fixes:**
