@@ -34,6 +34,14 @@ const VALID = JSON.stringify({
 })
 
 describe('parseGeojsonOverlay', () => {
+  it('collects property keys by frequency for the label picker', () => {
+    const overlay = parseGeojsonOverlay('x', VALID)
+    // 'name' appears once, both features have SOME properties; frequency
+    // then alphabetical ordering.
+    expect(overlay.propertyKeys).toEqual(['name'])
+    expect(overlay.labelProperty).toBeNull()
+  })
+
   it('parses features, reprojected, with a stable overlay shape', () => {
     const overlay = parseGeojsonOverlay('tracks.geojson', VALID)
     expect(overlay.name).toBe('tracks.geojson')

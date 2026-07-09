@@ -497,6 +497,13 @@ export function CompareViewer({
     (id: string) => setOverlays((prev) => prev.filter((o) => o.id !== id)),
     [],
   )
+  const setOverlayLabel = useCallback(
+    (id: string, labelProperty: string | null) =>
+      setOverlays((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, labelProperty } : o)),
+      ),
+    [],
+  )
 
   // -------- Source view-model for the map components --------
   const mapSourceA: CompareMapSource = {
@@ -640,6 +647,7 @@ export function CompareViewer({
               add: addOverlay,
               toggle: toggleOverlay,
               remove: removeOverlay,
+              setLabel: setOverlayLabel,
             }}
             annotations={{
               items: annotations,

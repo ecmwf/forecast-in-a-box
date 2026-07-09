@@ -43,6 +43,7 @@ export interface OverlayControls {
   add: (overlay: ContextOverlay) => void
   toggle: (id: string) => void
   remove: (id: string) => void
+  setLabel: (id: string, labelProperty: string | null) => void
 }
 
 export interface AnnotationControls {
@@ -284,6 +285,24 @@ function OverlaysSection({ overlays }: { overlays: OverlayControls }) {
                   {t('overlays.features', { count: overlay.featureCount })}
                 </span>
               </span>
+              {overlay.propertyKeys.length > 0 && (
+                <select
+                  value={overlay.labelProperty ?? ''}
+                  aria-label={t('overlays.labelAria', { name: overlay.name })}
+                  title={t('overlays.labelAria', { name: overlay.name })}
+                  onChange={(e) =>
+                    overlays.setLabel(overlay.id, e.target.value || null)
+                  }
+                  className="h-5 max-w-24 shrink-0 rounded border border-border bg-background text-[10px] text-muted-foreground"
+                >
+                  <option value="">{t('overlays.labelNone')}</option>
+                  {overlay.propertyKeys.map((key) => (
+                    <option key={key} value={key}>
+                      {key}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
                 onClick={() => overlays.remove(overlay.id)}

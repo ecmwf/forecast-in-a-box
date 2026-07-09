@@ -22,7 +22,8 @@ import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
 import { compositeMapToCanvas } from '../map-export'
-import { useContextOverlays } from './overlays'
+import { useContextOverlays, useOverlayHover } from './overlays'
+import { OverlayHoverCard } from './OverlayHoverCard'
 import { useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
@@ -231,6 +232,7 @@ function DualMapPanel({
 
   useMeasure(mapRef, measureMode, measureClearNonce)
   useContextOverlays(mapRef, overlays)
+  const overlayHover = useOverlayHover(mapRef, overlays)
   useAnnotationLayer(mapRef, annotations, source.slot, annotateArmed, {
     onCreate: onAnnotationCreate,
     onEdit: onAnnotationEdit,
@@ -288,6 +290,7 @@ function DualMapPanel({
         className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
       />
       <LoupeOverlay containerRef={containerRef} />
+      <OverlayHoverCard hover={overlayHover} />
       {annotateArmed && (
         <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
           {t('annotations.armedHint')}

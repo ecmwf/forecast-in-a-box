@@ -177,7 +177,9 @@
     "show": "Show {{name}}",
     "hide": "Hide {{name}}",
     "remove": "Remove {{name}}",
-    "invalid": "Could not read that file as GeoJSON"
+    "invalid": "Could not read that file as GeoJSON",
+    "labelAria": "Label property for {{name}}",
+    "labelNone": "No label"
   },
   "help": {
     "open": "Help & shortcuts",
