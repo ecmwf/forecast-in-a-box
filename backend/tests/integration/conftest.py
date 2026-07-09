@@ -134,6 +134,13 @@ def run_artifact_registry(shutdown_event: Any) -> None:
         httpd.shutdown()
 
 
+def _register_user(backend_client: httpx.Client, email: str, password: str) -> None:
+    headers = {"Content-Type": "application/json"}
+    data = {"email": email, "password": password}
+    response = backend_client.post("/auth/register", headers=headers, json=data)
+    assert response.is_success, f"failed to register user with {email=}"
+
+
 @pytest.fixture(scope="session")
 def backend_client() -> Generator[httpx.Client, None, None]:
     td = None
@@ -193,6 +200,8 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         validate_runtime(config)
         handles = launch_all(config)
         client = httpx.Client(base_url=config.backend.local_url() + "/api/v1", follow_redirects=True)
+        # we need to call admin register before yielding this to anybody, because the first registered user is admin
+        _register_user(client, "admin@somewhere.org", "adminPassword")
         yield client
     finally:
         if client is not None:
@@ -215,45 +224,37 @@ def backend_client() -> Generator[httpx.Client, None, None]:
 
 
 @pytest.fixture(scope="session")
-def backend_client_with_auth(backend_client: httpx.Client) -> Generator[httpx.Client, None, None]:
-    headers = {"Content-Type": "application/json"}
-    data = {"email": "authenticated_user@somewhere.org", "password": "something"}
-    response = backend_client.post("/auth/register", headers=headers, json=data)
-    assert response.is_success
-    response = backend_client.post("/auth/jwt/login", data={"username": "authenticated_user@somewhere.org", "password": "something"})
-    token = extract_auth_token_from_response(response)
-    assert token is not None, "Token should not be None"
-    backend_client.cookies.set(**prepare_cookie_with_auth_token(token))
+def backend_client_user(backend_client: httpx.Client) -> Generator[httpx.Client, None, None]:
+    """A separate httpx.Client authenticated as a regular user.
 
-    response = backend_client.get("/users/me")
-    assert response.is_success, "Failed to authenticate user"
-    yield backend_client
+    Uses a dedicated client so that its auth cookies do not interfere with
+    backend_client or backend_client_admin. First calls a register.
+    """
+    with httpx.Client(base_url=str(backend_client.base_url), follow_redirects=True) as user_client:
+        _register_user(backend_client, "user1@somewhere.org", "user1Password")
+        response = user_client.post("/auth/jwt/login", data={"username": "user1@somewhere.org", "password": "user1Password"})
+        token = extract_auth_token_from_response(response)
+        assert token is not None, "Token should not be None"
+        user_client.cookies.set(**prepare_cookie_with_auth_token(token))
+
+        response = user_client.get("/users/me")
+        assert response.is_success, "Failed to authenticate user"
+        yield user_client
 
 
 @pytest.fixture(scope="session")
-def backend_admin_client(backend_client: httpx.Client) -> Generator[httpx.Client, None, None]:
+def backend_client_admin(backend_client: httpx.Client) -> Generator[httpx.Client, None, None]:
     """A separate httpx.Client authenticated as the admin user (admin@somewhere.org).
 
-    Registers the user if not already present (note: the first registered user
-    becomes the superuser, so test_admin_flows.py must have run first).
+    Does not register -- that already happens in the backend_client fixture setup,
+    to ensure adminness.
     Uses a dedicated client so that its auth cookies do not interfere with
-    backend_client or backend_client_with_auth.
+    backend_client or backend_client_user.
     """
-    admin_email = "admin@somewhere.org"
-    admin_password = "something"
-    admin_client = httpx.Client(base_url=str(backend_client.base_url), follow_redirects=True)
-    try:
-        # Try registering; ignore errors (user may already exist from test_admin_flows).
-        backend_client.post(
-            "/auth/register",
-            headers={"Content-Type": "application/json"},
-            json={"email": admin_email, "password": admin_password},
-        )
-        response = admin_client.post("/auth/jwt/login", data={"username": admin_email, "password": admin_password})
+    with httpx.Client(base_url=str(backend_client.base_url), follow_redirects=True) as admin_client:
+        response = admin_client.post("/auth/jwt/login", data={"username": "admin@somewhere.org", "password": "adminPassword"})
         assert response.is_success, f"Admin login failed: {response.text}"
         token = extract_auth_token_from_response(response)
         assert token is not None, "Admin token should not be None"
         admin_client.cookies.set(**prepare_cookie_with_auth_token(token))
         yield admin_client
-    finally:
-        admin_client.close()

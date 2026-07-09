@@ -8,67 +8,57 @@ from forecastbox.routes.admin import ConfigResponse, GetReleaseStatusResponse
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
 
 
-def test_admin_flows(backend_client: httpx.Client) -> None:
-    # TODO this test is a bit flaky, because it must be executed first to ensure admin actually ending up admin
-    # but then the impl itself is flaky
-    # NOTE there is additionally dependence of test_model.py on this test
-
-    response = backend_client.get("/admin/uiConfig")
+def test_admin_flows(backend_client_admin: httpx.Client) -> None:
+    response = backend_client_admin.get("/admin/uiConfig")
     assert response.is_success
     ConfigResponse(**response.json())
 
+    # NOTE we dont register or login, already done in the conftest
     # curl -XPOST -H 'Content-Type: application/json' -d '{"email": "admin@somewhere.org", "password": "something"}' localhost:8000/api/v1/auth/register
-    headers = {"Content-Type": "application/json"}
-    data = {"email": "admin@somewhere.org", "password": "something"}
-    response = backend_client.post("/auth/register", headers=headers, json=data)
-    assert response.is_success
-    id_admin = response.json()["id"]
-
     # TOKEN=$(curl -s -XPOST -H 'Content-Type: application/x-www-form-urlencoded' --data-ascii 'username=admin@somewhere.org&password=something' localhost:8000/api/v1/auth/jwt/login | jq -r .access_token)
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    data = {"username": "admin@somewhere.org", "password": "something"}
-    response = backend_client.post("/auth/jwt/login", data=data)
-    assert response.is_success
-    token_admin = extract_auth_token_from_response(response)
-    assert token_admin is not None, "Token should not be None"
-    backend_client.cookies.set(**prepare_cookie_with_auth_token(token_admin))
 
     # curl -H "Authorization: Bearer $TOKEN" localhost:8000/api/v1/admin/users
-    response = backend_client.get("admin/users")
+    response = backend_client_admin.get("admin/users")
     assert response.is_success
     assert response.json()[0]["email"] == "admin@somewhere.org"
-    response = backend_client.get(f"admin/users/{id_admin}")
+    id_admin = response.json()[0]["id"]
+    response = backend_client_admin.get(f"admin/users/{id_admin}")
     assert response.is_success
     assert response.json()["email"] == "admin@somewhere.org"
 
     # get release
     if os.environ.get("CI_GITHUB_RATELIMIT", "no") != "yes":
         # NOTE this endpoint can fail with rate limit exceeded => we best not test in full matrix
-        response = backend_client.get("/admin/release")
+        response = backend_client_admin.get("/admin/release")
         assert response.is_success
         release_status = GetReleaseStatusResponse(**response.json())
         assert isinstance(release_status.local_release, Release)
         assert isinstance(release_status.local_release_age_days, int)
         assert isinstance(release_status.newest_available_release, Release)
 
-    # register
+    # register a new user
     headers = {"Content-Type": "application/json"}
-    data = {"email": "user@somewhere.org", "password": "something"}
-    response = backend_client.post("/auth/register", headers=headers, json=data)
+    data = {"email": "testAdminFlows@somewhere.org", "password": "testAdminFlowsPassword"}
+    response = backend_client_admin.post("/auth/register", headers=headers, json=data)
     assert response.is_success
 
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    data = {"username": "user@somewhere.org", "password": "something"}
-    response = backend_client.post("/auth/jwt/login", data=data)
-    assert response.is_success
-    backend_client.cookies.set(**prepare_cookie_with_auth_token(extract_auth_token_from_response(response)))  # ty:ignore[invalid-argument-type]
+    with httpx.Client(base_url=str(backend_client_admin.base_url), follow_redirects=True) as backend_client_user:
+        response = backend_client_user.post(
+            "/auth/jwt/login", data={"username": "testAdminFlows@somewhere.org", "password": "testAdminFlowsPassword"}
+        )
+        token = extract_auth_token_from_response(response)
+        assert token is not None, "Login has failed"
+        backend_client_user.cookies.set(**prepare_cookie_with_auth_token(token))  # ty:ignore[invalid-argument-type]
 
-    response = backend_client.get("admin/users")
-    assert not response.is_success
-    response = backend_client.get("/users/me")
-    assert response.is_success
+        response = backend_client_user.get("admin/users")
+        assert not response.is_success
+        response = backend_client_user.get("/users/me")
+        assert response.is_success
 
     headers = {"Content-Type": "application/json"}
-    data = {"email": "user@nowhere.org", "password": "something"}
-    response = backend_client.post("/auth/register", headers=headers, json=data)
-    assert response.status_code == 400
+    data = {"email": "testAdminFlows@nowhere.org", "password": "testAdminFlowsPassword"}
+    response = backend_client_admin.post("/auth/register", headers=headers, json=data)
+    assert response.status_code == 400, "nowhere domain should not be allowed"
+    data = {"email": "testAdminFlows@somewhere.org", "password": "testAdminFlowsPassword"}
+    response = backend_client_admin.post("/auth/register", headers=headers, json=data)
+    assert response.status_code == 400, "second register call should fail"
