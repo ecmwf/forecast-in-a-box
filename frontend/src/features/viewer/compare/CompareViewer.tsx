@@ -42,6 +42,7 @@ import {
 import { useCompareSelection } from './useCompareSelection'
 import {
   defaultToleranceMs,
+  effectiveAvailability,
   formatOffset,
   resolveSourceTime,
 } from './time-link'
@@ -253,6 +254,34 @@ export function CompareViewer({
 
   const resolvedFor = (slot: SourceSlot) =>
     slot === 'a' ? resolvedA : resolvedB
+
+  // Tracks (and the A/B/A∩B window presets) show what each side WOULD
+  // render at every axis position under the current time-link policy —
+  // under a +48h offset, B's usable window visibly shifts off the tail.
+  const displayTimeline = useMemo(() => {
+    if (timeLinkMode === 'exact' || timeLinkMode === 'independent') {
+      return timeline
+    }
+    return {
+      ...timeline,
+      availability: {
+        a: effectiveAvailability(
+          timeline.epochs,
+          timeIndexA,
+          'nearest',
+          0,
+          defaultToleranceMs(timeIndexA),
+        ),
+        b: effectiveAvailability(
+          timeline.epochs,
+          timeIndexB,
+          'nearest',
+          timeLinkMode === 'offset' ? offsetMs : 0,
+          defaultToleranceMs(timeIndexB),
+        ),
+      },
+    }
+  }, [timeline, timeIndexA, timeIndexB, timeLinkMode, offsetMs])
 
   const resolveTimeFor = useCallback(
     (slot: SourceSlot) => {
@@ -660,7 +689,7 @@ export function CompareViewer({
         )}
       </div>
       <CompareTimeSlider
-        timeline={timeline}
+        timeline={displayTimeline}
         index={safeStep}
         onChange={onTimeChange}
         linkMode={timeLinkMode}

@@ -13,6 +13,7 @@ import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import { buildSourceTimeIndex } from '@/features/viewer/compare/compare-timeline'
 import {
   defaultToleranceMs,
+  effectiveAvailability,
   formatOffset,
   resolveSourceTime,
 } from '@/features/viewer/compare/time-link'
@@ -82,5 +83,43 @@ describe('formatOffset', () => {
     expect(formatOffset(2 * HOUR)).toBe('+2 h')
     expect(formatOffset(-30 * 60_000)).toBe('−30 min')
     expect(formatOffset(90 * 60_000)).toBe('+1 h 30 min')
+  })
+})
+
+describe('effectiveAvailability', () => {
+  const axis = [0, 1, 2, 3, 4].map((i) => T00 + i * 6 * HOUR)
+
+  it('exact mode mirrors raw membership', () => {
+    expect(effectiveAvailability(axis, sixHourly, 'exact', 0, HOUR)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+    ])
+  })
+
+  it('a positive shift slides the usable window off the axis tail', () => {
+    // Sampling at t + 12h: the last two axis positions point past the
+    // source's final step (T00+24h) and beyond tolerance.
+    const shifted = effectiveAvailability(
+      axis,
+      sixHourly,
+      'nearest',
+      12 * HOUR,
+      3 * HOUR,
+    )
+    expect(shifted).toEqual([true, true, true, false, false])
+  })
+
+  it('an empty source is unavailable everywhere', () => {
+    const empty = buildSourceTimeIndex([], [])
+    expect(effectiveAvailability(axis, empty, 'nearest', 0, HOUR)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+    ])
   })
 })
