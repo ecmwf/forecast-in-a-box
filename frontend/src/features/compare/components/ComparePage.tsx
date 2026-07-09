@@ -29,8 +29,8 @@ import { entryDisplayName, entryRef } from '../entry-ref'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
-import { CompareSlotBar } from './CompareSlotBar'
 import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
+import { CompareSlotBar } from './CompareSlotBar'
 import { ComparePanel } from './ComparePanel'
 import { ComparisonSourcePicker } from './ComparisonSourcePicker'
 import type { ComparisonEntry } from '../entry-ref'
@@ -98,17 +98,13 @@ function useActivePair(): ActivePair & {
     }
   }, [entries, search.a, search.b, navigate])
 
-  // Assigning the OTHER slot's current source swaps the pair — the only
-  // sensible reading of that intent.
+  // Plain assignment — the same source in both slots is a real workflow
+  // (unlink layers, compare two parameters of one run; or pair with the
+  // offset/independent time-link to compare two instants). Swapping is
+  // the dedicated ⇄ button's job.
   const assignSlot = (slot: 'a' | 'b', ref: string) => {
     void navigate({
-      search: (prev) => {
-        const other = slot === 'a' ? 'b' : 'a'
-        if (prev[other] === ref) {
-          return { ...prev, [slot]: ref, [other]: prev[slot] }
-        }
-        return { ...prev, [slot]: ref }
-      },
+      search: (prev) => ({ ...prev, [slot]: ref }),
       replace: true,
     })
   }
