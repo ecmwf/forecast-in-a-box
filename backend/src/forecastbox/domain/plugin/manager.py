@@ -406,6 +406,10 @@ class PluginsStatus(FiabBaseModel):
     plugin_enabled: dict[PluginCompositeId, bool]
     plugin_excluded_templates: dict[PluginCompositeId, list[str]]
     plugin_glyph_remapping: dict[PluginCompositeId, dict[str, str]]
+    plugin_active_templates: dict[PluginCompositeId, list[str]]
+    """For each currently loaded plugin: template names that are not excluded. Absent for disabled/unloaded plugins."""
+    plugin_excluded_template_names: dict[PluginCompositeId, list[str]]
+    """For each currently loaded plugin: template names that are excluded by admin settings. Absent for disabled/unloaded plugins."""
 
 
 def status_brief() -> str:
@@ -423,6 +427,7 @@ def plugins_ready() -> bool:
 
 
 async def status_full() -> PluginsStatus:
+    plugins_snapshot: dict[PluginCompositeId, Plugin] = {}
     with timed_acquire(PluginManager.lock, 0.2) as result:
         if not result:
             status = "retrieving"
@@ -430,6 +435,7 @@ async def status_full() -> PluginsStatus:
         else:
             status = status_brief()
             plugin_errors = dict(PluginManager.errors)
+            plugins_snapshot = dict(PluginManager.plugins)
     plugin_versions: dict[PluginCompositeId, str] = {}
     plugin_updatedatetime: dict[PluginCompositeId, str] = {}
     plugin_enabled: dict[PluginCompositeId, bool] = {}
@@ -468,6 +474,13 @@ async def status_full() -> PluginsStatus:
                 plugin_errors[plugin_id] = PluginErrors(existing + template_errs)
     except Exception:
         logger.warning("failed to load plugin states from DB; status may be incomplete", exc_info=True)
+    plugin_active_templates: dict[PluginCompositeId, list[str]] = {}
+    plugin_excluded_template_names: dict[PluginCompositeId, list[str]] = {}
+    for plugin_id, plugin in plugins_snapshot.items():
+        all_names = [t.display_name for t in plugin.blueprint_templates]
+        excluded_set = set(plugin_excluded_templates.get(plugin_id, []))
+        plugin_active_templates[plugin_id] = [n for n in all_names if n not in excluded_set]
+        plugin_excluded_template_names[plugin_id] = [n for n in all_names if n in excluded_set]
     return PluginsStatus(
         updater_status=status,
         plugin_errors=plugin_errors,
@@ -476,6 +489,8 @@ async def status_full() -> PluginsStatus:
         plugin_enabled=plugin_enabled,
         plugin_excluded_templates=plugin_excluded_templates,
         plugin_glyph_remapping=plugin_glyph_remapping,
+        plugin_active_templates=plugin_active_templates,
+        plugin_excluded_template_names=plugin_excluded_template_names,
     )
 
 

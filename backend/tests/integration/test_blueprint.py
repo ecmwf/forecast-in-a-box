@@ -340,6 +340,18 @@ def test_plugin_template_exclusion(backend_client_user: httpx.Client, backend_cl
     assert "testBasic" in names, f"testBasic should still be present, but found: {names}"
     assert "testRemapping" in names, f"testRemapping should be present, but found: {names}"
 
+    # Verify that /plugin/status reflects the active/excluded template split correctly.
+    plugin_id_key = str(testPluginId)
+    status_response = backend_client_user.get("/plugin/status", timeout=10)
+    assert status_response.is_success, status_response.text
+    status_data = status_response.json()
+    active = status_data.get("plugin_active_templates", {}).get(plugin_id_key, [])
+    excluded_names = status_data.get("plugin_excluded_template_names", {}).get(plugin_id_key, [])
+    assert "testExclusion" not in active, f"testExclusion should not be active, got: {active}"
+    assert "testBasic" in active, f"testBasic should be active, got: {active}"
+    assert "testRemapping" in active, f"testRemapping should be active, got: {active}"
+    assert "testExclusion" in excluded_names, f"testExclusion should appear in excluded_template_names, got: {excluded_names}"
+
     # Excluded template must return 403 from templateExampleValues.
     response = backend_client_user.get(
         "/plugin/templateExampleValues",
