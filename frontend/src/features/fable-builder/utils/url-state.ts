@@ -14,12 +14,14 @@ import {
   encodeStateToURL,
   isStateTooLarge,
 } from '@/lib/url-state'
-import { FableBuilderV1Schema } from '@/api/types/fable.types'
+import { FableBuilderV1Schema, serializeFable } from '@/api/types/fable.types'
 
 export { isStateTooLarge }
 
+// FableBuilderV1Schema parses the list wire-format into a dict, so the URL must
+// hold the wire-format too — serialize on encode to keep decode symmetric.
 export function encodeFableToURL(fable: FableBuilderV1): string {
-  return encodeStateToURL(fable)
+  return encodeStateToURL(serializeFable(fable))
 }
 
 export function decodeFableFromURL(encoded: string): FableBuilderV1 | null {
