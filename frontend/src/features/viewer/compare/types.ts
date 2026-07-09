@@ -62,8 +62,12 @@ export interface CompareModeOptions {
   blend: number
 }
 
-/** One captured map image for export. */
+/** One captured map for export: raw composited canvas + metadata. The
+ *  export dialog bakes the title bar / legend strip on top. */
 export interface CaptureResult {
   label: string
-  dataUrl: string
+  /** Which source this capture shows; null = both (single-map modes). */
+  slot: 'a' | 'b' | null
+  canvas: HTMLCanvasElement
+  timeLabel: string | null
 }

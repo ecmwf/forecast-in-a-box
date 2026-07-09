@@ -21,8 +21,9 @@ import Draw from 'ol/interaction/Draw'
 import Overlay from 'ol/Overlay'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
-import { Fill, Stroke, Style } from 'ol/style'
+import { Fill, Stroke, Style, Text } from 'ol/style'
 import CircleStyle from 'ol/style/Circle'
+import Point from 'ol/geom/Point'
 import { getArea, getLength } from 'ol/sphere'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
@@ -69,6 +70,37 @@ const MEASURE_STYLE = new Style({
   }),
 })
 
+/**
+ * Finished measurements carry their result as canvas-native Text (at the
+ * top of the geometry's extent) instead of a DOM tooltip — so labels are
+ * part of the map pixels and survive PNG export/print captures.
+ */
+function measureStyleWithLabel(
+  label: string,
+  geometry: Geometry,
+): Array<Style> {
+  const extent = geometry.getExtent()
+  const anchor = new Point([
+    (extent[0] + extent[2]) / 2,
+    Math.max(extent[1], extent[3]),
+  ])
+  return [
+    MEASURE_STYLE,
+    new Style({
+      geometry: anchor,
+      text: new Text({
+        text: label,
+        font: '12px system-ui, sans-serif',
+        offsetY: -12,
+        fill: new Fill({ color: 'rgba(15, 23, 42, 0.95)' }),
+        backgroundFill: new Fill({ color: 'rgba(255, 255, 255, 0.92)' }),
+        backgroundStroke: new Stroke({ color: 'rgba(0, 0, 0, 0.15)' }),
+        padding: [3, 5, 2, 5],
+      }),
+    }),
+  ]
+}
+
 const TOOLTIP_CLASS =
   'rounded border border-border bg-background/95 px-1.5 py-0.5 font-mono text-xs shadow-sm whitespace-nowrap'
 
@@ -95,7 +127,13 @@ export function useMeasure(
     sourceRef.current ??= new VectorSource()
     const layer = new VectorLayer({
       source: sourceRef.current,
-      style: MEASURE_STYLE,
+      style: (feature) => {
+        const label = feature.get('measureLabel') as string | undefined
+        const geometry = feature.getGeometry()
+        return label && geometry
+          ? measureStyleWithLabel(label, geometry as Geometry)
+          : MEASURE_STYLE
+      },
       zIndex: 1500,
     })
     map.addLayer(layer)
@@ -143,9 +181,19 @@ export function useMeasure(
         ])
       })
     })
-    const endKey = draw.on('drawend', () => {
+    const endKey = draw.on('drawend', (evt) => {
       if (geometryKey) unByKey(geometryKey)
       geometryKey = null
+      // Freeze the result into the feature (canvas-rendered label) and
+      // drop the live DOM tooltip — exports then include the value.
+      const geometry = evt.feature.getGeometry()
+      if (geometry) {
+        evt.feature.set('measureLabel', measureText(geometry, projection))
+      }
+      if (tooltip) {
+        map.removeOverlay(tooltip)
+        overlaysRef.current = overlaysRef.current.filter((o) => o !== tooltip)
+      }
       tooltip = null
     })
 

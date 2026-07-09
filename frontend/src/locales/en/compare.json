@@ -165,7 +165,8 @@
     "print": "Print / PDF",
     "failed": "Could not capture the map view",
     "popupBlocked": "The report window was blocked — allow pop-ups for this site",
-    "open": "Export"
+    "open": "Export",
+    "legendsTitle": "Legends"
   },
   "overlays": {
     "title": "Context overlays",
