@@ -255,6 +255,32 @@ export function CompareViewer({
   const resolvedFor = (slot: SourceSlot) =>
     slot === 'a' ? resolvedA : resolvedB
 
+  // Per-side hover instants for the timeline tooltip: what each side
+  // would display if the slider stood at the hovered epoch.
+  const hoverTimes = useCallback(
+    (epoch: number) => {
+      if (timeLinkMode === 'exact' || timeLinkMode === 'independent') {
+        return null
+      }
+      const ra = resolveSourceTime(
+        timeIndexA,
+        epoch,
+        'nearest',
+        defaultToleranceMs(timeIndexA),
+      )
+      const rb = resolveSourceTime(
+        timeIndexB,
+        timeLinkMode === 'offset' ? epoch + offsetMs : epoch,
+        'nearest',
+        defaultToleranceMs(timeIndexB),
+      )
+      const label = (e: number | null) =>
+        e !== null ? formatStep(new Date(e).toISOString()) : null
+      return { a: label(ra.epoch), b: label(rb.epoch) }
+    },
+    [timeLinkMode, timeIndexA, timeIndexB, offsetMs],
+  )
+
   // Tracks (and the A/B/A∩B window presets) show what each side WOULD
   // render at every axis position under the current time-link policy —
   // under a +48h offset, B's usable window visibly shifts off the tail.
@@ -698,6 +724,7 @@ export function CompareViewer({
         onOffsetChange={setOffsetMs}
         clip={timeClip}
         onClipChange={setTimeClip}
+        hoverTimes={hoverTimes}
         independent={{
           a: {
             epochs: timeIndexA.epochs,

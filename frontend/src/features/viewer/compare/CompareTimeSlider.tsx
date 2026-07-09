@@ -63,6 +63,7 @@ export function CompareTimeSlider({
   independent,
   clip,
   onClipChange,
+  hoverTimes,
 }: {
   timeline: CompareTimeline
   index: number
@@ -77,6 +78,9 @@ export function CompareTimeSlider({
   /** Union-index window the whole control operates in (null = all). */
   clip: [number, number] | null
   onClipChange: (clip: [number, number] | null) => void
+  /** Per-side resolved instants for a hovered axis epoch (offset/nearest
+   *  modes); null → show the plain axis instant. */
+  hoverTimes: (epoch: number) => { a: string | null; b: string | null } | null
 }) {
   const { t } = useTranslation('executions')
   const { t: tCompare } = useTranslation('compare')
@@ -194,7 +198,10 @@ export function CompareTimeSlider({
                   } * (100% - 22px) / 100)`,
                 }}
               >
-                {formatStep(new Date(steps[hoverIndex]).toISOString())}
+                <HoverInstant
+                  epoch={steps[hoverIndex]}
+                  perSide={hoverTimes(steps[hoverIndex])}
+                />
               </div>
             )}
             {(['a', 'b'] as const).map((slot) => (
@@ -309,6 +316,36 @@ function IndependentSlider({
         {formatStep(new Date(axis.epochs[safe]).toISOString())}
       </span>
     </label>
+  )
+}
+
+/** Tooltip body: the axis instant, or both sides' resolved instants when
+ *  the time-link policy makes them differ (offset/nearest). */
+function HoverInstant({
+  epoch,
+  perSide,
+}: {
+  epoch: number
+  perSide: { a: string | null; b: string | null } | null
+}) {
+  if (!perSide) {
+    return <>{formatStep(new Date(epoch).toISOString())}</>
+  }
+  return (
+    <span className="flex items-center gap-2">
+      <span>
+        <span className="mr-1 font-bold text-blue-600 dark:text-blue-400">
+          A
+        </span>
+        {perSide.a ?? '—'}
+      </span>
+      <span>
+        <span className="mr-1 font-bold text-orange-600 dark:text-orange-400">
+          B
+        </span>
+        {perSide.b ?? '—'}
+      </span>
+    </span>
   )
 }
 
