@@ -69,13 +69,16 @@ export function CompareHelpDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t('help.title')}</DialogTitle>
           <DialogDescription>{t('help.intro')}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        {/* Two-column flow: five feature sections + the shortcut table
+            as the sixth block — keeps the dialog page-shaped instead of
+            a scroll tunnel. */}
+        <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
           {SECTIONS.map((id) => (
             <section key={id}>
               <P className="text-sm font-semibold">
@@ -89,14 +92,11 @@ export function CompareHelpDialog({
 
           <section>
             <P className="text-sm font-semibold">{t('help.shortcuts.title')}</P>
-            <P className="mt-0.5 text-xs text-muted-foreground">
-              {t('help.shortcuts.revealHint')}
-            </P>
-            <table className="mt-2 w-full text-sm">
+            <table className="mt-1 w-full text-sm">
               <tbody>
                 {SHORTCUTS.map(({ keys, id }) => (
-                  <tr key={id} className="border-t border-border/60">
-                    <td className="w-28 py-1.5 pr-3 whitespace-nowrap">
+                  <tr key={id} className="border-b border-border/60">
+                    <td className="w-16 py-1 pr-3 whitespace-nowrap">
                       {keys.map((k, i) => (
                         <span key={i}>
                           {i > 0 && k !== '…' && keys[i - 1] !== '…' && (
@@ -114,13 +114,16 @@ export function CompareHelpDialog({
                         </span>
                       ))}
                     </td>
-                    <td className="py-1.5 text-muted-foreground">
+                    <td className="py-1 text-muted-foreground">
                       {t(`help.shortcuts.${id}`)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <P className="mt-1.5 text-xs text-muted-foreground">
+              {t('help.shortcuts.revealHint')}
+            </P>
           </section>
         </div>
       </DialogContent>
