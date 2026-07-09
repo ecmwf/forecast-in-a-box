@@ -205,12 +205,23 @@ export function SingleMapCompare({
       return new Promise((resolve) => {
         map.once('rendercomplete', () => {
           const canvas = compositeMapToCanvas(map.getTargetElement())
+          const timeLabel =
+            a.timeLabel === b.timeLabel
+              ? a.timeLabel
+              : [
+                  a.timeLabel ? `A ${a.timeLabel}` : null,
+                  b.timeLabel ? `B ${b.timeLabel}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || null
           resolve(
             canvas
               ? [
                   {
                     label: `A · ${a.label}  |  B · ${b.label}`,
-                    dataUrl: canvas.toDataURL('image/png'),
+                    slot: null,
+                    canvas,
+                    timeLabel,
                   },
                 ]
               : [],
@@ -220,7 +231,7 @@ export function SingleMapCompare({
       })
     })
     return () => onRegisterCapture(null)
-  }, [mapRef, a.label, b.label, onRegisterCapture])
+  }, [mapRef, a.label, b.label, a.timeLabel, b.timeLabel, onRegisterCapture])
 
   // -------- Canvas clips (swipe / spy) --------
   // BOTH stacks are clipped to complementary regions so the comparison is

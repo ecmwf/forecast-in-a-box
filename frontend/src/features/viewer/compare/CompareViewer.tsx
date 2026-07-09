@@ -43,7 +43,7 @@ import {
   IMAGERY_BASEMAPS,
   SKINNYWMS_BASEMAP,
 } from '../ol-layers'
-import { skinnyWmsBasemap } from '../wms-capabilities'
+import { rebaseLensUrl, skinnyWmsBasemap } from '../wms-capabilities'
 import { CompareToolbar } from './CompareToolbar'
 import { CompareExportDialog } from './CompareExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
@@ -275,6 +275,28 @@ export function CompareViewer({
   )
   const [exportOpen, setExportOpen] = useState(false)
 
+  // Active layers' legends for the export (per slot, lens URLs rebased,
+  // external URLs verbatim — rebaseLensUrl handles both).
+  const exportLegends = useMemo(() => {
+    const specs: Array<{ slot: SourceSlot; title: string; url: string }> = []
+    for (const [slot, source, baseUrl, order] of [
+      ['a', sourceA, a.baseUrl, activeOrderA],
+      ['b', sourceB, b.baseUrl, activeOrderB],
+    ] as const) {
+      for (const name of order) {
+        const layer = source.layers.find((l) => l.name === name)
+        const legendUrl = layer?.styles[0]?.legendUrl
+        if (!layer || !legendUrl) continue
+        specs.push({
+          slot,
+          title: layer.title,
+          url: rebaseLensUrl(legendUrl, baseUrl),
+        })
+      }
+    }
+    return specs
+  }, [sourceA, sourceB, a.baseUrl, b.baseUrl, activeOrderA, activeOrderB])
+
   // Basemap — one choice driving every panel, embedded-viewer options.
   const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
   const [basemapOpacity, setBasemapOpacity] = useState(1)
@@ -424,6 +446,7 @@ export function CompareViewer({
         open={exportOpen}
         onOpenChange={setExportOpen}
         capture={captureAction}
+        legends={exportLegends}
         meta={{
           labelA: a.label,
           labelB: b.label,

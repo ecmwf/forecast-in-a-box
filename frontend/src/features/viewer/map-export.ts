@@ -118,6 +118,54 @@ export interface LegendExportItem {
   image: HTMLImageElement
 }
 
+/**
+ * Compose a final export canvas from a raw map capture: optional baked
+ * title bar (title + preformatted time) and a legend strip below the
+ * map. Shared by the embedded viewer's PNG export and the compare
+ * captures.
+ */
+export function composeExportCanvas(
+  mapCanvas: HTMLCanvasElement,
+  opts: {
+    titles: ReadonlyArray<string>
+    /** Already display-formatted time text (null = omitted). */
+    timeText: string | null
+    titleBarEnabled: boolean
+    legendItems: ReadonlyArray<LegendExportItem>
+  },
+): HTMLCanvasElement | null {
+  const { titles, timeText, titleBarEnabled, legendItems } = opts
+  const dpr = window.devicePixelRatio || 1
+  const stripHeight =
+    legendItems.length > 0
+      ? measureLegendStrip(legendItems, mapCanvas.width, dpr)
+      : 0
+  const out = document.createElement('canvas')
+  out.width = mapCanvas.width
+  out.height = mapCanvas.height + stripHeight
+  const ctx = out.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(mapCanvas, 0, 0)
+  if (titleBarEnabled && titles.length > 0) {
+    drawTitleBar(ctx, out.width, titles, timeText)
+  }
+  if (stripHeight > 0) {
+    drawLegendStrip(ctx, legendItems, out.width, mapCanvas.height, dpr)
+  }
+  return out
+}
+
+/** Load one legend image (anonymous CORS); null on failure. */
+export function loadLegendImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
 export interface MapExportOptions {
   /** Active layer titles, stacking order, for the baked-in title bar. */
   titles: ReadonlyArray<string>
@@ -144,27 +192,13 @@ export async function exportMapPng(
       const target = map.getTargetElement()
       const mapCanvas = compositeMapToCanvas(target)
       if (!mapCanvas) return resolve(null)
-      // Title bar / legends go on a fresh canvas — OL's own canvases get
-      // overwritten on the next render. If any pinned legends are
-      // present, the canvas extends downward to fit them in a balanced
-      // grid below the map.
-      const dpr = window.devicePixelRatio || 1
-      const stripHeight =
-        legendItems.length > 0
-          ? measureLegendStrip(legendItems, mapCanvas.width, dpr)
-          : 0
-      const out = document.createElement('canvas')
-      out.width = mapCanvas.width
-      out.height = mapCanvas.height + stripHeight
-      const ctx = out.getContext('2d')
-      if (!ctx) return resolve(null)
-      ctx.drawImage(mapCanvas, 0, 0)
-      if (titleBarEnabled && titles.length > 0) {
-        drawTitleBar(ctx, out.width, titles, activeTime)
-      }
-      if (stripHeight > 0) {
-        drawLegendStrip(ctx, legendItems, out.width, mapCanvas.height, dpr)
-      }
+      const out = composeExportCanvas(mapCanvas, {
+        titles,
+        timeText: activeTime ? formatStep(activeTime) : null,
+        titleBarEnabled,
+        legendItems,
+      })
+      if (!out) return resolve(null)
       out.toBlob((blob) => resolve(blob), 'image/png')
     })
     map.renderSync()
@@ -216,7 +250,7 @@ function drawTitleBar(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   titles: ReadonlyArray<string>,
-  activeTime: string | null,
+  time: string | null,
 ): void {
   const dpr = window.devicePixelRatio || 1
   const fontPx = 14 * dpr
@@ -225,7 +259,7 @@ function drawTitleBar(
   const top = 16 * dpr
   const radius = 8 * dpr
   const titleText = titles.join(' · ')
-  const timeText = activeTime ? formatStep(activeTime) : ''
+  const timeText = time ?? ''
 
   ctx.save()
   ctx.font = `500 ${fontPx}px system-ui, -apple-system, "Segoe UI", sans-serif`

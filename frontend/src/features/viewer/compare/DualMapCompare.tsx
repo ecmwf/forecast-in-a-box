@@ -218,7 +218,9 @@ function DualMapPanel({
             canvas
               ? {
                   label: `${source.slot.toUpperCase()} · ${source.label}`,
-                  dataUrl: canvas.toDataURL('image/png'),
+                  slot: source.slot,
+                  canvas,
+                  timeLabel: source.timeLabel,
                 }
               : null,
           )
@@ -227,7 +229,7 @@ function DualMapPanel({
       })
     })
     return () => onRegisterCapture(source.slot, null)
-  }, [source.slot, source.label, mapRef, onRegisterCapture])
+  }, [source.slot, source.label, source.timeLabel, mapRef, onRegisterCapture])
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
