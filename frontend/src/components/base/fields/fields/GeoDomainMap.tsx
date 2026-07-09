@@ -35,6 +35,7 @@ import 'ol/ol.css'
 import countriesGeo from '../data/countries.geo.json'
 import {
   boxHandles,
+  clampBboxLatitudeForMercator,
   isDegenerateBboxValue,
   moveExtent,
   parseBbox,
@@ -46,7 +47,7 @@ import {
 } from './geo-domain'
 import type { Coordinate } from 'ol/coordinate'
 import type { Pixel } from 'ol/pixel'
-import type { BoxHandle, BoxHandleRole, OlExtent } from './geo-domain'
+import type { Bbox, BoxHandle, BoxHandleRole, OlExtent } from './geo-domain'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -271,8 +272,9 @@ export default function GeoDomainMap({
       boxSource.clear()
       const bbox = parseBbox(valueRef.current)
       if (bbox) {
-        const extent = transformExtent(bbox, 'EPSG:4326', 'EPSG:3857')
-        boxSource.addFeature(new Feature(fromExtent(extent)))
+        boxSource.addFeature(
+          new Feature(fromExtent(bboxToMercatorExtent(bbox))),
+        )
       }
     }
 
@@ -429,8 +431,7 @@ export default function GeoDomainMap({
     boxSource.clear()
     const bbox = parseBbox(value)
     if (bbox) {
-      const extent = transformExtent(bbox, 'EPSG:4326', 'EPSG:3857')
-      boxSource.addFeature(new Feature(fromExtent(extent)))
+      boxSource.addFeature(new Feature(fromExtent(bboxToMercatorExtent(bbox))))
     }
   }, [value])
 
@@ -524,13 +525,23 @@ export default function GeoDomainMap({
   )
 }
 
+/** Convert a stored `[W,S,E,N]` bbox to a Web Mercator display extent. Latitude is clamped so a
+ *  polar bbox (lat →±90) can't yield an infinite extent that breaks the map's fit. */
+function bboxToMercatorExtent(bbox: Bbox): OlExtent {
+  return transformExtent(
+    clampBboxLatitudeForMercator(bbox),
+    'EPSG:4326',
+    'EPSG:3857',
+  ) as OlExtent
+}
+
 /** Initial fit target: a drawn box, else the extent of the initially selected countries, else null. */
 function initialExtent(
   countriesSource: VectorSource,
   value: string,
 ): OlExtent | null {
   const bbox = parseBbox(value)
-  if (bbox) return transformExtent(bbox, 'EPSG:4326', 'EPSG:3857') as OlExtent
+  if (bbox) return bboxToMercatorExtent(bbox)
   const selected = new Set(tokenize(value).map(lower))
   if (selected.size === 0) return null
   const extent = createEmpty()

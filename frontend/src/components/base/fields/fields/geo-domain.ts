@@ -88,6 +88,20 @@ export function isDegenerateBboxValue(value: string): boolean {
   return bbox !== null && (bbox[0] === bbox[2] || bbox[1] === bbox[3])
 }
 
+/**
+ * Max absolute latitude Web Mercator (EPSG:3857) can represent; at ±90 it diverges to ±∞.
+ * The wire contract allows lat up to ±90, so display transforms clamp to this — otherwise a
+ * polar bbox (e.g. `south=-90`) yields an infinite extent that breaks the map's fit.
+ */
+export const MERCATOR_MAX_LAT = 85.0511
+
+/** Clamp a bbox's latitudes into the Web Mercator range; longitudes are left untouched. */
+export function clampBboxLatitudeForMercator(bbox: Bbox): Bbox {
+  const clampLat = (lat: number): number =>
+    Math.min(MERCATOR_MAX_LAT, Math.max(-MERCATOR_MAX_LAT, lat))
+  return [bbox[0], clampLat(bbox[1]), bbox[2], clampLat(bbox[3])]
+}
+
 /** Serialise selected names (presets or countries) to the stored value. */
 export function serializeNames(names: ReadonlyArray<string>): string {
   return names.join(',')

@@ -10,8 +10,10 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  MERCATOR_MAX_LAT,
   PRESET_DOMAINS,
   boxHandles,
+  clampBboxLatitudeForMercator,
   detectMode,
   isAutoDomain,
   isBboxTokens,
@@ -194,5 +196,28 @@ describe('box editing geometry', () => {
   it('clamps the translation so the box stays within the world', () => {
     // +200 in x would push the east edge past 100; clamp so it lands on 100.
     expect(moveExtent([0, 0, 10, 20], 200, 0, WORLD)).toEqual([90, 0, 100, 20])
+  })
+})
+
+describe('clampBboxLatitudeForMercator', () => {
+  it('clamps ±90 latitudes to the Web Mercator limit, leaving longitude untouched', () => {
+    expect(clampBboxLatitudeForMercator([-180, -90, 180, 90])).toEqual([
+      -180,
+      -MERCATOR_MAX_LAT,
+      180,
+      MERCATOR_MAX_LAT,
+    ])
+  })
+
+  it('leaves an in-range box unchanged', () => {
+    expect(clampBboxLatitudeForMercator([-10, 35, 30, 60])).toEqual([
+      -10, 35, 30, 60,
+    ])
+  })
+
+  it('does not reorder an antimeridian box (west>east preserved)', () => {
+    expect(clampBboxLatitudeForMercator([170, -10, -170, 10])).toEqual([
+      170, -10, -170, 10,
+    ])
   })
 })
