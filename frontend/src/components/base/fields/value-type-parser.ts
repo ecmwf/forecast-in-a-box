@@ -25,6 +25,7 @@
  * - enumClosed['a','b','c'] → select dropdown (closed: must be one of the listed)
  * - list[enumClosed[a,b,c]] → multi-select restricted to the listed items
  * - list[enum[a,b,c]] → multi-select with suggestions, accept any string
+ * - geodomain → geographic-area picker (presets / countries / draw a box)
  * - optional[T] → same widget as T, with optional=true flag
  *
  * `enum`/`enumList` carry `closed: boolean` (closed vs open) for forward
@@ -55,6 +56,7 @@ export type ParsedValueType =
       closed: boolean
       optional?: boolean
     }
+  | { type: 'geodomain'; optional?: boolean }
   | { type: 'unknown'; raw: string; optional?: boolean }
 
 /**
@@ -96,6 +98,10 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
 
   if (normalized === 'date-iso8601' || normalized === 'date') {
     return { type: 'date' }
+  }
+
+  if (normalized === 'geodomain') {
+    return { type: 'geodomain' }
   }
 
   // List type: list[str], list[int], or list[enumClosed[...]]
@@ -178,6 +184,8 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
     case 'enum':
       return parsedType.options[0] ?? ''
     case 'enumList':
+      return ''
+    case 'geodomain':
       return ''
     case 'unknown':
       return ''

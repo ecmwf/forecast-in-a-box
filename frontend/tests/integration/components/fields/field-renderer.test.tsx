@@ -330,4 +330,21 @@ describe('FieldRenderer Integration', () => {
       await expect.element(input).toBeVisible()
     })
   })
+
+  describe('GeoDomain field', () => {
+    it('renders a trigger summarizing the current value', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType="geodomain" initialValue="global" />,
+      )
+      // The trigger shows the selected name as a badge (also echoed in current-value span).
+      await expect.element(screen.getByText('global').first()).toBeVisible()
+    })
+
+    it('shows the placeholder when empty', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType="geodomain" />,
+      )
+      await expect.element(screen.getByText('Select an area…')).toBeVisible()
+    })
+  })
 })

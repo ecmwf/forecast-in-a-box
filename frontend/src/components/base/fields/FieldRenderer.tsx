@@ -12,6 +12,7 @@ import { useMemo } from 'react'
 import { DateTimeField } from './fields/DateTimeField'
 import { EnumField } from './fields/EnumField'
 import { EnumListField } from './fields/EnumListField'
+import { GeoDomainField } from './fields/GeoDomainField'
 import { ListField } from './fields/ListField'
 import { NumberField } from './fields/NumberField'
 import { StringField } from './fields/StringField'
@@ -193,6 +194,19 @@ function renderField(
           value={value}
           onChange={onChange}
           options={parsedType.options}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={className}
+        />
+      )
+
+    case 'geodomain':
+      return (
+        <GeoDomainField
+          id={id}
+          configKey={configKey}
+          value={value}
+          onChange={onChange}
           placeholder={placeholder}
           disabled={disabled}
           className={className}
