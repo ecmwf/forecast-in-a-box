@@ -28,6 +28,7 @@ import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
 import { compositeMapToCanvas } from '../map-export'
 import { CompareSlotTag } from './CompareSlotTag'
+import { cn } from '@/lib/utils'
 import { LoupeOverlay } from './LoupeOverlay'
 import type View from 'ol/View'
 import type { SourceSlot } from './layer-pairing'
@@ -282,7 +283,10 @@ function DualMapPanel({
       onPointerMove={onPointerMove}
       onPointerLeave={() => onCross(null)}
     >
-      <div ref={containerRef} className="absolute inset-0" />
+      <div
+        ref={containerRef}
+        className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
+      />
       <LoupeOverlay containerRef={containerRef} />
       <CompareSlotTag
         slot={source.slot}

@@ -422,6 +422,39 @@ describe('CompareViewer', () => {
       .not.toBeInTheDocument()
   })
 
+  it('annotates per panel in side-by-side mode', async () => {
+    const style = document.createElement('style')
+    style.textContent =
+      '[data-slot="dialog-content"]{position:fixed;z-index:50}'
+    document.head.appendChild(style)
+
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(
+      <Harness portA={portA} portB={portB} initialMode="side" />,
+    )
+    await screen.getByRole('button', { name: /Annotate/ }).click()
+
+    const viewports = document.querySelectorAll('.ol-viewport')
+    expect(viewports.length).toBe(2)
+    for (const v of viewports) {
+      const container = (v as HTMLElement).parentElement!
+      container.style.cssText = 'position:relative;width:500px;height:400px'
+    }
+    // Click panel B (second map).
+    await page
+      .elementLocator(viewports[1] as Element)
+      .click({ position: { x: 250, y: 200 } })
+    await expect.element(screen.getByText('Annotation 1')).toBeVisible()
+    await screen.getByPlaceholder('Record your finding…').fill('B-side eddy')
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+
+    // Listed with the B slot badge.
+    await expect.element(screen.getByText('B-side eddy')).toBeVisible()
+    await expect
+      .element(screen.getByTitle('B', { exact: true }))
+      .toBeInTheDocument()
+  })
+
   it('clips the timeline to a source range via presets', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
