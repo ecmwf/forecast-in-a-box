@@ -215,7 +215,8 @@
       "flicker": "Toggle flicker frame (flicker mode)",
       "loupe": "Magnifier loupe (hold)",
       "swipe": "Nudge the swipe divider (when focused)",
-      "help": "Open this help"
+      "help": "Open this help",
+      "pan": "Pan the map (arrow keys too)"
     }
   }
 }
