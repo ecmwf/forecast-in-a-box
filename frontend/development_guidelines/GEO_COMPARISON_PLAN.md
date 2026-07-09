@@ -77,6 +77,39 @@
   echoes any Origin (full CORS) — it works as an external source once the
   URL is used correctly.
 
+## Improvement round 3 (user feedback 2026-07-09, screenshot-driven)
+
+All six items implemented same day:
+
+- [x] **Legend for external WMS**: `rebaseLensUrl` now rebases only
+  bare-origin (lens) bases; external endpoints with a path/query (ecCharts
+  `…/wms/?token=public`) keep their advertised legend URLs verbatim —
+  grafting doubled the path+query and broke the image.
+- [x] **NASA GIBS layers**: `useWmsLayerStack` skipped any layer without an
+  advertised `<Style>` — GIBS advertises none for most layers; empty
+  `STYLES=` (server default) now renders them. Whole-month periods (P1M
+  archives over decades) now step the calendar instead of a fixed
+  30.4375-day approximation that drifted off advertised instants.
+- [x] **A∩B browser filter**: fourth segment showing only pairs available in
+  both sources (ready to compare). Level-bearing groups stay in the
+  pressure section even when a filter leaves one entry.
+- [x] **Timeline**: hover on availability tracks shows a shared cursor line +
+  timestamp tooltip; click jumps to that step. Tracks render discrete
+  per-step cells (countable) up to 240 steps, merged runs beyond.
+- [x] **Slot tags**: per-side network spinner (real loading counters wired
+  into the layer stacks) + the valid time each side currently displays.
+- [x] **Loupe**: hold-Z now shows a crosshair cursor, a dashed outline of the
+  exact magnified region, and a crosshair in the loupe; works in ALL modes
+  including each side-by-side panel (pointer inspects instead of panning
+  while held).
+- [x] **Basemaps**: embedded-style Layers popover in the compare toolbar;
+  options shared with the embedded viewer via `useBasemap` — Carto
+  Positron, Sentinel-2 cloudless (EOX), Blue Marble (NASA GIBS), and
+  SkinnyWMS (native, from A's lens). Imagery hosts allowlisted in the CSP
+  for all builds. The EOX/GIBS one-click source presets moved here (they
+  are base layers, per user suggestion); time-dimensioned GIBS data can
+  still be added as a source via its WMS URL.
+
 ## Improvement round 1 (user feedback 2026-07-08, approved)
 
 Real-backend testing feedback (5 sources incl. ecCharts/FMI/DWD, 52-step

@@ -172,19 +172,6 @@ describe('ComparePage', () => {
     expect(listMockLenses()).toHaveLength(1)
   })
 
-  it('lists curated imagery presets in the picker', async () => {
-    const screen = await renderComparePage()
-    await expect
-      .element(screen.getByText('Reference imagery (one click)'))
-      .toBeVisible()
-    await expect
-      .element(screen.getByText('Sentinel-2 cloudless (EOX)'))
-      .toBeVisible()
-    await expect
-      .element(screen.getByText('NASA GIBS daily imagery'))
-      .toBeVisible()
-  })
-
   it('assigns slots via the slot bar and swaps them', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
     useComparisonStore.getState().addEntry(RUN_B)

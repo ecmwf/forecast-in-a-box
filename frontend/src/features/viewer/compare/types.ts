@@ -17,6 +17,8 @@ export interface CompareMapSource {
   baseUrl: string
   label: string
   layers: ReadonlyArray<ParsedLayer>
+  /** SkinnyWMS decoration layers (background/foreground) when lens-backed. */
+  decorationLayers: ReadonlyArray<ParsedLayer>
   activeOrder: ReadonlyArray<string>
   layerOpacities: ReadonlyMap<string, number>
   /** Raw TIME string THIS server advertised for the current instant. */
@@ -30,6 +32,8 @@ export interface CompareMapSource {
   /** Signed offset tag ("+2 h") when the shown instant differs from the
    *  requested one (nearest/offset time-link modes). */
   timeTag: string | null
+  /** Human label of the instant this source displays ("06 Jul 12:00Z"). */
+  timeLabel: string | null
   bbox: [number, number, number, number] | null
 }
 

@@ -60,11 +60,6 @@
       "placeholder": "/path/to/grib/output",
       "start": "Start lens & add"
     },
-    "presets": {
-      "title": "Reference imagery (one click)",
-      "add": "Add",
-      "probing": "Checking…"
-    },
     "collected": "Collected sources"
   },
   "lens": {
@@ -122,7 +117,8 @@
     },
     "offsetLabel": "B offset",
     "independentAria": "Valid time for source {{slot}}",
-    "offsetBadge": "{{slot}} {{tag}}"
+    "offsetBadge": "{{slot}} {{tag}}",
+    "trackHint": "Click to jump to a time step"
   },
   "link": {
     "linked": "Linked layers",
@@ -138,7 +134,9 @@
     "surface": "Surface (sfc)",
     "pressure": "Pressure level (pl)",
     "levels_one": "{{count}} level",
-    "levels_other": "{{count}} levels"
+    "levels_other": "{{count}} levels",
+    "both": "A∩B",
+    "bothHint": "Only layers available in both sources"
   },
   "sidebar": {
     "active": "Active layers",

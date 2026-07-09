@@ -116,12 +116,13 @@ export function CompareLayerBrowser({
           aria-label={t('browser.filterAria')}
           className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
         >
-          {(['all', 'a', 'b'] as const).map((f) => (
+          {(['all', 'a', 'b', 'both'] as const).map((f) => (
             <button
               key={f}
               type="button"
               onClick={() => setSlotFilter(f)}
               aria-pressed={slotFilter === f}
+              title={f === 'both' ? t('browser.bothHint') : undefined}
               className={cn(
                 'flex-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
                 slotFilter === f
@@ -129,7 +130,11 @@ export function CompareLayerBrowser({
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {f === 'all' ? t('browser.all') : f.toUpperCase()}
+              {f === 'all'
+                ? t('browser.all')
+                : f === 'both'
+                  ? t('browser.both')
+                  : f.toUpperCase()}
             </button>
           ))}
         </div>
@@ -418,7 +423,10 @@ function UnlinkedSourceSection({
   selectedLevels: ReadonlySet<number>
 }) {
   const { t } = useTranslation('compare')
-  if (slotFilter !== 'all' && slotFilter !== slot) return null
+  // 'both' has no meaning without pairing — show everything.
+  if (slotFilter === 'a' || slotFilter === 'b') {
+    if (slotFilter !== slot) return null
+  }
 
   const groups = source.groups.filter(
     (g) =>

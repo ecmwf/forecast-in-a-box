@@ -20,6 +20,7 @@ import {
   Eraser,
   FlaskConical,
   Globe2,
+  Layers,
   Ruler,
   SquareDashed,
   ZoomIn,
@@ -28,7 +29,14 @@ import { useTranslation } from 'react-i18next'
 import { firstNumber } from '../format'
 import type { LinkMode } from './useCompareSelection'
 import type { CompareMode, CompareModeOptions } from './types'
+import type { BasemapOption } from '../ol-layers'
 import { Button } from '@/components/ui/button'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { P } from '@/components/base/typography'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -54,6 +62,9 @@ export function CompareToolbar({
   onMeasureMode,
   onMeasureClear,
   onExport,
+  basemapId,
+  onBasemapChange,
+  availableBasemaps,
 }: {
   mode: CompareMode
   onModeChange: (mode: CompareMode) => void
@@ -68,6 +79,9 @@ export function CompareToolbar({
   onMeasureMode: (mode: 'none' | 'line' | 'area') => void
   onMeasureClear: () => void
   onExport: () => void
+  basemapId: string
+  onBasemapChange: (id: string) => void
+  availableBasemaps: ReadonlyArray<BasemapOption>
 }) {
   const { t } = useTranslation('compare')
   const { t: tExec } = useTranslation('executions')
@@ -131,6 +145,45 @@ export function CompareToolbar({
           >
             <Globe2 className="h-4 w-4" />
           </Button>
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  title={tExec('lens.basemap')}
+                  aria-label={tExec('lens.basemap')}
+                />
+              }
+            >
+              <Layers className="h-4 w-4" />
+            </PopoverTrigger>
+            <PopoverContent side="bottom" align="end" className="w-64 p-1">
+              <P className="px-2 pt-1 pb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                {tExec('lens.basemap')}
+              </P>
+              <div className="flex flex-col">
+                {availableBasemaps.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => onBasemapChange(b.id)}
+                    aria-pressed={b.id === basemapId}
+                    className={cn(
+                      'flex items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent',
+                      b.id === basemapId && 'bg-accent font-medium',
+                    )}
+                  >
+                    <span>{b.label}</span>
+                    {b.id === basemapId && (
+                      <span className="text-xs text-muted-foreground">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
           <span className="mx-1 h-5 w-px bg-border" />
           <Button
             variant={measureMode === 'line' ? 'secondary' : 'ghost'}

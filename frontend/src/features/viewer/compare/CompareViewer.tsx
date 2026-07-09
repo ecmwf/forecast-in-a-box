@@ -36,6 +36,14 @@ import {
   formatOffset,
   resolveSourceTime,
 } from './time-link'
+import { formatStep } from '../format'
+import {
+  BASEMAPS,
+  DEFAULT_BASEMAP_ID,
+  IMAGERY_BASEMAPS,
+  SKINNYWMS_BASEMAP,
+} from '../ol-layers'
+import { skinnyWmsBasemap } from '../wms-capabilities'
 import { CompareToolbar } from './CompareToolbar'
 import { CompareExportDialog } from './CompareExportDialog'
 import type { ContextOverlay } from './overlays'
@@ -265,6 +273,20 @@ export function CompareViewer({
   )
   const [exportOpen, setExportOpen] = useState(false)
 
+  // Basemap — one choice driving every panel, embedded-viewer options.
+  const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
+  const availableBasemaps = useMemo(() => {
+    // SkinnyWMS native background comes from A's lens (the canvas host in
+    // single-map modes); dual panels fall back per-side when B lacks one.
+    const hasSkinny =
+      skinnyWmsBasemap(sourceA.decorationLayers).background !== undefined
+    return [
+      ...BASEMAPS,
+      ...IMAGERY_BASEMAPS,
+      ...(hasSkinny ? [SKINNYWMS_BASEMAP] : []),
+    ]
+  }, [sourceA.decorationLayers])
+
   // Sidebar collapse — same affordance as the embedded viewer.
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
@@ -293,11 +315,16 @@ export function CompareViewer({
     baseUrl: a.baseUrl,
     label: a.label,
     layers: sourceA.layers,
+    decorationLayers: sourceA.decorationLayers,
     activeOrder: activeOrderA,
     layerOpacities: selection.opacitiesFor('a'),
     resolveTime: resolveTimeFor('a'),
     hiddenAtTime: resolvedA.hidden,
     timeTag: timeTagFor('a'),
+    timeLabel:
+      resolvedA.epoch !== null
+        ? formatStep(new Date(resolvedA.epoch).toISOString())
+        : null,
     masterOpacity: globalOpacity * sourceOpacity.a,
     bbox: sourceA.bbox,
   }
@@ -306,11 +333,16 @@ export function CompareViewer({
     baseUrl: b.baseUrl,
     label: b.label,
     layers: sourceB.layers,
+    decorationLayers: sourceB.decorationLayers,
     activeOrder: activeOrderB,
     layerOpacities: selection.opacitiesFor('b'),
     resolveTime: resolveTimeFor('b'),
     hiddenAtTime: resolvedB.hidden,
     timeTag: timeTagFor('b'),
+    timeLabel:
+      resolvedB.epoch !== null
+        ? formatStep(new Date(resolvedB.epoch).toISOString())
+        : null,
     masterOpacity: globalOpacity * sourceOpacity.b,
     bbox: sourceB.bbox,
   }
@@ -363,6 +395,9 @@ export function CompareViewer({
         onMeasureMode={setMeasureMode}
         onMeasureClear={() => setMeasureClearNonce((n) => n + 1)}
         onExport={() => setExportOpen(true)}
+        basemapId={basemapId}
+        onBasemapChange={setBasemapId}
+        availableBasemaps={availableBasemaps}
       />
       <CompareExportDialog
         open={exportOpen}
@@ -414,6 +449,7 @@ export function CompareViewer({
               measureMode={measureMode}
               measureClearNonce={measureClearNonce}
               overlays={overlays}
+              basemapId={basemapId}
               onRegisterFit={onRegisterFit}
               onRegisterCapture={onRegisterCapture}
             />
@@ -427,6 +463,7 @@ export function CompareViewer({
               measureMode={measureMode}
               measureClearNonce={measureClearNonce}
               overlays={overlays}
+              basemapId={basemapId}
               onRegisterFit={onRegisterFit}
               onRegisterCapture={onRegisterCapture}
             />
