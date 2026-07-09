@@ -48,7 +48,20 @@ export interface SkinnyWmsBasemapOption {
   label: string
 }
 
-export type BasemapOption = ExternalBasemapOption | SkinnyWmsBasemapOption
+// Public imagery served over plain WMS (satellite mosaics etc.).
+export interface WmsImageBasemapOption {
+  type: 'wms-image'
+  id: string
+  label: string
+  url: string
+  layerName: string
+  attribution: string
+}
+
+export type BasemapOption =
+  | ExternalBasemapOption
+  | SkinnyWmsBasemapOption
+  | WmsImageBasemapOption
 
 export const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
   {
@@ -56,6 +69,28 @@ export const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
     id: 'carto-positron-vector',
     label: 'Carto Positron',
     styleUrl: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+  },
+]
+
+// Curated public imagery basemaps — token-free, CORS-friendly, and
+// allowlisted in the CSP (vite csp-loopback-hosts adds their hosts).
+export const IMAGERY_BASEMAPS: ReadonlyArray<WmsImageBasemapOption> = [
+  {
+    type: 'wms-image',
+    id: 'eox-sentinel2-cloudless',
+    label: 'Sentinel-2 cloudless (EOX)',
+    url: 'https://tiles.maps.eox.at/wms',
+    layerName: 's2cloudless-2024_3857',
+    attribution:
+      'Sentinel-2 cloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data)',
+  },
+  {
+    type: 'wms-image',
+    id: 'gibs-bluemarble',
+    label: 'Blue Marble (NASA)',
+    url: 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi',
+    layerName: 'BlueMarble_ShadedRelief_Bathymetry',
+    attribution: 'NASA EOSDIS Global Imagery Browse Services (GIBS)',
   },
 ]
 
@@ -126,6 +161,20 @@ export function makeDataLayerSource(
     hidpi: false,
     ratio: 1,
   })
+}
+
+/** Imagery WMS basemap — same single-image mode as the data layers. */
+export function makeWmsImageBasemap(
+  opt: WmsImageBasemapOption,
+): ImageLayer<ImageWMS> {
+  const source = makeDataLayerSource(opt.url, {
+    LAYERS: opt.layerName,
+    STYLES: '',
+    FORMAT: 'image/jpeg',
+    TRANSPARENT: 'FALSE',
+  })
+  source.setAttributions(opt.attribution)
+  return new ImageLayer({ source })
 }
 
 // SkinnyWMS's `background` layer as a basemap — ImageWMS, like the data layers.

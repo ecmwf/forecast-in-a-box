@@ -24,14 +24,12 @@ import { useMeasure } from '../hooks/useMeasure'
 import { useContextOverlays } from './overlays'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
-import { DEFAULT_BASEMAP_ID } from '../ol-layers'
 import { CompareSlotTag } from './CompareSlotTag'
+import { LoupeOverlay } from './LoupeOverlay'
 import type View from 'ol/View'
-import type { ParsedLayer } from '../wms-capabilities'
 import type { CaptureResult, CompareMapSource } from './types'
 
 const noop = () => {}
-const NO_DECORATIONS: ReadonlyArray<ParsedLayer> = []
 
 /** Cursor position as container fractions, mirrored across panels. */
 type CrossPosition = { x: number; y: number } | null
@@ -40,6 +38,7 @@ export function DualMapCompare({
   view,
   a,
   b,
+  basemapId,
   measureMode,
   measureClearNonce,
   overlays,
@@ -49,6 +48,7 @@ export function DualMapCompare({
   view: View
   a: CompareMapSource
   b: CompareMapSource
+  basemapId: string
   measureMode: MeasureMode
   measureClearNonce: number
   overlays: ReadonlyArray<ContextOverlay>
@@ -102,6 +102,7 @@ export function DualMapCompare({
         view={view}
         cross={cross}
         onCross={setCross}
+        basemapId={basemapId}
         measureMode={measureMode}
         measureClearNonce={measureClearNonce}
         overlays={overlays}
@@ -113,6 +114,7 @@ export function DualMapCompare({
         view={view}
         cross={cross}
         onCross={setCross}
+        basemapId={basemapId}
         measureMode={measureMode}
         measureClearNonce={measureClearNonce}
         overlays={overlays}
@@ -128,6 +130,7 @@ function DualMapPanel({
   view,
   cross,
   onCross,
+  basemapId,
   measureMode,
   measureClearNonce,
   overlays,
@@ -138,6 +141,7 @@ function DualMapPanel({
   view: View
   cross: CrossPosition
   onCross: (pos: CrossPosition) => void
+  basemapId: string
   measureMode: MeasureMode
   measureClearNonce: number
   overlays: ReadonlyArray<ContextOverlay>
@@ -149,6 +153,12 @@ function DualMapPanel({
 }) {
   const { t } = useTranslation('compare')
   const containerRef = useRef<HTMLDivElement>(null)
+  const [loadingCount, setLoadingCount] = useState(0)
+  const incLoading = useCallback(() => setLoadingCount((c) => c + 1), [])
+  const decLoading = useCallback(
+    () => setLoadingCount((c) => Math.max(0, c - 1)),
+    [],
+  )
   const { mapRef, basemapLayerRef, tryFit, setFitBbox } = useOlMapBase(
     containerRef,
     {
@@ -162,10 +172,10 @@ function DualMapPanel({
     mapRef,
     basemapLayerRef,
     baseUrl: source.baseUrl,
-    decorationLayers: NO_DECORATIONS,
-    basemapId: DEFAULT_BASEMAP_ID,
-    incLoading: noop,
-    decLoading: noop,
+    decorationLayers: source.decorationLayers,
+    basemapId,
+    incLoading,
+    decLoading,
   })
   useWmsLayerStack(mapRef, source.baseUrl, source.layers, {
     zBase: 100,
@@ -173,8 +183,8 @@ function DualMapPanel({
     activeOrder: source.activeOrder,
     layerOpacities: source.layerOpacities,
     resolveTime: source.resolveTime,
-    incLoading: noop,
-    decLoading: noop,
+    incLoading,
+    decLoading,
   })
 
   useMeasure(mapRef, measureMode, measureClearNonce)
@@ -228,7 +238,13 @@ function DualMapPanel({
       onPointerLeave={() => onCross(null)}
     >
       <div ref={containerRef} className="absolute inset-0" />
-      <CompareSlotTag slot={source.slot} label={source.label} />
+      <LoupeOverlay containerRef={containerRef} />
+      <CompareSlotTag
+        slot={source.slot}
+        label={source.label}
+        loading={loadingCount > 0}
+        timeLabel={source.timeLabel}
+      />
       {source.hiddenAtTime && (
         <div className="absolute top-10 left-2 z-10 rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
           {t('timeline.gap', { slot: source.slot.toUpperCase() })}

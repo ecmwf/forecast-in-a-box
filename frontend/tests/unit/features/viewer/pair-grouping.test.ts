@@ -60,4 +60,17 @@ describe('groupPairs', () => {
     ])
     expect(onlyA.multiLevel[0].entries.map((e) => e.level)).toEqual([850, 500])
   })
+
+  it("filters to pairs available in both sources with 'both'", () => {
+    const both = groupPairs(pairs, 'both')
+    // tp is A-only → gone; only the shared 500 hPa level survives.
+    expect(both.singles.map((g) => g.title)).toEqual(['2 m temperature'])
+    expect(both.multiLevel[0].entries.map((e) => e.level)).toEqual([500])
+    for (const group of [...both.singles, ...both.multiLevel]) {
+      for (const entry of group.entries) {
+        expect(entry.perSource.a).toBeDefined()
+        expect(entry.perSource.b).toBeDefined()
+      }
+    }
+  })
 })

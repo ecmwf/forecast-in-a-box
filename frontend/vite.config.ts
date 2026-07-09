@@ -41,6 +41,9 @@ export default defineConfig(({ mode }) => {
           const hosts = [
             'http://localhost:*',
             'http://127.0.0.1:*',
+            // Built-in imagery basemaps (ol-layers IMAGERY_BASEMAPS).
+            'https://tiles.maps.eox.at',
+            'https://gibs.earthdata.nasa.gov',
             ...(isDev ? ['https:', 'http:'] : []),
             ...(env.FIAB_CSP_EXTRA_HOSTS ? [env.FIAB_CSP_EXTRA_HOSTS] : []),
           ]

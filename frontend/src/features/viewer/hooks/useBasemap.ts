@@ -21,11 +21,13 @@ import { skinnyWmsBasemap } from '../wms-capabilities'
 import {
   BASEMAPS,
   DEFAULT_BASEMAP_ID,
+  IMAGERY_BASEMAPS,
   REFERENCE_OVERLAY_Z,
   SKINNYWMS_BASEMAP,
   makeBasemapLayer,
   makeDataLayerSource,
   makeSkinnyWmsBasemap,
+  makeWmsImageBasemap,
 } from '../ol-layers'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
@@ -66,8 +68,11 @@ export function useBasemap(options: {
   )
   // Offer the SkinnyWMS basemap only once a `background` layer is advertised.
   const availableBasemaps = useMemo<ReadonlyArray<BasemapOption>>(
-    () =>
-      skinnyBasemap.background ? [...BASEMAPS, SKINNYWMS_BASEMAP] : BASEMAPS,
+    () => [
+      ...BASEMAPS,
+      ...IMAGERY_BASEMAPS,
+      ...(skinnyBasemap.background ? [SKINNYWMS_BASEMAP] : []),
+    ],
     [skinnyBasemap.background],
   )
 
@@ -91,6 +96,13 @@ export function useBasemap(options: {
       source?.on('imageloadend', decLoading)
       source?.on('imageloaderror', decLoading)
       newLayer = skinny
+    } else if (opt.type === 'wms-image') {
+      const imagery = makeWmsImageBasemap(opt)
+      const source = imagery.getSource()
+      source?.on('imageloadstart', incLoading)
+      source?.on('imageloadend', decLoading)
+      source?.on('imageloaderror', decLoading)
+      newLayer = imagery
     } else {
       // Carto basemap — or skinnywms with no background, which falls back.
       const external = opt.type === 'skinnywms' ? BASEMAPS[0] : opt

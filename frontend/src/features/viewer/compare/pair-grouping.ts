@@ -18,7 +18,7 @@
 
 import type { PairedLayer, SourceSlot } from './layer-pairing'
 
-export type SlotFilter = 'all' | SourceSlot
+export type SlotFilter = 'all' | 'both' | SourceSlot
 
 export interface PairGroup {
   /** Shared group identity — the pair keys' common prefix (group key). */
@@ -42,6 +42,9 @@ export interface PartitionedPairGroups {
 
 function matchesSlot(pair: PairedLayer, filter: SlotFilter): boolean {
   if (filter === 'all') return true
+  if (filter === 'both') {
+    return pair.perSource.a !== undefined && pair.perSource.b !== undefined
+  }
   return pair.perSource[filter] !== undefined
 }
 
@@ -82,8 +85,10 @@ export function groupPairs(
         (x.level ?? Number.NEGATIVE_INFINITY),
     )
   }
-  const isMulti = (g: PairGroup) =>
-    g.entries.length > 1 && g.entries.some((e) => e.level !== null)
+  // Level-bearing groups stay in the pressure section even when a filter
+  // leaves a single entry — otherwise it lands under "surface" without
+  // its level label.
+  const isMulti = (g: PairGroup) => g.entries.some((e) => e.level !== null)
 
   const byTitle = (x: PairGroup, y: PairGroup) => x.title.localeCompare(y.title)
   const singles = groups.filter((g) => !isMulti(g)).sort(byTitle)

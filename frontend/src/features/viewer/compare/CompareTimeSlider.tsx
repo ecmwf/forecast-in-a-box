@@ -77,6 +77,7 @@ export function CompareTimeSlider({
   const steps = timeline.epochs
   const safeIndex = Math.max(0, Math.min(index, steps.length - 1))
   const [playing, setPlaying] = useState(false)
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null)
 
   const indexRef = useRef(safeIndex)
   indexRef.current = safeIndex
@@ -169,15 +170,32 @@ export function CompareTimeSlider({
             step={1}
             onValueChange={(v) => onChange(firstNumber(v))}
           />
-          {/* Availability runs — contiguous spans per source, with a
-              cursor line at the current step. */}
-          <div className="grid grid-cols-[14px_1fr] items-center gap-x-2 gap-y-1">
+          {/* Per-source availability tracks. Hover shows the instant and
+              a shared cursor; click jumps to that step. */}
+          <div className="relative grid grid-cols-[14px_1fr] items-center gap-x-2 gap-y-1">
+            {hoverIndex !== null && steps[hoverIndex] !== undefined && (
+              <div
+                className="pointer-events-none absolute -top-7 z-10 -translate-x-1/2 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs whitespace-nowrap shadow-sm"
+                style={{
+                  left: `calc(22px + ${
+                    steps.length > 1
+                      ? (hoverIndex / (steps.length - 1)) * 100
+                      : 0
+                  } * (100% - 22px) / 100)`,
+                }}
+              >
+                {formatStep(new Date(steps[hoverIndex]).toISOString())}
+              </div>
+            )}
             {(['a', 'b'] as const).map((slot) => (
               <SlotRunTrack
                 key={slot}
                 slot={slot}
                 availability={timeline.availability[slot]}
                 currentIndex={safeIndex}
+                hoverIndex={hoverIndex}
+                onHover={setHoverIndex}
+                onJump={onChange}
               />
             ))}
           </div>
@@ -263,18 +281,33 @@ function IndependentSlider({
   )
 }
 
-/** Availability as merged runs (solid span = data, dashed = gap). */
+/** Individual step cells become merged runs above this count. */
+const TRACK_CELL_LIMIT = 240
+
+/**
+ * One source's availability track: discrete cells (gap = countable steps)
+ * up to TRACK_CELL_LIMIT, merged runs beyond. Hover previews the instant
+ * across both tracks; click jumps to it.
+ */
 function SlotRunTrack({
   slot,
   availability,
   currentIndex,
+  hoverIndex,
+  onHover,
+  onJump,
 }: {
   slot: SourceSlot
   availability: ReadonlyArray<boolean>
   currentIndex: number
+  hoverIndex: number | null
+  onHover: (index: number | null) => void
+  onJump: (index: number) => void
 }) {
   const { t } = useTranslation('compare')
+  const cells = availability.length <= TRACK_CELL_LIMIT
   const runs = useMemo(() => {
+    if (cells) return null
     const out: Array<{ available: boolean; length: number }> = []
     for (const available of availability) {
       const last = out[out.length - 1]
@@ -282,11 +315,15 @@ function SlotRunTrack({
       else out.push({ available, length: 1 })
     }
     return out
-  }, [availability])
-  const cursorPct =
-    availability.length > 1
-      ? (currentIndex / (availability.length - 1)) * 100
-      : 0
+  }, [availability, cells])
+  const pct = (index: number) =>
+    availability.length > 1 ? (index / (availability.length - 1)) * 100 : 0
+
+  const indexFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+    return Math.round(frac * (availability.length - 1))
+  }
 
   return (
     <>
@@ -296,25 +333,55 @@ function SlotRunTrack({
       <div
         role="img"
         aria-label={t('timeline.trackAria', { slot: slot.toUpperCase() })}
-        className="relative flex h-1.5 gap-px"
+        title={t('timeline.trackHint')}
+        className="relative flex h-2 cursor-pointer items-stretch gap-px py-0"
+        onPointerMove={(e) => onHover(indexFromPointer(e))}
+        onPointerLeave={() => onHover(null)}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          const frac = Math.min(
+            1,
+            Math.max(0, (e.clientX - rect.left) / rect.width),
+          )
+          onJump(Math.round(frac * (availability.length - 1)))
+        }}
       >
-        {runs.map((run, i) => (
-          <span
-            key={i}
-            style={{ flexGrow: run.length }}
-            className={cn(
-              'min-w-0 basis-0 rounded-sm',
-              run.available
-                ? TRACK_ON_CLASS[slot]
-                : 'border border-dashed border-border bg-transparent',
-            )}
-          />
-        ))}
+        {cells
+          ? availability.map((available, i) => (
+              <span
+                key={i}
+                className={cn(
+                  'min-w-0 flex-1 rounded-[1px]',
+                  available
+                    ? TRACK_ON_CLASS[slot]
+                    : 'bg-border/60 dark:bg-border/40',
+                )}
+              />
+            ))
+          : runs?.map((run, i) => (
+              <span
+                key={i}
+                style={{ flexGrow: run.length }}
+                className={cn(
+                  'min-w-0 basis-0 rounded-sm',
+                  run.available
+                    ? TRACK_ON_CLASS[slot]
+                    : 'border border-dashed border-border bg-transparent',
+                )}
+              />
+            ))}
         <span
           aria-hidden="true"
-          className="absolute -top-0.5 -bottom-0.5 w-0.5 -translate-x-1/2 rounded bg-foreground"
-          style={{ left: `${cursorPct}%` }}
+          className="pointer-events-none absolute -top-0.5 -bottom-0.5 w-0.5 -translate-x-1/2 rounded bg-foreground"
+          style={{ left: `${pct(currentIndex)}%` }}
         />
+        {hoverIndex !== null && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-0.5 -bottom-0.5 w-px -translate-x-1/2 bg-foreground/50"
+            style={{ left: `${pct(hoverIndex)}%` }}
+          />
+        )}
       </div>
     </>
   )

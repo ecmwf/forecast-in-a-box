@@ -39,12 +39,12 @@ import { useMeasure } from '../hooks/useMeasure'
 import { useContextOverlays } from './overlays'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
-import { DEFAULT_BASEMAP_ID } from '../ol-layers'
+import type { SourceSlot } from './layer-pairing'
 import { CompareSlotTag } from './CompareSlotTag'
+import { LoupeOverlay } from './LoupeOverlay'
 import { cn } from '@/lib/utils'
 import type RenderEvent from 'ol/render/Event'
 import type View from 'ol/View'
-import type { ParsedLayer } from '../wms-capabilities'
 import type {
   CaptureResult,
   CompareMapSource,
@@ -53,12 +53,8 @@ import type {
 } from './types'
 
 const noop = () => {}
-const NO_DECORATIONS: ReadonlyArray<ParsedLayer> = []
 /** Swipe keyboard step as a fraction of the map span. */
 const SWIPE_KEY_STEP = 0.02
-/** Loupe: rendered size and magnification. */
-const LOUPE_SIZE_PX = 180
-const LOUPE_ZOOM = 2
 
 export function SingleMapCompare({
   view,
@@ -66,6 +62,7 @@ export function SingleMapCompare({
   b,
   mode,
   options,
+  basemapId,
   measureMode,
   measureClearNonce,
   overlays,
@@ -77,6 +74,7 @@ export function SingleMapCompare({
   b: CompareMapSource
   mode: SingleMapMode
   options: CompareModeOptions
+  basemapId: string
   measureMode: MeasureMode
   measureClearNonce: number
   overlays: ReadonlyArray<ContextOverlay>
@@ -104,8 +102,9 @@ export function SingleMapCompare({
     mapRef,
     basemapLayerRef,
     baseUrl: a.baseUrl,
-    decorationLayers: NO_DECORATIONS,
-    basemapId: DEFAULT_BASEMAP_ID,
+    // SkinnyWMS-native uses A's background — one canvas, one base.
+    decorationLayers: a.decorationLayers,
+    basemapId,
     incLoading: noop,
     decLoading: noop,
   })
@@ -125,14 +124,36 @@ export function SingleMapCompare({
 
   const needsClip = mode === 'swipe' || mode === 'spy'
 
+  // Per-stack network activity for the slot-tag spinners.
+  const [loadingCount, setLoadingCount] = useState<Record<SourceSlot, number>>({
+    a: 0,
+    b: 0,
+  })
+  const incA = useCallback(
+    () => setLoadingCount((c) => ({ ...c, a: c.a + 1 })),
+    [],
+  )
+  const decA = useCallback(
+    () => setLoadingCount((c) => ({ ...c, a: Math.max(0, c.a - 1) })),
+    [],
+  )
+  const incB = useCallback(
+    () => setLoadingCount((c) => ({ ...c, b: c.b + 1 })),
+    [],
+  )
+  const decB = useCallback(
+    () => setLoadingCount((c) => ({ ...c, b: Math.max(0, c.b - 1) })),
+    [],
+  )
+
   const stackA = useWmsLayerStack(mapRef, a.baseUrl, a.layers, {
     zBase: 100,
     masterOpacity: masterA,
     activeOrder: a.activeOrder,
     layerOpacities: a.layerOpacities,
     resolveTime: a.resolveTime,
-    incLoading: noop,
-    decLoading: noop,
+    incLoading: incA,
+    decLoading: decA,
     trackRevision: true,
   })
   const stackB = useWmsLayerStack(mapRef, b.baseUrl, b.layers, {
@@ -141,8 +162,8 @@ export function SingleMapCompare({
     activeOrder: b.activeOrder,
     layerOpacities: b.layerOpacities,
     resolveTime: b.resolveTime,
-    incLoading: noop,
-    decLoading: noop,
+    incLoading: incB,
+    decLoading: decB,
     trackRevision: true,
   })
 
@@ -411,8 +432,20 @@ export function SingleMapCompare({
         className="absolute inset-0"
         onClick={mode === 'flicker' ? toggleFlicker : undefined}
       />
-      <CompareSlotTag slot="a" label={a.label} side="left" />
-      <CompareSlotTag slot="b" label={b.label} side="right" />
+      <CompareSlotTag
+        slot="a"
+        label={a.label}
+        side="left"
+        loading={loadingCount.a > 0}
+        timeLabel={a.timeLabel}
+      />
+      <CompareSlotTag
+        slot="b"
+        label={b.label}
+        side="right"
+        loading={loadingCount.b > 0}
+        timeLabel={b.timeLabel}
+      />
 
       {a.hiddenAtTime && <GapBadge slot="A" side="left" />}
       {b.hiddenAtTime && <GapBadge slot="B" side="right" />}
@@ -529,106 +562,6 @@ function GapBadge({ slot, side }: { slot: string; side: 'left' | 'right' }) {
       <div className="rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
         {t('timeline.gap', { slot })}
       </div>
-    </div>
-  )
-}
-
-/**
- * Hold-Z magnifier: a circular loupe following the cursor, drawn from the
- * map's composited canvas (raster zoom — cheap and honest about pixels).
- */
-function LoupeOverlay({
-  containerRef,
-}: {
-  containerRef: React.RefObject<HTMLDivElement | null>
-}) {
-  const [active, setActive] = useState(false)
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'z' || e.repeat) return
-      const target = e.target as HTMLElement | null
-      if (target && target.closest('input, textarea, select')) return
-      setActive(true)
-    }
-    const up = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'z') setActive(false)
-    }
-    window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
-    return () => {
-      window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!active) {
-      setPos(null)
-      return
-    }
-    const container = containerRef.current
-    if (!container) return
-    const onMove = (e: PointerEvent) => {
-      const rect = container.getBoundingClientRect()
-      setPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
-    }
-    container.addEventListener('pointermove', onMove)
-    return () => container.removeEventListener('pointermove', onMove)
-  }, [active, containerRef])
-
-  useEffect(() => {
-    if (!active || !pos) return
-    const container = containerRef.current
-    const loupe = canvasRef.current
-    if (!container || !loupe) return
-    let raf = 0
-    const draw = () => {
-      const src = container.querySelector('canvas')
-      const ctx = loupe.getContext('2d')
-      if (src && ctx) {
-        const scale = src.width / container.clientWidth // device-pixel ratio
-        const srcSize = (LOUPE_SIZE_PX / LOUPE_ZOOM) * scale
-        ctx.clearRect(0, 0, loupe.width, loupe.height)
-        ctx.drawImage(
-          src,
-          pos.x * scale - srcSize / 2,
-          pos.y * scale - srcSize / 2,
-          srcSize,
-          srcSize,
-          0,
-          0,
-          loupe.width,
-          loupe.height,
-        )
-      }
-      raf = requestAnimationFrame(draw)
-    }
-    raf = requestAnimationFrame(draw)
-    return () => cancelAnimationFrame(raf)
-  }, [active, pos, containerRef])
-
-  if (!active || !pos) return null
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute z-30 overflow-hidden rounded-full border-2 border-background shadow-lg ring-1 ring-border"
-      style={{
-        width: LOUPE_SIZE_PX,
-        height: LOUPE_SIZE_PX,
-        left: pos.x,
-        top: pos.y,
-        transform: 'translate(-50%, -115%)',
-      }}
-    >
-      <canvas
-        ref={canvasRef}
-        width={LOUPE_SIZE_PX * 2}
-        height={LOUPE_SIZE_PX * 2}
-        className="h-full w-full"
-      />
     </div>
   )
 }

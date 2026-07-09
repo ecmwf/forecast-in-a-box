@@ -25,7 +25,6 @@ import { useTranslation } from 'react-i18next'
 import { entryDisplayName } from '../entry-ref'
 import { gribMarkerRows, useLensPathIndex } from '../hooks/useLensPathIndex'
 import { probeWmsEndpoint } from '../wms-probe'
-import { EXTERNAL_WMS_PRESETS } from '../wms-presets'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { AddToComparisonButton } from './AddToComparisonButton'
 import { CompareBasketChip } from './CompareBasketChip'
@@ -152,7 +151,6 @@ export function ComparisonSourcePicker() {
         <SectionLabel icon={<FolderInput className="h-3.5 w-3.5" />}>
           {t('picker.external')}
         </SectionLabel>
-        <PresetList />
         <HostPathForm />
         <WmsUrlForm />
       </section>
@@ -348,67 +346,6 @@ function WmsUrlForm() {
         </Button>
       </div>
       {errorText && <P className="text-xs text-destructive">{errorText}</P>}
-    </div>
-  )
-}
-
-/** Curated public imagery sources — one click, same probe path as URLs. */
-function PresetList() {
-  const { t } = useTranslation('compare')
-  const addEntry = useComparisonStore((s) => s.addEntry)
-  const [probing, setProbing] = useState<string | null>(null)
-
-  const addPreset = async (presetId: string) => {
-    const preset = EXTERNAL_WMS_PRESETS.find((p) => p.id === presetId)
-    if (!preset || probing) return
-    setProbing(preset.id)
-    const result = await probeWmsEndpoint(preset.url)
-    setProbing(null)
-    if (!result.ok) {
-      showToast.error(t('picker.wmsUrl.errorUnreachable'))
-      return
-    }
-    const added = addEntry({
-      kind: 'wms',
-      url: result.baseUrl,
-      label: preset.label,
-    })
-    if (added === 'added') {
-      showToast.success(t('toast.added', { name: preset.label }))
-    } else if (added === 'full') {
-      showToast.error(t('toast.full', { max: 8 }))
-    }
-  }
-
-  return (
-    <div className="space-y-1 rounded-md border border-dashed border-border p-3">
-      <P className="text-sm font-medium">{t('picker.presets.title')}</P>
-      <ul className="divide-y divide-border">
-        {EXTERNAL_WMS_PRESETS.map((preset) => (
-          <li key={preset.id} className="flex items-center gap-3 py-1.5">
-            <div className="min-w-0 flex-1">
-              <P className="truncate text-sm">{preset.label}</P>
-              <P
-                className="truncate text-xs text-muted-foreground"
-                title={preset.attribution}
-              >
-                {preset.attribution}
-              </P>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={probing !== null}
-              onClick={() => void addPreset(preset.id)}
-              className="h-8 shrink-0"
-            >
-              {probing === preset.id
-                ? t('picker.presets.probing')
-                : t('picker.presets.add')}
-            </Button>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
