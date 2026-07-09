@@ -115,3 +115,25 @@ export function formatOffset(offsetMs: number): string {
   if (minutes === 0) return `${sign}${hours} h`
   return `${sign}${hours} h ${minutes} min`
 }
+
+/**
+ * Availability as the tracks should DISPLAY it: "would this source render
+ * data if the shared slider stood at this instant, under the current
+ * time-link policy?" — exact matches only, or nearest-within-tolerance,
+ * optionally shifted (offset mode samples B at t + Δ, so its usable
+ * window moves against the axis).
+ */
+export function effectiveAvailability(
+  epochs: ReadonlyArray<number>,
+  index: SourceTimeIndex,
+  mode: 'exact' | 'nearest',
+  shiftMs: number,
+  toleranceMs: number,
+): Array<boolean> {
+  if (index.epochs.length === 0) return epochs.map(() => false)
+  return epochs.map((epoch) => {
+    const target = epoch + shiftMs
+    if (mode === 'exact') return index.rawByEpoch.has(target)
+    return !resolveSourceTime(index, target, 'nearest', toleranceMs).hidden
+  })
+}
