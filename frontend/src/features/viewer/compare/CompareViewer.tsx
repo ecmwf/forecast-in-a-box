@@ -450,12 +450,16 @@ export function CompareViewer({
         meta={{ labelA: a.label, labelB: b.label }}
       />
       <div className="flex min-h-0 flex-1 gap-2">
-        {leftCollapsed ? (
+        {/* Collapse hides (not unmounts) the sidebars so working state —
+            filter tab, search, level chips, expanded groups — survives
+            reopening. */}
+        {leftCollapsed && (
           <CollapsedSidebarHandle
             side="left"
             onExpand={() => setLeftCollapsed(false)}
           />
-        ) : (
+        )}
+        <div style={{ display: leftCollapsed ? 'none' : 'contents' }}>
           <CompareActiveLayersPanel
             pairs={pairing.pairs}
             selection={selection}
@@ -477,7 +481,7 @@ export function CompareViewer({
             }}
             onCollapse={() => setLeftCollapsed(true)}
           />
-        )}
+        </div>
         <div className="min-h-0 min-w-0 flex-1">
           {mode === 'side' ? (
             <DualMapCompare
@@ -509,18 +513,19 @@ export function CompareViewer({
             />
           )}
         </div>
-        {rightCollapsed ? (
-          <CollapsedSidebarHandle
-            side="right"
-            onExpand={() => setRightCollapsed(false)}
-          />
-        ) : (
+        <div style={{ display: rightCollapsed ? 'none' : 'contents' }}>
           <CompareLayerBrowser
             pairs={pairing.pairs}
             selection={selection}
             sourceA={sourceA}
             sourceB={sourceB}
             onCollapse={() => setRightCollapsed(true)}
+          />
+        </div>
+        {rightCollapsed && (
+          <CollapsedSidebarHandle
+            side="right"
+            onExpand={() => setRightCollapsed(false)}
           />
         )}
       </div>
