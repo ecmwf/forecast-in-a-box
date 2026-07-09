@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber, formatStep } from '../format'
+import { availabilityRange, overlapRange } from './compare-timeline'
 import { TIME_LINK_MODES } from './time-link'
 import type { CompareTimeline } from './compare-timeline'
 import type { SourceSlot } from './layer-pairing'
@@ -60,6 +61,8 @@ export function CompareTimeSlider({
   offsetMs,
   onOffsetChange,
   independent,
+  clip,
+  onClipChange,
 }: {
   timeline: CompareTimeline
   index: number
@@ -71,11 +74,19 @@ export function CompareTimeSlider({
   onOffsetChange: (ms: number) => void
   /** Per-source axes for `independent` mode. */
   independent: Record<SourceSlot, IndependentAxis>
+  /** Union-index window the whole control operates in (null = all). */
+  clip: [number, number] | null
+  onClipChange: (clip: [number, number] | null) => void
 }) {
   const { t } = useTranslation('executions')
   const { t: tCompare } = useTranslation('compare')
   const steps = timeline.epochs
-  const safeIndex = Math.max(0, Math.min(index, steps.length - 1))
+  // The clip window: every control (slider, tracks, autoplay, stepper)
+  // operates inside it — the focus+context pattern from time-series UIs.
+  const rangeStart = clip ? Math.max(0, clip[0]) : 0
+  const rangeEnd = clip ? Math.min(steps.length - 1, clip[1]) : steps.length - 1
+  const rangeLen = Math.max(1, rangeEnd - rangeStart + 1)
+  const safeIndex = Math.max(rangeStart, Math.min(index, rangeEnd))
   const [playing, setPlaying] = useState(false)
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
 
@@ -87,10 +98,11 @@ export function CompareTimeSlider({
   useEffect(() => {
     if (!playing || steps.length <= 1 || linkMode === 'independent') return
     const id = window.setInterval(() => {
-      onChangeRef.current((indexRef.current + 1) % steps.length)
+      const current = indexRef.current
+      onChangeRef.current(current >= rangeEnd ? rangeStart : current + 1)
     }, AUTOPLAY_INTERVAL_MS)
     return () => window.clearInterval(id)
-  }, [playing, steps.length, linkMode])
+  }, [playing, steps.length, linkMode, rangeStart, rangeEnd])
 
   useEffect(() => {
     if (steps.length <= 1) setPlaying(false)
@@ -165,8 +177,8 @@ export function CompareTimeSlider({
         <>
           <Slider
             value={[safeIndex]}
-            min={0}
-            max={Math.max(0, steps.length - 1)}
+            min={rangeStart}
+            max={rangeEnd}
             step={1}
             onValueChange={(v) => onChange(firstNumber(v))}
           />
@@ -178,8 +190,8 @@ export function CompareTimeSlider({
                 className="pointer-events-none absolute -top-7 z-10 -translate-x-1/2 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs whitespace-nowrap shadow-sm"
                 style={{
                   left: `calc(22px + ${
-                    steps.length > 1
-                      ? (hoverIndex / (steps.length - 1)) * 100
+                    rangeLen > 1
+                      ? ((hoverIndex - rangeStart) / (rangeLen - 1)) * 100
                       : 0
                   } * (100% - 22px) / 100)`,
                 }}
@@ -191,14 +203,28 @@ export function CompareTimeSlider({
               <SlotRunTrack
                 key={slot}
                 slot={slot}
-                availability={timeline.availability[slot]}
-                currentIndex={safeIndex}
-                hoverIndex={hoverIndex}
-                onHover={setHoverIndex}
-                onJump={onChange}
+                availability={timeline.availability[slot].slice(
+                  rangeStart,
+                  rangeEnd + 1,
+                )}
+                currentIndex={safeIndex - rangeStart}
+                hoverIndex={
+                  hoverIndex === null ? null : hoverIndex - rangeStart
+                }
+                onHover={(i) =>
+                  setHoverIndex(i === null ? null : i + rangeStart)
+                }
+                onJump={(i) => onChange(i + rangeStart)}
               />
             ))}
           </div>
+          <TimeClipRow
+            timeline={timeline}
+            clip={clip}
+            rangeStart={rangeStart}
+            rangeEnd={rangeEnd}
+            onClipChange={onClipChange}
+          />
           <div className="flex items-center justify-between gap-2">
             <Button
               variant={playing ? 'default' : 'outline'}
@@ -215,7 +241,12 @@ export function CompareTimeSlider({
               )}
             </Button>
             <span className="font-mono text-xs text-muted-foreground tabular-nums">
-              {safeIndex + 1} / {steps.length}
+              {safeIndex - rangeStart + 1} / {rangeLen}
+              {clip && (
+                <span className="ml-1 text-muted-foreground/70">
+                  ({steps.length})
+                </span>
+              )}
             </span>
             <div className="flex items-center gap-1">
               <Button
@@ -224,7 +255,7 @@ export function CompareTimeSlider({
                 className="h-7 w-7"
                 disabled={steps.length <= 1}
                 onClick={() =>
-                  onChange((safeIndex - 1 + steps.length) % steps.length)
+                  onChange(safeIndex <= rangeStart ? rangeEnd : safeIndex - 1)
                 }
                 aria-label={t('lens.prevStep')}
               >
@@ -235,7 +266,9 @@ export function CompareTimeSlider({
                 size="icon"
                 className="h-7 w-7"
                 disabled={steps.length <= 1}
-                onClick={() => onChange((safeIndex + 1) % steps.length)}
+                onClick={() =>
+                  onChange(safeIndex >= rangeEnd ? rangeStart : safeIndex + 1)
+                }
                 aria-label={t('lens.nextStep')}
               >
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -384,5 +417,114 @@ function SlotRunTrack({
         )}
       </div>
     </>
+  )
+}
+
+/**
+ * Focus window over the union axis: a dual-thumb range with one-click
+ * presets — All, A's range, B's range, A∩B — because dragging thumbs
+ * precisely across thousands of steps is not a real workflow. Sub-pixel
+ * availability (a 60-step run inside a 4,000-step union) becomes
+ * visible by clipping to it.
+ */
+function TimeClipRow({
+  timeline,
+  clip,
+  rangeStart,
+  rangeEnd,
+  onClipChange,
+}: {
+  timeline: CompareTimeline
+  clip: [number, number] | null
+  rangeStart: number
+  rangeEnd: number
+  onClipChange: (clip: [number, number] | null) => void
+}) {
+  const { t } = useTranslation('compare')
+  const last = timeline.epochs.length - 1
+  if (last < 1) return null
+  const rangeA = availabilityRange(timeline.availability.a)
+  const rangeB = availabilityRange(timeline.availability.b)
+  const rangeBoth = overlapRange(
+    timeline.availability.a,
+    timeline.availability.b,
+  )
+
+  const apply = (range: [number, number] | null) => {
+    if (!range || (range[0] === 0 && range[1] === last)) onClipChange(null)
+    else onClipChange(range)
+  }
+
+  const preset = (
+    label: string,
+    range: [number, number] | null,
+    title: string,
+  ) => (
+    <button
+      type="button"
+      disabled={!range}
+      onClick={() => apply(range)}
+      title={title}
+      aria-pressed={
+        clip !== null && range !== null
+          ? clip[0] === range[0] && clip[1] === range[1]
+          : false
+      }
+      className={cn(
+        'rounded border border-border px-1.5 py-0.5 font-mono text-[10px] font-bold',
+        'disabled:opacity-40',
+        clip !== null &&
+          range !== null &&
+          clip[0] === range[0] &&
+          clip[1] === range[1]
+          ? 'bg-accent'
+          : 'hover:bg-accent',
+      )}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <div className="flex items-center gap-3">
+      <span className="shrink-0 text-xs text-muted-foreground">
+        {t('timeline.clipLabel')}
+      </span>
+      <label className="min-w-0 flex-1">
+        <span className="sr-only">{t('timeline.clipAria')}</span>
+        <Slider
+          value={[rangeStart, rangeEnd]}
+          min={0}
+          max={last}
+          step={1}
+          onValueChange={(v) => {
+            if (Array.isArray(v) && v.length === 2) {
+              apply([Math.min(v[0], v[1]), Math.max(v[0], v[1])])
+            }
+          }}
+        />
+      </label>
+      <span className="shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">
+        {formatStep(new Date(timeline.epochs[rangeStart]).toISOString())}
+        {' – '}
+        {formatStep(new Date(timeline.epochs[rangeEnd]).toISOString())}
+      </span>
+      <span className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onClipChange(null)}
+          aria-pressed={clip === null}
+          className={cn(
+            'rounded border border-border px-1.5 py-0.5 text-[10px] font-medium',
+            clip === null ? 'bg-accent' : 'hover:bg-accent',
+          )}
+        >
+          {t('timeline.clipAll')}
+        </button>
+        {preset('A', rangeA, t('timeline.clipHint', { slot: 'A' }))}
+        {preset('B', rangeB, t('timeline.clipHint', { slot: 'B' }))}
+        {preset('A∩B', rangeBoth, t('timeline.clipBothHint'))}
+      </span>
+    </div>
   )
 }

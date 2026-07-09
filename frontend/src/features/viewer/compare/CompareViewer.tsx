@@ -141,6 +141,8 @@ export function CompareViewer({
     [timeIndexA, timeIndexB],
   )
   const [timeStep, setTimeStep] = useState(0)
+  // Focus window over the union axis (indices into timeline.epochs).
+  const [timeClip, setTimeClip] = useState<[number, number] | null>(null)
   // Re-locate the selected instant when the union changes (layer add/
   // remove) instead of snapping to 0.
   const lastEpochRef = useRef<number | null>(null)
@@ -161,7 +163,17 @@ export function CompareViewer({
     [timeline.epochs],
   )
 
-  const safeStep = Math.max(0, Math.min(timeStep, timeline.epochs.length - 1))
+  // Drop a stale clip when the union changes shape under it.
+  useEffect(() => {
+    if (timeClip && timeClip[1] > timeline.epochs.length - 1) setTimeClip(null)
+  }, [timeClip, timeline.epochs.length])
+
+  const clipStart = timeClip ? timeClip[0] : 0
+  const clipEnd = timeClip ? timeClip[1] : timeline.epochs.length - 1
+  const safeStep = Math.max(
+    Math.max(0, clipStart),
+    Math.min(timeStep, Math.min(timeline.epochs.length - 1, clipEnd)),
+  )
   const currentEpoch: number | null =
     timeline.epochs.length > 0 ? timeline.epochs[safeStep] : null
 
@@ -537,6 +549,8 @@ export function CompareViewer({
         onLinkModeChange={setTimeLinkMode}
         offsetMs={offsetMs}
         onOffsetChange={setOffsetMs}
+        clip={timeClip}
+        onClipChange={setTimeClip}
         independent={{
           a: {
             epochs: timeIndexA.epochs,

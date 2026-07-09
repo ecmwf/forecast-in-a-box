@@ -376,6 +376,32 @@ describe('CompareViewer', () => {
     await screen.getByRole('button', { name: 'Clear measurements' }).click()
   })
 
+  it('clips the timeline to a source range via presets', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    // Union of T00/T06 (A) and T06/T12 (B) → 3 steps, full window.
+    await expect.element(screen.getByText('1 / 3')).toBeVisible()
+
+    // Clip to A's range (T00–T06) → the window is 2 steps, stepper wraps
+    // inside it and never reaches B-only T12.
+    await screen.getByTitle('Clip to A’s time range').click()
+    await expect.element(screen.getByText(/1 \/ 2/)).toBeVisible()
+    const next = screen.getByRole('button', { name: 'Next time step' })
+    await next.click()
+    await expect.element(screen.getByText(/2 \/ 2/)).toBeVisible()
+    await next.click()
+    await expect.element(screen.getByText(/1 \/ 2/)).toBeVisible()
+
+    // Back to the full union.
+    await screen
+      .getByRole('button', { name: 'All', exact: true })
+      .last()
+      .click()
+    await expect.element(screen.getByText('1 / 3')).toBeVisible()
+  })
+
   it('nearest time-link snaps within tolerance and tags the offset', async () => {
     const portA = nextPort++
     const portB = nextPort++

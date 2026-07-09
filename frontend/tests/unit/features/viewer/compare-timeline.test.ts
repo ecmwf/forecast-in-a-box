@@ -11,9 +11,11 @@
 import { describe, expect, it } from 'vitest'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
+  availabilityRange,
   buildCompareTimeline,
   buildSourceTimeIndex,
   locateEpoch,
+  overlapRange,
 } from '@/features/viewer/compare/compare-timeline'
 
 const timedLayer = (name: string, raw: string): ParsedLayer => ({
@@ -91,5 +93,20 @@ describe('locateEpoch', () => {
     expect(locateEpoch(epochs, 10_000_000)).toBe(2)
     expect(locateEpoch(epochs, null)).toBe(0)
     expect(locateEpoch([], 0)).toBe(-1)
+  })
+})
+
+describe('availabilityRange / overlapRange', () => {
+  it('finds first/last availability and the shared window', () => {
+    const a = [false, true, true, false, true, false]
+    const b = [false, false, true, true, true, true]
+    expect(availabilityRange(a)).toEqual([1, 4])
+    expect(availabilityRange(b)).toEqual([2, 5])
+    expect(overlapRange(a, b)).toEqual([2, 4])
+  })
+
+  it('returns null for empty availability or disjoint ranges', () => {
+    expect(availabilityRange([false, false])).toBeNull()
+    expect(overlapRange([true, false, false], [false, false, true])).toBeNull()
   })
 })
