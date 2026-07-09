@@ -188,6 +188,23 @@ describe('ComparePage', () => {
     await expect.element(pickerB).toHaveTextContent('Run A')
   })
 
+  it('allows the same source in both slots', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderComparePage()
+
+    const pickerA = screen.getByLabelText('Source for slot A')
+    const pickerB = screen.getByLabelText('Source for slot B')
+    await expect.element(pickerB).toHaveTextContent('Run B')
+
+    // Picking A's source for slot B must NOT swap — same-source compare
+    // (different layers of one run) is a real workflow.
+    await pickerB.click()
+    await screen.getByRole('option', { name: 'Run A' }).click()
+    await expect.element(pickerA).toHaveTextContent('Run A')
+    await expect.element(pickerB).toHaveTextContent('Run A')
+  })
+
   it('hydrates basket entries from a shared URL', async () => {
     const a = `run:${RUN_A.jobId}~${RUN_A.taskId}`
     const b = `run:${RUN_B.jobId}~${RUN_B.taskId}`
