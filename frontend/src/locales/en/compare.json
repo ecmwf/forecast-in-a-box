@@ -118,7 +118,12 @@
     "offsetLabel": "B offset",
     "independentAria": "Valid time for source {{slot}}",
     "offsetBadge": "{{slot}} {{tag}}",
-    "trackHint": "Click to jump to a time step"
+    "trackHint": "Click to jump to a time step",
+    "clipLabel": "Time window",
+    "clipAria": "Clip the timeline to a window",
+    "clipAll": "All",
+    "clipHint": "Clip to {{slot}}’s time range",
+    "clipBothHint": "Clip to where both sources have data"
   },
   "link": {
     "linked": "Linked layers",

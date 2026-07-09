@@ -88,3 +88,25 @@ export function locateEpoch(
   })
   return best
 }
+
+/** [first, last] index where the source has data; null when it never does. */
+export function availabilityRange(
+  availability: ReadonlyArray<boolean>,
+): [number, number] | null {
+  const first = availability.indexOf(true)
+  if (first === -1) return null
+  return [first, availability.lastIndexOf(true)]
+}
+
+/** Window where BOTH sources have data somewhere; null when disjoint. */
+export function overlapRange(
+  a: ReadonlyArray<boolean>,
+  b: ReadonlyArray<boolean>,
+): [number, number] | null {
+  const ra = availabilityRange(a)
+  const rb = availabilityRange(b)
+  if (!ra || !rb) return null
+  const start = Math.max(ra[0], rb[0])
+  const end = Math.min(ra[1], rb[1])
+  return start <= end ? [start, end] : null
+}
