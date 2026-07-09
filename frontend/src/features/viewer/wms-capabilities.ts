@@ -254,15 +254,38 @@ function expandSingleTimeSegment(seg: string): Array<string> {
   const start = Date.parse(startStr)
   const end = Date.parse(endStr)
   if (Number.isNaN(start) || Number.isNaN(end)) return [seg]
+
+  // Whole-month/year periods (satellite archives: P1M across decades)
+  // must step the calendar — a fixed 30.4375-day approximation drifts off
+  // the server's advertised instants within a few steps, and servers with
+  // nearestValue=0 reject the drifted TIME outright.
+  const calendarMonths = parseWholeMonthPeriod(periodStr)
+  const out: Array<string> = []
+  if (calendarMonths !== null) {
+    const d = new Date(start)
+    while (d.getTime() <= end) {
+      out.push(d.toISOString())
+      d.setUTCMonth(d.getUTCMonth() + calendarMonths)
+      if (out.length > 10000) break
+    }
+    return out
+  }
+
   const periodMs = parseIsoPeriodMs(periodStr)
   if (periodMs === null || periodMs <= 0) return [seg]
-  const out: Array<string> = []
   for (let t = start; t <= end; t += periodMs) {
     out.push(new Date(t).toISOString())
     // Safety cap — a malformed forecast period shouldn't OOM the tab.
     if (out.length > 10000) break
   }
   return out
+}
+
+/** P1M/P3M/P1Y… → total months; null when days/times are involved. */
+function parseWholeMonthPeriod(input: string): number | null {
+  const m = /^P(?:(\d+)Y)?(?:(\d+)M)?$/.exec(input)
+  if (!m || (!m[1] && !m[2])) return null
+  return Number(m[1] ?? 0) * 12 + Number(m[2] ?? 0)
 }
 
 const PERIOD_RE =
@@ -508,6 +531,12 @@ export function uniquePressureLevels(
  */
 export function rebaseLensUrl(url: string, baseUrl: string): string {
   try {
+    // Rebasing exists for loopback lens servers that advertise internal
+    // origins. External endpoints carry a path and/or query in the base
+    // (e.g. `…/wms/?token=…`) and advertise public URLs — grafting the
+    // base onto those doubles the path/query, so use them verbatim.
+    const base = new URL(baseUrl)
+    if (base.pathname !== '/' || base.search !== '') return url
     const upstream = new URL(url)
     return `${baseUrl.replace(/\/$/, '')}${upstream.pathname}${upstream.search}`
   } catch {
