@@ -46,6 +46,8 @@ import {
 import { skinnyWmsBasemap } from '../wms-capabilities'
 import { CompareToolbar } from './CompareToolbar'
 import { CompareExportDialog } from './CompareExportDialog'
+import { CompareHelpDialog } from './CompareHelpDialog'
+import { useCompareShortcuts } from './useCompareShortcuts'
 import type { ContextOverlay } from './overlays'
 import { CompareTimeSlider } from './CompareTimeSlider'
 import { CompareActiveLayersPanel } from './CompareActiveLayersPanel'
@@ -275,6 +277,7 @@ export function CompareViewer({
 
   // Basemap — one choice driving every panel, embedded-viewer options.
   const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
+  const [basemapOpacity, setBasemapOpacity] = useState(1)
   const availableBasemaps = useMemo(() => {
     // SkinnyWMS native background comes from A's lens (the canvas host in
     // single-map modes); dual panels fall back per-side when B lacks one.
@@ -290,6 +293,20 @@ export function CompareViewer({
   // Sidebar collapse — same affordance as the embedded viewer.
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  useCompareShortcuts({
+    // Any sidebar open → collapse both; both collapsed → restore both.
+    onToggleSidebars: () => {
+      const collapse = !(leftCollapsed && rightCollapsed)
+      setLeftCollapsed(collapse)
+      setRightCollapsed(collapse)
+    },
+    onMode: onModeChange,
+    onFit: fitAction,
+    onExport: () => setExportOpen(true),
+    onHelp: () => setHelpOpen((v) => !v),
+  })
 
   // -------- User-uploaded GeoJSON context overlays --------
   const [overlays, setOverlays] = useState<Array<ContextOverlay>>([])
@@ -398,7 +415,11 @@ export function CompareViewer({
         basemapId={basemapId}
         onBasemapChange={setBasemapId}
         availableBasemaps={availableBasemaps}
+        basemapOpacity={basemapOpacity}
+        onBasemapOpacityChange={setBasemapOpacity}
+        onHelp={() => setHelpOpen(true)}
       />
+      <CompareHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
       <CompareExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
@@ -450,6 +471,7 @@ export function CompareViewer({
               measureClearNonce={measureClearNonce}
               overlays={overlays}
               basemapId={basemapId}
+              basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
               onRegisterCapture={onRegisterCapture}
             />
@@ -464,6 +486,7 @@ export function CompareViewer({
               measureClearNonce={measureClearNonce}
               overlays={overlays}
               basemapId={basemapId}
+              basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
               onRegisterCapture={onRegisterCapture}
             />

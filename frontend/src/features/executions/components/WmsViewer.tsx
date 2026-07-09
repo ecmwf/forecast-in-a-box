@@ -50,7 +50,7 @@ import {
   DEFAULT_LAYER_OPACITY,
   makeDataLayerSource,
 } from '@/features/viewer/ol-layers'
-import { formatLatLon } from '@/features/viewer/format'
+import { firstNumber, formatLatLon } from '@/features/viewer/format'
 import { exportMapPng, loadLegendImages } from '@/features/viewer/map-export'
 import { useLensSource } from '@/features/viewer/hooks/useLensSource'
 import { useOlMapBase } from '@/features/viewer/hooks/useOlMapBase'
@@ -71,6 +71,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { P } from '@/components/base/typography'
+import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
 
@@ -153,12 +154,14 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
   }, [bbox, setFitBbox])
 
   const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
+  const [basemapOpacity, setBasemapOpacity] = useState(1)
   const { availableBasemaps } = useBasemap({
     mapRef,
     basemapLayerRef,
     baseUrl,
     decorationLayers,
     basemapId,
+    opacity: basemapOpacity,
     incLoading,
     decLoading,
   })
@@ -528,6 +531,21 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
                   </button>
                 ))}
               </div>
+              <label className="mt-1 block space-y-1 border-t border-border px-2 pt-2 pb-1">
+                <span className="flex items-center justify-between text-xs text-muted-foreground">
+                  {t('lens.basemapOpacity')}
+                  <span className="font-mono tabular-nums">
+                    {Math.round(basemapOpacity * 100)}%
+                  </span>
+                </span>
+                <Slider
+                  value={[Math.round(basemapOpacity * 100)]}
+                  min={0}
+                  max={100}
+                  step={5}
+                  onValueChange={(v) => setBasemapOpacity(firstNumber(v) / 100)}
+                />
+              </label>
             </PopoverContent>
           </Popover>
           {showSidebars && activeOrder.length > 0 && (

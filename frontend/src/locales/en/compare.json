@@ -176,5 +176,44 @@
     "hide": "Hide {{name}}",
     "remove": "Remove {{name}}",
     "invalid": "Could not read that file as GeoJSON"
+  },
+  "help": {
+    "open": "Help & shortcuts",
+    "title": "Compare viewer",
+    "intro": "Two sources — A (blue) and B (orange) — are shown on synchronized maps. Pick sources in the header, choose layers on the right, and control what is on the map from the left.",
+    "sections": {
+      "modes": {
+        "title": "Comparison modes",
+        "body": "Swipe splits one map with a draggable divider (vertical or horizontal). Side by side shows two maps with a shared camera and a mirrored crosshair. Flicker swaps A/B in place (Space or click). Spy reveals B through a movable lens — shape and size are in the action row. Blend draws B over A with an adjustable weight."
+      },
+      "layers": {
+        "title": "Layers & opacity",
+        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer."
+      },
+      "time": {
+        "title": "Valid time",
+        "body": "The timeline covers the union of both sources; the colored tracks show where each has data (hover for the instant, click to jump). The link mode decides how sides follow the axis: exact (identical instants or hidden), nearest (snap within tolerance, offset tagged on the panel), fixed offset (B lags A by Δ), or independent axes."
+      },
+      "tools": {
+        "title": "Tools",
+        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The layers icon switches the basemap (Carto, satellite imagery, SkinnyWMS native) and its opacity. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
+      },
+      "export": {
+        "title": "Export",
+        "body": "The download icon captures the current view as PNG or opens a print-ready report (title and description editable) for the browser’s print-to-PDF."
+      }
+    },
+    "shortcuts": {
+      "title": "Keyboard shortcuts",
+      "revealHint": "Hold ⌘ (Ctrl on Windows/Linux) to see shortcut badges on the toolbar.",
+      "sidebars": "Toggle both sidebars",
+      "modes": "Switch comparison mode",
+      "fit": "Fit to globe",
+      "export": "Export / report",
+      "flicker": "Toggle flicker frame (flicker mode)",
+      "loupe": "Magnifier loupe (hold)",
+      "swipe": "Nudge the swipe divider (when focused)",
+      "help": "Open this help"
+    }
   }
 }

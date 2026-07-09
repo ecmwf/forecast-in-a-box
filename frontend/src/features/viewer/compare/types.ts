@@ -40,6 +40,15 @@ export interface CompareMapSource {
 export type SingleMapMode = 'swipe' | 'flicker' | 'spy' | 'blend'
 export type CompareMode = SingleMapMode | 'side'
 
+/** Toolbar order — also the 1–5 keyboard shortcut order. */
+export const COMPARE_MODES: readonly [
+  CompareMode,
+  CompareMode,
+  CompareMode,
+  CompareMode,
+  CompareMode,
+] = ['swipe', 'side', 'flicker', 'spy', 'blend']
+
 export type SwipeOrientation = 'vertical' | 'horizontal'
 export type SpyShape = 'circle' | 'rectangle'
 

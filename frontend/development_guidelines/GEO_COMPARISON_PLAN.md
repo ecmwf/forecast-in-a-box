@@ -77,6 +77,24 @@
   echoes any Origin (full CORS) — it works as an external source once the
   URL is used correctly.
 
+## Improvement round 4 (user feedback 2026-07-09: shortcuts, help, basemap opacity)
+
+- [x] **Keyboard shortcuts** (TanStack Hotkeys, per project convention;
+  keymap centralized in `useCompareShortcuts.ts` `COMPARE_KEYS`):
+  S toggle both sidebars · 1–5 switch mode · F fit to globe · E export ·
+  H help. Existing Space (flicker) and hold-Z (loupe) documented. `?` was
+  considered for help but Shift+punctuation combos are layout-dependent
+  and unsupported by the library — H is the layout-safe mnemonic.
+- [x] **Help dialog**: info icon in the toolbar (and H) opens a feature
+  guide (modes, layers/opacity, time links, tools, export) + a shortcut
+  table; content under `compare:help.*`.
+- [x] **Shortcut discoverability**: shortcuts appended to button tooltips
+  (always), plus hold-⌘/Ctrl reveals kbd badges on the toolbar buttons
+  (TanStack `useKeyHold`; labels via `formatForDisplay`).
+- [x] **Basemap opacity slider** in the basemap popover — down to 0 to
+  remove the base entirely; same control added to the embedded viewer
+  (`useBasemap` gained an `opacity` option).
+
 ## Improvement round 3 (user feedback 2026-07-09, screenshot-driven)
 
 All six items implemented same day:
