@@ -37,7 +37,7 @@ import type { ComparisonEntry } from '../entry-ref'
 import type { CompareMode } from '@/features/viewer/compare/types'
 import { useStopLens } from '@/api/hooks/useLens'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
-import { H1 } from '@/components/base/typography'
+import { H1, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -258,7 +258,14 @@ export function ComparePage() {
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           <ComparePanel slot="A" entry={a} state={stateA} />
-          <ComparePanel slot="B" entry={b} state={stateB} />
+          {a !== null && b === null ? (
+            <EmptySlotGuidance
+              onAdd={() => setPickerOpen(true)}
+              onSelf={() => assignSlot('b', entryRef(a))}
+            />
+          ) : (
+            <ComparePanel slot="B" entry={b} state={stateB} />
+          )}
         </div>
       )}
     </ListPageContainer>
@@ -269,4 +276,37 @@ export function ComparePage() {
 function EnrichmentMount({ entry }: { entry: ComparisonEntry }) {
   useEnrichComparisonEntry(entry)
   return null
+}
+
+/**
+ * First-source guidance: with A filled and B empty (the state right
+ * after 'Compare' on a stored output), spell out the two next moves —
+ * add a second source, or compare the source with itself to inspect
+ * two time steps of one forecast.
+ */
+function EmptySlotGuidance({
+  onAdd,
+  onSelf,
+}: {
+  onAdd: () => void
+  onSelf: () => void
+}) {
+  const { t } = useTranslation('compare')
+  return (
+    <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border p-6 text-center">
+      <P className="text-sm font-medium">{t('emptyB.title')}</P>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button size="sm" onClick={onAdd} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" />
+          {t('emptyB.add')}
+        </Button>
+        <Button size="sm" variant="outline" onClick={onSelf}>
+          {t('emptyB.self')}
+        </Button>
+      </div>
+      <P className="max-w-md text-xs text-muted-foreground">
+        {t('emptyB.selfHint')}
+      </P>
+    </div>
+  )
 }

@@ -232,5 +232,11 @@
     "empty": "Arm the annotate tool and click the map to record findings.",
     "slotShared": "Both",
     "armedHint": "Click the map to add a note · Esc exits"
+  },
+  "emptyB": {
+    "title": "Choose what to compare against",
+    "add": "Add another source",
+    "self": "Compare with itself",
+    "selfHint": "Same source on both sides — compare two time steps of one forecast. Then pick “Time offset” or “Independent times” in the timeline."
   }
 }
