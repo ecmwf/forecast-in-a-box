@@ -522,7 +522,7 @@ describe('CompareViewer', () => {
 
     // Switch to nearest: B snaps to T01 and shows an honest "+1 h" tag.
     await screen.getByLabelText('Time link mode').click()
-    await screen.getByRole('option', { name: 'Nearest step' }).click()
+    await screen.getByRole('option', { name: 'Nearest time' }).click()
     await expect.element(screen.getByText('B +1 h')).toBeVisible()
     expect(
       screen.getByText('No data at this time — B').elements(),
