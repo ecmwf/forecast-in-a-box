@@ -122,7 +122,7 @@ export function CompareHelpDialog({
               </tbody>
             </table>
             <P className="mt-1.5 text-xs text-muted-foreground">
-              {t('help.shortcuts.revealHint')}
+              {t('help.shortcuts.revealHint', { key: keyLabel('Mod') })}
             </P>
           </section>
         </div>

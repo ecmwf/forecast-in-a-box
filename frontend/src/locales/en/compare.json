@@ -205,7 +205,7 @@
     },
     "shortcuts": {
       "title": "Keyboard shortcuts",
-      "revealHint": "Hold ⌘ (Ctrl on Windows/Linux) to see shortcut badges on the toolbar.",
+      "revealHint": "Hold {{key}} to see shortcut badges on the toolbar.",
       "sidebars": "Toggle both sidebars",
       "modes": "Switch comparison mode",
       "fit": "Fit to globe",
