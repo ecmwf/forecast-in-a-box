@@ -110,10 +110,10 @@
     "trackAria": "Availability for source {{slot}}",
     "linkAria": "Time link mode",
     "link": {
-      "exact": "Linked (exact)",
-      "nearest": "Nearest step",
-      "offset": "Fixed offset",
-      "independent": "Independent"
+      "exact": "Same time (exact)",
+      "nearest": "Nearest time",
+      "offset": "Time offset (B = A + Δ)",
+      "independent": "Independent times"
     },
     "offsetLabel": "B offset",
     "independentAria": "Valid time for source {{slot}}",
