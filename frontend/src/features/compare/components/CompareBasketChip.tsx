@@ -81,14 +81,16 @@ export function CompareBasketChip({
         ? t('basket.kindWms')
         : null
 
+  // Full-width row (not a chip): uniform rows read calmer in the
+  // manage list than a ragged chip cloud.
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-lg border bg-card py-1.5 pr-1.5 pl-2.5 text-sm transition-colors',
+        'flex w-full items-center gap-2 rounded-md border bg-card py-1.5 pr-1.5 pl-2.5 text-sm transition-colors',
         slot ? SLOT_RING_CLASS[slot] : 'border-border hover:border-primary/40',
       )}
     >
-      <span className="flex min-w-0 items-center gap-2 text-left">
+      <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
         {slot && (
           <span
             className={cn(
@@ -116,12 +118,12 @@ export function CompareBasketChip({
               }}
             />
           ) : (
-            <span className="block max-w-48 truncate font-medium" title={name}>
+            <span className="block truncate font-medium" title={name}>
               {name}
             </span>
           )}
           {sub && (
-            <span className="block max-w-48 truncate text-xs text-muted-foreground">
+            <span className="block truncate text-xs text-muted-foreground">
               {sub}
             </span>
           )}
