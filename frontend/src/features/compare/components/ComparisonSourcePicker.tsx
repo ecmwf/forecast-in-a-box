@@ -58,101 +58,108 @@ export function ComparisonSourcePicker() {
   return (
     // min-w-0: as a dialog-grid item the picker must not let unbreakable
     // path strings dictate its track width (grid items min-width:auto).
-    <div className="min-w-0 space-y-5">
-      <CollectedSources />
-      <Input
-        type="search"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder={t('picker.searchPlaceholder')}
-        className="h-9"
-      />
+    // Two columns: find-and-add on the left; the collection (a live
+    // dedupe reference while adding) + external entry on the right.
+    <div className="grid min-w-0 gap-x-8 gap-y-5 sm:grid-cols-2">
+      <div className="min-w-0 space-y-5">
+        <Input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('picker.searchPlaceholder')}
+          className="h-9"
+        />
 
-      {/* Recent runs */}
-      <section className="space-y-1">
-        <SectionLabel icon={<Rows3 className="h-3.5 w-3.5" />}>
-          {t('picker.recentRuns')}
-        </SectionLabel>
-        {markerRows.length === 0 ? (
-          <P className="py-2 text-sm text-muted-foreground">
-            {t('picker.empty')}
-          </P>
-        ) : (
-          <ul className="divide-y divide-border">
-            {markerRows.map((row) => (
-              <RunSourceRow
-                key={`${row.jobId}:${row.blockId}`}
-                row={row}
-                filter={query}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Running lenses */}
-      {lenses && lenses.length > 0 && (
+        {/* Recent runs */}
         <section className="space-y-1">
-          <SectionLabel icon={<Radar className="h-3.5 w-3.5" />}>
-            {t('picker.runningLenses')}
+          <SectionLabel icon={<Rows3 className="h-3.5 w-3.5" />}>
+            {t('picker.recentRuns')}
           </SectionLabel>
-          <ul className="divide-y divide-border">
-            {lenses.map((lens) => {
-              const path =
-                typeof lens.lens_params.local_path === 'string'
-                  ? lens.lens_params.local_path
-                  : ''
-              const match = path ? pathIndex.get(path) : undefined
-              if (
-                query &&
-                !path.toLowerCase().includes(query) &&
-                !lens.lens_name.toLowerCase().includes(query)
-              ) {
-                return null
-              }
-              return (
-                <li
-                  key={lens.lens_instance_id}
-                  className="flex items-center gap-3 py-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <P className="text-sm font-medium">{lens.lens_name}</P>
-                    <P className="font-mono text-xs break-all text-muted-foreground">
-                      {path}
-                    </P>
-                  </div>
-                  <AddToComparisonButton
-                    disabled={!match}
-                    disabledReason={t('entry.noMatch')}
-                    entry={
-                      match
-                        ? {
-                            kind: 'output',
-                            jobId: match.jobId,
-                            taskId: match.taskId,
-                            blockId: match.blockId,
-                            runName: '',
-                            blockTitle: match.blockId,
-                            runCreatedAt: match.runCreatedAt,
-                          }
-                        : { kind: 'path', path, label: path }
-                    }
-                  />
-                </li>
-              )
-            })}
-          </ul>
+          {markerRows.length === 0 ? (
+            <P className="py-2 text-sm text-muted-foreground">
+              {t('picker.empty')}
+            </P>
+          ) : (
+            <ul className="divide-y divide-border">
+              {markerRows.map((row) => (
+                <RunSourceRow
+                  key={`${row.jobId}:${row.blockId}`}
+                  row={row}
+                  filter={query}
+                />
+              ))}
+            </ul>
+          )}
         </section>
-      )}
 
-      {/* External data — host path + external WMS endpoint */}
-      <section className="space-y-2">
-        <SectionLabel icon={<FolderInput className="h-3.5 w-3.5" />}>
-          {t('picker.external')}
-        </SectionLabel>
-        <HostPathForm />
-        <WmsUrlForm />
-      </section>
+        {/* Running lenses */}
+        {lenses && lenses.length > 0 && (
+          <section className="space-y-1">
+            <SectionLabel icon={<Radar className="h-3.5 w-3.5" />}>
+              {t('picker.runningLenses')}
+            </SectionLabel>
+            <ul className="divide-y divide-border">
+              {lenses.map((lens) => {
+                const path =
+                  typeof lens.lens_params.local_path === 'string'
+                    ? lens.lens_params.local_path
+                    : ''
+                const match = path ? pathIndex.get(path) : undefined
+                if (
+                  query &&
+                  !path.toLowerCase().includes(query) &&
+                  !lens.lens_name.toLowerCase().includes(query)
+                ) {
+                  return null
+                }
+                return (
+                  <li
+                    key={lens.lens_instance_id}
+                    className="flex items-center gap-3 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <P className="text-sm font-medium">{lens.lens_name}</P>
+                      <P className="font-mono text-xs break-all text-muted-foreground">
+                        {path}
+                      </P>
+                    </div>
+                    <AddToComparisonButton
+                      disabled={!match}
+                      disabledReason={t('entry.noMatch')}
+                      entry={
+                        match
+                          ? {
+                              kind: 'output',
+                              jobId: match.jobId,
+                              taskId: match.taskId,
+                              blockId: match.blockId,
+                              runName: '',
+                              blockTitle: match.blockId,
+                              runCreatedAt: match.runCreatedAt,
+                            }
+                          : { kind: 'path', path, label: path }
+                      }
+                    />
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+      </div>
+
+      <div className="min-w-0 space-y-5">
+        <CollectedSources />
+
+        {/* External data — host path + external WMS endpoint */}
+        <section className="space-y-3">
+          <SectionLabel icon={<FolderInput className="h-3.5 w-3.5" />}>
+            {t('picker.external')}
+          </SectionLabel>
+          <HostPathForm />
+          <WmsUrlForm />
+        </section>
+      </div>
     </div>
   )
 }
