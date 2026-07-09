@@ -130,6 +130,10 @@ export function useOlMapBase(
       target: container,
       layers: [basemap],
       view: viewRef.current ?? createViewerView(),
+      // Default is 1px: a real mouse almost always drifts more than that
+      // between press and release, silently swallowing `singleclick`
+      // (annotations, feature hits). 6px still pans responsively.
+      moveTolerance: 6,
     })
     mapRef.current = map
     // Sheets animate in from off-screen; the container is 0×0 at mount

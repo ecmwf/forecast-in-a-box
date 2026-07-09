@@ -36,16 +36,15 @@ import { useOlMapBase } from '../hooks/useOlMapBase'
 import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
+import { compositeMapToCanvas } from '../map-export'
 import { useContextOverlays } from './overlays'
 import { useAnnotationLayer } from './annotations'
+import { CompareSlotTag } from './CompareSlotTag'
+import { LoupeOverlay } from './LoupeOverlay'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { SourceSlot } from './layer-pairing'
-import { compositeMapToCanvas } from '../map-export'
-import { CompareSlotTag } from './CompareSlotTag'
-import { LoupeOverlay } from './LoupeOverlay'
-import { cn } from '@/lib/utils'
 import type RenderEvent from 'ol/render/Event'
 import type View from 'ol/View'
 import type {
@@ -54,6 +53,7 @@ import type {
   CompareModeOptions,
   SingleMapMode,
 } from './types'
+import { cn } from '@/lib/utils'
 
 const noop = () => {}
 /** Swipe keyboard step as a fraction of the map span. */
@@ -536,6 +536,12 @@ export function SingleMapCompare({
       )}
 
       <LoupeOverlay containerRef={containerRef} />
+
+      {annotateArmed && (
+        <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
+          {t('annotations.armedHint')}
+        </div>
+      )}
 
       {mode === 'flicker' && (
         <div className="absolute top-2 left-1/2 z-20 -translate-x-1/2 space-y-1 text-center">

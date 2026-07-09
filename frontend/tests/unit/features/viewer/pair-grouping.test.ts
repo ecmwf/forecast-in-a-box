@@ -9,10 +9,10 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import { buildPairs } from '@/features/viewer/compare/layer-pairing'
 import { groupPairs } from '@/features/viewer/compare/pair-grouping'
 import { groupLayers } from '@/features/viewer/wms-capabilities'
-import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 
 const layer = (name: string, title: string): ParsedLayer => ({
   name,

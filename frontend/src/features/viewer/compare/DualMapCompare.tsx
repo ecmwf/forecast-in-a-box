@@ -21,18 +21,18 @@ import { useOlMapBase } from '../hooks/useOlMapBase'
 import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
+import { compositeMapToCanvas } from '../map-export'
 import { useContextOverlays } from './overlays'
 import { useAnnotationLayer } from './annotations'
+import { CompareSlotTag } from './CompareSlotTag'
+import { LoupeOverlay } from './LoupeOverlay'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
-import { compositeMapToCanvas } from '../map-export'
-import { CompareSlotTag } from './CompareSlotTag'
-import { cn } from '@/lib/utils'
-import { LoupeOverlay } from './LoupeOverlay'
 import type View from 'ol/View'
 import type { SourceSlot } from './layer-pairing'
 import type { CaptureResult, CompareMapSource } from './types'
+import { cn } from '@/lib/utils'
 
 const noop = () => {}
 
@@ -288,6 +288,11 @@ function DualMapPanel({
         className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
       />
       <LoupeOverlay containerRef={containerRef} />
+      {annotateArmed && (
+        <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
+          {t('annotations.armedHint')}
+        </div>
+      )}
       <CompareSlotTag
         slot={source.slot}
         label={source.label}

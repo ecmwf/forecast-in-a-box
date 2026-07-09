@@ -374,7 +374,7 @@ function PairRow({
       >
         {label}
       </span>
-      <SlotChips pair={pair} />
+      <SlotChips chipPair={pair} />
       {active ? (
         <X className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       ) : (
@@ -383,20 +383,20 @@ function PairRow({
     </button>
   )
 
-  function SlotChips({ pair }: { pair: PairedLayer }) {
+  function SlotChips({ chipPair }: { chipPair: PairedLayer }) {
     return (
       <span className="flex shrink-0 items-center gap-1">
         {(['a', 'b'] as const).map((slot) => (
           <span
             key={slot}
             title={
-              pair.perSource[slot]
+              chipPair.perSource[slot]
                 ? t('link.availableIn', { slots: slot.toUpperCase() })
                 : t('link.notAvailableIn', { slot: slot.toUpperCase() })
             }
             className={cn(
               'flex h-4 w-4 items-center justify-center rounded font-mono text-[10px] font-bold',
-              pair.perSource[slot]
+              chipPair.perSource[slot]
                 ? SLOT_CHIP_CLASS[slot]
                 : 'border border-dashed border-border text-muted-foreground/60',
             )}

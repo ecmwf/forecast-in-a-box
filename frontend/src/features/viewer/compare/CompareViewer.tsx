@@ -24,6 +24,15 @@ import 'ol/ol.css'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useLensSource } from '../hooks/useLensSource'
 import { createViewerView } from '../hooks/useOlMapBase'
+import { formatStep } from '../format'
+import {
+  BASEMAPS,
+  DEFAULT_BASEMAP_ID,
+  IMAGERY_BASEMAPS,
+  SKINNYWMS_BASEMAP,
+} from '../ol-layers'
+import { rebaseLensUrl, skinnyWmsBasemap } from '../wms-capabilities'
+import { CollapsedSidebarHandle } from '../components/CollapsedSidebarHandle'
 import { buildPairs } from './layer-pairing'
 import {
   buildCompareTimeline,
@@ -36,29 +45,20 @@ import {
   formatOffset,
   resolveSourceTime,
 } from './time-link'
-import { formatStep } from '../format'
-import {
-  BASEMAPS,
-  DEFAULT_BASEMAP_ID,
-  IMAGERY_BASEMAPS,
-  SKINNYWMS_BASEMAP,
-} from '../ol-layers'
-import { rebaseLensUrl, skinnyWmsBasemap } from '../wms-capabilities'
 import { CompareToolbar } from './CompareToolbar'
 import { CompareExportDialog } from './CompareExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
 import { nextAnnotationId } from './annotations'
-import type { MapAnnotation } from './annotations'
-import type { AnnotationDraft } from './AnnotationEditorDialog'
 import { useCompareShortcuts } from './useCompareShortcuts'
-import type { ContextOverlay } from './overlays'
 import { CompareTimeSlider } from './CompareTimeSlider'
 import { CompareActiveLayersPanel } from './CompareActiveLayersPanel'
-import { CollapsedSidebarHandle } from '../components/CollapsedSidebarHandle'
 import { CompareLayerBrowser } from './CompareLayerBrowser'
 import { DualMapCompare } from './DualMapCompare'
 import { SingleMapCompare } from './SingleMapCompare'
+import type { MapAnnotation } from './annotations'
+import type { AnnotationDraft } from './AnnotationEditorDialog'
+import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
 import type { ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
@@ -320,7 +320,7 @@ export function CompareViewer({
     // SkinnyWMS native background comes from A's lens (the canvas host in
     // single-map modes); dual panels fall back per-side when B lacks one.
     const hasSkinny =
-      skinnyWmsBasemap(sourceA.decorationLayers).background !== undefined
+      skinnyWmsBasemap(sourceA.decorationLayers).background !== null
     return [
       ...BASEMAPS,
       ...IMAGERY_BASEMAPS,
@@ -332,6 +332,67 @@ export function CompareViewer({
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+
+  // -------- Annotations: numbered findings pinned to the map ---------
+  const [annotations, setAnnotations] = useState<Array<MapAnnotation>>([])
+  const [annotateArmed, setAnnotateArmed] = useState(false)
+  const [annotationDraft, setAnnotationDraft] =
+    useState<AnnotationDraft | null>(null)
+  // Where a new annotation will land, captured at map-click time.
+  const pendingRef = useRef<{
+    coordinate: [number, number]
+    slot: SourceSlot | null
+  } | null>(null)
+
+  const onAnnotationCreate = useCallback(
+    (coordinate: [number, number], slot: SourceSlot | null) => {
+      pendingRef.current = { coordinate, slot }
+      setAnnotationDraft({ id: null, text: '', number: -1 })
+    },
+    [],
+  )
+  const onAnnotationEdit = useCallback(
+    (id: string) => {
+      const index = annotations.findIndex((ann) => ann.id === id)
+      if (index === -1) return
+      setAnnotationDraft({
+        id,
+        text: annotations[index].text,
+        number: index + 1,
+      })
+    },
+    [annotations],
+  )
+  const saveAnnotation = (text: string) => {
+    if (annotationDraft?.id) {
+      setAnnotations((prev) =>
+        prev.map((ann) =>
+          ann.id === annotationDraft.id ? { ...ann, text } : ann,
+        ),
+      )
+    } else if (pendingRef.current) {
+      const { coordinate, slot } = pendingRef.current
+      setAnnotations((prev) => [
+        ...prev,
+        { id: nextAnnotationId(), coordinate, text, slot },
+      ])
+      pendingRef.current = null
+    }
+    setAnnotationDraft(null)
+  }
+  const deleteAnnotation = () => {
+    if (annotationDraft?.id) {
+      setAnnotations((prev) =>
+        prev.filter((ann) => ann.id !== annotationDraft.id),
+      )
+    }
+    setAnnotationDraft(null)
+  }
+  const removeAnnotationById = useCallback(
+    (id: string) =>
+      setAnnotations((prev) => prev.filter((ann) => ann.id !== id)),
+    [],
+  )
 
   const onPan = useCallback((dx: number, dy: number) => {
     const view = viewRef.current
@@ -357,64 +418,12 @@ export function CompareViewer({
     onExport: () => setExportOpen(true),
     onHelp: () => setHelpOpen((v) => !v),
     onAnnotate: () => setAnnotateArmed((v) => !v),
+    onAnnotateDisarm: {
+      enabled: annotateArmed && annotationDraft === null,
+      disarm: () => setAnnotateArmed(false),
+    },
     onPan,
   })
-
-  // -------- Annotations: numbered findings pinned to the map ---------
-  const [annotations, setAnnotations] = useState<Array<MapAnnotation>>([])
-  const [annotateArmed, setAnnotateArmed] = useState(false)
-  const [annotationDraft, setAnnotationDraft] =
-    useState<AnnotationDraft | null>(null)
-  // Where a new annotation will land, captured at map-click time.
-  const pendingRef = useRef<{
-    coordinate: [number, number]
-    slot: SourceSlot | null
-  } | null>(null)
-
-  const onAnnotationCreate = useCallback(
-    (coordinate: [number, number], slot: SourceSlot | null) => {
-      pendingRef.current = { coordinate, slot }
-      setAnnotationDraft({ id: null, text: '', number: -1 })
-    },
-    [],
-  )
-  const onAnnotationEdit = useCallback(
-    (id: string) => {
-      const index = annotations.findIndex((a) => a.id === id)
-      if (index === -1) return
-      setAnnotationDraft({
-        id,
-        text: annotations[index].text,
-        number: index + 1,
-      })
-    },
-    [annotations],
-  )
-  const saveAnnotation = (text: string) => {
-    if (annotationDraft?.id) {
-      setAnnotations((prev) =>
-        prev.map((a) => (a.id === annotationDraft.id ? { ...a, text } : a)),
-      )
-    } else if (pendingRef.current) {
-      const { coordinate, slot } = pendingRef.current
-      setAnnotations((prev) => [
-        ...prev,
-        { id: nextAnnotationId(), coordinate, text, slot },
-      ])
-      pendingRef.current = null
-    }
-    setAnnotationDraft(null)
-  }
-  const deleteAnnotation = () => {
-    if (annotationDraft?.id) {
-      setAnnotations((prev) => prev.filter((a) => a.id !== annotationDraft.id))
-    }
-    setAnnotationDraft(null)
-  }
-  const removeAnnotationById = useCallback(
-    (id: string) => setAnnotations((prev) => prev.filter((a) => a.id !== id)),
-    [],
-  )
 
   // -------- User-uploaded GeoJSON context overlays --------
   const [overlays, setOverlays] = useState<Array<ContextOverlay>>([])
