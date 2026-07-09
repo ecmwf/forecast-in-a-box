@@ -31,6 +31,7 @@ import {
 } from '../ol-layers'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
+import type ImageWMS from 'ol/source/ImageWMS'
 import type { ParsedLayer, SkinnyWmsBasemap } from '../wms-capabilities'
 import type { BasemapLayer, BasemapOption } from '../ol-layers'
 
@@ -63,6 +64,9 @@ export function useBasemap(options: {
     decLoading,
   } = options
   const previousBasemapIdRef = useRef<string>(DEFAULT_BASEMAP_ID)
+  const referenceLayerRef = useRef<ImageLayer<ImageWMS> | null>(null)
+  const opacityRef = useRef(opacity)
+  opacityRef.current = opacity
 
   // SkinnyWMS decoration layers, split into base map + reference layers.
   const skinnyBasemap = useMemo(
@@ -132,8 +136,11 @@ export function useBasemap(options: {
 
   // Basemap opacity — applied to whichever layer currently holds the slot
   // (swaps create fresh layers, so this also covers the initial state).
+  // The SkinnyWMS reference overlay (coastlines/borders above the data)
+  // is part of the same base cartography, so it follows the slider too.
   useEffect(() => {
     basemapLayerRef.current?.setOpacity(opacity)
+    referenceLayerRef.current?.setOpacity(opacity)
   }, [opacity, basemapId, basemapLayerRef])
 
   // -------- SkinnyWMS reference overlay --------
@@ -154,8 +161,11 @@ export function useBasemap(options: {
     source.on('imageloadend', decLoading)
     source.on('imageloaderror', decLoading)
     const overlay = new ImageLayer({ source, zIndex: REFERENCE_OVERLAY_Z })
+    overlay.setOpacity(opacityRef.current)
+    referenceLayerRef.current = overlay
     map.addLayer(overlay)
     return () => {
+      referenceLayerRef.current = null
       map.removeLayer(overlay)
     }
   }, [
