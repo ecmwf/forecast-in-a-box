@@ -103,13 +103,13 @@ export function useWmsLayerStack(
     const wantedNames = new Set<string>()
     activeOrder.forEach((layerName, idx) => {
       const layer = layers.find((l) => l.name === layerName)
-      if (!layer || layer.styles.length === 0) return
-      const style = layer.styles[0]
+      if (!layer) return
       wantedNames.add(layerName)
 
       const params: Record<string, string> = {
         LAYERS: layerName,
-        STYLES: style.name,
+        // No advertised <Style> (NASA GIBS et al.) → empty = server default.
+        STYLES: layer.styles[0]?.name ?? '',
         FORMAT: 'image/png',
         TRANSPARENT: 'TRUE',
       }

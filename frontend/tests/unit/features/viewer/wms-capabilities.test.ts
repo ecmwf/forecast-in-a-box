@@ -201,6 +201,17 @@ describe('expandTimeSteps', () => {
     ])
   })
 
+  it('steps whole-month periods on the calendar (no drift)', () => {
+    // A fixed 30.4375-day month drifts off the server's advertised
+    // instants — satellite archives (P1M over decades) then 404.
+    expect(expandTimeSteps('2025-11-01/2026-02-01/P1M')).toEqual([
+      '2025-11-01T00:00:00.000Z',
+      '2025-12-01T00:00:00.000Z',
+      '2026-01-01T00:00:00.000Z',
+      '2026-02-01T00:00:00.000Z',
+    ])
+  })
+
   it('falls back to the raw segment when the interval is malformed', () => {
     expect(expandTimeSteps('not-a-date/also-not/PT6H')).toEqual([
       'not-a-date/also-not/PT6H',
@@ -230,6 +241,16 @@ describe('rebaseLensUrl', () => {
 
   it('returns the input unchanged when it is not an absolute URL', () => {
     expect(rebaseLensUrl('not a url', 'http://h:1')).toBe('not a url')
+  })
+
+  it('keeps advertised URLs verbatim for external (non-bare-origin) bases', () => {
+    // ecCharts-style base with path + token query: grafting would produce
+    // /wms/?token=…/wms/?token=…&request=GetLegend… — a garbage URL.
+    const advertised =
+      'https://eccharts.ecmwf.int/wms/?token=public&request=GetLegend&layers=z500'
+    expect(
+      rebaseLensUrl(advertised, 'https://eccharts.ecmwf.int/wms/?token=public'),
+    ).toBe(advertised)
   })
 })
 
