@@ -64,6 +64,7 @@ export function SingleMapCompare({
   mode,
   options,
   basemapId,
+  basemapOpacity,
   measureMode,
   measureClearNonce,
   overlays,
@@ -76,6 +77,7 @@ export function SingleMapCompare({
   mode: SingleMapMode
   options: CompareModeOptions
   basemapId: string
+  basemapOpacity: number
   measureMode: MeasureMode
   measureClearNonce: number
   overlays: ReadonlyArray<ContextOverlay>
@@ -106,6 +108,7 @@ export function SingleMapCompare({
     // SkinnyWMS-native uses A's background — one canvas, one base.
     decorationLayers: a.decorationLayers,
     basemapId,
+    opacity: basemapOpacity,
     incLoading: noop,
     decLoading: noop,
   })

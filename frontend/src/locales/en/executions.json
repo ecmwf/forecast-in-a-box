@@ -296,7 +296,8 @@
       "intro": "Each parameter exposed by the WMS server can be added to the map. Pick one to start; multi-pressure-level parameters expand into a level picker.",
       "noWfsNote": "SkinnyWMS doesn't implement WFS / GetFeatureInfo, so click-to-query isn't available here. To read raw values at a point, load the source GRIB file into a full GIS stack instead.",
       "paramsTitle": "Available parameters"
-    }
+    },
+    "basemapOpacity": "Basemap opacity"
   },
   "logs": {
     "title": "Gateway Log",

@@ -47,6 +47,8 @@ export function useBasemap(options: {
   baseUrl: string
   decorationLayers: ReadonlyArray<ParsedLayer>
   basemapId: string
+  /** Basemap layer opacity (0 hides it entirely). Default 1. */
+  opacity?: number
   incLoading: () => void
   decLoading: () => void
 }): BasemapControl {
@@ -56,6 +58,7 @@ export function useBasemap(options: {
     baseUrl,
     decorationLayers,
     basemapId,
+    opacity = 1,
     incLoading,
     decLoading,
   } = options
@@ -126,6 +129,12 @@ export function useBasemap(options: {
     incLoading,
     decLoading,
   ])
+
+  // Basemap opacity — applied to whichever layer currently holds the slot
+  // (swaps create fresh layers, so this also covers the initial state).
+  useEffect(() => {
+    basemapLayerRef.current?.setOpacity(opacity)
+  }, [opacity, basemapId, basemapLayerRef])
 
   // -------- SkinnyWMS reference overlay --------
   // Coastline/border layers over the data while the SkinnyWMS basemap is

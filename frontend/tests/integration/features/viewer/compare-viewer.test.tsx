@@ -257,6 +257,58 @@ describe('CompareViewer', () => {
     await expect.element(screen.getByText('Hold Z to magnify')).toBeVisible()
   })
 
+  it('drives sidebars, modes, and help via keyboard shortcuts', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await expect.element(screen.getByText('Active layers')).toBeVisible()
+
+    // TanStack Hotkeys listens on document; keyup resets its held-key
+    // tracker between presses.
+    const press = (key: string) => {
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true }),
+      )
+      document.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }))
+    }
+
+    // S toggles both sidebars.
+    press('s')
+    await expect
+      .element(screen.getByText('Active layers'))
+      .not.toBeInTheDocument()
+    press('s')
+    await expect.element(screen.getByText('Active layers')).toBeVisible()
+
+    // 2 → side-by-side (both slot tags visible as separate panels).
+    press('2')
+    await expect
+      .element(screen.getByRole('button', { name: /side by side/i }))
+      .toHaveAttribute('aria-pressed', 'true')
+    press('1')
+    await expect
+      .element(screen.getByRole('button', { name: /swipe/i }))
+      .toHaveAttribute('aria-pressed', 'true')
+
+    // H opens the help dialog with the shortcut table.
+    press('h')
+    await expect.element(screen.getByText('Keyboard shortcuts')).toBeVisible()
+    await expect.element(screen.getByText('Comparison modes')).toBeVisible()
+    press('h')
+  })
+
+  it('offers a basemap picker with an opacity slider', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    await screen.getByRole('button', { name: 'Basemap' }).click()
+    await expect
+      .element(screen.getByRole('button', { name: /Sentinel-2 cloudless/ }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('slider', { name: /Basemap opacity/ }))
+      .toBeInTheDocument()
+  })
+
   it('collapses and restores both sidebars like the embedded viewer', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)

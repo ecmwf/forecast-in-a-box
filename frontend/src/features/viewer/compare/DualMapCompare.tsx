@@ -40,6 +40,7 @@ export function DualMapCompare({
   a,
   b,
   basemapId,
+  basemapOpacity,
   measureMode,
   measureClearNonce,
   overlays,
@@ -50,6 +51,7 @@ export function DualMapCompare({
   a: CompareMapSource
   b: CompareMapSource
   basemapId: string
+  basemapOpacity: number
   measureMode: MeasureMode
   measureClearNonce: number
   overlays: ReadonlyArray<ContextOverlay>
@@ -104,6 +106,7 @@ export function DualMapCompare({
         cross={cross}
         onCross={setCross}
         basemapId={basemapId}
+        basemapOpacity={basemapOpacity}
         measureMode={measureMode}
         measureClearNonce={measureClearNonce}
         overlays={overlays}
@@ -116,6 +119,7 @@ export function DualMapCompare({
         cross={cross}
         onCross={setCross}
         basemapId={basemapId}
+        basemapOpacity={basemapOpacity}
         measureMode={measureMode}
         measureClearNonce={measureClearNonce}
         overlays={overlays}
@@ -132,6 +136,7 @@ function DualMapPanel({
   cross,
   onCross,
   basemapId,
+  basemapOpacity,
   measureMode,
   measureClearNonce,
   overlays,
@@ -143,6 +148,7 @@ function DualMapPanel({
   cross: CrossPosition
   onCross: (pos: CrossPosition) => void
   basemapId: string
+  basemapOpacity: number
   measureMode: MeasureMode
   measureClearNonce: number
   overlays: ReadonlyArray<ContextOverlay>
@@ -175,6 +181,7 @@ function DualMapPanel({
     baseUrl: source.baseUrl,
     decorationLayers: source.decorationLayers,
     basemapId,
+    opacity: basemapOpacity,
     incLoading,
     decLoading,
   })

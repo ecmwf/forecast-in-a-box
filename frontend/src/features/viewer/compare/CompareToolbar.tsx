@@ -20,6 +20,7 @@ import {
   Eraser,
   FlaskConical,
   Globe2,
+  HelpCircle,
   Layers,
   Ruler,
   SquareDashed,
@@ -27,6 +28,12 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber } from '../format'
+import {
+  COMPARE_KEYS,
+  keyLabel,
+  useShortcutReveal,
+} from './useCompareShortcuts'
+import { COMPARE_MODES } from './types'
 import type { LinkMode } from './useCompareSelection'
 import type { CompareMode, CompareModeOptions } from './types'
 import type { BasemapOption } from '../ol-layers'
@@ -41,13 +48,21 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 
-const MODES: ReadonlyArray<{ id: CompareMode; experimental: boolean }> = [
-  { id: 'swipe', experimental: false },
-  { id: 'side', experimental: false },
-  { id: 'flicker', experimental: true },
-  { id: 'spy', experimental: true },
-  { id: 'blend', experimental: true },
-]
+const EXPERIMENTAL: ReadonlySet<CompareMode> = new Set([
+  'flicker',
+  'spy',
+  'blend',
+])
+
+/** Shortcut badge shown while ⌘/Ctrl is held. */
+function KeyBadge({ label, show }: { label: string; show: boolean }) {
+  if (!show) return null
+  return (
+    <kbd className="absolute -top-1.5 -right-1.5 z-10 rounded border border-border bg-foreground px-1 font-mono text-[9px] leading-4 text-background shadow-sm">
+      {label}
+    </kbd>
+  )
+}
 
 export function CompareToolbar({
   mode,
@@ -65,6 +80,9 @@ export function CompareToolbar({
   basemapId,
   onBasemapChange,
   availableBasemaps,
+  basemapOpacity,
+  onBasemapOpacityChange,
+  onHelp,
 }: {
   mode: CompareMode
   onModeChange: (mode: CompareMode) => void
@@ -82,9 +100,13 @@ export function CompareToolbar({
   basemapId: string
   onBasemapChange: (id: string) => void
   availableBasemaps: ReadonlyArray<BasemapOption>
+  basemapOpacity: number
+  onBasemapOpacityChange: (opacity: number) => void
+  onHelp: () => void
 }) {
   const { t } = useTranslation('compare')
   const { t: tExec } = useTranslation('executions')
+  const reveal = useShortcutReveal()
 
   return (
     <div className="space-y-2 rounded-md border border-border bg-muted/40 px-2.5 py-2">
@@ -94,22 +116,30 @@ export function CompareToolbar({
           aria-label={t('page.title')}
           className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
         >
-          {MODES.map(({ id, experimental }) => (
+          {COMPARE_MODES.map((id, index) => (
             <button
               key={id}
               type="button"
               onClick={() => onModeChange(id)}
               aria-pressed={mode === id}
-              title={experimental ? t('modes.experimental') : undefined}
+              title={
+                EXPERIMENTAL.has(id)
+                  ? `${t('modes.experimental')} (${keyLabel(COMPARE_KEYS.modes[index])})`
+                  : `(${keyLabel(COMPARE_KEYS.modes[index])})`
+              }
               className={cn(
-                'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium transition-colors',
+                'relative inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium transition-colors',
                 mode === id
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
+              <KeyBadge
+                label={keyLabel(COMPARE_KEYS.modes[index])}
+                show={reveal}
+              />
               {t(`modes.${id}`)}
-              {experimental && (
+              {EXPERIMENTAL.has(id) && (
                 <FlaskConical className="h-3 w-3 text-amber-600 dark:text-amber-400" />
               )}
             </button>
@@ -137,12 +167,13 @@ export function CompareToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="relative h-7 w-7"
             disabled={!onFit}
             onClick={() => onFit?.()}
-            title={tExec('lens.fitGlobe')}
+            title={`${tExec('lens.fitGlobe')} (${keyLabel(COMPARE_KEYS.fit)})`}
             aria-label={tExec('lens.fitGlobe')}
           >
+            <KeyBadge label={keyLabel(COMPARE_KEYS.fit)} show={reveal} />
             <Globe2 className="h-4 w-4" />
           </Button>
           <Popover>
@@ -182,6 +213,23 @@ export function CompareToolbar({
                   </button>
                 ))}
               </div>
+              <label className="mt-1 block space-y-1 border-t border-border px-2 pt-2 pb-1">
+                <span className="flex items-center justify-between text-xs text-muted-foreground">
+                  {tExec('lens.basemapOpacity')}
+                  <span className="font-mono tabular-nums">
+                    {Math.round(basemapOpacity * 100)}%
+                  </span>
+                </span>
+                <Slider
+                  value={[Math.round(basemapOpacity * 100)]}
+                  min={0}
+                  max={100}
+                  step={5}
+                  onValueChange={(v) =>
+                    onBasemapOpacityChange(firstNumber(v) / 100)
+                  }
+                />
+              </label>
             </PopoverContent>
           </Popover>
           <span className="mx-1 h-5 w-px bg-border" />
@@ -225,12 +273,24 @@ export function CompareToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="relative h-7 w-7"
             onClick={onExport}
-            title={t('export.open')}
+            title={`${t('export.open')} (${keyLabel(COMPARE_KEYS.export)})`}
             aria-label={t('export.open')}
           >
+            <KeyBadge label={keyLabel(COMPARE_KEYS.export)} show={reveal} />
             <Download className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative h-7 w-7"
+            onClick={onHelp}
+            title={`${t('help.open')} (${keyLabel(COMPARE_KEYS.help)})`}
+            aria-label={t('help.open')}
+          >
+            <KeyBadge label={keyLabel(COMPARE_KEYS.help)} show={reveal} />
+            <HelpCircle className="h-4 w-4" />
           </Button>
         </div>
       </div>
