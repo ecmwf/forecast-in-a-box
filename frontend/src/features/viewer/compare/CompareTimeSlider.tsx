@@ -187,41 +187,48 @@ export function CompareTimeSlider({
           {/* Per-source availability tracks. Hover shows the instant and
               a shared cursor; click jumps to that step. */}
           <div className="relative grid grid-cols-[14px_1fr] items-center gap-x-2 gap-y-1">
-            {hoverIndex !== null && hoverIndex < steps.length && (
-              <div
-                className="pointer-events-none absolute -top-7 z-10 -translate-x-1/2 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs whitespace-nowrap shadow-sm"
-                style={{
-                  left: `calc(22px + ${
-                    rangeLen > 1
-                      ? ((hoverIndex - rangeStart) / (rangeLen - 1)) * 100
-                      : 0
-                  } * (100% - 22px) / 100)`,
-                }}
-              >
-                <HoverInstant
-                  epoch={steps[hoverIndex]}
-                  perSide={hoverTimes(steps[hoverIndex])}
-                />
-              </div>
-            )}
-            {(['a', 'b'] as const).map((slot) => (
-              <SlotRunTrack
-                key={slot}
-                slot={slot}
-                availability={timeline.availability[slot].slice(
-                  rangeStart,
-                  rangeEnd + 1,
-                )}
-                currentIndex={safeIndex - rangeStart}
-                hoverIndex={
-                  hoverIndex === null ? null : hoverIndex - rangeStart
-                }
-                onHover={(i) =>
-                  setHoverIndex(i === null ? null : i + rangeStart)
-                }
-                onJump={(i) => onChange(i + rangeStart)}
-              />
-            ))}
+            {(() => {
+              const hovered =
+                hoverIndex !== null && hoverIndex < steps.length
+                  ? {
+                      fraction:
+                        rangeLen > 1
+                          ? (hoverIndex - rangeStart) / (rangeLen - 1)
+                          : 0,
+                      epoch: steps[hoverIndex],
+                      perSide: hoverTimes(steps[hoverIndex]),
+                    }
+                  : null
+              return (
+                <>
+                  {hovered && hovered.perSide === null && (
+                    <HoverTooltip
+                      fraction={hovered.fraction}
+                      epoch={hovered.epoch}
+                    />
+                  )}
+                  {(['a', 'b'] as const).map((slot) => (
+                    <SlotRunTrack
+                      key={slot}
+                      slot={slot}
+                      availability={timeline.availability[slot].slice(
+                        rangeStart,
+                        rangeEnd + 1,
+                      )}
+                      currentIndex={safeIndex - rangeStart}
+                      hoverIndex={
+                        hoverIndex === null ? null : hoverIndex - rangeStart
+                      }
+                      hoverLabel={hovered?.perSide?.[slot] ?? null}
+                      onHover={(i) =>
+                        setHoverIndex(i === null ? null : i + rangeStart)
+                      }
+                      onJump={(i) => onChange(i + rangeStart)}
+                    />
+                  ))}
+                </>
+              )
+            })()}
           </div>
           <TimeClipRow
             timeline={timeline}
@@ -319,33 +326,33 @@ function IndependentSlider({
   )
 }
 
-/** Tooltip body: the axis instant, or both sides' resolved instants when
- *  the time-link policy makes them differ (offset/nearest). */
-function HoverInstant({
+/** Edge-aware translate class for a cursor-anchored label. */
+function anchorClass(fraction: number): string {
+  return fraction < 0.08
+    ? 'translate-x-0'
+    : fraction > 0.92
+      ? '-translate-x-full'
+      : '-translate-x-1/2'
+}
+
+/** Single-instant hover tooltip (exact mode — both sides identical). */
+function HoverTooltip({
+  fraction,
   epoch,
-  perSide,
 }: {
+  fraction: number
   epoch: number
-  perSide: { a: string | null; b: string | null } | null
 }) {
-  if (!perSide) {
-    return <>{formatStep(new Date(epoch).toISOString())}</>
-  }
   return (
-    <span className="flex items-center gap-2">
-      <span>
-        <span className="mr-1 font-bold text-blue-600 dark:text-blue-400">
-          A
-        </span>
-        {perSide.a ?? '—'}
-      </span>
-      <span>
-        <span className="mr-1 font-bold text-orange-600 dark:text-orange-400">
-          B
-        </span>
-        {perSide.b ?? '—'}
-      </span>
-    </span>
+    <div
+      className={cn(
+        'pointer-events-none absolute bottom-full z-10 mb-1 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs whitespace-nowrap shadow-sm',
+        anchorClass(fraction),
+      )}
+      style={{ left: `calc(22px + ${fraction * 100} * (100% - 22px) / 100)` }}
+    >
+      {formatStep(new Date(epoch).toISOString())}
+    </div>
   )
 }
 
@@ -362,6 +369,7 @@ function SlotRunTrack({
   availability,
   currentIndex,
   hoverIndex,
+  hoverLabel,
   onHover,
   onJump,
 }: {
@@ -369,6 +377,9 @@ function SlotRunTrack({
   availability: ReadonlyArray<boolean>
   currentIndex: number
   hoverIndex: number | null
+  /** This side's resolved instant at the hovered position, when the
+   *  time-link policy splits the sides ('—' = no data). */
+  hoverLabel: string | null
   onHover: (index: number | null) => void
   onJump: (index: number) => void
 }) {
@@ -449,6 +460,24 @@ function SlotRunTrack({
             className="pointer-events-none absolute -top-0.5 -bottom-0.5 w-px -translate-x-1/2 bg-foreground/50"
             style={{ left: `${pct(hoverIndex)}%` }}
           />
+        )}
+        {/* A's instant rides above its bar, B's below — labels live with
+            their tracks instead of one wide combined box. */}
+        {hoverIndex !== null && hoverLabel !== null && (
+          <span
+            className={cn(
+              'pointer-events-none absolute z-10 rounded border border-border bg-background px-1 py-px font-mono text-[10px] whitespace-nowrap shadow-sm',
+              slot === 'a' ? 'bottom-full mb-0.5' : 'top-full mt-0.5',
+              anchorClass(
+                availability.length > 1
+                  ? hoverIndex / (availability.length - 1)
+                  : 0,
+              ),
+            )}
+            style={{ left: `${pct(hoverIndex)}%` }}
+          >
+            {hoverLabel}
+          </span>
         )}
       </div>
     </>
