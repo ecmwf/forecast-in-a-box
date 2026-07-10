@@ -22,7 +22,7 @@ Provides parsing, validation, and conversion for a small set of type expressions
 
 from abc import ABC, abstractmethod
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Iterable, Literal, get_args
 
 # PSEUDO TYPES / EXCEPTIONS
 
@@ -181,7 +181,7 @@ class DatetimeType(FableType):
 class ClosedEnumType(FableType):
     """Closed enumeration type. Validates membership in the enum; conversion is a no-op."""
 
-    def __init__(self, items: list[str]) -> None:
+    def __init__(self, items: Iterable[str]) -> None:
         self.items = items
         self._item_set = set(items)
 
@@ -292,7 +292,8 @@ class BoundingBoxWSENType(ListType):
 
 
 # NOTE convert to Type class if ever needs to be `serialize`d
-UnrestrictedGeoDomainAlias = ClosedEnumType(["auto", "global", "datadefined"])
+UnrestrictedGeoDomainLiteral = Literal["auto", "global", "datadefined"]
+UnrestrictedGeoDomainAlias = ClosedEnumType(get_args(UnrestrictedGeoDomainLiteral))
 
 
 class GeoDomainSingleType(StringType):
