@@ -24,7 +24,7 @@ You have full power to run git commands, view files, make direct code edits, run
 3. **Formulate and Execute Fixes:**
    - Ideate the changes. You should be minimalistic! Do not introduce new UI elements, do not change inner workings of the frontend. If possible, coerce via some sort of adapter the new contract into the original one, so that the blast radius is minimized. The goal is not to improve the frontend, it is only to *maintain existing functionality*.
    - Modify the code in the `frontend/` codebase and tests and mocks to accommodate the changes. Make sure you respect the frontend style guide and local conventions.
-   - Do *not* modify the `backend/` codebase! If you believe you have identified a bug in the backend codebase, stop making any further edits, output description of the bug, and wait for user input.
+   - Do *not* modify the `backend/` codebase! If you believe you have identified a bug in the backend codebase, stop making any further edits, output description of the bug, and wait for user input. Similarly, if you believe the frontend cannot be modified without any feature loss or major restructuring or UX change given the current backend state, do not attempt the change, but output a description of the blocker, and wait for user input.
 
 4. **Verification:**
     - Run all the tests and linting as specified in the `frontend/AGENTS.md`. Once all of that passes, commit, don't push.
