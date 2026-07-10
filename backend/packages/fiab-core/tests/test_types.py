@@ -14,7 +14,7 @@ from datetime import date, datetime
 import pytest
 
 from fiab_core.types import (
-    BoundingBoxType,
+    BoundingBoxWSENType,
     ClosedEnumType,
     DatetimeType,
     DateType,
@@ -260,7 +260,7 @@ class TestListType:
 
 
 class TestGeoDomainType:
-    """GeoDomainType: comma-separated names, or a west,south,east,north integer bbox validated via BoundingBoxType."""
+    """GeoDomainType: comma-separated names, or a west,south,east,north integer bbox validated via BoundingBoxWSENType."""
 
     def test_parses_as_a_list_type(self) -> None:
         t = _parse("geodomain")
@@ -460,16 +460,16 @@ class TestGeoDomainSingleType:
         assert t.serialize() == "geodomainSingle"
 
 
-class TestBoundingBoxType:
-    """Tests for BoundingBoxType"""
+class TestBoundingBoxWSENType:
+    """Tests for BoundingBoxWSENType"""
 
     def test_convert_valid_bbox(self) -> None:
-        t = BoundingBoxType()
+        t = BoundingBoxWSENType()
         assert t.validate_convert("-10,40,30,70") == [-10, 40, 30, 70]
         assert t.validate_convert("0,0,0,0") == [0, 0, 0, 0]
 
     def test_convert_wrong_element_count_raises_error(self) -> None:
-        t = BoundingBoxType()
+        t = BoundingBoxWSENType()
         with pytest.raises(WrongType):
             t.validate_convert("1,2,3")
         with pytest.raises(WrongType):
@@ -478,33 +478,33 @@ class TestBoundingBoxType:
             t.validate_convert("")
 
     def test_convert_non_integer_elements_raises_error(self) -> None:
-        t = BoundingBoxType()
+        t = BoundingBoxWSENType()
         with pytest.raises(WrongType):
             t.validate_convert("1.5,2,3,4")
         with pytest.raises(WrongType):
             t.validate_convert("a,b,c,d")
 
     def test_convert_non_string_raises_type_error(self) -> None:
-        t = BoundingBoxType()
+        t = BoundingBoxWSENType()
         with pytest.raises(NotStringInput):
             t.validate_convert([1, 2, 3, 4])
         with pytest.raises(NotStringInput):
             t.validate_convert(None)
 
     def test_serialize(self) -> None:
-        assert BoundingBoxType().serialize() == "bbox"
+        assert BoundingBoxWSENType().serialize() == "bboxWSEN"
 
     def test_parse_and_round_trip(self) -> None:
-        t = _parse("bbox")
-        assert isinstance(t, BoundingBoxType)
+        t = _parse("bboxWSEN")
+        assert isinstance(t, BoundingBoxWSENType)
         assert t.validate_convert("10,20,30,40") == [10, 20, 30, 40]
-        assert t.serialize() == "bbox"
+        assert t.serialize() == "bboxWSEN"
 
     def test_list_of_bbox_now_supported(self) -> None:
-        t = _parse("list[bbox]")
+        t = _parse("list[bboxWSEN]")
         assert isinstance(t, ListType)
-        assert isinstance(t.item_type, BoundingBoxType)
-        # list[bbox] always fails at validate_convert: outer comma-split leaves
+        assert isinstance(t.item_type, BoundingBoxWSENType)
+        # list[bboxWSEN] always fails at validate_convert: outer comma-split leaves
         # single-element slots that cannot satisfy bbox's 4-element requirement
         with pytest.raises(WrongType):
             t.validate_convert("1,2,3,4")
@@ -580,9 +580,9 @@ class TestUnionType:
         assert t.validate_convert("hello") == "hello"
 
     def test_parse_union_with_bbox_now_supported(self) -> None:
-        t = _parse("union[bbox,str]")
+        t = _parse("union[bboxWSEN,str]")
         assert isinstance(t, UnionType)
-        assert isinstance(t.types[0], BoundingBoxType)
+        assert isinstance(t.types[0], BoundingBoxWSENType)
         assert t.validate_convert("1,2,3,4") == [1, 2, 3, 4]
         assert t.validate_convert("hello") == "hello"
 
