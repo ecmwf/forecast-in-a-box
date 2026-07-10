@@ -204,15 +204,40 @@ export function pluginBadgeKind(plugin: {
 }
 
 /**
- * Plugin detail - full plugin information from backend
+ * Generic plugin data - always present, regardless of install status
  */
-export const PluginDetailSchema = z.object({
-  status: z.enum(pluginStatusValues),
+export const PluginGenericDataSchema = z.object({
   store_info: PluginStoreEntrySchema.nullable(),
   remote_info: PluginRemoteInfoSchema.nullable(),
-  errored_detail: z.array(PluginErrorSchema).nullable(),
-  loaded_version: z.string().nullable(),
-  update_datetime: z.string().nullable(), // UTC ISO with offset, e.g. "...+00:00"
+})
+
+/**
+ * Plugin install data - present when the plugin has a DB record (i.e. was installed)
+ */
+export const PluginInstallDataSchema = z.object({
+  local_version: z.string(),
+  update_datetime: z.string(), // UTC ISO with offset, e.g. "...+00:00"
+  install_errors: z.array(PluginErrorSchema),
+})
+
+/**
+ * Plugin install settings - present when install succeeded (no error/critical install errors)
+ */
+export const PluginInstallSettingsSchema = z.object({
+  isEnabled: z.boolean(),
+  excluded_templates: z.array(z.string()),
+  included_templates: z.array(z.string()),
+  glyph_remapping: z.record(z.string(), z.string()),
+})
+
+/**
+ * Plugin detail - full plugin information from backend (GET /plugin/list)
+ */
+export const PluginDetailSchema = z.object({
+  generic_data: PluginGenericDataSchema,
+  install_data: PluginInstallDataSchema.nullable(),
+  settings_data: PluginInstallSettingsSchema.nullable(),
+  load_errors: z.array(PluginErrorSchema),
 })
 
 export type PluginDetail = z.infer<typeof PluginDetailSchema>
@@ -227,22 +252,17 @@ export const PluginListingSchema = z.object({
 export type PluginListing = z.infer<typeof PluginListingSchema>
 
 /**
- * Plugin status response from /plugin/status endpoint
+ * Derive the logical plugin status from the new nested PluginDetail structure.
+ * - No install_data → not installed → available
+ * - install_data present, settings_data absent → install failed → errored
+ * - settings_data.isEnabled false → disabled
+ * - settings_data.isEnabled true → loaded
  */
-export const PluginsStatusSchema = z.object({
-  updater_status: z.string(),
-  plugin_errors: z.record(z.string(), z.array(PluginErrorSchema)),
-  plugin_versions: z.record(z.string(), z.string()),
-  plugin_updatedatetime: z.record(z.string(), z.string()),
-  plugin_enabled: z.record(z.string(), z.boolean()),
-  plugin_excluded_templates: z.record(z.string(), z.array(z.string())),
-  plugin_glyph_remapping: z.record(
-    z.string(),
-    z.record(z.string(), z.string()),
-  ),
-})
-
-export type PluginsStatus = z.infer<typeof PluginsStatusSchema>
+export function derivePluginStatus(detail: PluginDetail): PluginStatus {
+  if (detail.install_data === null) return 'available'
+  if (detail.settings_data === null) return 'errored'
+  return detail.settings_data.isEnabled ? 'loaded' : 'disabled'
+}
 
 /**
  * Example data for a blueprint template from GET /plugin/templateExampleValues.
@@ -376,51 +396,48 @@ export function isUnstampedVersion(version: string): boolean {
 
 /**
  * Transform a PluginDetail to UI-friendly PluginInfo
- *
- * @param enabled - The `plugin_enabled` flag (/plugin/status). Orthogonal to
- *   `status`; omit to infer from `status`.
  */
 export function toPluginInfo(
   id: PluginCompositeId,
   detail: PluginDetail,
   capabilities: Array<PluginCapability> = [],
-  enabled?: boolean,
 ): PluginInfo {
-  const isInstalled = detail.status !== 'available'
+  const status = derivePluginStatus(detail)
+  const isInstalled = detail.install_data !== null
+  const loadedVersion = detail.install_data?.local_version ?? null
   const hasUpdate =
     isInstalled &&
-    detail.loaded_version !== null &&
-    !isUnstampedVersion(detail.loaded_version) &&
-    detail.remote_info !== null &&
-    isNewerVersion(detail.remote_info.version, detail.loaded_version)
-  const errorDetail = detail.errored_detail?.length
-    ? detail.errored_detail
-    : null
+    loadedVersion !== null &&
+    !isUnstampedVersion(loadedVersion) &&
+    detail.generic_data.remote_info !== null &&
+    isNewerVersion(detail.generic_data.remote_info.version, loadedVersion)
+  const allErrors: Array<PluginError> = [
+    ...(detail.install_data?.install_errors ?? []),
+    ...detail.load_errors,
+  ]
+  const errorDetail = allErrors.length ? allErrors : null
 
   return {
     id,
     displayId: toPluginDisplayId(id),
-    name: detail.store_info?.display_title ?? id.local,
-    description: detail.store_info?.display_description ?? '',
-    author: detail.store_info?.display_author ?? '',
-    version: detail.loaded_version === 'unknown' ? null : detail.loaded_version,
-    latestVersion: detail.remote_info?.version ?? null,
+    name: detail.generic_data.store_info?.display_title ?? id.local,
+    description: detail.generic_data.store_info?.display_description ?? '',
+    author: detail.generic_data.store_info?.display_author ?? '',
+    version: loadedVersion === 'unknown' ? null : loadedVersion,
+    latestVersion: detail.generic_data.remote_info?.version ?? null,
     capabilities,
-    status: detail.status,
-    // Prefer plugin_enabled; fall back to status when it's absent. `??` so an
-    // explicit `false` wins.
-    isEnabled:
-      enabled ?? (detail.status === 'loaded' || detail.status === 'errored'),
+    status,
+    isEnabled: detail.settings_data?.isEnabled ?? status === 'errored',
     isInstalled,
     hasUpdate,
-    updatedAt: detail.update_datetime
-      ? toUtcIsoOrNull(detail.update_datetime)
+    updatedAt: detail.install_data?.update_datetime
+      ? toUtcIsoOrNull(detail.install_data.update_datetime)
       : null,
     errorDetail,
     errorSeverity: errorDetail ? pluginErrorsMaxSeverity(errorDetail) : null,
-    comment: detail.store_info?.comment ?? null,
-    pipSource: detail.store_info?.pip_source ?? null,
-    moduleName: detail.store_info?.module_name ?? null,
+    comment: detail.generic_data.store_info?.comment ?? null,
+    pipSource: detail.generic_data.store_info?.pip_source ?? null,
+    moduleName: detail.generic_data.store_info?.module_name ?? null,
   }
 }
 
@@ -438,20 +455,16 @@ function toUtcIsoOrNull(dateStr: string): string | null {
 
 /**
  * Transform PluginListing response to array of PluginInfo
- *
- * @param enabledMap - `plugin_enabled` from /plugin/status, keyed like
- *   `listing.plugins`. Drives each plugin's `isEnabled`.
  */
 export function toPluginInfoList(
   listing: PluginListing,
   capabilitiesMap: Map<string, Array<PluginCapability>> = new Map(),
-  enabledMap: Record<string, boolean> = {},
 ): Array<PluginInfo> {
   return Object.entries(listing.plugins).map(([key, detail]) => {
     const id = parsePluginKey(key)
     const displayId = toPluginDisplayId(id)
     const capabilities = capabilitiesMap.get(displayId) ?? []
-    return toPluginInfo(id, detail, capabilities, enabledMap[key])
+    return toPluginInfo(id, detail, capabilities)
   })
 }
 

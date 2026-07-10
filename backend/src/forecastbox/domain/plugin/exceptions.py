@@ -16,3 +16,11 @@ HTTP responses at the router boundary.
 
 class PluginNotFound(Exception):
     """Raised when a requested plugin is not found in the DB and cannot be eg updated"""
+
+
+class PluginManagerBusy(Exception):
+    """Raised when the PluginManager lock cannot be acquired within the allowed timeout.
+
+    The caller should translate this to an HTTP 503 (Service Unavailable / Retry Later)
+    response so the client can retry the request after a short back-off.
+    """

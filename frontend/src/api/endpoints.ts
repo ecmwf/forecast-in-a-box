@@ -109,10 +109,8 @@ export const API_ENDPOINTS = {
    * POST endpoints use request body for PluginCompositeId.
    */
   plugin: {
-    /** GET - Get plugin system status */
-    status: `${API_PREFIX}/plugin/status`,
     /** GET - Get all plugin details */
-    details: `${API_PREFIX}/plugin/details`,
+    list: `${API_PREFIX}/plugin/list`,
     /** POST - Install a plugin (body: PluginCompositeId) */
     install: `${API_PREFIX}/plugin/install`,
     /** POST - Uninstall a plugin (body: PluginCompositeId) */

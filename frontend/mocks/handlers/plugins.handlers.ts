@@ -11,9 +11,8 @@
 /**
  * MSW Handlers for Plugin API
  *
- * These handlers match the new backend API exactly:
- * - GET /api/v1/plugin/status
- * - GET /api/v1/plugin/details
+ * These handlers match the new backend API:
+ * - GET /api/v1/plugin/list
  * - POST /api/v1/plugin/install
  * - POST /api/v1/plugin/uninstall
  * - POST /api/v1/plugin/update
@@ -27,7 +26,6 @@ import type {
   PluginDetail,
   PluginListing,
   PluginSettingsUpdate,
-  PluginsStatus,
 } from '@/api/types/plugins.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
@@ -86,53 +84,9 @@ function getCurrentDatetime(): string {
 }
 
 export const pluginsHandlers = [
-  // GET /api/v1/plugin/status
-  http.get(API_ENDPOINTS.plugin.status, async () => {
-    await delay(200)
-
-    // Build status response from current state
-    const status: PluginsStatus = {
-      updater_status: 'idle',
-      plugin_errors: {},
-      plugin_versions: {},
-      plugin_updatedatetime: {},
-      plugin_enabled: {},
-      plugin_excluded_templates: {},
-      plugin_glyph_remapping: {},
-    }
-
-    for (const [key, detail] of Object.entries(pluginsState.plugins)) {
-      if (detail.status === 'errored' && detail.errored_detail) {
-        status.plugin_errors[key] = detail.errored_detail
-      }
-      if (detail.loaded_version) {
-        status.plugin_versions[key] = detail.loaded_version
-      }
-      if (detail.update_datetime) {
-        status.plugin_updatedatetime[key] = detail.update_datetime
-      }
-      if (detail.status !== 'available') {
-        status.plugin_enabled[key] = detail.status !== 'disabled'
-        status.plugin_excluded_templates[key] = []
-        status.plugin_glyph_remapping[key] = {}
-      }
-    }
-
-    return HttpResponse.json(status)
-  }),
-
-  // GET /api/v1/plugin/details
-  http.get(API_ENDPOINTS.plugin.details, async ({ request }) => {
+  // GET /api/v1/plugin/list
+  http.get(API_ENDPOINTS.plugin.list, async () => {
     await delay(300)
-
-    // Check for forceRefresh query param (optional)
-    const url = new URL(request.url)
-    const forceRefresh = url.searchParams.get('forceRefresh') === 'true'
-
-    if (forceRefresh) {
-      // Simulate refresh - in real backend this would re-fetch from PyPI
-      await delay(500)
-    }
 
     return HttpResponse.json(pluginsState)
   }),
@@ -154,19 +108,29 @@ export const pluginsHandlers = [
       )
     }
 
-    if (plugin.status !== 'available') {
+    if (plugin.install_data !== null) {
       return new HttpResponse(
         JSON.stringify({ detail: 'Plugin is already installed' }),
         { status: 400 },
       )
     }
 
+    const newVersion = plugin.generic_data.remote_info?.version ?? '1.0.0'
     // Update plugin state
     pluginsState.plugins[key] = {
       ...plugin,
-      status: 'loaded',
-      loaded_version: plugin.remote_info?.version ?? '1.0.0',
-      update_datetime: getCurrentDatetime(),
+      install_data: {
+        local_version: newVersion,
+        update_datetime: getCurrentDatetime(),
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: true,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+      load_errors: [],
     }
 
     // Simulate backend reload: catalogue will 503 once while plugins restart
@@ -192,7 +156,7 @@ export const pluginsHandlers = [
       )
     }
 
-    if (plugin.status === 'available') {
+    if (plugin.install_data === null) {
       return new HttpResponse(
         JSON.stringify({ detail: 'Plugin is not installed' }),
         { status: 400 },
@@ -202,10 +166,9 @@ export const pluginsHandlers = [
     // Update plugin state
     pluginsState.plugins[key] = {
       ...plugin,
-      status: 'available',
-      loaded_version: null,
-      update_datetime: null,
-      errored_detail: null,
+      install_data: null,
+      settings_data: null,
+      load_errors: [],
     }
 
     // Simulate backend reload: catalogue will 503 once while plugins restart
@@ -231,15 +194,15 @@ export const pluginsHandlers = [
       )
     }
 
-    if (plugin.status === 'available') {
+    if (plugin.install_data === null) {
       return new HttpResponse(
         JSON.stringify({ detail: 'Plugin is not installed' }),
         { status: 400 },
       )
     }
 
-    const newVersion = plugin.remote_info?.version
-    if (!newVersion || newVersion === plugin.loaded_version) {
+    const newVersion = plugin.generic_data.remote_info?.version
+    if (!newVersion || newVersion === plugin.install_data.local_version) {
       return new HttpResponse(
         JSON.stringify({ detail: 'No update available' }),
         { status: 400 },
@@ -249,10 +212,12 @@ export const pluginsHandlers = [
     // Update plugin state
     pluginsState.plugins[key] = {
       ...plugin,
-      status: 'loaded',
-      loaded_version: newVersion,
-      update_datetime: getCurrentDatetime(),
-      errored_detail: null,
+      install_data: {
+        ...plugin.install_data,
+        local_version: newVersion,
+        update_datetime: getCurrentDatetime(),
+      },
+      load_errors: [],
     }
 
     // Simulate backend reload: catalogue will 503 once while plugins restart
@@ -284,7 +249,7 @@ export const pluginsHandlers = [
       )
     }
 
-    if (plugin.status === 'available') {
+    if (plugin.install_data === null) {
       return new HttpResponse(
         JSON.stringify({ detail: 'Plugin must be installed first' }),
         { status: 400 },
@@ -292,11 +257,13 @@ export const pluginsHandlers = [
     }
 
     // Update plugin state if isEnabled was provided
-    if (isEnabled !== undefined) {
+    if (isEnabled !== undefined && plugin.settings_data !== null) {
       pluginsState.plugins[key] = {
         ...plugin,
-        status: isEnabled ? 'loaded' : 'disabled',
-        errored_detail: isEnabled ? null : plugin.errored_detail,
+        settings_data: {
+          ...plugin.settings_data,
+          isEnabled,
+        },
       }
     }
 

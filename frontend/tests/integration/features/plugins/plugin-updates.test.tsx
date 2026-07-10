@@ -383,29 +383,34 @@ describe('Plugin Updates Integration', () => {
 
     it('shows an errored updatable plugin in both sections with its diagnostics', async () => {
       worker.use(
-        http.get(API_ENDPOINTS.plugin.details, () =>
+        http.get(API_ENDPOINTS.plugin.list, () =>
           HttpResponse.json({
             plugins: {
               "store='ecmwf' local='broken-ensemble'": {
-                status: 'errored',
-                store_info: {
-                  pip_source: 'fiab-plugin-broken',
-                  module_name: 'fiab_plugin_broken',
-                  display_title: 'Broken Ensemble',
-                  display_description: 'Errored plugin that has an update',
-                  display_author: 'ECMWF',
-                  comment: '',
+                generic_data: {
+                  store_info: {
+                    pip_source: 'fiab-plugin-broken',
+                    module_name: 'fiab_plugin_broken',
+                    display_title: 'Broken Ensemble',
+                    display_description: 'Errored plugin that has an update',
+                    display_author: 'ECMWF',
+                    comment: '',
+                  },
+                  remote_info: { version: '2.4.0' },
                 },
-                remote_info: { version: '2.4.0' },
-                errored_detail: [
+                install_data: {
+                  local_version: '2.1.0',
+                  update_datetime: '2026-02-03T00:00:00+00:00',
+                  install_errors: [],
+                },
+                settings_data: null,
+                load_errors: [
                   {
                     source: 'load',
                     detail: 'import failed: incompatible core',
                     severity: 'error',
                   },
                 ],
-                loaded_version: '2.1.0',
-                update_datetime: '2026-02-03T00:00:00+00:00',
               },
             },
           }),
