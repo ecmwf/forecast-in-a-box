@@ -15,7 +15,7 @@ Contains:
 """
 
 import logging
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
@@ -26,17 +26,15 @@ from forecastbox.domain.auth.users import UserRead
 from forecastbox.domain.glyphs.resolution import remap_glyph_names
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.db import get_plugin_state, upsert_plugin_state
-from forecastbox.domain.plugin.errors import PluginErrors
-from forecastbox.domain.plugin.exceptions import PluginNotFound
+from forecastbox.domain.plugin.detail import PluginListing, build_plugin_listing
+from forecastbox.domain.plugin.exceptions import PluginManagerBusy, PluginNotFound
 from forecastbox.domain.plugin.manager import (
     PluginManager,
-    PluginsStatus,
-    status_full,
     submit_update_single,
     uninstall_plugin,
     unload_single,
 )
-from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail, submit_install_plugin
+from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.config import PluginSettings, config
 from forecastbox.utility.packages import get_package_versions
@@ -52,78 +50,21 @@ router = APIRouter(
 )
 
 
-class PluginDetail(FiabBaseModel):
-    status: Literal["available", "disabled", "errored", "loaded"]
-    """Status of the plugin, mutually exclusive. All of (disabled, errored, loaded) imply that the plugin is installed"""
-    store_info: PluginStoreEntry | None = None
-    """Info about the plugin from the respective store. None if the plugin was installed locally"""
-    remote_info: PluginRemoteInfo | None = None
-    """Dynamic remote information such as the most recent published version. None if the plugin was installed locally"""
-    errored_detail: PluginErrors | None = None
-    """In case the plugin is errored or has warnings, this displays structured diagnostics"""
-    loaded_version: str | None = None
-    """In case the plugin is loaded, this shows the version"""
-    update_datetime: str | None = None
-    """In case the plugin is installed, this shows the most recent update datetime"""
-    # TODO add here the remapping/exclusion data
-
-
-class PluginListing(FiabBaseModel):
-    plugins: dict[PluginCompositeId, PluginDetail]
-
-
-# ---------------------------------------------------------------------------
-# Operational routes
-# ---------------------------------------------------------------------------
-
-
-@router.get("/status")
-async def get_plugins_status_full() -> PluginsStatus:
-    return await status_full()
-
-
 # ---------------------------------------------------------------------------
 # CRUD routes
 # ---------------------------------------------------------------------------
 
 
-@router.get("/details")
-async def get_plugin_details(forceRefresh: bool = False) -> PluginListing:
-    # TODO implement forceRefresh -- we would need to prod the thread to update the store, but await its completion here
-    if forceRefresh:
-        raise NotImplementedError
-    rv = {}
-    statuses = await status_full()
-    disabled = {plugin_id for plugin_id, enabled in statuses.plugin_enabled.items() if not enabled}
-    errored = set(statuses.plugin_errors.keys())
-    loaded = set(statuses.plugin_versions.keys())
-    installed = errored.union(loaded).union(disabled)
-    for pluginCompositeId, (storeEntry, remoteInfo) in get_plugins_detail().items():
-        rv[pluginCompositeId] = PluginDetail(
-            status="available",
-            store_info=storeEntry,
-            remote_info=remoteInfo,
+@router.get("/list")
+async def get_plugin_list() -> PluginListing:
+    """Return a full listing of all known plugins with install, settings, and error detail."""
+    try:
+        return await build_plugin_listing()
+    except PluginManagerBusy:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Plugin manager is busy; retry later",
         )
-    for pluginCompositeId in installed:
-        if pluginCompositeId in errored:
-            status = "errored"
-        elif pluginCompositeId in loaded:
-            status = "loaded"
-        elif pluginCompositeId in disabled:
-            status = "disabled"
-        else:
-            status = "available"
-        update = {
-            "status": status,
-            "errored_detail": statuses.plugin_errors.get(pluginCompositeId, None),  # ty:ignore[no-matching-overload]
-            "loaded_version": statuses.plugin_versions.get(pluginCompositeId, None),  # ty:ignore[no-matching-overload]
-            "update_datetime": statuses.plugin_updatedatetime.get(pluginCompositeId, None),  # ty:ignore[no-matching-overload]
-        }
-        if pluginCompositeId not in rv:
-            rv[pluginCompositeId] = PluginDetail(**update)  # ty:ignore[invalid-argument-type]
-        else:
-            rv[pluginCompositeId] = rv[pluginCompositeId].model_copy(update=update)
-    return PluginListing(plugins=rv)
 
 
 # TODO ideally we'd return the redirect here, but that is basically guaranteed to end up with a 503 because

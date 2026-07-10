@@ -24,17 +24,29 @@ def test_dbs_created(backend_client: httpx.Client) -> None:
 
 
 def test_plugin_install_state_persisted(backend_client: httpx.Client) -> None:
-    """Verify the test plugin install is reported via /plugin/status with no install error."""
+    """Verify the test plugin install is reported via /status with no install error."""
+    from .conftest import testPluginId
 
     def do_action() -> dict:
-        response = backend_client.get("/plugin/status", timeout=10)
+        response = backend_client.get("/status", timeout=10)
         assert response.is_success
         return response.json()
 
     def verify_ok(data: dict) -> dict | None:
-        return data if data.get("updater_status") == "ok" else None
+        return data if data.get("plugins") == "ok" else None
 
-    status = retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin loader did not reach 'ok' status")
+    retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin loader did not reach 'ok' status")
 
-    plugin_errors = status.get("plugin_errors", {})
-    assert "localTest:single" not in plugin_errors, f"Test plugin reported an error: {plugin_errors.get('localTest:single')}"
+    listing_response = backend_client.get("/plugin/list", timeout=10)
+    assert listing_response.is_success
+    plugins = listing_response.json().get("plugins", {})
+    plugin_key = str(testPluginId)
+    plugin_detail = plugins.get(plugin_key, None)
+    assert plugin_detail is not None, f"Test plugin {plugin_key!r} not found in /plugin/list"
+    install_data = plugin_detail.get("install_data", None)
+    assert install_data is not None, f"Test plugin has no install_data in /plugin/list"
+    install_errors = install_data.get("install_errors", [])
+    error_severities = [e.get("severity") for e in install_errors]
+    assert "error" not in error_severities and "critical" not in error_severities, (
+        f"Test plugin reported install error(s): {install_errors}"
+    )

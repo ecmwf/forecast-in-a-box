@@ -247,12 +247,12 @@ def test_plugin_template_in_blueprint_list(backend_client_user: httpx.Client) ->
     from .conftest import testPluginId
 
     def do_action() -> dict:
-        response = backend_client_user.get("/plugin/status", timeout=10)
+        response = backend_client_user.get("/status", timeout=10)
         assert response.is_success
         return response.json()
 
     def verify_ok(data: dict) -> dict | None:
-        return data if data.get("updater_status") == "ok" else None
+        return data if data.get("plugins") == "ok" else None
 
     retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin loader did not reach 'ok' status")
 
@@ -322,12 +322,12 @@ def test_plugin_template_exclusion(backend_client_user: httpx.Client, backend_cl
 
     # Wait for the re-ingest to complete.
     def do_action() -> dict:
-        resp = backend_client_user.get("/plugin/status", timeout=10)
+        resp = backend_client_user.get("/status", timeout=10)
         assert resp.is_success
         return resp.json()
 
     def verify_ok(data: dict) -> dict | None:
-        return data if data.get("updater_status") == "ok" else None
+        return data if data.get("plugins") == "ok" else None
 
     retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin re-ingest did not reach 'ok' status")
 
@@ -340,17 +340,19 @@ def test_plugin_template_exclusion(backend_client_user: httpx.Client, backend_cl
     assert "testBasic" in names, f"testBasic should still be present, but found: {names}"
     assert "testRemapping" in names, f"testRemapping should be present, but found: {names}"
 
-    # Verify that /plugin/status reflects the active/excluded template split correctly.
+    # Verify that /plugin/list reflects the active/excluded template split correctly.
     plugin_id_key = str(testPluginId)
-    status_response = backend_client_user.get("/plugin/status", timeout=10)
-    assert status_response.is_success, status_response.text
-    status_data = status_response.json()
-    active = status_data.get("plugin_active_templates", {}).get(plugin_id_key, [])
-    excluded_names = status_data.get("plugin_excluded_template_names", {}).get(plugin_id_key, [])
+    list_response = backend_client_user.get("/plugin/list", timeout=10)
+    assert list_response.is_success, list_response.text
+    list_data = list_response.json()
+    plugin_detail = list_data.get("plugins", {}).get(plugin_id_key, {})
+    settings = plugin_detail.get("settings_data", {}) or {}
+    active = settings.get("included_templates", [])
+    excluded_config = settings.get("excluded_templates", [])
     assert "testExclusion" not in active, f"testExclusion should not be active, got: {active}"
     assert "testBasic" in active, f"testBasic should be active, got: {active}"
     assert "testRemapping" in active, f"testRemapping should be active, got: {active}"
-    assert "testExclusion" in excluded_names, f"testExclusion should appear in excluded_template_names, got: {excluded_names}"
+    assert "testExclusion" in excluded_config, f"testExclusion should appear in excluded_templates, got: {excluded_config}"
 
     # Excluded template must return 403 from templateExampleValues.
     response = backend_client_user.get(
@@ -399,19 +401,19 @@ def test_plugin_template_exclusion(backend_client_user: httpx.Client, backend_cl
 
 def test_plugin_template_validation_failure(backend_client_user: httpx.Client) -> None:
     """Templates that fail validation with their example values are absent from the blueprint list
-    and their error is reported in plugin_errors in the plugin status."""
+    and their error is reported in load_errors in the plugin listing."""
     from .conftest import testPluginId
 
     # Wait for the initial plugin load to finish.
     def do_action() -> dict:
-        response = backend_client_user.get("/plugin/status", timeout=10)
+        response = backend_client_user.get("/status", timeout=10)
         assert response.is_success
         return response.json()
 
     def verify_ok(data: dict) -> dict | None:
-        return data if data.get("updater_status") == "ok" else None
+        return data if data.get("plugins") == "ok" else None
 
-    status = retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin loader did not reach 'ok' status")
+    retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin loader did not reach 'ok' status")
 
     # testFailValidation must NOT appear in the blueprint list.
     response = backend_client_user.get("/blueprint/list", timeout=10)
@@ -420,15 +422,14 @@ def test_plugin_template_validation_failure(backend_client_user: httpx.Client) -
     names = [b.get("display_name") for b in blueprints if b.get("source") == "plugin_template"]
     assert "testFailValidation" not in names, f"testFailValidation should have been rejected but found in: {names}"
 
-    # Its error must be reported in plugin_errors (merged alongside install errors).
-    # PluginsStatus dict keys for PluginCompositeId are serialized via str(plugin_id).
+    # Its error must be reported in load_errors for the plugin in /plugin/list.
     plugin_id_key = str(testPluginId)
-    plugin_errors = status.get("plugin_errors", {})
-    plugin_error_entries = plugin_errors.get(plugin_id_key, [])
-    details = " ".join(e.get("detail", "") for e in plugin_error_entries)
-    assert "testFailValidation" in details, (
-        f"Expected 'testFailValidation' in plugin_errors[{plugin_id_key!r}], got: {plugin_error_entries!r}"
-    )
+    list_response = backend_client_user.get("/plugin/list", timeout=10)
+    assert list_response.is_success, list_response.text
+    plugin_detail = list_response.json().get("plugins", {}).get(plugin_id_key, {})
+    load_errors = plugin_detail.get("load_errors", [])
+    details = " ".join(e.get("detail", "") for e in load_errors)
+    assert "testFailValidation" in details, f"Expected 'testFailValidation' in load_errors for {plugin_id_key!r}, got: {load_errors!r}"
 
 
 def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> None:

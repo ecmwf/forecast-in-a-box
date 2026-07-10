@@ -17,7 +17,7 @@ The synchronization logic is handled by a PluginManager with a single lock.
 Pyrsistent immutable structures are used for shared state (plugins, errors),
 making reads safe without locks. The lock is only acquired when swapping the
 top-level structure pointers on writes. Plugin versions and timestamps are
-persisted in the DB and read back by status_full; they are not held in memory.
+persisted in the DB and read back via domain.plugin.detail; they are not held in memory.
 
 There is at most one thread at any time doing any pip/importlib operations,
 thus inside these updater threads we don't need any other critical sections.
@@ -33,9 +33,8 @@ import re
 import threading
 import time
 from concurrent.futures import Future
-from typing import Literal
 
-from cascade.low.func import Either, assert_never
+from cascade.low.func import Either
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
 from packaging.version import Version
@@ -45,7 +44,6 @@ from pyrsistent.typing import PMap
 from forecastbox.domain.plugin.compatibility import install_plugin_compatibly
 from forecastbox.domain.plugin.db import (
     clear_asset_ingest_needed,
-    get_all_plugin_states,
     get_plugin_state,
     update_template_errors,
     upsert_plugin_state,
@@ -54,8 +52,6 @@ from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_version
-from forecastbox.utility.pydantic import FiabBaseModel
-from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
 
@@ -396,22 +392,6 @@ def submit_load_plugins(start_after: Future[None]) -> None:
             PluginManager.updater.start()
 
 
-class PluginsStatus(FiabBaseModel):
-    # TODO Change these fields to use pyrsistent types (PMap) instead of dict once we solve pydantic serialization.
-    # However, no immediate hotfix is needed as this class is constructed with a lock, ie, consistently
-    updater_status: Literal["ok", "running", "retrieving"] | str
-    plugin_errors: dict[PluginCompositeId, PluginErrors]
-    plugin_versions: dict[PluginCompositeId, str]
-    plugin_updatedatetime: dict[PluginCompositeId, str]
-    plugin_enabled: dict[PluginCompositeId, bool]
-    plugin_excluded_templates: dict[PluginCompositeId, list[str]]
-    plugin_glyph_remapping: dict[PluginCompositeId, dict[str, str]]
-    plugin_active_templates: dict[PluginCompositeId, list[str]]
-    """For each currently loaded plugin: template names that are not excluded. Absent for disabled/unloaded plugins."""
-    plugin_excluded_template_names: dict[PluginCompositeId, list[str]]
-    """For each currently loaded plugin: template names that are excluded by admin settings. Absent for disabled/unloaded plugins."""
-
-
 def status_brief() -> str:
     # NOTE this may be called without locking, we don't risk collection mutation during iteration
     if PluginManager.updater_error is not None:
@@ -424,74 +404,6 @@ def status_brief() -> str:
 
 def plugins_ready() -> bool:
     return status_brief() == "ok"
-
-
-async def status_full() -> PluginsStatus:
-    plugins_snapshot: dict[PluginCompositeId, Plugin] = {}
-    with timed_acquire(PluginManager.lock, 0.2) as result:
-        if not result:
-            status = "retrieving"
-            plugin_errors: dict[PluginCompositeId, PluginErrors] = {}
-        else:
-            status = status_brief()
-            plugin_errors = dict(PluginManager.errors)
-            plugins_snapshot = dict(PluginManager.plugins)
-    plugin_versions: dict[PluginCompositeId, str] = {}
-    plugin_updatedatetime: dict[PluginCompositeId, str] = {}
-    plugin_enabled: dict[PluginCompositeId, bool] = {}
-    plugin_excluded_templates: dict[PluginCompositeId, list[str]] = {}
-    plugin_glyph_remapping: dict[PluginCompositeId, dict[str, str]] = {}
-    try:
-        states = await get_all_plugin_states()
-        for state in states:
-            try:
-                plugin_id = PluginCompositeId.from_str(state.plugin_id)  # type: ignore[arg-type]
-            except Exception:
-                logger.warning(f"could not parse plugin_id {state.plugin_id!r} from DB; skipping")
-                continue
-            db_plugin_errors: PluginErrors = PluginErrors(
-                [
-                    PluginError(**e)  # type: ignore[arg-type]
-                    for e in (state.plugin_errors or [])  # type: ignore[union-attr]
-                ]
-            )
-            if db_plugin_errors:
-                existing = plugin_errors.get(plugin_id, [])
-                plugin_errors[plugin_id] = PluginErrors(existing + db_plugin_errors)
-            plugin_versions[plugin_id] = state.plugin_version  # type: ignore[assignment]
-            plugin_updatedatetime[plugin_id] = value_dt2str(state.updated_at)  # type: ignore[arg-type]
-            plugin_enabled[plugin_id] = bool(state.enabled)
-            plugin_excluded_templates[plugin_id] = list(state.excluded_templates) if state.excluded_templates else []  # type: ignore[arg-type]
-            plugin_glyph_remapping[plugin_id] = dict(state.glyph_remapping) if state.glyph_remapping else {}  # type: ignore[arg-type]
-            if state.template_errors:  # type: ignore[truthy-bool]
-                template_errs: PluginErrors = PluginErrors(
-                    [
-                        PluginError(source="template_ingest", severity="warning", detail=f"template {name!r}: {msg}")
-                        for name, msg in state.template_errors.items()  # type: ignore[union-attr]
-                    ]
-                )
-                existing = plugin_errors.get(plugin_id, [])
-                plugin_errors[plugin_id] = PluginErrors(existing + template_errs)
-    except Exception:
-        logger.warning("failed to load plugin states from DB; status may be incomplete", exc_info=True)
-    plugin_active_templates: dict[PluginCompositeId, list[str]] = {}
-    plugin_excluded_template_names: dict[PluginCompositeId, list[str]] = {}
-    for plugin_id, plugin in plugins_snapshot.items():
-        all_names = [t.display_name for t in plugin.blueprint_templates]
-        excluded_set = set(plugin_excluded_templates.get(plugin_id, []))
-        plugin_active_templates[plugin_id] = [n for n in all_names if n not in excluded_set]
-        plugin_excluded_template_names[plugin_id] = [n for n in all_names if n in excluded_set]
-    return PluginsStatus(
-        updater_status=status,
-        plugin_errors=plugin_errors,
-        plugin_versions=plugin_versions,
-        plugin_updatedatetime=plugin_updatedatetime,
-        plugin_enabled=plugin_enabled,
-        plugin_excluded_templates=plugin_excluded_templates,
-        plugin_glyph_remapping=plugin_glyph_remapping,
-        plugin_active_templates=plugin_active_templates,
-        plugin_excluded_template_names=plugin_excluded_template_names,
-    )
 
 
 def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
