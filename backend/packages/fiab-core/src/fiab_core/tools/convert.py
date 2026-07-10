@@ -9,7 +9,7 @@
 
 """Utilities for converting between various representations"""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import NewType, Self
 
 from fiab_core.types import UnrestrictedGeoDomainLiteral
@@ -20,7 +20,7 @@ GeoDomainRuntimeType = list[str] | UnrestrictedGeoDomainLiteral | list[int]
 @dataclass
 class GeoDomainWrapper:
     value: GeoDomainRuntimeType
-    fmt = "wsen"
+    fmt: str = field(default="wsen")
 
     def with_bbox_ordering(self, fmt: str) -> Self:
         """Give some permutation of 'wsen' to reorder the bbox inside. If geo domain is inside instead,
