@@ -91,6 +91,11 @@ def map_plot(
 
     resolved_domain = None if (isinstance(domain, str) and domain in UnrestrictedGeoDomainAlias.items) else domain
 
+    # bbox: reorder wire [W, S, E, N] to earthkit's [W, E, S, N]
+    if isinstance(resolved_domain, list) and len(resolved_domain) == 4 and all(isinstance(c, int) for c in resolved_domain):
+        west, south, east, north = resolved_domain
+        resolved_domain = [west, east, south, north]
+
     if groupby and groupby != "none":
         unique_values = iter_utils.flatten(arg.metadata(groupby) for arg in fields)
         unique_values = list(dict.fromkeys(unique_values))
