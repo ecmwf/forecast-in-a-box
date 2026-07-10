@@ -9,7 +9,6 @@
 
 """Unit tests for plugin route helpers — version/specifier parsing logic and /versions route."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -230,11 +229,8 @@ def _make_plugin_state(excluded: list[str] | None = None, remapping: dict[str, s
     return state
 
 
-def _run(coro: object) -> object:  # type: ignore[type-arg]
-    return asyncio.run(coro)  # type: ignore[arg-type]
-
-
-def test_template_example_values_returns_examples() -> None:
+@pytest.mark.asyncio
+async def test_template_example_values_returns_examples() -> None:
     plugin = _make_plugin(_TEMPLATE_WITH_EXAMPLES)
     state = _make_plugin_state()
     with (
@@ -242,12 +238,13 @@ def test_template_example_values_returns_examples() -> None:
         patch("forecastbox.routes.plugins.get_plugin_state", new=AsyncMock(return_value=state)),
     ):
         mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
-        result = _run(get_template_example_values(_PLUGIN_ID, "myTemplate"))
+        result = await get_template_example_values(_PLUGIN_ID, "myTemplate")
     assert result.example_values == {_BLOCK_A: {_TEXT: "${exampleGlyph}"}}
     assert result.example_glyphs == {"exampleGlyph": "hello world"}
 
 
-def test_template_example_values_applies_remapping() -> None:
+@pytest.mark.asyncio
+async def test_template_example_values_applies_remapping() -> None:
     plugin = _make_plugin(_TEMPLATE_WITH_EXAMPLES)
     state = _make_plugin_state(remapping={"exampleGlyph": "renamedGlyph"})
     with (
@@ -255,31 +252,34 @@ def test_template_example_values_applies_remapping() -> None:
         patch("forecastbox.routes.plugins.get_plugin_state", new=AsyncMock(return_value=state)),
     ):
         mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
-        result = _run(get_template_example_values(_PLUGIN_ID, "myTemplate"))
+        result = await get_template_example_values(_PLUGIN_ID, "myTemplate")
     # Key renamed, value's glyph reference renamed
     assert result.example_glyphs == {"renamedGlyph": "hello world"}
     # The example_value string referencing ${exampleGlyph} must be rewritten
     assert result.example_values[_BLOCK_A][_TEXT] == "${renamedGlyph}"
 
 
-def test_template_example_values_404_unknown_plugin() -> None:
+@pytest.mark.asyncio
+async def test_template_example_values_404_unknown_plugin() -> None:
     with patch("forecastbox.routes.plugins.PluginManager") as mock_pm:
         mock_pm.plugins = pmap()
         with pytest.raises(HTTPException) as exc_info:
-            _run(get_template_example_values(_PLUGIN_ID, "myTemplate"))
+            await get_template_example_values(_PLUGIN_ID, "myTemplate")
     assert exc_info.value.status_code == 404
 
 
-def test_template_example_values_404_unknown_display_name() -> None:
+@pytest.mark.asyncio
+async def test_template_example_values_404_unknown_display_name() -> None:
     plugin = _make_plugin(_TEMPLATE_WITH_EXAMPLES)
     with patch("forecastbox.routes.plugins.PluginManager") as mock_pm:
         mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
         with pytest.raises(HTTPException) as exc_info:
-            _run(get_template_example_values(_PLUGIN_ID, "nonExistent"))
+            await get_template_example_values(_PLUGIN_ID, "nonExistent")
     assert exc_info.value.status_code == 404
 
 
-def test_template_example_values_403_excluded() -> None:
+@pytest.mark.asyncio
+async def test_template_example_values_403_excluded() -> None:
     plugin = _make_plugin(_TEMPLATE_WITH_EXAMPLES)
     state = _make_plugin_state(excluded=["myTemplate"])
     with (
@@ -288,5 +288,5 @@ def test_template_example_values_403_excluded() -> None:
     ):
         mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
         with pytest.raises(HTTPException) as exc_info:
-            _run(get_template_example_values(_PLUGIN_ID, "myTemplate"))
+            await get_template_example_values(_PLUGIN_ID, "myTemplate")
     assert exc_info.value.status_code == 403

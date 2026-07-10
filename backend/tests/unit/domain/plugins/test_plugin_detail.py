@@ -13,7 +13,6 @@ Covers the included_templates / excluded_templates / load_errors / install_data
 fields derived from the in-memory plugin state and DB rows.
 """
 
-import asyncio
 import threading
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -81,10 +80,6 @@ def _make_db_state(
     return state
 
 
-def _run(coro: object) -> object:  # type: ignore[type-arg]
-    return asyncio.run(coro)  # type: ignore[arg-type]
-
-
 def _patch_db(states: list[MagicMock]) -> object:
     return patch("forecastbox.domain.plugin.detail.get_all_plugin_states", new=AsyncMock(return_value=states))
 
@@ -113,7 +108,8 @@ def _patch_manager(plugins: dict, errors: dict) -> object:
 # ---------------------------------------------------------------------------
 
 
-def test_included_templates_all_when_no_exclusions() -> None:
+@pytest.mark.asyncio
+async def test_included_templates_all_when_no_exclusions() -> None:
     plugin = _make_plugin("alpha", "beta", "gamma")
     state = _make_db_state(_PLUGIN_A, excluded=[])
 
@@ -127,7 +123,7 @@ def test_included_templates_all_when_no_exclusions() -> None:
         mock_pm.plugins = pmap({_PLUGIN_A: plugin})
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     detail = result.plugins[_PLUGIN_A]
     assert detail.settings_data is not None
@@ -135,7 +131,8 @@ def test_included_templates_all_when_no_exclusions() -> None:
     assert detail.settings_data.excluded_templates == []
 
 
-def test_excluded_template_removed_from_included() -> None:
+@pytest.mark.asyncio
+async def test_excluded_template_removed_from_included() -> None:
     plugin = _make_plugin("alpha", "beta", "gamma")
     state = _make_db_state(_PLUGIN_A, excluded=["beta"])
 
@@ -149,7 +146,7 @@ def test_excluded_template_removed_from_included() -> None:
         mock_pm.plugins = pmap({_PLUGIN_A: plugin})
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     sd = result.plugins[_PLUGIN_A].settings_data
     assert sd is not None
@@ -157,7 +154,8 @@ def test_excluded_template_removed_from_included() -> None:
     assert sd.excluded_templates == ["beta"]
 
 
-def test_all_templates_excluded_gives_empty_included() -> None:
+@pytest.mark.asyncio
+async def test_all_templates_excluded_gives_empty_included() -> None:
     plugin = _make_plugin("t1", "t2")
     state = _make_db_state(_PLUGIN_A, excluded=["t1", "t2"])
 
@@ -171,7 +169,7 @@ def test_all_templates_excluded_gives_empty_included() -> None:
         mock_pm.plugins = pmap({_PLUGIN_A: plugin})
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     sd = result.plugins[_PLUGIN_A].settings_data
     assert sd is not None
@@ -179,7 +177,8 @@ def test_all_templates_excluded_gives_empty_included() -> None:
     assert set(sd.excluded_templates) == {"t1", "t2"}
 
 
-def test_nonexistent_excluded_name_does_not_affect_included() -> None:
+@pytest.mark.asyncio
+async def test_nonexistent_excluded_name_does_not_affect_included() -> None:
     """A name in excluded_templates that doesn't match any template is still stored but doesn't remove any included."""
     plugin = _make_plugin("alpha", "beta")
     state = _make_db_state(_PLUGIN_A, excluded=["nonexistent", "beta"])
@@ -194,7 +193,7 @@ def test_nonexistent_excluded_name_does_not_affect_included() -> None:
         mock_pm.plugins = pmap({_PLUGIN_A: plugin})
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     sd = result.plugins[_PLUGIN_A].settings_data
     assert sd is not None
@@ -202,7 +201,8 @@ def test_nonexistent_excluded_name_does_not_affect_included() -> None:
     assert set(sd.excluded_templates) == {"nonexistent", "beta"}
 
 
-def test_disabled_plugin_has_empty_included_templates() -> None:
+@pytest.mark.asyncio
+async def test_disabled_plugin_has_empty_included_templates() -> None:
     """A disabled plugin should have settings_data with included_templates=[]."""
     state = _make_db_state(_PLUGIN_B, excluded=["something"], enabled=False)
 
@@ -216,7 +216,7 @@ def test_disabled_plugin_has_empty_included_templates() -> None:
         mock_pm.plugins = pmap()  # not loaded
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     detail = result.plugins[_PLUGIN_B]
     assert detail.settings_data is not None
@@ -224,7 +224,8 @@ def test_disabled_plugin_has_empty_included_templates() -> None:
     assert detail.settings_data.included_templates == []
 
 
-def test_multiple_plugins_computed_independently() -> None:
+@pytest.mark.asyncio
+async def test_multiple_plugins_computed_independently() -> None:
     plugin_a = _make_plugin("x", "y")
     plugin_b = _make_plugin("p", "q", "r")
     state_a = _make_db_state(_PLUGIN_A, excluded=["x"])
@@ -240,7 +241,7 @@ def test_multiple_plugins_computed_independently() -> None:
         mock_pm.plugins = pmap({_PLUGIN_A: plugin_a, _PLUGIN_B: plugin_b})
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     sd_a = result.plugins[_PLUGIN_A].settings_data
     sd_b = result.plugins[_PLUGIN_B].settings_data
@@ -250,7 +251,8 @@ def test_multiple_plugins_computed_independently() -> None:
     assert set(sd_b.excluded_templates) == {"q", "r"}
 
 
-def test_plugin_with_no_templates_gives_empty_included() -> None:
+@pytest.mark.asyncio
+async def test_plugin_with_no_templates_gives_empty_included() -> None:
     plugin = _make_plugin()
     state = _make_db_state(_PLUGIN_A)
 
@@ -264,14 +266,15 @@ def test_plugin_with_no_templates_gives_empty_included() -> None:
         mock_pm.plugins = pmap({_PLUGIN_A: plugin})
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     sd = result.plugins[_PLUGIN_A].settings_data
     assert sd is not None
     assert sd.included_templates == []
 
 
-def test_plugin_in_memory_without_db_state_has_no_install_data() -> None:
+@pytest.mark.asyncio
+async def test_plugin_in_memory_without_db_state_has_no_install_data() -> None:
     """A plugin loaded in memory but without a DB row should have install_data=None and settings_data=None."""
     plugin = _make_plugin("alpha", "beta")
 
@@ -285,7 +288,7 @@ def test_plugin_in_memory_without_db_state_has_no_install_data() -> None:
         mock_pm.plugins = pmap({_PLUGIN_A: plugin})
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     detail = result.plugins[_PLUGIN_A]
     assert detail.install_data is None
@@ -298,7 +301,8 @@ def test_plugin_in_memory_without_db_state_has_no_install_data() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_install_data_populated_when_db_state_exists() -> None:
+@pytest.mark.asyncio
+async def test_install_data_populated_when_db_state_exists() -> None:
     state = _make_db_state(_PLUGIN_A, version="2.3.1")
 
     with (
@@ -311,7 +315,7 @@ def test_install_data_populated_when_db_state_exists() -> None:
         mock_pm.plugins = pmap()
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     detail = result.plugins[_PLUGIN_A]
     assert detail.install_data is not None
@@ -320,7 +324,8 @@ def test_install_data_populated_when_db_state_exists() -> None:
     assert detail.install_data.install_errors == []
 
 
-def test_settings_data_absent_when_install_failed() -> None:
+@pytest.mark.asyncio
+async def test_settings_data_absent_when_install_failed() -> None:
     """If install_errors contain an error-severity entry, settings_data must be None."""
     state = _make_db_state(
         _PLUGIN_A,
@@ -338,7 +343,7 @@ def test_settings_data_absent_when_install_failed() -> None:
         mock_pm.plugins = pmap()
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     detail = result.plugins[_PLUGIN_A]
     assert detail.install_data is not None
@@ -347,7 +352,8 @@ def test_settings_data_absent_when_install_failed() -> None:
     assert detail.settings_data is None
 
 
-def test_settings_data_present_when_only_warnings() -> None:
+@pytest.mark.asyncio
+async def test_settings_data_present_when_only_warnings() -> None:
     """Install warnings should not suppress settings_data."""
     state = _make_db_state(
         _PLUGIN_A,
@@ -364,7 +370,7 @@ def test_settings_data_present_when_only_warnings() -> None:
         mock_pm.plugins = pmap()
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     detail = result.plugins[_PLUGIN_A]
     assert detail.settings_data is not None
@@ -375,7 +381,8 @@ def test_settings_data_present_when_only_warnings() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_load_errors_from_in_memory_errors() -> None:
+@pytest.mark.asyncio
+async def test_load_errors_from_in_memory_errors() -> None:
     state = _make_db_state(_PLUGIN_A)
     in_mem_err = PluginErrors([PluginError(source="load", severity="error", detail="import failed")])
 
@@ -389,7 +396,7 @@ def test_load_errors_from_in_memory_errors() -> None:
         mock_pm.plugins = pmap()
         mock_pm.errors = pmap({_PLUGIN_A: in_mem_err})
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     detail = result.plugins[_PLUGIN_A]
     assert len(detail.load_errors) == 1
@@ -397,7 +404,8 @@ def test_load_errors_from_in_memory_errors() -> None:
     assert detail.load_errors[0].severity == "error"
 
 
-def test_load_errors_include_template_errors_from_db() -> None:
+@pytest.mark.asyncio
+async def test_load_errors_include_template_errors_from_db() -> None:
     state = _make_db_state(_PLUGIN_A, template_errors={"myTemplate": "validation failed"})
 
     with (
@@ -410,7 +418,7 @@ def test_load_errors_include_template_errors_from_db() -> None:
         mock_pm.plugins = pmap()
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     detail = result.plugins[_PLUGIN_A]
     assert len(detail.load_errors) == 1
@@ -419,7 +427,8 @@ def test_load_errors_include_template_errors_from_db() -> None:
     assert "myTemplate" in detail.load_errors[0].detail
 
 
-def test_load_errors_combined_from_memory_and_db() -> None:
+@pytest.mark.asyncio
+async def test_load_errors_combined_from_memory_and_db() -> None:
     in_mem_err = PluginErrors([PluginError(source="load", severity="warning", detail="minor")])
     state = _make_db_state(_PLUGIN_A, template_errors={"tmpl": "bad"})
 
@@ -433,7 +442,7 @@ def test_load_errors_combined_from_memory_and_db() -> None:
         mock_pm.plugins = pmap()
         mock_pm.errors = pmap({_PLUGIN_A: in_mem_err})
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     detail = result.plugins[_PLUGIN_A]
     sources = {e.source for e in detail.load_errors}
@@ -445,7 +454,8 @@ def test_load_errors_combined_from_memory_and_db() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_raises_plugin_manager_busy_when_lock_not_acquired() -> None:
+@pytest.mark.asyncio
+async def test_raises_plugin_manager_busy_when_lock_not_acquired() -> None:
     """If the PluginManager lock cannot be acquired, PluginManagerBusy is raised."""
     busy_lock = threading.Lock()
     busy_lock.acquire()  # hold the lock so timed_acquire times out
@@ -456,7 +466,7 @@ def test_raises_plugin_manager_busy_when_lock_not_acquired() -> None:
         mock_pm.errors = pmap()
 
         with pytest.raises(PluginManagerBusy):
-            _run(build_plugin_listing())
+            await build_plugin_listing()
 
     busy_lock.release()
 
@@ -466,7 +476,8 @@ def test_raises_plugin_manager_busy_when_lock_not_acquired() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_glyph_remapping_propagated_to_settings() -> None:
+@pytest.mark.asyncio
+async def test_glyph_remapping_propagated_to_settings() -> None:
     state = _make_db_state(_PLUGIN_A, glyph_remapping={"old": "new"})
 
     with (
@@ -479,7 +490,7 @@ def test_glyph_remapping_propagated_to_settings() -> None:
         mock_pm.plugins = pmap()
         mock_pm.errors = pmap()
 
-        result = _run(build_plugin_listing())
+        result = await build_plugin_listing()
 
     sd = result.plugins[_PLUGIN_A].settings_data
     assert sd is not None
