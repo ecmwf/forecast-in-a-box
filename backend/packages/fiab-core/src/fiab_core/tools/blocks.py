@@ -29,6 +29,7 @@ from fiab_core.fable import (
     Error,
     QubedOutput,
 )
+from fiab_core.tools.convert import GeoDomainWrapper
 from fiab_core.types import ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
 
 
@@ -181,11 +182,12 @@ class BlockInstanceRich:
                 validator(item, option_id)
         return typed_raw_value
 
-    def config_as_geodomain(self, key: str | ConfigurationOptionId) -> str | list[int] | list[str]:
-        # NOTE validators hard here due to being such a large union...
+    def config_as_geodomain(self, key: str | ConfigurationOptionId) -> GeoDomainWrapper:
+        # NOTE validators are hard to support here due to being such a large union...
         option_id, option = self._get_configuration_option(key)
         raw_value = self._get_raw_value(option_id)
-        return raw_value  # ty: ignore[invalid-return-type] # we have nothing to add on top of validator
+        # NOTE we ignore types as we trust parser -- but its fragile!
+        return GeoDomainWrapper(raw_value)  # ty:ignore[invalid-argument-type]
 
 
 class QubedBlockBuilder(abc.ABC):

@@ -15,14 +15,14 @@ Provides parsing, validation, and conversion for a small set of type expressions
 - country (string subtype)
 - enumClosed[...], enumOpen[...] (enumeration types)
 - list[FableType] (container types)
-- bbox (bounding box: exactly four integers)
+- bboxWSEN (bounding box: exactly four integers, west-south-east-north, obeying constraints)
 - geodomain (bounding box or region/country names; the frontend renders a map/region picker)
 - union[FableType, ...] (union types)
 """
 
 from abc import ABC, abstractmethod
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Iterable, Literal, get_args
 
 # PSEUDO TYPES / EXCEPTIONS
 
@@ -181,7 +181,7 @@ class DatetimeType(FableType):
 class ClosedEnumType(FableType):
     """Closed enumeration type. Validates membership in the enum; conversion is a no-op."""
 
-    def __init__(self, items: list[str]) -> None:
+    def __init__(self, items: Iterable[str]) -> None:
         self.items = items
         self._item_set = set(items)
 
@@ -267,7 +267,7 @@ class UnionType(FableType):
 # DOMAIN TYPES
 
 
-class BoundingBoxType(ListType):
+class BoundingBoxWSENType(ListType):
     """Bounding box type. A list of exactly four integers: [west, south, east, north]. Validates eg:
     - latitudes are [-90, 90],
     - south <= north;
@@ -279,7 +279,7 @@ class BoundingBoxType(ListType):
     def validate_convert(self, value: Any) -> list[int]:
         result = super().validate_convert(value)
         if len(result) != 4:
-            raise WrongType(f"BoundingBox must have exactly 4 elements, got {len(result)}")
+            raise WrongType(f"BoundingBoxWSEN must have exactly 4 elements, got {len(result)}")
         west, south, east, north = result
         if not (-90 <= south <= 90 and -90 <= north <= 90):
             raise WrongType(f"Invalid bounding box latitudes south={south}, north={north} (must be within [-90, 90])")
@@ -288,11 +288,12 @@ class BoundingBoxType(ListType):
         return result
 
     def serialize(self) -> str:
-        return "bbox"
+        return "bboxWSEN"
 
 
 # NOTE convert to Type class if ever needs to be `serialize`d
-UnrestrictedGeoDomainAlias = ClosedEnumType(["auto", "global", "datadefined"])
+UnrestrictedGeoDomainLiteral = Literal["auto", "global", "datadefined"]
+UnrestrictedGeoDomainAlias = ClosedEnumType(get_args(UnrestrictedGeoDomainLiteral))
 
 
 class GeoDomainSingleType(StringType):
@@ -317,7 +318,7 @@ class GeoDomainType(UnionType):
     """An alias for a union over bounding box, list of single geo domains, and a single geo domain type."""
 
     def __init__(self) -> None:
-        super().__init__([BoundingBoxType(), UnrestrictedGeoDomainAlias, ListType(GeoDomainSingleType())])
+        super().__init__([BoundingBoxWSENType(), UnrestrictedGeoDomainAlias, ListType(GeoDomainSingleType())])
 
     def serialize(self) -> str:
         return "geodomain"
@@ -332,7 +333,7 @@ def parse(type_expr: str) -> tuple[FableType, str]:
     was consumed.
 
     Supports:
-    - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'country', 'bbox'
+    - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'country', 'bboxWSEN'
     - Enumerations: 'enumClosed[item1,item2]', 'enumOpen[item1,item2]'
     - Lists: 'list[int]', 'list[enumClosed[...]]', etc.
     - Union: 'union[int,str]', 'union[enumClosed[a,b],date]', etc.
@@ -350,7 +351,7 @@ def parse(type_expr: str) -> tuple[FableType, str]:
         ("int", IntType),
         ("str", StringType),
         ("geodomainSingle", GeoDomainSingleType),
-        ("bbox", BoundingBoxType),
+        ("bboxWSEN", BoundingBoxWSENType),
         ("geodomain", GeoDomainType),
     ]
     for name, factory in _ATOMIC:
@@ -397,6 +398,6 @@ def parse(type_expr: str) -> tuple[FableType, str]:
 
     raise NotFableType(
         f"Invalid type expression: {type_expr!r}. "
-        "Expected one of: str, int, float, date, datetime, country, bbox, geodomain, "
+        "Expected one of: str, int, float, date, datetime, country, bboxWSEN, geodomain, "
         "enumClosed[...], enumOpen[...], list[...], union[...]"
     )

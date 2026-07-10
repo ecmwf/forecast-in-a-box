@@ -1037,3 +1037,59 @@ class TestMapPlotSink:
         block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block=config).get_or_raise()
         assert action.nodes.dims == dims
+
+    def _get_map_plot_domain(self, action: Action) -> object:
+        for _, arr in nodetree_arrays(action.nodes):
+            for node in arr.values.flat:
+                if hasattr(node, "payload") and "map_plot" in node.payload.func:
+                    return node.payload.kwargs["domain"]
+        raise AssertionError("map_plot payload not found in compiled action")
+
+    def test_compile_bbox_domain_is_reordered_to_wesn(
+        self, operational_forecast_source_output: QubedOutput, operational_forecast_source_action: Action
+    ) -> None:
+        # Domain stored as WSEN [W=-10, S=35, E=30, N=60]; earthkit-plots expects WESN.
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockFactoryId("mapPlotSink"),
+            BlockInstanceBase(
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t"],
+                        "domain": [-10, 35, 30, 60],
+                        "format": "png",
+                        "groupby": "none",
+                        "splitby": [],
+                    }
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
+        action = block.compile(inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block=config).get_or_raise()
+        assert self._get_map_plot_domain(action) == [-10, 30, 35, 60]
+
+    def test_compile_region_domain_is_passed_through(
+        self, operational_forecast_source_output: QubedOutput, operational_forecast_source_action: Action
+    ) -> None:
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockFactoryId("mapPlotSink"),
+            BlockInstanceBase(
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {
+                        "param": ["2t"],
+                        "domain": ["global"],
+                        "format": "png",
+                        "groupby": "none",
+                        "splitby": [],
+                    }
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
+        action = block.compile(inputs={BlockInstanceId("source_output"): operational_forecast_source_action}, block=config).get_or_raise()
+        assert self._get_map_plot_domain(action) == ["global"]
