@@ -25,12 +25,14 @@ import logging
 
 from fiab_core.fable import PluginCompositeId
 from fiab_core.plugin import Plugin
+from pydantic import Field
 
 from forecastbox.domain.plugin.db import get_all_plugin_states
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail
+from forecastbox.schemata.jobs import PluginState
 from forecastbox.utility.concurrent import timed_acquire
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -82,7 +84,7 @@ class PluginDetail(FiabBaseModel):
     settings_data: PluginInstallSettings | None = None
     """Available only if the plugin was successfully installed (no install-phase errors
     of severity error or critical)."""
-    load_errors: PluginErrors
+    load_errors: PluginErrors = Field(default_factory=lambda: PluginErrors([]))
     """Load and template-ingestion errors accumulated since the last successful install.
     Always a list; non-empty only when the plugin is installed and enabled. Maximum
     severity determines whether the plugin can be used."""
@@ -108,20 +110,23 @@ def _build_detail(
     remote_info: PluginRemoteInfo | None,
     plugin_in_memory: Plugin | None,
     in_memory_errors: PluginErrors,
-    db_state: object,  # PluginState ORM row or None
+    db_state: PluginState | None,
 ) -> PluginDetail:
     generic_data = PluginGenericData(store_info=store_entry, remote_info=remote_info)
 
     if db_state is None:
-        return PluginDetail(
-            generic_data=generic_data,
-            load_errors=PluginErrors(list(in_memory_errors)),
-        )
+        if in_memory_errors:
+            logger.warning(
+                f"plugin {PluginCompositeId.to_str(plugin_id)!r} has in-memory errors but no DB state; "
+                "this is unexpected -- errors will not be surfaced"
+            )
+        return PluginDetail(generic_data=generic_data)
 
-    # install_data
-    install_errors = PluginErrors(
-        [PluginError(**e) for e in (db_state.plugin_errors or [])]  # type: ignore[union-attr]
-    )
+    # Separate persisted errors by source: install-phase errors go to install_data,
+    # load/template_ingest errors go to load_errors.
+    all_db_errors = PluginErrors([PluginError(**e) for e in (db_state.plugin_errors or [])])  # type: ignore[union-attr]
+    install_errors = PluginErrors([e for e in all_db_errors if e.source == "install"])
+    db_load_errors = PluginErrors([e for e in all_db_errors if e.source != "install"])
     install_data = PluginInstallData(
         local_version=db_state.plugin_version,  # type: ignore[attr-defined]
         update_datetime=value_dt2str(db_state.updated_at),  # type: ignore[attr-defined]
@@ -146,8 +151,8 @@ def _build_detail(
             glyph_remapping=dict(db_state.glyph_remapping) if db_state.glyph_remapping else {},  # type: ignore[arg-type]
         )
 
-    # load_errors -- in-memory errors + template-ingest errors from DB
-    load_error_list: list[PluginError] = list(in_memory_errors)
+    # load_errors -- db non-install errors + in-memory errors + template-ingest errors from DB
+    load_error_list: list[PluginError] = list(db_load_errors) + list(in_memory_errors)
     if db_state.template_errors:  # type: ignore[truthy-bool]
         load_error_list += [
             PluginError(source="template_ingest", severity="warning", detail=f"template {name!r}: {msg}")
@@ -180,7 +185,7 @@ async def build_plugin_listing() -> PluginListing:
     store_detail = get_plugins_detail()
 
     # Index DB states by parsed PluginCompositeId
-    states_by_id: dict[PluginCompositeId, object] = {}
+    states_by_id: dict[PluginCompositeId, PluginState] = {}
     for state in db_states:
         try:
             pid = PluginCompositeId.from_str(state.plugin_id)  # type: ignore[arg-type]

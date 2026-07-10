@@ -1,6 +1,5 @@
 ---
 name: adapt-pr-comments
-description: Analyzes the changes made in the current branch to the codebase in `backend/`, determines how those changes impact the `frontend/` codebase, and writes minimalistic fixes to resolve compatibility issues.
 description: Fetches unresolved comments from the specified PR and applies the fixes.
 argument-hint: <PR-number>
 ---
