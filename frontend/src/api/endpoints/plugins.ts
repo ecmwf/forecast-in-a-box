@@ -19,35 +19,20 @@ import type {
   PluginCompositeId,
   PluginListing,
   PluginSettingsUpdate,
-  PluginsStatus,
   TemplateExampleValues,
 } from '@/api/types/plugins.types'
 import { apiClient } from '@/api/client'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import {
   PluginListingSchema,
-  PluginsStatusSchema,
   TemplateExampleValuesSchema,
 } from '@/api/types/plugins.types'
 
 /**
- * Get plugin system status
- */
-export async function getPluginStatus(): Promise<PluginsStatus> {
-  return apiClient.get(API_ENDPOINTS.plugin.status, {
-    schema: PluginsStatusSchema,
-  })
-}
-
-/**
  * Get all plugin details
- * @param forceRefresh - If true, forces a refresh from the backend
  */
-export async function getPluginDetails(
-  forceRefresh?: boolean,
-): Promise<PluginListing> {
-  return apiClient.get(API_ENDPOINTS.plugin.details, {
-    params: forceRefresh ? { forceRefresh: 'true' } : undefined,
+export async function getPluginList(): Promise<PluginListing> {
+  return apiClient.get(API_ENDPOINTS.plugin.list, {
     schema: PluginListingSchema,
   })
 }

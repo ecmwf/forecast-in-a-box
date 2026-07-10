@@ -17,8 +17,7 @@ import type {
   PluginSettingsUpdate,
 } from '@/api/types/plugins.types'
 import {
-  getPluginDetails,
-  getPluginStatus,
+  getPluginList,
   installPlugin,
   uninstallPlugin,
   updatePlugin,
@@ -45,121 +44,67 @@ function createPluginKey(store: string, local: string): string {
   return `store='${store}' local='${local}'`
 }
 
-describe('getPluginStatus', () => {
+describe('getPluginList', () => {
   afterEach(() => {
     worker.resetHandlers()
   })
 
-  it('fetches plugin status successfully', async () => {
-    const mockResponse = {
-      updater_status: 'idle',
-      plugin_errors: {
-        [createPluginKey('ecmwf', 'legacy-viz')]: [
-          {
-            source: 'load',
-            detail: 'Failed to load: incompatible version',
-            severity: 'error',
-          },
-        ],
-      },
-      plugin_versions: {
-        [createPluginKey('ecmwf', 'anemoi-inference')]: '1.0.0',
-      },
-      plugin_updatedatetime: {
-        [createPluginKey('ecmwf', 'anemoi-inference')]: '2025-01-15T00:00:00',
-      },
-      plugin_enabled: {
-        [createPluginKey('ecmwf', 'anemoi-inference')]: true,
-        [createPluginKey('ecmwf', 'legacy-viz')]: true,
-      },
-      plugin_excluded_templates: {
-        [createPluginKey('ecmwf', 'anemoi-inference')]: ['Excluded Template'],
-      },
-      plugin_glyph_remapping: {
-        [createPluginKey('ecmwf', 'anemoi-inference')]: {
-          old_name: 'new_name',
-        },
-      },
-    }
-
-    worker.use(
-      http.get(API_ENDPOINTS.plugin.status, () => {
-        return HttpResponse.json(mockResponse)
-      }),
-    )
-
-    const result = await getPluginStatus()
-    expect(result.updater_status).toBe('idle')
-    expect(result.plugin_errors).toBeDefined()
-    expect(result.plugin_versions).toBeDefined()
-  })
-})
-
-describe('getPluginDetails', () => {
-  afterEach(() => {
-    worker.resetHandlers()
-  })
-
-  it('fetches plugin details successfully', async () => {
+  it('fetches plugin list successfully', async () => {
     const mockResponse: PluginListing = {
       plugins: {
         [createPluginKey('ecmwf', 'anemoi-inference')]: {
-          status: 'loaded',
-          store_info: {
-            pip_source: 'anemoi-inference',
-            module_name: 'anemoi_inference',
-            display_title: 'Anemoi Inference',
-            display_description: 'ML inference engine',
-            display_author: 'ECMWF',
-            comment: '',
+          generic_data: {
+            store_info: {
+              pip_source: 'anemoi-inference',
+              module_name: 'anemoi_inference',
+              display_title: 'Anemoi Inference',
+              display_description: 'ML inference engine',
+              display_author: 'ECMWF',
+              comment: '',
+            },
+            remote_info: { version: '1.0.0' },
           },
-          remote_info: { version: '1.0.0' },
-          errored_detail: null,
-          loaded_version: '1.0.0',
-          update_datetime: '2025-01-15T00:00:00+00:00',
+          install_data: {
+            local_version: '1.0.0',
+            update_datetime: '2025-01-15T00:00:00+00:00',
+            install_errors: [],
+          },
+          settings_data: {
+            isEnabled: true,
+            excluded_templates: [],
+            included_templates: [],
+            glyph_remapping: {},
+          },
+          load_errors: [],
         },
         [createPluginKey('ecmwf', 'storm-tracker')]: {
-          status: 'available',
-          store_info: {
-            pip_source: 'storm-tracker',
-            module_name: 'storm_tracker',
-            display_title: 'Storm Tracker',
-            display_description: 'Track severe weather',
-            display_author: 'ECMWF',
-            comment: 'New plugin!',
+          generic_data: {
+            store_info: {
+              pip_source: 'storm-tracker',
+              module_name: 'storm_tracker',
+              display_title: 'Storm Tracker',
+              display_description: 'Track severe weather',
+              display_author: 'ECMWF',
+              comment: 'New plugin!',
+            },
+            remote_info: { version: '2.0.0' },
           },
-          remote_info: { version: '2.0.0' },
-          errored_detail: null,
-          loaded_version: null,
-          update_datetime: null,
+          install_data: null,
+          settings_data: null,
+          load_errors: [],
         },
       },
     }
 
     worker.use(
-      http.get(API_ENDPOINTS.plugin.details, () => {
+      http.get(API_ENDPOINTS.plugin.list, () => {
         return HttpResponse.json(mockResponse)
       }),
     )
 
-    const result = await getPluginDetails()
+    const result = await getPluginList()
     expect(result.plugins).toBeDefined()
     expect(Object.keys(result.plugins)).toHaveLength(2)
-  })
-
-  it('passes forceRefresh parameter', async () => {
-    let receivedForceRefresh = false
-
-    worker.use(
-      http.get(API_ENDPOINTS.plugin.details, ({ request }) => {
-        const url = new URL(request.url)
-        receivedForceRefresh = url.searchParams.get('forceRefresh') === 'true'
-        return HttpResponse.json({ plugins: {} })
-      }),
-    )
-
-    await getPluginDetails(true)
-    expect(receivedForceRefresh).toBe(true)
   })
 })
 

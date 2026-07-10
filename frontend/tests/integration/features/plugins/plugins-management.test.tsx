@@ -464,26 +464,36 @@ describe('Plugins Management Integration', () => {
     }
 
     const baseDetail = {
-      store_info: {
-        pip_source: 'fiab-plugin-diag',
-        module_name: 'fiab_plugin_diag',
-        display_title: 'Diag Test',
-        display_description: 'Plugin for diagnostics rendering',
-        display_author: 'ECMWF',
-        comment: '',
+      generic_data: {
+        store_info: {
+          pip_source: 'fiab-plugin-diag',
+          module_name: 'fiab_plugin_diag',
+          display_title: 'Diag Test',
+          display_description: 'Plugin for diagnostics rendering',
+          display_author: 'ECMWF',
+          comment: '',
+        },
+        remote_info: null,
       },
-      remote_info: null,
-      loaded_version: '1.0.0',
-      update_datetime: null,
+      install_data: {
+        local_version: '1.0.0',
+        update_datetime: '2025-01-15T00:00:00+00:00',
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: true,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
     }
 
     it('softens a warning-only errored plugin to an amber Warning badge', async () => {
       worker.use(
-        http.get(API_ENDPOINTS.plugin.details, () =>
+        http.get(API_ENDPOINTS.plugin.list, () =>
           detailsResponse({
             ...baseDetail,
-            status: 'errored',
-            errored_detail: [
+            load_errors: [
               {
                 source: 'template_ingest',
                 detail: "template 'x' failed validation",
@@ -510,12 +520,18 @@ describe('Plugins Management Integration', () => {
 
     it('keeps the red Errored badge when any diagnostic is an error', async () => {
       worker.use(
-        http.get(API_ENDPOINTS.plugin.details, () =>
+        http.get(API_ENDPOINTS.plugin.list, () =>
           detailsResponse({
             ...baseDetail,
-            status: 'errored',
-            errored_detail: [
-              { source: 'install', detail: 'pip failed', severity: 'error' },
+            install_data: {
+              local_version: '1.0.0',
+              update_datetime: '2025-01-15T00:00:00+00:00',
+              install_errors: [
+                { source: 'install', detail: 'pip failed', severity: 'error' },
+              ],
+            },
+            settings_data: null,
+            load_errors: [
               {
                 source: 'template_ingest',
                 detail: 'bad template',
@@ -539,11 +555,10 @@ describe('Plugins Management Integration', () => {
 
     it('badges a loaded plugin carrying a warning as amber Warning (severity-driven)', async () => {
       worker.use(
-        http.get(API_ENDPOINTS.plugin.details, () =>
+        http.get(API_ENDPOINTS.plugin.list, () =>
           detailsResponse({
             ...baseDetail,
-            status: 'loaded',
-            errored_detail: [
+            load_errors: [
               {
                 source: 'load',
                 detail: 'version mismatch: DB has 0.9',
@@ -572,7 +587,7 @@ describe('Plugins Management Integration', () => {
   describe('Error Handling', () => {
     it('handles plugin details API returning 500', async () => {
       worker.use(
-        http.get(API_ENDPOINTS.plugin.details, () => {
+        http.get(API_ENDPOINTS.plugin.list, () => {
           return HttpResponse.json(
             { error: 'Internal server error' },
             { status: 500 },
@@ -591,7 +606,7 @@ describe('Plugins Management Integration', () => {
 
     it('handles empty plugin list', async () => {
       worker.use(
-        http.get(API_ENDPOINTS.plugin.details, () => {
+        http.get(API_ENDPOINTS.plugin.list, () => {
           return HttpResponse.json({ plugins: {} })
         }),
       )

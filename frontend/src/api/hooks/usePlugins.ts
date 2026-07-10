@@ -23,13 +23,11 @@ import type {
   PluginInfo,
   PluginListing,
   PluginSettingsUpdate,
-  PluginsStatus,
 } from '@/api/types/plugins.types'
 import {
   disablePlugin,
   enablePlugin,
-  getPluginDetails,
-  getPluginStatus,
+  getPluginList,
   getTemplateExampleValues,
   installPlugin,
   uninstallPlugin,
@@ -49,29 +47,16 @@ const log = createLogger('usePlugins')
 /** Query keys for plugins */
 export const pluginKeys = {
   all: ['plugin'] as const,
-  status: () => [...pluginKeys.all, 'status'] as const,
-  details: (forceRefresh?: boolean) =>
-    [...pluginKeys.all, 'details', { forceRefresh }] as const,
-}
-
-/**
- * Hook to get plugin system status
- */
-export function usePluginStatus() {
-  return useQuery<PluginsStatus>({
-    queryKey: pluginKeys.status(),
-    queryFn: getPluginStatus,
-    staleTime: 30 * 1000, // 30 seconds
-  })
+  list: () => [...pluginKeys.all, 'list'] as const,
 }
 
 /**
  * Hook to get all plugin details (raw backend response)
  */
-export function usePluginDetails(forceRefresh?: boolean) {
+export function usePluginList() {
   return useQuery<PluginListing>({
-    queryKey: pluginKeys.details(forceRefresh),
-    queryFn: () => getPluginDetails(forceRefresh),
+    queryKey: pluginKeys.list(),
+    queryFn: getPluginList,
     staleTime: 60 * 1000, // 1 minute
   })
 }
@@ -115,18 +100,15 @@ export function deriveCapabilitiesFromCatalogue(
 export function usePlugins(catalogue?: BlockFactoryCatalogue) {
   // Forward fields by explicit access, not rest/spread — Query tracks per-field
   // reads, so spreading re-renders on every field.
-  const query = usePluginDetails()
+  const query = usePluginList()
   const listing = query.data
-  // plugin_enabled lives on a separate endpoint — join it so the toggle
-  // reflects real enabled state, not just whether the module loaded.
-  const enabledMap = usePluginStatus().data?.plugin_enabled
 
   const plugins = useMemo<Array<PluginInfo>>(() => {
     if (!listing) return []
 
     const capabilitiesMap = deriveCapabilitiesFromCatalogue(catalogue)
-    return toPluginInfoList(listing, capabilitiesMap, enabledMap)
-  }, [listing, catalogue, enabledMap])
+    return toPluginInfoList(listing, capabilitiesMap)
+  }, [listing, catalogue])
 
   return {
     data: listing ? { plugins } : undefined,
@@ -184,8 +166,7 @@ function usePluginMutation<TVariables>(
       // Refresh caches. Status carries plugin_enabled, so it must refresh too
       // or the toggle sticks.
       await queryClient.invalidateQueries({ queryKey: fableKeys.catalogue() })
-      await queryClient.invalidateQueries({ queryKey: pluginKeys.details() })
-      await queryClient.invalidateQueries({ queryKey: pluginKeys.status() })
+      await queryClient.invalidateQueries({ queryKey: pluginKeys.list() })
     },
   })
 }
@@ -248,15 +229,15 @@ export function useTemplateExampleValues(
 }
 
 /**
- * Hook to refresh plugin details (force refresh from backend)
+ * Hook to refresh plugin list from backend
  */
 export function useRefreshPlugins() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: () => getPluginDetails(true),
+    mutationFn: () => getPluginList(),
     onSuccess: (data) => {
-      queryClient.setQueryData(pluginKeys.details(), data)
+      queryClient.setQueryData(pluginKeys.list(), data)
     },
   })
 }

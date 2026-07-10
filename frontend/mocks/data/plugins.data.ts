@@ -25,188 +25,263 @@ function createPluginKey(store: string, local: string): string {
 }
 
 /**
- * Mock plugin data in backend format
+ * Mock plugin data in backend format (new nested structure from GET /plugin/list)
  */
 export const mockPluginListing: PluginListing = {
   plugins: {
-    // ECMWF Plugin - loaded and installed (matches live backend exactly)
+    // ECMWF Plugin - loaded and installed
     [createPluginKey('ecmwf', 'ecmwf-base')]: {
-      status: 'loaded',
-      store_info: {
-        pip_source: 'fiab-plugin-ecmwf',
-        module_name: 'fiab_plugin_ecmwf',
-        display_title: 'ECMWF Plugin',
-        display_description:
-          'ECMWF plugin for Earthkit-data sources and products',
-        display_author: 'ECMWF',
-        comment: '',
+      generic_data: {
+        store_info: {
+          pip_source: 'fiab-plugin-ecmwf',
+          module_name: 'fiab_plugin_ecmwf',
+          display_title: 'ECMWF Plugin',
+          display_description:
+            'ECMWF plugin for Earthkit-data sources and products',
+          display_author: 'ECMWF',
+          comment: '',
+        },
+        remote_info: { version: '0.0.1' },
       },
-      remote_info: { version: '0.0.1' },
-      errored_detail: null,
-      loaded_version: '0.0.1',
-      update_datetime: '2026-02-03T00:00:00+00:00',
+      install_data: {
+        local_version: '0.0.1',
+        update_datetime: '2026-02-03T00:00:00+00:00',
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: true,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+      load_errors: [],
     },
 
     // Disabled plugins (installed but not enabled)
     [createPluginKey('ecmwf', 'anemoi-inference')]: {
-      status: 'disabled',
-      store_info: {
-        pip_source: 'anemoi-inference',
-        module_name: 'anemoi_inference',
-        display_title: 'Anemoi Inference',
-        display_description:
-          'ECMWF Anemoi machine learning inference engine for running AI weather models.',
-        display_author: 'ECMWF',
-        comment: 'Core plugin for ML inference',
+      generic_data: {
+        store_info: {
+          pip_source: 'anemoi-inference',
+          module_name: 'anemoi_inference',
+          display_title: 'Anemoi Inference',
+          display_description:
+            'ECMWF Anemoi machine learning inference engine for running AI weather models.',
+          display_author: 'ECMWF',
+          comment: 'Core plugin for ML inference',
+        },
+        remote_info: { version: '1.0.0' },
       },
-      remote_info: { version: '1.0.0' },
-      errored_detail: null,
-      loaded_version: '1.0.0',
-      update_datetime: '2025-01-01T00:00:00+00:00',
+      install_data: {
+        local_version: '1.0.0',
+        update_datetime: '2025-01-01T00:00:00+00:00',
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: false,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+      load_errors: [],
     },
     [createPluginKey('ecmwf', 'aifs-dataset')]: {
-      status: 'disabled',
-      store_info: {
-        pip_source: 'aifs-dataset',
-        module_name: 'aifs_dataset',
-        display_title: 'AIFS Forecast Dataset',
-        display_description:
-          'Access ECMWF AIFS (Artificial Intelligence Forecasting System) forecast datasets as input source.',
-        display_author: 'ECMWF',
-        comment: '',
+      generic_data: {
+        store_info: {
+          pip_source: 'aifs-dataset',
+          module_name: 'aifs_dataset',
+          display_title: 'AIFS Forecast Dataset',
+          display_description:
+            'Access ECMWF AIFS (Artificial Intelligence Forecasting System) forecast datasets as input source.',
+          display_author: 'ECMWF',
+          comment: '',
+        },
+        remote_info: { version: '1.0.0' },
       },
-      remote_info: { version: '1.0.0' },
-      errored_detail: null,
-      loaded_version: '1.0.0',
-      update_datetime: '2025-01-01T00:00:00+00:00',
+      install_data: {
+        local_version: '1.0.0',
+        update_datetime: '2025-01-01T00:00:00+00:00',
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: false,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+      load_errors: [],
     },
     [createPluginKey('ecmwf', 'regridding')]: {
-      status: 'disabled',
-      store_info: {
-        pip_source: 'ecmwf-regridding',
-        module_name: 'ecmwf_regridding',
-        display_title: 'ECMWF Regridding',
-        display_description:
-          'High-performance regridding and interpolation for forecast datasets.',
-        display_author: 'ECMWF',
-        comment: '',
+      generic_data: {
+        store_info: {
+          pip_source: 'ecmwf-regridding',
+          module_name: 'ecmwf_regridding',
+          display_title: 'ECMWF Regridding',
+          display_description:
+            'High-performance regridding and interpolation for forecast datasets.',
+          display_author: 'ECMWF',
+          comment: '',
+        },
+        remote_info: { version: '2.0.5' },
       },
-      remote_info: { version: '2.0.5' },
-      errored_detail: null,
-      loaded_version: '2.0.5',
-      update_datetime: '2025-12-04T00:00:00+00:00',
+      install_data: {
+        local_version: '2.0.5',
+        update_datetime: '2025-12-04T00:00:00+00:00',
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: false,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+      load_errors: [],
     },
     [createPluginKey('ecmwf', 'grib-export')]: {
-      status: 'disabled',
-      store_info: {
-        pip_source: 'grib-export',
-        module_name: 'grib_export',
-        display_title: 'GRIB Export',
-        display_description:
-          'Export forecast data in GRIB format for meteorological use.',
-        display_author: 'ECMWF',
-        comment: '',
+      generic_data: {
+        store_info: {
+          pip_source: 'grib-export',
+          module_name: 'grib_export',
+          display_title: 'GRIB Export',
+          display_description:
+            'Export forecast data in GRIB format for meteorological use.',
+          display_author: 'ECMWF',
+          comment: '',
+        },
+        remote_info: { version: '2.1.0' },
       },
-      remote_info: { version: '2.1.0' },
-      errored_detail: null,
-      loaded_version: '2.1.0',
-      update_datetime: '2025-10-20T00:00:00+00:00',
+      install_data: {
+        local_version: '2.1.0',
+        update_datetime: '2025-10-20T00:00:00+00:00',
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: false,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+      load_errors: [],
     },
     [createPluginKey('ecmwf', 'ensemble-forecast')]: {
-      status: 'disabled',
-      store_info: {
-        pip_source: 'ecmwf-ensemble',
-        module_name: 'ecmwf_ensemble',
-        display_title: 'ECMWF Ensemble',
-        display_description:
-          'AI-based ensemble forecasting using ECMWF model architecture.',
-        display_author: 'ECMWF',
-        comment: '',
+      generic_data: {
+        store_info: {
+          pip_source: 'ecmwf-ensemble',
+          module_name: 'ecmwf_ensemble',
+          display_title: 'ECMWF Ensemble',
+          display_description:
+            'AI-based ensemble forecasting using ECMWF model architecture.',
+          display_author: 'ECMWF',
+          comment: '',
+        },
+        remote_info: { version: '2.4.0' },
       },
-      remote_info: { version: '2.4.0' },
-      errored_detail: null,
-      loaded_version: '2.1.0',
-      update_datetime: '2025-09-01T00:00:00+00:00',
+      install_data: {
+        local_version: '2.1.0',
+        update_datetime: '2025-09-01T00:00:00+00:00',
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: false,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+      load_errors: [],
     },
     [createPluginKey('ecmwf', 'precipitation')]: {
-      status: 'disabled',
-      store_info: {
-        pip_source: 'precipitation-viz',
-        module_name: 'precipitation_viz',
-        display_title: 'Precipitation Visualizer',
-        display_description: 'Legacy module for rain density visualization.',
-        display_author: 'ECMWF',
-        comment: 'Deprecated - use new visualizer instead',
+      generic_data: {
+        store_info: {
+          pip_source: 'precipitation-viz',
+          module_name: 'precipitation_viz',
+          display_title: 'Precipitation Visualizer',
+          display_description: 'Legacy module for rain density visualization.',
+          display_author: 'ECMWF',
+          comment: 'Deprecated - use new visualizer instead',
+        },
+        remote_info: { version: '1.2.0' },
       },
-      remote_info: { version: '1.2.0' },
-      errored_detail: null,
-      loaded_version: '1.2.0',
-      update_datetime: '2025-11-01T00:00:00+00:00',
+      install_data: {
+        local_version: '1.2.0',
+        update_datetime: '2025-11-01T00:00:00+00:00',
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: false,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+      load_errors: [],
     },
 
     // Available plugins (not installed)
     [createPluginKey('ecmwf', 'anemoi-storm-tracker')]: {
-      status: 'available',
-      store_info: {
-        pip_source: 'anemoi-storm-tracker',
-        module_name: 'anemoi_storm_tracker',
-        display_title: 'Anemoi Storm Tracker',
-        display_description:
-          'ML-based severe weather tracking module for Anemoi inference pipelines.',
-        display_author: 'ECMWF',
-        comment: 'New plugin!',
+      generic_data: {
+        store_info: {
+          pip_source: 'anemoi-storm-tracker',
+          module_name: 'anemoi_storm_tracker',
+          display_title: 'Anemoi Storm Tracker',
+          display_description:
+            'ML-based severe weather tracking module for Anemoi inference pipelines.',
+          display_author: 'ECMWF',
+          comment: 'New plugin!',
+        },
+        remote_info: { version: '3.0.0' },
       },
-      remote_info: { version: '3.0.0' },
-      errored_detail: null,
-      loaded_version: null,
-      update_datetime: null,
+      install_data: null,
+      settings_data: null,
+      load_errors: [],
     },
     [createPluginKey('ecmwf', 'snow-analysis')]: {
-      status: 'available',
-      store_info: {
-        pip_source: 'snow-analysis',
-        module_name: 'snow_analysis',
-        display_title: 'Snow Analysis',
-        display_description: 'Analyze and forecast snow accumulation patterns.',
-        display_author: 'ECMWF',
-        comment: '',
+      generic_data: {
+        store_info: {
+          pip_source: 'snow-analysis',
+          module_name: 'snow_analysis',
+          display_title: 'Snow Analysis',
+          display_description:
+            'Analyze and forecast snow accumulation patterns.',
+          display_author: 'ECMWF',
+          comment: '',
+        },
+        remote_info: { version: '2.0.0' },
       },
-      remote_info: { version: '2.0.0' },
-      errored_detail: null,
-      loaded_version: null,
-      update_datetime: null,
+      install_data: null,
+      settings_data: null,
+      load_errors: [],
     },
     [createPluginKey('ecmwf', 'netcdf-export')]: {
-      status: 'available',
-      store_info: {
-        pip_source: 'netcdf-export',
-        module_name: 'netcdf_export',
-        display_title: 'NetCDF Export',
-        display_description:
-          'Export forecast data in NetCDF format for scientific analysis.',
-        display_author: 'ECMWF',
-        comment: '',
+      generic_data: {
+        store_info: {
+          pip_source: 'netcdf-export',
+          module_name: 'netcdf_export',
+          display_title: 'NetCDF Export',
+          display_description:
+            'Export forecast data in NetCDF format for scientific analysis.',
+          display_author: 'ECMWF',
+          comment: '',
+        },
+        remote_info: { version: '1.5.0' },
       },
-      remote_info: { version: '1.5.0' },
-      errored_detail: null,
-      loaded_version: null,
-      update_datetime: null,
+      install_data: null,
+      settings_data: null,
+      load_errors: [],
     },
     [createPluginKey('ecmwf', 'pdf-export')]: {
-      status: 'available',
-      store_info: {
-        pip_source: 'pdf-report-generator',
-        module_name: 'pdf_export',
-        display_title: 'PDF Report Generator',
-        display_description:
-          'Generate professional PDF reports from forecast data.',
-        display_author: 'ECMWF',
-        comment: '',
+      generic_data: {
+        store_info: {
+          pip_source: 'pdf-report-generator',
+          module_name: 'pdf_export',
+          display_title: 'PDF Report Generator',
+          display_description:
+            'Generate professional PDF reports from forecast data.',
+          display_author: 'ECMWF',
+          comment: '',
+        },
+        remote_info: { version: '1.5.0' },
       },
-      remote_info: { version: '1.5.0' },
-      errored_detail: null,
-      loaded_version: null,
-      update_datetime: null,
+      install_data: null,
+      settings_data: null,
+      load_errors: [],
     },
   },
 }

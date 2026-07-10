@@ -23,15 +23,34 @@ import {
 const ID: PluginCompositeId = { store: 'ecmwf', local: 'anemoi-inference' }
 
 function detailWith(update_datetime: string | null): PluginDetail {
+  if (update_datetime === null) {
+    // Available (not installed) plugin — no install_data → updatedAt is null
+    return {
+      generic_data: { store_info: null, remote_info: null },
+      install_data: null,
+      settings_data: null,
+      load_errors: [],
+    }
+  }
   return {
-    status: 'loaded',
-    store_info: null,
-    remote_info: null,
-    errored_detail: null,
-    loaded_version: '1.0.0',
-    update_datetime,
+    generic_data: { store_info: null, remote_info: null },
+    install_data: {
+      local_version: '1.0.0',
+      update_datetime,
+      install_errors: [],
+    },
+    settings_data: {
+      isEnabled: true,
+      excluded_templates: [],
+      included_templates: [],
+      glyph_remapping: {},
+    },
+    load_errors: [],
   }
 }
+
+/** A loaded plugin with a fixed datetime — use as base where datetime is irrelevant */
+const loadedDetail: PluginDetail = detailWith('2025-01-15T00:00:00+00:00')
 
 describe('toPluginInfo — updatedAt timezone normalization', () => {
   // Naive backend datetime → append Z so it reads as UTC, not local.
@@ -70,92 +89,136 @@ describe('toPluginInfo — updatedAt timezone normalization', () => {
 })
 
 const baseRaw = {
-  status: 'loaded' as const,
-  store_info: null,
-  remote_info: null,
-  loaded_version: '1.0.0',
-  update_datetime: null,
+  generic_data: { store_info: null, remote_info: null },
+  install_data: {
+    local_version: '1.0.0',
+    update_datetime: '2025-01-15T00:00:00+00:00',
+    install_errors: [],
+  },
+  settings_data: {
+    isEnabled: true,
+    excluded_templates: [],
+    included_templates: [],
+    glyph_remapping: {},
+  },
+  load_errors: [],
 }
 
-describe('PluginDetailSchema — errored_detail parsing', () => {
-  it('accepts null and outputs null', () => {
-    const result = PluginDetailSchema.parse({
-      ...baseRaw,
-      errored_detail: null,
-    })
-    expect(result.errored_detail).toBeNull()
+describe('PluginDetailSchema — load_errors parsing', () => {
+  it('accepts an empty load_errors array', () => {
+    const result = PluginDetailSchema.parse({ ...baseRaw, load_errors: [] })
+    expect(result.load_errors).toEqual([])
   })
 
-  it('preserves structured errors', () => {
+  it('preserves structured load errors', () => {
     const errors = [
-      { source: 'install', detail: 'pip failed', severity: 'error' },
+      { source: 'load', detail: 'module failed', severity: 'error' },
       {
         source: 'template_ingest',
         detail: 'bad template',
         severity: 'warning',
       },
     ]
-    const result = PluginDetailSchema.parse({
-      ...baseRaw,
-      errored_detail: errors,
-    })
-    expect(result.errored_detail).toEqual(errors)
+    const result = PluginDetailSchema.parse({ ...baseRaw, load_errors: errors })
+    expect(result.load_errors).toEqual(errors)
   })
 })
 
 describe('toPluginInfo — errorDetail normalization', () => {
-  it('normalizes an empty error list to null', () => {
-    const info = toPluginInfo(ID, { ...detailWith(null), errored_detail: [] })
+  it('normalizes empty install and load errors to null', () => {
+    const info = toPluginInfo(ID, loadedDetail)
     expect(info.errorDetail).toBeNull()
     expect(info.errorSeverity).toBeNull()
   })
 
-  it('passes structured errors through and derives the max severity', () => {
-    const errors = [{ source: 'load', detail: 'boom', severity: 'error' }]
-    const info = toPluginInfo(ID, {
-      ...detailWith(null),
-      errored_detail: errors,
-    })
-    expect(info.errorDetail).toEqual(errors)
+  it('surfaces load_errors and derives max severity', () => {
+    const detail: PluginDetail = {
+      ...loadedDetail,
+      load_errors: [{ source: 'load', detail: 'boom', severity: 'error' }],
+    }
+    const info = toPluginInfo(ID, detail)
+    expect(info.errorDetail).toEqual(detail.load_errors)
+    expect(info.errorSeverity).toBe('error')
+  })
+
+  it('combines install_errors and load_errors', () => {
+    const detail: PluginDetail = {
+      ...loadedDetail,
+      install_data: {
+        local_version: '1.0.0',
+        update_datetime: '2025-01-15T00:00:00+00:00',
+        install_errors: [
+          { source: 'install', detail: 'pip failed', severity: 'warning' },
+        ],
+      },
+      load_errors: [{ source: 'load', detail: 'boom', severity: 'error' }],
+    }
+    const info = toPluginInfo(ID, detail)
+    expect(info.errorDetail).toHaveLength(2)
     expect(info.errorSeverity).toBe('error')
   })
 })
 
-describe('toPluginInfo — isEnabled reflects the plugin_enabled flag', () => {
-  const loaded = detailWith(null) // status: 'loaded'
-
-  it('honours an explicit enabled=false even when the module loaded', () => {
-    // The bug this fixes: a loaded-but-disabled plugin used to read as enabled.
-    expect(toPluginInfo(ID, loaded, [], false).isEnabled).toBe(false)
+describe('toPluginInfo — isEnabled reflects settings_data.isEnabled', () => {
+  it('is true for a loaded (enabled) plugin', () => {
+    expect(toPluginInfo(ID, loadedDetail).isEnabled).toBe(true)
   })
 
-  it('honours an explicit enabled=true', () => {
-    const errored: PluginDetail = { ...loaded, status: 'errored' }
-    expect(toPluginInfo(ID, errored, [], true).isEnabled).toBe(true)
+  it('is false for a disabled plugin (settings_data.isEnabled = false)', () => {
+    const disabled: PluginDetail = {
+      ...loadedDetail,
+      settings_data: {
+        isEnabled: false,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+    }
+    expect(toPluginInfo(ID, disabled).isEnabled).toBe(false)
   })
 
-  it('falls back to status when the flag is absent (loaded → enabled)', () => {
-    expect(toPluginInfo(ID, loaded).isEnabled).toBe(true)
-  })
-
-  it('falls back to status when the flag is absent (available → disabled)', () => {
-    const available: PluginDetail = { ...loaded, status: 'available' }
-    expect(toPluginInfo(ID, available).isEnabled).toBe(false)
+  it('is true for an errored plugin (install failed) to preserve errored badge', () => {
+    const errored: PluginDetail = {
+      generic_data: { store_info: null, remote_info: null },
+      install_data: {
+        local_version: '1.0.0',
+        update_datetime: '2025-01-15T00:00:00+00:00',
+        install_errors: [
+          { source: 'install', detail: 'fail', severity: 'error' },
+        ],
+      },
+      settings_data: null,
+      load_errors: [],
+    }
+    expect(toPluginInfo(ID, errored).isEnabled).toBe(true)
   })
 })
 
-describe('toPluginInfoList — joins plugin_enabled by backend key', () => {
+describe('toPluginInfoList — derives isEnabled from settings_data', () => {
   const key = "store='ecmwf' local='anemoi-inference'"
-  const listing = { plugins: { [key]: detailWith(null) } }
 
-  it('applies the enabledMap entry to the matching plugin', () => {
-    const [info] = toPluginInfoList(listing, new Map(), { [key]: false })
+  it('reads isEnabled=false from settings_data', () => {
+    const listing = {
+      plugins: {
+        [key]: {
+          ...loadedDetail,
+          settings_data: {
+            isEnabled: false,
+            excluded_templates: [],
+            included_templates: [],
+            glyph_remapping: {},
+          },
+        },
+      },
+    }
+    const [info] = toPluginInfoList(listing)
     expect(info.isEnabled).toBe(false)
   })
 
-  it('falls back to status when a plugin is missing from the map', () => {
-    const [info] = toPluginInfoList(listing, new Map(), {})
-    expect(info.isEnabled).toBe(true) // status 'loaded'
+  it('reads isEnabled=true from settings_data', () => {
+    const listing = { plugins: { [key]: loadedDetail } }
+    const [info] = toPluginInfoList(listing)
+    expect(info.isEnabled).toBe(true)
   })
 })
 
@@ -281,9 +344,19 @@ describe('isNewerVersion', () => {
 describe('toPluginInfo — hasUpdate', () => {
   function installedWith(loaded: string, remote: string): PluginDetail {
     return {
-      ...detailWith(null),
-      loaded_version: loaded,
-      remote_info: { version: remote },
+      generic_data: { store_info: null, remote_info: { version: remote } },
+      install_data: {
+        local_version: loaded,
+        update_datetime: '2025-01-15T00:00:00+00:00',
+        install_errors: [],
+      },
+      settings_data: {
+        isEnabled: true,
+        excluded_templates: [],
+        included_templates: [],
+        glyph_remapping: {},
+      },
+      load_errors: [],
     }
   }
 
