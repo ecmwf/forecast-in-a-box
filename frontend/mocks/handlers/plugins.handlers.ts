@@ -286,9 +286,9 @@ export const pluginsHandlers = [
 
     return HttpResponse.json({
       example_values: {
-        block_source_1: { base_time: '2026-07-01T00:00:00' },
+        block_source_1: { base_time: { example_value: '2026-07-01T00:00:00' } },
       },
-      example_glyphs: { leadtime: '48' },
+      example_glyphs: { leadtime: { example_value: '48' } },
     })
   }),
 ]

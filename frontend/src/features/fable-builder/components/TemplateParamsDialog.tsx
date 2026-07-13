@@ -79,7 +79,7 @@ export function TemplateParamsDialog({
     if (!open) return
     const seeded: Record<string, string> = {}
     for (const name of params.required) {
-      seeded[name] = examples?.example_glyphs[name] ?? ''
+      seeded[name] = examples?.example_glyphs[name]?.example_value ?? ''
     }
     for (const [name, value] of Object.entries(params.prefilled)) {
       seeded[name] = value
@@ -100,7 +100,11 @@ export function TemplateParamsDialog({
               ...block,
               configuration_values: {
                 ...block.configuration_values,
-                ...examples.example_values[blockId],
+                ...Object.fromEntries(
+                  Object.entries(examples.example_values[blockId]).map(
+                    ([optId, inp]) => [optId, inp.example_value],
+                  ),
+                ),
               },
             }
           : block,

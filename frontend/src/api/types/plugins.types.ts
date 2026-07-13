@@ -265,14 +265,32 @@ export function derivePluginStatus(detail: PluginDetail): PluginStatus {
 }
 
 /**
+ * Example input for a single parameter or glyph in a blueprint template.
+ * The `example_value` is the actual string value; the other fields are UI metadata.
+ */
+export const BlueprintTemplateExampleInputSchema = z.object({
+  example_value: z.string(),
+  display_name: z.string().nullable().optional(),
+  display_description: z.string().nullable().optional(),
+  type_hint: z.string().nullable().optional(),
+})
+
+export type BlueprintTemplateExampleInput = z.infer<
+  typeof BlueprintTemplateExampleInputSchema
+>
+
+/**
  * Example data for a blueprint template from GET /plugin/templateExampleValues.
  * Mirrors what the backend overlays during template ingest validation.
  */
 export const TemplateExampleValuesSchema = z.object({
   /** Per-block example configuration values, keyed by block instance id then option id */
-  example_values: z.record(z.string(), z.record(z.string(), z.string())),
+  example_values: z.record(
+    z.string(),
+    z.record(z.string(), BlueprintTemplateExampleInputSchema),
+  ),
   /** Example glyph name-to-value pairs the user is expected to override */
-  example_glyphs: z.record(z.string(), z.string()),
+  example_glyphs: z.record(z.string(), BlueprintTemplateExampleInputSchema),
 })
 
 export type TemplateExampleValues = z.infer<typeof TemplateExampleValuesSchema>
