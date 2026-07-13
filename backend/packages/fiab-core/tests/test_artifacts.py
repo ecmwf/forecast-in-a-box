@@ -9,7 +9,7 @@
 
 import json
 
-from fiab_core.artifacts import AnemoiCheckpoint, ArtifactLocalId, ArtifactStoreId, CompositeArtifactId, parse_json
+from fiab_core.artifacts import AnemoiCheckpoint, ArtifactLocalId, ArtifactStoreId, CommonArtifactMetadata, CompositeArtifactId, parse_json
 
 
 def test_parse_json() -> None:
@@ -18,14 +18,16 @@ def test_parse_json() -> None:
         "artifacts": {
             "model1": {
                 "artifact_type": "AnemoiCheckpoint",
-                "store_info": {
+                "common": {
                     "url": "https://example.com/model1.ckpt",
                     "display_name": "Model 1",
                     "display_author": "ECMWF",
                     "display_description": "Example model",
                     "disk_size_bytes": 1,
-                    "pip_package_constraints": [],
                     "supported_platforms": ["linux"],
+                },
+                "specific": {
+                    "pip_package_constraints": [],
                     "input_characteristics": [],
                     "input_qube": {},
                     "output_qube": {},
@@ -35,12 +37,13 @@ def test_parse_json() -> None:
         },
     }
 
-    parsed = dict(parse_json(ArtifactStoreId("store1"), json.dumps(payload), lambda checkpoint: (True, checkpoint.display_name)))
+    parsed = dict(parse_json(ArtifactStoreId("store1"), json.dumps(payload), lambda common, specific: (True, common.display_name)))
 
     composite_id = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store1"), artifact_local_id=ArtifactLocalId("model1"))
     artifact = parsed[composite_id]
 
-    assert isinstance(artifact.store_info, AnemoiCheckpoint)
-    assert artifact.store_info.display_name == "Model 1"
+    assert isinstance(artifact.common, CommonArtifactMetadata)
+    assert isinstance(artifact.specific, AnemoiCheckpoint)
+    assert artifact.common.display_name == "Model 1"
     assert artifact.is_locally_compatible is True
     assert artifact.local_compatibility_detail == "Model 1"

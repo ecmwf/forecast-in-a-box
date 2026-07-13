@@ -29,6 +29,7 @@ class MlModelOverview:
     display_author: str
     disk_size_bytes: int
     supported_platforms: list[Platform]
+    tags: dict[str, str | None]
     is_available: bool
     is_locally_compatible: bool
     local_compatibility_detail: str | None
@@ -46,6 +47,7 @@ class MlModelDetail:
     disk_size_bytes: int
     pip_package_constraints: list[str]
     supported_platforms: list[Platform]
+    tags: dict[str, str | None]
     input_qube: dict[str, Any]
     output_qube: dict[str, Any]
     input_characteristics: list[str]

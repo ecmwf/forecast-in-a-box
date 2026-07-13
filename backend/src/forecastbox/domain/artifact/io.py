@@ -132,7 +132,7 @@ def _download_artifact_local(
     progress_callback: Callable[[int], None] | None = None,
 ) -> None:
     """Download an artifact from its remote URL to local storage."""
-    checkpoint = artifact.store_info
+    checkpoint = artifact.common
     artifact_path = get_artifact_local_path(composite_id, data_dir_url)
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -178,7 +178,7 @@ def _download_artifact_remote(
     handle: CommandHandle,
 ) -> None:
     """Download an artifact from its HTTP URL to remote storage via SSH curl."""
-    checkpoint = artifact.store_info
+    checkpoint = artifact.common
     artifact_path = get_artifact_local_path(composite_id, data_dir_url)
     temp_path = str(artifact_path) + ".tmp"
 

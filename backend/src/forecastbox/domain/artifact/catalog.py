@@ -57,7 +57,7 @@ def get_artifacts_catalog(artifact_stores_config: ArtifactStoresConfig) -> Artif
                 parse_json(
                     store_id,
                     raw,
-                    lambda store_info: get_model_checkpoint_compatibility(store_info, platform_info),
+                    lambda common, specific: get_model_checkpoint_compatibility(common, specific, platform_info),
                 ),
             )
 

@@ -23,7 +23,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     data = args.path.read_text()
-    dict(parse_json(ArtifactStoreId("validation"), data, lambda _checkpoint: (True, None)))
+    dict(parse_json(ArtifactStoreId("validation"), data, lambda _common, _specific: (True, None)))
 
 
 if __name__ == "__main__":

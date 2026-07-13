@@ -214,13 +214,14 @@ def list_models() -> list[MlModelOverview]:
         for composite_id, artifact in ArtifactManager.catalog.items():
             if artifact.artifact_type != "AnemoiCheckpoint":
                 continue
-            checkpoint = artifact.store_info
+            common = artifact.common
             overview = MlModelOverview(
                 composite_id=composite_id,
-                display_name=checkpoint.display_name,
-                display_author=checkpoint.display_author,
-                disk_size_bytes=checkpoint.disk_size_bytes,
-                supported_platforms=checkpoint.supported_platforms,
+                display_name=common.display_name,
+                display_author=common.display_author,
+                disk_size_bytes=common.disk_size_bytes,
+                supported_platforms=common.supported_platforms,
+                tags=common.tags,
                 is_available=composite_id in ArtifactManager.locally_available,
                 is_locally_compatible=artifact.is_locally_compatible,
                 local_compatibility_detail=artifact.local_compatibility_detail,
@@ -239,17 +240,19 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
         artifact = ArtifactManager.catalog[composite_id]
         if artifact.artifact_type != "AnemoiCheckpoint":
             raise KeyError(f"Artifact {composite_id} is not an AnemoiCheckpoint")
-        checkpoint = artifact.store_info
+        checkpoint = artifact.specific
+        common = artifact.common
 
         detail = MlModelDetail(
             composite_id=composite_id,
-            display_name=checkpoint.display_name,
-            display_author=checkpoint.display_author,
-            display_description=checkpoint.display_description,
-            url=checkpoint.url,
-            disk_size_bytes=checkpoint.disk_size_bytes,
+            display_name=common.display_name,
+            display_author=common.display_author,
+            display_description=common.display_description,
+            url=common.url,
+            disk_size_bytes=common.disk_size_bytes,
             pip_package_constraints=checkpoint.pip_package_constraints,
-            supported_platforms=checkpoint.supported_platforms,
+            supported_platforms=common.supported_platforms,
+            tags=common.tags,
             input_qube=checkpoint.input_qube,
             output_qube=checkpoint.output_qube,
             input_characteristics=checkpoint.input_characteristics,

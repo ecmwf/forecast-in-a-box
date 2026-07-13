@@ -30,6 +30,7 @@ def test_download_model(backend_client_admin: httpx.Client) -> None:
             assert model["is_available"] == False, f"Model {model['composite_id']['artifact_local_id']} should not be downloaded yet"
             assert model["is_locally_compatible"] == True
             assert model["local_compatibility_detail"] is None
+            assert "tags" in model
 
     # Submit download for all 4 models in parallel
     expected_checkpoints = {f"{test_model_artifact_id}{e}" for e in range(4)}
@@ -69,3 +70,4 @@ def test_download_model(backend_client_admin: httpx.Client) -> None:
     assert details["is_available"] == True
     assert details["is_locally_compatible"] == True
     assert details["local_compatibility_detail"] is None
+    assert details["tags"] == {"integration-test": None, "index": "0"}

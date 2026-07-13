@@ -166,7 +166,7 @@ class ArtifactsProvider:
 def parse_json(
     store_id: ArtifactStoreId,
     data: str,
-    compatibility_check: Callable[[AnemoiCheckpoint], tuple[bool, str | None]],
+    compatibility_check: Callable[[CommonArtifactMetadata, AnemoiCheckpoint], tuple[bool, str | None]],
 ) -> Iterator[tuple[CompositeArtifactId, ArtifactResolved]]:
     """Parse an artifacts.json payload into resolved artifacts."""
     store_data = json.loads(data)
@@ -174,10 +174,10 @@ def parse_json(
     for artifact_id, artifact_data in artifacts.items():
         composite_id = CompositeArtifactId(artifact_store_id=store_id, artifact_local_id=ArtifactLocalId(artifact_id))
         artifact_type = cast(ArtifactType, artifact_data["artifact_type"])
-        store_info_data = artifact_data["store_info"]
         if artifact_type == "AnemoiCheckpoint":
-            store_info = AnemoiCheckpoint(**store_info_data)
-            is_locally_compatible, local_compatibility_detail = compatibility_check(store_info)
+            common = CommonArtifactMetadata(**artifact_data["common"])
+            specific = AnemoiCheckpoint(**artifact_data["specific"])
+            is_locally_compatible, local_compatibility_detail = compatibility_check(common, specific)
         else:
             raise ValueError(f"Unsupported artifact type: {artifact_type}")
 
@@ -185,7 +185,8 @@ def parse_json(
             composite_id,
             ArtifactResolved(
                 artifact_type=artifact_type,
-                store_info=store_info,
+                common=common,
+                specific=specific,
                 is_locally_compatible=is_locally_compatible,
                 local_compatibility_detail=local_compatibility_detail,
             ),
