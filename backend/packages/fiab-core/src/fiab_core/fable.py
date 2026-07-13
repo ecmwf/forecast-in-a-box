@@ -173,6 +173,31 @@ class BlueprintTemplateBlock(FiabCoreBaseModel):
     instance: BlockInstance
 
 
+class BlueprintTemplateExampleInput(FiabCoreBaseModel):
+    """Regular blueprints have local glyphs and configuration options,
+    which in the latter case have a type and a description. In blueprint
+    templates, we allow for adding type and description to glyphs and
+    overriding those for configuration options.
+
+    These do *not* affect the blueprint persistence and execution. It only
+    plays a role in the user interface, when using the template as high-level
+    ready-to-go Job Preset, and when communicating the intent behind the
+    template.
+
+    The motivation for this is that in blueprints, the local glyphs
+    plays purely a role of variable *value*, whereas in templates, the
+    meaning shifts towards variable *definition*.
+
+    If the display_* or type_hint are not given here, the consumer of this
+    is assumed to take them from the underlying configuration option, or,
+    in the glyph case, assume no data."""
+
+    example_value: str
+    display_name: str | None = None
+    display_description: str | None = None
+    type_hint: str | None = None  # TODO validator -- if not None, then it must be a valid FableType
+
+
 class BlueprintTemplate(FiabCoreBaseModel):
     """A partial, ready-to-customise blueprint shipped by a plugin.
 
@@ -187,5 +212,5 @@ class BlueprintTemplate(FiabCoreBaseModel):
     blocks: dict[BlockInstanceId, BlueprintTemplateBlock]
     environment: BlueprintTemplateEnvironment | None = None
     local_glyphs: dict[str, str] = Field(default_factory=dict)
-    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
-    example_glyphs: dict[str, str] = Field(default_factory=dict)
+    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, BlueprintTemplateExampleInput]] = Field(default_factory=dict)
+    example_glyphs: dict[str, BlueprintTemplateExampleInput] = Field(default_factory=dict)
