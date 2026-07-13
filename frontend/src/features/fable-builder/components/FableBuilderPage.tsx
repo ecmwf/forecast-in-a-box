@@ -304,10 +304,19 @@ export function FableBuilderPage({
   function applyTemplateExampleValues() {
     if (!templateExamples) return
     const { blocks } = useFableBuilderStore.getState().fable
-    for (const [blockId, values] of Object.entries(
+    for (const [blockId, inputs] of Object.entries(
       templateExamples.example_values,
     )) {
-      if (blockId in blocks) updateBlockConfigBatch(blockId, values)
+      if (blockId in blocks)
+        updateBlockConfigBatch(
+          blockId,
+          Object.fromEntries(
+            Object.entries(inputs).map(([optId, inp]) => [
+              optId,
+              inp.example_value,
+            ]),
+          ),
+        )
     }
   }
 
@@ -322,10 +331,10 @@ export function FableBuilderPage({
 
   function handleTemplateSkip() {
     applyTemplateExampleValues()
-    for (const [key, value] of Object.entries(
+    for (const [key, inp] of Object.entries(
       templateExamples?.example_glyphs ?? {},
     )) {
-      setLocalGlyph(key, value)
+      setLocalGlyph(key, inp.example_value)
     }
     setTemplateParamsDone(true)
     showToast.info(t('template.prefilled'))
@@ -344,15 +353,24 @@ export function FableBuilderPage({
     if (!templateMode || templateParamsDone) return
     if (templateParams === null || !examplesSettled || templateHasParams) return
     const { blocks } = useFableBuilderStore.getState().fable
-    for (const [blockId, values] of Object.entries(
+    for (const [blockId, inputs] of Object.entries(
       templateExamples?.example_values ?? {},
     )) {
-      if (blockId in blocks) updateBlockConfigBatch(blockId, values)
+      if (blockId in blocks)
+        updateBlockConfigBatch(
+          blockId,
+          Object.fromEntries(
+            Object.entries(inputs).map(([optId, inp]) => [
+              optId,
+              inp.example_value,
+            ]),
+          ),
+        )
     }
-    for (const [key, value] of Object.entries(
+    for (const [key, inp] of Object.entries(
       templateExamples?.example_glyphs ?? {},
     )) {
-      setLocalGlyph(key, value)
+      setLocalGlyph(key, inp.example_value)
     }
     setTemplateParamsDone(true)
     if (templateExamples) showToast.info(t('template.prefilled'))

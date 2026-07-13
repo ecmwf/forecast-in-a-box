@@ -288,7 +288,9 @@ def test_plugin_template_in_blueprint_list(backend_client_user: httpx.Client) ->
     data = response.json()
     assert "example_values" in data
     assert "example_glyphs" in data
-    assert data["example_glyphs"].get("name") == "world", f"Expected name=world in example_glyphs, got: {data['example_glyphs']}"
+    name_entry = data["example_glyphs"].get("name")
+    assert name_entry is not None, f"Expected 'name' key in example_glyphs, got: {data['example_glyphs']}"
+    assert name_entry.get("example_value") == "world", f"Expected name.example_value=world in example_glyphs, got: {name_entry}"
 
 
 def test_plugin_template_exclusion(backend_client_user: httpx.Client, backend_client_admin: httpx.Client) -> None:

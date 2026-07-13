@@ -18,6 +18,7 @@ from fiab_core.fable import (
     BlueprintTemplate,
     BlueprintTemplateBlock,
     BlueprintTemplateEnvironment,
+    BlueprintTemplateExampleInput,
     ConfigurationOptionId,
     PluginCompositeId,
     PluginId,
@@ -95,8 +96,8 @@ def test_blueprint_template_round_trips_model_dump() -> None:
     tmpl = _make_template(
         environment=BlueprintTemplateEnvironment(environment_variables={"K": "V"}),
         local_glyphs={"g": "v"},
-        example_values={_BLOCK_ID: {_TEXT: "world"}},
-        example_glyphs={"g": "world"},
+        example_values={_BLOCK_ID: {_TEXT: BlueprintTemplateExampleInput(example_value="world", display_name="World")}},
+        example_glyphs={"g": BlueprintTemplateExampleInput(example_value="world")},
     )
 
     dumped = tmpl.model_dump()
@@ -106,10 +107,30 @@ def test_blueprint_template_round_trips_model_dump() -> None:
     assert restored.environment is not None
     assert restored.environment.environment_variables == {"K": "V"}
     assert restored.local_glyphs == {"g": "v"}
-    assert restored.example_values == {_BLOCK_ID: {_TEXT: "world"}}
-    assert restored.example_glyphs == {"g": "world"}
+    assert restored.example_values == {_BLOCK_ID: {_TEXT: BlueprintTemplateExampleInput(example_value="world", display_name="World")}}
+    assert restored.example_glyphs == {"g": BlueprintTemplateExampleInput(example_value="world")}
 
 
 def test_blueprint_template_environment_rejects_unknown_field() -> None:
     with pytest.raises(ValidationError):
         BlueprintTemplateEnvironment(environment_variables={}, unexpected="x")  # type: ignore[call-arg]
+
+
+# ---------------------------------------------------------------------------
+# BlueprintTemplateExampleInput
+# ---------------------------------------------------------------------------
+
+
+def test_blueprint_template_example_input_accepts_valid_type_hint() -> None:
+    inp = BlueprintTemplateExampleInput(example_value="hello", type_hint="str")
+    assert inp.type_hint == "str"
+
+
+def test_blueprint_template_example_input_accepts_none_type_hint() -> None:
+    inp = BlueprintTemplateExampleInput(example_value="hello")
+    assert inp.type_hint is None
+
+
+def test_blueprint_template_example_input_rejects_invalid_type_hint() -> None:
+    with pytest.raises(ValidationError):
+        BlueprintTemplateExampleInput(example_value="hello", type_hint="not-a-fable-type")

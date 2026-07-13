@@ -258,8 +258,10 @@ describe('getTemplateExampleValues', () => {
           displayName: url.searchParams.get('displayName'),
         }
         return HttpResponse.json({
-          example_values: { block_1: { area: '[-10, 40, 10, 60]' } },
-          example_glyphs: { leadtime: '48' },
+          example_values: {
+            block_1: { area: { example_value: '[-10, 40, 10, 60]' } },
+          },
+          example_glyphs: { leadtime: { example_value: '48' } },
         })
       }),
     )
@@ -273,7 +275,9 @@ describe('getTemplateExampleValues', () => {
       local: 'plugin-test',
       displayName: 'testBasic',
     })
-    expect(result.example_values.block_1).toEqual({ area: '[-10, 40, 10, 60]' })
-    expect(result.example_glyphs).toEqual({ leadtime: '48' })
+    expect(result.example_values.block_1).toEqual({
+      area: { example_value: '[-10, 40, 10, 60]' },
+    })
+    expect(result.example_glyphs).toEqual({ leadtime: { example_value: '48' } })
   })
 })

@@ -17,6 +17,7 @@ from fiab_core.fable import (
     BlueprintTemplate,
     BlueprintTemplateBlock,
     BlueprintTemplateEnvironment,
+    BlueprintTemplateExampleInput,
     ConfigurationOptionId,
     PluginCompositeId,
     PluginId,
@@ -119,8 +120,8 @@ def test_template_to_builder_example_values_not_in_configuration_values() -> Non
         display_name="t",
         display_description="d",
         blocks={example_block: block},
-        example_values={example_block: {opt: "example text"}},
-        example_glyphs={"name": "world"},
+        example_values={example_block: {opt: BlueprintTemplateExampleInput(example_value="example text")}},
+        example_glyphs={"name": BlueprintTemplateExampleInput(example_value="world")},
     )
     builder = template_to_builder(template, _REAL_PLUGIN_ID)
     result = next(b for b in builder.blocks if b.instance_id == example_block)
@@ -185,14 +186,14 @@ def _get_block(builder: BlueprintBuilder, block_id: BlockInstanceId) -> Routable
 def test_resolve_builder_with_examples_fills_missing_config_value() -> None:
     """Example values fill in config options absent from the template block."""
     builder = _make_builder(block_text=None)
-    result = resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "from example"}}, {})
+    result = resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: BlueprintTemplateExampleInput(example_value="from example")}}, {})
     assert _get_block(result, _BLOCK_A).instance.configuration_values[_OPT] == "from example"
 
 
 def test_resolve_builder_with_examples_overrides_existing_config_value() -> None:
     """Example values override existing template values for validation purposes."""
     builder = _make_builder(block_text="template value")
-    result = resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "example value"}}, {})
+    result = resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: BlueprintTemplateExampleInput(example_value="example value")}}, {})
     assert _get_block(result, _BLOCK_A).instance.configuration_values[_OPT] == "example value"
 
 
@@ -200,5 +201,5 @@ def test_resolve_builder_with_examples_does_not_mutate_original() -> None:
     """resolve_builder_with_examples must not mutate the caller's builder."""
     builder = _make_builder(block_text="original")
     original_config = dict(_get_block(builder, _BLOCK_A).instance.configuration_values)
-    resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: "override"}}, {})
+    resolve_builder_with_examples(builder, {_BLOCK_A: {_OPT: BlueprintTemplateExampleInput(example_value="override")}}, {})
     assert _get_block(builder, _BLOCK_A).instance.configuration_values == original_config
