@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 from cascade.low.exceptions import CascadeInternalError
-from fiab_core.artifacts import AnemoiCheckpoint, ArtifactLocalId, ArtifactResolved, ArtifactStoreId
+from fiab_core.artifacts import AnemoiCheckpoint, ArtifactLocalId, ArtifactResolved, ArtifactStoreId, CommonArtifactMetadata
 from packaging.version import Version
 from pyrsistent import pmap
 
@@ -39,30 +39,38 @@ from forecastbox.utility.tunnel import CommandHandle
 
 
 @pytest.fixture
-def sample_checkpoint() -> AnemoiCheckpoint:
-    """Sample ML model checkpoint for testing"""
-    return AnemoiCheckpoint(
+def sample_common() -> CommonArtifactMetadata:
+    """Sample common artifact metadata for testing"""
+    return CommonArtifactMetadata(
         url="https://example.com/model.ckpt",
         display_name="Test Model",
         display_author="Test Author",
         display_description="Test Description",
         disk_size_bytes=1024,
-        pip_package_constraints=["torch>=2.0"],
         supported_platforms=["linux", "macos"],
-        input_characteristics=["input_source"],
-        input_qube={},
-        output_qube={},
-        timestep="1h",
         comment="",
     )
 
 
 @pytest.fixture
-def sample_artifact(sample_checkpoint: AnemoiCheckpoint) -> ArtifactResolved:
-    """Sample ArtifactResolved wrapping sample_checkpoint, locally compatible"""
+def sample_checkpoint() -> AnemoiCheckpoint:
+    """Sample ML model checkpoint-specific data for testing"""
+    return AnemoiCheckpoint(
+        pip_package_constraints=["torch>=2.0"],
+        input_characteristics=["input_source"],
+        input_qube={},
+        output_qube={},
+        timestep="1h",
+    )
+
+
+@pytest.fixture
+def sample_artifact(sample_common: CommonArtifactMetadata, sample_checkpoint: AnemoiCheckpoint) -> ArtifactResolved:
+    """Sample ArtifactResolved wrapping sample_common + sample_checkpoint, locally compatible"""
     return ArtifactResolved(
         artifact_type="AnemoiCheckpoint",
-        store_info=sample_checkpoint,
+        common=sample_common,
+        specific=sample_checkpoint,
         is_locally_compatible=True,
         local_compatibility_detail=None,
     )
@@ -136,20 +144,32 @@ def test_composite_artifact_id_from_str_missing_colon() -> None:
         CoreCompositeArtifactId.from_str("no_colon_here")
 
 
-def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkpoint: Any) -> None:
+def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_common: Any, sample_checkpoint: Any) -> None:
     """Test getting artifacts catalog from multiple stores"""
     store1_data = {
         "display_name": "Store 1",
         "artifacts": {
-            "model1": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
-            "model2": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
+            "model1": {
+                "artifact_type": "AnemoiCheckpoint",
+                "common": sample_common.model_dump(),
+                "specific": sample_checkpoint.model_dump(),
+            },
+            "model2": {
+                "artifact_type": "AnemoiCheckpoint",
+                "common": sample_common.model_dump(),
+                "specific": sample_checkpoint.model_dump(),
+            },
         },
     }
 
     store2_data = {
         "display_name": "Store 2",
         "artifacts": {
-            "model3": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
+            "model3": {
+                "artifact_type": "AnemoiCheckpoint",
+                "common": sample_common.model_dump(),
+                "specific": sample_checkpoint.model_dump(),
+            },
         },
     }
 
@@ -176,18 +196,22 @@ def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_checkp
         for composite_id, artifact in catalog.items():
             assert isinstance(artifact, ArtifactResolved)
             assert artifact.artifact_type == "AnemoiCheckpoint"
-            assert isinstance(artifact.store_info, AnemoiCheckpoint)
-            assert artifact.store_info.display_name == "Test Model"
+            assert isinstance(artifact.common, CommonArtifactMetadata)
+            assert artifact.common.display_name == "Test Model"
             assert artifact.is_locally_compatible is True
             assert artifact.local_compatibility_detail is None
 
 
-def test_get_artifacts_catalog_from_git_tag(sample_checkpoint: Any) -> None:
+def test_get_artifacts_catalog_from_git_tag(sample_common: Any, sample_checkpoint: Any) -> None:
     """Test that gittag stores fetch artifacts from the highest c-tag."""
     store_data = {
         "display_name": "Store 1",
         "artifacts": {
-            "model1": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
+            "model1": {
+                "artifact_type": "AnemoiCheckpoint",
+                "common": sample_common.model_dump(),
+                "specific": sample_checkpoint.model_dump(),
+            },
         },
     }
 
@@ -261,12 +285,16 @@ def test_get_artifacts_catalog_unsupported_method() -> None:
         get_artifacts_catalog(config)
 
 
-def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_checkpoint: Any) -> None:
+def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_common: Any, sample_checkpoint: Any) -> None:
     """Test that get_artifacts_catalog loads from a local JSON file when the URL is a valid file path"""
     store_data = {
         "display_name": "Local Store",
         "artifacts": {
-            "local_model": {"artifact_type": "AnemoiCheckpoint", "store_info": sample_checkpoint.model_dump()},
+            "local_model": {
+                "artifact_type": "AnemoiCheckpoint",
+                "common": sample_common.model_dump(),
+                "specific": sample_checkpoint.model_dump(),
+            },
         },
     }
 
@@ -285,7 +313,7 @@ def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_checkpo
     assert len(catalog) == 1
     composite_id = CompositeArtifactId(ArtifactStoreId("local_store"), ArtifactLocalId("local_model"))
     assert composite_id in catalog
-    assert catalog[composite_id].store_info.display_name == "Test Model"
+    assert catalog[composite_id].common.display_name == "Test Model"
     assert catalog[composite_id].is_locally_compatible is True
     assert catalog[composite_id].local_compatibility_detail is None
 

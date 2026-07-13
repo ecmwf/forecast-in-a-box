@@ -48,15 +48,18 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
                 checkpoint_id = f"{test_model_artifact_id}{i}"
                 return {
                     "artifact_type": "AnemoiCheckpoint",
-                    "store_info": {
+                    "common": {
                         "url": f"http://localhost:{fake_artifact_registry_port}/{checkpoint_id}",
                         "display_name": f"Test Model Checkpoint {i}",
                         "display_author": "Test Author",
                         "display_description": f"A test model checkpoint {i} for integration tests",
                         "comment": "",
                         "disk_size_bytes": 1024,
-                        "pip_package_constraints": ["torch>=2.0.0"],
                         "supported_platforms": ["linux", "macos"],
+                        "tags": {"integration-test": None, "index": str(i)},
+                    },
+                    "specific": {
+                        "pip_package_constraints": ["torch>=2.0.0"],
                         "input_qube": {},
                         "output_qube": {"test": "qube"},
                         "input_characteristics": ["test_input"],
@@ -66,15 +69,18 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
 
             small_artifact = {
                 "artifact_type": "AnemoiCheckpoint",
-                "store_info": {
+                "common": {
                     "url": f"http://localhost:{fake_artifact_registry_port}/{test_blueprint_artifact_id}",
                     "display_name": "Small Test Checkpoint",
                     "display_author": "Test Author",
                     "display_description": "A small test checkpoint for artifact runtime dependency tests",
                     "comment": "",
                     "disk_size_bytes": 64,
-                    "pip_package_constraints": [],
                     "supported_platforms": ["linux", "macos"],
+                    "tags": {},
+                },
+                "specific": {
+                    "pip_package_constraints": [],
                     "input_qube": {},
                     "output_qube": {},
                     "input_characteristics": [],

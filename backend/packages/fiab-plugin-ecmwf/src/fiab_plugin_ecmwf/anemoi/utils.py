@@ -37,7 +37,7 @@ def _timestep_seconds(timestep: str) -> int:
 def get_available_checkpoints() -> dict[CompositeArtifactId, AnemoiCheckpoint]:
     all_artifacts = ArtifactsProvider.get_artifacts_lookup()
     return {
-        composite_id: artifact.store_info
+        composite_id: artifact.specific
         for composite_id, artifact in all_artifacts.items()
         if artifact.artifact_type == "AnemoiCheckpoint" and artifact.is_locally_compatible
     }

@@ -3,7 +3,7 @@ import platform
 import subprocess
 from dataclasses import dataclass
 
-from fiab_core.artifacts import AnemoiCheckpoint, Platform
+from fiab_core.artifacts import AnemoiCheckpoint, CommonArtifactMetadata, Platform
 
 logger = logging.getLogger(__name__)
 
@@ -57,22 +57,24 @@ def get_platform_info() -> PlatformInfo | None:
         return PlatformInfo(platform_name=None, gpu_memory_mib=None)
 
 
-def get_model_checkpoint_compatibility(model_checkpoint: AnemoiCheckpoint, platform_info: PlatformInfo | None) -> tuple[bool, str | None]:
+def get_model_checkpoint_compatibility(
+    common: CommonArtifactMetadata, specific: AnemoiCheckpoint, platform_info: PlatformInfo | None
+) -> tuple[bool, str | None]:
     errors = []
     if platform_info is None:
         errors.append("local PlatformInfo not detected")
     else:
-        if platform_info.platform_name not in model_checkpoint.supported_platforms:
+        if platform_info.platform_name not in common.supported_platforms:
             errors.append(
-                f"the local platform {platform_info.platform_name} is not supported by the model ({','.join(model_checkpoint.supported_platforms)})"
+                f"the local platform {platform_info.platform_name} is not supported by the model ({','.join(common.supported_platforms)})"
             )
-        if model_checkpoint.minimum_gpu_memory_mib is not None:
+        if specific.minimum_gpu_memory_mib is not None:
             if platform_info.gpu_memory_mib is None:
                 errors.append(f"no gpu found, but the model requires one")
             else:
-                if platform_info.gpu_memory_mib < model_checkpoint.minimum_gpu_memory_mib:
+                if platform_info.gpu_memory_mib < specific.minimum_gpu_memory_mib:
                     errors.append(
-                        f"found only {platform_info.gpu_memory_mib} MiB gpu memory, but model needs {model_checkpoint.minimum_gpu_memory_mib}"
+                        f"found only {platform_info.gpu_memory_mib} MiB gpu memory, but model needs {specific.minimum_gpu_memory_mib}"
                     )
     if errors:
         return False, ";".join(errors)

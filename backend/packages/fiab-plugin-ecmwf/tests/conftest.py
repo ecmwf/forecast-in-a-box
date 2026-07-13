@@ -12,7 +12,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from fiab_core.artifacts import AnemoiCheckpoint, ArtifactResolved, ArtifactsProvider, CompositeArtifactId
+from fiab_core.artifacts import AnemoiCheckpoint, ArtifactResolved, ArtifactsProvider, CommonArtifactMetadata, CompositeArtifactId
 from qubed import Qube
 
 DUMMY_QUBE = Qube.from_json(
@@ -42,19 +42,21 @@ def dummy_provider(*, timestep: str = "1h") -> Generator[None, None, None]:
         lambda: {
             CompositeArtifactId.from_str("dummy_store:dummy_ckpt"): ArtifactResolved(
                 artifact_type="AnemoiCheckpoint",
-                store_info=AnemoiCheckpoint(
+                common=CommonArtifactMetadata(
                     url="http://example.com/dummy_checkpoint",
                     display_name="Dummy Checkpoint",
                     display_author="Author",
                     display_description="A dummy checkpoint for testing",
                     disk_size_bytes=1234,
-                    pip_package_constraints=[],
                     supported_platforms=["linux"],
+                    comment="A dummy comment",
+                ),
+                specific=AnemoiCheckpoint(
+                    pip_package_constraints=[],
                     input_characteristics=[],
                     input_qube=DUMMY_QUBE.to_json(),
                     output_qube=DUMMY_QUBE.to_json(),
                     timestep=timestep,
-                    comment="A dummy comment",
                 ),
                 is_locally_compatible=True,
                 local_compatibility_detail=None,

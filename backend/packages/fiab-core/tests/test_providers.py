@@ -19,6 +19,7 @@ from fiab_core.artifacts import (
     ArtifactsLookup,
     ArtifactsProvider,
     ArtifactStoreId,
+    CommonArtifactMetadata,
     CompositeArtifactId,
 )
 
@@ -47,23 +48,26 @@ def test_get_artifact_local_path_raises_before_registration() -> None:
 
 
 def test_get_artifacts_lookup_returns_registered_result() -> None:
-    checkpoint = AnemoiCheckpoint(
+    common = CommonArtifactMetadata(
         url="http://example.com/model.ckpt",
         display_name="My Model",
         display_author="Author",
         display_description="A model",
         disk_size_bytes=1024,
-        pip_package_constraints=[],
         supported_platforms=["linux"],
+        comment="",
+    )
+    specific = AnemoiCheckpoint(
+        pip_package_constraints=[],
         input_characteristics=[],
         input_qube={},
         output_qube={},
         timestep="1h",
-        comment="",
     )
     artifact = ArtifactResolved(
         artifact_type="AnemoiCheckpoint",
-        store_info=checkpoint,
+        common=common,
+        specific=specific,
         is_locally_compatible=True,
         local_compatibility_detail=None,
     )
@@ -72,30 +76,33 @@ def test_get_artifacts_lookup_returns_registered_result() -> None:
     ArtifactsProvider.register_get_artifacts_lookup(lambda: catalog)
     result = ArtifactsProvider.get_artifacts_lookup()
     assert result[composite_id] == artifact
-    assert result[composite_id].store_info == checkpoint
+    assert result[composite_id].common == common
     assert result[composite_id].is_locally_compatible is True
     assert result[composite_id].local_compatibility_detail is None
 
 
 def test_get_artifacts_lookup_returns_registered_result_incompatible() -> None:
     """Verifies that incompatible artifacts are stored and returned correctly."""
-    checkpoint = AnemoiCheckpoint(
+    common = CommonArtifactMetadata(
         url="http://example.com/model.ckpt",
         display_name="Incompatible Model",
         display_author="Author",
         display_description="A model that is not locally compatible",
         disk_size_bytes=512,
-        pip_package_constraints=[],
         supported_platforms=["linux"],
+        comment="",
+    )
+    specific = AnemoiCheckpoint(
+        pip_package_constraints=[],
         input_characteristics=[],
         input_qube={},
         output_qube={},
         timestep="1h",
-        comment="",
     )
     artifact = ArtifactResolved(
         artifact_type="AnemoiCheckpoint",
-        store_info=checkpoint,
+        common=common,
+        specific=specific,
         is_locally_compatible=False,
         local_compatibility_detail="Requires CUDA 12, but only CUDA 11 is available",
     )
@@ -113,23 +120,26 @@ def test_get_artifacts_lookup_returns_current_value_of_mutable_source() -> None:
     ArtifactsProvider.register_get_artifacts_lookup(lambda: catalog)
     assert len(ArtifactsProvider.get_artifacts_lookup()) == 0
 
-    checkpoint = AnemoiCheckpoint(
+    common = CommonArtifactMetadata(
         url="http://example.com/model.ckpt",
         display_name="M",
         display_author="A",
         display_description="D",
         disk_size_bytes=0,
-        pip_package_constraints=[],
         supported_platforms=[],
+        comment="",
+    )
+    specific = AnemoiCheckpoint(
+        pip_package_constraints=[],
         input_characteristics=[],
         input_qube={},
         output_qube={},
         timestep="1h",
-        comment="",
     )
     artifact = ArtifactResolved(
         artifact_type="AnemoiCheckpoint",
-        store_info=checkpoint,
+        common=common,
+        specific=specific,
         is_locally_compatible=True,
         local_compatibility_detail=None,
     )
