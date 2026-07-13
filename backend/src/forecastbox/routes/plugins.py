@@ -19,7 +19,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
-from fiab_core.fable import BlockInstanceId, ConfigurationOptionId, PluginCompositeId
+from fiab_core.fable import BlockInstanceId, BlueprintTemplateExampleInput, ConfigurationOptionId, PluginCompositeId
 from packaging.version import InvalidVersion, Version
 
 from forecastbox.domain.auth.users import UserRead
@@ -186,9 +186,9 @@ async def update_plugin_settings_endpoint(
 
 
 class TemplateExampleValuesResponse(FiabBaseModel):
-    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
+    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, BlueprintTemplateExampleInput]]
     """Per-block example configuration values, keyed by block instance id then option id."""
-    example_glyphs: dict[str, str]
+    example_glyphs: dict[str, BlueprintTemplateExampleInput]
     """Example glyph name-to-value pairs the user is expected to override."""
 
 
@@ -225,15 +225,19 @@ async def get_template_example_values(
 
     glyph_remapping: dict[str, str] = dict(plugin_state.glyph_remapping) if plugin_state.glyph_remapping else {}  # type: ignore[no-matching-overload]
 
-    remapped_example_values: dict[str, dict[str, str]] = {
-        block_id: {opt_id: remap_glyph_names(val, glyph_remapping) for opt_id, val in opts.items()}
+    remapped_example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, BlueprintTemplateExampleInput]] = {
+        BlockInstanceId(block_id): {
+            ConfigurationOptionId(opt_id): inp.model_copy(update={"example_value": remap_glyph_names(inp.example_value, glyph_remapping)})
+            for opt_id, inp in opts.items()
+        }
         for block_id, opts in template.example_values.items()
     }
-    remapped_example_glyphs: dict[str, str] = {
-        glyph_remapping.get(key, key): remap_glyph_names(val, glyph_remapping) for key, val in template.example_glyphs.items()
+    remapped_example_glyphs: dict[str, BlueprintTemplateExampleInput] = {
+        glyph_remapping.get(key, key): inp.model_copy(update={"example_value": remap_glyph_names(inp.example_value, glyph_remapping)})
+        for key, inp in template.example_glyphs.items()
     }
 
     return TemplateExampleValuesResponse(
-        example_values=remapped_example_values,  # ty:ignore[invalid-argument-type]
+        example_values=remapped_example_values,
         example_glyphs=remapped_example_glyphs,
     )

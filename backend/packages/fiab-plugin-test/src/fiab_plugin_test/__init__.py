@@ -15,6 +15,7 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     BlueprintTemplate,
     BlueprintTemplateBlock,
+    BlueprintTemplateExampleInput,
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
     NoOutput,
@@ -223,8 +224,22 @@ _testBasic = BlueprintTemplate(
         _BLOCK_EXAMPLE: _make_source_text_block(""),
     },
     local_glyphs={"greeting": "hello"},
-    example_values={_BLOCK_EXAMPLE: {TEXT: "text from example values"}},
-    example_glyphs={"name": "world"},
+    example_values={
+        _BLOCK_EXAMPLE: {
+            TEXT: BlueprintTemplateExampleInput(
+                example_value="text from example values",
+                display_name="Message",
+                display_description="The text that the source block will output.",
+            )
+        }
+    },
+    example_glyphs={
+        "name": BlueprintTemplateExampleInput(
+            example_value="world",
+            display_name="Name",
+            display_description="The name to greet.",
+        )
+    },
 )
 
 _BLOCK_EXCL = BlockInstanceId("text_excl")

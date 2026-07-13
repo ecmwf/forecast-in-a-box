@@ -195,7 +195,18 @@ class BlueprintTemplateExampleInput(FiabCoreBaseModel):
     example_value: str
     display_name: str | None = None
     display_description: str | None = None
-    type_hint: str | None = None  # TODO validator -- if not None, then it must be a valid FableType
+    type_hint: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_type_hint(self) -> Self:
+        if self.type_hint is not None:
+            try:
+                _, remainder = parse(self.type_hint)
+                if remainder.strip():
+                    raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
+            except NotFableType as exc:
+                raise ValueError(str(exc)) from exc
+        return self
 
 
 class BlueprintTemplate(FiabCoreBaseModel):

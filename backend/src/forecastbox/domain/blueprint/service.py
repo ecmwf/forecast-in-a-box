@@ -32,6 +32,7 @@ from fiab_core.fable import (
     BlockInstanceOutput,
     BlockKind,
     BlueprintTemplate,
+    BlueprintTemplateExampleInput,
     ConfigurationOptionId,
     NoOutput,
     PluginCompositeId,
@@ -405,8 +406,8 @@ def template_to_builder(template: BlueprintTemplate, plugin_id: PluginCompositeI
 
 def resolve_builder_with_examples(
     builder: BlueprintBuilder,
-    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, str]],
-    example_glyphs: dict[str, str],
+    example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, BlueprintTemplateExampleInput]],
+    example_glyphs: dict[str, BlueprintTemplateExampleInput],
 ) -> BlueprintBuilder:
     """Return a copy of ``builder`` with example values/glyphs overlaid for validation only.
 
@@ -429,7 +430,10 @@ def resolve_builder_with_examples(
     for routable in copy.blocks:
         if routable.instance_id in example_values:
             # Merge: example values override existing template configuration values.
-            merged_config = {**routable.instance.configuration_values, **example_values[routable.instance_id]}
+            # Only the example_value string is used for execution; the other fields
+            # (display_name, display_description, type_hint) are UI metadata only.
+            example_str_values = {opt: inp.example_value for opt, inp in example_values[routable.instance_id].items()}
+            merged_config = {**routable.instance.configuration_values, **example_str_values}
             new_blocks.append(
                 routable.model_copy(update={"instance": routable.instance.model_copy(update={"configuration_values": merged_config})})
             )
@@ -437,7 +441,7 @@ def resolve_builder_with_examples(
             new_blocks.append(routable)
 
     # Merge example_glyphs into local_glyphs; example glyphs take precedence.
-    merged_local_glyphs: dict[str, str] = {**copy.local_glyphs, **example_glyphs}
+    merged_local_glyphs: dict[str, str] = {**copy.local_glyphs, **{k: v.example_value for k, v in example_glyphs.items()}}
 
     return copy.model_copy(update={"blocks": new_blocks, "local_glyphs": merged_local_glyphs})
 

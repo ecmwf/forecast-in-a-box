@@ -21,6 +21,7 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlueprintTemplate,
     BlueprintTemplateBlock,
+    BlueprintTemplateExampleInput,
     ConfigurationOptionId,
     PluginCompositeId,
     PluginId,
@@ -201,8 +202,8 @@ _TEMPLATE_WITH_EXAMPLES = BlueprintTemplate(
             instance=BlockInstance(configuration_values={_TEXT: "fixed"}, input_ids={}),
         ),
     },
-    example_values={_BLOCK_A: {_TEXT: "${exampleGlyph}"}},
-    example_glyphs={"exampleGlyph": "hello world"},
+    example_values={_BLOCK_A: {_TEXT: BlueprintTemplateExampleInput(example_value="${exampleGlyph}")}},
+    example_glyphs={"exampleGlyph": BlueprintTemplateExampleInput(example_value="hello world")},
 )
 
 _TEMPLATE_NO_EXAMPLES = BlueprintTemplate(
@@ -239,8 +240,8 @@ async def test_template_example_values_returns_examples() -> None:
     ):
         mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
         result = await get_template_example_values(_PLUGIN_ID, "myTemplate")
-    assert result.example_values == {_BLOCK_A: {_TEXT: "${exampleGlyph}"}}
-    assert result.example_glyphs == {"exampleGlyph": "hello world"}
+    assert result.example_values == {_BLOCK_A: {_TEXT: BlueprintTemplateExampleInput(example_value="${exampleGlyph}")}}
+    assert result.example_glyphs == {"exampleGlyph": BlueprintTemplateExampleInput(example_value="hello world")}
 
 
 @pytest.mark.asyncio
@@ -254,9 +255,9 @@ async def test_template_example_values_applies_remapping() -> None:
         mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
         result = await get_template_example_values(_PLUGIN_ID, "myTemplate")
     # Key renamed, value's glyph reference renamed
-    assert result.example_glyphs == {"renamedGlyph": "hello world"}
+    assert result.example_glyphs == {"renamedGlyph": BlueprintTemplateExampleInput(example_value="hello world")}
     # The example_value string referencing ${exampleGlyph} must be rewritten
-    assert result.example_values[_BLOCK_A][_TEXT] == "${renamedGlyph}"
+    assert result.example_values[_BLOCK_A][_TEXT] == BlueprintTemplateExampleInput(example_value="${renamedGlyph}")
 
 
 @pytest.mark.asyncio
