@@ -152,6 +152,11 @@ class RawOutput(FiabCoreBaseModel):
     mime_type: str = "application/octet-stream"
 
 
+def is_textual(mime_type: str) -> bool:
+    # we check the starts with because of encoding, extension, etc
+    return mime_type.startswith("text/plain")
+
+
 class NoOutput(FiabCoreBaseModel):
     # use this when there is no output whatsoever -- this stops *any* expansion of the block
     pass

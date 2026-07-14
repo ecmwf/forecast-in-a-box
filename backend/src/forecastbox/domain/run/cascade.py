@@ -78,9 +78,16 @@ class ExecutionSpecification(FiabBaseModel):
     shared: bool = Field(default=False)
 
 
+stored_output_max_length = 10 * 1024**2
+
+
 class RunOutputCharacteristic(FiabBaseModel):
     mime_type: str = "application/octet-stream"
     original_block: BlockInstanceId
+    value: str | None = Field(
+        default=None,
+        description=f"If the actual output value is textual (text/plain) and has already been computed, we will store it here, trimmed to {stored_output_max_length} characters",
+    )
 
 
 class RunOutputs(FiabBaseModel):

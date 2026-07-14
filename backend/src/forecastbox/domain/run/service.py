@@ -32,7 +32,7 @@ from cascade.controller.report import JobId
 from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
 from cascade.low.func import Either
-from fiab_core.fable import BlockInstanceId
+from fiab_core.fable import BlockInstanceId, is_textual
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
@@ -40,18 +40,32 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.run.background import execute_background
-from forecastbox.domain.run.cascade import RunOutputs
+from forecastbox.domain.run.cascade import RunOutputCharacteristic, RunOutputs, stored_output_max_length
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.memcache import pop as pop_memcache
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
+
+
+def _decode_textual_output(raw: bytes, mime_type: str) -> str:
+    """Decode raw bytes to string using the charset declared in the mime_type.
+
+    Falls back to utf-8 when no charset is specified. On decode error, stores a
+    diagnostic message instead of raising.
+    """
+    encoding = get_encoding(mime_type)
+    try:
+        return raw.decode(encoding)[:stored_output_max_length]
+    except Exception as e:
+        return f"Decoding Error: {repr(e)}"[:stored_output_max_length]
 
 
 class RunDetail(FiabBaseModel):
@@ -195,13 +209,20 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
     status = cast(str, execution.status)
 
     # Derive available_task_ids from stored outputs without calling cascade for terminal states:
-    # completed → assume all outputs are available; failed → assume none are.
+    # completed → assume all outputs are available; failed → only those with a locally cached value.
     raw_outputs = cast(dict | None, execution.outputs)
     available_task_ids: list[TaskId] | None
     if status == "completed":
         available_task_ids = [TaskId(k) for k in (raw_outputs or {}).get("outputs", {}).keys()]
     elif status == "failed":
-        available_task_ids = []
+        if raw_outputs:
+            try:
+                _cached = RunOutputs.model_validate(raw_outputs)
+                available_task_ids = [tid for tid, char in _cached.outputs.items() if char.value is not None]
+            except Exception:
+                available_task_ids = []
+        else:
+            available_task_ids = []
     else:
         available_task_ids = None
 
@@ -267,6 +288,39 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         if response.error:
             return _build(status_override="unknown", error_override=response.error)
 
+        # Fetch and store values for newly available textual outputs.
+        # We compare what cascade reports as available against what is already stored locally,
+        # and fetch any textual (text/plain) outputs that have not been fetched yet.
+        updated_outputs: RunOutputs | None = None
+        if raw_outputs is not None and job_id in response.datasets:
+            try:
+                outputs_model = RunOutputs.model_validate(raw_outputs)
+                already_fetched = {tid for tid, char in outputs_model.outputs.items() if char.value is not None}
+                cascade_available = {d.task for d in response.datasets[job_id]}
+                for task_id in cascade_available - already_fetched:
+                    char = outputs_model.outputs.get(task_id)
+                    if char is None or not is_textual(char.mime_type):
+                        continue
+                    try:
+                        fetch_resp = client.request_response(
+                            api.ResultRetrievalRequest(job_id=job_id, dataset_id=DatasetId(task=task_id, output="0")),
+                            get_gateway_url(),
+                        )
+                        fetch_resp = cast(api.ResultRetrievalResponse, fetch_resp)  # type: ignore[attr-defined]
+                        if fetch_resp.error:
+                            logger.warning("Failed to fetch value for task %r: %s", task_id, fetch_resp.error)
+                            continue
+                        decoded = api.decoded_result(fetch_resp, job=None)  # type: ignore[attr-defined]
+                        if isinstance(decoded, bytes):
+                            char.value = _decode_textual_output(decoded, char.mime_type)
+                            updated_outputs = outputs_model
+                    except Exception as e:
+                        logger.warning("Failed to fetch value for task %r: %r", task_id, e)
+            except Exception as e:
+                logger.warning("Failed to process textual outputs for run %r: %r", run_id, e)
+        if updated_outputs is not None:
+            raw_outputs = updated_outputs.model_dump()
+
         # NOTE we should check more carefuly in the None branch -- the job_id may not be part of the response
         # if the job has not started yet -- but we should verify that in the status, etc
         if task_to_block is not None and response.planned_task_ids is not None and job_id in response.planned_task_ids:
@@ -281,21 +335,22 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         else:
             completed_block_ids = None
         jobprogress = response.progresses.get(job_id)
+        outputs_kwargs = {"outputs": raw_outputs} if updated_outputs is not None else {}
         if jobprogress is None:
-            await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway")
-            available_task_ids = []
+            await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error="evicted from gateway", **outputs_kwargs)
+            available_task_ids = [tid for tid, char in updated_outputs.outputs.items() if char.value is not None] if updated_outputs else []
             pop_memcache(run_id)
             return _build(status_override="failed", error_override="evicted from gateway")
         elif jobprogress.failure:
-            await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error=jobprogress.failure)
-            available_task_ids = []
+            await run_db.update_run_runtime(run_id, actual_attempt, status="failed", error=jobprogress.failure, **outputs_kwargs)
+            available_task_ids = [tid for tid, char in updated_outputs.outputs.items() if char.value is not None] if updated_outputs else []
             pop_memcache(run_id)
             return _build(status_override="failed", error_override=jobprogress.failure)
         elif jobprogress.completed or jobprogress.pct == "100.00":
-            await run_db.update_run_runtime(run_id, actual_attempt, status="completed", progress="100.00")
+            await run_db.update_run_runtime(run_id, actual_attempt, status="completed", progress="100.00", **outputs_kwargs)
             return _build(status_override="completed", progress_override="100.00")
         else:
-            await run_db.update_run_runtime(run_id, actual_attempt, status="running", progress=jobprogress.pct)
+            await run_db.update_run_runtime(run_id, actual_attempt, status="running", progress=jobprogress.pct, **outputs_kwargs)
             return _build(
                 status_override="running",
                 error_override=warning_error,
