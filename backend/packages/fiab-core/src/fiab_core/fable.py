@@ -152,9 +152,9 @@ class RawOutput(FiabCoreBaseModel):
     mime_type: str = "application/octet-stream"
 
 
-def is_textual(output: RawOutput) -> bool:
+def is_textual(mime_type: str) -> bool:
     # we check the starts with because of encoding, extension, etc
-    return output.mime_type.startswith("text/plain")
+    return mime_type.startswith("text/plain")
 
 
 class NoOutput(FiabCoreBaseModel):

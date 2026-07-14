@@ -1700,8 +1700,56 @@ def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, a
 
 
 @pytest.mark.skip("leaves hanging process behind")
-def test_gateway_restart_with_in_progress_job(backend_client_user: httpx.Client) -> None:
-    """Kill the gateway while a job is active; verify the expected status transitions."""
+def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: httpx.Client) -> None:
+    """Kill the gateway while a job is active; verify the expected status transitions.
+
+    A simple text-output job is submitted and completed before the gateway is killed.
+    After the restart, its output must still be fetchable from the locally cached value.
+    """
+    # --- Step 1: submit a simple job that completes quickly and has a textual output ---
+    source_text = RoutableBlock(
+        instance_id=BlockInstanceId("source_text"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_text"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "gateway-restart-test-output"}),
+            input_ids={},
+        ),
+    )
+    text_sink = RoutableBlock(
+        instance_id=BlockInstanceId("text_sink"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": f"{tmpdir}/gwrestart_${{runId}}.txt"}),
+            input_ids={"data": BlockInstanceId("source_text")},
+        ),
+    )
+    simple_builder = BlueprintBuilder(blocks=[source_text, text_sink])
+    simple_save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=simple_builder).model_dump())
+    assert simple_save_resp.is_success, simple_save_resp.text
+    simple_blueprint_id = simple_save_resp.json()["blueprint_id"]
+
+    simple_run_resp = backend_client_user.post("/run/create", json={"blueprint_id": simple_blueprint_id})
+    assert simple_run_resp.is_success, simple_run_resp.text
+    simple_run_id = simple_run_resp.json()["run_id"]
+
+    # Wait until the simple job completes (and its textual value is cached in the DB)
+    ensure_completed_v2(backend_client_user, simple_run_id, sleep=1, attempts=120)
+
+    # Identify the sink_file output task id
+    simple_detail = backend_client_user.get("/run/get", params={"run_id": simple_run_id}).raise_for_status().json()
+    simple_outputs = simple_detail["outputs"]["outputs"]
+    simple_available = [tid for tid, char in simple_outputs.items() if char["is_available"] and "sink_file" in tid]
+    assert len(simple_available) == 1, f"Expected exactly one available sink_file task, got: {simple_outputs}"
+    simple_sink_task_id = simple_available[0]
+
+    # Sanity check: output is accessible while cascade is still up
+    content_resp = backend_client_user.get("/run/outputContent", params={"run_id": simple_run_id, "dataset_id": simple_sink_task_id})
+    assert content_resp.is_success, content_resp.text
+    assert content_resp.content.decode("utf-8").startswith("file://")
+
+    # --- Step 2: submit a long-running sleeper job ---
     sleeper = RoutableBlock(
         instance_id=BlockInstanceId("sleeper"),
         plugin=testPluginId,
@@ -1736,6 +1784,7 @@ def test_gateway_restart_with_in_progress_job(backend_client_user: httpx.Client)
 
     _wait_until_running(backend_client_user, run_id)
 
+    # --- Step 3: kill the gateway ---
     # TODO this leaves the workers hanging. We need some solution to collect them properly
     kill_resp = backend_client_user.post("/gateway/kill")
     assert kill_resp.is_success, kill_resp.text
@@ -1749,7 +1798,7 @@ def test_gateway_restart_with_in_progress_job(backend_client_user: httpx.Client)
     start_resp = backend_client_user.post("/gateway/start")
     assert start_resp.is_success, start_resp.text
 
-    # After the gateway restarts (fresh, empty), the job is unknown to it → "evicted from gateway"
+    # After the gateway restarts (fresh, empty), the sleeper job is unknown to it → "evicted from gateway"
     def poll_evicted() -> Any:
         resp = backend_client_user.get("/run/get", params={"run_id": run_id}, timeout=10)
         assert resp.is_success, resp.text
@@ -1763,6 +1812,12 @@ def test_gateway_restart_with_in_progress_job(backend_client_user: httpx.Client)
         return None
 
     retry_until(poll_evicted, verify_evicted, attempts=30, sleep=1.0, error_msg=f"Run {run_id} never reached 'evicted from gateway'")
+
+    # --- Step 4: verify the completed simple job's text output is still fetchable ---
+    # The gateway no longer holds the result, but it must be served from the local DB cache.
+    cached_content_resp = backend_client_user.get("/run/outputContent", params={"run_id": simple_run_id, "dataset_id": simple_sink_task_id})
+    assert cached_content_resp.is_success, cached_content_resp.text
+    assert cached_content_resp.content.decode("utf-8").startswith("file://")
 
 
 def test_blueprint_artifact_execute(tmpdir: Any, backend_client_user: httpx.Client) -> None:

@@ -426,6 +426,18 @@ async def get_run_output_content(
     """Retrieve the result of a specific output task, encoded as bytes."""
     execution, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
     dataset = DatasetId(task=TaskId(dataset_id), output="0")
+
+    # Serve from locally cached value when available, without contacting cascade.
+    raw_outputs = cast(dict | None, execution.outputs)
+    if raw_outputs is not None:
+        try:
+            outputs_model = RunOutputs.model_validate(raw_outputs)
+            char = outputs_model.outputs.get(TaskId(dataset_id))
+            if char is not None and char.value is not None:
+                return Response(char.value.encode("utf-8"), media_type=char.mime_type)
+        except Exception:
+            pass  # fall through to cascade
+
     mime_result = service.get_mime_of_output(execution, dataset)
     if mime_result.t is None:
         raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
