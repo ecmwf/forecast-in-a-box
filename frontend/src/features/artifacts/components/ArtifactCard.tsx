@@ -18,6 +18,7 @@ import { Download, HardDrive, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
+import { ArtifactTagChips } from './ArtifactTagChips'
 import type {
   ArtifactInfo,
   CompositeArtifactId,
@@ -99,6 +100,7 @@ export function ArtifactCard({
             {platform}
           </span>
         ))}
+        <ArtifactTagChips tags={artifact.tags} max={3} />
         <ArtifactCompatibilityBadge artifact={artifact} />
       </div>
 

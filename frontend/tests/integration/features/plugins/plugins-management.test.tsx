@@ -582,6 +582,37 @@ describe('Plugins Management Integration', () => {
       await expect.element(screen.getByText('Loaded')).not.toBeInTheDocument()
       await expect.element(screen.getByText(/version mismatch/)).toBeVisible()
     })
+
+    it('badges an installed plugin whose module failed to load as red Errored', async () => {
+      // Install succeeded (settings_data present, enabled) but loading the
+      // module failed — the error-severity diagnostic must win over 'loaded'.
+      worker.use(
+        http.get(API_ENDPOINTS.plugin.list, () =>
+          detailsResponse({
+            ...baseDetail,
+            load_errors: [
+              {
+                source: 'load',
+                detail:
+                  "ModuleNotFoundError: no module named 'fiab_plugin_diag'",
+                severity: 'error',
+              },
+            ],
+          }),
+        ),
+      )
+
+      const screen = await renderWithRouter(<TestPluginsPage />)
+      await expect
+        .element(screen.getByRole('heading', { name: 'Plugin Store' }))
+        .toBeVisible()
+
+      await expect.element(screen.getByText('Errored')).toBeVisible()
+      await expect.element(screen.getByText('Loaded')).not.toBeInTheDocument()
+      await expect
+        .element(screen.getByText(/ModuleNotFoundError/))
+        .toBeVisible()
+    })
   })
 
   describe('Error Handling', () => {

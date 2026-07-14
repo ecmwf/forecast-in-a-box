@@ -37,11 +37,11 @@ interface PluginStatusBadgeProps {
   status: PluginStatus
   /** Whether an update is available (shown as visual indicator) */
   hasUpdate?: boolean
-  /** Max diagnostic severity; drives the badge directly (a warning is amber
-   *  whether the plugin loaded or errored). */
+  /** Max diagnostic severity; drives the badge directly (error/critical red,
+   *  warning amber — whether the plugin loaded or errored). */
   severity?: PluginErrorSeverity | null
-  /** `plugin_enabled` flag. Explicit `false` → "Disabled" regardless of load
-   *  status. Omit to drive the badge by `status` alone. */
+  /** `settings_data.isEnabled` flag. Explicit `false` → "Disabled" regardless
+   *  of load status. Omit to drive the badge by `status` alone. */
   isEnabled?: boolean
   className?: string
 }

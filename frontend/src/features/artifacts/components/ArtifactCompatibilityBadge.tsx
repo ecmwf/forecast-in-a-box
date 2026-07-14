@@ -18,7 +18,10 @@ import type { ArtifactInfo } from '@/api/types/artifacts.types'
 import { cn } from '@/lib/utils'
 
 interface ArtifactCompatibilityBadgeProps {
-  artifact: ArtifactInfo
+  artifact: Pick<
+    ArtifactInfo,
+    'isLocallyCompatible' | 'localCompatibilityDetail'
+  >
   className?: string
 }
 

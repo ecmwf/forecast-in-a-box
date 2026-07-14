@@ -17,27 +17,36 @@
 
 import {
   ArrowLeft,
+  Check,
+  Copy,
   Download,
   ExternalLink,
   HardDrive,
   Trash2,
+  TriangleAlert,
   X,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
+import { ArtifactTagChips } from './ArtifactTagChips'
 import { QubeTree } from './QubeTree'
 import type {
   CompositeArtifactId,
   MlModelDetail,
 } from '@/api/types/artifacts.types'
 import { formatBytes } from '@/api/types/artifacts.types'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { H1, H2, P } from '@/components/base/typography'
+import { copyToClipboard } from '@/lib/utils'
+import { showToast } from '@/lib/toast'
 import { isHttpUrl } from '@/utils/url'
 
 export interface ArtifactDetailPageProps {
@@ -98,21 +107,13 @@ export function ArtifactDetailPage({
                 {platform}
               </span>
             ))}
-            <span
-              className={
-                detail.is_locally_compatible
-                  ? 'inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-sm font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                  : 'inline-flex items-center rounded bg-yellow-100 px-2 py-0.5 text-sm font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-              }
-            >
-              {detail.is_locally_compatible
-                ? t('compatibility.compatible')
-                : detail.local_compatibility_detail
-                  ? t('compatibility.notCompatibleDetail', {
-                      detail: detail.local_compatibility_detail,
-                    })
-                  : t('compatibility.notCompatible')}
-            </span>
+            <ArtifactTagChips tags={detail.tags} />
+            <ArtifactCompatibilityBadge
+              artifact={{
+                isLocallyCompatible: detail.is_locally_compatible,
+                localCompatibilityDetail: detail.local_compatibility_detail,
+              }}
+            />
           </div>
         </div>
         <div className="flex gap-2">
@@ -174,6 +175,18 @@ export function ArtifactDetailPage({
         </div>
       </div>
 
+      {/* Full incompatibility reason from the backend */}
+      {!detail.is_locally_compatible && detail.local_compatibility_detail && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400">
+          <TriangleAlert />
+          <AlertDescription className="text-amber-800 dark:text-amber-400">
+            {t('compatibility.notCompatibleDetail', {
+              detail: detail.local_compatibility_detail,
+            })}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Download Progress Bar */}
       {isDownloading && downloadProgress !== undefined && (
         <Progress value={Math.round(downloadProgress)} />
@@ -194,12 +207,7 @@ export function ArtifactDetailPage({
         {detail.pip_package_constraints.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {detail.pip_package_constraints.map((constraint) => (
-              <span
-                key={constraint}
-                className="rounded bg-muted px-2.5 py-1 font-mono text-sm text-muted-foreground"
-              >
-                {constraint}
-              </span>
+              <ConstraintChip key={constraint} value={constraint} />
             ))}
           </div>
         ) : (
@@ -241,6 +249,47 @@ export function ArtifactDetailPage({
         )}
       </div>
     </div>
+  )
+}
+
+/** Truncating mono chip; long values (wheel URLs) get a tooltip + copy button. */
+function ConstraintChip({ value }: { value: string }) {
+  const { t } = useTranslation('artifacts')
+  const [copied, setCopied] = useState(false)
+  const showCopy = value.length > 40
+
+  const handleCopy = () => {
+    void copyToClipboard(value).then((ok) => {
+      if (ok) {
+        setCopied(true)
+        window.setTimeout(() => setCopied(false), 1500)
+      } else {
+        showToast.error(t('detail.constraintCopyFailed'))
+      }
+    })
+  }
+
+  return (
+    <span
+      title={value}
+      className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded bg-muted px-2.5 py-1 font-mono text-sm text-muted-foreground"
+    >
+      <span className="truncate">{value}</span>
+      {showCopy && (
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label={t('detail.copyConstraint')}
+          className="shrink-0 rounded p-0.5 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          {copied ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
+        </button>
+      )}
+    </span>
   )
 }
 

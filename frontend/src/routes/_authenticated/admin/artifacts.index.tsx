@@ -21,6 +21,7 @@ import { RefreshCw } from 'lucide-react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
+import type { DeleteArtifactTarget } from '@/features/artifacts/components/ConfirmDeleteArtifactDialog'
 import { encodeArtifactId } from '@/api/types/artifacts.types'
 import {
   useArtifacts,
@@ -35,6 +36,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { ArtifactsFilters } from '@/features/artifacts/components/ArtifactsFilters'
 import { ArtifactsList } from '@/features/artifacts/components/ArtifactsList'
 import { AvailableModelsSection } from '@/features/artifacts/components/AvailableModelsSection'
+import { ConfirmDeleteArtifactDialog } from '@/features/artifacts/components/ConfirmDeleteArtifactDialog'
 import { useUiStore } from '@/stores/uiStore'
 
 export const Route = createFileRoute('/_authenticated/admin/artifacts/')({
@@ -50,6 +52,8 @@ function ArtifactsPage() {
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('')
+  const [pendingDelete, setPendingDelete] =
+    useState<DeleteArtifactTarget | null>(null)
 
   // Queries & mutations
   const { artifacts, isLoading, refetch } = useArtifacts()
@@ -134,13 +138,29 @@ function ArtifactsPage() {
         <ArtifactsList
           artifacts={downloadedArtifacts}
           viewMode={artifactsViewMode}
-          onDelete={(id) => deleteModel.mutate(id)}
+          onDelete={(id) => {
+            const artifact = downloadedArtifacts.find(
+              (a) =>
+                a.id.artifact_store_id === id.artifact_store_id &&
+                a.id.artifact_local_id === id.artifact_local_id,
+            )
+            setPendingDelete({ id, name: artifact?.displayName ?? '' })
+          }}
           onViewDetails={handleViewDetails}
           deletingId={deleteModel.isPending ? deleteModel.variables : undefined}
           variant={dashboardVariant}
           shadow={panelShadow}
         />
       </div>
+
+      <ConfirmDeleteArtifactDialog
+        target={pendingDelete}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={(id) => {
+          setPendingDelete(null)
+          deleteModel.mutate(id)
+        }}
+      />
 
       {/* Available Models Section */}
       <AvailableModelsSection

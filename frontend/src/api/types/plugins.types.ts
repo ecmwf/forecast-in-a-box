@@ -180,8 +180,8 @@ export type PluginBadgeKind =
 
 /**
  * The one badge a plugin shows. Badge and status filter both derive from this,
- * so they can't drift. Precedence: disabled → update → warning → errored →
- * available → loaded.
+ * so they can't drift. Precedence: disabled → errored (severe diagnostics) →
+ * update → warning → errored (status) → available → loaded.
  */
 export function pluginBadgeKind(plugin: {
   status: PluginStatus
@@ -194,9 +194,12 @@ export function pluginBadgeKind(plugin: {
   if (plugin.isEnabled === false && plugin.status !== 'available') {
     return 'disabled'
   }
+  // Severity drives the badge, not status — error/critical diagnostics are red
+  // even when install succeeded but the module failed to load; warnings amber.
+  if (plugin.errorSeverity === 'error' || plugin.errorSeverity === 'critical') {
+    return 'errored'
+  }
   if (plugin.hasUpdate && plugin.status === 'loaded') return 'update'
-  // Severity drives the badge, not status — a warning is amber whether the
-  // plugin loaded or errored.
   if (plugin.errorSeverity === 'warning') return 'warning'
   if (plugin.status === 'errored') return 'errored'
   if (plugin.status === 'available') return 'available'
@@ -340,7 +343,7 @@ export interface PluginInfo {
   description: string
   /** Author name from store_info.display_author */
   author: string
-  /** Currently installed version (loaded_version) */
+  /** Currently installed version (install_data.local_version) */
   version: string | null
   /** Latest available version (remote_info.version) */
   latestVersion: string | null
@@ -350,8 +353,8 @@ export interface PluginInfo {
   capabilities: Array<PluginCapability>
   /** Current status from backend */
   status: PluginStatus
-  /** Enabled = its blocks appear in the catalogue. Reflects `plugin_enabled`,
-   *  not merely whether it loaded. */
+  /** Enabled = its blocks appear in the catalogue. Reflects
+   *  `settings_data.isEnabled`, not merely whether it loaded. */
   isEnabled: boolean
   /** Whether plugin is installed (not available) */
   isInstalled: boolean

@@ -59,6 +59,8 @@ export const MlModelOverviewSchema = z.object({
   display_author: z.string(),
   disk_size_bytes: z.number(),
   supported_platforms: z.array(z.string()),
+  /** Arbitrary key → optional-detail labels from the store catalog. */
+  tags: z.record(z.string(), z.string().nullable()),
   is_available: z.boolean(),
   is_locally_compatible: z.boolean(),
   local_compatibility_detail: z.string().nullable(),
@@ -151,6 +153,7 @@ export interface ArtifactInfo {
   diskSize: string
   diskSizeBytes: number
   platforms: Array<string>
+  tags: Record<string, string | null>
   isAvailable: boolean
   isLocallyCompatible: boolean
   localCompatibilityDetail: string | null
@@ -168,6 +171,7 @@ export function toArtifactInfo(model: MlModelOverview): ArtifactInfo {
     diskSize: formatBytes(model.disk_size_bytes),
     diskSizeBytes: model.disk_size_bytes,
     platforms: model.supported_platforms,
+    tags: model.tags,
     isAvailable: model.is_available,
     isLocallyCompatible: model.is_locally_compatible,
     localCompatibilityDetail: model.local_compatibility_detail,
