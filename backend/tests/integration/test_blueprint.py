@@ -1793,7 +1793,7 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
     status_resp = backend_client_user.get("/run/get", params={"run_id": run_id}, timeout=30)
     assert status_resp.is_success, status_resp.text
     assert status_resp.json()["status"] == "unknown"
-    assert "failed to communicate with gateway" in status_resp.json()["error"]
+    assert "internal cascade failure: GatewayNotRunning('Gateway is not running')" in status_resp.json()["error"]
 
     start_resp = backend_client_user.post("/gateway/start")
     assert start_resp.is_success, start_resp.text

@@ -26,7 +26,6 @@ based on the supplied ``AuthContext``.
 
 import asyncio
 import logging
-import re
 from typing import cast
 
 from cascade.controller.report import JobId
@@ -48,13 +47,12 @@ from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, Compil
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.jobs import Blueprint, Run
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.memcache import pop as pop_memcache
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
-
-_CHARSET_RE = re.compile(r"charset=([^\s;]+)", re.IGNORECASE)
 
 
 def _decode_textual_output(raw: bytes, mime_type: str) -> str:
@@ -63,8 +61,7 @@ def _decode_textual_output(raw: bytes, mime_type: str) -> str:
     Falls back to utf-8 when no charset is specified. On decode error, stores a
     diagnostic message instead of raising.
     """
-    m = _CHARSET_RE.search(mime_type)
-    encoding = m.group(1) if m else "utf-8"
+    encoding = get_encoding(mime_type)
     try:
         return raw.decode(encoding)[:stored_output_max_length]
     except Exception as e:

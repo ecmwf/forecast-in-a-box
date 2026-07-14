@@ -7,6 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import re
 from pathlib import Path
 
 import httpx
@@ -28,3 +29,11 @@ def fetch_content(url: str, client: httpx.Client) -> bytes:
 
     else:
         raise ValueError("Unsupported protocol. Use http://, https://, or file://")
+
+
+_CHARSET_RE = re.compile(r"charset=([^\s;]+)", re.IGNORECASE)
+
+
+def get_encoding(mime_type: str) -> str:
+    m = _CHARSET_RE.search(mime_type)
+    return m.group(1) if m else "utf-8"

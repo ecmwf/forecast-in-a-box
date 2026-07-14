@@ -40,6 +40,7 @@ from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -434,7 +435,8 @@ async def get_run_output_content(
             outputs_model = RunOutputs.model_validate(raw_outputs)
             char = outputs_model.outputs.get(TaskId(dataset_id))
             if char is not None and char.value is not None:
-                return Response(char.value.encode("utf-8"), media_type=char.mime_type)
+                encoding = get_encoding(char.mime_type)
+                return Response(char.value.encode(encoding), media_type=char.mime_type)
         except Exception:
             pass  # fall through to cascade
 
