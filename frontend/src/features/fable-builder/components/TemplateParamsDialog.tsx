@@ -13,8 +13,9 @@
  *
  * Collects a template's parameters when forking: required glyphs (seeded
  * from plugin examples) plus the template's own defaults, collapsed.
- * Values validate live against /blueprint/expand on a candidate builder;
- * plain text inputs until the backend ships per-parameter metadata.
+ * Values validate live against /blueprint/expand on a candidate builder.
+ * Parameters with example metadata render as labeled typed fields;
+ * the rest stay plain text.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -46,6 +47,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
 import { useDebounce } from '@/hooks/useDebounce'
 import { cn } from '@/lib/utils'
 
@@ -160,18 +162,40 @@ export function TemplateParamsDialog({
   const renderField = (name: string) => {
     const preview = resolvedPreview(name)
     const missing = isMissing(name)
+    const meta = examples?.example_glyphs[name]
     return (
       <div key={name} className="flex flex-col gap-1.5">
-        <Label htmlFor={`template-param-${name}`} className="font-mono text-xs">
-          {name}
+        <Label
+          htmlFor={`template-param-${name}`}
+          className={meta?.display_name ? 'text-sm' : 'font-mono text-xs'}
+          // tooltip keeps the raw glyph name reachable
+          title={meta?.display_name ? name : undefined}
+        >
+          {meta?.display_name ?? name}
         </Label>
-        <Input
-          id={`template-param-${name}`}
-          value={values[name] ?? ''}
-          onChange={(e) => setValue(name, e.target.value)}
-          aria-invalid={missing || undefined}
-          className={cn(missing && 'border-amber-400')}
-        />
+        {meta?.display_description && (
+          <p className="text-xs text-muted-foreground">
+            {meta.display_description}
+          </p>
+        )}
+        {meta?.type_hint ? (
+          <FieldRenderer
+            id={`template-param-${name}`}
+            configKey={name}
+            valueType={meta.type_hint}
+            value={values[name] ?? ''}
+            onChange={(value) => setValue(name, value)}
+            inputClassName={cn(missing && 'border-amber-400')}
+          />
+        ) : (
+          <Input
+            id={`template-param-${name}`}
+            value={values[name] ?? ''}
+            onChange={(e) => setValue(name, e.target.value)}
+            aria-invalid={missing || undefined}
+            className={cn(missing && 'border-amber-400')}
+          />
+        )}
         {missing ? (
           <p className="text-xs text-amber-600 dark:text-amber-400">
             {t('template.dialog.missingValue')}
