@@ -103,7 +103,7 @@ test.describe('Plugin Install Flow', () => {
     //  1. POST /plugin/install      → 200
     //  2. GET  /blueprint/catalogue → 503  (plugins reloading)
     //  3. GET  /blueprint/catalogue → 200  (retry succeeds)
-    //  4. GET  /plugin/details      → 200  (updated listing)
+    //  4. GET  /plugin/list         → 200  (updated listing)
 
     // After install completes the plugin should appear in the installed
     // section with a toggle switch. Wait for the full retry + refetch cycle.

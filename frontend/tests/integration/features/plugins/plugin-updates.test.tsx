@@ -300,7 +300,7 @@ describe('Plugin Updates Integration', () => {
         .element(screen.getByRole('heading', { name: 'Plugin Store' }))
         .toBeVisible()
 
-      // ECMWF Ensemble has loaded_version '2.1.0' but remote_info version '2.4.0';
+      // ECMWF Ensemble has local_version '2.1.0' but remote_info version '2.4.0';
       // it renders in the updates section AND the installed list
       await expect
         .element(screen.getByText('ECMWF Ensemble').first())
@@ -574,7 +574,7 @@ describe('Plugin Updates Integration', () => {
   // -----------------------------------------------------------------------
   // Mutating tests (trigger update mutation) - placed LAST because the MSW
   // handler uses shared mutable state that persists across tests.
-  // After update, ECMWF Ensemble loaded_version becomes 2.4.0 and
+  // After update, ECMWF Ensemble local_version becomes 2.4.0 and
   // hasUpdate becomes false, removing it from the updates section.
   // -----------------------------------------------------------------------
 
@@ -598,7 +598,7 @@ describe('Plugin Updates Integration', () => {
       const updateButton = screen.getByRole('button', { name: /update now/i })
       await updateButton.click()
 
-      // The MSW handler updates the plugin state (loaded_version becomes 2.4.0)
+      // The MSW handler updates the plugin state (local_version becomes 2.4.0)
       // and invalidates queries. After refetch, the plugin should no longer
       // appear in the updates section since versions will match.
       // MSW update handler has 1000ms delay + refetch (300ms for details)

@@ -267,6 +267,25 @@ describe('pluginBadgeKind — one source of truth for badge + filter', () => {
     )
   })
 
+  it('an error/critical diagnostic reddens even a loaded plugin (load failure)', () => {
+    // Install succeeded (status derives to 'loaded') but the module failed to
+    // load — the severe diagnostic must win over 'loaded' and 'update'.
+    expect(pluginBadgeKind({ status: 'loaded', errorSeverity: 'error' })).toBe(
+      'errored',
+    )
+    expect(
+      pluginBadgeKind({ status: 'loaded', errorSeverity: 'critical' }),
+    ).toBe('errored')
+    expect(
+      pluginBadgeKind({
+        status: 'loaded',
+        isEnabled: true,
+        hasUpdate: true,
+        errorSeverity: 'error',
+      }),
+    ).toBe('errored')
+  })
+
   it('falls through to the plain status when nothing else applies', () => {
     expect(pluginBadgeKind({ status: 'loaded', isEnabled: true })).toBe(
       'loaded',

@@ -163,8 +163,7 @@ function usePluginMutation<TVariables>(
       await action(variables)
       // Poll until the catalogue is available again (plugins finished reloading)
       await waitForCatalogue()
-      // Refresh caches. Status carries plugin_enabled, so it must refresh too
-      // or the toggle sticks.
+      // Refresh caches: catalogue for block availability, list for plugin state.
       await queryClient.invalidateQueries({ queryKey: fableKeys.catalogue() })
       await queryClient.invalidateQueries({ queryKey: pluginKeys.list() })
     },
