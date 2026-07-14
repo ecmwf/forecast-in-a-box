@@ -216,6 +216,7 @@ const mockModels: Array<MlModelDetail> = [
     display_author: 'ECMWF',
     disk_size_bytes: 2_147_483_648,
     supported_platforms: ['cpu', 'cuda'],
+    tags: { resolution: 'o96', deterministic: null },
     is_available: true,
     is_locally_compatible: true,
     local_compatibility_detail: null,
@@ -249,6 +250,13 @@ const mockModels: Array<MlModelDetail> = [
     display_author: 'ECMWF',
     disk_size_bytes: 993_937_386,
     supported_platforms: ['linux', 'macos'],
+    // exercises the "+N" overflow and long-detail tooltip paths
+    tags: {
+      resolution: 'n320',
+      experimental: null,
+      attention: 'scaled dot-product attention (sdpa) variant',
+      mse: null,
+    },
     is_available: false,
     is_locally_compatible: false,
     local_compatibility_detail:
@@ -287,6 +295,7 @@ const mockModels: Array<MlModelDetail> = [
     display_author: 'ECMWF',
     disk_size_bytes: 921_584_533,
     supported_platforms: ['linux', 'macos'],
+    tags: { resolution: 'n320', ensemble: null },
     is_available: true,
     is_locally_compatible: true,
     local_compatibility_detail: null,
@@ -297,6 +306,8 @@ const mockModels: Array<MlModelDetail> = [
       'anemoi-models==0.6.0',
       'torch>=2.6.0',
       'torch_geometric==2.4.0',
+      // wheel-URL constraint as in the real catalog — exercises truncation + copy
+      'https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl',
     ],
     input_qube: buildAifsQube({
       pressureParams: STANDARD_PRESSURE_PARAMS,
@@ -325,6 +336,8 @@ const mockModels: Array<MlModelDetail> = [
     display_author: 'ECMWF',
     disk_size_bytes: 3_221_225_472,
     supported_platforms: ['cuda'],
+    // empty tags: chips render nothing
+    tags: {},
     is_available: false,
     is_locally_compatible: false,
     local_compatibility_detail: 'No compatible GPU detected on this host.',

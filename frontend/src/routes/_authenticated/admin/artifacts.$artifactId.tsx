@@ -14,8 +14,10 @@
  * Shows full details for a single ML model artifact.
  */
 
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import type { DeleteArtifactTarget } from '@/features/artifacts/components/ConfirmDeleteArtifactDialog'
 import { decodeArtifactId } from '@/api/types/artifacts.types'
 import {
   useArtifactDetail,
@@ -24,6 +26,7 @@ import {
 } from '@/api/hooks/useArtifacts'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { ArtifactDetailPage } from '@/features/artifacts/components/ArtifactDetailPage'
+import { ConfirmDeleteArtifactDialog } from '@/features/artifacts/components/ConfirmDeleteArtifactDialog'
 
 export const Route = createFileRoute(
   '/_authenticated/admin/artifacts/$artifactId',
@@ -39,6 +42,8 @@ function ArtifactDetailRoute() {
   const { data: detail, isLoading } = useArtifactDetail(compositeId)
   const downloadModel = useDownloadModel()
   const deleteModel = useDeleteModel()
+  const [pendingDelete, setPendingDelete] =
+    useState<DeleteArtifactTarget | null>(null)
 
   if (isLoading) {
     return (
@@ -57,14 +62,24 @@ function ArtifactDetailRoute() {
   }
 
   return (
-    <ArtifactDetailPage
-      detail={detail}
-      onDownload={(id) => downloadModel.mutate(id)}
-      onDelete={(id) => deleteModel.mutate(id)}
-      onCancelDownload={downloadModel.cancel}
-      isDownloading={downloadModel.isDownloading(detail.composite_id)}
-      downloadProgress={downloadModel.getProgress(detail.composite_id)}
-      isDeleting={deleteModel.isPending}
-    />
+    <>
+      <ArtifactDetailPage
+        detail={detail}
+        onDownload={(id) => downloadModel.mutate(id)}
+        onDelete={(id) => setPendingDelete({ id, name: detail.display_name })}
+        onCancelDownload={downloadModel.cancel}
+        isDownloading={downloadModel.isDownloading(detail.composite_id)}
+        downloadProgress={downloadModel.getProgress(detail.composite_id)}
+        isDeleting={deleteModel.isPending}
+      />
+      <ConfirmDeleteArtifactDialog
+        target={pendingDelete}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={(id) => {
+          setPendingDelete(null)
+          deleteModel.mutate(id)
+        }}
+      />
+    </>
   )
 }

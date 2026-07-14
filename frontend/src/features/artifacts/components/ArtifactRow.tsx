@@ -19,6 +19,7 @@ import { Eye, HardDrive, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
+import { ArtifactTagChips } from './ArtifactTagChips'
 import type {
   ArtifactInfo,
   CompositeArtifactId,
@@ -60,6 +61,11 @@ export function ArtifactRow({
                 {platform}
               </span>
             ))}
+            <ArtifactTagChips
+              tags={artifact.tags}
+              max={2}
+              className="px-1.5 text-xs"
+            />
             <ArtifactCompatibilityBadge
               artifact={artifact}
               className="px-1.5 text-xs"
