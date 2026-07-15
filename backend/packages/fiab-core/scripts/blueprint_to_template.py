@@ -24,6 +24,12 @@ The output is a standalone Python file that defines a ``template`` variable of t
 Review all ``# TODO`` comments in the output before committing.
 """
 
+# TODO dont use the blockInstanceId in the input -- instead, use "human readable", derived from the block name. For example, "block_1784116163887_4my2dcp" block instance id of a block factory BlockFactoryId("operationalForecastSource") should be replaced by BlockInstanceId("operationalForecastSource"). However, block instance ids need to be unique, so you would need to scan the whole json for unicity of the factory ids, and enumerate where there are conflicts. Note you need to do the remapping *also* in the input ids, consistently!
+# TODO add in means to choose whether a given local glyph's value should be hardcoded or should go to example values
+# TODO add in means to query backend endpoint directly with a given blueprint id / run id, instead of requiring the user to download the json manually by hand. Alternatively, add this functionality to the rust cli, so that we just pipe them together
+# TODO add in regime that would ask the user for a filename + plugin, and place it to the right location and handle the registration in the outer plugin class as well
+# TODO make it part of fiab-core or backend functionality, include an endpoint that would take blueprint id, local-or-example, and path to save it at (or plugin name + fname inside templates/ directory), and invoke it from the frontend
+
 import json
 import sys
 from typing import Any
