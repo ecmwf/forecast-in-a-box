@@ -7,7 +7,10 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import dataclasses
+
 from fiab_core.fable import BlockFactoryId
+from fiab_core.plugin import Plugin
 from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
@@ -21,6 +24,7 @@ from fiab_plugin_ecmwf.blocks import (
     TemporalStatistics,
     ZarrSink,
 )
+from fiab_plugin_ecmwf.templates.prototype import template as _prototype_template
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("operationalForecastSource"): OperationalForecastSource(),
@@ -35,4 +39,8 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
 }
 
-plugin = QubedPluginBuilder(block_builders=blocks, base_environment=["fiab-plugin-ecmwf"]).as_plugin()
+_base_plugin = QubedPluginBuilder(block_builders=blocks, base_environment=["fiab-plugin-ecmwf"]).as_plugin()
+
+
+def plugin() -> Plugin:
+    return dataclasses.replace(_base_plugin(), blueprint_templates=(_prototype_template,))
