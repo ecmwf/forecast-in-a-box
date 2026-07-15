@@ -277,18 +277,55 @@ export const pluginsHandlers = [
     const displayName = url.searchParams.get('displayName')
 
     // Matches the 'template-basic-map' blueprint fixture in fable.handlers.ts
-    if (displayName !== 'testBasic') {
-      return new HttpResponse(
-        JSON.stringify({ detail: `Template ${displayName} not found` }),
-        { status: 404 },
-      )
+    if (displayName === 'testBasic') {
+      return HttpResponse.json({
+        example_values: {
+          block_source_1: {
+            base_time: { example_value: '2026-07-01T00:00:00' },
+          },
+        },
+        example_glyphs: {
+          // with UI metadata (#549): renders as a labeled typed field
+          leadtime: {
+            example_value: '48',
+            display_name: 'Lead time',
+            display_description: 'Forecast horizon in hours',
+            type_hint: 'int',
+          },
+        },
+      })
     }
 
-    return HttpResponse.json({
-      example_values: {
-        block_source_1: { base_time: { example_value: '2026-07-01T00:00:00' } },
-      },
-      example_glyphs: { leadtime: { example_value: '48' } },
-    })
+    // Matches the 'template-typed-inputs' fixture: one glyph per field kind
+    if (displayName === 'testTyped') {
+      return HttpResponse.json({
+        example_values: {},
+        example_glyphs: {
+          count: {
+            example_value: '4',
+            display_name: 'Count',
+            display_description: 'How many members to request.',
+            type_hint: 'int',
+          },
+          format: {
+            example_value: 'png',
+            display_name: 'Format',
+            display_description: 'Output image format.',
+            type_hint: 'enumClosed[png,pdf,svg]',
+          },
+          area: {
+            example_value: 'Europe',
+            display_name: 'Area',
+            display_description: 'Geographic area to cover.',
+            type_hint: 'geodomain',
+          },
+        },
+      })
+    }
+
+    return new HttpResponse(
+      JSON.stringify({ detail: `Template ${displayName} not found` }),
+      { status: 404 },
+    )
   }),
 ]

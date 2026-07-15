@@ -66,6 +66,30 @@ function seedSavedFables(): Record<string, SavedFableEntry | undefined> {
     source: 'plugin_template',
   }
 
+  // Required glyphs with type hints; examples served by plugins.handlers.ts
+  const [baseBlockId, baseBlock] = Object.entries(templateBase.fable.blocks)[0]
+  seeded['template-typed-inputs'] = {
+    ...templateBase,
+    fable: {
+      blocks: {
+        [baseBlockId]: {
+          ...baseBlock,
+          configuration_values: {
+            ...baseBlock.configuration_values,
+            forecast: '${format}',
+            base_time: '${count} ${area}',
+          },
+        },
+      },
+      local_glyphs: {},
+    },
+    display_name: 'testTyped',
+    display_description: 'Template with typed example glyphs',
+    tags: [],
+    user_id: 'local:plugin-test',
+    source: 'plugin_template',
+  }
+
   return seeded
 }
 
@@ -73,6 +97,7 @@ function seedFableVersions(): Record<string, number> {
   return {
     ...Object.fromEntries(Object.keys(mockSavedFables).map((id) => [id, 1])),
     'template-basic-map': 1,
+    'template-typed-inputs': 1,
   }
 }
 
