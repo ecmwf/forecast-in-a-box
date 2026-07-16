@@ -48,6 +48,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
+import { ResolvedPreview } from '@/components/base/fields/fields/GlyphFieldWrapper'
 import { useDebounce } from '@/hooks/useDebounce'
 import { cn } from '@/lib/utils'
 
@@ -201,10 +202,9 @@ export function TemplateParamsDialog({
             {t('template.dialog.missingValue')}
           </p>
         ) : (
-          preview !== null && (
-            <p className="truncate text-xs text-muted-foreground">
-              → {preview}
-            </p>
+          preview !== null &&
+          preview !== (values[name] ?? '') && (
+            <ResolvedPreview preview={preview} />
           )
         )}
       </div>
@@ -223,7 +223,8 @@ export function TemplateParamsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        {/* min-w-0: keeps nowrap preview lines from widening the dialog grid */}
+        <div className="flex min-w-0 flex-col gap-4">
           {params.required.length > 0 && (
             <div className="flex flex-col gap-3">
               {params.required.map(renderField)}

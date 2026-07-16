@@ -36,6 +36,7 @@ import {
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
@@ -81,21 +82,24 @@ export interface GlyphFieldWrapperProps {
 type FieldMode = 'concrete' | 'glyph'
 
 /** Italic "resolves to …" line with the full value in a tooltip. */
-function ResolvedPreview({ preview }: { preview: string }) {
+export function ResolvedPreview({ preview }: { preview: string }) {
   const { t } = useTranslation('glyphs')
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <div className="mt-1 truncate text-sm text-muted-foreground italic" />
-        }
-      >
-        {t('panel.resolvesTo')} <span className="font-mono">{preview}</span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-96 font-mono break-all">
-        {preview}
-      </TooltipContent>
-    </Tooltip>
+    // fast delay — the tooltip is the only way to read a truncated value
+    <TooltipProvider delay={120}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <div className="mt-1 truncate text-sm text-muted-foreground italic" />
+          }
+        >
+          {t('panel.resolvesTo')} <span className="font-mono">{preview}</span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-96 font-mono break-all">
+          {preview}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -141,10 +145,8 @@ export function GlyphFieldWrapper({
 
   const valueHasGlyphs = containsGlyphs(value)
 
-  // No glyphs / glyph mode disabled → render children directly, adding an
-  // error ring + inline error text when invalid, and the resolved preview
-  // when a glyph value was injected (e.g. by a template) into a field that
-  // doesn't offer glyph editing itself.
+  // No glyphs / glyph mode disabled → children as-is, plus error text and
+  // the resolved preview when a template injected a glyph value.
   if (!hasGlyphs || !allowGlyphMode) {
     const injectedPreview =
       valueHasGlyphs && !hasFieldError

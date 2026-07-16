@@ -8,8 +8,9 @@
  * does it submit to any jurisdiction.
  */
 
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { renderWithProviders } from '@tests/utils/render'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { EnumField } from '@/components/base/fields/fields/EnumField'
 import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 
@@ -39,6 +40,16 @@ function renderEnum({
 }
 
 describe('EnumField — resolved preview for template-injected glyph values', () => {
+  // Browser-mode tests render without the app stylesheet; restore the dialog's
+  // production stacking so its backdrop can't paint over the popup and swallow
+  // hover events in the modal test.
+  beforeAll(() => {
+    const style = document.createElement('style')
+    style.textContent =
+      '[data-slot="dialog-content"]{position:fixed;z-index:50}'
+    document.head.appendChild(style)
+  })
+
   it('shows "resolves to" when the value is a glyph with a backend resolution', async () => {
     const screen = await renderEnum({
       value: '${forecastSource}',
@@ -64,6 +75,45 @@ describe('EnumField — resolved preview for template-injected glyph values', ()
     })
 
     expect(screen.getByText(/resolves to/).elements()).toHaveLength(0)
+  })
+
+  it('hovering the preview opens a tooltip with the full value', async () => {
+    const screen = await renderEnum({
+      value: '${forecastSource}',
+      resolvedConfig: { source: 'ecmwf-open-data' },
+    })
+
+    await screen.getByText(/resolves to/).hover()
+    // Tooltip duplicates the value; trigger line + tooltip content = 2.
+    await expect
+      .element(screen.getByText('ecmwf-open-data', { exact: true }).nth(1))
+      .toBeInTheDocument()
+  })
+
+  it('the preview tooltip also opens inside a modal dialog', async () => {
+    const screen = await renderWithProviders(
+      <Dialog open>
+        <DialogContent>
+          <BlockValidationProvider
+            fieldErrors={null}
+            resolvedConfig={{ source: 'ecmwf-open-data' }}
+          >
+            <EnumField
+              id="field-source"
+              configKey="source"
+              value="${forecastSource}"
+              onChange={() => {}}
+              options={['mars', 'ecmwf-open-data']}
+            />
+          </BlockValidationProvider>
+        </DialogContent>
+      </Dialog>,
+    )
+
+    await screen.getByText(/resolves to/).hover()
+    await expect
+      .element(screen.getByText('ecmwf-open-data', { exact: true }).nth(1))
+      .toBeInTheDocument()
   })
 
   it('prefers the field error over the preview', async () => {
