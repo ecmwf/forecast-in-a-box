@@ -36,11 +36,14 @@ import {
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { DefineVariableButton } from '@/features/fable-builder/components/shared/DefineVariableButton'
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
 import {
   useFieldErrors,
+  useMissingGlyphs,
   useResolvedConfig,
 } from '@/features/fable-builder/context/BlockValidationContext'
 import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
@@ -79,6 +82,28 @@ export interface GlyphFieldWrapperProps {
 }
 
 type FieldMode = 'concrete' | 'glyph'
+
+/** Italic "resolves to …" line with the full value in a tooltip. */
+export function ResolvedPreview({ preview }: { preview: string }) {
+  const { t } = useTranslation('glyphs')
+  return (
+    // fast delay — the tooltip is the only way to read a truncated value
+    <TooltipProvider delay={120}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <div className="mt-1 truncate text-sm text-muted-foreground italic" />
+          }
+        >
+          {t('panel.resolvesTo')} <span className="font-mono">{preview}</span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-96 font-mono break-all">
+          {preview}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 
 export function GlyphFieldWrapper({
   id,
@@ -120,19 +145,40 @@ export function GlyphFieldWrapper({
       : fieldErrors[0]
     : null
 
-  // No glyphs / glyph mode disabled → render children directly, only adding
-  // an error ring + inline error text when the field is invalid.
+  const missingGlyphNames = useMissingGlyphs()?.[configKey] ?? null
+  const valueHasGlyphs = containsGlyphs(value)
+
+  // No glyphs / glyph mode disabled → children as-is, plus error text and
+  // the resolved preview when a template injected a glyph value.
   if (!hasGlyphs || !allowGlyphMode) {
-    if (!hasFieldError) return <>{children}</>
+    const injectedPreview =
+      valueHasGlyphs && !hasFieldError
+        ? (resolvedConfig?.[configKey] ?? null)
+        : null
+    const showInjectedPreview =
+      injectedPreview !== null && injectedPreview !== value
+    if (!hasFieldError && !showInjectedPreview && !missingGlyphNames?.length) {
+      return <>{children}</>
+    }
     return (
       <div>
-        <div className="rounded-md ring-1 ring-destructive">{children}</div>
-        <p className="mt-1 truncate text-xs text-destructive">{errorMessage}</p>
+        {hasFieldError ? (
+          <div className="rounded-md ring-1 ring-destructive">{children}</div>
+        ) : (
+          children
+        )}
+        {errorMessage && (
+          <p className="mt-1 truncate text-xs text-destructive">
+            {errorMessage}
+          </p>
+        )}
+        {missingGlyphNames?.map((name) => (
+          <DefineVariableButton key={name} name={name} />
+        ))}
+        {showInjectedPreview && <ResolvedPreview preview={injectedPreview} />}
       </div>
     )
   }
-
-  const valueHasGlyphs = containsGlyphs(value)
   const canSwitchToConcrete = mode === 'glyph' && !valueHasGlyphs
 
   function handleToggle() {
@@ -234,27 +280,14 @@ export function GlyphFieldWrapper({
         <p className="mt-1 truncate text-xs text-destructive">{errorMessage}</p>
       )}
 
+      {missingGlyphNames?.map((name) => (
+        <DefineVariableButton key={name} name={name} />
+      ))}
+
       {/* In-flow so visual order reads Input → Preview → Nudge. Validation
           is debounced 300 ms, so these appear/disappear at pause boundaries,
           not per keystroke — an honest layout reaction, not flicker. */}
-      {showPreview && (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <div className="mt-1 truncate text-sm text-muted-foreground italic" />
-            }
-          >
-            {t('panel.resolvesTo')}{' '}
-            <span className="font-mono">{resolvedPreview}</span>
-          </TooltipTrigger>
-          <TooltipContent
-            side="bottom"
-            className="max-w-96 font-mono break-all"
-          >
-            {resolvedPreview}
-          </TooltipContent>
-        </Tooltip>
-      )}
+      {showPreview && <ResolvedPreview preview={resolvedPreview} />}
 
       {dateNudgeVisible && (
         <div className="mt-1 flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-400">

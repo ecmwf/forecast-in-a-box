@@ -261,6 +261,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
           <BlockValidationProvider
             resolvedConfig={resolvedConfigForBlock}
             fieldErrors={mappedErrors.byConfigKey}
+            missingGlyphs={missingGlyphs}
           >
             <div className="space-y-3">
               <div className="text-sm font-medium">

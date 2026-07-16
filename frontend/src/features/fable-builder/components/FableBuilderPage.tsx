@@ -24,6 +24,7 @@ import { TemplateParamsDialog } from './TemplateParamsDialog'
 import type { TFunction } from 'i18next'
 import type { PresetId } from '@/features/fable-builder/presets/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
+import type { TemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { deriveTemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
@@ -138,6 +139,11 @@ export function FableBuilderPage({
   const initializedRef = useRef(false)
   const [templateInitialized, setTemplateInitialized] = useState(false)
   const [templateParamsDone, setTemplateParamsDone] = useState(false)
+  // Set after "Load config"; resolved into loadedParams once glyphs are known
+  const [loadedCheckPending, setLoadedCheckPending] = useState(false)
+  const [loadedParams, setLoadedParams] = useState<TemplateParameters | null>(
+    null,
+  )
 
   // Auto-persist drafts to localStorage + beforeunload guard
   useDraftPersistence()
@@ -301,6 +307,24 @@ export function FableBuilderPage({
     )
   }, [templateInitialized, knownGlyphs, knownGlyphsLoading])
 
+  // Loaded-config counterpart: unresolvable references become dialog inputs
+  useEffect(() => {
+    if (!loadedCheckPending || knownGlyphsLoading) return
+    const params = deriveTemplateParameters(
+      useFableBuilderStore.getState().fable,
+      new Set(knownGlyphs.map((glyph) => glyph.name)),
+    )
+    setLoadedParams(params.required.length > 0 ? params : null)
+    setLoadedCheckPending(false)
+  }, [loadedCheckPending, knownGlyphs, knownGlyphsLoading])
+
+  function handleLoadedParamsApply(values: Record<string, string>) {
+    for (const [key, value] of Object.entries(values)) {
+      if (value !== '') setLocalGlyph(key, value)
+    }
+    setLoadedParams(null)
+  }
+
   function applyTemplateExampleValues() {
     if (!templateExamples) return
     const { blocks } = useFableBuilderStore.getState().fable
@@ -455,6 +479,7 @@ export function FableBuilderPage({
         <FableBuilderHeader
           fableId={templateMode ? undefined : fableId}
           catalogue={catalogue}
+          onConfigLoaded={() => setLoadedCheckPending(true)}
         />
 
         {/* Wrapper is relative so the validation banner overlays absolutely —
@@ -498,6 +523,22 @@ export function FableBuilderPage({
           examples={templateExamples}
           onApply={handleTemplateApply}
           onSkip={handleTemplateSkip}
+          catalogue={catalogue}
+        />
+      )}
+
+      {loadedParams && (
+        <TemplateParamsDialog
+          open
+          params={loadedParams}
+          baseFable={fable}
+          examples={undefined}
+          onApply={handleLoadedParamsApply}
+          onSkip={() => setLoadedParams(null)}
+          title={t('template.dialog.missingVarsTitle')}
+          description={t('template.dialog.missingVarsDescription')}
+          catalogue={catalogue}
+          scopeSelectable
         />
       )}
     </GlyphProvider>

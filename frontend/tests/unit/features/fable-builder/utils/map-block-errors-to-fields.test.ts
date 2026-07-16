@@ -103,6 +103,44 @@ describe('mapBlockErrorsToFields', () => {
     ])
   })
 
+  describe('root-cause dedup for unresolvable glyphs', () => {
+    it('maps a lone "Configuration option ... is missing" to the field', () => {
+      const result = mapBlockErrorsToFields(
+        ["Configuration option 'path' is missing for block factory 'gribSink'"],
+        {},
+        messages,
+      )
+      expect(result.byConfigKey).toEqual({
+        path: ['Missing required value'],
+      })
+      expect(result.unmapped).toEqual([])
+    })
+
+    it('drops "Configuration option ... is missing" when the key has an unknown glyph', () => {
+      const result = mapBlockErrorsToFields(
+        ["Configuration option 'path' is missing for block factory 'gribSink'"],
+        { path: ['dataRoot'] },
+        messages,
+      )
+      expect(result.byConfigKey).toEqual({
+        path: ['Unknown glyph: ${dataRoot}'],
+      })
+      expect(result.unmapped).toEqual([])
+    })
+
+    it('drops the missing-config set entry when the key has an unknown glyph', () => {
+      const result = mapBlockErrorsToFields(
+        ["Block contains missing config: {'path', 'format'}"],
+        { path: ['dataRoot'] },
+        messages,
+      )
+      expect(result.byConfigKey).toEqual({
+        path: ['Unknown glyph: ${dataRoot}'],
+        format: ['Missing required value'],
+      })
+    })
+  })
+
   it('combines parsed errors, structured missing glyphs, and unmapped errors', () => {
     const result = mapBlockErrorsToFields(
       ["Block contains missing config: {'date'}", 'Plugin not found'],

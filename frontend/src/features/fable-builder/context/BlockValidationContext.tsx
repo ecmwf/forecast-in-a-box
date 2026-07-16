@@ -21,21 +21,25 @@ interface BlockValidation {
   fieldErrors: Record<string, Array<string>> | null
   /** Backend-resolved config map (`/blueprint/expand`); null when unresolved. */
   resolvedConfig: Record<string, string> | null
+  /** Unresolvable glyph names per config option key; null when none. */
+  missingGlyphs?: Record<string, ReadonlyArray<string>> | null
 }
 
 const BlockValidationContext = createContext<BlockValidation>({
   fieldErrors: null,
   resolvedConfig: null,
+  missingGlyphs: null,
 })
 
 export function BlockValidationProvider({
   fieldErrors,
   resolvedConfig,
+  missingGlyphs = null,
   children,
 }: BlockValidation & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ fieldErrors, resolvedConfig }),
-    [fieldErrors, resolvedConfig],
+    () => ({ fieldErrors, resolvedConfig, missingGlyphs }),
+    [fieldErrors, resolvedConfig, missingGlyphs],
   )
   return (
     <BlockValidationContext.Provider value={value}>
@@ -50,4 +54,11 @@ export function useFieldErrors(): Record<string, Array<string>> | null {
 
 export function useResolvedConfig(): Record<string, string> | null {
   return useContext(BlockValidationContext).resolvedConfig
+}
+
+export function useMissingGlyphs(): Record<
+  string,
+  ReadonlyArray<string>
+> | null {
+  return useContext(BlockValidationContext).missingGlyphs ?? null
 }

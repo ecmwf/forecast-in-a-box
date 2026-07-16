@@ -82,7 +82,9 @@
   "validationStatus": {
     "validating": "Validating",
     "valid": "Valid",
-    "hasErrors": "Has errors",
+    "issues_one": "{{count}} issue",
+    "issues_other": "{{count}} issues",
+    "globalIssueLabel": "Configuration",
     "validatingConfiguration": "Validating configuration...",
     "configurationIssues": "Configuration Issues"
   },
@@ -296,6 +298,10 @@
     "dialog": {
       "title": "Template parameters",
       "description": "Provide values for this template's placeholders — everything can still be changed in the builder.",
+      "missingVarsTitle": "Missing variables",
+      "missingVarsDescription": "This configuration references variables that are not defined on this system. Provide values and choose per variable whether it is stored in the configuration (local) or on this system (global).",
+      "usedIn": "Used in {{block}} → {{option}}",
+      "usedInMore": "+{{count}}",
       "prefilled": "Prefilled by the template ({{count}})",
       "apply": "Apply",
       "skip": "Skip",
