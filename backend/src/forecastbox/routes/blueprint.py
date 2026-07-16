@@ -136,7 +136,7 @@ class BlueprintDetail(FiabBaseModel):
     display_description: str | None = None
     tags: list[Tag] = []
     parent_id: str | None = None
-    source: str | None = None
+    source: BlueprintSource | None = None
     created_at: str
     updated_at: str
     user: str
@@ -317,7 +317,7 @@ async def get_blueprint(
         display_description=retrieved.display_description,
         tags=tags,
         parent_id=retrieved.parent_id,
-        source=retrieved.source,
+        source=cast("BlueprintSource", retrieved.source),
         created_at=retrieved.created_at,
         updated_at=retrieved.updated_at,
         user=retrieved.user,
@@ -363,7 +363,7 @@ async def list_blueprints(
                 display_description=cast(str | None, defn.display_description),
                 tags=tags,
                 parent_id=cast(str | None, defn.parent_id),
-                source=cast(str | None, defn.source),
+                source=cast("BlueprintSource | None", defn.source),
                 created_at=value_dt2str(row.created_at),
                 updated_at=value_dt2str(cast(dt.datetime, defn.created_at)),
                 user=cast(str, defn.created_by),

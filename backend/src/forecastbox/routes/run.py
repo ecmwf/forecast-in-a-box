@@ -21,7 +21,7 @@ import logging
 import os
 import pathlib
 import zipfile
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 
 import orjson
 from cascade.controller.report import JobId
@@ -90,10 +90,13 @@ class RunOutputsResponse(FiabBaseModel):
     outputs: dict[TaskId, RunOutputDetail]
 
 
+RunDetailStatus = Literal["submitted", "preparing", "running", "completed", "failed"]
+
+
 class RunDetailResponse(FiabBaseModel):
     run_id: RunId
     attempt_count: int
-    status: str
+    status: RunDetailStatus
     created_at: str
     updated_at: str
     user: str
@@ -173,7 +176,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
     return RunDetailResponse(
         run_id=domain_detail.run_id,
         attempt_count=domain_detail.attempt_count,
-        status=domain_detail.status,
+        status=cast("RunDetailStatus", domain_detail.status),
         created_at=domain_detail.created_at,
         updated_at=domain_detail.updated_at,
         user=domain_detail.user,
