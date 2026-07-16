@@ -72,7 +72,7 @@ export const scheduleHandlers = [
         .toISOString()
         .replace('T', ' ')
         .replace(/\.\d{3}Z$/, '+00:00'),
-      created_by: null,
+      user: null,
       display_name: 'Updated Schedule',
       display_description: null,
       tags: null,

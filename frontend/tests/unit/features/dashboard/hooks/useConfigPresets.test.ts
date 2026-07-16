@@ -60,7 +60,7 @@ const DEFAULT_BLUEPRINTS: Array<BlueprintListItem> = [
     display_description: 'Description 1',
     tags: ['prod'],
     source: 'user_defined',
-    created_by: null,
+    created_by: 'mock-user',
     coreVersionMismatch: null,
   },
   {
@@ -70,7 +70,7 @@ const DEFAULT_BLUEPRINTS: Array<BlueprintListItem> = [
     display_description: null,
     tags: [],
     source: 'user_defined',
-    created_by: null,
+    created_by: 'mock-user',
     coreVersionMismatch: null,
   },
   {
@@ -80,7 +80,7 @@ const DEFAULT_BLUEPRINTS: Array<BlueprintListItem> = [
     display_description: null,
     tags: ['test', 'europe'],
     source: 'user_defined',
-    created_by: null,
+    created_by: 'mock-user',
     coreVersionMismatch: null,
   },
 ]
@@ -169,7 +169,7 @@ describe('useConfigPresets', () => {
           display_description: null,
           tags: ['europe', ONEOFF_TAG],
           source: 'user_defined',
-          created_by: null,
+          created_by: 'mock-user',
           coreVersionMismatch: null,
         },
       ]
@@ -192,7 +192,7 @@ describe('useConfigPresets', () => {
           display_description: null,
           tags: [],
           source: 'plugin_template',
-          created_by: null,
+          created_by: 'mock-user',
           coreVersionMismatch: null,
         },
       ]
@@ -214,7 +214,7 @@ describe('useConfigPresets', () => {
           display_description: null,
           tags: [ONEOFF_TAG],
           source: 'user_defined',
-          created_by: null,
+          created_by: 'mock-user',
           coreVersionMismatch: null,
         },
       ]

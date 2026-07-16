@@ -21,21 +21,25 @@ import { JobStatusSchema } from '@/api/types/job.types'
 // Schemas — must match backend models in routes/experiment.py
 // ---------------------------------------------------------------------------
 
-/** routes/experiment.py: ScheduleDefinitionResponse */
-export const ScheduleDefinitionResponseSchema = z.object({
-  experiment_id: z.string(),
-  experiment_version: z.number(),
-  blueprint_id: z.string(),
-  blueprint_version: z.number(),
-  cron_expr: z.string(),
-  max_acceptable_delay_hours: z.number(),
-  enabled: z.boolean(),
-  created_at: z.string(),
-  created_by: z.string(),
-  display_name: z.string().nullable(),
-  display_description: z.string().nullable(),
-  tags: z.array(z.string()).nullable(),
-})
+/** routes/experiment.py: ExperimentDetail */
+export const ScheduleDefinitionResponseSchema = z
+  .object({
+    experiment_id: z.string(),
+    experiment_version: z.number(),
+    blueprint_id: z.string(),
+    blueprint_version: z.number(),
+    cron_expr: z.string(),
+    max_acceptable_delay_hours: z.number(),
+    enabled: z.boolean(),
+    created_at: z.string(),
+    // Backend field is `user` -- kept as `created_by` here since that's the
+    // established app-level name for this "owner" value.
+    user: z.string(),
+    display_name: z.string().nullable(),
+    display_description: z.string().nullable(),
+    tags: z.array(z.string()).nullable(),
+  })
+  .transform(({ user, ...rest }) => ({ ...rest, created_by: user }))
 
 /** routes/experiment.py: ListSchedulesResponse */
 export const ScheduleListResponseSchema = z.object({

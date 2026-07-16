@@ -43,7 +43,7 @@ interface WireBlueprint {
   display_description: string | null
   tags: Array<{ key: string; value: string }> | null
   source: string | null
-  created_by: string | null
+  user: string
 }
 
 const mockBlueprints: Array<WireBlueprint> = [
@@ -57,7 +57,7 @@ const mockBlueprints: Array<WireBlueprint> = [
       { key: 'europe', value: '' },
     ],
     source: 'user_defined',
-    created_by: null,
+    user: 'mock-user',
   },
   {
     blueprint_id: 'bp-002',
@@ -66,7 +66,7 @@ const mockBlueprints: Array<WireBlueprint> = [
     display_description: null,
     tags: null,
     source: 'user_defined',
-    created_by: null,
+    user: 'mock-user',
   },
   {
     blueprint_id: 'bp-003',
@@ -75,7 +75,7 @@ const mockBlueprints: Array<WireBlueprint> = [
     display_description: 'Full global run',
     tags: [{ key: 'global', value: '' }],
     source: 'user_defined',
-    created_by: null,
+    user: 'mock-user',
   },
 ]
 
@@ -106,7 +106,7 @@ const mockTemplates: Array<WireBlueprint> = [
     display_description: 'Ready-made starting point',
     tags: null,
     source: 'plugin_template',
-    created_by: 'local:plugin-test',
+    user: 'local:plugin-test',
   },
 ]
 
@@ -167,7 +167,7 @@ describe('ConfigPresetsSection', () => {
       display_description: null,
       tags: null,
       source: 'user_defined',
-      created_by: null,
+      user: 'mock-user',
     }))
     useBlueprintListHandler(manyBlueprints)
 
@@ -187,7 +187,7 @@ describe('ConfigPresetsSection', () => {
         display_description: null,
         tags: [{ key: 'prod', value: '' }],
         source: 'user_defined',
-        created_by: null,
+        user: 'mock-user',
       },
       {
         blueprint_id: 'bp-run',
@@ -196,7 +196,7 @@ describe('ConfigPresetsSection', () => {
         display_description: null,
         tags: [{ key: ONEOFF_TAG, value: '' }],
         source: 'user_defined',
-        created_by: null,
+        user: 'mock-user',
       },
       {
         blueprint_id: 'bp-template',
@@ -205,7 +205,7 @@ describe('ConfigPresetsSection', () => {
         display_description: null,
         tags: null,
         source: 'plugin_template',
-        created_by: null,
+        user: 'mock-user',
       },
     ])
 
