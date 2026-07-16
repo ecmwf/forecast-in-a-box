@@ -17,6 +17,7 @@ import httpx
 import orjson
 from cascade.low.func import assert_never
 from fiab_core.fable import PluginCompositeId, PluginId
+from pydantic import Field
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 from typing_extensions import Self
@@ -66,8 +67,8 @@ def get_latest_version(package_name: str, client: httpx.Client) -> str:
 
 class PluginStore(FiabBaseModel):
     display_name: str
-    plugins: dict[PluginId, PluginStoreEntry] = {}
-    remote: dict[PluginId, PluginRemoteInfo] = {}
+    plugins: dict[PluginId, PluginStoreEntry] = Field(default_factory=dict)
+    remote: dict[PluginId, PluginRemoteInfo] = Field(default_factory=dict)
 
 
 def fetch_store(client: httpx.Client, plugin_store_config: PluginStoreConfig) -> PluginStore:
