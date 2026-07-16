@@ -19,9 +19,9 @@ from fiab_core.fable import (
 
 template = BlueprintTemplate(
     display_name="Prototype Template",
-    display_description="A simple fetch of a recent forecast, selection of temperature, and saving of a grib",
+    display_description="Fetch recent forecast, select temperature in a day by one ensemble member, save as a grib",
     blocks={
-        BlockInstanceId("block_1784116163887_4my2dcp"): BlueprintTemplateBlock(
+        BlockInstanceId("source"): BlueprintTemplateBlock(
             factory_id=BlockFactoryId("operationalForecastSource"),
             instance=BlockInstance(
                 configuration_values={
@@ -32,7 +32,7 @@ template = BlueprintTemplate(
                 input_ids={},
             ),
         ),
-        BlockInstanceId("block_1784116184409_sdaoh52"): BlueprintTemplateBlock(
+        BlockInstanceId("selectParam"): BlueprintTemplateBlock(
             factory_id=BlockFactoryId("select"),
             instance=BlockInstance(
                 configuration_values={
@@ -40,18 +40,42 @@ template = BlueprintTemplate(
                     ConfigurationOptionId("values"): "2t",
                 },
                 input_ids={
-                    "dataset": BlockInstanceId("block_1784116163887_4my2dcp"),
+                    "dataset": BlockInstanceId("source"),
                 },
             ),
         ),
-        BlockInstanceId("block_1784116202433_qaqj75m"): BlueprintTemplateBlock(
+        BlockInstanceId("selectNumber"): BlueprintTemplateBlock(
+            factory_id=BlockFactoryId("select"),
+            instance=BlockInstance(
+                configuration_values={
+                    ConfigurationOptionId("dimension"): "number",
+                    ConfigurationOptionId("values"): "0",
+                },
+                input_ids={
+                    "dataset": BlockInstanceId("selectParam"),
+                },
+            ),
+        ),
+        BlockInstanceId("selectStep"): BlueprintTemplateBlock(
+            factory_id=BlockFactoryId("select"),
+            instance=BlockInstance(
+                configuration_values={
+                    ConfigurationOptionId("dimension"): "step",
+                    ConfigurationOptionId("values"): "24",
+                },
+                input_ids={
+                    "dataset": BlockInstanceId("selectNumber"),
+                },
+            ),
+        ),
+        BlockInstanceId("sink"): BlueprintTemplateBlock(
             factory_id=BlockFactoryId("gribSink"),
             instance=BlockInstance(
                 configuration_values={
                     ConfigurationOptionId("path"): "${outputRoot}/${runId}.${attemptCount}",
                 },
                 input_ids={
-                    "dataset": BlockInstanceId("block_1784116184409_sdaoh52"),
+                    "dataset": BlockInstanceId("selectStep"),
                 },
             ),
         ),
