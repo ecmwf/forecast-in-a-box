@@ -308,6 +308,7 @@ export function BlockInstanceCard({
                 <BlockValidationProvider
                   resolvedConfig={resolvedConfigForBlock}
                   fieldErrors={mappedErrors.byConfigKey}
+                  missingGlyphs={missingGlyphs}
                 >
                   <div className="space-y-4">
                     {Object.entries(factory.configuration_options).map(

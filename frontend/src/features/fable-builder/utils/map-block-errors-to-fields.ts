@@ -68,11 +68,15 @@ function pushError(
  * Map block-level backend errors and structured missing glyphs onto specific
  * configuration keys.
  *
- * Recognised `errors` shapes (Python-set literals):
+ * Recognised `errors` shapes:
  * - "Block contains extra config: {...}" → messages.unknownConfigKey
  * - "Block contains missing config: {...}" → messages.missingRequiredValue
+ * - "Configuration option 'x' is missing for block factory ..." →
+ *   messages.missingRequiredValue
  *
  * `missingGlyphs[configKey] = [name, ...]` → messages.unknownGlyph(name) per name.
+ * Missing-config errors for a key that also has unknown glyphs are dropped —
+ * the unresolvable glyph is the root cause and gets the one message.
  * Anything else in `errors` is returned as `unmapped`.
  */
 export function mapBlockErrorsToFields(
@@ -82,6 +86,11 @@ export function mapBlockErrorsToFields(
 ): MappedBlockErrors {
   const byConfigKey: Record<string, Array<string>> = {}
   const unmapped: Array<string> = []
+  const keysWithUnknownGlyphs = new Set(
+    Object.entries(missingGlyphs)
+      .filter(([, names]) => names.length > 0)
+      .map(([key]) => key),
+  )
 
   for (const error of errors) {
     const extraConfig = error.match(/^Block contains extra config:\s*(.+)$/)
@@ -105,7 +114,18 @@ export function mapBlockErrorsToFields(
         continue
       }
       for (const key of set) {
+        if (keysWithUnknownGlyphs.has(key)) continue
         pushError(byConfigKey, key, messages.missingRequiredValue)
+      }
+      continue
+    }
+
+    const missingOption = error.match(
+      /^Configuration option '([^']+)' is missing for block factory\b/,
+    )
+    if (missingOption) {
+      if (!keysWithUnknownGlyphs.has(missingOption[1])) {
+        pushError(byConfigKey, missingOption[1], messages.missingRequiredValue)
       }
       continue
     }

@@ -39,9 +39,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { DefineVariableButton } from '@/features/fable-builder/components/shared/DefineVariableButton'
 import { useGlyphContext } from '@/features/fable-builder/context/GlyphContext'
 import {
   useFieldErrors,
+  useMissingGlyphs,
   useResolvedConfig,
 } from '@/features/fable-builder/context/BlockValidationContext'
 import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
@@ -143,6 +145,7 @@ export function GlyphFieldWrapper({
       : fieldErrors[0]
     : null
 
+  const missingGlyphNames = useMissingGlyphs()?.[configKey] ?? null
   const valueHasGlyphs = containsGlyphs(value)
 
   // No glyphs / glyph mode disabled → children as-is, plus error text and
@@ -154,7 +157,9 @@ export function GlyphFieldWrapper({
         : null
     const showInjectedPreview =
       injectedPreview !== null && injectedPreview !== value
-    if (!hasFieldError && !showInjectedPreview) return <>{children}</>
+    if (!hasFieldError && !showInjectedPreview && !missingGlyphNames?.length) {
+      return <>{children}</>
+    }
     return (
       <div>
         {hasFieldError ? (
@@ -167,6 +172,9 @@ export function GlyphFieldWrapper({
             {errorMessage}
           </p>
         )}
+        {missingGlyphNames?.map((name) => (
+          <DefineVariableButton key={name} name={name} />
+        ))}
         {showInjectedPreview && <ResolvedPreview preview={injectedPreview} />}
       </div>
     )
@@ -271,6 +279,10 @@ export function GlyphFieldWrapper({
       {errorMessage && (
         <p className="mt-1 truncate text-xs text-destructive">{errorMessage}</p>
       )}
+
+      {missingGlyphNames?.map((name) => (
+        <DefineVariableButton key={name} name={name} />
+      ))}
 
       {/* In-flow so visual order reads Input → Preview → Nudge. Validation
           is debounced 300 ms, so these appear/disappear at pause boundaries,

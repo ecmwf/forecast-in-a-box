@@ -92,6 +92,20 @@
     "switchToConcrete": "Use the value picker",
     "cannotSwitchBack": "Clear the variable expression to switch back",
     "glyphPlaceholder": "e.g. ${variableName}",
+    "defineVariable": {
+      "action": "Define {{name}}",
+      "title": "Define variable",
+      "description": "Provide a value for {{name}} so it can resolve.",
+      "scopeLabel": "Scope",
+      "scopeLocal": "Local",
+      "scopeGlobal": "Global",
+      "scopeLocalHint": "This configuration — travels with it when shared.",
+      "scopeGlobalHint": "This system — available to every configuration here.",
+      "valueLabel": "Value",
+      "create": "Create",
+      "cancel": "Cancel",
+      "globalCreateFailed": "Could not create the global variable"
+    },
     "datePreview": {
       "hasTime": "Date field — the value carries a time component",
       "floorDayAction": "Truncate to date",

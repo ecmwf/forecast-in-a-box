@@ -13,20 +13,24 @@ import { renderWithProviders } from '@tests/utils/render'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { EnumField } from '@/components/base/fields/fields/EnumField'
 import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
+import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 
 function renderEnum({
   value,
   resolvedConfig = null,
   fieldErrors = null,
+  missingGlyphs = null,
 }: {
   value: string
   resolvedConfig?: Record<string, string> | null
   fieldErrors?: Record<string, Array<string>> | null
+  missingGlyphs?: Record<string, ReadonlyArray<string>> | null
 }) {
   return renderWithProviders(
     <BlockValidationProvider
       fieldErrors={fieldErrors}
       resolvedConfig={resolvedConfig}
+      missingGlyphs={missingGlyphs}
     >
       <EnumField
         id="field-source"
@@ -114,6 +118,45 @@ describe('EnumField — resolved preview for template-injected glyph values', ()
     await expect
       .element(screen.getByText('ecmwf-open-data', { exact: true }).nth(1))
       .toBeInTheDocument()
+  })
+
+  it('offers "Define variable" for an unresolvable glyph and creates a local', async () => {
+    const screen = await renderEnum({
+      value: '${dataRoot}',
+      fieldErrors: { source: ['Unknown glyph: ${dataRoot}'] },
+      missingGlyphs: { source: ['dataRoot'] },
+    })
+
+    await screen.getByRole('button', { name: 'Define ${dataRoot}' }).click()
+    await expect.element(screen.getByText('Define variable')).toBeVisible()
+
+    await screen.getByLabelText('Value').fill('/tmp/data')
+    await screen.getByRole('button', { name: 'Create' }).click()
+
+    expect(useFableBuilderStore.getState().fable.local_glyphs?.dataRoot).toBe(
+      '/tmp/data',
+    )
+  })
+
+  it('define-variable with Global scope creates a global, not a local', async () => {
+    const screen = await renderEnum({
+      value: '${dataRoot}',
+      fieldErrors: { source: ['Unknown glyph: ${dataRoot}'] },
+      missingGlyphs: { source: ['dataRoot'] },
+    })
+
+    await screen.getByRole('button', { name: 'Define ${dataRoot}' }).click()
+    await screen.getByRole('button', { name: 'Global' }).click()
+    await screen.getByLabelText('Value').fill('/srv/data')
+    await screen.getByRole('button', { name: 'Create' }).click()
+
+    // Success (MSW-backed create) closes the dialog; the error path keeps it open.
+    await expect
+      .poll(() => screen.getByText('Define variable').elements().length)
+      .toBe(0)
+    expect(
+      useFableBuilderStore.getState().fable.local_glyphs?.dataRoot,
+    ).toBeUndefined()
   })
 
   it('prefers the field error over the preview', async () => {
