@@ -5,7 +5,7 @@
       "artifact_type": "AnemoiCheckpoint",
       "common": {
         "url": "https://sites.ecmwf.int/repository/fiab/testing/checkpoints/aifs-global-o48.ckpt",
-        "display_name": "AIFS Global o48 Testing",
+        "display_name": "AIFS Global o48",
         "display_author": "ECMWF",
         "display_description": "",
         "disk_size_bytes": 188732703,
@@ -13,7 +13,9 @@
           "linux",
           "macos"
         ],
-        "tags": {}
+        "tags": {
+            "status": "demo"
+        }
       },
       "specific": {
         "pip_package_constraints": [
@@ -295,7 +297,9 @@
         "supported_platforms": [
           "linux"
         ],
-        "tags": {}
+        "tags": {
+            "status": "operational"
+        }
       },
       "specific": {
         "pip_package_constraints": [
@@ -604,7 +608,9 @@
           "linux",
           "macos"
         ],
-        "tags": {}
+        "tags": {
+            "status": "operational"
+        }
       },
       "specific": {
         "pip_package_constraints": [
@@ -911,7 +917,9 @@
         "supported_platforms": [
           "linux"
         ],
-        "tags": {}
+        "tags": {
+            "status": "operational"
+        }
       },
       "specific": {
         "pip_package_constraints": [
@@ -1216,7 +1224,9 @@
           "linux",
           "macos"
         ],
-        "tags": {}
+        "tags": {
+            "status": "operational"
+        }
       },
       "specific": {
         "pip_package_constraints": [
@@ -1520,7 +1530,9 @@
         "supported_platforms": [
           "linux"
         ],
-        "tags": {}
+        "tags": {
+            "status": "operational"
+        }
       },
       "specific": {
         "pip_package_constraints": [
@@ -1928,7 +1940,9 @@
         "display_author": "MetNorway",
         "display_description": "",
         "comment": "",
-        "tags": {},
+        "tags": {
+            "status": "operational"
+        },
         "disk_size_bytes": 1449403913,
         "supported_platforms": [
           "linux",
@@ -2245,7 +2259,9 @@
         "display_author": "ECMWF",
         "display_description": "",
         "comment": "",
-        "tags": {},
+        "tags": {
+            "status": "operational"
+        },
         "disk_size_bytes": 993937386,
         "supported_platforms": [
           "linux"
@@ -2557,7 +2573,9 @@
         "display_author": "MetNorway",
         "display_description": "",
         "comment": "",
-        "tags": {},
+        "tags": {
+            "status": "operational"
+        },
         "disk_size_bytes": 1449403913,
         "supported_platforms": [
           "linux",
@@ -2874,7 +2892,9 @@
         "display_author": "FMI",
         "display_description": "",
         "comment": "",
-        "tags": {},
+        "tags": {
+            "status": "operational"
+        },
         "disk_size_bytes": 1891893167,
         "supported_platforms": [
           "linux",
@@ -3178,10 +3198,12 @@
       "common": {
         "url": "https://sites.ecmwf.int/repository/fiab/testing/checkpoints/bris-europe-0.5-o48-20251017.ckpt",
         "display_name": "BRIS Europe 2025/10",
-        "display_author": "MetNorway-Testing",
+        "display_author": "MetNorway",
         "display_description": "",
         "comment": "",
-        "tags": {},
+        "tags": {
+            "status": "demo"
+        },
         "disk_size_bytes": 1028464312,
         "supported_platforms": [
           "linux",
