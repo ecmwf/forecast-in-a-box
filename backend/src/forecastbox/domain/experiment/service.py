@@ -118,30 +118,29 @@ async def create_schedule(
     return experiment_id
 
 
-async def get_schedule(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> ExperimentDefinition:
-    """Return the experiment blueprint for a cron schedule.
+async def get_schedule(
+    auth_context: AuthContext, experiment_id: ExperimentDefinitionId, version: int | None = None
+) -> experiment_db.ExperimentLatest:
+    """Return the experiment schedule (paired with its entity-level created_at) for a cron schedule.
 
-    Raises ExperimentNotFound if not found or not a cron schedule.
-    Possession of the ID is treated as sufficient read access.
+    Applies the same ownership scoping as ``list_schedules`` -- a caller may only
+    retrieve a schedule they own, or (if admin) any schedule.
+    Raises ExperimentNotFound if not found, not visible to ``auth_context``, or not a cron schedule.
     """
-    exp_def = await experiment_db.get_experiment_definition(experiment_id)
-    if exp_def is None or exp_def.experiment_type != "cron_schedule":
+    results = list(
+        await experiment_db.list_experiment_definitions(
+            auth_context=auth_context, experiment_definition_id=experiment_id, version=version, limit=1
+        )
+    )
+    if not results or results[0].experiment.experiment_type != "cron_schedule":
         raise ExperimentNotFound(f"Schedule {experiment_id} not found")
-    return exp_def
-
-
-async def get_schedule_created_at(experiment_id: ExperimentDefinitionId) -> dt.datetime:
-    """Return the entity-level ``created_at`` (first version's creation time) for an experiment."""
-    created_at = await experiment_db.get_experiment_definition_created_at(experiment_id)
-    if created_at is None:
-        raise ExperimentNotFound(f"Schedule {experiment_id} not found")
-    return created_at
+    return results[0]
 
 
 async def list_schedules(
     auth_context: AuthContext,
     pagination: PaginationSpec,
-) -> tuple[list[experiment_db.ExperimentListRow], int, int]:
+) -> tuple[list[experiment_db.ExperimentLatest], int, int]:
     """Return (schedules, total, total_pages) for cron-schedule experiments visible to the actor.
 
     Raises ValueError if page is out of range.
@@ -167,8 +166,8 @@ async def update_schedule(
     enabled: bool | None,
     max_acceptable_delay_hours: int | None,
     first_run_override: dt.datetime | None,
-) -> ExperimentDefinition:
-    """Update a cron schedule experiment. Returns the updated ExperimentDefinition.
+) -> experiment_db.ExperimentLatest:
+    """Update a cron schedule experiment. Returns the updated schedule paired with its entity-level created_at.
 
     Acquires scheduler_lock for the duration.  Raises SchedulerBusy if lock
     cannot be acquired.  Raises ExperimentNotFound or ExperimentAccessDenied as
@@ -226,9 +225,11 @@ async def update_schedule(
                 logger.debug(f"Schedule {experiment_id}: disabled, next run cleared")
         prod_scheduler()
 
-    updated = await experiment_db.get_experiment_definition(experiment_id)
-    assert updated is not None
-    return updated
+    updated = list(
+        await experiment_db.list_experiment_definitions(auth_context=auth_context, experiment_definition_id=experiment_id, limit=1)
+    )
+    assert updated
+    return updated[0]
 
 
 async def delete_schedule(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> None:

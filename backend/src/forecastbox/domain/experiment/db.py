@@ -17,6 +17,7 @@ a single ``async_session_maker`` attribute to inject an in-memory database.
 import datetime as dt
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import cast
 
 from sqlalchemy import func, select, update
@@ -114,7 +115,12 @@ async def get_experiment_definition(
     """Return a specific or the latest non-deleted version of an ExperimentDefinition.
 
     No authorization is applied; possession of the experiment ID is treated as
-    sufficient read access.
+    sufficient read access. This is intentional and relied upon by internal
+    callers (scheduling, update/delete write paths, ...) that already possess a
+    validated foreign key or have performed their own ownership check. Route
+    handlers exposing an ExperimentDefinition to a caller by id must NOT use this
+    function -- use ``list_experiment_definitions`` (with ``experiment_definition_id``
+    set) instead, which applies the same ownership scoping as the list endpoint.
     """
     if version is not None:
         query = select(ExperimentDefinition).where(
@@ -135,33 +141,12 @@ async def get_experiment_definition(
     return await querySingle(query, _jobs_module.async_session_maker)
 
 
-async def get_experiment_definition_created_at(experiment_definition_id: ExperimentDefinitionId) -> dt.datetime | None:
-    """Return the creation time of the first (oldest) version of an ExperimentDefinition.
+@dataclass
+class ExperimentLatest:
+    """An ExperimentDefinition (a specific or the latest visible version) paired with the entity's true creation time."""
 
-    This is the entity-level ``created_at``, as distinct from a specific
-    version's own ``created_at`` (which corresponds to the entity's
-    ``updated_at`` for that version). Returns ``None`` if no version exists.
-    """
-    query = select(func.min(ExperimentDefinition.created_at)).where(
-        ExperimentDefinition.experiment_definition_id == experiment_definition_id
-    )
-
-    async def function(i: int) -> dt.datetime | None:
-        async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(query)
-            return result.scalar()
-
-    return await dbRetry(function)
-
-
-class ExperimentListRow:
-    """An ExperimentDefinition (latest visible version) paired with the entity's true creation time."""
-
-    __slots__ = ("experiment", "created_at")
-
-    def __init__(self, experiment: ExperimentDefinition, created_at: dt.datetime) -> None:
-        self.experiment = experiment
-        self.created_at = created_at
+    experiment: ExperimentDefinition
+    created_at: dt.datetime
 
 
 async def list_experiment_definitions(
@@ -170,34 +155,56 @@ async def list_experiment_definitions(
     experiment_type: str | None = None,
     offset: int = 0,
     limit: int | None = None,
-) -> Iterable[ExperimentListRow]:
-    """Return the latest non-deleted version of every ExperimentDefinition visible to the caller.
+    experiment_definition_id: ExperimentDefinitionId | None = None,
+    version: int | None = None,
+) -> Iterable[ExperimentLatest]:
+    """Return the latest (or a pinned) non-deleted version of every ExperimentDefinition visible to the caller.
 
     Admins and passthrough callers (``auth_context.has_admin()``) see all experiment definitions.
     Authenticated non-admin users see only their own experiment definitions.
 
+    ``experiment_definition_id`` narrows the result to a single entity; combined
+    with ``limit=1`` this backs a single "get" lookup while still applying the
+    same ownership scoping as the list endpoint -- there is deliberately no
+    separate, unauthenticated single-row query for route handlers (see
+    ``get_experiment_definition`` for the internal, unauthenticated equivalent).
+    ``version`` optionally pins that entity to a specific version instead of its
+    latest one; it is only meaningful together with ``experiment_definition_id``.
+
     Each returned row is paired with the entity's true ``created_at``
-    (the first version's creation time), alongside the latest version's own
+    (the first version's creation time), alongside the returned version's own
     ``created_at`` which represents that version's ``updated_at``.
     """
 
-    async def function(i: int) -> list[ExperimentListRow]:
+    async def function(i: int) -> list[ExperimentLatest]:
         async with _jobs_module.async_session_maker() as session:
-            subq = (
-                select(
-                    ExperimentDefinition.experiment_definition_id,
-                    func.max(ExperimentDefinition.version).label("max_version"),
-                    func.min(ExperimentDefinition.created_at).label("first_created_at"),
+            subq = select(
+                ExperimentDefinition.experiment_definition_id,
+                func.max(ExperimentDefinition.version).label("max_version"),
+                func.min(ExperimentDefinition.created_at).label("first_created_at"),
+            ).where(ExperimentDefinition.is_deleted.is_(False))
+            if experiment_definition_id is not None:
+                # Safe and cheap to filter here: experiment_definition_id is the GROUP BY key
+                # itself, so restricting rows before grouping cannot change
+                # max_version/first_created_at for the remaining group -- it just avoids
+                # aggregating over every other experiment. NOTE: created_by and
+                # experiment_type are deliberately NOT filtered here -- they are attributes of
+                # individual version rows, and filtering them pre-aggregation would match "any
+                # version satisfies the filter" instead of "the returned version does", and
+                # could even change which version is picked as the latest one.
+                subq = subq.where(ExperimentDefinition.experiment_definition_id == experiment_definition_id)
+            subq = subq.group_by(ExperimentDefinition.experiment_definition_id).subquery()
+
+            if version is not None:
+                join_condition = (ExperimentDefinition.experiment_definition_id == subq.c.experiment_definition_id) & (
+                    ExperimentDefinition.version == version
                 )
-                .where(ExperimentDefinition.is_deleted.is_(False))
-                .group_by(ExperimentDefinition.experiment_definition_id)
-                .subquery()
-            )
-            query = select(ExperimentDefinition, subq.c.first_created_at).join(
-                subq,
-                (ExperimentDefinition.experiment_definition_id == subq.c.experiment_definition_id)
-                & (ExperimentDefinition.version == subq.c.max_version),
-            )
+            else:
+                join_condition = (ExperimentDefinition.experiment_definition_id == subq.c.experiment_definition_id) & (
+                    ExperimentDefinition.version == subq.c.max_version
+                )
+
+            query = select(ExperimentDefinition, subq.c.first_created_at).join(subq, join_condition)
             if experiment_type is not None:
                 query = query.where(ExperimentDefinition.experiment_type == experiment_type)
             if not auth_context.has_admin():
@@ -206,7 +213,7 @@ async def list_experiment_definitions(
             if limit is not None:
                 query = query.limit(limit)
             result = await session.execute(query)
-            return [ExperimentListRow(experiment=r[0], created_at=r[1]) for r in result.all()]
+            return [ExperimentLatest(experiment=r[0], created_at=r[1]) for r in result.all()]
 
     return await dbRetry(function)
 

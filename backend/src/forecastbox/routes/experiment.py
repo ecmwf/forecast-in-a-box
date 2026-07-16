@@ -200,11 +200,10 @@ async def get_experiment(
 ) -> ExperimentDetail:
     """Retrieve a single experiment by id."""
     try:
-        exp = await service.get_schedule(auth_context, spec.experiment_id)
-        entity_created_at = await service.get_schedule_created_at(spec.experiment_id)
+        latest = await service.get_schedule(auth_context, spec.experiment_id, spec.version)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return _experiment_to_detail(exp, entity_created_at)
+    return _experiment_to_detail(latest.experiment, latest.created_at)
 
 
 @router.get("/list")
@@ -236,12 +235,12 @@ async def update_experiment(
         current = await service.get_schedule(auth_context, update.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    if cast(int, current.version) != update.version:
+    if cast(int, current.experiment.version) != update.version:
         raise HTTPException(
             status_code=409,
             detail=(
                 f"Version conflict for experiment {update.experiment_id!r}: "
-                f"expected version {update.version}, current is {current.version}."
+                f"expected version {update.version}, current is {current.experiment.version}."
             ),
         )
     try:
@@ -263,8 +262,7 @@ async def update_experiment(
         raise HTTPException(status_code=400, detail=str(e))
     except ExperimentVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
-    entity_created_at = await service.get_schedule_created_at(update.experiment_id)
-    return _experiment_to_detail(updated, entity_created_at)
+    return _experiment_to_detail(updated.experiment, updated.created_at)
 
 
 @router.post("/delete")
@@ -280,12 +278,12 @@ async def delete_experiment(
         current = await service.get_schedule(auth_context, request.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    if cast(int, current.version) != request.version:
+    if cast(int, current.experiment.version) != request.version:
         raise HTTPException(
             status_code=409,
             detail=(
                 f"Version conflict for experiment {request.experiment_id!r}: "
-                f"expected version {request.version}, current is {current.version}."
+                f"expected version {request.version}, current is {current.experiment.version}."
             ),
         )
     try:
