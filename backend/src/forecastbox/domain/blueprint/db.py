@@ -135,6 +135,33 @@ async def get_blueprint(blueprint_id: BlueprintId, version: int | None = None) -
     return await querySingle(query, _jobs_module.async_session_maker)
 
 
+async def get_blueprint_created_at(blueprint_id: BlueprintId) -> dt.datetime | None:
+    """Return the creation time of the first (oldest) version of a Blueprint.
+
+    This is the entity-level ``created_at``, as distinct from a specific
+    version's own ``created_at`` (which corresponds to the entity's
+    ``updated_at`` for that version). Returns ``None`` if no version exists.
+    """
+    query = select(func.min(Blueprint.created_at)).where(Blueprint.blueprint_id == blueprint_id)
+
+    async def function(i: int) -> dt.datetime | None:
+        async with _jobs_module.async_session_maker() as session:
+            result = await session.execute(query)
+            return result.scalar()
+
+    return await dbRetry(function)
+
+
+class BlueprintListRow:
+    """A Blueprint (latest visible version) paired with the entity's true creation time."""
+
+    __slots__ = ("blueprint", "created_at")
+
+    def __init__(self, blueprint: Blueprint, created_at: dt.datetime) -> None:
+        self.blueprint = blueprint
+        self.created_at = created_at
+
+
 async def list_blueprints(
     *,
     auth_context: AuthContext,
@@ -142,7 +169,7 @@ async def list_blueprints(
     limit: int | None = None,
     created_by: str | None = None,
     source: BlueprintSource | None = None,
-) -> Iterable[Blueprint]:
+) -> Iterable[BlueprintListRow]:
     """Return the latest non-deleted version of every Blueprint visible to the caller, with optional paging.
 
     Admins and passthrough callers (``auth_context.has_admin()``) see all blueprints.
@@ -151,20 +178,25 @@ async def list_blueprints(
 
     ``created_by`` and ``source`` are optional caller-supplied filters applied at the
     outer query level so that paging counts and ordering remain correct.
+
+    Each returned row is paired with the entity's true ``created_at``
+    (the first version's creation time), alongside the latest version's own
+    ``created_at`` which represents that version's ``updated_at``.
     """
 
-    async def function(i: int) -> list[Blueprint]:
+    async def function(i: int) -> list[BlueprintListRow]:
         async with _jobs_module.async_session_maker() as session:
             subq = (
                 select(
                     Blueprint.blueprint_id,
                     func.max(Blueprint.version).label("max_version"),
+                    func.min(Blueprint.created_at).label("first_created_at"),
                 )
                 .where(Blueprint.is_deleted.is_(False))
                 .group_by(Blueprint.blueprint_id)
                 .subquery()
             )
-            query = select(Blueprint).join(
+            query = select(Blueprint, subq.c.first_created_at).join(
                 subq,
                 (Blueprint.blueprint_id == subq.c.blueprint_id) & (Blueprint.version == subq.c.max_version),
             )
@@ -183,7 +215,7 @@ async def list_blueprints(
             if limit is not None:
                 query = query.limit(limit)
             result = await session.execute(query)
-            return [r[0] for r in result.all()]
+            return [BlueprintListRow(blueprint=r[0], created_at=r[1]) for r in result.all()]
 
     return await dbRetry(function)
 

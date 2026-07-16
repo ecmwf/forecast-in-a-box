@@ -54,6 +54,7 @@ from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.graph import topological_order
 from forecastbox.utility.pydantic import FiabBaseModel
+from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,12 @@ class BlueprintRetrieveResult(FiabBaseModel):
     tags: list[Tag] = Field(default_factory=list)
     parent_id: str | None = None
     fiabcore_major: int
+    created_at: str
+    """Creation time of the first version of this blueprint entity."""
+    updated_at: str
+    """Creation time of the returned version."""
+    user: str
+    """Owner of this blueprint entity."""
 
 
 class BlueprintValidationExpansion(FiabBaseModel):
@@ -526,6 +533,7 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None = None) ->
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} has no builder spec.")
     builder = BlueprintBuilder.model_validate(blueprint.builder)
     raw_tags: list[dict] = blueprint.tags or []  # ty:ignore[invalid-argument-type,invalid-assignment]
+    entity_created_at = await db.get_blueprint_created_at(blueprint_id) or blueprint.created_at
     return BlueprintRetrieveResult(
         blueprint_id=BlueprintId(str(blueprint.blueprint_id)),  # ty:ignore[invalid-argument-type]
         blueprint_version=cast(int, blueprint.version),
@@ -535,4 +543,7 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None = None) ->
         tags=[Tag.model_validate(t) for t in raw_tags],
         parent_id=blueprint.parent_id,  # ty:ignore[invalid-argument-type]
         fiabcore_major=cast(int, blueprint.fiabcore_major),
+        created_at=value_dt2str(entity_created_at),
+        updated_at=value_dt2str(blueprint.created_at),  # ty:ignore[invalid-argument-type]
+        user=cast(str, blueprint.created_by),
     )

@@ -135,31 +135,65 @@ async def get_experiment_definition(
     return await querySingle(query, _jobs_module.async_session_maker)
 
 
+async def get_experiment_definition_created_at(experiment_definition_id: ExperimentDefinitionId) -> dt.datetime | None:
+    """Return the creation time of the first (oldest) version of an ExperimentDefinition.
+
+    This is the entity-level ``created_at``, as distinct from a specific
+    version's own ``created_at`` (which corresponds to the entity's
+    ``updated_at`` for that version). Returns ``None`` if no version exists.
+    """
+    query = select(func.min(ExperimentDefinition.created_at)).where(
+        ExperimentDefinition.experiment_definition_id == experiment_definition_id
+    )
+
+    async def function(i: int) -> dt.datetime | None:
+        async with _jobs_module.async_session_maker() as session:
+            result = await session.execute(query)
+            return result.scalar()
+
+    return await dbRetry(function)
+
+
+class ExperimentListRow:
+    """An ExperimentDefinition (latest visible version) paired with the entity's true creation time."""
+
+    __slots__ = ("experiment", "created_at")
+
+    def __init__(self, experiment: ExperimentDefinition, created_at: dt.datetime) -> None:
+        self.experiment = experiment
+        self.created_at = created_at
+
+
 async def list_experiment_definitions(
     *,
     auth_context: AuthContext,
     experiment_type: str | None = None,
     offset: int = 0,
     limit: int | None = None,
-) -> Iterable[ExperimentDefinition]:
+) -> Iterable[ExperimentListRow]:
     """Return the latest non-deleted version of every ExperimentDefinition visible to the caller.
 
     Admins and passthrough callers (``auth_context.has_admin()``) see all experiment definitions.
     Authenticated non-admin users see only their own experiment definitions.
+
+    Each returned row is paired with the entity's true ``created_at``
+    (the first version's creation time), alongside the latest version's own
+    ``created_at`` which represents that version's ``updated_at``.
     """
 
-    async def function(i: int) -> list[ExperimentDefinition]:
+    async def function(i: int) -> list[ExperimentListRow]:
         async with _jobs_module.async_session_maker() as session:
             subq = (
                 select(
                     ExperimentDefinition.experiment_definition_id,
                     func.max(ExperimentDefinition.version).label("max_version"),
+                    func.min(ExperimentDefinition.created_at).label("first_created_at"),
                 )
                 .where(ExperimentDefinition.is_deleted.is_(False))
                 .group_by(ExperimentDefinition.experiment_definition_id)
                 .subquery()
             )
-            query = select(ExperimentDefinition).join(
+            query = select(ExperimentDefinition, subq.c.first_created_at).join(
                 subq,
                 (ExperimentDefinition.experiment_definition_id == subq.c.experiment_definition_id)
                 & (ExperimentDefinition.version == subq.c.max_version),
@@ -172,7 +206,7 @@ async def list_experiment_definitions(
             if limit is not None:
                 query = query.limit(limit)
             result = await session.execute(query)
-            return [r[0] for r in result.all()]
+            return [ExperimentListRow(experiment=r[0], created_at=r[1]) for r in result.all()]
 
     return await dbRetry(function)
 

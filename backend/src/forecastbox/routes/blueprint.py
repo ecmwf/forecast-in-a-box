@@ -25,6 +25,7 @@ Glyph routes:
  - POST glyphs/global/delete  — delete a global glyph by id
 """
 
+import datetime as dt
 import logging
 from typing import Annotated, Any, Literal, cast
 
@@ -64,6 +65,7 @@ from forecastbox.schemata.jobs import BlueprintSource, GlobalGlyph
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
+from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
 PREFIX = "/api/v1/blueprint"
@@ -128,6 +130,9 @@ class BlueprintGetResponse(FiabBaseModel):
     display_description: str | None = None
     tags: list[Tag] = []
     parent_id: str | None = None
+    created_at: str
+    updated_at: str
+    user: str
 
 
 class BlueprintListItem(FiabBaseModel):
@@ -137,7 +142,9 @@ class BlueprintListItem(FiabBaseModel):
     display_description: str | None = None
     tags: list[Tag] | None = None
     source: str | None = None
-    created_by: str | None = None
+    created_at: str
+    updated_at: str
+    user: str | None = None
 
 
 class BlueprintListFilters(FiabBaseModel):
@@ -312,6 +319,9 @@ async def get_blueprint(
         display_description=retrieved.display_description,
         tags=tags,
         parent_id=retrieved.parent_id,
+        created_at=retrieved.created_at,
+        updated_at=retrieved.updated_at,
+        user=retrieved.user,
     )
 
 
@@ -341,7 +351,8 @@ async def list_blueprints(
     )
     current_fiabcore_major = get_fiabcore_version().major
     items = []
-    for defn in page_defs:
+    for row in page_defs:
+        defn = row.blueprint
         raw_tags: list[dict] = cast(list[dict], defn.tags) or []
         tags = [Tag.model_validate(t) for t in raw_tags]
         _maybe_append_coreversion_mismatch(tags, cast(int, defn.fiabcore_major), current_fiabcore_major)
@@ -353,7 +364,9 @@ async def list_blueprints(
                 display_description=cast(str | None, defn.display_description),
                 tags=tags,
                 source=cast(str | None, defn.source),
-                created_by=cast(str | None, defn.created_by),
+                created_at=value_dt2str(row.created_at),
+                updated_at=value_dt2str(cast(dt.datetime, defn.created_at)),
+                user=cast(str | None, defn.created_by),
             )
         )
     return BlueprintListResponse(blueprints=items, total=total, page=pagination.page, page_size=pagination.page_size)

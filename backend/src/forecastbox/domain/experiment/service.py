@@ -130,10 +130,18 @@ async def get_schedule(auth_context: AuthContext, experiment_id: ExperimentDefin
     return exp_def
 
 
+async def get_schedule_created_at(experiment_id: ExperimentDefinitionId) -> dt.datetime:
+    """Return the entity-level ``created_at`` (first version's creation time) for an experiment."""
+    created_at = await experiment_db.get_experiment_definition_created_at(experiment_id)
+    if created_at is None:
+        raise ExperimentNotFound(f"Schedule {experiment_id} not found")
+    return created_at
+
+
 async def list_schedules(
     auth_context: AuthContext,
     pagination: PaginationSpec,
-) -> tuple[list[ExperimentDefinition], int, int]:
+) -> tuple[list[experiment_db.ExperimentListRow], int, int]:
     """Return (schedules, total, total_pages) for cron-schedule experiments visible to the actor.
 
     Raises ValueError if page is out of range.
