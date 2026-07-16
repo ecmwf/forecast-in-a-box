@@ -18,6 +18,7 @@ from typing import Any, cast
 from earthkit.data.utils.dates import to_timedelta
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import QubedOutput
+from fiab_core.tools.plugins import _detect_editable_install
 from qubed import Qube
 
 from ..qubed_utils import expand
@@ -196,7 +197,6 @@ class CheckpointArtifact:
         packages = list(checkpoint.pip_package_constraints)
 
         ekw_anemoi_version = importlib.metadata.version("earthkit-workflows-anemoi")
-        from fiab_core.tools.plugins import _detect_editable_install
 
         if not "dev" in ekw_anemoi_version:
             editable = _detect_editable_install(f"earthkit-workflows-anemoi")

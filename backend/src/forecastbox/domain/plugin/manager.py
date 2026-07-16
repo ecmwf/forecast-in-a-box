@@ -49,6 +49,7 @@ from forecastbox.domain.plugin.db import (
     upsert_plugin_state,
 )
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
+from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrent import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_version
@@ -133,7 +134,6 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
         template_to_builder,
         validate_expand,
     )
-    from forecastbox.utility.auth import AuthContext
 
     plugin_id_str = PluginCompositeId.to_str(plugin_id)
 
