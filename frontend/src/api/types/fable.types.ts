@@ -326,7 +326,7 @@ export function partitionBlueprintTags(
   return { tags, coreVersionMismatch }
 }
 
-/** routes/blueprint.py: BlueprintListItem */
+/** routes/blueprint.py: BlueprintDetail (as returned by the list endpoint) */
 export const BlueprintListItemSchema = z
   .object({
     blueprint_id: z.string(),
@@ -335,10 +335,13 @@ export const BlueprintListItemSchema = z
     display_description: z.string().nullable(),
     tags: z.array(TagObjectSchema).nullable(),
     source: z.string().nullable(),
-    created_by: z.string().nullable(),
+    // Backend field is `user` -- kept as `created_by` here since that's the
+    // established app-level name for this "owner" value.
+    user: z.string(),
   })
-  .transform(({ tags, ...rest }) => ({
+  .transform(({ tags, user, ...rest }) => ({
     ...rest,
+    created_by: user,
     ...partitionBlueprintTags(tags ?? []),
   }))
 

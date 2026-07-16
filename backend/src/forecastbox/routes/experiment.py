@@ -87,7 +87,8 @@ class ExperimentDetail(FiabBaseModel):
     max_acceptable_delay_hours: int
     enabled: bool
     created_at: str
-    created_by: str
+    updated_at: str
+    user: str
     display_name: str | None
     display_description: str | None
     tags: list[str] | None = None
@@ -141,7 +142,7 @@ class ExperimentRunsResponse(FiabBaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _experiment_to_detail(exp: ExperimentDefinition) -> ExperimentDetail:
+def _experiment_to_detail(exp: ExperimentDefinition, entity_created_at: dt.datetime) -> ExperimentDetail:
     exp_def = cast(dict, exp.experiment_definition) or {}
     return ExperimentDetail(
         experiment_id=ExperimentDefinitionId(str(exp.experiment_definition_id)),  # ty:ignore[invalid-argument-type]
@@ -151,8 +152,9 @@ def _experiment_to_detail(exp: ExperimentDefinition) -> ExperimentDetail:
         cron_expr=str(exp_def.get("cron_expr", "")),
         max_acceptable_delay_hours=int(exp_def.get("max_acceptable_delay_hours", 24)),
         enabled=bool(exp_def.get("enabled", True)),
-        created_at=str(exp.created_at),
-        created_by=cast(str, exp.created_by),
+        created_at=value_dt2str(entity_created_at),
+        updated_at=value_dt2str(cast(dt.datetime, exp.created_at)),
+        user=cast(str, exp.created_by),
         display_name=cast(str | None, exp.display_name),
         display_description=cast(str | None, exp.display_description),
         tags=cast(list[str] | None, exp.tags),
@@ -198,10 +200,10 @@ async def get_experiment(
 ) -> ExperimentDetail:
     """Retrieve a single experiment by id."""
     try:
-        exp = await service.get_schedule(auth_context, spec.experiment_id)
+        latest = await service.get_schedule(auth_context, spec.experiment_id, spec.version)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return _experiment_to_detail(exp)
+    return _experiment_to_detail(latest.experiment, latest.created_at)
 
 
 @router.get("/list")
@@ -214,7 +216,7 @@ async def list_experiments(
         experiments, total, total_pages = await service.list_schedules(auth_context, pagination)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    items = [_experiment_to_detail(exp) for exp in experiments]
+    items = [_experiment_to_detail(row.experiment, row.created_at) for row in experiments]
     return ExperimentListResponse(
         experiments=items, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages
     )
@@ -233,12 +235,12 @@ async def update_experiment(
         current = await service.get_schedule(auth_context, update.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    if cast(int, current.version) != update.version:
+    if cast(int, current.experiment.version) != update.version:
         raise HTTPException(
             status_code=409,
             detail=(
                 f"Version conflict for experiment {update.experiment_id!r}: "
-                f"expected version {update.version}, current is {current.version}."
+                f"expected version {update.version}, current is {current.experiment.version}."
             ),
         )
     try:
@@ -260,7 +262,7 @@ async def update_experiment(
         raise HTTPException(status_code=400, detail=str(e))
     except ExperimentVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
-    return _experiment_to_detail(updated)
+    return _experiment_to_detail(updated.experiment, updated.created_at)
 
 
 @router.post("/delete")
@@ -276,12 +278,12 @@ async def delete_experiment(
         current = await service.get_schedule(auth_context, request.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    if cast(int, current.version) != request.version:
+    if cast(int, current.experiment.version) != request.version:
         raise HTTPException(
             status_code=409,
             detail=(
                 f"Version conflict for experiment {request.experiment_id!r}: "
-                f"expected version {request.version}, current is {current.version}."
+                f"expected version {request.version}, current is {current.experiment.version}."
             ),
         )
     try:

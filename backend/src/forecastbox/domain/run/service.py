@@ -76,6 +76,7 @@ class RunDetail(FiabBaseModel):
     status: str
     created_at: str
     updated_at: str
+    user: str
     blueprint_id: BlueprintId
     blueprint_version: int
     error: str | None = None
@@ -248,6 +249,7 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
             status=status_override or status,
             created_at=value_dt2str(execution.created_at),
             updated_at=value_dt2str(execution.updated_at),
+            user=cast(str, execution.created_by),
             blueprint_id=BlueprintId(str(execution.blueprint_id)),  # ty:ignore[invalid-argument-type]
             blueprint_version=cast(int, execution.blueprint_version),
             error=error_override if error_override is not None else cast(str | None, execution.error),

@@ -17,6 +17,7 @@ a single ``async_session_maker`` attribute to inject an in-memory database.
 import datetime as dt
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import cast
 
 from sqlalchemy import func, or_, select, update
@@ -114,7 +115,12 @@ async def get_blueprint(blueprint_id: BlueprintId, version: int | None = None) -
     """Return a specific or the latest non-deleted version of a Blueprint.
 
     No authorization is applied; possession of the blueprint ID is treated as
-    sufficient read access.
+    sufficient read access. This is intentional and relied upon by internal
+    callers (scheduling, run execution, ...) that already possess a validated
+    foreign key to the blueprint. Route handlers exposing a Blueprint to a
+    caller by id must NOT use this function -- use ``list_blueprints`` (with
+    ``blueprint_id`` set) instead, which applies the same ownership scoping as
+    the list endpoint.
     """
     if version is not None:
         query = select(Blueprint).where(
@@ -135,6 +141,14 @@ async def get_blueprint(blueprint_id: BlueprintId, version: int | None = None) -
     return await querySingle(query, _jobs_module.async_session_maker)
 
 
+@dataclass
+class BlueprintLatest:
+    """A Blueprint (a specific or the latest visible version) paired with the entity's true creation time."""
+
+    blueprint: Blueprint
+    created_at: dt.datetime
+
+
 async def list_blueprints(
     *,
     auth_context: AuthContext,
@@ -142,8 +156,10 @@ async def list_blueprints(
     limit: int | None = None,
     created_by: str | None = None,
     source: BlueprintSource | None = None,
-) -> Iterable[Blueprint]:
-    """Return the latest non-deleted version of every Blueprint visible to the caller, with optional paging.
+    blueprint_id: BlueprintId | None = None,
+    version: int | None = None,
+) -> Iterable[BlueprintLatest]:
+    """Return the latest (or a pinned) non-deleted version of every Blueprint visible to the caller, with optional paging.
 
     Admins and passthrough callers (``auth_context.has_admin()``) see all blueprints.
     Authenticated non-admin users see only their own blueprints and plugin templates.
@@ -151,23 +167,49 @@ async def list_blueprints(
 
     ``created_by`` and ``source`` are optional caller-supplied filters applied at the
     outer query level so that paging counts and ordering remain correct.
+
+    ``blueprint_id`` narrows the result to a single entity; combined with ``limit=1``
+    this backs a single "get" lookup while still applying the same ownership scoping
+    as the list endpoint -- there is deliberately no separate, unauthenticated
+    single-row query for route handlers (see ``get_blueprint`` for the internal,
+    unauthenticated equivalent). ``version`` optionally pins that entity to a specific
+    version instead of its latest one; it is only meaningful together with
+    ``blueprint_id``.
+
+    Each returned row is paired with the entity's true ``created_at``
+    (the first version's creation time), alongside the returned version's own
+    ``created_at`` which represents that version's ``updated_at``.
     """
 
-    async def function(i: int) -> list[Blueprint]:
+    async def function(i: int) -> list[BlueprintLatest]:
         async with _jobs_module.async_session_maker() as session:
-            subq = (
-                select(
-                    Blueprint.blueprint_id,
-                    func.max(Blueprint.version).label("max_version"),
-                )
-                .where(Blueprint.is_deleted.is_(False))
-                .group_by(Blueprint.blueprint_id)
-                .subquery()
-            )
-            query = select(Blueprint).join(
-                subq,
-                (Blueprint.blueprint_id == subq.c.blueprint_id) & (Blueprint.version == subq.c.max_version),
-            )
+            subq = select(
+                Blueprint.blueprint_id,
+                func.max(Blueprint.version).label("max_version"),
+                func.min(Blueprint.created_at).label("first_created_at"),
+            ).where(Blueprint.is_deleted.is_(False))
+            if blueprint_id is not None:
+                # Safe and cheap to filter here: blueprint_id is the GROUP BY key itself, so
+                # restricting rows before grouping cannot change max_version/first_created_at
+                # for the remaining group -- it just avoids aggregating over every other
+                # blueprint. NOTE: created_by and source are deliberately NOT filtered here --
+                # unlike blueprint_id, they are attributes of individual version rows and are
+                # not guaranteed constant across a blueprint's versions (``source`` is
+                # recomputed from ``display_name`` on every save; ``created_by`` reflects
+                # whoever authored that particular version, e.g. an admin editing another
+                # user's blueprint). Filtering them pre-aggregation would match "any version
+                # satisfies the filter" instead of "the returned version does", and could even
+                # change which version is picked as the latest one.
+                subq = subq.where(Blueprint.blueprint_id == blueprint_id)
+            subq = subq.group_by(Blueprint.blueprint_id).subquery()
+
+            join_condition = Blueprint.blueprint_id == subq.c.blueprint_id
+            if version is not None:
+                join_condition = join_condition & (Blueprint.version == version)
+            else:
+                join_condition = join_condition & (Blueprint.version == subq.c.max_version)
+
+            query = select(Blueprint, subq.c.first_created_at).join(subq, join_condition)
             if not auth_context.has_admin():
                 query = query.where(
                     or_(
@@ -183,7 +225,7 @@ async def list_blueprints(
             if limit is not None:
                 query = query.limit(limit)
             result = await session.execute(query)
-            return [r[0] for r in result.all()]
+            return [BlueprintLatest(blueprint=r[0], created_at=r[1]) for r in result.all()]
 
     return await dbRetry(function)
 

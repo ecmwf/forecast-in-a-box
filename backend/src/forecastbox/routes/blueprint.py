@@ -25,6 +25,7 @@ Glyph routes:
  - POST glyphs/global/delete  — delete a global glyph by id
 """
 
+import datetime as dt
 import logging
 from typing import Annotated, Any, Literal, cast
 
@@ -64,6 +65,7 @@ from forecastbox.schemata.jobs import BlueprintSource, GlobalGlyph
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
+from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
 PREFIX = "/api/v1/blueprint"
@@ -120,24 +122,24 @@ class BlueprintCreateResponse(FiabBaseModel):
     version: int
 
 
-class BlueprintGetResponse(FiabBaseModel):
+class BlueprintDetail(FiabBaseModel):
+    """A Blueprint, as returned by both the get and list endpoints.
+
+    ``builder`` is only populated by the get endpoint -- the list endpoint
+    leaves it unset to keep the response size small.
+    """
+
     blueprint_id: BlueprintId
     version: int
-    builder: BlueprintBuilder
+    builder: BlueprintBuilder | None = None
     display_name: str | None = None
     display_description: str | None = None
     tags: list[Tag] = []
     parent_id: str | None = None
-
-
-class BlueprintListItem(FiabBaseModel):
-    blueprint_id: BlueprintId
-    version: int
-    display_name: str | None = None
-    display_description: str | None = None
-    tags: list[Tag] | None = None
     source: str | None = None
-    created_by: str | None = None
+    created_at: str
+    updated_at: str
+    user: str
 
 
 class BlueprintListFilters(FiabBaseModel):
@@ -148,7 +150,7 @@ class BlueprintListFilters(FiabBaseModel):
 
 
 class BlueprintListResponse(FiabBaseModel):
-    blueprints: list[BlueprintListItem]
+    blueprints: list[BlueprintDetail]
     total: int
     page: int
     page_size: int
@@ -293,18 +295,21 @@ async def create_blueprint(
 @router.get("/get")
 async def get_blueprint(
     spec: Annotated[BlueprintLookup, Depends()],
-) -> BlueprintGetResponse:
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> BlueprintDetail:
     """Retrieve a saved blueprint by id and optional version.
 
-    Returns the latest non-deleted version when version is omitted.
+    Returns the latest non-deleted version when version is omitted. Applies the
+    same ownership scoping as ``/list`` -- a caller may only retrieve a blueprint
+    they own, a plugin template, or (if admin) any blueprint.
     """
     try:
-        retrieved = await service.load_builder(spec.blueprint_id, spec.version)
+        retrieved = await service.load_builder(spec.blueprint_id, spec.version, auth_context)
     except BlueprintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     tags = list(retrieved.tags)
     _maybe_append_coreversion_mismatch(tags, retrieved.fiabcore_major, get_fiabcore_version().major)
-    return BlueprintGetResponse(
+    return BlueprintDetail(
         blueprint_id=retrieved.blueprint_id,
         version=retrieved.blueprint_version,
         builder=retrieved.builder,
@@ -312,6 +317,10 @@ async def get_blueprint(
         display_description=retrieved.display_description,
         tags=tags,
         parent_id=retrieved.parent_id,
+        source=retrieved.source,
+        created_at=retrieved.created_at,
+        updated_at=retrieved.updated_at,
+        user=retrieved.user,
     )
 
 
@@ -341,19 +350,23 @@ async def list_blueprints(
     )
     current_fiabcore_major = get_fiabcore_version().major
     items = []
-    for defn in page_defs:
+    for row in page_defs:
+        defn = row.blueprint
         raw_tags: list[dict] = cast(list[dict], defn.tags) or []
         tags = [Tag.model_validate(t) for t in raw_tags]
         _maybe_append_coreversion_mismatch(tags, cast(int, defn.fiabcore_major), current_fiabcore_major)
         items.append(
-            BlueprintListItem(
+            BlueprintDetail(
                 blueprint_id=BlueprintId(str(defn.blueprint_id)),  # ty:ignore[invalid-argument-type]
                 version=cast(int, defn.version),
                 display_name=cast(str | None, defn.display_name),
                 display_description=cast(str | None, defn.display_description),
                 tags=tags,
+                parent_id=cast(str | None, defn.parent_id),
                 source=cast(str | None, defn.source),
-                created_by=cast(str | None, defn.created_by),
+                created_at=value_dt2str(row.created_at),
+                updated_at=value_dt2str(cast(dt.datetime, defn.created_at)),
+                user=cast(str, defn.created_by),
             )
         )
     return BlueprintListResponse(blueprints=items, total=total, page=pagination.page, page_size=pagination.page_size)

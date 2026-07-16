@@ -96,6 +96,7 @@ class RunDetailResponse(FiabBaseModel):
     status: str
     created_at: str
     updated_at: str
+    user: str
     blueprint_id: BlueprintId
     blueprint_version: int
     error: str | None = None
@@ -175,6 +176,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
         status=domain_detail.status,
         created_at=domain_detail.created_at,
         updated_at=domain_detail.updated_at,
+        user=domain_detail.user,
         blueprint_id=domain_detail.blueprint_id,
         blueprint_version=domain_detail.blueprint_version,
         error=domain_detail.error,

@@ -20,6 +20,7 @@ No HTTP exceptions are raised here; callers are responsible for mapping
 ``BlueprintNotFound`` and ``BlueprintAccessDenied`` to HTTP responses.
 """
 
+import datetime as dt
 import logging
 from collections import defaultdict
 from itertools import groupby
@@ -54,6 +55,7 @@ from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.graph import topological_order
 from forecastbox.utility.pydantic import FiabBaseModel
+from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +133,14 @@ class BlueprintRetrieveResult(FiabBaseModel):
     display_description: str | None = None
     tags: list[Tag] = Field(default_factory=list)
     parent_id: str | None = None
+    source: str
     fiabcore_major: int
+    created_at: str
+    """Creation time of the first version of this blueprint entity."""
+    updated_at: str
+    """Creation time of the returned version."""
+    user: str
+    """Owner of this blueprint entity."""
 
 
 class BlueprintValidationExpansion(FiabBaseModel):
@@ -514,14 +523,19 @@ async def save_builder(
     return BlueprintSaveResult(blueprint_id=blueprint_id, blueprint_version=version)
 
 
-async def load_builder(blueprint_id: BlueprintId, version: int | None = None) -> BlueprintRetrieveResult:
+async def load_builder(blueprint_id: BlueprintId, version: int | None, auth_context: AuthContext) -> BlueprintRetrieveResult:
     """Load a Blueprint and return it as a BlueprintRetrieveResult.
 
-    Raises ``BlueprintNotFound`` if the id does not exist or has no builder spec.
+    Applies the same ownership scoping as ``list_blueprints`` -- a caller may only
+    load a blueprint they own, a plugin template, or (if admin) any blueprint.
+    Raises ``BlueprintNotFound`` if the id does not exist, is not visible to
+    ``auth_context``, or has no builder spec.
     """
-    blueprint = await db.get_blueprint(blueprint_id, version)
-    if blueprint is None:
+    results = list(await db.list_blueprints(auth_context=auth_context, blueprint_id=blueprint_id, version=version, limit=1))
+    if not results:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} not found.")
+    latest = results[0]
+    blueprint = latest.blueprint
     if blueprint.builder is None:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} has no builder spec.")
     builder = BlueprintBuilder.model_validate(blueprint.builder)
@@ -534,5 +548,9 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None = None) ->
         display_description=blueprint.display_description,  # ty:ignore[invalid-argument-type]
         tags=[Tag.model_validate(t) for t in raw_tags],
         parent_id=blueprint.parent_id,  # ty:ignore[invalid-argument-type]
+        source=cast(str, blueprint.source),
         fiabcore_major=cast(int, blueprint.fiabcore_major),
+        created_at=value_dt2str(latest.created_at),
+        updated_at=value_dt2str(cast(dt.datetime, blueprint.created_at)),
+        user=cast(str, blueprint.created_by),
     )

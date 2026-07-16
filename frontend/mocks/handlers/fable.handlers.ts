@@ -354,7 +354,7 @@ export const fableHandlers = [
         display_description: entry.display_description,
         tags: entry.tags.map((k) => ({ key: k, value: '' })),
         source: entry.source ?? null,
-        created_by: entry.user_id,
+        user: entry.user_id,
       }))
 
     return HttpResponse.json({

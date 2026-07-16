@@ -126,7 +126,7 @@ async def test_jobs_blueprint_soft_delete(mem_session_maker_both: async_sessionm
     assert await blueprint_db.get_blueprint(job_id) is None
 
     definitions = list(await blueprint_db.list_blueprints(auth_context=_admin))
-    assert all(d.blueprint_id != job_id for d in definitions)
+    assert all(d.blueprint.blueprint_id != job_id for d in definitions)
 
 
 @pytest.mark.asyncio
@@ -138,13 +138,13 @@ async def test_jobs_list_blueprints_latest_only(mem_session_maker_both: async_se
     other_id, _ = await blueprint_db.upsert_blueprint(auth_context=_user2, source="oneoff_execution", created_by="user2")
 
     definitions = list(await blueprint_db.list_blueprints(auth_context=_admin))
-    ids = [d.blueprint_id for d in definitions]
+    ids = [d.blueprint.blueprint_id for d in definitions]
     assert job_id in ids
     assert other_id in ids
 
-    matching = [d for d in definitions if d.blueprint_id == job_id]
+    matching = [d for d in definitions if d.blueprint.blueprint_id == job_id]
     assert len(matching) == 1
-    assert matching[0].version == 3
+    assert matching[0].blueprint.version == 3
 
 
 @pytest.mark.asyncio
@@ -154,17 +154,17 @@ async def test_jobs_list_blueprints_ownership_filter(mem_session_maker_both: asy
     id_u2, _ = await blueprint_db.upsert_blueprint(auth_context=_user2, source="user_defined", created_by="user2")
     id_tmpl, _ = await blueprint_db.upsert_blueprint(auth_context=_admin, source="plugin_template", created_by="admin")
 
-    u1_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_user1)}
+    u1_defs = {d.blueprint.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_user1)}
     assert id_u1 in u1_defs
     assert id_tmpl in u1_defs
     assert id_u2 not in u1_defs
 
-    anon_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_anon)}
+    anon_defs = {d.blueprint.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_anon)}
     assert id_u1 in anon_defs
     assert id_u2 in anon_defs
     assert id_tmpl in anon_defs
 
-    admin_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_admin)}
+    admin_defs = {d.blueprint.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_admin)}
     assert {id_u1, id_u2, id_tmpl}.issubset(admin_defs)
 
 
@@ -370,8 +370,8 @@ async def test_experiment_list_filters_by_actor(mem_session_maker_both: async_se
     admin_exps = list(await experiment_db.list_experiment_definitions(auth_context=_admin))
     anon_exps = list(await experiment_db.list_experiment_definitions(auth_context=_anon))
 
-    assert len(user1_exps) == 1 and user1_exps[0].created_by == "user1"
-    assert len(user2_exps) == 1 and user2_exps[0].created_by == "user2"
+    assert len(user1_exps) == 1 and user1_exps[0].experiment.created_by == "user1"
+    assert len(user2_exps) == 1 and user2_exps[0].experiment.created_by == "user2"
     assert len(admin_exps) == 2
     assert len(anon_exps) == 2
 
@@ -388,7 +388,7 @@ async def test_anon_list_blueprints_sees_all(mem_session_maker_both: async_sessi
     id_u2, _ = await blueprint_db.upsert_blueprint(auth_context=_user2, source="user_defined", created_by="user2")
     id_tmpl, _ = await blueprint_db.upsert_blueprint(auth_context=_admin, source="plugin_template", created_by="admin")
 
-    anon_defs = {d.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_anon)}
+    anon_defs = {d.blueprint.blueprint_id for d in await blueprint_db.list_blueprints(auth_context=_anon)}
     assert {id_u1, id_u2, id_tmpl}.issubset(anon_defs)
 
 
