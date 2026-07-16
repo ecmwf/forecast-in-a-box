@@ -90,7 +90,8 @@ class RunOutputsResponse(FiabBaseModel):
     outputs: dict[TaskId, RunOutputDetail]
 
 
-RunDetailStatus = Literal["submitted", "preparing", "running", "completed", "failed"]
+# duplicated from db.py for domain separation
+RunDetailStatus = Literal["submitted", "preparing", "running", "completed", "failed", "unknown"]
 
 
 class RunDetailResponse(FiabBaseModel):
@@ -176,7 +177,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
     return RunDetailResponse(
         run_id=domain_detail.run_id,
         attempt_count=domain_detail.attempt_count,
-        status=cast("RunDetailStatus", domain_detail.status),
+        status=domain_detail.status,
         created_at=domain_detail.created_at,
         updated_at=domain_detail.updated_at,
         user=domain_detail.user,
