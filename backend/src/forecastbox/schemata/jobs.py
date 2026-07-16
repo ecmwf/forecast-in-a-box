@@ -29,7 +29,7 @@ from forecastbox.utility.time import UTCDateTime
 
 BlueprintSource = Literal["plugin_template", "user_defined", "oneoff_execution"]
 ExperimentType = Literal["cron_schedule", "batch_execution", "external_trigger"]
-RunStatus = Literal["submitted", "preparing", "running", "completed", "failed"]
+RunStatus = Literal["submitted", "preparing", "running", "completed", "failed", "unknown"]
 
 
 class Base(DeclarativeBase):

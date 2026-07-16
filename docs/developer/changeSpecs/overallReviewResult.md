@@ -15,56 +15,6 @@ around the `routes` contract rules; the rest are minor or documented technical d
 
 ---
 
-## Section 1: Route response contracts omit mandatory lifecycle fields
-
-**Guideline:** `routes/__init__.py` docstring -- "the contract is always materialized as a
-dedicated self-contained pydantic class, which always contains at a minimum key+version, any
-foreign keys, and the created/updated" and "every domain entity contains `created_at`,
-`updated_at`, `user` fields".
-
-**Breaches:**
-- `backend/src/forecastbox/routes/blueprint.py`
-  - `BlueprintGetResponse` (lines ~122-131): has `blueprint_id` + `version` but no
-    `created_at`, `updated_at`, or `user`/`created_by`.
-  - `BlueprintListItem` (lines ~133-141): exposes `created_by` but no `created_at` /
-    `updated_at`.
-- `backend/src/forecastbox/routes/experiment.py`
-  - `ExperimentDetail` (lines ~81-94): has `created_at` + `created_by` but no `updated_at`,
-    despite the entity being versioned (`experiment_version` present).
-- `backend/src/forecastbox/routes/run.py`
-  - `RunDetailResponse` (lines ~93-106): has `created_at` + `updated_at` but no `user` /
-    owner field.
-
-**Fix hint:** Add the missing `created_at` / `updated_at` / owner fields to these response
-DTOs, and standardize the owner field name (`created_by` is used in some places, the
-guideline calls it `user`). Because these are client-facing contracts, coordinate any
-serialized-name change with the frontend (see Section 5 note on `/api/v1` stability).
-
----
-
-## Section 2: Enum-like route fields typed as bare `str`
-
-**Guideline:** `routes/__init__.py` docstring -- "for enum-like fields, the contract
-explicitly lists the values (either as `typing.Literal`, or `enum.Enum` -- the former is
-generally preferred)".
-
-**Breaches:**
-- `backend/src/forecastbox/routes/run.py`
-  - `RunDetailResponse.status: str` (line ~95). The domain already defines the closed set
-    `RunStatus = Literal["submitted", "preparing", "running", "completed", "failed"]` in
-    `backend/src/forecastbox/schemata/jobs.py:32`.
-- `backend/src/forecastbox/routes/blueprint.py`
-  - `BlueprintListItem.source: str | None` (line ~139). `BlueprintSource` already exists as
-    an enum-like type (used elsewhere, e.g. `domain/blueprint/db.py`), and the sibling filter
-    class `BlueprintListFilters.source` is correctly typed `BlueprintSource | None`.
-
-**Fix hint:** Replace the bare `str` with a route-local `typing.Literal` (preferred, to keep
-the contract self-contained and decoupled from domain refactors) mirroring the domain enum
-values, or reuse the existing enum-like type where the routes docstring already permits direct
-domain-type use.
-
----
-
 ## Section 3: Domain classes used directly in route contracts without the required marker
 
 **Guideline:** `routes/__init__.py` docstring -- "there are a few places where classes

@@ -45,7 +45,7 @@ from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunNotFound
 from forecastbox.domain.run.types import RunId
-from forecastbox.schemata.jobs import Blueprint, Run
+from forecastbox.schemata.jobs import Blueprint, Run, RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.memcache import pop as pop_memcache
@@ -73,7 +73,7 @@ class RunDetail(FiabBaseModel):
 
     run_id: RunId
     attempt_count: int
-    status: str
+    status: RunStatus
     created_at: str
     updated_at: str
     user: str
@@ -207,7 +207,7 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
     run_id = RunId(str(execution.run_id))  # ty:ignore[invalid-argument-type]
     actual_attempt = cast(int, execution.attempt_count)
     cascade_job_id = cast(str | None, execution.cascade_job_id)
-    status = cast(str, execution.status)
+    status = cast(RunStatus, execution.status)
 
     # Derive available_task_ids from stored outputs without calling cascade for terminal states:
     # completed → assume all outputs are available; failed → only those with a locally cached value.
@@ -237,7 +237,7 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
         return {task_to_block[task_id] for task_id in task_ids_by_job[job_id]}
 
     def _build(
-        status_override: str | None = None,
+        status_override: RunStatus | None = None,
         error_override: str | None = None,
         progress_override: str | None = None,
         completed_block_ids: set[BlockInstanceId] | None = None,
