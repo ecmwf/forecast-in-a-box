@@ -26,10 +26,23 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { TemplateParameters } from '@/features/fable-builder/utils/template-parameters'
-import type { FableBuilderV1 } from '@/api/types/fable.types'
+import { useQueryClient } from '@tanstack/react-query'
+import type {
+  ParameterUsage,
+  TemplateParameters,
+} from '@/features/fable-builder/utils/template-parameters'
+import type {
+  BlockFactoryCatalogue,
+  FableBuilderV1,
+} from '@/api/types/fable.types'
 import type { TemplateExampleValues } from '@/api/types/plugins.types'
-import { useFableValidation } from '@/api/hooks/useFable'
+import { getFactory } from '@/api/types/fable.types'
+import {
+  fableKeys,
+  useCreateGlobalGlyph,
+  useFableValidation,
+} from '@/api/hooks/useFable'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { hasUnterminatedGlyph } from '@/features/fable-builder/utils/glyph-display'
 import { Button } from '@/components/ui/button'
 import {
@@ -63,6 +76,13 @@ interface TemplateParamsDialogProps {
   onApply: (values: Record<string, string>) => void
   /** Continue with the plugin's examples applied silently */
   onSkip: () => void
+  /** Dialog copy overrides (defaults: template-fork wording) */
+  title?: string
+  description?: string
+  /** Resolves block/option display titles for the usage-context lines */
+  catalogue?: BlockFactoryCatalogue
+  /** Per-parameter local/global scope; global values are created on Apply. */
+  scopeSelectable?: boolean
 }
 
 export function TemplateParamsDialog({
@@ -72,10 +92,19 @@ export function TemplateParamsDialog({
   examples,
   onApply,
   onSkip,
+  title,
+  description,
+  catalogue,
+  scopeSelectable = false,
 }: TemplateParamsDialogProps) {
-  const { t } = useTranslation('configure')
+  const { t } = useTranslation(['configure', 'glyphs'])
   const [values, setValues] = useState<Record<string, string>>({})
+  const [scopes, setScopes] = useState<Record<string, 'local' | 'global'>>({})
   const [showPrefilled, setShowPrefilled] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [applyError, setApplyError] = useState<string | null>(null)
+  const createGlobal = useCreateGlobalGlyph()
+  const queryClient = useQueryClient()
 
   // Re-seed the form whenever the dialog opens for a template
   useEffect(() => {
@@ -88,6 +117,8 @@ export function TemplateParamsDialog({
       seeded[name] = value
     }
     setValues(seeded)
+    setScopes({})
+    setApplyError(null)
     setShowPrefilled(false)
   }, [open, params, examples])
 
@@ -160,23 +191,127 @@ export function TemplateParamsDialog({
   const setValue = (name: string, value: string) =>
     setValues((current) => ({ ...current, [name]: value }))
 
+  /** Create global-scoped values, then hand the rest to onApply as locals. */
+  async function handleApply() {
+    const globalEntries = Object.entries(values).filter(
+      ([name, value]) => scopes[name] === 'global' && value.trim() !== '',
+    )
+    const localValues = Object.fromEntries(
+      Object.entries(values).filter(([name]) => scopes[name] !== 'global'),
+    )
+    if (globalEntries.length === 0) {
+      onApply(values)
+      return
+    }
+    setApplying(true)
+    setApplyError(null)
+    try {
+      await Promise.all(
+        globalEntries.map(([name, value]) =>
+          createGlobal.mutateAsync({
+            key: name,
+            value: value.trim(),
+            public: false,
+            overriddable: null,
+          }),
+        ),
+      )
+      // Globals don't change the fable, so revalidate explicitly.
+      await queryClient.invalidateQueries({
+        queryKey: [...fableKeys.all, 'validation'],
+      })
+      onApply(localValues)
+    } catch (err) {
+      setApplyError(
+        err instanceof Error
+          ? err.message
+          : t('glyphs:field.defineVariable.globalCreateFailed'),
+      )
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  /** "Block → Option" with display titles when the catalogue knows them */
+  function usageLabel(site: ParameterUsage): string {
+    const block =
+      site.blockId in baseFable.blocks
+        ? baseFable.blocks[site.blockId]
+        : undefined
+    if (!block) return site.optionId
+    const factory = catalogue
+      ? getFactory(catalogue, block.factory_id)
+      : undefined
+    let optionTitle = site.optionId
+    if (factory && site.optionId in factory.configuration_options) {
+      const optionMeta = factory.configuration_options[site.optionId]
+      if (optionMeta.title) optionTitle = optionMeta.title
+    }
+    return t('template.dialog.usedIn', {
+      block: factory?.title ?? block.factory_id.factory,
+      option: optionTitle,
+    })
+  }
+
   const renderField = (name: string) => {
     const preview = resolvedPreview(name)
     const missing = isMissing(name)
     const meta = examples?.example_glyphs[name]
+    const usageSites = name in params.usage ? params.usage[name] : []
+    const scope = scopes[name] === 'global' ? 'global' : 'local'
     return (
       <div key={name} className="flex flex-col gap-1.5">
-        <Label
-          htmlFor={`template-param-${name}`}
-          className={meta?.display_name ? 'text-sm' : 'font-mono text-xs'}
-          // tooltip keeps the raw glyph name reachable
-          title={meta?.display_name ? name : undefined}
-        >
-          {meta?.display_name ?? name}
-        </Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label
+            htmlFor={`template-param-${name}`}
+            className={meta?.display_name ? 'text-sm' : 'font-mono text-xs'}
+            // tooltip keeps the raw glyph name reachable
+            title={meta?.display_name ? name : undefined}
+          >
+            {meta?.display_name ?? name}
+          </Label>
+          {scopeSelectable && params.required.includes(name) && (
+            <ToggleGroup
+              variant="outline"
+              size="sm"
+              value={[scope]}
+              onValueChange={(next) => {
+                const first = next[0]
+                if (first === 'local' || first === 'global') {
+                  setScopes((current) => ({ ...current, [name]: first }))
+                }
+              }}
+            >
+              <ToggleGroupItem
+                value="local"
+                className="h-6 px-2 text-xs"
+                title={t('glyphs:field.defineVariable.scopeLocalHint')}
+              >
+                {t('glyphs:field.defineVariable.scopeLocal')}
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="global"
+                className="h-6 px-2 text-xs"
+                title={t('glyphs:field.defineVariable.scopeGlobalHint')}
+              >
+                {t('glyphs:field.defineVariable.scopeGlobal')}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
+        </div>
         {meta?.display_description && (
           <p className="text-xs text-muted-foreground">
             {meta.display_description}
+          </p>
+        )}
+        {usageSites.length > 0 && (
+          <p
+            className="truncate text-xs text-muted-foreground"
+            title={usageSites.map(usageLabel).join('\n')}
+          >
+            {usageLabel(usageSites[0])}
+            {usageSites.length > 1 &&
+              ` ${t('template.dialog.usedInMore', { count: usageSites.length - 1 })}`}
           </p>
         )}
         {meta?.type_hint ? (
@@ -217,9 +352,9 @@ export function TemplateParamsDialog({
     <Dialog open={open} onOpenChange={(next) => !next && onSkip()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('template.dialog.title')}</DialogTitle>
+          <DialogTitle>{title ?? t('template.dialog.title')}</DialogTitle>
           <DialogDescription>
-            {t('template.dialog.description')}
+            {description ?? t('template.dialog.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -271,11 +406,17 @@ export function TemplateParamsDialog({
           </div>
         </div>
 
+        {applyError && (
+          <p className="text-xs text-destructive" role="alert">
+            {applyError}
+          </p>
+        )}
+
         <DialogFooter>
-          <Button variant="outline" onClick={onSkip}>
+          <Button variant="outline" onClick={onSkip} disabled={applying}>
             {t('template.dialog.skip')}
           </Button>
-          <Button onClick={() => onApply(values)}>
+          <Button onClick={() => void handleApply()} disabled={applying}>
             {t('template.dialog.apply')}
           </Button>
         </DialogFooter>
