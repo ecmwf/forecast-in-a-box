@@ -57,11 +57,14 @@ import {
 interface FableBuilderHeaderProps {
   fableId?: string
   catalogue: BlockFactoryCatalogue
+  /** Fired after a config file was parsed and applied to the store */
+  onConfigLoaded?: () => void
 }
 
 export function FableBuilderHeader({
   fableId,
   catalogue,
+  onConfigLoaded,
 }: FableBuilderHeaderProps) {
   const { t } = useTranslation('configure')
   const [shareButtonText, setShareButtonText] = useState(() =>
@@ -195,6 +198,7 @@ export function FableBuilderHeader({
         ) {
           setFable(parsed as FableBuilderV1, null)
           showToast.success(t('header.configLoaded'))
+          onConfigLoaded?.()
         } else {
           showToast.error(
             t('header.invalidConfigTitle'),
@@ -249,7 +253,7 @@ export function FableBuilderHeader({
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>{t('blockCount', { count: blockCount })}</span>
-                {hasBlocks && <ValidationStatusBadge />}
+                {hasBlocks && <ValidationStatusBadge catalogue={catalogue} />}
                 <DraftStatus className="hidden sm:inline-flex" />
               </div>
             </div>
