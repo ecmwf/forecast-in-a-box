@@ -1,1924 +1,3520 @@
 {
-    "display_name": "ECMWF Artifact Store",
-    "artifacts": {
-        "aifs-global-o48": {
-            "artifact_type": "AnemoiCheckpoint",
-            "common": {
-                "url": "https://sites.ecmwf.int/repository/fiab/testing/checkpoints/aifs-global-o48.ckpt",
-                "display_name": "AIFS Global o48 Testing",
-                "display_author": "ECMWF",
-                "display_description": "",
-                "disk_size_bytes": 188732703,
-                "supported_platforms": [
-                    "linux",
-                    "macos"
-                ],
-                "tags": {}
-            },
-            "specific": {
-                "pip_package_constraints": [
-                    "anemoi-models==0.5.0",
-                    "anemoi-inference",
-                    "torch==2.6.0",
-                    "torch_geometric==2.4.0"
-                ],
-                "input_characteristics": [
-                    "input_source",
-                    "lead_time",
-                    "base_time"
-                ],
-                "input_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "lsm",
-                                            "msl",
-                                            "sdor",
-                                            "skt",
-                                            "slor",
-                                            "sp",
-                                            "tcw",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "output_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "cp",
-                                            "msl",
-                                            "skt",
-                                            "sp",
-                                            "tcw",
-                                            "tp"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "timestep": "6h"
-            }
-        },
-        "aifs-single-mse-1.1_w_flash_attn": {
-            "artifact_type": "AnemoiCheckpoint",
-            "common": {
-                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-single-mse-1.1.ckpt",
-                "display_name": "AIFS Single MSE 1.1",
-                "display_author": "ECMWF",
-                "display_description": "",
-                "disk_size_bytes": 993937386,
-                "supported_platforms": [
-                    "linux"
-                ],
-                "tags": {}
-            },
-            "specific": {
-                "pip_package_constraints": [
-                    "anemoi-models==0.4.2",
-                    "anemoi-inference",
-                    "torch==2.6.0",
-                    "torch_geometric==2.4.0",
-                    "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
-                ],
-                "input_characteristics": [
-                    "input_source",
-                    "lead_time",
-                    "base_time"
-                ],
-                "input_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "lsm",
-                                            "msl",
-                                            "sdor",
-                                            "skt",
-                                            "slor",
-                                            "sp",
-                                            "stl1",
-                                            "stl2",
-                                            "swvl1",
-                                            "swvl2",
-                                            "tcw",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "output_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        2,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure",
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        2,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface",
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "100u",
-                                            "100v",
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "cp",
-                                            "hcc",
-                                            "lcc",
-                                            "mcc",
-                                            "msl",
-                                            "ro",
-                                            "sf",
-                                            "skt",
-                                            "sp",
-                                            "ssrd",
-                                            "stl1",
-                                            "stl2",
-                                            "strd",
-                                            "swvl1",
-                                            "swvl2",
-                                            "tcc",
-                                            "tcw",
-                                            "tp"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "timestep": "6h",
-                "configuration": {
-                    "control_options": {
-                        "ANEMOI_INFERENCE_NUM_CHUNKS": 8
-                    }
-                }
-            }
-        },
-        "aifs-single-mse-1.1_w_sdpa": {
-            "artifact_type": "AnemoiCheckpoint",
-            "common": {
-                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-single-mse-1.1_sdpa.ckpt",
-                "display_name": "AIFS Single MSE 1.1",
-                "display_author": "ECMWF",
-                "display_description": "",
-                "disk_size_bytes": 993937386,
-                "supported_platforms": [
-                    "linux",
-                    "macos"
-                ],
-                "tags": {}
-            },
-            "specific": {
-                "pip_package_constraints": [
-                    "anemoi-models==0.4.2",
-                    "anemoi-inference",
-                    "torch==2.6.0",
-                    "torch_geometric==2.4.0"
-                ],
-                "input_characteristics": [
-                    "input_source",
-                    "lead_time",
-                    "base_time"
-                ],
-                "input_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "lsm",
-                                            "msl",
-                                            "sdor",
-                                            "skt",
-                                            "slor",
-                                            "sp",
-                                            "stl1",
-                                            "stl2",
-                                            "swvl1",
-                                            "swvl2",
-                                            "tcw",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "output_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        2,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure",
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        2,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface",
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "100u",
-                                            "100v",
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "cp",
-                                            "hcc",
-                                            "lcc",
-                                            "mcc",
-                                            "msl",
-                                            "ro",
-                                            "sf",
-                                            "skt",
-                                            "sp",
-                                            "ssrd",
-                                            "stl1",
-                                            "stl2",
-                                            "strd",
-                                            "swvl1",
-                                            "swvl2",
-                                            "tcc",
-                                            "tcw",
-                                            "tp"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "timestep": "6h",
-                "configuration": {
-                    "control_options": {
-                        "ANEMOI_INFERENCE_NUM_CHUNKS": 8
-                    }
-                }
-            }
-        },
-        "aifs-ens-crps-1.0_w_flash_attn": {
-            "artifact_type": "AnemoiCheckpoint",
-            "common": {
-                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-ens-crps-1.0.ckpt",
-                "display_name": "AIFS ENS CRPS 1.0",
-                "display_author": "ECMWF",
-                "display_description": "",
-                "disk_size_bytes": 921584533,
-                "supported_platforms": [
-                    "linux"
-                ],
-                "tags": {}
-            },
-            "specific": {
-                "pip_package_constraints": [
-                    "anemoi-models==0.6.0",
-                    "torch==2.6.0",
-                    "torch_geometric==2.4.0",
-                    "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"
-                ],
-                "input_characteristics": [
-                    "input_source",
-                    "lead_time",
-                    "base_time",
-                    "ensemble_number"
-                ],
-                "input_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "lsm",
-                                            "msl",
-                                            "sdor",
-                                            "skt",
-                                            "slor",
-                                            "sp",
-                                            "stl1",
-                                            "stl2",
-                                            "tcw",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "output_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        2,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure",
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        2,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface",
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "100u",
-                                            "100v",
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "cp",
-                                            "hcc",
-                                            "lcc",
-                                            "mcc",
-                                            "msl",
-                                            "ro",
-                                            "sf",
-                                            "skt",
-                                            "sp",
-                                            "ssrd",
-                                            "stl1",
-                                            "stl2",
-                                            "strd",
-                                            "tcc",
-                                            "tcw",
-                                            "tp"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "timestep": "6h",
-                "configuration": {
-                    "control_options": {
-                        "ANEMOI_INFERENCE_NUM_CHUNKS": 8
-                    }
-                }
-            }
-        },
-        "aifs-ens-crps-1.0_w_sdpa": {
-            "artifact_type": "AnemoiCheckpoint",
-            "common": {
-                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-ens-crps-1.0_sdpa.ckpt",
-                "display_name": "AIFS ENS CRPS 1.0",
-                "display_author": "ECMWF",
-                "display_description": "",
-                "disk_size_bytes": 921584533,
-                "supported_platforms": [
-                    "linux",
-                    "macos"
-                ],
-                "tags": {}
-            },
-            "specific": {
-                "pip_package_constraints": [
-                    "anemoi-models==0.6.0",
-                    "anemoi-inference",
-                    "torch==2.6.0",
-                    "torch_geometric==2.4.0"
-                ],
-                "input_characteristics": [
-                    "input_source",
-                    "lead_time",
-                    "base_time",
-                    "ensemble_number"
-                ],
-                "input_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "lsm",
-                                            "msl",
-                                            "sdor",
-                                            "skt",
-                                            "slor",
-                                            "sp",
-                                            "stl1",
-                                            "stl2",
-                                            "tcw",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "output_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        2,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure",
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q",
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        2,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface",
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "100u",
-                                            "100v",
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "cp",
-                                            "hcc",
-                                            "lcc",
-                                            "mcc",
-                                            "msl",
-                                            "ro",
-                                            "sf",
-                                            "skt",
-                                            "sp",
-                                            "ssrd",
-                                            "stl1",
-                                            "stl2",
-                                            "strd",
-                                            "tcc",
-                                            "tcw",
-                                            "tp"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "timestep": "6h",
-                "configuration": {
-                    "control_options": {
-                        "ANEMOI_INFERENCE_NUM_CHUNKS": 8
-                    }
-                }
-            }
-        },
-        "imerg-gt": {
-            "artifact_type": "AnemoiCheckpoint",
-            "common": {
-                "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/imerg-gt.ckpt",
-                "display_name": "IMERG GT",
-                "display_author": "ECMWF",
-                "display_description": "",
-                "disk_size_bytes": 1311272793,
-                "supported_platforms": [
-                    "linux"
-                ],
-                "tags": {}
-            },
-            "specific": {
-                "pip_package_constraints": [
-                    "anemoi-models==0.12.0",
-                    "anemoi-inference",
-                    "torch==2.9.0",
-                    "torch_geometric==2.7.0"
-                ],
-                "input_characteristics": [
-                    "input_source",
-                    "lead_time",
-                    "base_time",
-                    "ensemble_number"
-                ],
-                "input_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                },
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    10,
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "cdww",
-                                            "cos_mwd",
-                                            "h1012",
-                                            "h1214",
-                                            "h1417",
-                                            "h1721",
-                                            "h2125",
-                                            "h2530",
-                                            "lsm",
-                                            "msl",
-                                            "mwp",
-                                            "sd",
-                                            "sdor",
-                                            "sin_mwd",
-                                            "skt",
-                                            "slor",
-                                            "sp",
-                                            "stl1",
-                                            "stl2",
-                                            "swh",
-                                            "swvl1",
-                                            "swvl2",
-                                            "tcw",
-                                            "wmb",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "output_qube": {
-                    "key": "root",
-                    "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                            "root"
-                        ]
-                    },
-                    "metadata": {},
-                    "children": [
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "pl"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "pressure"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "q"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                },
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "t",
-                                            "u",
-                                            "v",
-                                            "w",
-                                            "z"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": [
-                                        {
-                                            "key": "level",
-                                            "values": {
-                                                "type": "enum",
-                                                "dtype": "int64",
-                                                "values": [
-                                                    10,
-                                                    50,
-                                                    100,
-                                                    150,
-                                                    200,
-                                                    250,
-                                                    300,
-                                                    400,
-                                                    500,
-                                                    600,
-                                                    700,
-                                                    850,
-                                                    925,
-                                                    1000
-                                                ]
-                                            },
-                                            "metadata": {},
-                                            "children": []
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "key": "levtype",
-                            "values": {
-                                "type": "enum",
-                                "dtype": "str",
-                                "values": [
-                                    "sfc"
-                                ]
-                            },
-                            "metadata": {
-                                "name": {
-                                    "shape": [
-                                        1,
-                                        1,
-                                        1
-                                    ],
-                                    "dtype": "str",
-                                    "values": [
-                                        "surface"
-                                    ]
-                                }
-                            },
-                            "children": [
-                                {
-                                    "key": "param",
-                                    "values": {
-                                        "type": "enum",
-                                        "dtype": "str",
-                                        "values": [
-                                            "100u",
-                                            "100v",
-                                            "10u",
-                                            "10v",
-                                            "2d",
-                                            "2t",
-                                            "cdww",
-                                            "cos_mwd",
-                                            "cp",
-                                            "h1012",
-                                            "h1214",
-                                            "h1417",
-                                            "h1721",
-                                            "h2125",
-                                            "h2530",
-                                            "hcc",
-                                            "lcc",
-                                            "mcc",
-                                            "msl",
-                                            "mwp",
-                                            "ro",
-                                            "sd",
-                                            "sf",
-                                            "sin_mwd",
-                                            "skt",
-                                            "snowc",
-                                            "sp",
-                                            "ssrd",
-                                            "stl1",
-                                            "stl2",
-                                            "strd",
-                                            "swh",
-                                            "swvl1",
-                                            "swvl2",
-                                            "tcc",
-                                            "tcw",
-                                            "tp"
-                                        ]
-                                    },
-                                    "metadata": {},
-                                    "children": []
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "timestep": "6h",
-                "configuration": {
-                    "pre_processors": [
-                        {
-                            "forward-transform-filter": "cos_sin_mean_wave_direction"
-                        }
-                    ],
-                    "post_processors": [
-                        {
-                            "backward-transform-filter": "cos_sin_mean_wave_direction"
-                        }
-                    ]
-                }
-            }
+  "display_name": "ECMWF Artifact Store",
+  "artifacts": {
+    "aifs-global-o48": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/testing/checkpoints/aifs-global-o48.ckpt",
+        "display_name": "AIFS Global o48",
+        "display_author": "ECMWF",
+        "display_description": "",
+        "disk_size_bytes": 188732703,
+        "supported_platforms": [
+          "linux",
+          "macos"
+        ],
+        "tags": {
+            "status": "demo"
         }
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.5.0",
+          "anemoi-inference",
+          "torch==2.6.0",
+          "torch_geometric==2.4.0"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "lsm",
+                      "msl",
+                      "sdor",
+                      "skt",
+                      "slor",
+                      "sp",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "cp",
+                      "msl",
+                      "skt",
+                      "sp",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "timestep": "6h"
+      }
+    },
+    "aifs-single-mse-1.1_w_flash_attn": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-single-mse-1.1.ckpt",
+        "display_name": "AIFS Single MSE 1.1",
+        "display_author": "ECMWF",
+        "display_description": "",
+        "disk_size_bytes": 993937386,
+        "supported_platforms": [
+          "linux"
+        ],
+        "tags": {
+            "status": "operational"
+        }
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.4.2",
+          "anemoi-inference",
+          "torch==2.6.0",
+          "torch_geometric==2.4.0",
+          "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "lsm",
+                      "msl",
+                      "sdor",
+                      "skt",
+                      "slor",
+                      "sp",
+                      "stl1",
+                      "stl2",
+                      "swvl1",
+                      "swvl2",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure",
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface",
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "100u",
+                      "100v",
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "cp",
+                      "hcc",
+                      "lcc",
+                      "mcc",
+                      "msl",
+                      "ro",
+                      "sf",
+                      "skt",
+                      "sp",
+                      "ssrd",
+                      "stl1",
+                      "stl2",
+                      "strd",
+                      "swvl1",
+                      "swvl2",
+                      "tcc",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "timestep": "6h",
+        "configuration": {
+          "control_options": {
+            "ANEMOI_INFERENCE_NUM_CHUNKS": 8
+          }
+        }
+      }
+    },
+    "aifs-single-mse-1.1_w_sdpa": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-single-mse-1.1_sdpa.ckpt",
+        "display_name": "AIFS Single MSE 1.1",
+        "display_author": "ECMWF",
+        "display_description": "",
+        "disk_size_bytes": 993937386,
+        "supported_platforms": [
+          "linux",
+          "macos"
+        ],
+        "tags": {
+            "status": "operational"
+        }
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.4.2",
+          "anemoi-inference",
+          "torch==2.6.0",
+          "torch_geometric==2.4.0"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "lsm",
+                      "msl",
+                      "sdor",
+                      "skt",
+                      "slor",
+                      "sp",
+                      "stl1",
+                      "stl2",
+                      "swvl1",
+                      "swvl2",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure",
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface",
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "100u",
+                      "100v",
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "cp",
+                      "hcc",
+                      "lcc",
+                      "mcc",
+                      "msl",
+                      "ro",
+                      "sf",
+                      "skt",
+                      "sp",
+                      "ssrd",
+                      "stl1",
+                      "stl2",
+                      "strd",
+                      "swvl1",
+                      "swvl2",
+                      "tcc",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "timestep": "6h",
+        "configuration": {
+          "control_options": {
+            "ANEMOI_INFERENCE_NUM_CHUNKS": 8
+          }
+        }
+      }
+    },
+    "aifs-ens-crps-1.0_w_flash_attn": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-ens-crps-1.0.ckpt",
+        "display_name": "AIFS ENS CRPS 1.0",
+        "display_author": "ECMWF",
+        "display_description": "",
+        "disk_size_bytes": 921584533,
+        "supported_platforms": [
+          "linux"
+        ],
+        "tags": {
+            "status": "operational"
+        }
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.6.0",
+          "torch==2.6.0",
+          "torch_geometric==2.4.0",
+          "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time",
+          "ensemble_number"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "lsm",
+                      "msl",
+                      "sdor",
+                      "skt",
+                      "slor",
+                      "sp",
+                      "stl1",
+                      "stl2",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure",
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface",
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "100u",
+                      "100v",
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "cp",
+                      "hcc",
+                      "lcc",
+                      "mcc",
+                      "msl",
+                      "ro",
+                      "sf",
+                      "skt",
+                      "sp",
+                      "ssrd",
+                      "stl1",
+                      "stl2",
+                      "strd",
+                      "tcc",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "timestep": "6h",
+        "configuration": {
+          "control_options": {
+            "ANEMOI_INFERENCE_NUM_CHUNKS": 8
+          }
+        }
+      }
+    },
+    "aifs-ens-crps-1.0_w_sdpa": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-ens-crps-1.0_sdpa.ckpt",
+        "display_name": "AIFS ENS CRPS 1.0",
+        "display_author": "ECMWF",
+        "display_description": "",
+        "disk_size_bytes": 921584533,
+        "supported_platforms": [
+          "linux",
+          "macos"
+        ],
+        "tags": {
+            "status": "operational"
+        }
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.6.0",
+          "anemoi-inference",
+          "torch==2.6.0",
+          "torch_geometric==2.4.0"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time",
+          "ensemble_number"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "lsm",
+                      "msl",
+                      "sdor",
+                      "skt",
+                      "slor",
+                      "sp",
+                      "stl1",
+                      "stl2",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure",
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface",
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "100u",
+                      "100v",
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "cp",
+                      "hcc",
+                      "lcc",
+                      "mcc",
+                      "msl",
+                      "ro",
+                      "sf",
+                      "skt",
+                      "sp",
+                      "ssrd",
+                      "stl1",
+                      "stl2",
+                      "strd",
+                      "tcc",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "timestep": "6h",
+        "configuration": {
+          "control_options": {
+            "ANEMOI_INFERENCE_NUM_CHUNKS": 8
+          }
+        }
+      }
+    },
+    "imerg-gt": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/imerg-gt.ckpt",
+        "display_name": "IMERG GT",
+        "display_author": "ECMWF",
+        "display_description": "",
+        "disk_size_bytes": 1311272793,
+        "supported_platforms": [
+          "linux"
+        ],
+        "tags": {
+            "status": "operational"
+        }
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.12.0",
+          "anemoi-inference",
+          "torch==2.9.0",
+          "torch_geometric==2.7.0"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time",
+          "ensemble_number"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "t",
+                      "u",
+                      "v",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          10,
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "cdww",
+                      "cos_mwd",
+                      "h1012",
+                      "h1214",
+                      "h1417",
+                      "h1721",
+                      "h2125",
+                      "h2530",
+                      "lsm",
+                      "msl",
+                      "mwp",
+                      "sd",
+                      "sdor",
+                      "sin_mwd",
+                      "skt",
+                      "slor",
+                      "sp",
+                      "stl1",
+                      "stl2",
+                      "swh",
+                      "swvl1",
+                      "swvl2",
+                      "tcw",
+                      "wmb",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          10,
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "100u",
+                      "100v",
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "cdww",
+                      "cos_mwd",
+                      "cp",
+                      "h1012",
+                      "h1214",
+                      "h1417",
+                      "h1721",
+                      "h2125",
+                      "h2530",
+                      "hcc",
+                      "lcc",
+                      "mcc",
+                      "msl",
+                      "mwp",
+                      "ro",
+                      "sd",
+                      "sf",
+                      "sin_mwd",
+                      "skt",
+                      "snowc",
+                      "sp",
+                      "ssrd",
+                      "stl1",
+                      "stl2",
+                      "strd",
+                      "swh",
+                      "swvl1",
+                      "swvl2",
+                      "tcc",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "timestep": "6h",
+        "configuration": {
+          "pre_processors": [
+            {
+              "forward-transform-filter": "cos_sin_mean_wave_direction"
+            }
+          ],
+          "post_processors": [
+            {
+              "backward-transform-filter": "cos_sin_mean_wave_direction"
+            }
+          ]
+        }
+      }
+    },
+    "BRIS-Malawi-2025.10": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/metnorway/checkpoints/bris-malawi-0.025-n320-20251017.ckpt",
+        "display_name": "BRIS Malawi 2025/10",
+        "display_author": "MetNorway",
+        "display_description": "",
+        "comment": "",
+        "tags": {
+            "status": "operational"
+        },
+        "disk_size_bytes": 1449403913,
+        "supported_platforms": [
+          "linux",
+          "macos"
+        ]
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.9.5",
+          "anemoi-graphs==0.6.6",
+          "anemoi-inference",
+          "anemoi-plugins-ecmwf-inference[regrid]>=0.3.0",
+          "torch",
+          "torch_geometric==2.4.0"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "hcc",
+                      "lcc",
+                      "lsm",
+                      "mcc",
+                      "msl",
+                      "skt",
+                      "sp",
+                      "tcc",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "hcc",
+                      "lcc",
+                      "mcc",
+                      "msl",
+                      "skt",
+                      "sp",
+                      "ssrd",
+                      "strd",
+                      "tcc",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "configuration": {
+          "pre_processors": [],
+          "post_processors": [],
+          "control_options": {
+            "ANEMOI_INFERENCE_NUM_CHUNKS": 16
+          },
+          "input_options": [
+            {
+              "source0": {
+                "grid": "N320",
+                "pre_processors": [
+                  {
+                    "regrid": {
+                      "grid": "checkpoint:source0"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "global": {}
+            }
+          ],
+          "nested_model": true,
+          "region_of_interest": "source0"
+        },
+        "timestep": "6h"
+      }
+    },
+    "aifs-single-mse-1.1_w_flash_attn_aarch64": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/ecmwf/checkpoints/aifs-single-mse-1.1.ckpt",
+        "display_name": "AIFS Single MSE 1.1",
+        "display_author": "ECMWF",
+        "display_description": "",
+        "comment": "",
+        "tags": {
+            "status": "operational"
+        },
+        "disk_size_bytes": 993937386,
+        "supported_platforms": [
+          "linux"
+        ]
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.4.2",
+          "anemoi-inference",
+          "torch",
+          "torch_geometric==2.4.0",
+          "https://github.com/cathalobrien/get-flash-attn/releases/download/v0.1-alpha/flash_attn-2.7.4+cu12torch2.8cxx11abiFALSE-cp312-cp312-linux_aarch64.whl"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "lsm",
+                      "msl",
+                      "sdor",
+                      "skt",
+                      "slor",
+                      "sp",
+                      "stl1",
+                      "stl2",
+                      "swvl1",
+                      "swvl2",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure",
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          600,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface",
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "100u",
+                      "100v",
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "cp",
+                      "hcc",
+                      "lcc",
+                      "mcc",
+                      "msl",
+                      "ro",
+                      "sf",
+                      "skt",
+                      "sp",
+                      "ssrd",
+                      "stl1",
+                      "stl2",
+                      "strd",
+                      "swvl1",
+                      "swvl2",
+                      "tcc",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "configuration": {
+          "pre_processors": [],
+          "post_processors": [],
+          "control_options": {
+            "ANEMOI_INFERENCE_NUM_CHUNKS": 8
+          },
+          "nested_model": false
+        },
+        "timestep": "6h"
+      }
+    },
+    "BRIS-2025.10": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/metnorway/checkpoints/bris-2025_10.ckpt",
+        "display_name": "BRIS 2025/10",
+        "display_author": "MetNorway",
+        "display_description": "",
+        "comment": "",
+        "tags": {
+            "status": "operational"
+        },
+        "disk_size_bytes": 1449403913,
+        "supported_platforms": [
+          "linux",
+          "macos"
+        ]
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.9.5",
+          "anemoi-graphs==0.6.6",
+          "anemoi-inference",
+          "anemoi-plugins-ecmwf-inference[regrid]>=0.3.0",
+          "torch",
+          "torch_geometric==2.4.0"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "hcc",
+                      "lcc",
+                      "lsm",
+                      "mcc",
+                      "msl",
+                      "skt",
+                      "sp",
+                      "tcc",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "hcc",
+                      "lcc",
+                      "mcc",
+                      "msl",
+                      "skt",
+                      "sp",
+                      "ssrd",
+                      "strd",
+                      "tcc",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "configuration": {
+          "pre_processors": [],
+          "post_processors": [],
+          "control_options": {
+            "ANEMOI_INFERENCE_NUM_CHUNKS": 16
+          },
+          "input_options": [
+            {
+              "source0": {
+                "grid": "N320",
+                "pre_processors": [
+                  {
+                    "regrid": {
+                      "grid": "checkpoint:source0"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "global": {}
+            }
+          ],
+          "nested_model": true,
+          "region_of_interest": "lam_0"
+        },
+        "timestep": "6h"
+      }
+    },
+    "aila-v2": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/fmi/checkpoints/aila-2.0.ckpt",
+        "display_name": "AILA v2",
+        "display_author": "FMI",
+        "display_description": "",
+        "comment": "",
+        "tags": {
+            "status": "operational"
+        },
+        "disk_size_bytes": 1891893167,
+        "supported_platforms": [
+          "linux",
+          "macos"
+        ]
+      },
+      "specific": {
+        "pip_package_constraints": [
+          "anemoi-models==0.8.1",
+          "anemoi-graphs==0.8.5",
+          "anemoi-inference",
+          "anemoi-plugins-ecmwf-inference[regrid]==0.3.0",
+          "torch",
+          "torch_geometric==2.6.1"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "lsm",
+                      "msl",
+                      "skt",
+                      "sp",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "msl",
+                      "skt",
+                      "sp",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "configuration": {
+          "pre_processors": [],
+          "post_processors": [],
+          "control_options": {
+            "ANEMOI_INFERENCE_NUM_CHUNKS": 16
+          },
+          "input_options": [
+            {
+              "lam_0": {
+                "grid": "N320",
+                "pre_processors": [
+                  {
+                    "regrid": {
+                      "grid": "checkpoint:source0"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "global": {}
+            }
+          ],
+          "nested_model": true,
+          "region_of_interest": "lam_0"
+        },
+        "timestep": "6h"
+      }
+    },
+    "BRIS-Europe-2025.10": {
+      "artifact_type": "AnemoiCheckpoint",
+      "common": {
+        "url": "https://sites.ecmwf.int/repository/fiab/testing/checkpoints/bris-europe-0.5-o48-20251017.ckpt",
+        "display_name": "BRIS Europe 2025/10",
+        "display_author": "MetNorway",
+        "display_description": "",
+        "comment": "",
+        "tags": {
+            "status": "demo"
+        },
+        "disk_size_bytes": 1028464312,
+        "supported_platforms": [
+          "linux",
+          "macos"
+        ]
+      },
+      "specific": {
+        "minimum_gpu_memory_mib": 2000,
+        "pip_package_constraints": [
+          "anemoi-models==0.9.5",
+          "anemoi-graphs==0.6.6",
+          "anemoi-inference",
+          "anemoi-plugins-ecmwf-inference[regrid]>=0.3.0",
+          "torch==2.8",
+          "torch_geometric==2.4.0"
+        ],
+        "input_characteristics": [
+          "input_source",
+          "lead_time",
+          "base_time"
+        ],
+        "input_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "hcc",
+                      "lcc",
+                      "lsm",
+                      "mcc",
+                      "msl",
+                      "skt",
+                      "sp",
+                      "tcc",
+                      "tcw",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "output_qube": {
+          "key": "root",
+          "values": {
+            "type": "enum",
+            "dtype": "str",
+            "values": [
+              "root"
+            ]
+          },
+          "metadata": {},
+          "children": [
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "pl"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "pressure"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "q",
+                      "t",
+                      "u",
+                      "v",
+                      "w",
+                      "z"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "level",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "int64",
+                        "values": [
+                          50,
+                          100,
+                          150,
+                          200,
+                          250,
+                          300,
+                          400,
+                          500,
+                          700,
+                          850,
+                          925,
+                          1000
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "levtype",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "sfc"
+                ]
+              },
+              "metadata": {
+                "name": {
+                  "shape": [
+                    1,
+                    1,
+                    1
+                  ],
+                  "dtype": "str",
+                  "values": [
+                    "surface"
+                  ]
+                }
+              },
+              "children": [
+                {
+                  "key": "param",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "10u",
+                      "10v",
+                      "2d",
+                      "2t",
+                      "hcc",
+                      "lcc",
+                      "mcc",
+                      "msl",
+                      "skt",
+                      "sp",
+                      "ssrd",
+                      "strd",
+                      "tcc",
+                      "tcw",
+                      "tp"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        "configuration": {
+          "pre_processors": [],
+          "post_processors": [],
+          "control_options": {
+            "ANEMOI_INFERENCE_NUM_CHUNKS": 16
+          },
+          "input_options": [
+            {
+              "source0": {
+                "grid": "n320",
+                "pre_processors": [
+                  {
+                    "regrid": {
+                      "grid": "0.5/0.5",
+                      "area": "70/-20/20/30"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "source1": {
+                "grid": "o48"
+              }
+            }
+          ],
+          "nested_model": true,
+          "region_of_interest": "source0"
+        },
+        "timestep": "6h"
+      }
     }
+  }
 }
