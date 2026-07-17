@@ -1,3 +1,4 @@
+import importlib.metadata
 import pathlib
 
 from cascade.low.func import Either
@@ -142,7 +143,12 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
 
 
 def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
-    with PayloadBuildingContext(environment=[f"-e {pathlib.Path(__file__).parent.parent.parent}"]):
+    self_version = importlib.metadata.version("fiab-plugin-test")
+    if self_version == "0.0.0":
+        spec = [f"-e {pathlib.Path(__file__).parent.parent.parent}"]
+    else:
+        spec = [f"fiab-plugin-test=={self_version}"]
+    with PayloadBuildingContext(environment=spec):
         # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
         if factory_id == "source_42":
             action = from_source(Payload("fiab_plugin_test.runtime.source_42"))
