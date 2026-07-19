@@ -188,20 +188,48 @@ describe('ComparePage', () => {
     await expect.element(pickerB).toHaveTextContent('Run A')
   })
 
-  it('guides the first-source state and offers self-comparison', async () => {
+  it('runs the viewer solo with a single source', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
     const screen = await renderComparePage()
 
+    // A auto-starts and the viewer mounts without a B: the toolbar shows
+    // the Compare CTA instead of the mode switcher, and B is unassigned.
     await expect
-      .element(screen.getByText('Choose what to compare against'))
+      .element(screen.getByText('Compare…'), { timeout: 8000 })
       .toBeVisible()
-    await screen.getByRole('button', { name: 'Compare with itself' }).click()
+    expect(
+      screen.getByRole('button', { name: 'Swipe' }).elements(),
+    ).toHaveLength(0)
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toHaveTextContent('Pick a source…')
+  })
+
+  it('offers "Same as A" in the B picker for self-comparison', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    const screen = await renderComparePage()
+
+    await screen.getByLabelText('Source for slot B').click()
+    await screen.getByRole('option', { name: 'Same as A' }).click()
     await expect
       .element(screen.getByLabelText('Source for slot B'))
       .toHaveTextContent('Run A')
-    expect(
-      screen.getByText('Choose what to compare against').elements(),
-    ).toHaveLength(0)
+  })
+
+  it('"Single view" clears B and materialization does not re-fill it', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderComparePage()
+
+    const pickerB = screen.getByLabelText('Source for slot B')
+    await expect.element(pickerB).toHaveTextContent('Run B')
+
+    await pickerB.click()
+    await screen.getByRole('option', { name: 'Single view' }).click()
+    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    // The `b=off` sentinel holds against the auto-fill effect.
+    await new Promise((r) => setTimeout(r, 1200))
+    await expect.element(pickerB).toHaveTextContent('Pick a source…')
   })
 
   it('allows the same source in both slots', async () => {

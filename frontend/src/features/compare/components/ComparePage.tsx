@@ -25,7 +25,7 @@ import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Loader2, Plus, Square, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
-import { entryDisplayName, entryRef } from '../entry-ref'
+import { SLOT_B_OFF, entryDisplayName, entryRef } from '../entry-ref'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
@@ -34,10 +34,11 @@ import { CompareSlotBar } from './CompareSlotBar'
 import { ComparePanel } from './ComparePanel'
 import { ComparisonSourcePicker } from './ComparisonSourcePicker'
 import type { ComparisonEntry } from '../entry-ref'
+import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/compare/types'
 import { useStopLens } from '@/api/hooks/useLens'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
-import { H1, P } from '@/components/base/typography'
+import { H1 } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -66,6 +67,7 @@ export interface ActivePair {
 function useActivePair(): ActivePair & {
   assignSlot: (slot: 'a' | 'b', ref: string) => void
   swapSlots: () => void
+  clearSlotB: () => void
 } {
   const search = route.useSearch()
   const navigate = route.useNavigate()
@@ -79,13 +81,14 @@ function useActivePair(): ActivePair & {
   const bValid = search.b !== undefined && byRef.has(search.b)
 
   // Materialize missing slots from basket order (route file explains why
-  // the pair is always pinned in the URL). Unknown refs are left in place
-  // — useHydrateComparisonFromUrl owns them (adds or strips). `replace`
+  // the pair is always pinned in the URL). `b=off` is a deliberate single
+  // view — never re-fill it. Unknown refs are left in place —
+  // useHydrateComparisonFromUrl owns them (adds or strips). `replace`
   // keeps history clean while chips are clicked around.
   useEffect(() => {
     if (entries.length === 0) return
     const refs = entries.map((e) => entryRef(e))
-    const aMissing = search.a === undefined
+    const aMissing = search.a === undefined || search.a === SLOT_B_OFF
     const bMissing = search.b === undefined
     if (!aMissing && !bMissing) return
     const nextA = aMissing ? refs.find((r) => r !== search.b) : search.a
@@ -109,8 +112,15 @@ function useActivePair(): ActivePair & {
     })
   }
   const swapSlots = () => {
+    if (search.b === SLOT_B_OFF) return
     void navigate({
       search: (prev) => ({ ...prev, a: prev.b, b: prev.a }),
+      replace: true,
+    })
+  }
+  const clearSlotB = () => {
+    void navigate({
+      search: (prev) => ({ ...prev, b: SLOT_B_OFF }),
       replace: true,
     })
   }
@@ -120,6 +130,7 @@ function useActivePair(): ActivePair & {
     b: bValid ? (byRef.get(search.b!) ?? null) : null,
     assignSlot,
     swapSlots,
+    clearSlotB,
   }
 }
 
@@ -129,7 +140,7 @@ export function ComparePage() {
   const navigate = route.useNavigate()
   const entries = useComparisonStore((s) => s.entries)
   const clear = useComparisonStore((s) => s.clear)
-  const { a, b, assignSlot, swapSlots } = useActivePair()
+  const { a, b, assignSlot, swapSlots, clearSlotB } = useActivePair()
   useHydrateComparisonFromUrl()
 
   const mode: CompareMode = search.mode ?? 'swipe'
@@ -179,14 +190,19 @@ export function ComparePage() {
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <H1 className="text-xl">{t('page.title')}</H1>
         {entries.length > 0 && (
-          <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
             <CompareSlotBar
               entries={entries}
               aRef={a ? entryRef(a) : undefined}
               bRef={b ? entryRef(b) : undefined}
               onAssign={assignSlot}
               onSwap={swapSlots}
+              onSingleView={clearSlotB}
             />
+            {/* B lifecycle while the solo viewer keeps working. */}
+            {b !== null && a !== null && stateA.phase === 'running' && (
+              <SlotBStatusChip state={stateB} />
+            )}
           </div>
         )}
         <div className="ml-auto flex items-center gap-2">
@@ -238,7 +254,7 @@ export function ComparePage() {
         <div className="mx-auto w-full max-w-xl rounded-lg border border-border bg-card p-5">
           <ComparisonSourcePicker />
         </div>
-      ) : a && b && stateA.phase === 'running' && stateB.phase === 'running' ? (
+      ) : a && stateA.phase === 'running' ? (
         <div className="h-[75vh] min-h-[560px]">
           <Suspense
             fallback={
@@ -247,28 +263,75 @@ export function ComparePage() {
               </div>
             }
           >
+            {/* Single JSX position — b flips null↔value without a
+                remount, so camera/selection/time survive the switch. */}
             <CompareViewer
               a={{ baseUrl: stateA.baseUrl, label: entryDisplayName(a) }}
-              b={{ baseUrl: stateB.baseUrl, label: entryDisplayName(b) }}
+              b={
+                b && stateB.phase === 'running'
+                  ? { baseUrl: stateB.baseUrl, label: entryDisplayName(b) }
+                  : null
+              }
               mode={mode}
               onModeChange={onModeChange}
+              onRequestAddSource={() => setPickerOpen(true)}
+              onRemoveB={clearSlotB}
             />
           </Suspense>
         </div>
       ) : (
+        // A not running yet — lifecycle panels.
         <div className="grid gap-3 lg:grid-cols-2">
           <ComparePanel slot="A" entry={a} state={stateA} />
-          {a !== null && b === null ? (
-            <EmptySlotGuidance
-              onAdd={() => setPickerOpen(true)}
-              onSelf={() => assignSlot('b', entryRef(a))}
-            />
-          ) : (
-            <ComparePanel slot="B" entry={b} state={stateB} />
-          )}
+          {b !== null && <ComparePanel slot="B" entry={b} state={stateB} />}
         </div>
       )}
     </ListPageContainer>
+  )
+}
+
+/** Compact B lifecycle indicator shown while the viewer runs solo. */
+function SlotBStatusChip({ state }: { state: ComparisonSourceState }) {
+  const { t } = useTranslation('compare')
+  if (state.phase === 'running' || state.phase === 'idle') return null
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="flex h-4 w-4 items-center justify-center rounded bg-orange-600 font-mono text-[10px] font-bold text-white dark:bg-orange-500">
+        B
+      </span>
+      {state.phase === 'failed' || state.phase === 'dirError' ? (
+        <>
+          <span className="max-w-64 truncate text-destructive">
+            {('error' in state && state.error) || t('lens.failed')}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs"
+            onClick={state.retry}
+          >
+            {t('lens.retry')}
+          </Button>
+        </>
+      ) : state.phase === 'stopped' ? (
+        <>
+          {t('lens.paused')}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs"
+            onClick={state.start}
+          >
+            {t('lens.start')}
+          </Button>
+        </>
+      ) : (
+        <>
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {t('lens.starting')}
+        </>
+      )}
+    </span>
   )
 }
 
@@ -276,37 +339,4 @@ export function ComparePage() {
 function EnrichmentMount({ entry }: { entry: ComparisonEntry }) {
   useEnrichComparisonEntry(entry)
   return null
-}
-
-/**
- * First-source guidance: with A filled and B empty (the state right
- * after 'Compare' on a stored output), spell out the two next moves —
- * add a second source, or compare the source with itself to inspect
- * two time steps of one forecast.
- */
-function EmptySlotGuidance({
-  onAdd,
-  onSelf,
-}: {
-  onAdd: () => void
-  onSelf: () => void
-}) {
-  const { t } = useTranslation('compare')
-  return (
-    <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border p-6 text-center">
-      <P className="text-sm font-medium">{t('emptyB.title')}</P>
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <Button size="sm" onClick={onAdd} className="gap-1.5">
-          <Plus className="h-3.5 w-3.5" />
-          {t('emptyB.add')}
-        </Button>
-        <Button size="sm" variant="outline" onClick={onSelf}>
-          {t('emptyB.self')}
-        </Button>
-      </div>
-      <P className="max-w-md text-xs text-muted-foreground">
-        {t('emptyB.selfHint')}
-      </P>
-    </div>
-  )
 }

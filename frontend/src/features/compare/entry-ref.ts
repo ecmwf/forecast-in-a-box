@@ -107,6 +107,12 @@ export function decodeEntryRef(ref: string): DecodedEntryRef | null {
   return null
 }
 
+/**
+ * Slot-B URL sentinel for a deliberate single view — a plainly cleared B
+ * would be re-filled by materialization. Refs carry `kind:`, no collision.
+ */
+export const SLOT_B_OFF = 'off'
+
 /** Human-readable name for toasts and chips. */
 export function entryDisplayName(
   entry: NewComparisonEntry | ComparisonEntry,

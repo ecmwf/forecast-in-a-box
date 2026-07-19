@@ -156,7 +156,9 @@
   "slots": {
     "swap": "Swap A and B",
     "placeholder": "Pick a source…",
-    "pickerAria": "Source for slot {{slot}}"
+    "pickerAria": "Source for slot {{slot}}",
+    "sameAsA": "Same as A",
+    "singleView": "Single view"
   },
   "measure": {
     "line": "Measure distance",
@@ -236,12 +238,6 @@
     "empty": "Arm the annotate tool and click the map to record findings.",
     "slotShared": "Both",
     "armedHint": "Click the map to add a note · Esc exits"
-  },
-  "emptyB": {
-    "title": "Choose what to compare against",
-    "add": "Add another source",
-    "self": "Compare with itself",
-    "selfHint": "Same source on both sides — compare two time steps of one forecast. Then pick “Time offset” or “Independent times” in the timeline."
   },
   "toolbar": {
     "compareCta": "Compare…"

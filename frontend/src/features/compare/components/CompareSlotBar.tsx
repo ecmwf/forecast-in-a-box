@@ -34,12 +34,17 @@ const SLOT_BADGE: Record<'a' | 'b', string> = {
   b: 'bg-orange-600 text-white dark:bg-orange-500',
 }
 
+/** B-picker action item values — namespaced so no entry ref collides. */
+const ITEM_SAME_AS_A = '__same-as-a'
+const ITEM_SINGLE_VIEW = '__single-view'
+
 export function CompareSlotBar({
   entries,
   aRef,
   bRef,
   onAssign,
   onSwap,
+  onSingleView,
 }: {
   entries: ReadonlyArray<ComparisonEntry>
   aRef: string | undefined
@@ -47,6 +52,8 @@ export function CompareSlotBar({
   /** Assign `ref` to `slot`; assigning the other slot's source swaps. */
   onAssign: (slot: 'a' | 'b', ref: string) => void
   onSwap: () => void
+  /** Clear B back to a single-source view. */
+  onSingleView: () => void
 }) {
   const { t } = useTranslation('compare')
 
@@ -73,7 +80,23 @@ export function CompareSlotBar({
         slot="b"
         entries={entries}
         value={bRef}
-        onChange={(ref) => onAssign('b', ref)}
+        onChange={(ref) => {
+          if (ref === ITEM_SAME_AS_A) {
+            if (aRef) onAssign('b', aRef)
+          } else if (ref === ITEM_SINGLE_VIEW) {
+            onSingleView()
+          } else {
+            onAssign('b', ref)
+          }
+        }}
+        actions={[
+          ...(aRef && bRef !== aRef
+            ? [{ value: ITEM_SAME_AS_A, label: t('slots.sameAsA') }]
+            : []),
+          ...(bRef
+            ? [{ value: ITEM_SINGLE_VIEW, label: t('slots.singleView') }]
+            : []),
+        ]}
       />
     </div>
   )
@@ -84,11 +107,14 @@ function SlotPicker({
   entries,
   value,
   onChange,
+  actions = [],
 }: {
   slot: 'a' | 'b'
   entries: ReadonlyArray<ComparisonEntry>
   value: string | undefined
   onChange: (ref: string) => void
+  /** Extra non-entry items rendered below the sources. */
+  actions?: ReadonlyArray<{ value: string; label: string }>
 }) {
   const { t } = useTranslation('compare')
   const current = entries.find((e) => entryRef(e) === value)
@@ -127,6 +153,14 @@ function SlotPicker({
               </SelectItem>
             )
           })}
+          {actions.length > 0 && (
+            <div className="my-1 border-t border-border" role="presentation" />
+          )}
+          {actions.map((action) => (
+            <SelectItem key={action.value} value={action.value}>
+              <span className="text-muted-foreground">{action.label}</span>
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>
