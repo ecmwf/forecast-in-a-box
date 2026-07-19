@@ -25,6 +25,15 @@ import type { PairedLayer, SourceSlot } from './layer-pairing'
 
 export type LinkMode = 'linked' | 'unlinked'
 
+function moveItem<T>(list: ReadonlyArray<T>, from: number, to: number): Array<T> {
+  if (from === to || from < 0 || to < 0) return [...list]
+  if (from >= list.length || to >= list.length) return [...list]
+  const next = [...list]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
+}
+
 interface PerSourceSelection {
   activeOrder: Array<string>
   layerOpacities: Map<string, number>
@@ -43,6 +52,10 @@ export interface CompareSelection {
   togglePair: (key: string) => void
   setPairOpacity: (key: string, opacity: number) => void
   pairOpacity: (key: string) => number
+  /** Move an active pair within the stacking order (linked mode). */
+  reorderPair: (from: number, to: number) => void
+  /** Move an active layer within one source's order (unlinked mode). */
+  reorderLayer: (slot: SourceSlot, from: number, to: number) => void
   isLayerActive: (slot: SourceSlot, name: string) => boolean
   toggleLayer: (slot: SourceSlot, name: string) => void
   setLayerOpacity: (slot: SourceSlot, name: string, opacity: number) => void
@@ -117,6 +130,23 @@ export function useCompareSelection(
       return next
     })
   }, [])
+
+  const reorderPair = useCallback((from: number, to: number) => {
+    setLinkedOrder((prev) => moveItem(prev, from, to))
+  }, [])
+
+  const reorderLayer = useCallback(
+    (slot: SourceSlot, from: number, to: number) => {
+      setPerSource((prev) => ({
+        ...prev,
+        [slot]: {
+          ...prev[slot],
+          activeOrder: moveItem(prev[slot].activeOrder, from, to),
+        },
+      }))
+    },
+    [],
+  )
 
   const setPairOpacity = useCallback((key: string, opacity: number) => {
     setLinkedOpacities((prev) => {
@@ -212,6 +242,8 @@ export function useCompareSelection(
     opacitiesFor,
     isPairActive: (key) => linkedOrder.includes(key),
     togglePair,
+    reorderPair,
+    reorderLayer,
     setPairOpacity,
     pairOpacity: (key) => linkedOpacities.get(key) ?? DEFAULT_LAYER_OPACITY,
     isLayerActive: (slot, name) => perSource[slot].activeOrder.includes(name),
