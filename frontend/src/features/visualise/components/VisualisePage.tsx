@@ -29,6 +29,7 @@ import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
 import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
+import { useViewportFill } from '../hooks/useViewportFill'
 import { CompareSlotBar } from './CompareSlotBar'
 import { ComparePanel } from './ComparePanel'
 import { SourcePicker } from './SourcePicker'
@@ -161,6 +162,9 @@ export function VisualisePage() {
   const [lensesPaused, setLensesPaused] = useState(false)
   const stateA = useComparisonSource(a, { autoStart: !lensesPaused })
   const stateB = useComparisonSource(b, { autoStart: !lensesPaused })
+  const viewerFill = useViewportFill(
+    entries.length > 0 && a !== null && stateA.phase === 'running',
+  )
 
   const stopMutation = useStopLens()
   const activeLensIds = [stateA, stateB].flatMap((s) =>
@@ -178,7 +182,8 @@ export function VisualisePage() {
   }
 
   return (
-    <ListPageContainer className="space-y-4">
+    // Slim constant gutter — a map workspace uses the width it can get.
+    <ListPageContainer className="space-y-4 px-4 py-4 sm:px-4 lg:px-4">
       {/* Stub entries (hydrated links, lens rows) upgrade their display
           metadata here — chips used to host this, but they now live in
           the manage dialog and may never mount. */}
@@ -253,7 +258,17 @@ export function VisualisePage() {
       {entries.length === 0 ? (
         <VisualiseHub />
       ) : a && stateA.phase === 'running' ? (
-        <div className="h-[75vh] min-h-[560px]">
+        // Sized so the viewer bottom meets the viewport bottom; the
+        // footer stays on the page below the fold.
+        <div
+          ref={viewerFill.ref}
+          style={
+            viewerFill.height !== null
+              ? { height: viewerFill.height }
+              : undefined
+          }
+          className="h-[75vh] min-h-[480px]"
+        >
           <Suspense
             fallback={
               <div className="flex h-full items-center justify-center text-muted-foreground">
