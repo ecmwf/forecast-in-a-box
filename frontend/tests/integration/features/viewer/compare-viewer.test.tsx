@@ -529,6 +529,32 @@ describe('CompareViewer', () => {
     ).toHaveLength(0)
   })
 
+  it('offset mode offers a slider with alignment presets synced to the field', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    await screen.getByLabelText('Time link mode').click()
+    await screen.getByRole('option', { name: 'Time offset (B = A + Δ)' }).click()
+
+    const slider = screen.getByRole('slider', {
+      name: 'Time offset between A and B',
+    })
+    await expect.element(slider).toBeInTheDocument()
+
+    // "Align starts" = B.first − A.first = +6 h; the panel tag and the
+    // hours field both follow.
+    await screen.getByRole('button', { name: 'Align starts' }).click()
+    await expect.element(screen.getByText('B +6 h')).toBeVisible()
+    const hours = screen.getByRole('textbox').first()
+    await expect.element(hours).toHaveValue('6')
+
+    // Reset preset returns to zero.
+    await screen.getByRole('button', { name: '0', exact: true }).click()
+    await expect.element(hours).toHaveValue('0')
+    expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
+  })
+
   it('auto-unlinks with a notice when the sources share no layers', async () => {
     const portA = nextPort++
     const portB = nextPort++

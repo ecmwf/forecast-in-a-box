@@ -126,7 +126,13 @@
     "clipAria": "Clip the timeline to a window",
     "clipAll": "All",
     "clipHint": "Clip to {{slot}}’s time range",
-    "clipBothHint": "Clip to where both sources have data"
+    "clipBothHint": "Clip to where both sources have data",
+    "offsetSliderAria": "Time offset between A and B",
+    "offsetZeroHint": "Reset the offset to zero",
+    "alignStarts": "Align starts",
+    "alignStartsHint": "Shift B so both series start together",
+    "alignEnds": "Align ends",
+    "alignEndsHint": "Shift B so both series end together"
   },
   "link": {
     "linked": "Linked layers",

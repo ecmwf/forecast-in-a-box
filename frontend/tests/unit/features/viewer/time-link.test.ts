@@ -15,6 +15,8 @@ import {
   defaultToleranceMs,
   effectiveAvailability,
   formatOffset,
+  medianStepMs,
+  offsetBounds,
   resolveSourceTime,
 } from '@/features/viewer/compare/time-link'
 
@@ -120,6 +122,46 @@ describe('effectiveAvailability', () => {
       false,
       false,
       false,
+    ])
+  })
+})
+
+describe('medianStepMs', () => {
+  it('returns the median inter-step interval, 6 h for sparse axes', () => {
+    expect(medianStepMs(sixHourly)).toBe(6 * HOUR)
+    expect(medianStepMs(buildSourceTimeIndex([], []))).toBe(6 * HOUR)
+  })
+})
+
+describe('offsetBounds', () => {
+  const shifted = buildSourceTimeIndex(
+    [
+      {
+        name: '2t',
+        title: '2t',
+        styles: [],
+        // 12 h later, same span: 2026-07-06T12 … 2026-07-07T12.
+        time: { raw: '2026-07-06T12:00:00Z/2026-07-07T12:00:00Z/PT6H' },
+      } satisfies ParsedLayer,
+    ],
+    ['2t'],
+  )
+
+  it('spans every Δ where the windows can intersect, containing 0', () => {
+    // A: T00…T00+24h, B: T12…T12+24h → Δ ∈ [12−24, 36] h with 0 kept.
+    const [min, max] = offsetBounds(sixHourly, shifted)
+    expect(min).toBe(-12 * HOUR)
+    expect(max).toBe(36 * HOUR)
+    expect(offsetBounds(sixHourly, sixHourly)).toEqual([
+      -24 * HOUR,
+      24 * HOUR,
+    ])
+  })
+
+  it('falls back to ±48 h when either axis is empty', () => {
+    expect(offsetBounds(sixHourly, buildSourceTimeIndex([], []))).toEqual([
+      -48 * HOUR,
+      48 * HOUR,
     ])
   })
 })
