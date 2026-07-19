@@ -22,6 +22,7 @@ import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
 import { usePointerReadout } from '../hooks/usePointerReadout'
+import { useTimeStepPrefetch } from '../hooks/useTimeStepPrefetch'
 import { formatLatLon } from '../format'
 import { compositeMapToCanvas } from '../map-export'
 import { useContextOverlays, useOverlayHover } from './overlays'
@@ -46,6 +47,7 @@ export function DualMapCompare({
   view,
   a,
   b,
+  preload = false,
   basemapId,
   basemapOpacity,
   measureMode,
@@ -61,6 +63,8 @@ export function DualMapCompare({
   view: View
   a: CompareMapSource
   b: CompareMapSource
+  /** Prefetch every active layer × time step into the HTTP cache. */
+  preload?: boolean
   basemapId: string
   basemapOpacity: number
   measureMode: MeasureMode
@@ -121,6 +125,7 @@ export function DualMapCompare({
       <DualMapPanel
         source={a}
         view={view}
+        preload={preload}
         cross={cross}
         onCross={setCross}
         basemapId={basemapId}
@@ -138,6 +143,7 @@ export function DualMapCompare({
       <DualMapPanel
         source={b}
         view={view}
+        preload={preload}
         cross={cross}
         onCross={setCross}
         basemapId={basemapId}
@@ -159,6 +165,7 @@ export function DualMapCompare({
 function DualMapPanel({
   source,
   view,
+  preload,
   cross,
   onCross,
   basemapId,
@@ -175,6 +182,7 @@ function DualMapPanel({
 }: {
   source: CompareMapSource
   view: View
+  preload: boolean
   cross: CrossPosition
   onCross: (pos: CrossPosition) => void
   basemapId: string
@@ -233,6 +241,13 @@ function DualMapPanel({
   })
 
   useMeasure(mapRef, measureMode, measureClearNonce)
+  useTimeStepPrefetch(mapRef, {
+    enabled: preload,
+    baseUrl: source.baseUrl,
+    layers: source.layers,
+    activeOrder: source.activeOrder,
+    timeSteps: source.timeSteps,
+  })
   const pointer = usePointerReadout(mapRef)
   useContextOverlays(mapRef, overlays)
   const overlayHover = useOverlayHover(mapRef, overlays)

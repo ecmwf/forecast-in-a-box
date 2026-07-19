@@ -37,6 +37,7 @@ import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
 import { usePointerReadout } from '../hooks/usePointerReadout'
+import { useTimeStepPrefetch } from '../hooks/useTimeStepPrefetch'
 import { formatLatLon } from '../format'
 import { compositeMapToCanvas } from '../map-export'
 import { useContextOverlays, useOverlayHover } from './overlays'
@@ -72,6 +73,7 @@ export function SingleMapCompare({
   a,
   b,
   captureOnly = null,
+  preload = false,
   mode,
   options,
   basemapId,
@@ -92,6 +94,8 @@ export function SingleMapCompare({
   b: CompareMapSource | null
   /** Render only this slot (mode effects/clips off) for a per-slot copy. */
   captureOnly?: SourceSlot | null
+  /** Prefetch every active layer × time step into the HTTP cache. */
+  preload?: boolean
   mode: SingleMapMode
   options: CompareModeOptions
   basemapId: string
@@ -212,6 +216,20 @@ export function SingleMapCompare({
   )
 
   useMeasure(mapRef, measureMode, measureClearNonce)
+  useTimeStepPrefetch(mapRef, {
+    enabled: preload,
+    baseUrl: a.baseUrl,
+    layers: a.layers,
+    activeOrder: a.activeOrder,
+    timeSteps: a.timeSteps,
+  })
+  useTimeStepPrefetch(mapRef, {
+    enabled: preload && b !== null,
+    baseUrl: b?.baseUrl ?? a.baseUrl,
+    layers: b?.layers ?? EMPTY_LAYERS,
+    activeOrder: b?.activeOrder ?? EMPTY_ORDER,
+    timeSteps: b?.timeSteps ?? EMPTY_ORDER,
+  })
   const pointer = usePointerReadout(mapRef)
   useContextOverlays(mapRef, overlays)
   const overlayHover = useOverlayHover(mapRef, overlays)

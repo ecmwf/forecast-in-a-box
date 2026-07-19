@@ -18,7 +18,7 @@
 
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, Eye, EyeOff, Upload, X } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, HelpCircle, Upload, X } from 'lucide-react'
 import { firstNumber } from '../format'
 import { rebaseLensUrl } from '../wms-capabilities'
 import { LegendImage } from '../components/LegendImage'
@@ -33,6 +33,12 @@ import { Button } from '@/components/ui/button'
 import { showToast } from '@/lib/toast'
 import { createLogger } from '@/lib/logger'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
@@ -72,6 +78,7 @@ export function CompareActiveLayersPanel({
   sources,
   overlays,
   annotations,
+  preload,
   onCollapse,
 }: {
   pairs: ReadonlyArray<PairedLayer>
@@ -81,6 +88,7 @@ export function CompareActiveLayersPanel({
   sources: { a: PanelSlotSource; b: PanelSlotSource | null }
   overlays: OverlayControls
   annotations: AnnotationControls
+  preload: { enabled: boolean; setEnabled: (v: boolean) => void; available: boolean }
   onCollapse: () => void
 }) {
   const { t } = useTranslation('compare')
@@ -122,6 +130,36 @@ export function CompareActiveLayersPanel({
               onChange={(v) => opacity.setSource(slot, v)}
             />
           ))}
+        {preload.available && (
+          <label className="flex items-center justify-between gap-2 text-xs">
+            <span className="flex items-center gap-1 text-muted-foreground">
+              {tExec('lens.preloadTimeSteps')}
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="shrink-0 text-muted-foreground/60 hover:text-muted-foreground"
+                    />
+                  }
+                >
+                  <HelpCircle className="h-3 w-3" />
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  className="max-w-72 whitespace-pre-line"
+                >
+                  {tExec('lens.preloadTimeStepsHelp')}
+                </TooltipContent>
+              </Tooltip>
+            </span>
+            <Switch
+              size="sm"
+              checked={preload.enabled}
+              onCheckedChange={preload.setEnabled}
+            />
+          </label>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2">

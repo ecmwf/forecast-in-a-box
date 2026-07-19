@@ -660,7 +660,9 @@ describe('CompareViewer solo', () => {
     expect(
       screen.getByRole('button', { name: 'Swipe' }).elements(),
     ).toHaveLength(0)
-    expect(screen.getByRole('switch').elements()).toHaveLength(0)
+    expect(
+      screen.getByRole('switch', { name: /link layer selection/i }).elements(),
+    ).toHaveLength(0)
     expect(
       screen.getByRole('img', { name: 'Availability for source B' }).elements(),
     ).toHaveLength(0)
@@ -700,12 +702,33 @@ describe('CompareViewer solo', () => {
     await expect
       .element(screen.getByRole('button', { name: 'Swipe' }))
       .toBeVisible()
-    await expect.element(screen.getByRole('switch')).toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('switch', { name: /link layer selection/i }))
+      .toBeInTheDocument()
     // Union timeline (T00,T06,T12) keeps the selected instant, and the
     // solo selection projects onto B — its T00 gap badge proves both.
     await expect.element(screen.getByText('1 / 3')).toBeVisible()
     await expect
       .element(screen.getByText('No data at this time — B'))
       .toBeVisible()
+  })
+})
+
+describe('CompareViewer preload', () => {
+  it('offers the preload toggle once a timeline exists', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    // No time-aware selection yet — no toggle.
+    expect(
+      screen.getByRole('switch', { name: 'Preload time steps' }).elements(),
+    ).toHaveLength(0)
+
+    await screen.getByText('2 m temperature').first().click()
+    const toggle = screen.getByRole('switch', { name: 'Preload time steps' })
+    await expect.element(toggle).toBeInTheDocument()
+    // Programmatic click — the unstyled switch has no box to aim at.
+    ;(toggle.element() as HTMLElement).click()
+    await expect.element(toggle).toBeChecked()
   })
 })
