@@ -24,7 +24,7 @@ import { Link, useParams } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useFableRetrieve } from '@/api/hooks/useFable'
 import { useJobStatus } from '@/api/hooks/useJobs'
-import { useComparisonCount } from '@/features/compare/stores/comparisonStore'
+import { useComparisonCount } from '@/features/visualise/stores/comparisonStore'
 import { cn } from '@/lib/utils'
 
 const navItems = [

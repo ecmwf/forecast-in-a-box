@@ -28,7 +28,7 @@ import { resetArtifactsHandlerState } from '../mocks/handlers/artifacts.handlers
 import { resetFableHandlerState } from '../mocks/handlers/fable.handlers'
 import { resetPluginsHandlerState } from '../mocks/handlers/plugins.handlers'
 import { useActivityStore } from '@/stores/activityStore'
-import { useComparisonStore } from '@/features/compare/stores/comparisonStore'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import { useCommandStore } from '@/stores/commandStore'
 import { useConfigStore } from '@/stores/configStore'
 import { useUiStore } from '@/stores/uiStore'

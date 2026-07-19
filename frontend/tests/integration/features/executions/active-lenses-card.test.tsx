@@ -28,7 +28,7 @@ import {
   resetLensState,
 } from '@tests/../mocks/data/lens.data'
 import { ActiveLensesCard } from '@/features/executions/components/ActiveLensesCard'
-import { useComparisonStore } from '@/features/compare/stores/comparisonStore'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import i18n from '@/lib/i18n'
 
 async function renderCard() {

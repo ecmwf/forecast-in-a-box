@@ -36,7 +36,7 @@ import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import type { RunOutputs } from '@/api/types/job.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
-import { useComparisonStore } from '@/features/compare/stores/comparisonStore'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import i18n from '@/lib/i18n'
 
 // Matches the job-completed-001 seed: its `task-out-grib` marker output's
