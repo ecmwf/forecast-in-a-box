@@ -168,6 +168,23 @@ export function CompareViewer({
     () => buildCompareTimeline(timeIndexA, timeIndexB),
     [timeIndexA, timeIndexB],
   )
+  // Raw per-source step strings, epoch-ordered (prefetch warmup).
+  const rawStepsA = useMemo(
+    () =>
+      timeIndexA.epochs.flatMap((e) => {
+        const raw = timeIndexA.rawByEpoch.get(e)
+        return raw !== undefined ? [raw] : []
+      }),
+    [timeIndexA],
+  )
+  const rawStepsB = useMemo(
+    () =>
+      timeIndexB.epochs.flatMap((e) => {
+        const raw = timeIndexB.rawByEpoch.get(e)
+        return raw !== undefined ? [raw] : []
+      }),
+    [timeIndexB],
+  )
   const [timeStep, setTimeStep] = useState(0)
   // Focus window over the union axis (indices into timeline.epochs).
   const [timeClip, setTimeClip] = useState<[number, number] | null>(null)
@@ -471,6 +488,9 @@ export function CompareViewer({
     ]
   }, [sourceA.decorationLayers])
 
+  // Time-step prefetch (default off — bandwidth-heavy).
+  const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)
+
   // Sidebar collapse — same affordance as the embedded viewer.
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
@@ -607,6 +627,7 @@ export function CompareViewer({
     activeOrder: activeOrderA,
     layerOpacities: selection.opacitiesFor('a'),
     resolveTime: resolveTimeFor('a'),
+    timeSteps: rawStepsA,
     hiddenAtTime: resolvedA.hidden,
     timeTag: timeTagFor('a'),
     timeLabel:
@@ -626,6 +647,7 @@ export function CompareViewer({
         activeOrder: activeOrderB,
         layerOpacities: selection.opacitiesFor('b'),
         resolveTime: resolveTimeFor('b'),
+        timeSteps: rawStepsB,
         hiddenAtTime: resolvedB.hidden,
         timeTag: timeTagFor('b'),
         timeLabel:
@@ -788,6 +810,11 @@ export function CompareViewer({
               source: sourceOpacity,
               setSource: setSourceOpacityFor,
             }}
+            preload={{
+              enabled: preloadTimeSteps,
+              setEnabled: setPreloadTimeSteps,
+              available: timeline.epochs.length > 1,
+            }}
             sources={{
               a: { label: a.label, baseUrl: a.baseUrl, lens: sourceA },
               b: b ? { label: b.label, baseUrl: b.baseUrl, lens: sourceB } : null,
@@ -801,6 +828,7 @@ export function CompareViewer({
               view={viewRef.current}
               a={mapSourceA}
               b={mapSourceB}
+              preload={preloadTimeSteps}
               measureMode={measureMode}
               measureClearNonce={measureClearNonce}
               overlays={overlays}
@@ -819,6 +847,7 @@ export function CompareViewer({
               a={mapSourceA}
               b={mapSourceB}
               captureOnly={captureOnly}
+              preload={preloadTimeSteps}
               mode={mode === 'side' ? 'swipe' : mode}
               options={modeOptions}
               measureMode={measureMode}

@@ -23,6 +23,8 @@ export interface CompareMapSource {
   layerOpacities: ReadonlyMap<string, number>
   /** Raw TIME string THIS server advertised for the current instant. */
   resolveTime: (layer: ParsedLayer) => string | null
+  /** All raw TIME strings of the active selection (prefetch). */
+  timeSteps: ReadonlyArray<string>
   /** Base stack opacity: global × per-source tier (mode factors and
    *  time-gap hiding are applied by the map components on top). */
   masterOpacity: number
