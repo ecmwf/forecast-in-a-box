@@ -29,6 +29,9 @@ test.describe('Visualise page', () => {
 
     await page.goto('/visualise')
     await page.waitForLoadState('networkidle')
+    // The footer stays on the page (below the fold once a viewer fills
+    // the viewport).
+    await expect(page.locator('footer')).toBeAttached()
 
     await expect(
       page.getByRole('heading', { name: 'Visualise', exact: true }),
