@@ -61,7 +61,7 @@ const WIDE_TAB_CONTENT =
 
 export function RunDetailPage() {
   const { t } = useTranslation('executions')
-  const { jobId } = useParams({ from: '/_authenticated/executions/$jobId' })
+  const { jobId } = useParams({ from: '/_authenticated/runs/$jobId' })
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('outputs')
   const [metadataOpen, setMetadataOpen] = useState(false)
@@ -111,7 +111,7 @@ export function RunDetailPage() {
             }),
             status: 'active',
             startedAt: Date.now(),
-            navigateTo: `/executions/${jobId}`,
+            navigateTo: `/runs/${jobId}`,
           })
           showToast.success(t('actions.restartJob'))
         },
@@ -129,7 +129,7 @@ export function RunDetailPage() {
       {
         onSuccess: () => {
           showToast.success(t('actions.deleteJob'))
-          navigate({ to: '/executions' })
+          navigate({ to: '/runs' })
         },
         onError: (error) => {
           log.error('Failed to delete job', { jobId, error })
@@ -178,7 +178,7 @@ export function RunDetailPage() {
         <Button
           variant="outline"
           nativeButton={false}
-          render={<Link to="/executions" />}
+          render={<Link to="/runs" />}
         >
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           {t('errors.backToExecutions')}

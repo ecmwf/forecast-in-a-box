@@ -27,23 +27,23 @@ import type { Page } from '@playwright/test'
  * Establish an anonymous session by visiting the root URL.
  * The anonymous auth provider sets a UUID in localStorage on mount,
  * which the router's beforeLoad guard requires for authenticated routes.
- * After auth initializes, the landing page redirects to /dashboard.
+ * After auth initializes, the landing page redirects to /overview.
  */
 async function establishSession(page: Page) {
   await page.goto('/')
-  await page.waitForURL(/dashboard/, { timeout: 15000 })
+  await page.waitForURL(/overview/, { timeout: 15000 })
   await page.waitForLoadState('networkidle')
 }
 
 test.describe('Anonymous Authentication', () => {
-  test('anonymous user is redirected from landing to dashboard', async ({
+  test('anonymous user is redirected from landing to overview', async ({
     page,
   }) => {
     await page.goto('/')
 
     await expect(page).toHaveTitle(/Forecast/)
     // Anonymous users are automatically authenticated and redirected to dashboard
-    await page.waitForURL(/dashboard/, { timeout: 15000 })
+    await page.waitForURL(/overview/, { timeout: 15000 })
     await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible({
       timeout: 10000,
     })
@@ -52,7 +52,7 @@ test.describe('Anonymous Authentication', () => {
   test('anonymous user can access dashboard directly', async ({ page }) => {
     await establishSession(page)
 
-    await page.goto('/dashboard')
+    await page.goto('/overview')
     await page.waitForLoadState('networkidle')
 
     // Dashboard should be accessible with anonymous auth
@@ -144,7 +144,7 @@ test.describe('Anonymous Authentication', () => {
     await expect(page).toHaveURL(/admin\/sources/)
 
     // Navigate back to dashboard
-    await page.goto('/dashboard')
+    await page.goto('/overview')
     await page.waitForLoadState('networkidle')
     await expect(page).toHaveURL(/dashboard/)
   })

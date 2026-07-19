@@ -20,9 +20,9 @@ import type { Page } from '@playwright/test'
 
 async function navigateTo(page: Page, path: string) {
   await page.goto('/')
-  await page.waitForURL(/dashboard/, { timeout: 15000 })
+  await page.waitForURL(/overview/, { timeout: 15000 })
   await page.waitForLoadState('networkidle')
-  if (path !== '/dashboard') {
+  if (path !== '/overview') {
     await page.goto(path)
     await page.waitForURL(new RegExp(path.replace('/', '\\/')), {
       timeout: 10000,
@@ -34,7 +34,7 @@ async function navigateTo(page: Page, path: string) {
 
 test.describe('Executions List Page', () => {
   test.beforeEach(async ({ page }) => {
-    await navigateTo(page, '/executions')
+    await navigateTo(page, '/runs')
   })
 
   test('executions page loads with heading', async ({ page }) => {
@@ -106,7 +106,7 @@ test.describe('Executions List Page', () => {
 
 test.describe('Executions Status Filtering', () => {
   test.beforeEach(async ({ page }) => {
-    await navigateTo(page, '/executions')
+    await navigateTo(page, '/runs')
   })
 
   test('clicking a status filter updates the list', async ({ page }) => {
@@ -145,10 +145,10 @@ test.describe('Executions Status Filtering', () => {
 
 test.describe('Execution Detail Page', () => {
   test('navigates to detail page from list', async ({ page }) => {
-    await navigateTo(page, '/executions')
+    await navigateTo(page, '/runs')
 
     // Verify we're on the executions page
-    await expect(page).toHaveURL(/executions/)
+    await expect(page).toHaveURL(/runs/)
 
     // Find a job detail link — use exact match to avoid "View Results" etc.
     const viewLink = page.getByRole('link', { name: 'View', exact: true })
@@ -164,8 +164,8 @@ test.describe('Execution Detail Page', () => {
         .catch(() => false)
     ) {
       await viewLink.first().click()
-      await page.waitForURL(/executions\/[^/]+/, { timeout: 10000 })
-      await expect(page).toHaveURL(/executions\/[^/]+/)
+      await page.waitForURL(/runs\/[^/]+/, { timeout: 10000 })
+      await expect(page).toHaveURL(/runs\/[^/]+/)
     } else if (
       await inspectLink
         .first()
@@ -173,13 +173,13 @@ test.describe('Execution Detail Page', () => {
         .catch(() => false)
     ) {
       await inspectLink.first().click()
-      await page.waitForURL(/executions\/[^/]+/, { timeout: 10000 })
-      await expect(page).toHaveURL(/executions\/[^/]+/)
+      await page.waitForURL(/runs\/[^/]+/, { timeout: 10000 })
+      await expect(page).toHaveURL(/runs\/[^/]+/)
     }
   })
 
   test('detail page shows back link', async ({ page }) => {
-    await navigateTo(page, '/executions')
+    await navigateTo(page, '/runs')
 
     // Navigate to first available job
     const viewLink = page.getByText('View')
@@ -219,7 +219,7 @@ test.describe('Execution Detail Page', () => {
   })
 
   test('detail page shows tab controls', async ({ page }) => {
-    await navigateTo(page, '/executions')
+    await navigateTo(page, '/runs')
 
     const viewLink = page.getByText('View')
     const inspectLink = page.getByText('Inspect')
@@ -262,7 +262,7 @@ test.describe('Execution Detail Page', () => {
   })
 
   test('back link navigates to executions list', async ({ page }) => {
-    await navigateTo(page, '/executions')
+    await navigateTo(page, '/runs')
 
     const viewLink = page.getByText('View')
     if (

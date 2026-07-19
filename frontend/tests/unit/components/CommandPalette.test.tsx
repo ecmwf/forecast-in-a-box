@@ -172,7 +172,7 @@ describe('CommandPalette', () => {
 
     await screen.getByRole('option', { name: /Dashboard/ }).click()
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/dashboard' })
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/overview' })
     expect(useCommandStore.getState().isOpen).toBe(false)
   })
 
@@ -197,7 +197,7 @@ describe('CommandPalette', () => {
     await screen.getByPlaceholder(PLACEHOLDER).fill('executions')
     await userEvent.keyboard('{Enter}')
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/executions' })
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/runs' })
     expect(useCommandStore.getState().isOpen).toBe(false)
   })
 

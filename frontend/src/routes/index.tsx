@@ -32,10 +32,10 @@ function Index() {
   const { isAuthenticated, isLoading } = useAuth()
   const navigate = useNavigate()
 
-  // Redirect authenticated users to dashboard
+  // Redirect authenticated users to the overview
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      log.info('User is authenticated, redirecting to dashboard')
+      log.info('User is authenticated, redirecting to overview')
 
       // Check for stored redirect (validate to prevent open redirect attacks)
       const storedRedirect = localStorage.getItem(STORAGE_KEYS.auth.redirectUrl)
@@ -52,8 +52,8 @@ function Index() {
         log.warn('Invalid redirect URL blocked:', storedRedirect)
       }
 
-      log.info('Redirecting to /dashboard')
-      navigate({ to: '/dashboard', replace: true })
+      log.info('Redirecting to /overview')
+      navigate({ to: '/overview', replace: true })
     }
   }, [isLoading, isAuthenticated, navigate])
 

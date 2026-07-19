@@ -71,7 +71,7 @@ function renderDetailPage(jobId: string, search = '') {
 
   const detailRoute = createRoute({
     getParentRoute: () => authenticatedRoute,
-    path: '/executions/$jobId',
+    path: '/runs/$jobId',
     component: () => (
       <AuthContext.Provider value={anonymousAuth}>
         <RunDetailPage />
@@ -85,7 +85,7 @@ function renderDetailPage(jobId: string, search = '') {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({
-      initialEntries: [`/executions/${jobId}${search}`],
+      initialEntries: [`/runs/${jobId}${search}`],
     }),
   })
 

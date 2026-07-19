@@ -24,9 +24,9 @@ import type { Page } from '@playwright/test'
  */
 async function navigateTo(page: Page, path: string) {
   await page.goto('/')
-  await page.waitForURL(/dashboard/, { timeout: 15000 })
+  await page.waitForURL(/overview/, { timeout: 15000 })
   await page.waitForLoadState('networkidle')
-  if (path !== '/dashboard') {
+  if (path !== '/overview') {
     await page.goto(path)
     await page.waitForLoadState('networkidle')
   }
@@ -35,7 +35,7 @@ async function navigateTo(page: Page, path: string) {
 
 test.describe('Dashboard Content', () => {
   test.beforeEach(async ({ page }) => {
-    await navigateTo(page, '/dashboard')
+    await navigateTo(page, '/overview')
   })
 
   test('dashboard loads with welcome card', async ({ page }) => {
@@ -145,7 +145,7 @@ test.describe('Dashboard Content', () => {
 
 test.describe('System Status', () => {
   test.beforeEach(async ({ page }) => {
-    await navigateTo(page, '/dashboard')
+    await navigateTo(page, '/overview')
   })
 
   test('status indicator visible in footer', async ({ page }) => {
@@ -185,7 +185,7 @@ test.describe('Cross-Page Navigation', () => {
   test('navigates from dashboard to plugins via quick action', async ({
     page,
   }) => {
-    await navigateTo(page, '/dashboard')
+    await navigateTo(page, '/overview')
 
     const managePlugins = page.getByText('Manage Plugins')
     if (
@@ -204,7 +204,7 @@ test.describe('Cross-Page Navigation', () => {
   test('navigates from dashboard to sources via quick action', async ({
     page,
   }) => {
-    await navigateTo(page, '/dashboard')
+    await navigateTo(page, '/overview')
 
     const manageSources = page.getByText('Manage Sources')
     if (
@@ -222,7 +222,7 @@ test.describe('Cross-Page Navigation', () => {
 
   test('full navigation cycle across pages', async ({ page }) => {
     // Dashboard → Plugins → Sources → Configure → Dashboard
-    await navigateTo(page, '/dashboard')
+    await navigateTo(page, '/overview')
 
     // Go to plugins
     await page.goto('/admin/plugins')
@@ -256,7 +256,7 @@ test.describe('Cross-Page Navigation', () => {
     await expect(page).toHaveURL(/configure/)
 
     // Back to dashboard
-    await page.goto('/dashboard')
+    await page.goto('/overview')
     await page.waitForLoadState('networkidle')
     const welcomeHeading = page.getByText(/welcome back/i)
     if (

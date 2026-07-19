@@ -52,7 +52,7 @@ export function VisualiseHub() {
           />
           <RunSourceList query={search.trim().toLowerCase()} paged />
           <Link
-            to="/executions"
+            to="/runs"
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             {t('hub.browseAll')}

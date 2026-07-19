@@ -49,7 +49,7 @@ function createTestQueryClient() {
 function renderNavToggle(initialPath: string) {
   const rootRoute = createRootRoute({ component: () => <Outlet /> })
 
-  const routes = ['/dashboard', '/configure', '/executions', '/visualise'].map(
+  const routes = ['/overview', '/configure', '/runs', '/visualise'].map(
     (path) =>
       createRoute({
         getParentRoute: () => rootRoute,
@@ -74,14 +74,14 @@ function renderNavToggle(initialPath: string) {
 
 describe('NavToggle', () => {
   it('renders a navigation landmark', async () => {
-    const screen = await renderNavToggle('/dashboard')
+    const screen = await renderNavToggle('/overview')
     await expect
       .element(screen.getByRole('navigation', { name: 'Main navigation' }))
       .toBeVisible()
   })
 
   it('renders all four nav links', async () => {
-    const screen = await renderNavToggle('/dashboard')
+    const screen = await renderNavToggle('/overview')
     await expect.element(screen.getByText('Overview')).toBeVisible()
     await expect.element(screen.getByText('Configure')).toBeVisible()
     await expect.element(screen.getByText('Runs')).toBeVisible()
@@ -89,7 +89,7 @@ describe('NavToggle', () => {
   })
 
   it('marks Overview as active on /dashboard', async () => {
-    const screen = await renderNavToggle('/dashboard')
+    const screen = await renderNavToggle('/overview')
     const link = screen.getByText('Overview')
     await expect.element(link).toHaveAttribute('aria-current', 'page')
   })
@@ -101,7 +101,7 @@ describe('NavToggle', () => {
   })
 
   it('marks Runs as active on /executions', async () => {
-    const screen = await renderNavToggle('/executions')
+    const screen = await renderNavToggle('/runs')
     const link = screen.getByText('Runs')
     await expect.element(link).toHaveAttribute('aria-current', 'page')
   })
@@ -113,7 +113,7 @@ describe('NavToggle', () => {
   })
 
   it('does not mark inactive links with aria-current', async () => {
-    const screen = await renderNavToggle('/dashboard')
+    const screen = await renderNavToggle('/overview')
     const configLink = screen.getByText('Configure')
     const execLink = screen.getByText('Runs')
     await expect.element(configLink).not.toHaveAttribute('aria-current')
@@ -121,7 +121,7 @@ describe('NavToggle', () => {
   })
 
   it('shows Visualise without a badge while the basket is empty', async () => {
-    const screen = await renderNavToggle('/dashboard')
+    const screen = await renderNavToggle('/overview')
     await expect.element(screen.getByText('Visualise')).toBeVisible()
     expect(screen.getByText('0').elements()).toHaveLength(0)
   })
@@ -137,7 +137,7 @@ describe('NavToggle', () => {
       path: '/data/b',
       label: 'B',
     })
-    const screen = await renderNavToggle('/dashboard')
+    const screen = await renderNavToggle('/overview')
     await expect.element(screen.getByText('Visualise')).toBeVisible()
     await expect.element(screen.getByText('2')).toBeVisible()
   })
