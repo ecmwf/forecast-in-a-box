@@ -9,7 +9,11 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { composeExportCanvas } from '@/features/viewer/map-export'
+import {
+  canvasToPngBlob,
+  composeExportCanvas,
+  joinCanvasesHorizontally,
+} from '@/features/viewer/map-export'
 
 function mapCanvas(): HTMLCanvasElement {
   const c = document.createElement('canvas')
@@ -56,5 +60,23 @@ describe('composeExportCanvas', () => {
     })!
     expect(out.width).toBe(400)
     expect(out.height).toBeGreaterThan(200)
+  })
+})
+
+describe('joinCanvasesHorizontally', () => {
+  it('joins side by side with a gap, single canvas passes through', () => {
+    const a = mapCanvas()
+    expect(joinCanvasesHorizontally([a])).toBe(a)
+    const joined = joinCanvasesHorizontally([mapCanvas(), mapCanvas()])!
+    expect(joined.width).toBe(400 + 16 + 400)
+    expect(joined.height).toBe(200)
+    expect(joinCanvasesHorizontally([])).toBeNull()
+  })
+})
+
+describe('canvasToPngBlob', () => {
+  it('produces a PNG blob', async () => {
+    const blob = await canvasToPngBlob(mapCanvas())
+    expect(blob?.type).toBe('image/png')
   })
 })

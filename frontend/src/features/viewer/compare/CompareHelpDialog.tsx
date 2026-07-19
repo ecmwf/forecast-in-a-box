@@ -33,6 +33,7 @@ type ShortcutId =
   | 'pan'
   | 'annotate'
   | 'fit'
+  | 'copy'
   | 'export'
   | 'flicker'
   | 'loupe'
@@ -55,6 +56,7 @@ const SHORTCUTS: ReadonlyArray<{
   { keys: COMPARE_KEYS.pan.map(keyLabel), id: 'pan' },
   { keys: [keyLabel(COMPARE_KEYS.annotate)], id: 'annotate' },
   { keys: [keyLabel(COMPARE_KEYS.fit)], id: 'fit' },
+  { keys: [keyLabel(COMPARE_KEYS.copy)], id: 'copy' },
   { keys: [keyLabel(COMPARE_KEYS.export)], id: 'export' },
   { keys: [keyLabel('Space')], id: 'flicker' },
   { keys: ['Z'], id: 'loupe' },

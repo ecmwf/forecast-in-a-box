@@ -224,6 +224,7 @@
       "sidebars": "Toggle both sidebars",
       "modes": "Switch comparison mode",
       "fit": "Fit to globe",
+      "copy": "Copy the view to the clipboard",
       "export": "Export / report",
       "flicker": "Toggle flicker frame (flicker mode)",
       "loupe": "Magnifier loupe (hold)",
@@ -247,7 +248,9 @@
     "armedHint": "Click the map to add a note · Esc exits"
   },
   "toolbar": {
-    "compareCta": "Compare…"
+    "compareCta": "Compare…",
+    "copyOptions": "Copy options",
+    "copySlot": "Copy {{slot}} only"
   },
   "hub": {
     "title": "Visualise forecasts on a map",

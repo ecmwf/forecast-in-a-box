@@ -16,6 +16,8 @@
  */
 
 import {
+  ChevronDown,
+  Copy,
   Download,
   Eraser,
   FlaskConical,
@@ -37,9 +39,16 @@ import {
 } from './useCompareShortcuts'
 import { COMPARE_MODES } from './types'
 import type { LinkMode } from './useCompareSelection'
+import type { SourceSlot } from './layer-pairing'
 import type { CompareMode, CompareModeOptions } from './types'
 import type { BasemapOption } from '../ol-layers'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Popover,
   PopoverContent,
@@ -83,6 +92,8 @@ export function CompareToolbar({
   annotateArmed,
   onAnnotateToggle,
   onExport,
+  onCopy,
+  copySlots,
   basemapId,
   onBasemapChange,
   availableBasemaps,
@@ -108,6 +119,10 @@ export function CompareToolbar({
   annotateArmed: boolean
   onAnnotateToggle: () => void
   onExport: () => void
+  /** Copy the view (null) or one slot's clean image. */
+  onCopy: (only: SourceSlot | null) => void
+  /** Offer the per-slot copy menu (comparison only). */
+  copySlots: boolean
   basemapId: string
   onBasemapChange: (id: string) => void
   availableBasemaps: ReadonlyArray<BasemapOption>
@@ -312,6 +327,44 @@ export function CompareToolbar({
             <MessageSquarePlus className="h-4 w-4" />
           </Button>
           <span className="mx-1 h-5 w-px bg-border" />
+          <span className="flex items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative h-7 w-7"
+              onClick={() => onCopy(null)}
+              title={`${tExec('lens.copyMap')} (${keyLabel(COMPARE_KEYS.copy)})`}
+              aria-label={tExec('lens.copyMap')}
+            >
+              <KeyBadge label={keyLabel(COMPARE_KEYS.copy)} show={reveal} />
+              <Copy className="h-4 w-4" />
+            </Button>
+            {copySlots && (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-4 -ml-1"
+                      title={t('toolbar.copyOptions')}
+                      aria-label={t('toolbar.copyOptions')}
+                    />
+                  }
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onCopy('a')}>
+                    {t('toolbar.copySlot', { slot: 'A' })}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onCopy('b')}>
+                    {t('toolbar.copySlot', { slot: 'B' })}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </span>
           <Button
             variant="ghost"
             size="icon"
