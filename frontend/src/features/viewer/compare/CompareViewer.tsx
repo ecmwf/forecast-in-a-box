@@ -491,6 +491,47 @@ export function CompareViewer({
   // Time-step prefetch (default off — bandwidth-heavy).
   const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)
 
+  // Pinned legends, keyed `${slot}:${layerName}`.
+  const [pinnedLegends, setPinnedLegends] = useState<Set<string>>(new Set())
+  const togglePinLegend = useCallback((slot: SourceSlot, name: string) => {
+    const key = `${slot}:${name}`
+    setPinnedLegends((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+  const pinnedLegendItems = useMemo(() => {
+    return Array.from(pinnedLegends).flatMap((key) => {
+      const sep = key.indexOf(':')
+      const slot = key.slice(0, sep) as SourceSlot
+      const name = key.slice(sep + 1)
+      const source = slot === 'a' ? sourceA : sourceB
+      const base = slot === 'a' ? a.baseUrl : bBaseUrl
+      const layer = source.layers.find((l) => l.name === name)
+      const legendUrl = layer?.styles[0]?.legendUrl
+      if (base === null || !layer || !legendUrl) return []
+      return [
+        {
+          key,
+          slot,
+          title: hasB ? `${slot.toUpperCase()} · ${layer.title}` : layer.title,
+          url: rebaseLensUrl(legendUrl, base),
+        },
+      ]
+    })
+  }, [pinnedLegends, sourceA, sourceB, a.baseUrl, bBaseUrl, hasB])
+  const unpinLegend = useCallback(
+    (key: string) =>
+      setPinnedLegends((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      }),
+    [],
+  )
+
   // Sidebar collapse — same affordance as the embedded viewer.
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
@@ -815,6 +856,7 @@ export function CompareViewer({
               setEnabled: setPreloadTimeSteps,
               available: timeline.epochs.length > 1,
             }}
+            pins={{ pinned: pinnedLegends, toggle: togglePinLegend }}
             sources={{
               a: { label: a.label, baseUrl: a.baseUrl, lens: sourceA },
               b: b ? { label: b.label, baseUrl: b.baseUrl, lens: sourceB } : null,
@@ -829,6 +871,8 @@ export function CompareViewer({
               a={mapSourceA}
               b={mapSourceB}
               preload={preloadTimeSteps}
+              pinnedLegends={pinnedLegendItems}
+              onUnpinLegend={unpinLegend}
               measureMode={measureMode}
               measureClearNonce={measureClearNonce}
               overlays={overlays}
@@ -848,6 +892,8 @@ export function CompareViewer({
               b={mapSourceB}
               captureOnly={captureOnly}
               preload={preloadTimeSteps}
+              pinnedLegends={pinnedLegendItems}
+              onUnpinLegend={unpinLegend}
               mode={mode === 'side' ? 'swipe' : mode}
               options={modeOptions}
               measureMode={measureMode}

@@ -40,11 +40,13 @@ import { usePointerReadout } from '../hooks/usePointerReadout'
 import { useTimeStepPrefetch } from '../hooks/useTimeStepPrefetch'
 import { formatLatLon } from '../format'
 import { compositeMapToCanvas } from '../map-export'
+import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
 import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
 import { useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
+import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
@@ -74,6 +76,8 @@ export function SingleMapCompare({
   b,
   captureOnly = null,
   preload = false,
+  pinnedLegends = [],
+  onUnpinLegend = noop,
   mode,
   options,
   basemapId,
@@ -96,6 +100,8 @@ export function SingleMapCompare({
   captureOnly?: SourceSlot | null
   /** Prefetch every active layer × time step into the HTTP cache. */
   preload?: boolean
+  pinnedLegends?: ReadonlyArray<PinnedLegendItem>
+  onUnpinLegend?: (key: string) => void
   mode: SingleMapMode
   options: CompareModeOptions
   basemapId: string
@@ -606,6 +612,7 @@ export function SingleMapCompare({
 
       <LoupeOverlay containerRef={containerRef} />
       <OverlayHoverCard hover={overlayHover} />
+      <PinnedLegendsBar items={pinnedLegends} onUnpin={onUnpinLegend} />
 
       {pointer && (
         <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-border bg-background/90 px-2.5 py-1 font-mono text-xs tabular-nums shadow-sm backdrop-blur-sm">

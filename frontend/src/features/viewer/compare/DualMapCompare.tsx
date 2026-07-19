@@ -25,11 +25,13 @@ import { usePointerReadout } from '../hooks/usePointerReadout'
 import { useTimeStepPrefetch } from '../hooks/useTimeStepPrefetch'
 import { formatLatLon } from '../format'
 import { compositeMapToCanvas } from '../map-export'
+import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
 import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
 import { useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
+import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
@@ -43,11 +45,15 @@ const noop = () => {}
 /** Cursor position as container fractions, mirrored across panels. */
 type CrossPosition = { x: number; y: number } | null
 
+type SlotLegendItem = PinnedLegendItem & { slot: SourceSlot }
+
 export function DualMapCompare({
   view,
   a,
   b,
   preload = false,
+  pinnedLegends = [],
+  onUnpinLegend = noop,
   basemapId,
   basemapOpacity,
   measureMode,
@@ -65,6 +71,8 @@ export function DualMapCompare({
   b: CompareMapSource
   /** Prefetch every active layer × time step into the HTTP cache. */
   preload?: boolean
+  pinnedLegends?: ReadonlyArray<SlotLegendItem>
+  onUnpinLegend?: (key: string) => void
   basemapId: string
   basemapOpacity: number
   measureMode: MeasureMode
@@ -126,6 +134,8 @@ export function DualMapCompare({
         source={a}
         view={view}
         preload={preload}
+        pinnedLegends={pinnedLegends}
+        onUnpinLegend={onUnpinLegend}
         cross={cross}
         onCross={setCross}
         basemapId={basemapId}
@@ -144,6 +154,8 @@ export function DualMapCompare({
         source={b}
         view={view}
         preload={preload}
+        pinnedLegends={pinnedLegends}
+        onUnpinLegend={onUnpinLegend}
         cross={cross}
         onCross={setCross}
         basemapId={basemapId}
@@ -166,6 +178,8 @@ function DualMapPanel({
   source,
   view,
   preload,
+  pinnedLegends,
+  onUnpinLegend,
   cross,
   onCross,
   basemapId,
@@ -183,6 +197,8 @@ function DualMapPanel({
   source: CompareMapSource
   view: View
   preload: boolean
+  pinnedLegends: ReadonlyArray<SlotLegendItem>
+  onUnpinLegend: (key: string) => void
   cross: CrossPosition
   onCross: (pos: CrossPosition) => void
   basemapId: string
@@ -309,6 +325,10 @@ function DualMapPanel({
       />
       <LoupeOverlay containerRef={containerRef} />
       <OverlayHoverCard hover={overlayHover} />
+      <PinnedLegendsBar
+        items={pinnedLegends.filter((i) => i.slot === source.slot)}
+        onUnpin={onUnpinLegend}
+      />
       {pointer && (
         <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-border bg-background/90 px-2.5 py-1 font-mono text-xs tabular-nums shadow-sm backdrop-blur-sm">
           {formatLatLon(pointer.lat, pointer.lon)}
