@@ -10,7 +10,7 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { ComparePage } from '@/features/compare/components/ComparePage'
+import { VisualisePage } from '@/features/visualise/components/VisualisePage'
 
 /**
  * Visualisation URL state — the shareable projection of a view.
@@ -29,6 +29,6 @@ const visualiseSearchSchema = z.object({
 })
 
 export const Route = createFileRoute('/_authenticated/visualise')({
-  component: ComparePage,
+  component: VisualisePage,
   validateSearch: visualiseSearchSchema,
 })

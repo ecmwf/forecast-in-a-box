@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { parseGeojsonOverlay } from '@/features/viewer/compare/overlays'
+import { parseGeojsonOverlay } from '@/features/viewer/geo/overlays'
 
 const VALID = JSON.stringify({
   type: 'FeatureCollection',

@@ -26,7 +26,7 @@ import type {
   LensInstanceDetailResponse,
   LensStatus,
 } from '@/api/types/lens.types'
-import type { LensPathMatch } from '@/features/compare/hooks/useLensPathIndex'
+import type { LensPathMatch } from '@/features/visualise/hooks/useLensPathIndex'
 import { useLensList, useStopLens } from '@/api/hooks/useLens'
 import { buildLensBaseUrl, buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import { showToast } from '@/lib/toast'
@@ -42,8 +42,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { P } from '@/components/base/typography'
-import { AddToComparisonButton } from '@/features/compare/components/AddToComparisonButton'
-import { useLensPathIndex } from '@/features/compare/hooks/useLensPathIndex'
+import { AddToComparisonButton } from '@/features/visualise/components/AddToComparisonButton'
+import { useLensPathIndex } from '@/features/visualise/hooks/useLensPathIndex'
 
 const WmsViewer = lazy(() => import('./WmsViewer'))
 
@@ -178,7 +178,7 @@ function ActiveLensRow({
   isStopping: boolean
 }) {
   const { t } = useTranslation('executions')
-  const { t: tCompare } = useTranslation('compare')
+  const { t: tCompare } = useTranslation('visualise')
   const path =
     typeof lens.lens_params.local_path === 'string'
       ? lens.lens_params.local_path

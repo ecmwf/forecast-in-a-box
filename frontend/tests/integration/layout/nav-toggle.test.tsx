@@ -30,7 +30,7 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { NavToggle } from '@/components/layout/NavToggle'
-import { useComparisonStore } from '@/features/compare/stores/comparisonStore'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import i18n from '@/lib/i18n'
 
 function createTestQueryClient() {

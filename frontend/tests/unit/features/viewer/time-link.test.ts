@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
-import { buildSourceTimeIndex } from '@/features/viewer/compare/compare-timeline'
+import { buildSourceTimeIndex } from '@/features/viewer/geo/compare-timeline'
 import {
   defaultToleranceMs,
   effectiveAvailability,
@@ -18,7 +18,7 @@ import {
   medianStepMs,
   offsetBounds,
   resolveSourceTime,
-} from '@/features/viewer/compare/time-link'
+} from '@/features/viewer/geo/time-link'
 
 const HOUR = 3600_000
 

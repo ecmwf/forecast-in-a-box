@@ -31,7 +31,7 @@ import schedulesEN from '@/locales/en/schedules.json'
 import configureEN from '@/locales/en/configure.json'
 import glyphsEN from '@/locales/en/glyphs.json'
 import journalEN from '@/locales/en/journal.json'
-import compareEN from '@/locales/en/compare.json'
+import visualiseEN from '@/locales/en/visualise.json'
 
 // Translation resources organized by namespace
 const resources = {
@@ -50,7 +50,7 @@ const resources = {
     configure: configureEN,
     glyphs: glyphsEN,
     journal: journalEN,
-    compare: compareEN,
+    visualise: visualiseEN,
   },
 }
 
@@ -79,7 +79,7 @@ i18n
       'configure',
       'glyphs',
       'journal',
-      'compare',
+      'visualise',
     ],
 
     // Interpolation options

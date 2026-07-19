@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { annotationVisibleOn } from '@/features/viewer/compare/annotations'
+import { annotationVisibleOn } from '@/features/viewer/geo/annotations'
 
 describe('annotationVisibleOn', () => {
   it('single map shows everything', () => {

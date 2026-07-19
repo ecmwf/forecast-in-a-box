@@ -16,7 +16,7 @@ import {
   buildSourceTimeIndex,
   locateEpoch,
   overlapRange,
-} from '@/features/viewer/compare/compare-timeline'
+} from '@/features/viewer/geo/compare-timeline'
 
 const timedLayer = (name: string, raw: string): ParsedLayer => ({
   name,

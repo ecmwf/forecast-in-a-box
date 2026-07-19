@@ -36,8 +36,8 @@ import {
 import { buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
-import { AddToComparisonButton } from '@/features/compare/components/AddToComparisonButton'
-import { SLOT_B_OFF, entryRef } from '@/features/compare/entry-ref'
+import { AddToComparisonButton } from '@/features/visualise/components/AddToComparisonButton'
+import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
 import { showToast } from '@/lib/toast'
 import { cn, copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -160,7 +160,7 @@ function StoredOutputRowItem({
   const stopMutation = useStopLens()
   const dirQuery = useStoredDirPath(jobId, row.taskId, row.isAvailable)
   const dirPath = dirQuery.data
-  // The row owns its lens instance; the viewer sheet only displays it.
+  // The row owns its lens instance.
   const [lensId, setLensId] = useState<string | null>(null)
   const statusQuery = useLensStatus(lensId ?? undefined)
 
