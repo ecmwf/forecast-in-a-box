@@ -41,7 +41,8 @@ const log = createLogger('CompareExportDialog')
 
 export interface CompareExportMeta {
   labelA: string
-  labelB: string
+  /** null when exporting a solo view. */
+  labelB: string | null
 }
 
 export interface ExportLegendSpec {
@@ -170,7 +171,11 @@ export function CompareExportDialog({
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={`${meta.labelA} vs ${meta.labelB}`}
+              placeholder={
+                meta.labelB === null
+                  ? meta.labelA
+                  : `${meta.labelA} vs ${meta.labelB}`
+              }
             />
           </label>
         </div>

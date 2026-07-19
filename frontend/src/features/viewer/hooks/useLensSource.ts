@@ -51,7 +51,8 @@ export interface LensSource {
   retry: () => void
 }
 
-export function useLensSource(baseUrl: string): LensSource {
+/** `baseUrl: null` yields an inert source: no fetch, empty layers. */
+export function useLensSource(baseUrl: string | null): LensSource {
   const [layers, setLayers] = useState<Array<ParsedLayer>>([])
   const [decorationLayers, setDecorationLayers] = useState<Array<ParsedLayer>>(
     [],
@@ -60,13 +61,32 @@ export function useLensSource(baseUrl: string): LensSource {
     null,
   )
   const [error, setError] = useState<string | null>(null)
-  const [loadingLayers, setLoadingLayers] = useState(true)
+  const [loadingLayers, setLoadingLayers] = useState(baseUrl !== null)
 
   // `retryNonce` re-triggers the fetch effect on manual retry.
   const [retryNonce, setRetryNonce] = useState(0)
   const [retrying, setRetrying] = useState(false)
 
+  // Sync `loadingLayers` with baseUrl changes during render — the fetch
+  // effect flips it too late for same-commit consumers (the compare
+  // auto-unlink would see a stale not-loading source the instant B is
+  // added or swapped and wrongly drop the linked selection).
+  const [prevBaseUrl, setPrevBaseUrl] = useState<string | null>(baseUrl)
+  if (baseUrl !== prevBaseUrl) {
+    setPrevBaseUrl(baseUrl)
+    setLoadingLayers(baseUrl !== null)
+  }
+
   useEffect(() => {
+    if (baseUrl === null) {
+      setLayers([])
+      setDecorationLayers([])
+      setBbox(null)
+      setError(null)
+      setLoadingLayers(false)
+      setRetrying(false)
+      return
+    }
     const ac = new AbortController()
     const delaysMs = CAPABILITIES_RETRY_DELAYS_MS
     setError(null)

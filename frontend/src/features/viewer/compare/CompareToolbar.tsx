@@ -19,6 +19,7 @@ import {
   Download,
   Eraser,
   FlaskConical,
+  GitCompareArrows,
   Globe2,
   HelpCircle,
   Layers,
@@ -66,6 +67,8 @@ function KeyBadge({ label, show }: { label: string; show: boolean }) {
 }
 
 export function CompareToolbar({
+  solo = false,
+  onRequestAddSource,
   mode,
   onModeChange,
   linkMode,
@@ -87,6 +90,9 @@ export function CompareToolbar({
   onBasemapOpacityChange,
   onHelp,
 }: {
+  /** Single-source: modes + link hidden, "Compare…" CTA in their place. */
+  solo?: boolean
+  onRequestAddSource?: () => void
   mode: CompareMode
   onModeChange: (mode: CompareMode) => void
   linkMode: LinkMode
@@ -116,6 +122,20 @@ export function CompareToolbar({
   return (
     <div className="space-y-2 rounded-md border border-border bg-muted/40 px-2.5 py-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
+        {solo ? (
+          // The progressive-disclosure hinge: where the mode switcher will
+          // appear once a second source exists.
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={onRequestAddSource}
+            disabled={!onRequestAddSource}
+          >
+            <GitCompareArrows className="h-3.5 w-3.5" />
+            {t('toolbar.compareCta')}
+          </Button>
+        ) : (
         <div
           role="group"
           aria-label={t('page.title')}
@@ -150,25 +170,30 @@ export function CompareToolbar({
             </button>
           ))}
         </div>
+        )}
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm">
-            <Switch
-              size="sm"
-              checked={linkMode === 'linked'}
-              disabled={linkDisabled}
-              onCheckedChange={(checked) =>
-                onLinkModeChange(checked ? 'linked' : 'unlinked')
-              }
-              aria-label={t('link.toggleAria')}
-            />
-            <span
-              className={cn(
-                linkMode === 'linked' ? 'font-medium' : 'text-muted-foreground',
-              )}
-            >
-              {linkMode === 'linked' ? t('link.linked') : t('link.unlinked')}
-            </span>
-          </label>
+          {!solo && (
+            <label className="flex items-center gap-2 text-sm">
+              <Switch
+                size="sm"
+                checked={linkMode === 'linked'}
+                disabled={linkDisabled}
+                onCheckedChange={(checked) =>
+                  onLinkModeChange(checked ? 'linked' : 'unlinked')
+                }
+                aria-label={t('link.toggleAria')}
+              />
+              <span
+                className={cn(
+                  linkMode === 'linked'
+                    ? 'font-medium'
+                    : 'text-muted-foreground',
+                )}
+              >
+                {linkMode === 'linked' ? t('link.linked') : t('link.unlinked')}
+              </span>
+            </label>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -311,7 +336,13 @@ export function CompareToolbar({
           </Button>
         </div>
       </div>
-      <ModeActionRow mode={mode} options={options} onChange={onOptionsChange} />
+      {!solo && (
+        <ModeActionRow
+          mode={mode}
+          options={options}
+          onChange={onOptionsChange}
+        />
+      )}
     </div>
   )
 }

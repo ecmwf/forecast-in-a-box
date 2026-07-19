@@ -562,3 +562,92 @@ describe('CompareViewer', () => {
     expect(screen.getByText('2 m temperature').elements()).toHaveLength(0)
   })
 })
+
+/** Same pair, but B mounts only when `withB` flips — the progressive
+ *  single→comparison transition. */
+function ProgressiveHarness({
+  portA,
+  portB,
+  withB,
+}: {
+  portA: number
+  portB: number
+  withB: boolean
+}) {
+  const [mode, setMode] = useState<CompareMode>('swipe')
+  return (
+    <I18nextProvider i18n={i18n}>
+      <div style={{ width: 1100, height: 700 }}>
+        <CompareViewer
+          a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
+          b={
+            withB
+              ? { baseUrl: `http://localhost:${portB}`, label: 'Run B' }
+              : null
+          }
+          mode={mode}
+          onModeChange={setMode}
+        />
+      </div>
+    </I18nextProvider>
+  )
+}
+
+describe('CompareViewer solo', () => {
+  it('runs with a single source: no comparison controls, layers work', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(
+      <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
+    )
+
+    // A's layers are browsable; comparison affordances are absent.
+    await expect.element(screen.getByText('2 m temperature')).toBeVisible()
+    await expect.element(screen.getByText('Compare…')).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Swipe' }).elements(),
+    ).toHaveLength(0)
+    expect(screen.getByRole('switch').elements()).toHaveLength(0)
+    expect(
+      screen.getByRole('img', { name: 'Availability for source B' }).elements(),
+    ).toHaveLength(0)
+
+    // Activating a layer builds A's own timeline (T00, T06).
+    await screen.getByText('2 m temperature').first().click()
+    await expect.element(screen.getByText('1 / 2')).toBeVisible()
+    await expect
+      .element(screen.getByRole('img', { name: 'Availability for source A' }))
+      .toBeInTheDocument()
+    // Global opacity stays; the per-source tier is comparison-only.
+    await expect
+      .element(screen.getByRole('slider', { name: /Global opacity/ }))
+      .toBeInTheDocument()
+    expect(
+      screen.getByRole('slider', { name: /All of A/ }).elements(),
+    ).toHaveLength(0)
+  })
+
+  it('keeps selection and time when B arrives; comparison controls appear', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(
+      <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
+    )
+    await screen.getByText('2 m temperature').first().click()
+    await expect.element(screen.getByText('1 / 2')).toBeVisible()
+
+    await screen.rerender(
+      <ProgressiveHarness portA={portA} portB={portB} withB />,
+    )
+
+    // Mode switcher and link toggle materialize in place.
+    await expect
+      .element(screen.getByRole('button', { name: 'Swipe' }))
+      .toBeVisible()
+    await expect.element(screen.getByRole('switch')).toBeInTheDocument()
+    // Union timeline (T00,T06,T12) keeps the selected instant, and the
+    // solo selection projects onto B — its T00 gap badge proves both.
+    await expect.element(screen.getByText('1 / 3')).toBeVisible()
+    await expect
+      .element(screen.getByText('No data at this time — B'))
+      .toBeVisible()
+  })
+})
