@@ -9,11 +9,12 @@
  */
 
 /**
- * Primary section nav (Overview / Configure / Runs / Visualise). A fifth
- * item for the open run appears on an execution detail page.
+ * Primary section nav (Overview / Configure / Runs / Visualise). On a run
+ * detail page the open run appears as a breadcrumb child of Runs.
  */
 
 import {
+  ChevronRight,
   Earth,
   FileText,
   LayoutDashboard,
@@ -29,7 +30,7 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   {
-    to: '/dashboard',
+    to: '/overview',
     labelKey: 'nav.overview',
     Icon: LayoutDashboard,
     exact: false,
@@ -41,7 +42,7 @@ const navItems = [
     exact: false,
   },
   // Exact: an open run highlights the run item, not this one — "Runs" stays a link to the list.
-  { to: '/executions', labelKey: 'nav.executions', Icon: Play, exact: true },
+  { to: '/runs', labelKey: 'nav.executions', Icon: Play, exact: true },
 ] as const
 
 const itemClass = cn(
@@ -53,25 +54,34 @@ const itemClass = cn(
 const activeItemClass =
   'bg-background text-foreground shadow-sm hover:bg-background'
 
-/** The fourth nav item — the execution run currently open. */
+/**
+ * The open run, rendered as a breadcrumb child of Runs (chevron + compact
+ * muted style) so it doesn't read as another main tab.
+ */
 function RunNavItem({ jobId }: { jobId: string }) {
   const { data: jobData } = useJobStatus(jobId)
   const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
   const label = fableData?.display_name?.trim() || jobId.slice(0, 8)
 
   return (
-    <Link
-      to="/executions/$jobId"
-      params={{ jobId }}
-      activeOptions={{ includeSearch: false }}
-      className={cn(itemClass, 'max-w-40')}
-      activeProps={{ className: activeItemClass, 'aria-current': 'page' }}
-    >
-      <FileText className="h-4 w-4 shrink-0" />
-      <span className="min-w-0 truncate" title={label}>
-        {label}
-      </span>
-    </Link>
+    <span className="flex min-w-0 items-center">
+      <ChevronRight
+        aria-hidden="true"
+        className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50"
+      />
+      <Link
+        to="/runs/$jobId"
+        params={{ jobId }}
+        activeOptions={{ includeSearch: false }}
+        className={cn(itemClass, 'max-w-40 gap-1 px-2 text-xs')}
+        activeProps={{ className: activeItemClass, 'aria-current': 'page' }}
+      >
+        <FileText className="h-3.5 w-3.5 shrink-0" />
+        <span className="min-w-0 truncate" title={label}>
+          {label}
+        </span>
+      </Link>
+    </span>
   )
 }
 
@@ -103,7 +113,7 @@ function VisualiseNavItem() {
 
 export function NavToggle() {
   const { t } = useTranslation('common')
-  // `jobId` is only present on the /executions/$jobId route.
+  // `jobId` is only present on the /runs/$jobId route.
   const { jobId } = useParams({ strict: false })
 
   return (
@@ -123,8 +133,9 @@ export function NavToggle() {
           {t(labelKey)}
         </Link>
       ))}
-      <VisualiseNavItem />
+      {/* Child of Runs (last static item) — before the Visualise tab. */}
       {jobId && <RunNavItem jobId={jobId} />}
+      <VisualiseNavItem />
     </nav>
   )
 }

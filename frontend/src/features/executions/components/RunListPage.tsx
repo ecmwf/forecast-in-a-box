@@ -41,7 +41,7 @@ const EXECUTIONS_FILTERS: ReadonlyArray<RunFilter> = [
   'bookmarked',
 ]
 
-const route = getRouteApi('/_authenticated/executions/')
+const route = getRouteApi('/_authenticated/runs/')
 
 export function RunListPage() {
   const { t } = useTranslation('executions')

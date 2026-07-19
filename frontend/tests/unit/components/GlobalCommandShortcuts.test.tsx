@@ -47,7 +47,7 @@ describe('GlobalCommandShortcuts', () => {
 
     await userEvent.keyboard('gd')
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/dashboard' })
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/overview' })
   })
 
   it('navigates to executions on the "g e" sequence', async () => {
@@ -59,7 +59,7 @@ describe('GlobalCommandShortcuts', () => {
 
     await userEvent.keyboard('ge')
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/executions' })
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/runs' })
   })
 
   it('stays inert while a text input is focused', async () => {

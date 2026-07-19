@@ -19,7 +19,7 @@ import type { Page } from '@playwright/test'
 
 async function establishSession(page: Page) {
   await page.goto('/')
-  await page.waitForURL(/dashboard/, { timeout: 15000 })
+  await page.waitForURL(/overview/, { timeout: 15000 })
   await page.waitForLoadState('networkidle')
 }
 

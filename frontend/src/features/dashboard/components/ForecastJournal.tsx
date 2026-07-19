@@ -97,7 +97,7 @@ export function ForecastJournal({ variant, shadow }: ForecastJournalProps) {
       footer={
         <div className="border-t border-border p-4 text-center">
           <Link
-            to="/executions"
+            to="/runs"
             className="inline-flex items-center text-sm font-medium text-primary hover:underline"
           >
             {t('viewAll')}

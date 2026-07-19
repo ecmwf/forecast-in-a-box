@@ -43,7 +43,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       category: 'Navigation',
       keywords: ['home', 'dashboard', 'main'],
       hotkey: ['G', 'D'],
-      action: () => navigate({ to: '/dashboard' }),
+      action: () => navigate({ to: '/overview' }),
     },
     {
       id: 'nav-configure',
@@ -63,7 +63,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       category: 'Navigation',
       keywords: ['executions', 'history', 'past', 'runs', 'journal', 'jobs'],
       hotkey: ['G', 'E'],
-      action: () => navigate({ to: '/executions' }),
+      action: () => navigate({ to: '/runs' }),
     },
     {
       id: 'nav-visualise',

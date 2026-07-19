@@ -433,7 +433,7 @@ export function FableBuilderPage({
         <Button
           variant="outline"
           nativeButton={false}
-          render={<Link to="/dashboard" />}
+          render={<Link to="/overview" />}
         >
           {t('page.backToDashboard')}
         </Button>

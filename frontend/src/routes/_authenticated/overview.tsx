@@ -58,6 +58,6 @@ function DashboardPage() {
   )
 }
 
-export const Route = createFileRoute('/_authenticated/dashboard')({
+export const Route = createFileRoute('/_authenticated/overview')({
   component: DashboardPage,
 })

@@ -239,7 +239,7 @@ export function FableBuilderHeader({
         <div className="grid grid-cols-[1fr_auto] items-center gap-2 sm:gap-4">
           {/* Left: Back button + title */}
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <Link to="/dashboard">
+            <Link to="/overview">
               <Button variant="ghost" size="icon" className="shrink-0">
                 <ArrowLeft className="h-4 w-4" />
               </Button>

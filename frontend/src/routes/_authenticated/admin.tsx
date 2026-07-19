@@ -49,12 +49,12 @@ export const Route = createFileRoute('/_authenticated/admin')({
     } catch (error) {
       log.error('Failed to verify admin access:', error)
       showToast.error(i18n.t('plugins:admin.verifyAccessError'))
-      throw redirect({ to: '/dashboard' })
+      throw redirect({ to: '/overview' })
     }
 
     if (!user.is_superuser) {
       log.warn('Non-superuser attempted to access admin route')
-      throw redirect({ to: '/dashboard' })
+      throw redirect({ to: '/overview' })
     }
   },
   component: AdminLayout,

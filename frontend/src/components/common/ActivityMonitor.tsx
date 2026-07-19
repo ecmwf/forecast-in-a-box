@@ -273,7 +273,7 @@ export function ActivityMonitor() {
         {/* Footer */}
         <div className="border-t border-border px-4 py-2">
           <Link
-            to="/executions"
+            to="/runs"
             className="flex items-center justify-between text-sm text-muted-foreground hover:text-foreground"
           >
             {t('activity.viewAll')}

@@ -40,7 +40,7 @@ describe('cn', () => {
 
 describe('isValidInternalRedirect', () => {
   it('accepts valid internal paths', () => {
-    expect(isValidInternalRedirect('/dashboard')).toBe(true)
+    expect(isValidInternalRedirect('/overview')).toBe(true)
     expect(isValidInternalRedirect('/users/profile')).toBe(true)
     expect(isValidInternalRedirect('/')).toBe(true)
     expect(isValidInternalRedirect('/path?query=value')).toBe(true)
@@ -90,7 +90,7 @@ describe('isExternalUrl', () => {
   })
 
   it('identifies internal paths as non-external', () => {
-    expect(isExternalUrl('/dashboard')).toBe(false)
+    expect(isExternalUrl('/overview')).toBe(false)
     expect(isExternalUrl('/users/profile')).toBe(false)
     expect(isExternalUrl('/')).toBe(false)
   })

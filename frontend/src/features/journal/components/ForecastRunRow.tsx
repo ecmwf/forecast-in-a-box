@@ -75,7 +75,7 @@ export const ForecastRunRow = memo(function ({
         <div className="min-w-0 grow">
           <div className="mb-1 flex min-w-0 items-center gap-1.5">
             <Link
-              to="/executions/$jobId"
+              to="/runs/$jobId"
               params={{ jobId: run.runId }}
               className="min-w-0 truncate text-sm font-medium hover:underline"
             >
@@ -251,7 +251,7 @@ function RunAction({ run }: { run: ForecastRunViewModel }) {
 
   return (
     <Link
-      to="/executions/$jobId"
+      to="/runs/$jobId"
       params={{ jobId: run.runId }}
       className={cn('text-sm font-semibold hover:underline', variant.className)}
     >
