@@ -15,10 +15,12 @@ import { ComparePage } from '@/features/compare/components/ComparePage'
 /**
  * Comparison URL state — the shareable projection of a comparison.
  * `a`/`b` are entry refs (`run:<jobId>~<taskId>` | `path:<path>` |
- * `wms:<url>`); the basket itself is localStorage, and lens ids/ports are
- * runtime-only. Unlike other routes, `a`/`b` are deliberately always
- * materialized once sources are active: the "default pair" depends on
- * client-local basket state, so a shared URL must pin it explicitly.
+ * `wms:<url>`); `b` may also be the literal `off` (deliberate
+ * single-source view, see SLOT_B_OFF). The basket itself is localStorage,
+ * and lens ids/ports are runtime-only. Unlike other routes, `a`/`b` are
+ * deliberately always materialized once sources are active: the "default
+ * pair" depends on client-local basket state, so a shared URL must pin it
+ * explicitly.
  */
 const compareSearchSchema = z.object({
   a: z.string().optional(),

@@ -22,7 +22,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
-import { decodeEntryRef, entryRef } from '../entry-ref'
+import { SLOT_B_OFF, decodeEntryRef, entryRef } from '../entry-ref'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { jobKeys } from '@/api/hooks/useJobs'
 import { getJobStatus } from '@/api/endpoints/job'
@@ -71,7 +71,7 @@ export function useHydrateComparisonFromUrl(): void {
     }
 
     for (const ref of [search.a, search.b]) {
-      if (!ref || processedRef.current.has(ref)) continue
+      if (!ref || ref === SLOT_B_OFF || processedRef.current.has(ref)) continue
       if (entries.some((e) => entryRef(e) === ref)) continue
       processedRef.current.add(ref)
 
