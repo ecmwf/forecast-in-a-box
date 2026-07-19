@@ -64,6 +64,7 @@ import { MapTitleBar } from '@/features/viewer/components/MapTitleBar'
 import { PinnedLegendsBar } from '@/features/viewer/components/PinnedLegendsBar'
 import { WmsOverviewPanel } from '@/features/viewer/components/WmsOverviewPanel'
 import { showToast } from '@/lib/toast'
+import { copyToClipboard } from '@/lib/clipboard'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -367,21 +368,14 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
     }
   }, [exportPng, t])
 
-  const copyMap = useCallback(async () => {
-    try {
-      const blob = await exportPng()
-      if (!blob) {
+  const copyMap = useCallback(() => {
+    // Unawaited promise: the item must be built inside the gesture (Safari).
+    copyToClipboard('image/png', exportPng())
+      .then(() => showToast.success(t('lens.mapCopied')))
+      .catch((err: unknown) => {
+        log.error('Map copy failed', { error: err })
         showToast.error(t('lens.mapCopyFailed'))
-        return
-      }
-      await navigator.clipboard.write([
-        new ClipboardItem({ [blob.type]: blob }),
-      ])
-      showToast.success(t('lens.mapCopied'))
-    } catch (err) {
-      log.error('Map copy failed', { error: err })
-      showToast.error(t('lens.mapCopyFailed'))
-    }
+      })
   }, [exportPng, t])
 
   // -------- Right-sidebar filter state --------
