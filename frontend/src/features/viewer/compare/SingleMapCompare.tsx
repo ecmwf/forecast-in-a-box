@@ -69,6 +69,7 @@ export function SingleMapCompare({
   view,
   a,
   b,
+  captureOnly = null,
   mode,
   options,
   basemapId,
@@ -87,6 +88,8 @@ export function SingleMapCompare({
   a: CompareMapSource
   /** null runs the map solo: no B stack, clips, divider, or mode UI. */
   b: CompareMapSource | null
+  /** Render only this slot (mode effects/clips off) for a per-slot copy. */
+  captureOnly?: SourceSlot | null
   mode: SingleMapMode
   options: CompareModeOptions
   basemapId: string
@@ -135,10 +138,14 @@ export function SingleMapCompare({
   })
 
   // Stack opacity = base tier (global × source) × mode factor; a time gap
-  // hides the stack outright. Mode factors are comparison-only.
+  // hides the stack outright. Mode factors are comparison-only. A pending
+  // per-slot capture shows only that slot at base opacity (no clips).
   let masterA = a.masterOpacity
   let masterB = b?.masterOpacity ?? 0
-  if (!solo) {
+  if (captureOnly) {
+    if (captureOnly !== 'a') masterA = 0
+    if (captureOnly !== 'b') masterB = 0
+  } else if (!solo) {
     if (mode === 'flicker') {
       masterA = flickerFrame === 'a' ? masterA : 0
       masterB = flickerFrame === 'b' ? masterB : 0
@@ -149,7 +156,8 @@ export function SingleMapCompare({
   if (a.hiddenAtTime) masterA = 0
   if (b?.hiddenAtTime) masterB = 0
 
-  const needsClip = !solo && (mode === 'swipe' || mode === 'spy')
+  const needsClip =
+    !solo && !captureOnly && (mode === 'swipe' || mode === 'spy')
 
   // Per-stack network activity for the slot-tag spinners.
   const [loadingCount, setLoadingCount] = useState<Record<SourceSlot, number>>({
@@ -242,24 +250,29 @@ export function SingleMapCompare({
       return new Promise((resolve) => {
         map.once('rendercomplete', () => {
           const canvas = compositeMapToCanvas(map.getTargetElement())
+          // Per-slot capture and solo describe one source; the combined
+          // view carries both labels/instants.
+          const single = captureOnly ?? (bLabel === null ? 'a' : null)
           const timeLabel =
-            bLabel === null || a.timeLabel === bTimeLabel
-              ? a.timeLabel
-              : [
-                  a.timeLabel ? `A ${a.timeLabel}` : null,
-                  bTimeLabel ? `B ${bTimeLabel}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ') || null
+            single !== null
+              ? (single === 'a' ? a.timeLabel : bTimeLabel)
+              : a.timeLabel === bTimeLabel
+                ? a.timeLabel
+                : [
+                    a.timeLabel ? `A ${a.timeLabel}` : null,
+                    bTimeLabel ? `B ${bTimeLabel}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || null
           resolve(
             canvas
               ? [
                   {
                     label:
-                      bLabel === null
-                        ? a.label
+                      single !== null
+                        ? (single === 'a' ? a.label : (bLabel ?? ''))
                         : `A · ${a.label}  |  B · ${bLabel}`,
-                    slot: bLabel === null ? 'a' : null,
+                    slot: single,
                     canvas,
                     timeLabel,
                   },
@@ -271,7 +284,15 @@ export function SingleMapCompare({
       })
     })
     return () => onRegisterCapture(null)
-  }, [mapRef, a.label, bLabel, a.timeLabel, bTimeLabel, onRegisterCapture])
+  }, [
+    mapRef,
+    a.label,
+    bLabel,
+    a.timeLabel,
+    bTimeLabel,
+    captureOnly,
+    onRegisterCapture,
+  ])
 
   // -------- Canvas clips (swipe / spy) --------
   // BOTH stacks are clipped to complementary regions so the comparison is

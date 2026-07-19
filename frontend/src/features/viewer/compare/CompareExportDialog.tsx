@@ -18,11 +18,9 @@
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { composeExportCanvas, loadLegendImage } from '../map-export'
-import { annotationVisibleOn } from './annotations'
+import { composeCaptures } from './export-pipeline'
+import type { ExportLegendSpec } from './export-pipeline'
 import type { MapAnnotation } from './annotations'
-import type { ExportNote, LegendExportItem } from '../map-export'
-import type { SourceSlot } from './layer-pairing'
 import type { CaptureResult } from './types'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,37 +41,6 @@ export interface CompareExportMeta {
   labelA: string
   /** null when exporting a solo view. */
   labelB: string | null
-}
-
-export interface ExportLegendSpec {
-  slot: SourceSlot
-  title: string
-  url: string
-}
-
-interface LoadedLegend extends LegendExportItem {
-  slot: SourceSlot
-}
-
-/** Legends relevant to one capture: its own slot, or all for combined. */
-function legendsFor(
-  capture: CaptureResult,
-  legends: ReadonlyArray<LoadedLegend>,
-): Array<LoadedLegend> {
-  return legends.filter((l) => capture.slot === null || l.slot === capture.slot)
-}
-
-/** Notes for one capture — the annotations its panel actually shows,
- *  keeping their global numbering. */
-function notesFor(
-  capture: CaptureResult,
-  annotations: ReadonlyArray<MapAnnotation>,
-): Array<ExportNote> {
-  return annotations.flatMap((a, i) =>
-    annotationVisibleOn(a, capture.slot)
-      ? [{ number: i + 1, text: a.text }]
-      : [],
-  )
 }
 
 export function CompareExportDialog({
@@ -97,64 +64,29 @@ export function CompareExportDialog({
   const { t } = useTranslation('compare')
   const [title, setTitle] = useState('')
 
-  const withCaptures = async (
-    use: (
-      captures: Array<CaptureResult>,
-      loadedLegends: Array<LoadedLegend>,
-    ) => void,
-  ) => {
+  const downloadPng = async () => {
     if (!capture) return
     try {
-      const [captures, images] = await Promise.all([
-        capture(),
-        Promise.all(legends.map((l) => loadLegendImage(l.url))),
-      ])
-      if (captures.length === 0) {
-        showToast.error(t('export.failed'))
-        return
-      }
-      // Failed legend loads are dropped silently — the map still exports.
-      const loadedLegends = legends.flatMap((spec, i) => {
-        const image = images[i]
-        return image
-          ? [
-              {
-                slot: spec.slot,
-                title: `${spec.slot.toUpperCase()} · ${spec.title}`,
-                image,
-              },
-            ]
-          : []
+      const canvases = await composeCaptures({
+        capture,
+        legends,
+        annotations,
+        title,
       })
-      use(captures, loadedLegends)
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      canvases.forEach((composed, i) => {
+        const a = document.createElement('a')
+        a.href = composed.toDataURL('image/png')
+        a.download = `compare-${stamp}${canvases.length > 1 ? `-${i + 1}` : ''}.png`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      })
     } catch (err) {
       log.error('Comparison export failed', { error: err })
       showToast.error(t('export.failed'))
     }
   }
-
-  const downloadPng = () =>
-    withCaptures((captures, loadedLegends) => {
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-      captures.forEach((c, i) => {
-        // Bake title + time + this capture's legends so the PNG is
-        // self-describing outside the report.
-        const composed = composeExportCanvas(c.canvas, {
-          titles: [title.trim() || c.label],
-          timeText: c.timeLabel,
-          titleBarEnabled: true,
-          legendItems: legendsFor(c, loadedLegends),
-          notes: notesFor(c, annotations),
-        })
-        if (!composed) return
-        const a = document.createElement('a')
-        a.href = composed.toDataURL('image/png')
-        a.download = `compare-${stamp}${captures.length > 1 ? `-${i + 1}` : ''}.png`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-      })
-    })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

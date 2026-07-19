@@ -14,6 +14,7 @@
  *   B          toggle both sidebars
  *   1–5        switch comparison mode
  *   F          fit to globe
+ *   C          copy the view to the clipboard
  *   E          export dialog
  *   H          help dialog
  *   N          toggle the annotate tool (Esc disarms)
@@ -35,6 +36,7 @@ import type { CompareMode } from './types'
 export const COMPARE_KEYS = {
   sidebars: 'B',
   fit: 'F',
+  copy: 'C',
   export: 'E',
   help: 'H',
   annotate: 'N',
@@ -69,6 +71,7 @@ export function useCompareShortcuts(handlers: {
   onToggleSidebars: () => void
   onMode: (mode: CompareMode) => void
   onFit: (() => void) | null
+  onCopy: () => void
   onExport: () => void
   onHelp: () => void
   onAnnotate: () => void
@@ -82,6 +85,7 @@ export function useCompareShortcuts(handlers: {
     onToggleSidebars,
     onMode,
     onFit,
+    onCopy,
     onExport,
     onHelp,
     onAnnotate,
@@ -100,6 +104,7 @@ export function useCompareShortcuts(handlers: {
   useHotkey(COMPARE_KEYS.modes[3], () => onMode(COMPARE_MODES[3]), opts)
   useHotkey(COMPARE_KEYS.modes[4], () => onMode(COMPARE_MODES[4]), opts)
   useHotkey(COMPARE_KEYS.fit, () => onFit?.(), opts)
+  useHotkey(COMPARE_KEYS.copy, () => onCopy(), opts)
   useHotkey(COMPARE_KEYS.export, () => onExport(), opts)
   useHotkey(COMPARE_KEYS.help, () => onHelp(), opts)
   useHotkey(COMPARE_KEYS.annotate, () => onAnnotate(), opts)

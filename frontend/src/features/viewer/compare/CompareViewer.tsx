@@ -36,7 +36,9 @@ import {
   SKINNYWMS_BASEMAP,
 } from '../ol-layers'
 import { rebaseLensUrl, skinnyWmsBasemap } from '../wms-capabilities'
+import { canvasToPngBlob, joinCanvasesHorizontally } from '../map-export'
 import { CollapsedSidebarHandle } from '../components/CollapsedSidebarHandle'
+import { composeCaptures } from './export-pipeline'
 import { buildPairs } from './layer-pairing'
 import {
   buildCompareTimeline,
@@ -78,6 +80,11 @@ import type {
 import type { TimeLinkMode } from './time-link'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
+import { copyToClipboard } from '@/lib/clipboard'
+import { showToast } from '@/lib/toast'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('CompareViewer')
 
 export interface CompareViewerSource {
   baseUrl: string
@@ -379,6 +386,50 @@ export function CompareViewer({
   )
   const [exportOpen, setExportOpen] = useState(false)
 
+  // Per-slot copy re-renders the single map with only that slot showing;
+  // side-by-side just filters its per-map captures.
+  const [captureOnly, setCaptureOnly] = useState<SourceSlot | null>(null)
+  const captureFor = async (
+    only: SourceSlot | null,
+  ): Promise<Array<CaptureResult>> => {
+    if (!captureAction) throw new Error('Capture unavailable')
+    if (only === null) return captureAction()
+    setCaptureOnly(only)
+    try {
+      // Two frames: React commit, then OL applies the opacity change.
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(r)),
+      )
+      const results = await captureAction()
+      return results.filter((c) => c.slot === only)
+    } finally {
+      setCaptureOnly(null)
+    }
+  }
+
+  // Unawaited promise: the item must be built inside the gesture (Safari).
+  // Combined view joins side-by-side maps into one image — the clipboard
+  // holds a single item.
+  const copyView = (only: SourceSlot | null) => {
+    if (!captureAction) return
+    copyToClipboard(
+      'image/png',
+      composeCaptures({
+        capture: () => captureFor(only),
+        legends: exportLegends,
+        annotations,
+      }).then((canvases) => {
+        const joined = joinCanvasesHorizontally(canvases)
+        return joined ? canvasToPngBlob(joined) : null
+      }),
+    )
+      .then(() => showToast.success(tExec('lens.mapCopied')))
+      .catch((err: unknown) => {
+        log.error('View copy failed', { error: err })
+        showToast.error(tExec('lens.mapCopyFailed'))
+      })
+  }
+
   // Active layers' legends for the export (per slot, lens URLs rebased,
   // external URLs verbatim — rebaseLensUrl handles both).
   const bBaseUrl = b?.baseUrl ?? null
@@ -510,6 +561,7 @@ export function CompareViewer({
       if (hasB) onModeChange(next)
     },
     onFit: fitAction,
+    onCopy: () => copyView(null),
     onExport: () => setExportOpen(true),
     onHelp: () => setHelpOpen((v) => !v),
     onAnnotate: () => setAnnotateArmed((v) => !v),
@@ -667,6 +719,8 @@ export function CompareViewer({
         annotateArmed={annotateArmed}
         onAnnotateToggle={() => setAnnotateArmed((v) => !v)}
         onExport={() => setExportOpen(true)}
+        onCopy={copyView}
+        copySlots={hasB}
         basemapId={basemapId}
         onBasemapChange={setBasemapId}
         availableBasemaps={availableBasemaps}
@@ -764,6 +818,7 @@ export function CompareViewer({
               view={viewRef.current}
               a={mapSourceA}
               b={mapSourceB}
+              captureOnly={captureOnly}
               mode={mode === 'side' ? 'swipe' : mode}
               options={modeOptions}
               measureMode={measureMode}

@@ -16,7 +16,7 @@
  */
 
 import { useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from '@vitest/browser/context'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
@@ -26,6 +26,10 @@ import { CompareViewer } from '@/features/viewer/compare/CompareViewer'
 import i18n from '@/lib/i18n'
 
 let nextPort = 19800
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 /** A: 2t (T00,T06) + msl + tp + q@500/850 · B: 2t (T06,T12) + msl +
  *  q@500/700 — overlap 2t/msl/q@500. */
@@ -371,6 +375,30 @@ describe('CompareViewer', () => {
     await expect.element(screen.getByText('Add GeoJSON')).toBeVisible()
   })
 
+  it('offers copy-to-clipboard with a synchronously built PNG item', async () => {
+    const { portA, portB } = registerDefaultPair()
+    let itemTypes: ReadonlyArray<string> = []
+    const write = vi
+      .spyOn(navigator.clipboard, 'write')
+      .mockImplementation((items) => {
+        itemTypes = items[0].types
+        return Promise.resolve()
+      })
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    await screen.getByRole('button', { name: 'Copy map to clipboard' }).click()
+    // Item constructed synchronously in the gesture (Safari rule). The
+    // payload blob itself needs a sized map — covered by unit tests.
+    expect(write).toHaveBeenCalledTimes(1)
+    expect(itemTypes).toContain('image/png')
+
+    // Per-slot copy via the split-button menu.
+    await screen.getByRole('button', { name: 'Copy options' }).click()
+    await screen.getByRole('menuitem', { name: 'Copy A only' }).click()
+    expect(write).toHaveBeenCalledTimes(2)
+  })
+
   it('offers measure tools that toggle exclusively', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
@@ -635,6 +663,10 @@ describe('CompareViewer solo', () => {
     expect(screen.getByRole('switch').elements()).toHaveLength(0)
     expect(
       screen.getByRole('img', { name: 'Availability for source B' }).elements(),
+    ).toHaveLength(0)
+    // Plain copy button — the per-slot menu is comparison-only.
+    expect(
+      screen.getByRole('button', { name: 'Copy options' }).elements(),
     ).toHaveLength(0)
 
     // Activating a layer builds A's own timeline (T00, T06).

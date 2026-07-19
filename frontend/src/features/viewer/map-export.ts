@@ -113,6 +113,39 @@ export function compositeMapToCanvas(
   return out
 }
 
+/** Join canvases left-to-right on a white ground (side-by-side copy). */
+export function joinCanvasesHorizontally(
+  canvases: ReadonlyArray<HTMLCanvasElement>,
+): HTMLCanvasElement | null {
+  if (canvases.length === 0) return null
+  if (canvases.length === 1) return canvases[0]
+  const gap = 16
+  const width =
+    canvases.reduce((w, c) => w + c.width, 0) + gap * (canvases.length - 1)
+  const height = Math.max(...canvases.map((c) => c.height))
+  const out = document.createElement('canvas')
+  out.width = width
+  out.height = height
+  const ctx = out.getContext('2d')
+  if (!ctx) return null
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, width, height)
+  let x = 0
+  for (const canvas of canvases) {
+    ctx.drawImage(canvas, x, 0)
+    x += canvas.width + gap
+  }
+  return out
+}
+
+export function canvasToPngBlob(
+  canvas: HTMLCanvasElement,
+): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), 'image/png')
+  })
+}
+
 export interface LegendExportItem {
   title: string
   image: HTMLImageElement
