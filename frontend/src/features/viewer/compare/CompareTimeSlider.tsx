@@ -52,6 +52,16 @@ export interface IndependentAxis {
   onChange: (index: number) => void
 }
 
+/** Offset-slider range/step and alignment presets, from the raw indexes. */
+export interface OffsetMeta {
+  minMs: number
+  maxMs: number
+  stepMs: number
+  /** null while either axis is empty. */
+  alignStartsMs: number | null
+  alignEndsMs: number | null
+}
+
 export function CompareTimeSlider({
   hasB = true,
   timeline,
@@ -61,6 +71,7 @@ export function CompareTimeSlider({
   onLinkModeChange,
   offsetMs,
   onOffsetChange,
+  offsetMeta,
   independent,
   clip,
   onClipChange,
@@ -76,6 +87,7 @@ export function CompareTimeSlider({
   /** B's lag relative to A in `offset` mode. */
   offsetMs: number
   onOffsetChange: (ms: number) => void
+  offsetMeta: OffsetMeta
   /** Per-source axes for `independent` mode. */
   independent: Record<SourceSlot, IndependentAxis>
   /** Union-index window the whole control operates in (null = all). */
@@ -149,13 +161,6 @@ export function CompareTimeSlider({
               </SelectContent>
             </Select>
           )}
-          {linkMode === 'offset' && (
-            <OffsetField
-              label={tCompare('timeline.offsetLabel')}
-              offsetMs={offsetMs}
-              onOffsetChange={onOffsetChange}
-            />
-          )}
           {hasSharedAxis && (
             <span className="font-mono text-xs tabular-nums">
               {formatStep(new Date(steps[safeIndex]).toISOString())}
@@ -163,6 +168,14 @@ export function CompareTimeSlider({
           )}
         </div>
       </div>
+
+      {linkMode === 'offset' && (
+        <OffsetControl
+          offsetMs={offsetMs}
+          onOffsetChange={onOffsetChange}
+          meta={offsetMeta}
+        />
+      )}
 
       {linkMode === 'independent' ? (
         <div className="space-y-2">
@@ -328,39 +341,102 @@ function IndependentSlider({
   )
 }
 
+function formatHours(ms: number): string {
+  const hours = ms / HOUR_MS
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1)
+}
+
 /**
- * Offset entry as a plain numeric-mode text field — type=number fights
- * partial edits ('048', hard to clear). Focus selects all for instant
- * overwrite; empty means 0 while staying visually empty.
+ * Offset Δ control: slider over the intersecting range, alignment
+ * presets, and an exact hours field. The field is a plain text input —
+ * type=number fights partial edits ('048', hard to clear) — and mirrors
+ * `offsetMs` except while being edited.
  */
-function OffsetField({
-  label,
+function OffsetControl({
   offsetMs,
   onOffsetChange,
+  meta,
 }: {
-  label: string
   offsetMs: number
   onOffsetChange: (ms: number) => void
+  meta: OffsetMeta
 }) {
-  const [text, setText] = useState(() => String(Math.round(offsetMs / HOUR_MS)))
-  return (
-    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+  const { t } = useTranslation('compare')
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState('')
+  const shownText = editing ? text : formatHours(offsetMs)
+
+  const preset = (label: string, ms: number | null, title: string) => (
+    <button
+      type="button"
+      disabled={ms === null}
+      onClick={() => {
+        if (ms !== null) onOffsetChange(ms)
+      }}
+      title={title}
+      aria-pressed={ms !== null && offsetMs === ms}
+      className={cn(
+        'rounded border border-border px-1.5 py-0.5 text-[10px] font-medium',
+        'disabled:opacity-40',
+        ms !== null && offsetMs === ms ? 'bg-accent' : 'hover:bg-accent',
+      )}
+    >
       {label}
-      <Input
-        type="text"
-        inputMode="numeric"
-        value={text}
-        onFocus={(e) => e.currentTarget.select()}
-        onChange={(e) => {
-          const value = e.target.value
-          if (!/^-?\d*$/.test(value)) return
-          setText(value)
-          onOffsetChange((Number(value) || 0) * HOUR_MS)
-        }}
-        className="h-7 w-16 text-xs"
-      />
-      h
-    </label>
+    </button>
+  )
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <span className="shrink-0 text-xs text-muted-foreground">
+        {t('timeline.offsetLabel')}
+      </span>
+      <label className="min-w-0 flex-1">
+        <span className="sr-only">{t('timeline.offsetSliderAria')}</span>
+        <Slider
+          value={[Math.min(meta.maxMs, Math.max(meta.minMs, offsetMs))]}
+          min={meta.minMs}
+          max={meta.maxMs}
+          step={meta.stepMs}
+          className="[&_[data-slot=slider-range]]:bg-muted-foreground/50 [&_[data-slot=slider-thumb]]:border-muted-foreground [&_[data-slot=slider-thumb]]:bg-muted"
+          onValueChange={(v) => onOffsetChange(firstNumber(v))}
+        />
+      </label>
+      <span className="flex shrink-0 items-center gap-1">
+        {preset('0', 0, t('timeline.offsetZeroHint'))}
+        {preset(
+          t('timeline.alignStarts'),
+          meta.alignStartsMs,
+          t('timeline.alignStartsHint'),
+        )}
+        {preset(
+          t('timeline.alignEnds'),
+          meta.alignEndsMs,
+          t('timeline.alignEndsHint'),
+        )}
+      </span>
+      <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="sr-only">{t('timeline.offsetLabel')}</span>
+        <Input
+          type="text"
+          inputMode="decimal"
+          value={shownText}
+          onFocus={(e) => {
+            setText(formatHours(offsetMs))
+            setEditing(true)
+            e.currentTarget.select()
+          }}
+          onBlur={() => setEditing(false)}
+          onChange={(e) => {
+            const value = e.target.value
+            if (!/^-?\d*(\.\d*)?$/.test(value)) return
+            setText(value)
+            onOffsetChange(Math.round((Number(value) || 0) * HOUR_MS))
+          }}
+          className="h-7 w-16 text-xs"
+        />
+        h
+      </label>
+    </div>
   )
 }
 

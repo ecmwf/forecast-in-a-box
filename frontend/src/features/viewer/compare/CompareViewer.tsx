@@ -48,6 +48,8 @@ import {
   defaultToleranceMs,
   effectiveAvailability,
   formatOffset,
+  medianStepMs,
+  offsetBounds,
   resolveSourceTime,
 } from './time-link'
 import { CompareToolbar } from './CompareToolbar'
@@ -213,6 +215,23 @@ export function CompareViewer({
   // -------- Time-link policy (exact / nearest / offset / independent) --
   const [timeLinkMode, setTimeLinkMode] = useState<TimeLinkMode>('exact')
   const [offsetMs, setOffsetMs] = useState(0)
+  // From the RAW indexes — displayTimeline already shifts B by Δ, so
+  // deriving bounds from it would feed back on itself.
+  const offsetMeta = useMemo(() => {
+    const [minMs, maxMs] = offsetBounds(timeIndexA, timeIndexB)
+    const epochsA = timeIndexA.epochs
+    const epochsB = timeIndexB.epochs
+    const empty = epochsA.length === 0 || epochsB.length === 0
+    return {
+      minMs,
+      maxMs,
+      stepMs: Math.min(medianStepMs(timeIndexA), medianStepMs(timeIndexB)),
+      alignStartsMs: empty ? null : epochsB[0] - epochsA[0],
+      alignEndsMs: empty
+        ? null
+        : epochsB[epochsB.length - 1] - epochsA[epochsA.length - 1],
+    }
+  }, [timeIndexA, timeIndexB])
   const [indepIndex, setIndepIndex] = useState<Record<SourceSlot, number>>({
     a: 0,
     b: 0,
@@ -787,6 +806,7 @@ export function CompareViewer({
         onLinkModeChange={setTimeLinkMode}
         offsetMs={offsetMs}
         onOffsetChange={setOffsetMs}
+        offsetMeta={offsetMeta}
         clip={timeClip}
         onClipChange={setTimeClip}
         hoverTimes={hoverTimes}

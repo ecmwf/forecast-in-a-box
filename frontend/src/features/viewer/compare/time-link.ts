@@ -47,20 +47,44 @@ const UNRESOLVED: ResolvedSourceTime = {
   hidden: false,
 }
 
+/** Median inter-step interval; 6 h fallback for sparse axes. */
+export function medianStepMs(index: SourceTimeIndex): number {
+  const { epochs } = index
+  if (epochs.length < 2) return 6 * 3600_000
+  const diffs = epochs
+    .slice(1)
+    .map((e, i) => e - epochs[i])
+    .sort((x, y) => x - y)
+  return diffs[Math.floor(diffs.length / 2)]
+}
+
 /**
  * Default nearest-tolerance for a source: half its median step, clamped
  * to [30 min, 12 h] — tight enough to stay honest, loose enough to bridge
  * hourly↔6-hourly rhythms.
  */
 export function defaultToleranceMs(index: SourceTimeIndex): number {
-  const { epochs } = index
-  if (epochs.length < 2) return 3 * 3600_000
-  const diffs = epochs
-    .slice(1)
-    .map((e, i) => e - epochs[i])
-    .sort((x, y) => x - y)
-  const median = diffs[Math.floor(diffs.length / 2)]
-  return Math.min(Math.max(median / 2, 30 * 60_000), 12 * 3600_000)
+  return Math.min(Math.max(medianStepMs(index) / 2, 30 * 60_000), 12 * 3600_000)
+}
+
+/**
+ * Slider range for the offset Δ (B sampled at t + Δ): every Δ where B's
+ * window still intersects A's axis. Always contains 0; ±48 h fallback
+ * when either axis is empty.
+ */
+export function offsetBounds(
+  a: SourceTimeIndex,
+  b: SourceTimeIndex,
+): [number, number] {
+  const fallback = 48 * 3600_000
+  if (a.epochs.length === 0 || b.epochs.length === 0) {
+    return [-fallback, fallback]
+  }
+  const aFirst = a.epochs[0]
+  const aLast = a.epochs[a.epochs.length - 1]
+  const bFirst = b.epochs[0]
+  const bLast = b.epochs[b.epochs.length - 1]
+  return [Math.min(0, bFirst - aLast), Math.max(0, bLast - aFirst)]
 }
 
 /**
