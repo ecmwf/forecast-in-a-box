@@ -24,6 +24,7 @@ import {
   EyeOff,
   GripVertical,
   HelpCircle,
+  Pin,
   Upload,
   X,
 } from 'lucide-react'
@@ -79,6 +80,39 @@ export interface PanelSlotSource {
   lens: LensSource
 }
 
+export interface LegendPins {
+  /** Keys `${slot}:${layerName}`. */
+  pinned: ReadonlySet<string>
+  toggle: (slot: SourceSlot, name: string) => void
+}
+
+/** Pin/unpin button next to a legend. */
+function PinButton({
+  pins,
+  slot,
+  name,
+}: {
+  pins: LegendPins
+  slot: SourceSlot
+  name: string
+}) {
+  const { t } = useTranslation('executions')
+  const pinned = pins.pinned.has(`${slot}:${name}`)
+  return (
+    <Button
+      variant={pinned ? 'default' : 'ghost'}
+      size="icon"
+      className="h-6 w-6 shrink-0"
+      onClick={() => pins.toggle(slot, name)}
+      aria-pressed={pinned}
+      title={pinned ? t('lens.unpinLegend') : t('lens.pinLegend')}
+      aria-label={pinned ? t('lens.unpinLegend') : t('lens.pinLegend')}
+    >
+      <Pin className="h-3.5 w-3.5" />
+    </Button>
+  )
+}
+
 export function CompareActiveLayersPanel({
   pairs,
   selection,
@@ -87,6 +121,7 @@ export function CompareActiveLayersPanel({
   overlays,
   annotations,
   preload,
+  pins,
   onCollapse,
 }: {
   pairs: ReadonlyArray<PairedLayer>
@@ -97,6 +132,7 @@ export function CompareActiveLayersPanel({
   overlays: OverlayControls
   annotations: AnnotationControls
   preload: { enabled: boolean; setEnabled: (v: boolean) => void; available: boolean }
+  pins: LegendPins
   onCollapse: () => void
 }) {
   const { t } = useTranslation('compare')
@@ -184,6 +220,7 @@ export function CompareActiveLayersPanel({
                   onReorder={selection.reorderPair}
                   selection={selection}
                   sources={sources}
+                  pins={pins}
                 />
               ))}
             </ul>
@@ -194,12 +231,14 @@ export function CompareActiveLayersPanel({
               slot="a"
               selection={selection}
               source={sources.a}
+              pins={pins}
             />
             {sources.b !== null && (
               <ActiveSourceSection
                 slot="b"
                 selection={selection}
                 source={sources.b}
+                pins={pins}
               />
             )}
           </>
@@ -433,12 +472,14 @@ function ActivePairCard({
   onReorder,
   selection,
   sources,
+  pins,
 }: {
   pair: PairedLayer
   index: number
   onReorder: (from: number, to: number) => void
   selection: CompareSelection
   sources: { a: PanelSlotSource; b: PanelSlotSource | null }
+  pins: LegendPins
 }) {
   const { t } = useTranslation('compare')
   const { t: tExec } = useTranslation('executions')
@@ -536,6 +577,7 @@ function ActivePairCard({
                   title={`${title} (${slot.toUpperCase()})`}
                 />
               </div>
+              <PinButton pins={pins} slot={slot} name={layer.name} />
             </div>,
           ]
         })}
@@ -549,10 +591,12 @@ function ActiveSourceSection({
   slot,
   selection,
   source,
+  pins,
 }: {
   slot: SourceSlot
   selection: CompareSelection
   source: PanelSlotSource
+  pins: LegendPins
 }) {
   const { t } = useTranslation('compare')
   const { t: tExec } = useTranslation('executions')
@@ -654,11 +698,14 @@ function ActiveSourceSection({
                   />
                 </label>
                 {legendUrl && (
-                  <div className="mt-2">
-                    <LegendImage
-                      url={rebaseLensUrl(legendUrl, baseUrl)}
-                      title={title}
-                    />
+                  <div className="mt-2 flex items-start gap-1.5">
+                    <div className="min-w-0 flex-1">
+                      <LegendImage
+                        url={rebaseLensUrl(legendUrl, baseUrl)}
+                        title={title}
+                      />
+                    </div>
+                    <PinButton pins={pins} slot={slot} name={name} />
                   </div>
                 )}
               </li>

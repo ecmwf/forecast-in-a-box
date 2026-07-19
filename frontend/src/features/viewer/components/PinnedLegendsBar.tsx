@@ -10,11 +10,16 @@
 
 import { PinOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { rebaseLensUrl } from '../wms-capabilities'
-import type { ParsedLayer } from '../wms-capabilities'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
+
+/** One pinned legend; `url` must already be browser-reachable (rebased). */
+export interface PinnedLegendItem {
+  key: string
+  title: string
+  url: string
+}
 
 /**
  * Floating strip at the bottom of the map area listing every legend the
@@ -23,23 +28,13 @@ import { cn } from '@/lib/utils'
  * shows the layer title, the legend image, and an unpin button.
  */
 export function PinnedLegendsBar({
-  baseUrl,
-  layers,
-  pinnedLegends,
+  items,
   onUnpin,
 }: {
-  baseUrl: string
-  layers: ReadonlyArray<ParsedLayer>
-  pinnedLegends: ReadonlySet<string>
-  onUnpin: (name: string) => void
+  items: ReadonlyArray<PinnedLegendItem>
+  onUnpin: (key: string) => void
 }) {
   const { t } = useTranslation('executions')
-  const items = Array.from(pinnedLegends).flatMap((name) => {
-    const layer = layers.find((l) => l.name === name)
-    const legendUrl = layer?.styles[0]?.legendUrl
-    if (!layer || !legendUrl) return []
-    return [{ layer, legendUrl: rebaseLensUrl(legendUrl, baseUrl) }]
-  })
   if (items.length === 0) return null
   // Pick column count to match item count exactly (so the strip always
   // fills the row), capped at 3 on very wide screens. Special case: 4
@@ -57,18 +52,18 @@ export function PinnedLegendsBar({
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 max-h-[45%] overflow-y-auto">
       <div className="pointer-events-auto m-3">
         <div className={cn('grid gap-2', gridClass)}>
-          {items.map(({ layer, legendUrl }) => (
+          {items.map(({ key, title, url }) => (
             <div
-              key={layer.name}
+              key={key}
               className="flex items-start gap-2 rounded border border-border bg-card px-2 py-2"
             >
               <div className="min-w-0 flex-1">
-                <P className="truncate text-xs font-medium" title={layer.title}>
-                  {layer.title}
+                <P className="truncate text-xs font-medium" title={title}>
+                  {title}
                 </P>
                 <img
-                  src={legendUrl}
-                  alt={`${layer.title} legend`}
+                  src={url}
+                  alt={`${title} legend`}
                   className="mt-1 h-auto max-h-40 w-full object-contain"
                   loading="lazy"
                 />
@@ -77,7 +72,7 @@ export function PinnedLegendsBar({
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 shrink-0"
-                onClick={() => onUnpin(layer.name)}
+                onClick={() => onUnpin(key)}
                 aria-label={t('lens.unpinLegend')}
                 title={t('lens.unpinLegend')}
               >

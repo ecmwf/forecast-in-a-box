@@ -42,7 +42,10 @@ import {
 import { useTranslation } from 'react-i18next'
 import 'ol/ol.css'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
-import { expandTimeSteps } from '@/features/viewer/wms-capabilities'
+import {
+  expandTimeSteps,
+  rebaseLensUrl,
+} from '@/features/viewer/wms-capabilities'
 import {
   DEFAULT_BASEMAP_ID,
   DEFAULT_LAYER_OPACITY,
@@ -518,9 +521,18 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
 
         {showSidebars && pinnedLegends.size > 0 && (
           <PinnedLegendsBar
-            baseUrl={baseUrl}
-            layers={layers}
-            pinnedLegends={pinnedLegends}
+            items={Array.from(pinnedLegends).flatMap((name) => {
+              const layer = layers.find((l) => l.name === name)
+              const legendUrl = layer?.styles[0]?.legendUrl
+              if (!layer || !legendUrl) return []
+              return [
+                {
+                  key: name,
+                  title: layer.title,
+                  url: rebaseLensUrl(legendUrl, baseUrl),
+                },
+              ]
+            })}
             onUnpin={togglePinLegend}
           />
         )}

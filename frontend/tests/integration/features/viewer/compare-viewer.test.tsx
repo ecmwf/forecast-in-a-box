@@ -769,3 +769,20 @@ describe('CompareViewer reorder', () => {
       .toEqual(['Remove 2 m temperature', 'Remove Mean sea level pressure'])
   })
 })
+
+describe('CompareViewer legend pinning', () => {
+  it('pins a legend to the map strip and unpins from it', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    // Pin A's legend from the pair card → the strip appears on the map.
+    await screen.getByRole('button', { name: 'Pin legend open' }).first().click()
+    await expect
+      .element(screen.getByText('A · 2 m temperature'))
+      .toBeVisible()
+
+    await screen.getByRole('button', { name: 'Unpin legend' }).last().click()
+    expect(screen.getByText('A · 2 m temperature').elements()).toHaveLength(0)
+  })
+})
