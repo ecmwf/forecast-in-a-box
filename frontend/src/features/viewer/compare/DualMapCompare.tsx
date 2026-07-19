@@ -21,6 +21,8 @@ import { useOlMapBase } from '../hooks/useOlMapBase'
 import { useBasemap } from '../hooks/useBasemap'
 import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
+import { usePointerReadout } from '../hooks/usePointerReadout'
+import { formatLatLon } from '../format'
 import { compositeMapToCanvas } from '../map-export'
 import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
@@ -231,6 +233,7 @@ function DualMapPanel({
   })
 
   useMeasure(mapRef, measureMode, measureClearNonce)
+  const pointer = usePointerReadout(mapRef)
   useContextOverlays(mapRef, overlays)
   const overlayHover = useOverlayHover(mapRef, overlays)
   useAnnotationLayer(mapRef, annotations, source.slot, annotateArmed, {
@@ -291,6 +294,11 @@ function DualMapPanel({
       />
       <LoupeOverlay containerRef={containerRef} />
       <OverlayHoverCard hover={overlayHover} />
+      {pointer && (
+        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-border bg-background/90 px-2.5 py-1 font-mono text-xs tabular-nums shadow-sm backdrop-blur-sm">
+          {formatLatLon(pointer.lat, pointer.lon)}
+        </div>
+      )}
       {annotateArmed && (
         <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
           {t('annotations.armedHint')}
