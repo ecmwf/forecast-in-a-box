@@ -41,18 +41,16 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import 'ol/ol.css'
-import ImageLayer from 'ol/layer/Image'
-import type ImageWMS from 'ol/source/ImageWMS'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import { expandTimeSteps } from '@/features/viewer/wms-capabilities'
 import {
   DEFAULT_BASEMAP_ID,
   DEFAULT_LAYER_OPACITY,
-  makeDataLayerSource,
 } from '@/features/viewer/ol-layers'
 import { firstNumber, formatLatLon } from '@/features/viewer/format'
 import { exportMapPng, loadLegendImages } from '@/features/viewer/map-export'
 import { useLensSource } from '@/features/viewer/hooks/useLensSource'
+import { useTimeStepPrefetch } from '@/features/viewer/hooks/useTimeStepPrefetch'
 import { useOlMapBase } from '@/features/viewer/hooks/useOlMapBase'
 import { useBasemap } from '@/features/viewer/hooks/useBasemap'
 import { useWmsLayerStack } from '@/features/viewer/hooks/useWmsLayerStack'
@@ -77,9 +75,6 @@ import { cn } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('WmsViewer')
-
-// Safety ceiling per prefetch image — server-hung loads shouldn't leak layers.
-const PREFETCH_LOAD_TIMEOUT_MS = 30_000
 
 interface WmsViewerProps {
   /** Absolute base URL of the lens, e.g. `http://127.0.0.1:51234`. */
@@ -182,76 +177,15 @@ export default function WmsViewer({ baseUrl }: WmsViewerProps) {
     decLoading,
   })
 
-  // -------- Time-step prefetch --------
-  // Warms the browser HTTP cache for every (time-aware active layer ×
-  // time step) at the current viewport. Same source config as the visible
-  // layer, so URLs match and OL hits cache when the user scrubs.
-  // Default off — bandwidth-heavy.
+  // -------- Time-step prefetch (default off — bandwidth-heavy) --------
   const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)
-
-  useEffect(() => {
-    if (!preloadTimeSteps) return
-    const map = mapRef.current
-    if (!map || timeSteps.length <= 1) return
-    const timeAwareActive = activeOrder
-      .map((name) => layers.find((l) => l.name === name))
-      .filter((l): l is ParsedLayer => !!l && !!l.time && l.styles.length > 0)
-    if (timeAwareActive.length === 0) return
-
-    // Object-wrapped so TS-ESLint sees mutability across the await below.
-    const state = { cancelled: false }
-    const hiddenLayers: Array<ImageLayer<ImageWMS>> = []
-
-    // Hidden ImageLayer per (layer × step), torn down once loaded.
-    const prefetchOne = (layer: ParsedLayer, step: string) =>
-      new Promise<void>((resolve) => {
-        if (state.cancelled) return resolve()
-        const source = makeDataLayerSource(baseUrl, {
-          LAYERS: layer.name,
-          STYLES: layer.styles[0].name,
-          FORMAT: 'image/png',
-          TRANSPARENT: 'TRUE',
-          TIME: step,
-        })
-        const hidden = new ImageLayer({
-          source,
-          opacity: 0,
-          zIndex: -1,
-        })
-        let settled = false
-        let safetyTimer = 0
-        const settle = () => {
-          if (settled) return
-          settled = true
-          window.clearTimeout(safetyTimer)
-          map.removeLayer(hidden)
-          const i = hiddenLayers.indexOf(hidden)
-          if (i >= 0) hiddenLayers.splice(i, 1)
-          resolve()
-        }
-        source.once('imageloadend', settle)
-        source.once('imageloaderror', settle)
-        // Safety: if the load events never fire (server hung), don't leak.
-        safetyTimer = window.setTimeout(settle, PREFETCH_LOAD_TIMEOUT_MS)
-        hiddenLayers.push(hidden)
-        map.addLayer(hidden)
-      })
-
-    ;(async () => {
-      for (const layer of timeAwareActive) {
-        for (const step of timeSteps) {
-          if (state.cancelled) return
-          await prefetchOne(layer, step)
-        }
-      }
-    })()
-
-    return () => {
-      state.cancelled = true
-      // Best-effort cleanup of any still-attached hidden layers.
-      for (const h of hiddenLayers) map.removeLayer(h)
-    }
-  }, [preloadTimeSteps, baseUrl, activeOrder, layers, timeSteps])
+  useTimeStepPrefetch(mapRef, {
+    enabled: preloadTimeSteps,
+    baseUrl,
+    layers,
+    activeOrder,
+    timeSteps,
+  })
 
   // -------- Pointer read-out --------
 
