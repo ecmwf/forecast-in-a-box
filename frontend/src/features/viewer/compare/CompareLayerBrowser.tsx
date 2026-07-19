@@ -46,12 +46,15 @@ function pairMatchesSearch(pair: PairedLayer, query: string): boolean {
 }
 
 export function CompareLayerBrowser({
+  hasB = true,
   pairs,
   selection,
   sourceA,
   sourceB,
   onCollapse,
 }: {
+  /** Solo hides the slot filter and the A/B availability chips. */
+  hasB?: boolean
   pairs: ReadonlyArray<PairedLayer>
   selection: CompareSelection
   sourceA: LensSource
@@ -111,6 +114,7 @@ export function CompareLayerBrowser({
           />
         </div>
         {/* All | A | B availability filter */}
+        {hasB && (
         <div
           role="group"
           aria-label={t('browser.filterAria')}
@@ -138,6 +142,7 @@ export function CompareLayerBrowser({
             </button>
           ))}
         </div>
+        )}
         {partitioned.allLevels.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {partitioned.allLevels.map((level) => {
@@ -173,6 +178,7 @@ export function CompareLayerBrowser({
             partitioned={partitioned}
             selectedLevels={selectedLevels}
             selection={selection}
+            showChips={hasB}
           />
         ) : slotFilter === 'both' ? (
           // Unlinked = no pairing, so "available in both" is by definition
@@ -190,14 +196,16 @@ export function CompareLayerBrowser({
               slotFilter={slotFilter}
               selectedLevels={selectedLevels}
             />
-            <UnlinkedSourceSection
-              slot="b"
-              source={sourceB}
-              selection={selection}
-              query={query}
-              slotFilter={slotFilter}
-              selectedLevels={selectedLevels}
-            />
+            {hasB && (
+              <UnlinkedSourceSection
+                slot="b"
+                source={sourceB}
+                selection={selection}
+                query={query}
+                slotFilter={slotFilter}
+                selectedLevels={selectedLevels}
+              />
+            )}
           </>
         )}
       </div>
@@ -213,10 +221,12 @@ function LinkedSections({
   partitioned,
   selectedLevels,
   selection,
+  showChips,
 }: {
   partitioned: ReturnType<typeof groupPairs>
   selectedLevels: ReadonlySet<number>
   selection: CompareSelection
+  showChips: boolean
 }) {
   const { t } = useTranslation('compare')
   const multiLevel = useMemo(
@@ -250,7 +260,11 @@ function LinkedSections({
           <ul className="space-y-1">
             {partitioned.singles.map((group) => (
               <li key={group.key}>
-                <PairRow pair={group.entries[0]} selection={selection} />
+                <PairRow
+                  pair={group.entries[0]}
+                  selection={selection}
+                  showChips={showChips}
+                />
               </li>
             ))}
           </ul>
@@ -265,6 +279,7 @@ function LinkedSections({
                 key={group.key}
                 group={group}
                 selection={selection}
+                showChips={showChips}
               />
             ))}
           </ul>
@@ -278,9 +293,11 @@ function LinkedSections({
 function PairGroupRow({
   group,
   selection,
+  showChips,
 }: {
   group: ReturnType<typeof groupPairs>['multiLevel'][number]
   selection: CompareSelection
+  showChips: boolean
 }) {
   const { t } = useTranslation('compare')
   const [open, setOpen] = useState(false)
@@ -330,6 +347,7 @@ function PairGroupRow({
                 selection={selection}
                 title={`${pair.level} ${unit}`}
                 compact
+                showChips={showChips}
               />
             </li>
           ))}
@@ -345,11 +363,13 @@ function PairRow({
   selection,
   title,
   compact = false,
+  showChips = true,
 }: {
   pair: PairedLayer
   selection: CompareSelection
   title?: string
   compact?: boolean
+  showChips?: boolean
 }) {
   const { t } = useTranslation('compare')
   const active = selection.isPairActive(pair.key)
@@ -374,7 +394,7 @@ function PairRow({
       >
         {label}
       </span>
-      <SlotChips chipPair={pair} />
+      {showChips && <SlotChips chipPair={pair} />}
       {active ? (
         <X className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       ) : (

@@ -59,6 +59,12 @@ export interface OpacityTiers {
   setSource: (slot: SourceSlot, v: number) => void
 }
 
+export interface PanelSlotSource {
+  label: string
+  baseUrl: string
+  lens: LensSource
+}
+
 export function CompareActiveLayersPanel({
   pairs,
   selection,
@@ -71,10 +77,8 @@ export function CompareActiveLayersPanel({
   pairs: ReadonlyArray<PairedLayer>
   selection: CompareSelection
   opacity: OpacityTiers
-  sources: Record<
-    SourceSlot,
-    { label: string; baseUrl: string; lens: LensSource }
-  >
+  /** `b: null` = solo — per-source tiers and slot chips are hidden. */
+  sources: { a: PanelSlotSource; b: PanelSlotSource | null }
   overlays: OverlayControls
   annotations: AnnotationControls
   onCollapse: () => void
@@ -108,15 +112,16 @@ export function CompareActiveLayersPanel({
           value={opacity.global}
           onChange={opacity.setGlobal}
         />
-        {(['a', 'b'] as const).map((slot) => (
-          <OpacityRow
-            key={slot}
-            label={t('sidebar.sourceOpacity', { slot: slot.toUpperCase() })}
-            slot={slot}
-            value={opacity.source[slot]}
-            onChange={(v) => opacity.setSource(slot, v)}
-          />
-        ))}
+        {sources.b !== null &&
+          (['a', 'b'] as const).map((slot) => (
+            <OpacityRow
+              key={slot}
+              label={t('sidebar.sourceOpacity', { slot: slot.toUpperCase() })}
+              slot={slot}
+              value={opacity.source[slot]}
+              onChange={(v) => opacity.setSource(slot, v)}
+            />
+          ))}
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2">
@@ -140,13 +145,15 @@ export function CompareActiveLayersPanel({
             <ActiveSourceSection
               slot="a"
               selection={selection}
-              sources={sources}
+              source={sources.a}
             />
-            <ActiveSourceSection
-              slot="b"
-              selection={selection}
-              sources={sources}
-            />
+            {sources.b !== null && (
+              <ActiveSourceSection
+                slot="b"
+                selection={selection}
+                source={sources.b}
+              />
+            )}
           </>
         )}
       </div>
@@ -379,10 +386,7 @@ function ActivePairCard({
 }: {
   pair: PairedLayer
   selection: CompareSelection
-  sources: Record<
-    SourceSlot,
-    { label: string; baseUrl: string; lens: LensSource }
-  >
+  sources: { a: PanelSlotSource; b: PanelSlotSource | null }
 }) {
   const { t } = useTranslation('compare')
   const title =
@@ -423,22 +427,25 @@ function ActivePairCard({
       </label>
       <div className="mt-2 space-y-1.5">
         {(['a', 'b'] as const).flatMap((slot) => {
+          const slotSource = sources[slot]
           const layer = pair.perSource[slot]
           const legendUrl = layer?.styles[0]?.legendUrl
-          if (!layer || !legendUrl) return []
+          if (!slotSource || !layer || !legendUrl) return []
           return [
             <div key={slot} className="flex items-start gap-1.5">
-              <span
-                className={cn(
-                  'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
-                  SLOT_CHIP_CLASS[slot],
-                )}
-              >
-                {slot.toUpperCase()}
-              </span>
+              {sources.b !== null && (
+                <span
+                  className={cn(
+                    'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
+                    SLOT_CHIP_CLASS[slot],
+                  )}
+                >
+                  {slot.toUpperCase()}
+                </span>
+              )}
               <div className="min-w-0 flex-1">
                 <LegendImage
-                  url={rebaseLensUrl(legendUrl, sources[slot].baseUrl)}
+                  url={rebaseLensUrl(legendUrl, slotSource.baseUrl)}
                   title={`${title} (${slot.toUpperCase()})`}
                 />
               </div>
@@ -454,17 +461,14 @@ function ActivePairCard({
 function ActiveSourceSection({
   slot,
   selection,
-  sources,
+  source,
 }: {
   slot: SourceSlot
   selection: CompareSelection
-  sources: Record<
-    SourceSlot,
-    { label: string; baseUrl: string; lens: LensSource }
-  >
+  source: PanelSlotSource
 }) {
   const { t } = useTranslation('compare')
-  const { lens, baseUrl, label } = sources[slot]
+  const { lens, baseUrl, label } = source
   const activeNames = selection.activeOrderFor(slot)
 
   return (

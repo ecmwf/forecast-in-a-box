@@ -78,7 +78,9 @@
     "slotLabel": "{{slot}} · {{name}}",
     "emptySlot": "Pick a second source to compare",
     "pickPrompt": "Click a source chip above, or add a new source",
-    "corsHint": "If this is an external server, it must send CORS headers"
+    "corsHint": "If this is an external server, it must send CORS headers",
+    "bError": "Second source failed:",
+    "removeB": "Remove B"
   },
   "modes": {
     "swipe": "Swipe",
@@ -240,5 +242,8 @@
     "add": "Add another source",
     "self": "Compare with itself",
     "selfHint": "Same source on both sides — compare two time steps of one forecast. Then pick “Time offset” or “Independent times” in the timeline."
+  },
+  "toolbar": {
+    "compareCta": "Compare…"
   }
 }

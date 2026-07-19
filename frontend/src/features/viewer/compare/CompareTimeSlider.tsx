@@ -53,6 +53,7 @@ export interface IndependentAxis {
 }
 
 export function CompareTimeSlider({
+  hasB = true,
   timeline,
   index,
   onChange,
@@ -65,6 +66,8 @@ export function CompareTimeSlider({
   onClipChange,
   hoverTimes,
 }: {
+  /** Solo hides the link select, B track, and B/A∩B clip presets. */
+  hasB?: boolean
   timeline: CompareTimeline
   index: number
   onChange: (index: number) => void
@@ -122,26 +125,30 @@ export function CompareTimeSlider({
           {tCompare('timeline.label')}
         </span>
         <div className="flex items-center gap-2">
-          <Select
-            value={linkMode}
-            onValueChange={(v) => {
-              if (v !== null) onLinkModeChange(v)
-            }}
-          >
-            <SelectTrigger
-              className="h-7 w-40 text-xs"
-              aria-label={tCompare('timeline.linkAria')}
+          {hasB && (
+            <Select
+              value={linkMode}
+              onValueChange={(v) => {
+                if (v !== null) onLinkModeChange(v)
+              }}
             >
-              <SelectValue>{tCompare(`timeline.link.${linkMode}`)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {TIME_LINK_MODES.map((mode) => (
-                <SelectItem key={mode} value={mode}>
-                  {tCompare(`timeline.link.${mode}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <SelectTrigger
+                className="h-7 w-40 text-xs"
+                aria-label={tCompare('timeline.linkAria')}
+              >
+                <SelectValue>
+                  {tCompare(`timeline.link.${linkMode}`)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_LINK_MODES.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {tCompare(`timeline.link.${mode}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {linkMode === 'offset' && (
             <OffsetField
               label={tCompare('timeline.offsetLabel')}
@@ -199,7 +206,8 @@ export function CompareTimeSlider({
                       epoch={hovered.epoch}
                     />
                   )}
-                  {(['a', 'b'] as const).map((slot) => (
+                  {(hasB ? (['a', 'b'] as const) : (['a'] as const)).map(
+                    (slot) => (
                     <SlotRunTrack
                       key={slot}
                       slot={slot}
@@ -217,12 +225,14 @@ export function CompareTimeSlider({
                       }
                       onJump={(i) => onChange(i + rangeStart)}
                     />
-                  ))}
+                    ),
+                  )}
                 </>
               )
             })()}
           </div>
           <TimeClipRow
+            hasB={hasB}
             timeline={timeline}
             clip={clip}
             rangeStart={rangeStart}
@@ -519,12 +529,14 @@ function SlotRunTrack({
  * visible by clipping to it.
  */
 function TimeClipRow({
+  hasB,
   timeline,
   clip,
   rangeStart,
   rangeEnd,
   onClipChange,
 }: {
+  hasB: boolean
   timeline: CompareTimeline
   clip: [number, number] | null
   rangeStart: number
@@ -615,9 +627,10 @@ function TimeClipRow({
         >
           {t('timeline.clipAll')}
         </button>
-        {preset('A', rangeA, t('timeline.clipHint', { slot: 'A' }))}
-        {preset('B', rangeB, t('timeline.clipHint', { slot: 'B' }))}
-        {preset('A∩B', rangeBoth, t('timeline.clipBothHint'))}
+        {/* Solo: the union IS A's range, so the slot presets are noise. */}
+        {hasB && preset('A', rangeA, t('timeline.clipHint', { slot: 'A' }))}
+        {hasB && preset('B', rangeB, t('timeline.clipHint', { slot: 'B' }))}
+        {hasB && preset('A∩B', rangeBoth, t('timeline.clipBothHint'))}
       </span>
     </div>
   )

@@ -57,6 +57,11 @@ import type {
 import { cn } from '@/lib/utils'
 
 const noop = () => {}
+/** Stable inert stand-ins for the B stack while running solo. */
+const noTime = () => null
+const EMPTY_LAYERS: ReadonlyArray<never> = []
+const EMPTY_ORDER: ReadonlyArray<string> = []
+const EMPTY_OPACITIES: ReadonlyMap<string, number> = new Map()
 /** Swipe keyboard step as a fraction of the map span. */
 const SWIPE_KEY_STEP = 0.02
 
@@ -80,7 +85,8 @@ export function SingleMapCompare({
 }: {
   view: View
   a: CompareMapSource
-  b: CompareMapSource
+  /** null runs the map solo: no B stack, clips, divider, or mode UI. */
+  b: CompareMapSource | null
   mode: SingleMapMode
   options: CompareModeOptions
   basemapId: string
@@ -102,6 +108,7 @@ export function SingleMapCompare({
 }) {
   const { t } = useTranslation('compare')
   const containerRef = useRef<HTMLDivElement>(null)
+  const solo = b === null
 
   // Mode-owned reveal state; tuning (orientation/shape/size/blend) comes
   // from the toolbar via `options`.
@@ -128,19 +135,21 @@ export function SingleMapCompare({
   })
 
   // Stack opacity = base tier (global × source) × mode factor; a time gap
-  // hides the stack outright.
+  // hides the stack outright. Mode factors are comparison-only.
   let masterA = a.masterOpacity
-  let masterB = b.masterOpacity
-  if (mode === 'flicker') {
-    masterA = flickerFrame === 'a' ? masterA : 0
-    masterB = flickerFrame === 'b' ? masterB : 0
-  } else if (mode === 'blend') {
-    masterB *= blend
+  let masterB = b?.masterOpacity ?? 0
+  if (!solo) {
+    if (mode === 'flicker') {
+      masterA = flickerFrame === 'a' ? masterA : 0
+      masterB = flickerFrame === 'b' ? masterB : 0
+    } else if (mode === 'blend') {
+      masterB *= blend
+    }
   }
   if (a.hiddenAtTime) masterA = 0
-  if (b.hiddenAtTime) masterB = 0
+  if (b?.hiddenAtTime) masterB = 0
 
-  const needsClip = mode === 'swipe' || mode === 'spy'
+  const needsClip = !solo && (mode === 'swipe' || mode === 'spy')
 
   // Per-stack network activity for the slot-tag spinners.
   const [loadingCount, setLoadingCount] = useState<Record<SourceSlot, number>>({
@@ -174,16 +183,23 @@ export function SingleMapCompare({
     decLoading: decA,
     trackRevision: true,
   })
-  const stackB = useWmsLayerStack(mapRef, b.baseUrl, b.layers, {
-    zBase: 200,
-    masterOpacity: masterB,
-    activeOrder: b.activeOrder,
-    layerOpacities: b.layerOpacities,
-    resolveTime: b.resolveTime,
-    incLoading: incB,
-    decLoading: decB,
-    trackRevision: true,
-  })
+  // Unconditional hook; solo passes an inert config (empty order → the
+  // stack reconciles to zero layers, zero requests).
+  const stackB = useWmsLayerStack(
+    mapRef,
+    b?.baseUrl ?? a.baseUrl,
+    b?.layers ?? EMPTY_LAYERS,
+    {
+      zBase: 200,
+      masterOpacity: masterB,
+      activeOrder: b?.activeOrder ?? EMPTY_ORDER,
+      layerOpacities: b?.layerOpacities ?? EMPTY_OPACITIES,
+      resolveTime: b?.resolveTime ?? noTime,
+      incLoading: incB,
+      decLoading: decB,
+      trackRevision: true,
+    },
+  )
 
   useMeasure(mapRef, measureMode, measureClearNonce)
   useContextOverlays(mapRef, overlays)
@@ -195,7 +211,7 @@ export function SingleMapCompare({
 
   // Fit plumbing (union bbox of both sources).
   useEffect(() => {
-    const boxes = [a.bbox, b.bbox].filter(
+    const boxes = [a.bbox, b?.bbox ?? null].filter(
       (box): box is [number, number, number, number] => box !== null,
     )
     if (boxes.length === 0) {
@@ -208,7 +224,7 @@ export function SingleMapCompare({
       Math.max(...boxes.map((box) => box[2])),
       Math.max(...boxes.map((box) => box[3])),
     ])
-  }, [a.bbox, b.bbox, setFitBbox])
+  }, [a.bbox, b?.bbox, setFitBbox])
   useEffect(() => {
     onRegisterFit(() => tryFit(true))
     return () => onRegisterFit(null)
@@ -217,6 +233,8 @@ export function SingleMapCompare({
   // Export capture: composite all layer canvases (basemap, WMS stacks,
   // overlays) — the mode's clipping is baked into the WMS canvas, so the
   // result is WYSIWYG.
+  const bLabel = b?.label ?? null
+  const bTimeLabel = b?.timeLabel ?? null
   useEffect(() => {
     onRegisterCapture(() => {
       const map = mapRef.current
@@ -225,11 +243,11 @@ export function SingleMapCompare({
         map.once('rendercomplete', () => {
           const canvas = compositeMapToCanvas(map.getTargetElement())
           const timeLabel =
-            a.timeLabel === b.timeLabel
+            bLabel === null || a.timeLabel === bTimeLabel
               ? a.timeLabel
               : [
                   a.timeLabel ? `A ${a.timeLabel}` : null,
-                  b.timeLabel ? `B ${b.timeLabel}` : null,
+                  bTimeLabel ? `B ${bTimeLabel}` : null,
                 ]
                   .filter(Boolean)
                   .join(' · ') || null
@@ -237,8 +255,11 @@ export function SingleMapCompare({
             canvas
               ? [
                   {
-                    label: `A · ${a.label}  |  B · ${b.label}`,
-                    slot: null,
+                    label:
+                      bLabel === null
+                        ? a.label
+                        : `A · ${a.label}  |  B · ${bLabel}`,
+                    slot: bLabel === null ? 'a' : null,
                     canvas,
                     timeLabel,
                   },
@@ -250,7 +271,7 @@ export function SingleMapCompare({
       })
     })
     return () => onRegisterCapture(null)
-  }, [mapRef, a.label, b.label, a.timeLabel, b.timeLabel, onRegisterCapture])
+  }, [mapRef, a.label, bLabel, a.timeLabel, bTimeLabel, onRegisterCapture])
 
   // -------- Canvas clips (swipe / spy) --------
   // BOTH stacks are clipped to complementary regions so the comparison is
@@ -392,7 +413,7 @@ export function SingleMapCompare({
 
   // Spy cursor tracking.
   useEffect(() => {
-    if (mode !== 'spy') return
+    if (mode !== 'spy' || solo) return
     const map = mapRef.current
     const container = containerRef.current
     if (!map || !container) return
@@ -412,7 +433,7 @@ export function SingleMapCompare({
       container.removeEventListener('pointerleave', onLeave)
       spyPixelRef.current = null
     }
-  }, [mode, mapRef])
+  }, [mode, solo, mapRef])
 
   // Flicker: Space toggles (map click too, via the overlay button below).
   const toggleFlicker = useCallback(
@@ -420,7 +441,7 @@ export function SingleMapCompare({
     [],
   )
   useEffect(() => {
-    if (mode !== 'flicker') return
+    if (mode !== 'flicker' || solo) return
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return
       const target = e.target as HTMLElement | null
@@ -431,7 +452,7 @@ export function SingleMapCompare({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [mode, toggleFlicker])
+  }, [mode, solo, toggleFlicker])
 
   // Swipe divider drag + keyboard.
   const updateSwipe = useCallback(
@@ -464,7 +485,9 @@ export function SingleMapCompare({
         ref={containerRef}
         className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
         onClick={
-          mode === 'flicker' && !annotateArmed ? toggleFlicker : undefined
+          mode === 'flicker' && !solo && !annotateArmed
+            ? toggleFlicker
+            : undefined
         }
       />
       <CompareSlotTag
@@ -474,20 +497,22 @@ export function SingleMapCompare({
         loading={loadingCount.a > 0}
         timeLabel={a.timeLabel}
       />
-      <CompareSlotTag
-        slot="b"
-        label={b.label}
-        side="right"
-        loading={loadingCount.b > 0}
-        timeLabel={b.timeLabel}
-      />
+      {b && (
+        <CompareSlotTag
+          slot="b"
+          label={b.label}
+          side="right"
+          loading={loadingCount.b > 0}
+          timeLabel={b.timeLabel}
+        />
+      )}
 
       {a.hiddenAtTime && <GapBadge slot="A" side="left" />}
-      {b.hiddenAtTime && <GapBadge slot="B" side="right" />}
+      {b?.hiddenAtTime && <GapBadge slot="B" side="right" />}
       {a.timeTag && <TimeTagBadge slot="A" tag={a.timeTag} side="left" />}
-      {b.timeTag && <TimeTagBadge slot="B" tag={b.timeTag} side="right" />}
+      {b?.timeTag && <TimeTagBadge slot="B" tag={b.timeTag} side="right" />}
 
-      {mode === 'swipe' && (
+      {mode === 'swipe' && !solo && (
         <div
           role="slider"
           aria-label={t('modes.swipeHandle')}
@@ -546,7 +571,7 @@ export function SingleMapCompare({
         </div>
       )}
 
-      {mode === 'flicker' && (
+      {mode === 'flicker' && !solo && (
         <div className="absolute top-2 left-1/2 z-20 -translate-x-1/2 space-y-1 text-center">
           <button
             type="button"

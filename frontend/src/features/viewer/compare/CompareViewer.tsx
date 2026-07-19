@@ -9,7 +9,11 @@
  */
 
 /**
- * Synchronized two-source WMS comparison viewer.
+ * Synchronized WMS viewer for one or two sources. With `b` null it runs
+ * solo (no mode switcher / link toggle / B track); comparison controls
+ * appear in place when B arrives — selection survives because pair keys
+ * are source-independent, and the camera survives because the `ol/View`
+ * is persistent.
  *
  * Owns: per-source capabilities (useLensSource ×2), the pairing/selection
  * model (linked by default, auto-unlinks on zero overlap), the shared
@@ -80,20 +84,28 @@ export interface CompareViewerSource {
 
 export function CompareViewer({
   a,
-  b,
+  b = null,
   mode,
   onModeChange,
+  onRequestAddSource,
+  onRemoveB,
 }: {
   a: CompareViewerSource
-  b: CompareViewerSource
+  /** Second source; null runs the viewer solo. */
+  b?: CompareViewerSource | null
   mode: CompareMode
   onModeChange: (mode: CompareMode) => void
+  /** Solo-mode "Compare…" CTA in the toolbar. */
+  onRequestAddSource?: () => void
+  /** Clear slot B (offered when B fails). */
+  onRemoveB?: () => void
 }) {
   const { t } = useTranslation('compare')
   const { t: tExec } = useTranslation('executions')
 
+  const hasB = b !== null
   const sourceA = useLensSource(a.baseUrl)
-  const sourceB = useLensSource(b.baseUrl)
+  const sourceB = useLensSource(b?.baseUrl ?? null)
 
   // One View for the lifetime of the comparison: camera state survives
   // mode switches and source swaps.
@@ -108,7 +120,9 @@ export function CompareViewer({
   const selection = useCompareSelection(pairing.pairs)
 
   const bothReady = !sourceA.loadingLayers && !sourceB.loadingLayers
-  const zeroOverlap = bothReady && pairing.overlapCount === 0
+  // Solo always has zero overlap — never auto-unlink there, it would
+  // destroy the pair-key selection that carries over when B arrives.
+  const zeroOverlap = hasB && bothReady && pairing.overlapCount === 0
   useEffect(() => {
     if (zeroOverlap && selection.linkMode === 'linked') {
       selection.setLinkMode('unlinked', { auto: true })
@@ -348,12 +362,16 @@ export function CompareViewer({
 
   // Active layers' legends for the export (per slot, lens URLs rebased,
   // external URLs verbatim — rebaseLensUrl handles both).
+  const bBaseUrl = b?.baseUrl ?? null
   const exportLegends = useMemo(() => {
     const specs: Array<{ slot: SourceSlot; title: string; url: string }> = []
-    for (const [slot, source, baseUrl, order] of [
-      ['a', sourceA, a.baseUrl, activeOrderA],
-      ['b', sourceB, b.baseUrl, activeOrderB],
-    ] as const) {
+    const slots: Array<
+      readonly [SourceSlot, typeof sourceA, string, ReadonlyArray<string>]
+    > = [['a', sourceA, a.baseUrl, activeOrderA]]
+    if (bBaseUrl !== null) {
+      slots.push(['b', sourceB, bBaseUrl, activeOrderB])
+    }
+    for (const [slot, source, baseUrl, order] of slots) {
       for (const name of order) {
         const layer = source.layers.find((l) => l.name === name)
         const legendUrl = layer?.styles[0]?.legendUrl
@@ -366,7 +384,7 @@ export function CompareViewer({
       }
     }
     return specs
-  }, [sourceA, sourceB, a.baseUrl, b.baseUrl, activeOrderA, activeOrderB])
+  }, [sourceA, sourceB, a.baseUrl, bBaseUrl, activeOrderA, activeOrderB])
 
   // Basemap — one choice driving every panel, embedded-viewer options.
   const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
@@ -468,7 +486,10 @@ export function CompareViewer({
       setLeftCollapsed(collapse)
       setRightCollapsed(collapse)
     },
-    onMode: onModeChange,
+    // Mode keys are comparison-only.
+    onMode: (next) => {
+      if (hasB) onModeChange(next)
+    },
     onFit: fitAction,
     onExport: () => setExportOpen(true),
     onHelp: () => setHelpOpen((v) => !v),
@@ -524,38 +545,41 @@ export function CompareViewer({
     masterOpacity: globalOpacity * sourceOpacity.a,
     bbox: sourceA.bbox,
   }
-  const mapSourceB: CompareMapSource = {
-    slot: 'b',
-    baseUrl: b.baseUrl,
-    label: b.label,
-    layers: sourceB.layers,
-    decorationLayers: sourceB.decorationLayers,
-    activeOrder: activeOrderB,
-    layerOpacities: selection.opacitiesFor('b'),
-    resolveTime: resolveTimeFor('b'),
-    hiddenAtTime: resolvedB.hidden,
-    timeTag: timeTagFor('b'),
-    timeLabel:
-      resolvedB.epoch !== null
-        ? formatStep(new Date(resolvedB.epoch).toISOString())
-        : null,
-    masterOpacity: globalOpacity * sourceOpacity.b,
-    bbox: sourceB.bbox,
-  }
+  const mapSourceB: CompareMapSource | null = b
+    ? {
+        slot: 'b',
+        baseUrl: b.baseUrl,
+        label: b.label,
+        layers: sourceB.layers,
+        decorationLayers: sourceB.decorationLayers,
+        activeOrder: activeOrderB,
+        layerOpacities: selection.opacitiesFor('b'),
+        resolveTime: resolveTimeFor('b'),
+        hiddenAtTime: resolvedB.hidden,
+        timeTag: timeTagFor('b'),
+        timeLabel:
+          resolvedB.epoch !== null
+            ? formatStep(new Date(resolvedB.epoch).toISOString())
+            : null,
+        masterOpacity: globalOpacity * sourceOpacity.b,
+        bbox: sourceB.bbox,
+      }
+    : null
 
   // -------- Capabilities load/error surface --------
-  const sourceError = sourceA.error ?? sourceB.error
-  if (sourceError) {
+  // Only A gates the whole viewer; a failing/loading B must not blank a
+  // working solo view.
+  if (sourceA.error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 rounded-md border border-border bg-card p-6 text-center text-sm">
-        <P className="max-w-md text-destructive">{sourceError}</P>
+        <P className="max-w-md text-destructive">{sourceA.error}</P>
         <P className="text-xs text-muted-foreground">{t('panel.corsHint')}</P>
         <Button
           variant="outline"
           size="sm"
           onClick={() => {
             sourceA.retry()
-            sourceB.retry()
+            if (hasB) sourceB.retry()
           }}
           className="gap-1.5"
         >
@@ -565,7 +589,7 @@ export function CompareViewer({
       </div>
     )
   }
-  if (!bothReady) {
+  if (sourceA.loadingLayers) {
     return (
       <div className="flex h-full items-center justify-center gap-2 rounded-md border border-border bg-card text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -576,7 +600,38 @@ export function CompareViewer({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
+      {hasB && sourceB.error && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
+          <span className="min-w-0 truncate">
+            <span className="font-medium">{t('panel.bError')}</span>{' '}
+            <span className="text-muted-foreground">{sourceB.error}</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5"
+              onClick={sourceB.retry}
+            >
+              <RefreshCw className="h-3 w-3" />
+              {tExec('lens.retry')}
+            </Button>
+            {onRemoveB && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={onRemoveB}
+              >
+                {t('panel.removeB')}
+              </Button>
+            )}
+          </span>
+        </div>
+      )}
       <CompareToolbar
+        solo={!hasB}
+        onRequestAddSource={onRequestAddSource}
         mode={mode}
         onModeChange={onModeChange}
         linkMode={selection.linkMode}
@@ -626,7 +681,7 @@ export function CompareViewer({
         capture={captureAction}
         legends={exportLegends}
         annotations={annotations}
-        meta={{ labelA: a.label, labelB: b.label }}
+        meta={{ labelA: a.label, labelB: b?.label ?? null }}
       />
       <div className="flex min-h-0 flex-1 gap-2">
         {/* Collapse hides (not unmounts) the sidebars so working state —
@@ -662,13 +717,13 @@ export function CompareViewer({
             }}
             sources={{
               a: { label: a.label, baseUrl: a.baseUrl, lens: sourceA },
-              b: { label: b.label, baseUrl: b.baseUrl, lens: sourceB },
+              b: b ? { label: b.label, baseUrl: b.baseUrl, lens: sourceB } : null,
             }}
             onCollapse={() => setLeftCollapsed(true)}
           />
         </div>
         <div className="min-h-0 min-w-0 flex-1">
-          {mode === 'side' ? (
+          {mode === 'side' && mapSourceB ? (
             <DualMapCompare
               view={viewRef.current}
               a={mapSourceA}
@@ -690,7 +745,7 @@ export function CompareViewer({
               view={viewRef.current}
               a={mapSourceA}
               b={mapSourceB}
-              mode={mode}
+              mode={mode === 'side' ? 'swipe' : mode}
               options={modeOptions}
               measureMode={measureMode}
               measureClearNonce={measureClearNonce}
@@ -708,6 +763,7 @@ export function CompareViewer({
         </div>
         <div style={{ display: rightCollapsed ? 'none' : 'contents' }}>
           <CompareLayerBrowser
+            hasB={hasB}
             pairs={pairing.pairs}
             selection={selection}
             sourceA={sourceA}
@@ -723,6 +779,7 @@ export function CompareViewer({
         )}
       </div>
       <CompareTimeSlider
+        hasB={hasB}
         timeline={displayTimeline}
         index={safeStep}
         onChange={onTimeChange}
