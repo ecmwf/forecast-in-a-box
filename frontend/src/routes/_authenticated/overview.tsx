@@ -25,21 +25,15 @@ import { ConfigPresetsSection } from '@/features/dashboard/components/ConfigPres
 import { ForecastJournal } from '@/features/dashboard/components/ForecastJournal'
 import { GettingStartedSection } from '@/features/dashboard/components/GettingStartedSection'
 import { WelcomeCard } from '@/features/dashboard/components/WelcomeCard'
-import { cn } from '@/lib/utils'
+import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { useUiStore } from '@/stores/uiStore'
 
 function DashboardPage() {
-  const layoutMode = useUiStore((state) => state.layoutMode)
   const dashboardVariant = useUiStore((state) => state.dashboardVariant)
   const panelShadow = useUiStore((state) => state.panelShadow)
 
   return (
-    <div
-      className={cn(
-        'mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8',
-        layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
-      )}
-    >
+    <ListPageContainer>
       {/* Row 1: Welcome + Community News */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <WelcomeCard variant={dashboardVariant} shadow={panelShadow} />
@@ -54,7 +48,7 @@ function DashboardPage() {
 
       {/* Row 4: Forecast Journal */}
       <ForecastJournal variant={dashboardVariant} shadow={panelShadow} />
-    </div>
+    </ListPageContainer>
   )
 }
 

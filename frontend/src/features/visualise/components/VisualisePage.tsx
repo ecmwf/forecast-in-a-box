@@ -29,7 +29,7 @@ import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
 import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
-import { useViewportFill } from '../hooks/useViewportFill'
+
 import { CompareSlotBar } from './CompareSlotBar'
 import { ComparePanel } from './ComparePanel'
 import { SourcePicker } from './SourcePicker'
@@ -38,6 +38,7 @@ import type { ComparisonEntry } from '../entry-ref'
 import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/geo/types'
 import { useStopLens } from '@/api/hooks/useLens'
+import { useViewportFill } from '@/hooks/useViewportFill'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { H1 } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
@@ -258,8 +259,7 @@ export function VisualisePage() {
       {entries.length === 0 ? (
         <VisualiseHub />
       ) : a && stateA.phase === 'running' ? (
-        // Sized so the viewer bottom meets the viewport bottom; the
-        // footer stays on the page below the fold.
+        // Viewer bottom meets the viewport bottom; footer below the fold.
         <div
           ref={viewerFill.ref}
           style={

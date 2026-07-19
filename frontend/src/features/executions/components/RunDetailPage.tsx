@@ -34,8 +34,10 @@ import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { StoredOutputsCard } from './StoredOutputsCard'
+import type { CSSProperties } from 'react'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
+import { useViewportFill } from '@/hooks/useViewportFill'
 import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
@@ -87,6 +89,7 @@ export function RunDetailPage() {
   }, [jobId, resetExecutionSelection])
 
   const layoutMode = useUiStore((state) => state.layoutMode)
+  const columnsFill = useViewportFill(true, { insetPx: 32 })
   const { data: catalogue } = useBlockCatalogue()
 
   // Sync scroll-to-top before paint — a tall /configure scroll position
@@ -235,11 +238,17 @@ export function RunDetailPage() {
       {/* Wide: side-by-side, pinned to viewport height with independent
           column scroll. Narrow: stacked single-document scroll. */}
       <div
+        ref={columnsFill.ref}
+        style={
+          columnsFill.height !== null
+            ? ({ '--fill-h': `${columnsFill.height}px` } as CSSProperties)
+            : undefined
+        }
         className={cn(
           'flex flex-1 flex-col gap-8',
-          // Wide: pin to viewport minus chrome (~17rem). flex-none cancels
-          // the inherited flex-1 so the explicit height is honoured.
-          'min-[1280px]:h-[calc(100vh_-_17rem)] min-[1280px]:flex-row',
+          // Wide: pin to the measured viewport remainder (calc fallback).
+          // flex-none cancels the inherited flex-1 so the height holds.
+          'min-[1280px]:h-[var(--fill-h,calc(100vh_-_17rem))] min-[1280px]:flex-row',
           'min-[1280px]:flex-none min-[1280px]:gap-6 min-[1280px]:overflow-hidden',
         )}
       >

@@ -8,23 +8,23 @@
  * does it submit to any jurisdiction.
  */
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useState } from 'react'
 
 /**
- * Height that puts the element's bottom at the viewport bottom while the
- * page stays a normal document (the footer remains reachable below the
- * fold). Re-measured on window resize and any body-height change (e.g.
- * the dismissible notification banner above).
+ * Height landing the element's bottom on the viewport bottom; the page
+ * stays a normal document (footer below the fold). Re-measures on resize
+ * and body-height changes (banner dismissal). Callback ref — the target
+ * usually mounts after loading states.
  */
 export function useViewportFill(
   active: boolean,
   { minPx = 480, insetPx = 16 }: { minPx?: number; insetPx?: number } = {},
-): { ref: React.RefObject<HTMLDivElement | null>; height: number | null } {
-  const ref = useRef<HTMLDivElement | null>(null)
+): { ref: (node: HTMLDivElement | null) => void; height: number | null } {
+  const [el, setEl] = useState<HTMLDivElement | null>(null)
+  const ref = useCallback((node: HTMLDivElement | null) => setEl(node), [])
   const [height, setHeight] = useState<number | null>(null)
 
   useLayoutEffect(() => {
-    const el = ref.current
     if (!active || !el) return
     const update = () => {
       const docTop = el.getBoundingClientRect().top + window.scrollY
@@ -38,7 +38,7 @@ export function useViewportFill(
       window.removeEventListener('resize', update)
       observer.disconnect()
     }
-  }, [active, minPx, insetPx])
+  }, [active, el, minPx, insetPx])
 
   return { ref, height }
 }
