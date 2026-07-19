@@ -13,7 +13,7 @@ import { z } from 'zod'
 import { ComparePage } from '@/features/compare/components/ComparePage'
 
 /**
- * Comparison URL state — the shareable projection of a comparison.
+ * Visualisation URL state — the shareable projection of a view.
  * `a`/`b` are entry refs (`run:<jobId>~<taskId>` | `path:<path>` |
  * `wms:<url>`); `b` may also be the literal `off` (deliberate
  * single-source view, see SLOT_B_OFF). The basket itself is localStorage,
@@ -22,18 +22,13 @@ import { ComparePage } from '@/features/compare/components/ComparePage'
  * pair" depends on client-local basket state, so a shared URL must pin it
  * explicitly.
  */
-const compareSearchSchema = z.object({
+const visualiseSearchSchema = z.object({
   a: z.string().optional(),
   b: z.string().optional(),
   mode: z.enum(['swipe', 'side', 'flicker', 'spy', 'blend']).optional(),
-  time: z.string().optional(),
 })
 
-export type CompareMode = NonNullable<
-  z.infer<typeof compareSearchSchema>['mode']
->
-
-export const Route = createFileRoute('/_authenticated/compare')({
+export const Route = createFileRoute('/_authenticated/visualise')({
   component: ComparePage,
-  validateSearch: compareSearchSchema,
+  validateSearch: visualiseSearchSchema,
 })

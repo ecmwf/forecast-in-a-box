@@ -47,7 +47,6 @@ const searchSchema = z.object({
   a: z.string().optional(),
   b: z.string().optional(),
   mode: z.enum(['swipe', 'side', 'flicker', 'spy', 'blend']).optional(),
-  time: z.string().optional(),
 })
 
 function renderComparePage(search = '') {
@@ -65,17 +64,17 @@ function renderComparePage(search = '') {
     id: '_authenticated',
     component: () => <Outlet />,
   })
-  const compareRoute = createRoute({
+  const visualiseRoute = createRoute({
     getParentRoute: () => authenticatedRoute,
-    path: '/compare',
+    path: '/visualise',
     validateSearch: searchSchema,
     component: ComparePage,
   })
   const router = createRouter({
     routeTree: rootRoute.addChildren([
-      authenticatedRoute.addChildren([compareRoute]),
+      authenticatedRoute.addChildren([visualiseRoute]),
     ]),
-    history: createMemoryHistory({ initialEntries: [`/compare${search}`] }),
+    history: createMemoryHistory({ initialEntries: [`/visualise${search}`] }),
   })
   return render(
     <QueryClientProvider client={queryClient}>

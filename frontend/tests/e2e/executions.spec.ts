@@ -207,7 +207,7 @@ test.describe('Execution Detail Page', () => {
     await page.waitForTimeout(1000)
 
     // Back link should be visible
-    const backLink = page.getByText('Executions')
+    const backLink = page.getByText('Runs')
     if (
       await backLink
         .first()

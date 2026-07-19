@@ -9,49 +9,32 @@
  */
 
 /**
- * Source picker for the comparison basket — the /compare empty state and
- * the "Add source" dialog body. Three sections:
- *  1. recent runs with stored (GRIB-dir) outputs — scans page 1 of the
- *     run list only (documented limitation until the backend can filter)
+ * Source picker for the basket — the "Add source" dialog body. Sections:
+ *  1. recent runs with stored (GRIB-dir) outputs (RunSourceList)
  *  2. running lens servers, matched back to outputs by path
- *  3. external data: a GRIB directory on the FIAB host (a lens is started
- *     on it when the source becomes active). External WMS URLs follow in
- *     a later phase.
+ *  3. external data: host GRIB directory + external WMS endpoint
  */
 
-import { useMemo, useState } from 'react'
-import { FolderInput, Globe, Loader2, Radar, Rows3 } from 'lucide-react'
+import { useState } from 'react'
+import { FolderInput, Radar, Rows3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { entryDisplayName, entryRef } from '../entry-ref'
-import { gribMarkerRows, useLensPathIndex } from '../hooks/useLensPathIndex'
-import { probeWmsEndpoint } from '../wms-probe'
+import { entryRef } from '../entry-ref'
+import { useLensPathIndex } from '../hooks/useLensPathIndex'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { AddToComparisonButton } from './AddToComparisonButton'
 import { CompareBasketChip } from './CompareBasketChip'
-import type { GribMarkerRow } from '../hooks/useLensPathIndex'
-import type { NewComparisonEntry } from '../entry-ref'
-import { useJobsStatus } from '@/api/hooks/useJobs'
-import { useFableRetrieve } from '@/api/hooks/useFable'
+import { HostPathForm } from './sources/HostPathForm'
+import { RunSourceList } from './sources/RunSourceList'
+import { WmsUrlForm } from './sources/WmsUrlForm'
 import { useLensList } from '@/api/hooks/useLens'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { P } from '@/components/base/typography'
-import { showToast } from '@/lib/toast'
-import { formatInZone, useAppTimeZone } from '@/lib/datetime'
-
-const PICKER_RUNS = 20
 
 export function ComparisonSourcePicker() {
   const { t } = useTranslation('compare')
   const [search, setSearch] = useState('')
-  const { data: jobsList } = useJobsStatus(1, PICKER_RUNS)
   const { data: lenses } = useLensList()
   const pathIndex = useLensPathIndex()
-
-  const markerRows = useMemo(
-    () => gribMarkerRows(jobsList?.runs ?? []),
-    [jobsList],
-  )
 
   const query = search.trim().toLowerCase()
 
@@ -75,21 +58,7 @@ export function ComparisonSourcePicker() {
           <SectionLabel icon={<Rows3 className="h-3.5 w-3.5" />}>
             {t('picker.recentRuns')}
           </SectionLabel>
-          {markerRows.length === 0 ? (
-            <P className="py-2 text-sm text-muted-foreground">
-              {t('picker.empty')}
-            </P>
-          ) : (
-            <ul className="divide-y divide-border">
-              {markerRows.map((row) => (
-                <RunSourceRow
-                  key={`${row.jobId}:${row.blockId}`}
-                  row={row}
-                  filter={query}
-                />
-              ))}
-            </ul>
-          )}
+          <RunSourceList query={query} />
         </section>
 
         {/* Running lenses */}
@@ -176,183 +145,6 @@ function SectionLabel({
       {icon}
       {children}
     </P>
-  )
-}
-
-/** One run-output row: blueprint name resolved lazily per row. */
-function RunSourceRow({ row, filter }: { row: GribMarkerRow; filter: string }) {
-  const timeZone = useAppTimeZone()
-  const { data: fableData } = useFableRetrieve(useRunBlueprintId(row.jobId))
-  const runName = fableData?.display_name?.trim() ?? ''
-
-  const entry: NewComparisonEntry = {
-    kind: 'output',
-    jobId: row.jobId,
-    taskId: row.taskId,
-    blockId: row.blockId,
-    runName,
-    blockTitle: row.blockId,
-    runCreatedAt: row.runCreatedAt,
-  }
-  const name = entryDisplayName(entry)
-  const haystack = `${name} ${row.blockId} ${row.jobId}`.toLowerCase()
-  if (filter && !haystack.includes(filter)) return null
-
-  return (
-    <li className="flex items-center gap-3 py-2">
-      <div className="min-w-0 flex-1">
-        <P className="truncate text-sm font-medium">{name}</P>
-        <P className="truncate font-mono text-[11px] text-muted-foreground/70">
-          {row.blockId}
-          {row.runCreatedAt
-            ? ` · ${formatInZone(new Date(row.runCreatedAt), timeZone, 'yyyy-MM-dd HH:mm')}`
-            : ''}
-        </P>
-      </div>
-      <AddToComparisonButton entry={entry} />
-    </li>
-  )
-}
-
-/** blueprint_id for a run, from the cached run list / status queries. */
-function useRunBlueprintId(jobId: string): string | undefined {
-  const { data: jobsList } = useJobsStatus(1, PICKER_RUNS)
-  return jobsList?.runs.find((r) => r.run_id === jobId)?.blueprint_id
-}
-
-function HostPathForm() {
-  const { t } = useTranslation('compare')
-  const [path, setPath] = useState('')
-  const addEntry = useComparisonStore((s) => s.addEntry)
-
-  const submit = () => {
-    const trimmed = path.trim()
-    if (!trimmed) return
-    const label = trimmed.replace(/\/$/, '').split('/').pop() || trimmed
-    const result = addEntry({ kind: 'path', path: trimmed, label })
-    if (result === 'added') {
-      showToast.success(t('toast.added', { name: label }))
-      setPath('')
-    } else if (result === 'full') {
-      showToast.error(t('toast.full', { max: 8 }))
-    }
-  }
-
-  return (
-    <div className="space-y-1.5">
-      <P className="text-sm font-medium">{t('picker.hostPath.title')}</P>
-      <P className="text-xs text-muted-foreground">
-        {t('picker.hostPath.description')}
-      </P>
-      <div className="flex gap-2">
-        <Input
-          value={path}
-          onChange={(e) => setPath(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') submit()
-          }}
-          placeholder={t('picker.hostPath.placeholder')}
-          className="h-8 font-mono text-xs"
-        />
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={submit}
-          disabled={!path.trim()}
-          className="h-8 shrink-0"
-        >
-          {t('picker.add')}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-type WmsFormError =
-  | { reason: 'invalid-url' | 'unreachable' | 'parse' }
-  | { reason: 'http'; status: number }
-  | null
-
-function WmsUrlForm() {
-  const { t } = useTranslation('compare')
-  const [url, setUrl] = useState('')
-  const [probing, setProbing] = useState(false)
-  const [error, setError] = useState<WmsFormError>(null)
-  const addEntry = useComparisonStore((s) => s.addEntry)
-
-  const submit = async () => {
-    if (probing || !url.trim()) return
-    setProbing(true)
-    setError(null)
-    const result = await probeWmsEndpoint(url)
-    setProbing(false)
-    if (!result.ok) {
-      setError(
-        result.reason === 'http'
-          ? { reason: 'http', status: result.status }
-          : { reason: result.reason },
-      )
-      return
-    }
-    const added = addEntry({
-      kind: 'wms',
-      url: result.baseUrl,
-      label: result.label,
-    })
-    if (added === 'added') {
-      showToast.success(t('toast.added', { name: result.label }))
-      setUrl('')
-    } else if (added === 'full') {
-      showToast.error(t('toast.full', { max: 8 }))
-    }
-  }
-
-  const errorText =
-    error === null
-      ? null
-      : error.reason === 'invalid-url'
-        ? t('picker.wmsUrl.errorInvalidUrl')
-        : error.reason === 'unreachable'
-          ? t('picker.wmsUrl.errorUnreachable')
-          : error.reason === 'http'
-            ? t('picker.wmsUrl.errorHttp', { status: error.status })
-            : t('picker.wmsUrl.errorParse')
-
-  return (
-    <div className="space-y-1.5">
-      <P className="flex items-center gap-1.5 text-sm font-medium">
-        <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-        {t('picker.wmsUrl.title')}
-      </P>
-      <P className="text-xs text-muted-foreground">
-        {t('picker.wmsUrl.description')}
-      </P>
-      <div className="flex gap-2">
-        <Input
-          value={url}
-          onChange={(e) => {
-            setUrl(e.target.value)
-            setError(null)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void submit()
-          }}
-          placeholder={t('picker.wmsUrl.placeholder')}
-          className="h-8 font-mono text-xs"
-        />
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void submit()}
-          disabled={!url.trim() || probing}
-          className="h-8 shrink-0 gap-1.5"
-        >
-          {probing && <Loader2 className="h-3 w-3 animate-spin" />}
-          {probing ? t('picker.wmsUrl.probing') : t('picker.wmsUrl.connect')}
-        </Button>
-      </div>
-      {errorText && <P className="text-xs text-destructive">{errorText}</P>}
-    </div>
   )
 }
 

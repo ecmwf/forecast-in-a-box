@@ -1,7 +1,7 @@
 {
   "page": {
-    "title": "Compare",
-    "description": "Compare geographic outputs from different runs or external sources on synchronized maps."
+    "title": "Visualise",
+    "description": "View geographic outputs on a map — from past runs, external WMS servers, or host folders. Add a second source to compare."
   },
   "entry": {
     "add": "Compare",
@@ -31,7 +31,7 @@
     "kindWms": "WMS"
   },
   "picker": {
-    "title": "Add comparison source",
+    "title": "Add source",
     "searchPlaceholder": "Search runs and blocks…",
     "recentRuns": "Recent runs with stored outputs",
     "recentRunsLimit": "Showing the most recent runs only",
@@ -60,7 +60,8 @@
       "placeholder": "/path/to/grib/output",
       "start": "Start lens & add"
     },
-    "collected": "Collected sources"
+    "collected": "Collected sources",
+    "loadMore": "Load more runs"
   },
   "lens": {
     "resolving": "Locating output directory…",
@@ -241,5 +242,11 @@
   },
   "toolbar": {
     "compareCta": "Compare…"
+  },
+  "hub": {
+    "title": "Visualise forecasts on a map",
+    "description": "Load a previously generated result, connect an external WMS server, or point at a GRIB folder on the host. One source opens a map view; a second turns it into a comparison.",
+    "previousResults": "Previous results",
+    "browseAll": "Browse all runs"
   }
 }
