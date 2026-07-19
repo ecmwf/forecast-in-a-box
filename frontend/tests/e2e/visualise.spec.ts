@@ -9,10 +9,9 @@
  */
 
 /**
- * Compare page smoke (must pass against both the MSW-mocked and the
+ * Visualise page smoke (must pass against both the MSW-mocked and the
  * real-stack Playwright configs, so it only asserts state that exists in
- * both: the route, the empty-state source picker, and the contextual nav
- * item's absence while the basket is empty).
+ * both: the route, the empty-state hub, and the permanent nav item).
  */
 
 import { expect, test } from '@playwright/test'
@@ -24,31 +23,33 @@ async function establishSession(page: Page) {
   await page.waitForLoadState('networkidle')
 }
 
-test.describe('Compare page', () => {
-  test('renders the empty-state source picker at /compare', async ({
-    page,
-  }) => {
+test.describe('Visualise page', () => {
+  test('renders the empty-state hub at /visualise', async ({ page }) => {
     await establishSession(page)
 
-    await page.goto('/compare')
+    await page.goto('/visualise')
     await page.waitForLoadState('networkidle')
 
     await expect(
-      page.getByRole('heading', { name: 'Compare', exact: true }),
+      page.getByRole('heading', { name: 'Visualise', exact: true }),
     ).toBeVisible({ timeout: 10000 })
-    // Empty basket → the source picker is the page body, external forms
-    // included.
+    // Empty basket → the hub with all three source paths.
+    await expect(page.getByText('Visualise forecasts on a map')).toBeVisible()
     await expect(page.getByText('GRIB directory on this host')).toBeVisible()
-    await expect(page.getByText('External WMS server')).toBeVisible()
+    await expect(
+      page.getByText('External WMS server', { exact: true }),
+    ).toBeVisible()
   })
 
-  test('hides the contextual Compare nav item while the basket is empty', async ({
+  test('shows the Visualise nav item even with an empty basket', async ({
     page,
   }) => {
     await establishSession(page)
 
     const nav = page.getByRole('navigation', { name: 'Main navigation' })
-    await expect(nav.getByText('Executions')).toBeVisible({ timeout: 10000 })
-    await expect(nav.getByText('Compare')).toHaveCount(0)
+    await expect(nav.getByText('Runs')).toBeVisible({ timeout: 10000 })
+    await expect(nav.getByText('Visualise')).toBeVisible()
+    await nav.getByText('Visualise').click()
+    await page.waitForURL(/visualise/, { timeout: 10000 })
   })
 })

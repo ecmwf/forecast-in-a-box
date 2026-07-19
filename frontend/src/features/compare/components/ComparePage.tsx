@@ -9,16 +9,15 @@
  */
 
 /**
- * /compare — geographic comparison of collected sources.
+ * /visualise — geo visualisation of collected sources; single-source by
+ * default, comparison once a second source is active.
  *
- * The basket (persisted, see comparisonStore) holds up to 8 sources; two
- * are active at a time as slots A and B, pinned in the URL (`?a=…&b=…`)
- * so a comparison is shareable. Clicking a basket chip activates it as
- * source B (clicking the current A swaps the pair) — the fastest gesture
- * for "compare everything against a reference A". Active sources resolve
- * to lenses automatically (useComparisonSource); lenses are never stopped
- * implicitly — the header offers an explicit stop that also pauses
- * auto-start.
+ * The basket (persisted, see comparisonStore) holds up to 8 sources; up
+ * to two are active as slots A and B, pinned in the URL (`?a=…&b=…`,
+ * `b=off` = deliberate single view) so a view is shareable. Active
+ * sources resolve to lenses automatically (useComparisonSource); lenses
+ * are never stopped implicitly — the header offers an explicit stop that
+ * also pauses auto-start.
  */
 
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
@@ -33,6 +32,7 @@ import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
 import { CompareSlotBar } from './CompareSlotBar'
 import { ComparePanel } from './ComparePanel'
 import { ComparisonSourcePicker } from './ComparisonSourcePicker'
+import { VisualiseHub } from './VisualiseHub'
 import type { ComparisonEntry } from '../entry-ref'
 import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/compare/types'
@@ -56,7 +56,7 @@ const CompareViewer = lazy(() =>
   })),
 )
 
-const route = getRouteApi('/_authenticated/compare')
+const route = getRouteApi('/_authenticated/visualise')
 
 export interface ActivePair {
   a: ComparisonEntry | null
@@ -251,9 +251,7 @@ export function ComparePage() {
       </div>
 
       {entries.length === 0 ? (
-        <div className="mx-auto w-full max-w-xl rounded-lg border border-border bg-card p-5">
-          <ComparisonSourcePicker />
-        </div>
+        <VisualiseHub />
       ) : a && stateA.phase === 'running' ? (
         <div className="h-[75vh] min-h-[560px]">
           <Suspense

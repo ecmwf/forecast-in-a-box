@@ -46,7 +46,8 @@ const ALL_COMMANDS = [
   'Dataset Forecast',
   'Dashboard',
   'Configure',
-  'Executions',
+  'Runs',
+  'Visualise',
   'Admin',
 ]
 
@@ -143,12 +144,12 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    // "journal" is a keyword of the Executions command — it appears in neither
+    // "journal" is a keyword of the Runs command — it appears in neither
     // its label nor its description.
     await screen.getByPlaceholder(PLACEHOLDER).fill('journal')
 
     await expect
-      .element(screen.getByRole('option', { name: /Executions/ }))
+      .element(screen.getByRole('option', { name: /Runs/ }))
       .toBeVisible()
     await expect
       .element(screen.getByRole('option', { name: /Dashboard/ }))

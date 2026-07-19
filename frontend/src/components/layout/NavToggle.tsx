@@ -9,13 +9,13 @@
  */
 
 /**
- * Primary section nav (Overview / Configuration / Executions). A fourth item
- * for the open run appears on an execution detail page.
+ * Primary section nav (Overview / Configure / Runs / Visualise). A fifth
+ * item for the open run appears on an execution detail page.
  */
 
 import {
+  Earth,
   FileText,
-  GitCompareArrows,
   LayoutDashboard,
   Play,
   SlidersHorizontal,
@@ -40,7 +40,7 @@ const navItems = [
     Icon: SlidersHorizontal,
     exact: false,
   },
-  // Exact: an open run highlights the run item, not this one — "Executions" stays a link to the list.
+  // Exact: an open run highlights the run item, not this one — "Runs" stays a link to the list.
   { to: '/executions', labelKey: 'nav.executions', Icon: Play, exact: true },
 ] as const
 
@@ -76,26 +76,27 @@ function RunNavItem({ jobId }: { jobId: string }) {
 }
 
 /**
- * Contextual Compare item — appears only while the comparison basket is
- * non-empty (same pattern as the run item). The count subscription lives
- * in this leaf so basket changes re-render one link, not the whole nav.
+ * Permanent Visualise item; the badge shows the source-basket count. The
+ * count subscription lives in this leaf so basket changes re-render one
+ * link, not the whole nav.
  */
-function CompareNavItem() {
+function VisualiseNavItem() {
   const { t } = useTranslation('common')
   const count = useComparisonCount()
-  if (count === 0) return null
   return (
     <Link
-      to="/compare"
+      to="/visualise"
       activeOptions={{ includeSearch: false }}
       className={itemClass}
       activeProps={{ className: activeItemClass, 'aria-current': 'page' }}
     >
-      <GitCompareArrows className="h-4 w-4" />
-      {t('nav.compare')}
-      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums">
-        {count}
-      </span>
+      <Earth className="h-4 w-4" />
+      {t('nav.visualise')}
+      {count > 0 && (
+        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums">
+          {count}
+        </span>
+      )}
     </Link>
   )
 }
@@ -122,8 +123,8 @@ export function NavToggle() {
           {t(labelKey)}
         </Link>
       ))}
+      <VisualiseNavItem />
       {jobId && <RunNavItem jobId={jobId} />}
-      <CompareNavItem />
     </nav>
   )
 }

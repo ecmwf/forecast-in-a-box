@@ -17,6 +17,7 @@
 import {
   BarChart3,
   Database,
+  Earth,
   History,
   Home,
   Layers,
@@ -105,6 +106,16 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       keywords: ['executions', 'history', 'past', 'runs', 'journal', 'jobs'],
       hotkey: ['G', 'E'],
       action: () => navigate({ to: '/executions' }),
+    },
+    {
+      id: 'nav-visualise',
+      label: i18n.t('common:commands.visualise.label'),
+      description: i18n.t('common:commands.visualise.description'),
+      icon: <Earth className="h-4 w-4" />,
+      category: 'Navigation',
+      keywords: ['visualise', 'visualize', 'map', 'compare', 'wms', 'viewer'],
+      hotkey: ['G', 'V'],
+      action: () => navigate({ to: '/visualise' }),
     },
     {
       id: 'nav-admin',

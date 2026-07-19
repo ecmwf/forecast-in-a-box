@@ -31,7 +31,7 @@ import { showToast } from '@/lib/toast'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('useHydrateComparisonFromUrl')
-const route = getRouteApi('/_authenticated/compare')
+const route = getRouteApi('/_authenticated/visualise')
 
 /** Default label for hydrated path entries: the last path segment. */
 function pathLabel(path: string): string {

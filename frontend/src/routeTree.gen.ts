@@ -12,10 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedVisualiseRouteImport } from './routes/_authenticated/visualise'
 import { Route as AuthenticatedPresetsRouteImport } from './routes/_authenticated/presets'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfigureRouteImport } from './routes/_authenticated/configure'
-import { Route as AuthenticatedCompareRouteImport } from './routes/_authenticated/compare'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedSchedulesIndexRouteImport } from './routes/_authenticated/schedules.index'
 import { Route as AuthenticatedExecutionsIndexRouteImport } from './routes/_authenticated/executions.index'
@@ -46,6 +46,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedVisualiseRoute = AuthenticatedVisualiseRouteImport.update({
+  id: '/visualise',
+  path: '/visualise',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedPresetsRoute = AuthenticatedPresetsRouteImport.update({
   id: '/presets',
   path: '/presets',
@@ -59,11 +64,6 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
 const AuthenticatedConfigureRoute = AuthenticatedConfigureRouteImport.update({
   id: '/configure',
   path: '/configure',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedCompareRoute = AuthenticatedCompareRouteImport.update({
-  id: '/compare',
-  path: '/compare',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -159,10 +159,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/compare': typeof AuthenticatedCompareRoute
   '/configure': typeof AuthenticatedConfigureRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/presets': typeof AuthenticatedPresetsRoute
+  '/visualise': typeof AuthenticatedVisualiseRoute
   '/admin/artifacts': typeof AuthenticatedAdminArtifactsRouteWithChildren
   '/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
   '/admin/variables': typeof AuthenticatedAdminVariablesRouteWithChildren
@@ -181,10 +181,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/compare': typeof AuthenticatedCompareRoute
   '/configure': typeof AuthenticatedConfigureRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/presets': typeof AuthenticatedPresetsRoute
+  '/visualise': typeof AuthenticatedVisualiseRoute
   '/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
   '/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
   '/schedules/$scheduleId': typeof AuthenticatedSchedulesScheduleIdRoute
@@ -203,10 +203,10 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
-  '/_authenticated/compare': typeof AuthenticatedCompareRoute
   '/_authenticated/configure': typeof AuthenticatedConfigureRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/presets': typeof AuthenticatedPresetsRoute
+  '/_authenticated/visualise': typeof AuthenticatedVisualiseRoute
   '/_authenticated/admin/artifacts': typeof AuthenticatedAdminArtifactsRouteWithChildren
   '/_authenticated/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
   '/_authenticated/admin/variables': typeof AuthenticatedAdminVariablesRouteWithChildren
@@ -228,10 +228,10 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin'
-    | '/compare'
     | '/configure'
     | '/dashboard'
     | '/presets'
+    | '/visualise'
     | '/admin/artifacts'
     | '/admin/plugins'
     | '/admin/variables'
@@ -250,10 +250,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
-    | '/compare'
     | '/configure'
     | '/dashboard'
     | '/presets'
+    | '/visualise'
     | '/configure/$fableId'
     | '/executions/$jobId'
     | '/schedules/$scheduleId'
@@ -271,10 +271,10 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/about'
     | '/_authenticated/admin'
-    | '/_authenticated/compare'
     | '/_authenticated/configure'
     | '/_authenticated/dashboard'
     | '/_authenticated/presets'
+    | '/_authenticated/visualise'
     | '/_authenticated/admin/artifacts'
     | '/_authenticated/admin/plugins'
     | '/_authenticated/admin/variables'
@@ -320,6 +320,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/visualise': {
+      id: '/_authenticated/visualise'
+      path: '/visualise'
+      fullPath: '/visualise'
+      preLoaderRoute: typeof AuthenticatedVisualiseRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/presets': {
       id: '/_authenticated/presets'
       path: '/presets'
@@ -339,13 +346,6 @@ declare module '@tanstack/react-router' {
       path: '/configure'
       fullPath: '/configure'
       preLoaderRoute: typeof AuthenticatedConfigureRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/compare': {
-      id: '/_authenticated/compare'
-      path: '/compare'
-      fullPath: '/compare'
-      preLoaderRoute: typeof AuthenticatedCompareRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin': {
@@ -541,10 +541,10 @@ const AuthenticatedConfigureRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
-  AuthenticatedCompareRoute: typeof AuthenticatedCompareRoute
   AuthenticatedConfigureRoute: typeof AuthenticatedConfigureRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedPresetsRoute: typeof AuthenticatedPresetsRoute
+  AuthenticatedVisualiseRoute: typeof AuthenticatedVisualiseRoute
   AuthenticatedExecutionsJobIdRoute: typeof AuthenticatedExecutionsJobIdRoute
   AuthenticatedSchedulesScheduleIdRoute: typeof AuthenticatedSchedulesScheduleIdRoute
   AuthenticatedExecutionsIndexRoute: typeof AuthenticatedExecutionsIndexRoute
@@ -553,10 +553,10 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
-  AuthenticatedCompareRoute: AuthenticatedCompareRoute,
   AuthenticatedConfigureRoute: AuthenticatedConfigureRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedPresetsRoute: AuthenticatedPresetsRoute,
+  AuthenticatedVisualiseRoute: AuthenticatedVisualiseRoute,
   AuthenticatedExecutionsJobIdRoute: AuthenticatedExecutionsJobIdRoute,
   AuthenticatedSchedulesScheduleIdRoute: AuthenticatedSchedulesScheduleIdRoute,
   AuthenticatedExecutionsIndexRoute: AuthenticatedExecutionsIndexRoute,

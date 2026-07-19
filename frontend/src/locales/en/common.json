@@ -47,9 +47,9 @@
   "nav": {
     "label": "Main navigation",
     "overview": "Overview",
-    "configuration": "Configuration",
-    "executions": "Executions",
-    "compare": "Compare"
+    "configuration": "Configure",
+    "executions": "Runs",
+    "visualise": "Visualise"
   },
   "status": {
     "title": "System Status",
@@ -166,12 +166,16 @@
       "description": "Create a new forecast configuration"
     },
     "executions": {
-      "label": "Executions",
+      "label": "Runs",
       "description": "Monitor forecast job executions"
     },
     "admin": {
       "label": "Admin",
       "description": "Manage plugins and models"
+    },
+    "visualise": {
+      "label": "Visualise",
+      "description": "View and compare geo outputs on a map"
     }
   },
   "timezone": {
