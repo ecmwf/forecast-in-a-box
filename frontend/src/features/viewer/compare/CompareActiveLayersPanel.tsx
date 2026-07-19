@@ -16,9 +16,17 @@
  * legends and removal.
  */
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, Eye, EyeOff, HelpCircle, Upload, X } from 'lucide-react'
+import {
+  ChevronLeft,
+  Eye,
+  EyeOff,
+  GripVertical,
+  HelpCircle,
+  Upload,
+  X,
+} from 'lucide-react'
 import { firstNumber } from '../format'
 import { rebaseLensUrl } from '../wms-capabilities'
 import { LegendImage } from '../components/LegendImage'
@@ -168,10 +176,12 @@ export function CompareActiveLayersPanel({
             <EmptyHint />
           ) : (
             <ul className="space-y-2">
-              {activePairs.map((pair) => (
+              {activePairs.map((pair, index) => (
                 <ActivePairCard
                   key={pair.key}
                   pair={pair}
+                  index={index}
+                  onReorder={selection.reorderPair}
                   selection={selection}
                   sources={sources}
                 />
@@ -419,22 +429,61 @@ function OpacityRow({
 /** Linked mode: one card per active PAIR, with both sources' legends. */
 function ActivePairCard({
   pair,
+  index,
+  onReorder,
   selection,
   sources,
 }: {
   pair: PairedLayer
+  index: number
+  onReorder: (from: number, to: number) => void
   selection: CompareSelection
   sources: { a: PanelSlotSource; b: PanelSlotSource | null }
 }) {
   const { t } = useTranslation('compare')
+  const { t: tExec } = useTranslation('executions')
+  const [over, setOver] = useState(false)
   const title =
     pair.level !== null
       ? `${pair.title} · ${pair.level} ${pair.levelUnit ?? 'hPa'}`
       : pair.title
 
   return (
-    <li className="rounded-md border border-border bg-card p-2.5">
-      <div className="flex items-start gap-2">
+    <li
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        setOver(true)
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setOver(false)
+        const from = Number(e.dataTransfer.getData('text/x-compare-pair'))
+        if (Number.isInteger(from)) onReorder(from, index)
+      }}
+      className={cn(
+        'rounded-md border bg-card p-2.5 transition-colors',
+        over ? 'border-primary' : 'border-border',
+      )}
+    >
+      {/* Header initiates drags; the slider below is excluded so its
+          pointer events reach Base UI's gesture handler. */}
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/x-compare-pair', String(index))
+          e.dataTransfer.effectAllowed = 'move'
+        }}
+        className="flex cursor-grab items-start gap-2 active:cursor-grabbing"
+      >
+        <span
+          aria-hidden="true"
+          title={tExec('lens.dragHandle')}
+          className="text-muted-foreground"
+        >
+          <GripVertical className="h-4 w-4" />
+        </span>
         <P
           className="min-w-0 flex-1 truncate text-sm font-medium"
           title={title}
@@ -506,8 +555,11 @@ function ActiveSourceSection({
   source: PanelSlotSource
 }) {
   const { t } = useTranslation('compare')
+  const { t: tExec } = useTranslation('executions')
+  const [overIndex, setOverIndex] = useState<number | null>(null)
   const { lens, baseUrl, label } = source
   const activeNames = selection.activeOrderFor(slot)
+  const dragMime = `text/x-compare-layer-${slot}`
 
   return (
     <section>
@@ -526,16 +578,47 @@ function ActiveSourceSection({
         <EmptyHint />
       ) : (
         <ul className="space-y-2">
-          {activeNames.map((name) => {
+          {activeNames.map((name, index) => {
             const layer = lens.layers.find((l) => l.name === name)
             const title = layer?.title ?? name
             const legendUrl = layer?.styles[0]?.legendUrl
             return (
               <li
                 key={name}
-                className="rounded-md border border-border bg-card p-2.5"
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setOverIndex(index)
+                }}
+                onDragLeave={() => setOverIndex(null)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setOverIndex(null)
+                  const from = Number(e.dataTransfer.getData(dragMime))
+                  if (Number.isInteger(from)) {
+                    selection.reorderLayer(slot, from, index)
+                  }
+                }}
+                className={cn(
+                  'rounded-md border bg-card p-2.5 transition-colors',
+                  overIndex === index ? 'border-primary' : 'border-border',
+                )}
               >
-                <div className="flex items-start gap-2">
+                <div
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(dragMime, String(index))
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  className="flex cursor-grab items-start gap-2 active:cursor-grabbing"
+                >
+                  <span
+                    aria-hidden="true"
+                    title={tExec('lens.dragHandle')}
+                    className="text-muted-foreground"
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </span>
                   <P
                     className="min-w-0 flex-1 truncate text-sm font-medium"
                     title={title}

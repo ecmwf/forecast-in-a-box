@@ -732,3 +732,40 @@ describe('CompareViewer preload', () => {
     await expect.element(toggle).toBeChecked()
   })
 })
+
+describe('CompareViewer reorder', () => {
+  it('drag-reorders active pairs in the stacking order', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    // Activate two pairs; the newest lands on top: [msl, 2t].
+    await screen.getByText('2 m temperature').first().click()
+    await screen.getByText('Mean sea level pressure').first().click()
+
+    const cardOrder = () =>
+      screen
+        .getByRole('button', { name: /^Remove / })
+        .elements()
+        .map((el) => el.getAttribute('aria-label'))
+    expect(cardOrder()).toEqual([
+      'Remove Mean sea level pressure',
+      'Remove 2 m temperature',
+    ])
+
+    // Native drag: card 0 dropped onto card 1.
+    const grips = screen.getByTitle('Drag to reorder').elements()
+    const dt = new DataTransfer()
+    grips[0]
+      .closest('[draggable]')!
+      .dispatchEvent(
+        new DragEvent('dragstart', { dataTransfer: dt, bubbles: true }),
+      )
+    grips[1]
+      .closest('li')!
+      .dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true }))
+
+    await expect
+      .poll(() => cardOrder())
+      .toEqual(['Remove 2 m temperature', 'Remove Mean sea level pressure'])
+  })
+})
