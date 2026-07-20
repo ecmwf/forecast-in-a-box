@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 from importlib.resources import files
-from typing import Literal, Optional
+from typing import Optional
 
 import yaml
 from pymetkit import ParamDB

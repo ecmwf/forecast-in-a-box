@@ -41,15 +41,16 @@ from fiab_plugin_ecmwf.block_utils import (
     _param_id_to_param_key,
     _param_key_to_param_id,
 )
-from fiab_plugin_ecmwf.qubed_utils import axes, contains, coxpand, datacubes, select
+from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, select
 
 
-def load_pproc_schema() -> str:
+def load_pproc_schema(cache_size: int) -> Schema:
     with path("fiab_plugin_ecmwf.products.pproc", "schema.yaml") as pproc_schema:
-        return str(pproc_schema)
+        return Schema.from_file(str(pproc_schema), matching_cache_size=cache_size)
 
 
-PPROC_SCHEMA = load_pproc_schema()
+PPROC_RECONSTRUCT_CACHE_SIZE = 50
+PPROC_SCHEMA = load_pproc_schema(PPROC_RECONSTRUCT_CACHE_SIZE)
 
 
 class EnsembleStatistics(Product):
@@ -145,9 +146,11 @@ class PredefinedThresholdProbability(Product):
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
         prob_qube = Qube.empty()
-        schema = Schema.from_file(PPROC_SCHEMA)
-        for output, _ in schema.outputs_from_inputs(
-            inputs=list(datacubes(input_dataset)), output_template={TYPE: self.stat_type, "selection": "default"}
+        cubes = list(datacubes(input_dataset))
+        sample_axes = axes(collapse(select(input_dataset, {ENSEMBLE: 1}), ENSEMBLE))
+        coords = {dim: list(values) for dim, values in sample_axes.items() if (len(values) == 1 and dim not in [ENSEMBLE, PARAM])}
+        for output, _ in PPROC_SCHEMA.outputs_from_inputs(
+            inputs=cubes, output_template={**coords, TYPE: self.stat_type, "selection": "default"}
         ):
             prob_qube = prob_qube | Qube.from_datacube(output)
         restrictions[PARAM] = ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(prob_qube)[PARAM]])
@@ -178,11 +181,14 @@ class PredefinedThresholdProbability(Product):
     def intersect(self, other: QubedOutput) -> bool:
         if not contains(other, ENSEMBLE) or len(axes(other)[ENSEMBLE]) <= 1:
             return False
-        schema = Schema.from_file(PPROC_SCHEMA)
-        outputs = list(
-            schema.outputs_from_inputs(inputs=list(datacubes(other)), output_template={TYPE: self.stat_type, "selection": "default"})
-        )
-        return len(outputs) > 0
+        cubes = list(datacubes(other))
+        sample_axes = axes(collapse(select(other, {ENSEMBLE: 1}), ENSEMBLE))
+        coords = {dim: list(values) for dim, values in sample_axes.items() if (len(values) == 1 and dim not in [ENSEMBLE, PARAM])}
+        for _ in PPROC_SCHEMA.outputs_from_inputs(
+            inputs=cubes, output_template={**coords, TYPE: self.stat_type, "selection": "default"},
+        ):
+            return True
+        return False
 
 
 class CustomThresholdProbability(Product):

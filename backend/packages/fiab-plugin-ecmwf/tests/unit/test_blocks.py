@@ -384,7 +384,7 @@ class TestSelect:
 
         result = block.compile(inputs={BlockInstanceId("source_output"): input_action}, block=select_configuration)  # type: ignore[dict-item]
         assert result.t is selected_action
-        input_action.select.assert_called_once_with({PARAM: "167"}, expand=True)
+        input_action.select.assert_called_once_with({PARAM: ["167"]}, expand=True)
 
     def test_compile_calls_select_with_integer_values(self, select_configuration: BlockInstance) -> None:
         block = _select()
@@ -396,6 +396,17 @@ class TestSelect:
         result = block.compile(inputs={BlockInstanceId("source_output"): input_action}, block=config)  # type: ignore[dict-item]
         assert result.t is selected_action
         input_action.select.assert_called_once_with({STEP: [0, 6]})
+
+    def test_compile_calls_select_with_dependant_index(self, select_configuration: BlockInstance) -> None:
+        block = _select()
+        input_action = MagicMock()
+        selected_action = MagicMock()
+        input_action.select.return_value = selected_action
+        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "type", "values": ["cf"]})})
+
+        result = block.compile(inputs={BlockInstanceId("source_output"): input_action}, block=config)  # type: ignore[dict-item]
+        assert result.t is selected_action
+        input_action.select.assert_called_once_with({"type": "cf"})
 
     def test_expander_offers_select_without_static_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
         expansions = plugin().expander(operational_forecast_source_output)
