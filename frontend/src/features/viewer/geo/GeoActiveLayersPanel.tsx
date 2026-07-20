@@ -27,12 +27,20 @@ import {
   Pin,
   Upload,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react'
 import { firstNumber } from '../format'
-import { rebaseLensUrl } from '../wms-capabilities'
+import {
+  combineScaleBands,
+  rebaseLensUrl,
+  scaleBandState,
+  scaleBandTargetResolution,
+} from '../wms-capabilities'
 import { LegendImage } from '../components/LegendImage'
 import { SLOT_CHIP_CLASS } from './GeoLayerBrowser'
 import { parseGeojsonOverlay } from './overlays'
+import type { ScaleBand } from '../wms-capabilities'
 import type { ContextOverlay } from './overlays'
 import type { MapAnnotation } from './annotations'
 import type { PairedLayer, SourceSlot } from './layer-pairing'
@@ -113,6 +121,47 @@ function PinButton({
   )
 }
 
+/** Scale-limited layer affordance: muted badge in range, amber "zoom to reveal" out of range. */
+function ScaleHint({
+  band,
+  resolution,
+  onZoomTo,
+}: {
+  band: ScaleBand | undefined
+  resolution: number | null
+  onZoomTo: (res: number) => void
+}) {
+  const { t } = useTranslation('visualise')
+  if (!band) return null
+  const state =
+    resolution === null ? 'in-range' : scaleBandState(band, resolution)
+  if (state === 'in-range') {
+    return (
+      <span
+        className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground"
+        title={t('scale.dependentHint')}
+      >
+        <ZoomIn className="h-3 w-3" />
+        {t('scale.dependent')}
+      </span>
+    )
+  }
+  const Icon = state === 'zoom-in' ? ZoomIn : ZoomOut
+  return (
+    <button
+      type="button"
+      onClick={() => onZoomTo(scaleBandTargetResolution(band))}
+      title={t('scale.outOfRangeHint')}
+      className="mt-1.5 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/25"
+    >
+      <Icon className="h-3 w-3" />
+      {state === 'zoom-in'
+        ? t('scale.zoomInToReveal')
+        : t('scale.zoomOutToReveal')}
+    </button>
+  )
+}
+
 export function GeoActiveLayersPanel({
   pairs,
   selection,
@@ -122,6 +171,8 @@ export function GeoActiveLayersPanel({
   annotations,
   preload,
   pins,
+  resolution,
+  onZoomToResolution,
   onCollapse,
 }: {
   pairs: ReadonlyArray<PairedLayer>
@@ -137,6 +188,10 @@ export function GeoActiveLayersPanel({
     available: boolean
   }
   pins: LegendPins
+  /** Current view resolution (m/px) for scale-band hints; null until known. */
+  resolution: number | null
+  /** Animate the shared view to a resolution (jump into a layer's band). */
+  onZoomToResolution: (res: number) => void
   onCollapse: () => void
 }) {
   const { t } = useTranslation('visualise')
@@ -225,6 +280,8 @@ export function GeoActiveLayersPanel({
                   selection={selection}
                   sources={sources}
                   pins={pins}
+                  resolution={resolution}
+                  onZoomToResolution={onZoomToResolution}
                 />
               ))}
             </ul>
@@ -236,6 +293,8 @@ export function GeoActiveLayersPanel({
               selection={selection}
               source={sources.a}
               pins={pins}
+              resolution={resolution}
+              onZoomToResolution={onZoomToResolution}
             />
             {sources.b !== null && (
               <ActiveSourceSection
@@ -243,6 +302,8 @@ export function GeoActiveLayersPanel({
                 selection={selection}
                 source={sources.b}
                 pins={pins}
+                resolution={resolution}
+                onZoomToResolution={onZoomToResolution}
               />
             )}
           </>
@@ -477,6 +538,8 @@ function ActivePairCard({
   selection,
   sources,
   pins,
+  resolution,
+  onZoomToResolution,
 }: {
   pair: PairedLayer
   index: number
@@ -484,6 +547,8 @@ function ActivePairCard({
   selection: CompareSelection
   sources: { a: PanelSlotSource; b: PanelSlotSource | null }
   pins: LegendPins
+  resolution: number | null
+  onZoomToResolution: (res: number) => void
 }) {
   const { t } = useTranslation('visualise')
   const { t: tExec } = useTranslation('executions')
@@ -545,6 +610,14 @@ function ActivePairCard({
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
+      <ScaleHint
+        band={combineScaleBands(
+          pair.perSource.a?.scale,
+          pair.perSource.b?.scale,
+        )}
+        resolution={resolution}
+        onZoomTo={onZoomToResolution}
+      />
       <label className="mt-2 block">
         <span className="sr-only">{`${title} opacity`}</span>
         <Slider
@@ -596,11 +669,15 @@ function ActiveSourceSection({
   selection,
   source,
   pins,
+  resolution,
+  onZoomToResolution,
 }: {
   slot: SourceSlot
   selection: CompareSelection
   source: PanelSlotSource
   pins: LegendPins
+  resolution: number | null
+  onZoomToResolution: (res: number) => void
 }) {
   const { t } = useTranslation('visualise')
   const { t: tExec } = useTranslation('executions')
@@ -683,6 +760,11 @@ function ActiveSourceSection({
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
+                <ScaleHint
+                  band={layer?.scale}
+                  resolution={resolution}
+                  onZoomTo={onZoomToResolution}
+                />
                 <label className="mt-2 block">
                   <span className="sr-only">{`${title} opacity`}</span>
                   <Slider

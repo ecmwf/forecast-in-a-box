@@ -705,6 +705,20 @@ export function GeoViewer({
     view.setCenter(view.getConstrainedCenter(target, resolution) ?? target)
   }, [])
 
+  // Live resolution drives the panel's scale-band (zoom-range) hints.
+  const [viewResolution, setViewResolution] = useState<number | null>(null)
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    const update = () => setViewResolution(view.getResolution() ?? null)
+    update()
+    view.on('change:resolution', update)
+    return () => view.un('change:resolution', update)
+  }, [])
+  const onZoomToResolution = useCallback((res: number) => {
+    viewRef.current?.animate({ resolution: res, duration: 350 })
+  }, [])
+
   useGeoShortcuts({
     // Any sidebar open → collapse both; both collapsed → restore both.
     onToggleSidebars: () => {
@@ -960,6 +974,8 @@ export function GeoViewer({
                 ? { label: b.label, baseUrl: b.baseUrl, lens: sourceB }
                 : null,
             }}
+            resolution={viewResolution}
+            onZoomToResolution={onZoomToResolution}
             onCollapse={() => setLeftCollapsed(true)}
           />
         </div>

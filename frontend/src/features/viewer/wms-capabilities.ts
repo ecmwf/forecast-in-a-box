@@ -33,6 +33,14 @@ export interface ParsedLayer {
   title: string
   styles: Array<ParsedStyle>
   time?: ParsedTime
+  /** Resolution range the server serves this in (scale limits); absent = every zoom. */
+  scale?: ScaleBand
+}
+
+/** Resolution range (m/px) a layer serves within; unbounded sides are 0 / Infinity. */
+export interface ScaleBand {
+  minRes: number
+  maxRes: number
 }
 
 export interface ParsedCapabilities {
@@ -189,7 +197,66 @@ function parseLayer(el: Element): ParsedLayer | null {
     }
   }
 
-  return { name, title, styles, time }
+  return { name, title, styles, time, scale: parseScaleBand(el) }
+}
+
+/** OGC rendering pixel size (0.28 mm): scaleDenominator = resolution / 0.00028. */
+const OGC_PIXEL_M = 0.00028
+
+/** Scale limits → resolution band: WMS 1.3.0 denominators, else 1.1.1 ScaleHint (÷√2); undefined if unconstrained. */
+function parseScaleBand(el: Element): ScaleBand | undefined {
+  let minRes = 0
+  let maxRes = Infinity
+  const minDenom = numOf(el, 'MinScaleDenominator')
+  const maxDenom = numOf(el, 'MaxScaleDenominator')
+  if (!Number.isNaN(minDenom) || !Number.isNaN(maxDenom)) {
+    if (!Number.isNaN(minDenom)) minRes = minDenom * OGC_PIXEL_M
+    if (!Number.isNaN(maxDenom)) maxRes = maxDenom * OGC_PIXEL_M
+  } else {
+    const hints = directChildren(el, 'ScaleHint')
+    if (hints.length > 0) {
+      const min = hints[0].getAttribute('min')
+      const max = hints[0].getAttribute('max')
+      if (min && Number.isFinite(Number(min)) && Number(min) > 0) {
+        minRes = Number(min) / Math.SQRT2
+      }
+      if (max && Number.isFinite(Number(max))) maxRes = Number(max) / Math.SQRT2
+    }
+  }
+  if (minRes >= maxRes) return undefined // degenerate/inverted
+  return minRes > 0 || Number.isFinite(maxRes) ? { minRes, maxRes } : undefined
+}
+
+/** Intersection of two bands — a pair shows only where both do. */
+export function combineScaleBands(
+  a: ScaleBand | undefined,
+  b: ScaleBand | undefined,
+): ScaleBand | undefined {
+  if (!a) return b
+  if (!b) return a
+  return {
+    minRes: Math.max(a.minRes, b.minRes),
+    maxRes: Math.min(a.maxRes, b.maxRes),
+  }
+}
+
+export type ScaleState = 'in-range' | 'zoom-in' | 'zoom-out'
+
+/** Where a resolution sits vs a band: zoom-in = too coarse, zoom-out = too fine. */
+export function scaleBandState(
+  band: ScaleBand,
+  resolution: number,
+): ScaleState {
+  if (resolution >= band.maxRes) return 'zoom-in'
+  if (resolution < band.minRes) return 'zoom-out'
+  return 'in-range'
+}
+
+/** A resolution comfortably inside the band to animate the view to. */
+export function scaleBandTargetResolution(band: ScaleBand): number {
+  const { minRes, maxRes } = band
+  if (minRes > 0 && Number.isFinite(maxRes)) return Math.sqrt(minRes * maxRes)
+  return Number.isFinite(maxRes) ? maxRes / 2 : minRes * 2
 }
 
 function parseBbox(
