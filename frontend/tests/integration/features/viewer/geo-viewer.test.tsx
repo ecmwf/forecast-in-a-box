@@ -840,6 +840,10 @@ describe('GeoViewer layer browser grouping', () => {
       <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
     )
 
+    // Grouping is off by default — enable it to cluster the titles.
+    await expect.element(screen.getByText('Wind speed 10m')).toBeVisible()
+    await screen.getByRole('button', { name: 'Group similar layers' }).click()
+
     // Group header with the shared prefix and a count; children hidden.
     await expect
       .element(screen.getByText('Air temperature', { exact: true }))
@@ -860,7 +864,7 @@ describe('GeoViewer layer browser grouping', () => {
       .toBeInTheDocument()
   })
 
-  it('the group toggle switches to a flat full-title listing', async () => {
+  it('the group toggle clusters flat full-title rows on demand', async () => {
     const portA = nextPort++
     const portB = nextPort++
     registerMockWmsServer(portA, {
@@ -876,14 +880,17 @@ describe('GeoViewer layer browser grouping', () => {
       <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
     )
 
-    await expect.element(screen.getByText('3 layers')).toBeVisible()
-    await screen.getByRole('button', { name: 'Group similar layers' }).click()
-    expect(screen.getByText('3 layers').elements()).toHaveLength(0)
+    // Flat by default: full titles, no group header.
     await expect
       .element(screen.getByText('Air temperature 2m indexed'))
       .toBeVisible()
     await expect
       .element(screen.getByText('Air temperature pl in AIFS'))
       .toBeVisible()
+    expect(screen.getByText('3 layers').elements()).toHaveLength(0)
+
+    // Toggle clusters them under the shared prefix.
+    await screen.getByRole('button', { name: 'Group similar layers' }).click()
+    await expect.element(screen.getByText('3 layers')).toBeVisible()
   })
 })

@@ -187,6 +187,7 @@ export function GeoToolbar({
                   type="button"
                   onClick={() => onFocusChange?.(slot)}
                   aria-pressed={focusSlot === slot}
+                  aria-label={t(`focus.${title}`)}
                   title={t(`focus.${title}`)}
                   className={cn(
                     'rounded-md px-2 py-1 text-sm font-medium transition-colors',
