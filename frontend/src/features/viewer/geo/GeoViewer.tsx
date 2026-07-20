@@ -625,6 +625,25 @@ export function GeoViewer({
     [],
   )
 
+  // Source focus: a slot views only that source (UI collapses to it); null compares both.
+  const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
+  useEffect(() => {
+    if (!hasB && focusSlot !== null) setFocusSlot(null)
+  }, [hasB, focusSlot])
+  // Focus = one source, no pairs: force unlinked (lossless) while focused, restore on exit.
+  const preFocusLinked = useRef(false)
+  useEffect(() => {
+    if (focusSlot !== null) {
+      if (selection.linkMode === 'linked') {
+        preFocusLinked.current = true
+        selection.setLinkMode('unlinked')
+      }
+    } else if (preFocusLinked.current) {
+      preFocusLinked.current = false
+      selection.setLinkMode('linked')
+    }
+  }, [focusSlot, selection.linkMode])
+
   // Sidebar collapse — same affordance as the embedded viewer.
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
@@ -876,6 +895,8 @@ export function GeoViewer({
       )}
       <GeoToolbar
         solo={!hasB}
+        focusSlot={focusSlot}
+        onFocusChange={setFocusSlot}
         onRequestAddSource={onRequestAddSource}
         mode={mode}
         onModeChange={onModeChange}
@@ -976,11 +997,12 @@ export function GeoViewer({
             }}
             resolution={viewResolution}
             onZoomToResolution={onZoomToResolution}
+            focusSlot={focusSlot}
             onCollapse={() => setLeftCollapsed(true)}
           />
         </div>
         <div className="min-h-0 min-w-0 flex-1">
-          {mode === 'side' && mapSourceB ? (
+          {focusSlot === null && mode === 'side' && mapSourceB ? (
             <DualMapView
               view={viewRef.current}
               a={mapSourceA}
@@ -1005,11 +1027,14 @@ export function GeoViewer({
               view={viewRef.current}
               a={mapSourceA}
               b={mapSourceB}
-              captureOnly={captureOnly}
+              // Focus masks the other source (via per-slot capture); export capture wins.
+              captureOnly={captureOnly ?? focusSlot}
               preload={preloadTimeSteps}
               pinnedLegends={pinnedLegendItems}
               onUnpinLegend={unpinLegend}
-              mode={mode === 'side' ? 'swipe' : mode}
+              mode={
+                focusSlot !== null ? 'blend' : mode === 'side' ? 'swipe' : mode
+              }
               options={modeOptions}
               measureMode={measureMode}
               measureClearNonce={measureClearNonce}
@@ -1028,6 +1053,7 @@ export function GeoViewer({
         <div style={{ display: rightCollapsed ? 'none' : 'contents' }}>
           <GeoLayerBrowser
             hasB={hasB}
+            focusSlot={focusSlot}
             pairs={pairing.pairs}
             selection={selection}
             sourceA={sourceA}
@@ -1044,6 +1070,7 @@ export function GeoViewer({
       </div>
       <GeoTimeSlider
         hasB={hasB}
+        soloSlot={focusSlot}
         timeline={displayTimeline}
         failures={trackFailures}
         index={safeStep}

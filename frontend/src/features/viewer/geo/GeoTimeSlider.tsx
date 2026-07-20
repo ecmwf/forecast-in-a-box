@@ -77,6 +77,7 @@ export interface OffsetMeta {
 
 export function GeoTimeSlider({
   hasB = true,
+  soloSlot = null,
   timeline,
   failures,
   index,
@@ -93,6 +94,8 @@ export function GeoTimeSlider({
 }: {
   /** Solo hides the link select, B track, and B/A∩B clip presets. */
   hasB?: boolean
+  /** View only one source: single shared-axis track for that slot. */
+  soloSlot?: SourceSlot | null
   timeline: CompareTimeline
   /** Axis-aligned "advertised but not served" marks (GetMap failures). */
   failures: Record<SourceSlot, ReadonlyArray<boolean>>
@@ -116,6 +119,13 @@ export function GeoTimeSlider({
   const { t } = useTranslation('executions')
   const { t: tCompare } = useTranslation('visualise')
   const steps = timeline.epochs
+  // Focus collapses the timeline to one shared-axis track (no link modes).
+  const focused = soloSlot !== null
+  const slots: ReadonlyArray<SourceSlot> = soloSlot
+    ? [soloSlot]
+    : hasB
+      ? ['a', 'b']
+      : ['a']
   // The clip window: every control (slider, tracks, autoplay, stepper)
   // operates inside it — the focus+context pattern from time-series UIs.
   const rangeStart = clip ? Math.max(0, clip[0]) : 0
@@ -143,14 +153,15 @@ export function GeoTimeSlider({
     if (steps.length <= 1) setPlaying(false)
   }, [steps.length])
 
-  const hasSharedAxis = linkMode !== 'independent' && steps.length > 0
-  if (linkMode !== 'independent' && steps.length === 0) return null
+  const sharedAxis = focused || linkMode !== 'independent'
+  const hasSharedAxis = sharedAxis && steps.length > 0
+  if (sharedAxis && steps.length === 0) return null
 
   // The light track tint needs words: warn while any failure mark is
   // visible in the current window (tracks are hidden in independent mode).
   const hasVisibleFailures =
     linkMode !== 'independent' &&
-    (hasB ? (['a', 'b'] as const) : (['a'] as const)).some((slot) =>
+    slots.some((slot) =>
       failures[slot].slice(rangeStart, rangeEnd + 1).some(Boolean),
     )
 
@@ -167,7 +178,7 @@ export function GeoTimeSlider({
           </span>
         )}
         <div className="flex items-center gap-2">
-          {hasB && (
+          {hasB && !focused && (
             <Select
               value={linkMode}
               onValueChange={(v) => {
@@ -199,7 +210,7 @@ export function GeoTimeSlider({
         </div>
       </div>
 
-      {linkMode === 'offset' && (
+      {!focused && linkMode === 'offset' && (
         <OffsetControl
           offsetMs={offsetMs}
           onOffsetChange={onOffsetChange}
@@ -207,7 +218,7 @@ export function GeoTimeSlider({
         />
       )}
 
-      {linkMode === 'independent' ? (
+      {!focused && linkMode === 'independent' ? (
         <div className="space-y-2">
           {(['a', 'b'] as const).map((slot) => (
             <IndependentSlider
@@ -248,34 +259,32 @@ export function GeoTimeSlider({
                       epoch={hovered.epoch}
                     />
                   )}
-                  {(hasB ? (['a', 'b'] as const) : (['a'] as const)).map(
-                    (slot) => (
-                      <SlotRunTrack
-                        key={slot}
-                        slot={slot}
-                        availability={timeline.availability[slot].slice(
-                          rangeStart,
-                          rangeEnd + 1,
-                        )}
-                        failed={failures[slot].slice(rangeStart, rangeEnd + 1)}
-                        currentIndex={safeIndex - rangeStart}
-                        hoverIndex={
-                          hoverIndex === null ? null : hoverIndex - rangeStart
-                        }
-                        hoverLabel={hovered?.perSide?.[slot] ?? null}
-                        onHover={(i) =>
-                          setHoverIndex(i === null ? null : i + rangeStart)
-                        }
-                        onJump={(i) => onChange(i + rangeStart)}
-                      />
-                    ),
-                  )}
+                  {slots.map((slot) => (
+                    <SlotRunTrack
+                      key={slot}
+                      slot={slot}
+                      availability={timeline.availability[slot].slice(
+                        rangeStart,
+                        rangeEnd + 1,
+                      )}
+                      failed={failures[slot].slice(rangeStart, rangeEnd + 1)}
+                      currentIndex={safeIndex - rangeStart}
+                      hoverIndex={
+                        hoverIndex === null ? null : hoverIndex - rangeStart
+                      }
+                      hoverLabel={hovered?.perSide?.[slot] ?? null}
+                      onHover={(i) =>
+                        setHoverIndex(i === null ? null : i + rangeStart)
+                      }
+                      onJump={(i) => onChange(i + rangeStart)}
+                    />
+                  ))}
                 </>
               )
             })()}
           </div>
           <TimeClipRow
-            hasB={hasB}
+            hasB={hasB && !focused}
             timeline={timeline}
             clip={clip}
             rangeStart={rangeStart}

@@ -124,6 +124,9 @@ export function SingleMapView({
   const { t } = useTranslation('visualise')
   const containerRef = useRef<HTMLDivElement>(null)
   const solo = b === null
+  // Isolating a slot (focus/per-slot capture) hides the other's tag and badges too.
+  const showA = captureOnly === null || captureOnly === 'a'
+  const showB = b !== null && (captureOnly === null || captureOnly === 'b')
 
   // Mode-owned reveal state; tuning (orientation/shape/size/blend) comes
   // from the toolbar via `options`.
@@ -544,14 +547,16 @@ export function SingleMapView({
             : undefined
         }
       />
-      <CompareSlotTag
-        slot="a"
-        label={a.label}
-        side="left"
-        loading={loadingCount.a > 0}
-        timeLabel={a.timeLabel}
-      />
-      {b && (
+      {showA && (
+        <CompareSlotTag
+          slot="a"
+          label={a.label}
+          side="left"
+          loading={loadingCount.a > 0}
+          timeLabel={a.timeLabel}
+        />
+      )}
+      {showB && (
         <CompareSlotTag
           slot="b"
           label={b.label}
@@ -561,16 +566,20 @@ export function SingleMapView({
         />
       )}
 
-      {a.hiddenAtTime && <GapBadge slot="A" side="left" />}
-      {b?.hiddenAtTime && <GapBadge slot="B" side="right" />}
-      {stackA.errorCount > 0 && !a.hiddenAtTime && (
+      {showA && a.hiddenAtTime && <GapBadge slot="A" side="left" />}
+      {showB && b.hiddenAtTime && <GapBadge slot="B" side="right" />}
+      {showA && stackA.errorCount > 0 && !a.hiddenAtTime && (
         <LoadErrorBadge slot="A" side="left" />
       )}
-      {stackB.errorCount > 0 && !b?.hiddenAtTime && (
+      {showB && stackB.errorCount > 0 && !b.hiddenAtTime && (
         <LoadErrorBadge slot="B" side="right" />
       )}
-      {a.timeTag && <TimeTagBadge slot="A" tag={a.timeTag} side="left" />}
-      {b?.timeTag && <TimeTagBadge slot="B" tag={b.timeTag} side="right" />}
+      {showA && a.timeTag && (
+        <TimeTagBadge slot="A" tag={a.timeTag} side="left" />
+      )}
+      {showB && b.timeTag && (
+        <TimeTagBadge slot="B" tag={b.timeTag} side="right" />
+      )}
 
       {mode === 'swipe' && !solo && (
         <div

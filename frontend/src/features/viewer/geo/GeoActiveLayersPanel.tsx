@@ -173,6 +173,7 @@ export function GeoActiveLayersPanel({
   pins,
   resolution,
   onZoomToResolution,
+  focusSlot,
   onCollapse,
 }: {
   pairs: ReadonlyArray<PairedLayer>
@@ -192,6 +193,8 @@ export function GeoActiveLayersPanel({
   resolution: number | null
   /** Animate the shared view to a resolution (jump into a layer's band). */
   onZoomToResolution: (res: number) => void
+  /** View only one source: hide the other's section and per-source tiers. */
+  focusSlot: SourceSlot | null
   onCollapse: () => void
 }) {
   const { t } = useTranslation('visualise')
@@ -200,6 +203,8 @@ export function GeoActiveLayersPanel({
   const activePairs = selection.linkedOrder
     .map((key) => pairByKey.get(key))
     .filter((p): p is PairedLayer => p !== undefined)
+  const focusedSource =
+    focusSlot === 'a' ? sources.a : focusSlot === 'b' ? sources.b : null
 
   return (
     <aside className="flex w-64 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
@@ -224,6 +229,7 @@ export function GeoActiveLayersPanel({
           onChange={opacity.setGlobal}
         />
         {sources.b !== null &&
+          focusSlot === null &&
           (['a', 'b'] as const).map((slot) => (
             <OpacityRow
               key={slot}
@@ -266,7 +272,16 @@ export function GeoActiveLayersPanel({
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2">
-        {selection.linkMode === 'linked' ? (
+        {focusSlot !== null && focusedSource !== null ? (
+          <ActiveSourceSection
+            slot={focusSlot}
+            selection={selection}
+            source={focusedSource}
+            pins={pins}
+            resolution={resolution}
+            onZoomToResolution={onZoomToResolution}
+          />
+        ) : selection.linkMode === 'linked' ? (
           activePairs.length === 0 ? (
             <EmptyHint />
           ) : (
