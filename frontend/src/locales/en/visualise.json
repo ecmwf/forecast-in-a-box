@@ -175,7 +175,12 @@
     "placeholder": "Pick a source…",
     "pickerAria": "Source for slot {{slot}}",
     "sameAsA": "Same as A",
-    "singleView": "Single view"
+    "singleView": "Single view",
+    "kind": {
+      "run": "Run",
+      "wms": "WMS",
+      "folder": "Folder"
+    }
   },
   "measure": {
     "line": "Measure distance",
