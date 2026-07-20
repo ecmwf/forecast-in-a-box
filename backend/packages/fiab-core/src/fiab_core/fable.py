@@ -12,10 +12,10 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
 import abc
-from typing import Any, Literal, NewType
+from typing import Annotated, Any, Literal, NewType
 
 from earthkit.workflows.fluent import Action
-from pydantic import ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import BeforeValidator, ConfigDict, Field, PlainSerializer, WithJsonSchema, model_validator
 from qubed import Qube
 from typing_extensions import Self
 
@@ -26,35 +26,45 @@ Error = str
 """Compiler/validator error message type alias."""
 
 
+def _parse_fable_type(value: str | FableType) -> FableType:
+    if isinstance(value, FableType):
+        return value
+    if not isinstance(value, str):
+        raise ValueError(f"Expected a Fable type expression string, got {type(value).__name__}")
+    try:
+        parsed, remainder = parse(value)
+        if remainder.strip():
+            raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
+    except NotFableType as exc:
+        raise ValueError(str(exc)) from exc
+    return parsed
+
+
+def _serialize_fable_type(value: FableType) -> str:
+    return value.serialize()
+
+
+FableTypeField = Annotated[
+    FableType,
+    BeforeValidator(_parse_fable_type),
+    PlainSerializer(_serialize_fable_type, return_type=str),
+    WithJsonSchema({"type": "string"}),
+]
+
+
 class BlockConfigurationOption(FiabCoreBaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     title: str
     """Brief string to display in the BlockFactory detail"""
     description: str
     """Extended description, possibly with example values and their effect"""
-    value_type: str
-    """Will be used when deserializing the actual value"""
+    value_type: FableTypeField
+    """Type used when deserializing the actual value; serialized as an expression for clients"""
     default_value: str | None = None
     """Used by the frontend to inject the default value"""
     is_advanced: bool = False
     """Used by the frontend to optionally hide the setting unless advanced. Do not set if no default provided / None not valid"""
-
-    # TODO replace value_type: str with Annotated[fiab_core.FableType, BeforeValidator of fiab_core.types.parse, PlainSerializer of fiab_coreFableType.serialize], and remove this private attr
-    _value_type: FableType = PrivateAttr()
-
-    @model_validator(mode="after")
-    def _validate_and_cache_value_type(self) -> Self:
-        try:
-            parsed, remainder = parse(self.value_type)
-            if remainder.strip():
-                raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
-            self._value_type = parsed
-        except NotFableType as exc:
-            raise ValueError(str(exc)) from exc
-        return self
-
-    @property
-    def parsed_value_type(self) -> FableType:
-        return self._value_type
 
 
 ConfigurationOptionId = NewType("ConfigurationOptionId", str)

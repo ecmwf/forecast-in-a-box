@@ -86,8 +86,8 @@ class BlockInstanceRich:
 
     def config_as_str(self, key: str | ConfigurationOptionId, *, validator: Callable[[str, str], None] | None = None) -> str:
         option_id, option = self._get_configuration_option(key)
-        if not isinstance(option.parsed_value_type, (StringType, ClosedEnumType, OpenEnumType)):
-            raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not str")
+        if not isinstance(option.value_type, (StringType, ClosedEnumType, OpenEnumType)):
+            raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not str")
         raw_value = self._get_raw_value(option_id)
         if isinstance(raw_value, str):
             if validator is not None:
@@ -97,8 +97,8 @@ class BlockInstanceRich:
 
     def config_as_int(self, key: str | ConfigurationOptionId, *, validator: Callable[[int, str], None] | None = None) -> int:
         option_id, option = self._get_configuration_option(key)
-        if not isinstance(option.parsed_value_type, IntType):
-            raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not int")
+        if not isinstance(option.value_type, IntType):
+            raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not int")
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is int:
             if validator is not None:
@@ -108,8 +108,10 @@ class BlockInstanceRich:
 
     def config_as_float(self, key: str | ConfigurationOptionId, *, validator: Callable[[float, str], None] | None = None) -> float:
         option_id, option = self._get_configuration_option(key)
-        if not isinstance(option.parsed_value_type, FloatType):
-            raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not float")
+        if not isinstance(option.value_type, FloatType):
+            raise BlockInstanceConfigurationError(
+                f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not float"
+            )
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is float:
             if validator is not None:
@@ -119,8 +121,10 @@ class BlockInstanceRich:
 
     def config_as_date(self, key: str | ConfigurationOptionId, *, validator: Callable[[date, str], None] | None = None) -> date:
         option_id, option = self._get_configuration_option(key)
-        if not isinstance(option.parsed_value_type, DateType):
-            raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not date")
+        if not isinstance(option.value_type, DateType):
+            raise BlockInstanceConfigurationError(
+                f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not date"
+            )
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is date:
             if validator is not None:
@@ -130,8 +134,10 @@ class BlockInstanceRich:
 
     def config_as_datetime(self, key: str | ConfigurationOptionId, *, validator: Callable[[datetime, str], None] | None = None) -> datetime:
         option_id, option = self._get_configuration_option(key)
-        if not isinstance(option.parsed_value_type, DatetimeType):
-            raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type!r}, not datetime")
+        if not isinstance(option.value_type, DatetimeType):
+            raise BlockInstanceConfigurationError(
+                f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not datetime"
+            )
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is datetime:
             if validator is not None:
@@ -148,9 +154,9 @@ class BlockInstanceRich:
         validator: Callable[[T, str], None] | None = None,
     ) -> list[T]:
         option_id, option = self._get_configuration_option(key)
-        if not isinstance(option.parsed_value_type, ListType):
+        if not isinstance(option.value_type, ListType):
             raise BlockInstanceConfigurationError(
-                f"Configuration option {option_id!r} has type {option.value_type!r}, not list[{item_type.__name__}]"
+                f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not list[{item_type.__name__}]"
             )
         raw_value = self._get_raw_value(option_id)
         if not isinstance(raw_value, list):
@@ -168,9 +174,9 @@ class BlockInstanceRich:
         }.get(item_type)
         if expected_item_types is None:
             raise BlockInstanceConfigurationError(f"Unsupported list item type {item_type!r}")
-        if not isinstance(option.parsed_value_type.item_type, expected_item_types):
+        if not isinstance(option.value_type.item_type, expected_item_types):
             raise BlockInstanceConfigurationError(
-                f"Configuration option {option_id!r} has type {option.value_type!r}, not list[{item_type.__name__}]"
+                f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not list[{item_type.__name__}]"
             )
         if any(type(item) is not item_type for item in raw_value):
             raise BlockInstanceConfigurationError(
