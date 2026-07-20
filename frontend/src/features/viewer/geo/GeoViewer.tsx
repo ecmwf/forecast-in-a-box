@@ -590,9 +590,12 @@ export function GeoViewer({
       const name = key.slice(sep + 1)
       const source = slot === 'a' ? sourceA : sourceB
       const base = slot === 'a' ? a.baseUrl : bBaseUrl
+      const activeOrder = slot === 'a' ? activeOrderA : activeOrderB
       const layer = source.layers.find((l) => l.name === name)
       const legendUrl = layer?.styles[0]?.legendUrl
-      if (base === null || !layer || !legendUrl) return []
+      // Hide pins whose layer is no longer selected — restored if re-added.
+      if (base === null || !layer || !legendUrl || !activeOrder.includes(name))
+        return []
       return [
         {
           key,
@@ -602,7 +605,16 @@ export function GeoViewer({
         },
       ]
     })
-  }, [pinnedLegends, sourceA, sourceB, a.baseUrl, bBaseUrl, hasB])
+  }, [
+    pinnedLegends,
+    sourceA,
+    sourceB,
+    a.baseUrl,
+    bBaseUrl,
+    hasB,
+    activeOrderA,
+    activeOrderB,
+  ])
   const unpinLegend = useCallback(
     (key: string) =>
       setPinnedLegends((prev) => {
