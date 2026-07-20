@@ -7,29 +7,28 @@ drun-mongo:
 drun:
     docker run --rm -it --network host --name forecast-in-a-box forecast-in-a-box
 
-fiabwheel:
+fiabfrontend:
     #!/usr/bin/env bash
     set -euo pipefail
     pushd frontend
     npm ci
     npm run prodbuild
+    git rev-parse HEAD > dist/.git-commit
     popd
 
     pushd backend
     rm -rf src/forecastbox/static
     ln -s ../../../frontend/dist src/forecastbox/static
-    find src/forecastbox/static/ -type f | sed 's/.*/include &/' > MANIFEST.in
+    popd
+
+fiabwheel:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just fiabfrontend
+
+    pushd backend
+    find src/forecastbox/static/ -type f ! -name .git-commit | sed 's/.*/include &/' > MANIFEST.in
     python -m build --installer uv .
-
-    # NOTE building packagesDist disabled for now
-    # mkdir packagesDist
-    # for e in $(ls -d packages/*) ; do 
-    #     pushd $e
-    #     python -m build --installer uv .
-    #     mv dist/* ../../packagesDist
-    #     popd
-    # done
-
     popd
 
 clean:
@@ -57,5 +56,41 @@ f2:
 
 dev:
     #!/usr/bin/env bash
-    if [[ ! -d backend/src/forecastbox/static ]] ; then just fiabwheel ; fi
-    just -f backend/justfile -d backend dev
+    set -euo pipefail
+
+    frontend_build_marker=frontend/dist/.git-commit
+    frontend_build_needed=false
+    if [[ ! -L backend/src/forecastbox/static ||
+        ! -d backend/src/forecastbox/static ||
+        ! -f "$frontend_build_marker" ]] ; then
+        frontend_build_needed=true
+    else
+        frontend_build_commit=$(< "$frontend_build_marker")
+        if ! git cat-file -e "${frontend_build_commit}^{commit}" 2>/dev/null ||
+            ! git diff --quiet "$frontend_build_commit" HEAD -- frontend; then
+            frontend_build_needed=true
+        fi
+    fi
+
+    if [[ "$frontend_build_needed" == true ]] ; then
+        if ! read -r -p "The frontend build is missing or out of date. Build it now? [y/N] " response ; then
+            response=y
+        fi
+        case "$response" in
+            y|Y|yes|Yes|YES)
+                just fiabfrontend
+                ;;
+            *)
+                echo "Skipping frontend build; the backend will use the existing frontend files."
+                ;;
+        esac
+    fi
+
+    pushd backend
+    if [[ -z "${FIAB_ROOT-}" ]] ; then
+        if [[ ! -d .fiab ]] ; then mkdir -p .fiab/data_dir ; fi
+        echo "1761908420:d0.0.1" > .fiab/pylock.toml.timestamp
+    fi
+    if [[ ! -d .venv ]] ; then uv sync --extra runtime --all-packages ; fi
+    FIAB_ROOT=.fiab uv run --no-sync python -m forecastbox.entrypoint.main
+    popd

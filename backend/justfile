@@ -7,10 +7,4 @@ test:
     FIAB_IGNORE_CONFIG_SOURCES=1 uv run pytest tests/integration
 
 dev:
-    #!/usr/bin/env bash
-    if [[ -z "$FIAB_ROOT" ]] ; then
-        if [[ ! -d .fiab ]] ; then mkdir -p .fiab/data_dir ; fi
-        echo "1761908420:d0.0.1" > .fiab/pylock.toml.timestamp
-    fi
-    if [[ ! -d .venv ]] ; then uv sync --extra runtime --all-packages ; fi
-    FIAB_ROOT=.fiab uv run --no-sync python -m forecastbox.entrypoint.main
+    just -f ../justfile dev
