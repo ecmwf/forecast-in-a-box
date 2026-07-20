@@ -20,6 +20,11 @@ Provides parsing, validation, and conversion for a small set of type expressions
 - union[FableType, ...] (union types)
 """
 
+# TODO there is a problem that enums are untyped. Currently, an integer-only enum
+# like closedEnum[1, 2] parses ok but serialized as closedEnum['1', '2'], which is odd.
+# We want to introduce closedEnum<type>[], and parse values with that type. We want to
+# mandate the quotes on the input.
+
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Any, Iterable, Literal, get_args
