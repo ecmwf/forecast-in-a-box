@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import { useState } from 'react'
 import { PinOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -35,7 +36,10 @@ export function PinnedLegendsBar({
   onUnpin: (key: string) => void
 }) {
   const { t } = useTranslation('executions')
-  if (items.length === 0) return null
+  // Advertised legends whose endpoint failed — their cards are dropped.
+  const [failedKeys, setFailedKeys] = useState<ReadonlySet<string>>(new Set())
+  const shown = items.filter((i) => !failedKeys.has(i.key))
+  if (shown.length === 0) return null
   // Pick column count to match item count exactly (so the strip always
   // fills the row), capped at 3 on very wide screens. Special case: 4
   // items become 2×2 instead of 3+1, which the user explicitly preferred
@@ -43,16 +47,16 @@ export function PinnedLegendsBar({
   // a narrower width and centre it — full-width-with-aspect-ratio makes
   // the card unnecessarily tall.
   const gridClass =
-    items.length === 1
+    shown.length === 1
       ? 'grid-cols-1 sm:max-w-md sm:mx-auto'
-      : items.length === 2 || items.length === 4
+      : shown.length === 2 || shown.length === 4
         ? 'grid-cols-1 sm:grid-cols-2'
         : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 max-h-[45%] overflow-y-auto">
       <div className="pointer-events-auto m-3">
         <div className={cn('grid gap-2', gridClass)}>
-          {items.map(({ key, title, url }) => (
+          {shown.map(({ key, title, url }) => (
             <div
               key={key}
               className="flex items-start gap-2 rounded border border-border bg-card px-2 py-2"
@@ -66,6 +70,9 @@ export function PinnedLegendsBar({
                   alt={`${title} legend`}
                   className="mt-1 h-auto max-h-40 w-full object-contain"
                   loading="lazy"
+                  onError={() =>
+                    setFailedKeys((prev) => new Set(prev).add(key))
+                  }
                 />
               </div>
               <Button
