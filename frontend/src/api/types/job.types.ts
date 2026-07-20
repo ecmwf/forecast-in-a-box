@@ -51,7 +51,8 @@ export const RunOutputsSchema = z
 
 /** routes/run.py: JobExecutionDetail. `*_block_ids` are only set on
  * /run/get and clear to `null` on terminal status, so both `null` and
- * `undefined` are valid wire shapes. */
+ * `undefined` are valid wire shapes. `lost_task_ids` was added after older
+ * backend versions, so an omitted field is treated as an empty map. */
 export const JobExecutionDetailSchema = z.object({
   run_id: z.string(),
   attempt_count: z.number(),
@@ -63,6 +64,7 @@ export const JobExecutionDetailSchema = z.object({
   error: z.string().nullable(),
   progress: z.string().nullable(),
   cascade_job_id: z.string().nullable(),
+  lost_task_ids: z.record(z.string(), z.string()).default({}),
   outputs: RunOutputsSchema.nullable(),
   completed_block_ids: z.array(z.string()).nullable().optional(),
   planned_block_ids: z.array(z.string()).nullable().optional(),

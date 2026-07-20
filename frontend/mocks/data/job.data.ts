@@ -48,6 +48,7 @@ const seedExecutions: Array<JobExecutionDetail> = [
     error: null,
     progress: '100',
     cascade_job_id: 'cascade-001',
+    lost_task_ids: {},
     outputs: {
       'task-out-1': {
         mime_type: 'image/png',
@@ -86,6 +87,7 @@ const seedExecutions: Array<JobExecutionDetail> = [
     error: null,
     progress: '45',
     cascade_job_id: 'cascade-002',
+    lost_task_ids: {},
     outputs: {
       'task-out-4': {
         mime_type: 'image/png',
@@ -107,6 +109,7 @@ const seedExecutions: Array<JobExecutionDetail> = [
     error: 'Worker process exited with code 137 (OOM killed)',
     progress: '62',
     cascade_job_id: 'cascade-003',
+    lost_task_ids: {},
     outputs: {},
     completed_block_ids: null,
     planned_block_ids: null,
@@ -122,6 +125,7 @@ const seedExecutions: Array<JobExecutionDetail> = [
     error: null,
     progress: '0',
     cascade_job_id: null,
+    lost_task_ids: {},
     outputs: null,
   },
 ]
@@ -140,6 +144,7 @@ export const mixedAvailabilityExecution: JobExecutionDetail = {
   error: null,
   progress: '70',
   cascade_job_id: 'cascade-005',
+  lost_task_ids: {},
   outputs: {
     'task-out-5a': {
       mime_type: 'image/png',
@@ -169,6 +174,7 @@ export const opaqueMimeExecution: JobExecutionDetail = {
   error: null,
   progress: '100',
   cascade_job_id: 'cascade-006',
+  lost_task_ids: {},
   outputs: {
     'task-out-6': {
       mime_type: 'application/octet-stream',
@@ -193,6 +199,7 @@ export const noStoredOutputsExecution: JobExecutionDetail = {
   error: null,
   progress: '100',
   cascade_job_id: 'cascade-007',
+  lost_task_ids: {},
   outputs: null,
   completed_block_ids: null,
   planned_block_ids: null,
@@ -238,6 +245,7 @@ export function addExecution(request: JobExecuteRequest): JobExecuteResponse {
     error: null,
     progress: '0',
     cascade_job_id: null,
+    lost_task_ids: {},
     outputs: null,
   }
   return { run_id, attempt_count: 1 }
