@@ -201,6 +201,7 @@ export function SingleMapView({
     resolveTime: a.resolveTime,
     incLoading: incA,
     decLoading: decA,
+    onLoadResult: a.onLoadResult,
     trackRevision: true,
   })
   // Unconditional hook; solo passes an inert config (empty order → the
@@ -217,6 +218,7 @@ export function SingleMapView({
       resolveTime: b?.resolveTime ?? noTime,
       incLoading: incB,
       decLoading: decB,
+      onLoadResult: b?.onLoadResult,
       trackRevision: true,
     },
   )
@@ -282,7 +284,9 @@ export function SingleMapView({
           const single = captureOnly ?? (bLabel === null ? 'a' : null)
           const timeLabel =
             single !== null
-              ? (single === 'a' ? a.timeLabel : bTimeLabel)
+              ? single === 'a'
+                ? a.timeLabel
+                : bTimeLabel
               : a.timeLabel === bTimeLabel
                 ? a.timeLabel
                 : [
@@ -297,7 +301,9 @@ export function SingleMapView({
                   {
                     label:
                       single !== null
-                        ? (single === 'a' ? a.label : (bLabel ?? ''))
+                        ? single === 'a'
+                          ? a.label
+                          : (bLabel ?? '')
                         : `A · ${a.label}  |  B · ${bLabel}`,
                     slot: single,
                     canvas,
@@ -557,6 +563,12 @@ export function SingleMapView({
 
       {a.hiddenAtTime && <GapBadge slot="A" side="left" />}
       {b?.hiddenAtTime && <GapBadge slot="B" side="right" />}
+      {stackA.errorCount > 0 && !a.hiddenAtTime && (
+        <LoadErrorBadge slot="A" side="left" />
+      )}
+      {stackB.errorCount > 0 && !b?.hiddenAtTime && (
+        <LoadErrorBadge slot="B" side="right" />
+      )}
       {a.timeTag && <TimeTagBadge slot="A" tag={a.timeTag} side="left" />}
       {b?.timeTag && <TimeTagBadge slot="B" tag={b.timeTag} side="right" />}
 
@@ -683,6 +695,31 @@ function GapBadge({ slot, side }: { slot: string; side: 'left' | 'right' }) {
     >
       <div className="rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
         {t('timeline.gap', { slot })}
+      </div>
+    </div>
+  )
+}
+
+/** The server returned no image for the requested instant (the layer is
+ *  hidden — an older image must never pose as this time). */
+export function LoadErrorBadge({
+  slot,
+  side,
+}: {
+  slot: string
+  side: 'left' | 'right'
+}) {
+  const { t } = useTranslation('visualise')
+  return (
+    <div
+      className={
+        side === 'left'
+          ? 'absolute top-10 left-2 z-10'
+          : 'absolute top-10 right-2 z-10'
+      }
+    >
+      <div className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
+        {t('timeline.loadError', { slot })}
       </div>
     </div>
   )

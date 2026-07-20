@@ -21,6 +21,8 @@ import { useMemo, useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
+  List,
+  ListTree,
   Loader2,
   Plus,
   Search,
@@ -40,6 +42,21 @@ import { cn } from '@/lib/utils'
 export const SLOT_CHIP_CLASS: Record<SourceSlot, string> = {
   a: 'bg-blue-600/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
   b: 'bg-orange-600/15 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300',
+}
+
+/** groupByTitlePrefix, or one flat pass-through cluster when toggled off. */
+function titleClusters<T>(
+  items: ReadonlyArray<T>,
+  getTitle: (item: T) => string,
+  grouped: boolean,
+): ReturnType<typeof groupByTitlePrefix<T>> {
+  if (grouped) return groupByTitlePrefix(items, getTitle)
+  return [
+    {
+      prefix: null,
+      items: items.map((item) => ({ item, shortTitle: getTitle(item) })),
+    },
+  ]
 }
 
 function pairMatchesSearch(pair: PairedLayer, query: string): boolean {
@@ -74,15 +91,25 @@ export function GeoLayerBrowser({
   const [search, setSearch] = useState('')
   const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
   const [selectedLevels, setSelectedLevels] = useState<Set<number>>(new Set())
+  const [grouped, setGrouped] = useState(true)
   const query = search.trim().toLowerCase()
+
+  // Per-panel selection browses one catalog at a time: "All" would
+  // interleave two unrelated catalogs and "A∩B" is empty by definition,
+  // so unlinked mode offers just A | B.
+  const unlinked = selection.linkMode !== 'linked'
+  const effectiveFilter: SlotFilter =
+    unlinked && (slotFilter === 'all' || slotFilter === 'both')
+      ? 'a'
+      : slotFilter
 
   const filteredPairs = useMemo(
     () => pairs.filter((pair) => pairMatchesSearch(pair, query)),
     [pairs, query],
   )
   const partitioned = useMemo(
-    () => groupPairs(filteredPairs, slotFilter),
-    [filteredPairs, slotFilter],
+    () => groupPairs(filteredPairs, effectiveFilter),
+    [filteredPairs, effectiveFilter],
   )
 
   const toggleLevel = (level: number) => {
@@ -110,6 +137,23 @@ export function GeoLayerBrowser({
           <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             {tExec('lens.layers')}
           </P>
+          <button
+            type="button"
+            onClick={() => setGrouped((v) => !v)}
+            aria-pressed={grouped}
+            title={t('browser.groupToggle')}
+            aria-label={t('browser.groupToggle')}
+            className={cn(
+              'ml-auto rounded p-0.5 hover:bg-accent hover:text-foreground',
+              grouped ? 'text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            {grouped ? (
+              <ListTree className="h-3.5 w-3.5" />
+            ) : (
+              <List className="h-3.5 w-3.5" />
+            )}
+          </button>
         </div>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -121,35 +165,38 @@ export function GeoLayerBrowser({
             className="h-8 pl-7 text-sm"
           />
         </div>
-        {/* All | A | B availability filter */}
+        {/* All | A | B availability filter (just A | B when unlinked). */}
         {hasB && (
-        <div
-          role="group"
-          aria-label={t('browser.filterAria')}
-          className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
-        >
-          {(['all', 'a', 'b', 'both'] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setSlotFilter(f)}
-              aria-pressed={slotFilter === f}
-              title={f === 'both' ? t('browser.bothHint') : undefined}
-              className={cn(
-                'flex-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
-                slotFilter === f
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {f === 'all'
-                ? t('browser.all')
-                : f === 'both'
-                  ? t('browser.both')
-                  : f.toUpperCase()}
-            </button>
-          ))}
-        </div>
+          <div
+            role="group"
+            aria-label={t('browser.filterAria')}
+            className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
+          >
+            {(unlinked
+              ? (['a', 'b'] as const)
+              : (['all', 'a', 'b', 'both'] as const)
+            ).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setSlotFilter(f)}
+                aria-pressed={effectiveFilter === f}
+                title={f === 'both' ? t('browser.bothHint') : undefined}
+                className={cn(
+                  'flex-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
+                  effectiveFilter === f
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {f === 'all'
+                  ? t('browser.all')
+                  : f === 'both'
+                    ? t('browser.both')
+                    : f.toUpperCase()}
+              </button>
+            ))}
+          </div>
         )}
         {partitioned.allLevels.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -188,14 +235,9 @@ export function GeoLayerBrowser({
             selection={selection}
             showChips={hasB}
             query={query}
+            grouped={grouped}
             loading={sourceA.loadingLayers || sourceB.loadingLayers}
           />
-        ) : slotFilter === 'both' ? (
-          // Unlinked = no pairing, so "available in both" is by definition
-          // empty — say so instead of silently showing everything.
-          <P className="p-2 text-sm text-muted-foreground">
-            {t('browser.bothEmpty')}
-          </P>
         ) : (
           <>
             <UnlinkedSourceSection
@@ -203,8 +245,9 @@ export function GeoLayerBrowser({
               source={sourceA}
               selection={selection}
               query={query}
-              slotFilter={slotFilter}
+              slotFilter={effectiveFilter}
               selectedLevels={selectedLevels}
+              grouped={grouped}
             />
             {hasB && (
               <UnlinkedSourceSection
@@ -212,8 +255,9 @@ export function GeoLayerBrowser({
                 source={sourceB}
                 selection={selection}
                 query={query}
-                slotFilter={slotFilter}
+                slotFilter={effectiveFilter}
                 selectedLevels={selectedLevels}
+                grouped={grouped}
               />
             )}
           </>
@@ -233,6 +277,7 @@ function LinkedSections({
   selection,
   showChips,
   query,
+  grouped,
   loading,
 }: {
   partitioned: ReturnType<typeof groupPairs>
@@ -240,6 +285,7 @@ function LinkedSections({
   selection: CompareSelection
   showChips: boolean
   query: string
+  grouped: boolean
   loading: boolean
 }) {
   const { t } = useTranslation('visualise')
@@ -281,7 +327,7 @@ function LinkedSections({
         <section>
           <SectionHeading>{t('browser.surface')}</SectionHeading>
           <ul className="space-y-1">
-            {groupByTitlePrefix(partitioned.singles, (g) => g.title).map(
+            {titleClusters(partitioned.singles, (g) => g.title, grouped).map(
               (cluster) =>
                 cluster.prefix === null ? (
                   cluster.items.map(({ item: group }) => (
@@ -492,6 +538,7 @@ function UnlinkedSourceSection({
   query,
   slotFilter,
   selectedLevels,
+  grouped,
 }: {
   slot: SourceSlot
   source: LensSource
@@ -499,6 +546,7 @@ function UnlinkedSourceSection({
   query: string
   slotFilter: SlotFilter
   selectedLevels: ReadonlySet<number>
+  grouped: boolean
 }) {
   const { t } = useTranslation('visualise')
   const { t: tExec } = useTranslation('executions')
@@ -568,7 +616,7 @@ function UnlinkedSourceSection({
               </li>
             )
           }
-          return groupByTitlePrefix(rows, (r) => r.label).map((cluster) =>
+          return titleClusters(rows, (r) => r.label, grouped).map((cluster) =>
             cluster.prefix === null ? (
               cluster.items.map(({ item }) => row(item.name, item.label))
             ) : (
@@ -636,7 +684,10 @@ function TitlePrefixGroup({
             !open && '-rotate-90',
           )}
         />
-        <P className="min-w-0 flex-1 truncate text-sm font-medium" title={prefix}>
+        <P
+          className="min-w-0 flex-1 truncate text-sm font-medium"
+          title={prefix}
+        >
           {prefix}
         </P>
         <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">

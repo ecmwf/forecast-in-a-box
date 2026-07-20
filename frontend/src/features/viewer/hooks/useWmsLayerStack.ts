@@ -22,17 +22,39 @@
  * z-index math exactly.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ImageLayer from 'ol/layer/Image'
 import { DEFAULT_LAYER_OPACITY, makeDataLayerSource } from '../ol-layers'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
+import type { ImageSourceEvent } from 'ol/source/Image'
 import type { ParsedLayer } from '../wms-capabilities'
 
 interface ManagedLayer {
   layer: ImageLayer<ImageWMS>
   source: ImageWMS
+  /** Last load failed — the layer is hidden so a stale image can never
+   *  masquerade as the requested instant. */
+  errored: boolean
+  /** TIME of the most recently requested params (load-result fallback). */
+  lastTime: string | null
+  /** Serialized params last pushed to OL — updateParams always refetches,
+   *  so identical params must never be pushed again. */
+  paramsKey: string
+}
+
+/** TIME actually on the request URL — exact attribution even when the
+ *  params moved on while this load was in flight. Null when the loaded
+ *  result is already an ImageBitmap (no URL to read). */
+function requestedTime(evt: ImageSourceEvent): string | null {
+  const img = evt.image.getImage()
+  if (!(img instanceof HTMLImageElement)) return null
+  try {
+    return new URL(img.src).searchParams.get('TIME')
+  } catch {
+    return null
+  }
 }
 
 export interface WmsLayerStackConfig {
@@ -51,6 +73,8 @@ export interface WmsLayerStackConfig {
   resolveTime: (layer: ParsedLayer) => string | null
   incLoading: () => void
   decLoading: () => void
+  /** Per-request load outcome (feeds the GetMap failure cache). */
+  onLoadResult?: (layerName: string, time: string | null, ok: boolean) => void
   /**
    * Bump `revision` state after each reconciliation. Costs one extra
    * consumer render per change — enable only when something must re-attach
@@ -64,6 +88,8 @@ export interface WmsLayerStack {
   stackRef: RefObject<ReadonlyArray<ImageLayer<ImageWMS>>>
   /** Reconciliation counter; stays 0 unless `trackRevision` is set. */
   revision: number
+  /** Layers whose latest load failed (hidden until a load succeeds). */
+  errorCount: number
 }
 
 export function useWmsLayerStack(
@@ -80,8 +106,14 @@ export function useWmsLayerStack(
     resolveTime,
     incLoading,
     decLoading,
+    onLoadResult,
     trackRevision = false,
   } = config
+
+  // Listeners are bound once per layer; a ref keeps them on the latest
+  // callback without re-running the reconcile effect.
+  const onLoadResultRef = useRef(onLoadResult)
+  onLoadResultRef.current = onLoadResult
 
   const managedRef = useRef<Map<string, ManagedLayer>>(new Map())
   // The map instance the managed layers were added to. When the map is
@@ -90,6 +122,12 @@ export function useWmsLayerStack(
   const attachedMapRef = useRef<OlMap | null>(null)
   const stackRef = useRef<ReadonlyArray<ImageLayer<ImageWMS>>>([])
   const [revision, setRevision] = useState(0)
+  const [errorCount, setErrorCount] = useState(0)
+  const syncErrorCount = useCallback(() => {
+    setErrorCount(
+      [...managedRef.current.values()].filter((m) => m.errored).length,
+    )
+  }, [])
 
   useEffect(() => {
     const map = mapRef.current
@@ -120,23 +158,69 @@ export function useWmsLayerStack(
       const effectiveOpacity = perLayer * masterOpacity
       const z = zBase + (activeOrder.length - idx) // index 0 → highest z
 
+      const paramsKey = JSON.stringify(params)
       const existing = managed.get(layerName)
       if (existing) {
-        existing.source.updateParams(params)
+        // Guarded: reconciles also run for opacity/order changes and
+        // render churn — pushing identical params would refetch (and for
+        // an errored layer, retry-loop against a failing server).
+        if (existing.paramsKey !== paramsKey) {
+          existing.paramsKey = paramsKey
+          existing.lastTime = time
+          existing.source.updateParams(params)
+          // Hidden-on-error layers never re-request (OL culls invisible
+          // layers) — unhide so the refreshed params get retried. No stale
+          // frame: updateParams bumped the source revision, which clears
+          // the renderer's cached image for unrendered layers.
+          if (existing.errored) existing.layer.setVisible(true)
+        }
         existing.layer.setOpacity(effectiveOpacity)
         existing.layer.setZIndex(z)
       } else {
         const source = makeDataLayerSource(baseUrl, params)
-        source.on('imageloadstart', incLoading)
-        source.on('imageloadend', decLoading)
-        source.on('imageloaderror', decLoading)
         const olLayer = new ImageLayer({
           source,
           opacity: effectiveOpacity,
           zIndex: z,
         })
+        const entry: ManagedLayer = {
+          layer: olLayer,
+          source,
+          errored: false,
+          lastTime: time,
+          paramsKey,
+        }
+        source.on('imageloadstart', incLoading)
+        source.on('imageloadend', (evt) => {
+          decLoading()
+          if (entry.errored) {
+            entry.errored = false
+            syncErrorCount()
+          }
+          entry.layer.setVisible(true)
+          onLoadResultRef.current?.(
+            layerName,
+            requestedTime(evt) ?? entry.lastTime,
+            true,
+          )
+        })
+        // A failed load must never leave the previous image on screen —
+        // it would masquerade as the newly requested instant.
+        source.on('imageloaderror', (evt) => {
+          decLoading()
+          if (!entry.errored) {
+            entry.errored = true
+            syncErrorCount()
+          }
+          entry.layer.setVisible(false)
+          onLoadResultRef.current?.(
+            layerName,
+            requestedTime(evt) ?? entry.lastTime,
+            false,
+          )
+        })
         map.addLayer(olLayer)
-        managed.set(layerName, { layer: olLayer, source })
+        managed.set(layerName, entry)
       }
     })
 
@@ -146,6 +230,7 @@ export function useWmsLayerStack(
         managed.delete(name)
       }
     }
+    syncErrorCount()
 
     stackRef.current = activeOrder.flatMap((name) => {
       const m = managed.get(name)
@@ -164,6 +249,7 @@ export function useWmsLayerStack(
     trackRevision,
     incLoading,
     decLoading,
+    syncErrorCount,
   ])
 
   // Unmount: detach this stack's layers (the map may outlive the stack —
@@ -181,5 +267,5 @@ export function useWmsLayerStack(
     [],
   )
 
-  return { stackRef, revision }
+  return { stackRef, revision, errorCount }
 }

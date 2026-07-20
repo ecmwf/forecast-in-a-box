@@ -78,16 +78,16 @@ function Harness({
   const [queryClient] = useState(() => new QueryClient())
   return (
     <QueryClientProvider client={queryClient}>
-    <I18nextProvider i18n={i18n}>
-      <div style={{ width: 1100, height: 700 }}>
-        <GeoViewer
-          a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
-          b={{ baseUrl: `http://localhost:${portB}`, label: 'Run B' }}
-          mode={mode}
-          onModeChange={setMode}
-        />
-      </div>
-    </I18nextProvider>
+      <I18nextProvider i18n={i18n}>
+        <div style={{ width: 1100, height: 700 }}>
+          <GeoViewer
+            a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
+            b={{ baseUrl: `http://localhost:${portB}`, label: 'Run B' }}
+            mode={mode}
+            onModeChange={setMode}
+          />
+        </div>
+      </I18nextProvider>
     </QueryClientProvider>
   )
 }
@@ -567,7 +567,9 @@ describe('GeoViewer', () => {
     await screen.getByText('2 m temperature').first().click()
 
     await screen.getByLabelText('Time link mode').click()
-    await screen.getByRole('option', { name: 'Time offset (B = A + Δ)' }).click()
+    await screen
+      .getByRole('option', { name: 'Time offset (B = A + Δ)' })
+      .click()
 
     const slider = screen.getByRole('slider', {
       name: 'Time offset between A and B',
@@ -609,15 +611,40 @@ describe('GeoViewer', () => {
     await expect
       .element(screen.getByRole('switch', { name: /link layer selection/i }))
       .toBeDisabled()
-    // Per-source sections list each side's own layers.
+    // Per-panel selection browses one catalog at a time: just A | B —
+    // no "All" (two unrelated catalogs) and no "A∩B" (empty by definition).
+    expect(
+      screen.getByRole('button', { name: 'All', exact: true }).elements(),
+    ).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'A∩B' }).elements()).toHaveLength(
+      0,
+    )
     await expect.element(screen.getByText('2 m temperature')).toBeVisible()
+    expect(screen.getByText('Total precipitation').elements()).toHaveLength(0)
+    await screen.getByRole('button', { name: 'B', exact: true }).click()
     await expect.element(screen.getByText('Total precipitation')).toBeVisible()
-    // A∩B with zero overlap → explicit empty panel, not a full listing.
-    await screen.getByRole('button', { name: 'A∩B' }).click()
-    await expect
-      .element(screen.getByText('No layers are available in both sources.'))
-      .toBeVisible()
     expect(screen.getByText('2 m temperature').elements()).toHaveLength(0)
+
+    // Swap B for a source that DOES share layers → the situational
+    // unlink undoes itself: banner gone, pair filter back.
+    const portB2 = nextPort++
+    registerMockWmsServer(portB2, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    await screen.rerender(<Harness portA={portA} portB={portB2} />)
+    await expect
+      .element(screen.getByRole('button', { name: 'A∩B' }))
+      .toBeVisible()
+    expect(
+      screen
+        .getByText(
+          'The two sources share no common layers — selection is per panel.',
+        )
+        .elements(),
+    ).toHaveLength(0)
+    await expect
+      .element(screen.getByRole('switch', { name: /link layer selection/i }))
+      .toBeEnabled()
   })
 })
 
@@ -636,20 +663,20 @@ function ProgressiveHarness({
   const [queryClient] = useState(() => new QueryClient())
   return (
     <QueryClientProvider client={queryClient}>
-    <I18nextProvider i18n={i18n}>
-      <div style={{ width: 1100, height: 700 }}>
-        <GeoViewer
-          a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
-          b={
-            withB
-              ? { baseUrl: `http://localhost:${portB}`, label: 'Run B' }
-              : null
-          }
-          mode={mode}
-          onModeChange={setMode}
-        />
-      </div>
-    </I18nextProvider>
+      <I18nextProvider i18n={i18n}>
+        <div style={{ width: 1100, height: 700 }}>
+          <GeoViewer
+            a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
+            b={
+              withB
+                ? { baseUrl: `http://localhost:${portB}`, label: 'Run B' }
+                : null
+            }
+            mode={mode}
+            onModeChange={setMode}
+          />
+        </div>
+      </I18nextProvider>
     </QueryClientProvider>
   )
 }
@@ -784,10 +811,11 @@ describe('GeoViewer legend pinning', () => {
     await screen.getByText('2 m temperature').first().click()
 
     // Pin A's legend from the pair card → the strip appears on the map.
-    await screen.getByRole('button', { name: 'Pin legend open' }).first().click()
-    await expect
-      .element(screen.getByText('A · 2 m temperature'))
-      .toBeVisible()
+    await screen
+      .getByRole('button', { name: 'Pin legend open' })
+      .first()
+      .click()
+    await expect.element(screen.getByText('A · 2 m temperature')).toBeVisible()
 
     await screen.getByRole('button', { name: 'Unpin legend' }).last().click()
     expect(screen.getByText('A · 2 m temperature').elements()).toHaveLength(0)
@@ -830,5 +858,32 @@ describe('GeoViewer layer browser grouping', () => {
         }),
       )
       .toBeInTheDocument()
+  })
+
+  it('the group toggle switches to a flat full-title listing', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [
+        { name: 'at2i', title: 'Air temperature 2m indexed' },
+        { name: 'at2m', title: 'Air temperature 2m max' },
+        { name: 'atpl', title: 'Air temperature pl in AIFS' },
+        { name: 'ws', title: 'Wind speed 10m' },
+      ],
+    })
+    registerMockWmsServer(portB, { layers: [] })
+    const screen = await render(
+      <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
+    )
+
+    await expect.element(screen.getByText('3 layers')).toBeVisible()
+    await screen.getByRole('button', { name: 'Group similar layers' }).click()
+    expect(screen.getByText('3 layers').elements()).toHaveLength(0)
+    await expect
+      .element(screen.getByText('Air temperature 2m indexed'))
+      .toBeVisible()
+    await expect
+      .element(screen.getByText('Air temperature pl in AIFS'))
+      .toBeVisible()
   })
 })

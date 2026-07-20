@@ -32,6 +32,8 @@ export interface MockWmsServerConfig {
   bbox?: [number, number, number, number]
   /** Requests answered 503 before the server starts serving capabilities. */
   failuresBeforeSuccess?: number
+  /** GetMap TIME values answered with a WMS service exception. */
+  failGetMapTimes?: Array<string>
 }
 
 interface MockWmsServer {
@@ -44,6 +46,7 @@ let servers = new Map<number, MockWmsServer>()
 
 export function resetWmsState(): void {
   servers = new Map()
+  getMapLog.clear()
 }
 
 export function hasMockWmsServer(port: number): boolean {
@@ -59,6 +62,25 @@ export function registerMockWmsServer(
     remainingFailures: config.failuresBeforeSuccess ?? 0,
     capabilitiesRequests: 0,
   })
+}
+
+/** GetMap requests seen per port (TIME param values, in order). */
+const getMapLog = new Map<number, Array<string | null>>()
+
+export function recordGetMap(port: number, time: string | null): void {
+  const log = getMapLog.get(port) ?? []
+  log.push(time)
+  getMapLog.set(port, log)
+}
+
+export function getMapRequests(port: number): ReadonlyArray<string | null> {
+  return getMapLog.get(port) ?? []
+}
+
+/** Should this port's GetMap fail for the given TIME? */
+export function getMapFailsFor(port: number, time: string | null): boolean {
+  const times = servers.get(port)?.config.failGetMapTimes
+  return !!time && !!times && times.includes(time)
 }
 
 /** Capabilities requests seen by a server (asserting retry behaviour). */

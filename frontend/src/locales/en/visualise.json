@@ -140,7 +140,10 @@
     "alignStarts": "Align starts",
     "alignStartsHint": "Shift B so both series start together",
     "alignEnds": "Align ends",
-    "alignEndsHint": "Shift B so both series end together"
+    "alignEndsHint": "Shift B so both series end together",
+    "loadError": "Server returned no data for this time — {{slot}}",
+    "notServed": "Advertised but not served",
+    "notServedHint": "Light segments: times this server advertises but did not serve"
   },
   "link": {
     "linked": "Linked layers",
@@ -159,7 +162,7 @@
     "levels_other": "{{count}} levels",
     "both": "A∩B",
     "bothHint": "Only layers available in both sources",
-    "bothEmpty": "No layers are available in both sources.",
+    "groupToggle": "Group similar layers",
     "layers_one": "{{count}} layer",
     "layers_other": "{{count}} layers"
   },
