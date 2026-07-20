@@ -18,9 +18,17 @@
  */
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Plus,
+  Search,
+  X,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { groupPairs } from './pair-grouping'
+import { groupByTitlePrefix } from './title-grouping'
 import type { SlotFilter } from './pair-grouping'
 import type { PairedLayer, SourceSlot } from './layer-pairing'
 import type { CompareSelection } from './useCompareSelection'
@@ -87,7 +95,7 @@ export function GeoLayerBrowser({
   }
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
+    <aside className="flex w-80 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
       <div className="space-y-2 border-b border-border bg-muted/40 px-3 pt-2.5 pb-2.5">
         <div className="flex items-center gap-1.5">
           <button
@@ -179,6 +187,8 @@ export function GeoLayerBrowser({
             selectedLevels={selectedLevels}
             selection={selection}
             showChips={hasB}
+            query={query}
+            loading={sourceA.loadingLayers || sourceB.loadingLayers}
           />
         ) : slotFilter === 'both' ? (
           // Unlinked = no pairing, so "available in both" is by definition
@@ -222,13 +232,18 @@ function LinkedSections({
   selectedLevels,
   selection,
   showChips,
+  query,
+  loading,
 }: {
   partitioned: ReturnType<typeof groupPairs>
   selectedLevels: ReadonlySet<number>
   selection: CompareSelection
   showChips: boolean
+  query: string
+  loading: boolean
 }) {
   const { t } = useTranslation('visualise')
+  const { t: tExec } = useTranslation('executions')
   const multiLevel = useMemo(
     () =>
       partitioned.multiLevel
@@ -246,6 +261,14 @@ function LinkedSections({
   )
 
   if (partitioned.singles.length === 0 && multiLevel.length === 0) {
+    if (loading) {
+      return (
+        <P className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {tExec('lens.loadingLayers')}
+        </P>
+      )
+    }
     return (
       <P className="p-2 text-sm text-muted-foreground">
         {t('picker.searchEmpty')}
@@ -258,15 +281,44 @@ function LinkedSections({
         <section>
           <SectionHeading>{t('browser.surface')}</SectionHeading>
           <ul className="space-y-1">
-            {partitioned.singles.map((group) => (
-              <li key={group.key}>
-                <PairRow
-                  pair={group.entries[0]}
-                  selection={selection}
-                  showChips={showChips}
-                />
-              </li>
-            ))}
+            {groupByTitlePrefix(partitioned.singles, (g) => g.title).map(
+              (cluster) =>
+                cluster.prefix === null ? (
+                  cluster.items.map(({ item: group }) => (
+                    <li key={group.key}>
+                      <PairRow
+                        pair={group.entries[0]}
+                        selection={selection}
+                        showChips={showChips}
+                      />
+                    </li>
+                  ))
+                ) : (
+                  <TitlePrefixGroup
+                    key={`${cluster.prefix}:${query}`}
+                    prefix={cluster.prefix}
+                    count={cluster.items.length}
+                    activeCount={
+                      cluster.items.filter(({ item }) =>
+                        selection.isPairActive(item.entries[0].key),
+                      ).length
+                    }
+                    defaultOpen={query !== ''}
+                  >
+                    {cluster.items.map(({ item: group, shortTitle }) => (
+                      <li key={group.key} className="px-1 py-0.5">
+                        <PairRow
+                          pair={group.entries[0]}
+                          selection={selection}
+                          title={shortTitle}
+                          compact
+                          showChips={showChips}
+                        />
+                      </li>
+                    ))}
+                  </TitlePrefixGroup>
+                ),
+            )}
           </ul>
         </section>
       )}
@@ -449,6 +501,7 @@ function UnlinkedSourceSection({
   selectedLevels: ReadonlySet<number>
 }) {
   const { t } = useTranslation('visualise')
+  const { t: tExec } = useTranslation('executions')
   // 'both' never reaches here (handled as an empty state upstream).
   if (slotFilter === 'a' || slotFilter === 'b') {
     if (slotFilter !== slot) return null
@@ -475,21 +528,24 @@ function UnlinkedSourceSection({
         </span>
       </SectionHeading>
       <ul className="space-y-1">
-        {groups.map((group) => {
-          const entries =
-            selectedLevels.size === 0
-              ? group.entries
-              : group.entries.filter(
-                  (e) => e.level === null || selectedLevels.has(e.level),
-                )
-          if (entries.length === 0) return null
-          return entries.map((entry) => {
-            const name = entry.layer.name
+        {(() => {
+          const rows = groups.flatMap((group) => {
+            const entries =
+              selectedLevels.size === 0
+                ? group.entries
+                : group.entries.filter(
+                    (e) => e.level === null || selectedLevels.has(e.level),
+                  )
+            return entries.map((entry) => ({
+              name: entry.layer.name,
+              label:
+                entry.level !== null
+                  ? `${group.title} · ${entry.level} ${group.levelUnit ?? 'hPa'}`
+                  : group.title,
+            }))
+          })
+          const row = (name: string, label: string) => {
             const active = selection.isLayerActive(slot, name)
-            const label =
-              entry.level !== null
-                ? `${group.title} · ${entry.level} ${group.levelUnit ?? 'hPa'}`
-                : group.title
             return (
               <li key={name}>
                 <button
@@ -511,15 +567,89 @@ function UnlinkedSourceSection({
                 </button>
               </li>
             )
-          })
-        })}
-        {groups.length === 0 && (
-          <P className="px-2 py-1 text-sm text-muted-foreground">
-            {t('picker.searchEmpty')}
-          </P>
-        )}
+          }
+          return groupByTitlePrefix(rows, (r) => r.label).map((cluster) =>
+            cluster.prefix === null ? (
+              cluster.items.map(({ item }) => row(item.name, item.label))
+            ) : (
+              <TitlePrefixGroup
+                key={`${cluster.prefix}:${query}`}
+                prefix={cluster.prefix}
+                count={cluster.items.length}
+                activeCount={
+                  cluster.items.filter(({ item }) =>
+                    selection.isLayerActive(slot, item.name),
+                  ).length
+                }
+                defaultOpen={query !== ''}
+              >
+                {cluster.items.map(({ item, shortTitle }) =>
+                  row(item.name, shortTitle),
+                )}
+              </TitlePrefixGroup>
+            ),
+          )
+        })()}
+        {groups.length === 0 &&
+          (source.loadingLayers ? (
+            <P className="flex items-center gap-2 px-2 py-1 text-sm text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              {tExec('lens.loadingLayers')}
+            </P>
+          ) : (
+            <P className="px-2 py-1 text-sm text-muted-foreground">
+              {t('picker.searchEmpty')}
+            </P>
+          ))}
       </ul>
     </section>
+  )
+}
+
+/** Collapsible cluster of layers sharing a leading title prefix. */
+function TitlePrefixGroup({
+  prefix,
+  count,
+  activeCount,
+  defaultOpen,
+  children,
+}: {
+  prefix: string
+  count: number
+  activeCount: number
+  defaultOpen: boolean
+  children: React.ReactNode
+}) {
+  const { t } = useTranslation('visualise')
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <li className="rounded-md border border-border bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start gap-2 px-2 py-1.5 text-left"
+      >
+        <ChevronDown
+          className={cn(
+            'mt-0.5 h-3 w-3 shrink-0 text-muted-foreground transition-transform',
+            !open && '-rotate-90',
+          )}
+        />
+        <P className="min-w-0 flex-1 truncate text-sm font-medium" title={prefix}>
+          {prefix}
+        </P>
+        <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+          {activeCount > 0 && (
+            <span className="rounded bg-primary/10 px-1 font-mono text-primary">
+              {activeCount}
+            </span>
+          )}
+          {t('browser.layers', { count })}
+        </span>
+      </button>
+      {open && <ul className="border-t border-border px-1 py-1">{children}</ul>}
+    </li>
   )
 }
 

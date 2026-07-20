@@ -52,7 +52,8 @@
       "errorInvalidUrl": "Enter a valid http(s) URL",
       "errorUnreachable": "Server not reachable — check the URL, and that it allows cross-origin (CORS) requests from this app",
       "errorHttp": "The server responded with HTTP {{status}} — check the URL path and any token",
-      "errorParse": "The server responded, but not with a readable WMS capabilities document"
+      "errorParse": "The server responded, but not with a readable WMS capabilities document",
+      "errorTimeout": "Timed out — the server may be slow, try again"
     },
     "hostPath": {
       "title": "GRIB directory on this host",
@@ -61,7 +62,14 @@
       "start": "Start lens & add"
     },
     "collected": "Collected sources",
-    "loadMore": "Load more runs"
+    "loadMore": "Load more runs",
+    "curated": {
+      "title": "Known WMS servers",
+      "added": "Added",
+      "failed": "Could not reach {{name}}",
+      "checking": "Checking WMS capabilities…",
+      "timedOut": "{{name}} timed out — the server may be slow, try again"
+    }
   },
   "lens": {
     "resolving": "Locating output directory…",
@@ -151,7 +159,9 @@
     "levels_other": "{{count}} levels",
     "both": "A∩B",
     "bothHint": "Only layers available in both sources",
-    "bothEmpty": "No layers are available in both sources."
+    "bothEmpty": "No layers are available in both sources.",
+    "layers_one": "{{count}} layer",
+    "layers_other": "{{count}} layers"
   },
   "sidebar": {
     "active": "Active layers",

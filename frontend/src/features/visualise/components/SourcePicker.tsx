@@ -23,6 +23,7 @@ import { useLensPathIndex } from '../hooks/useLensPathIndex'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { AddToComparisonButton } from './AddToComparisonButton'
 import { CompareBasketChip } from './CompareBasketChip'
+import { CuratedWmsList } from './sources/CuratedWmsList'
 import { HostPathForm } from './sources/HostPathForm'
 import { RunSourceList } from './sources/RunSourceList'
 import { WmsUrlForm } from './sources/WmsUrlForm'
@@ -125,8 +126,9 @@ export function SourcePicker() {
           <SectionLabel icon={<FolderInput className="h-3.5 w-3.5" />}>
             {t('picker.external')}
           </SectionLabel>
-          <HostPathForm />
           <WmsUrlForm />
+          <CuratedWmsList />
+          <HostPathForm />
         </section>
       </div>
     </div>

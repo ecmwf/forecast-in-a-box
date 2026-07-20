@@ -20,6 +20,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from '@vitest/browser/context'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
 import type { CompareMode } from '@/features/viewer/geo/types'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
@@ -74,7 +75,9 @@ function Harness({
   initialMode?: CompareMode
 }) {
   const [mode, setMode] = useState<CompareMode>(initialMode)
+  const [queryClient] = useState(() => new QueryClient())
   return (
+    <QueryClientProvider client={queryClient}>
     <I18nextProvider i18n={i18n}>
       <div style={{ width: 1100, height: 700 }}>
         <GeoViewer
@@ -85,6 +88,7 @@ function Harness({
         />
       </div>
     </I18nextProvider>
+    </QueryClientProvider>
   )
 }
 
@@ -629,7 +633,9 @@ function ProgressiveHarness({
   withB: boolean
 }) {
   const [mode, setMode] = useState<CompareMode>('swipe')
+  const [queryClient] = useState(() => new QueryClient())
   return (
+    <QueryClientProvider client={queryClient}>
     <I18nextProvider i18n={i18n}>
       <div style={{ width: 1100, height: 700 }}>
         <GeoViewer
@@ -644,6 +650,7 @@ function ProgressiveHarness({
         />
       </div>
     </I18nextProvider>
+    </QueryClientProvider>
   )
 }
 
@@ -784,5 +791,44 @@ describe('GeoViewer legend pinning', () => {
 
     await screen.getByRole('button', { name: 'Unpin legend' }).last().click()
     expect(screen.getByText('A · 2 m temperature').elements()).toHaveLength(0)
+  })
+})
+
+describe('GeoViewer layer browser grouping', () => {
+  it('clusters repetitive catalog titles into prefix groups', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [
+        { name: 'at2i', title: 'Air temperature 2m indexed' },
+        { name: 'at2m', title: 'Air temperature 2m max' },
+        { name: 'atpl', title: 'Air temperature pl in AIFS' },
+        { name: 'atfl', title: 'Air temperature fl in MEPS' },
+        { name: 'ws', title: 'Wind speed 10m' },
+      ],
+    })
+    registerMockWmsServer(portB, { layers: [] })
+    const screen = await render(
+      <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
+    )
+
+    // Group header with the shared prefix and a count; children hidden.
+    await expect
+      .element(screen.getByText('Air temperature', { exact: true }))
+      .toBeVisible()
+    await expect.element(screen.getByText('4 layers')).toBeVisible()
+    await expect.element(screen.getByText('Wind speed 10m')).toBeVisible()
+    expect(screen.getByText('2m indexed').elements()).toHaveLength(0)
+
+    // Expanding shows suffix-only rows; activating uses the full title.
+    await screen.getByText('Air temperature', { exact: true }).click()
+    await screen.getByText('2m indexed').click()
+    await expect
+      .element(
+        screen.getByRole('slider', {
+          name: /Air temperature 2m indexed opacity/,
+        }),
+      )
+      .toBeInTheDocument()
   })
 })
