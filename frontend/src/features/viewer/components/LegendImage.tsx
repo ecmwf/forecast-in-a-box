@@ -9,11 +9,13 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { P } from '@/components/base/typography'
 
 // Hover-popover close delay — lets the cursor travel trigger→content.
 const LEGEND_HOVER_CLOSE_MS = 200
@@ -27,7 +29,11 @@ const LEGEND_HOVER_CLOSE_MS = 200
  * bottom of the map for side-by-side comparison.
  */
 export function LegendImage({ url, title }: { url: string; title: string }) {
+  const { t } = useTranslation('executions')
   const [hovered, setHovered] = useState(false)
+  // Servers sometimes advertise legends their endpoint then 500s on.
+  const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [url])
   const closeTimer = useRef<number | null>(null)
 
   const cancelTimer = useCallback(() => {
@@ -48,6 +54,14 @@ export function LegendImage({ url, title }: { url: string; title: string }) {
     }, LEGEND_HOVER_CLOSE_MS)
   }, [cancelTimer])
   useEffect(() => () => cancelTimer(), [cancelTimer])
+
+  if (failed) {
+    return (
+      <P className="text-xs text-muted-foreground/70 italic">
+        {t('lens.legendUnavailable')}
+      </P>
+    )
+  }
 
   return (
     <Popover
@@ -74,6 +88,7 @@ export function LegendImage({ url, title }: { url: string; title: string }) {
           alt={`${title} legend`}
           className="h-auto max-h-32 w-full object-contain"
           loading="lazy"
+          onError={() => setFailed(true)}
         />
       </PopoverTrigger>
       <PopoverContent

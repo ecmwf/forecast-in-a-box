@@ -297,7 +297,8 @@
       "noWfsNote": "SkinnyWMS doesn't implement WFS / GetFeatureInfo, so click-to-query isn't available here. To read raw values at a point, load the source GRIB file into a full GIS stack instead.",
       "paramsTitle": "Available parameters"
     },
-    "basemapOpacity": "Basemap opacity"
+    "basemapOpacity": "Basemap opacity",
+    "legendUnavailable": "Legend unavailable"
   },
   "logs": {
     "title": "Gateway Log",
