@@ -24,17 +24,16 @@ from fiab_core.fable import (
     PluginId,
     PluginStoreId,
 )
-from fiab_core.types import FableType, StringType
+from fiab_core.types import StringType
 
 
-def test_block_configuration_option_caches_parsed_value_type() -> None:
+def test_block_configuration_option_parses_value_type() -> None:
     option = BlockConfigurationOption(title="Title", description="Description", value_type="str")
 
-    assert isinstance(option.parsed_value_type, StringType)
-    assert isinstance(option._value_type, FableType)
+    assert isinstance(option.value_type, StringType)
 
 
-def test_block_configuration_option_excludes_cached_value_type_from_serialization() -> None:
+def test_block_configuration_option_serializes_value_type() -> None:
     option = BlockConfigurationOption(title="Title", description="Description", value_type="str")
 
     dumped = option.model_dump()

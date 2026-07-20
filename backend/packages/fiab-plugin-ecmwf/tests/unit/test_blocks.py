@@ -333,10 +333,10 @@ class TestOperationalForecastSource:
 
     def test_catalogue_value_types_are_canonical(self) -> None:
         assert (
-            OperationalForecastSource.configuration_options[ConfigurationOptionId("source")].value_type
-            == "enumClosed['mars', 'ecmwf-open-data']"
+            OperationalForecastSource.configuration_options[ConfigurationOptionId("source")].value_type.serialize()
+            == "enumClosed[mars,ecmwf-open-data]"
         )
-        assert OperationalForecastSource.configuration_options[ConfigurationOptionId("base_time")].value_type == "datetime"
+        assert OperationalForecastSource.configuration_options[ConfigurationOptionId("base_time")].value_type.serialize() == "datetime"
         assert PARAM not in OperationalForecastSource.configuration_options
         assert STEP not in OperationalForecastSource.configuration_options
         assert ENSEMBLE not in OperationalForecastSource.configuration_options
@@ -344,7 +344,7 @@ class TestOperationalForecastSource:
 
 class TestEnsembleStatistics:
     def test_catalogue_value_type_is_canonical(self) -> None:
-        assert EnsembleStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type == "enumClosed['mean', 'std']"
+        assert EnsembleStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type.serialize() == "enumClosed[mean,std]"
 
     def test_from_operational_forecast_source(
         self, ensemble_statistics_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
@@ -400,8 +400,8 @@ class TestEnsembleStatistics:
 class TestTemporalStatistics:
     def test_catalogue_value_type_is_canonical(self) -> None:
         assert (
-            TemporalStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type
-            == "enumClosed['mean', 'std', 'min', 'max']"
+            TemporalStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type.serialize()
+            == "enumClosed[mean,std,min,max]"
         )
 
     def test_from_operational_forecast_source(
@@ -530,8 +530,8 @@ class TestZarrSink:
 
 class TestSelect:
     def test_catalogue_value_types_are_canonical(self) -> None:
-        assert _select().configuration_options[DIMENSION].value_type == "str"
-        assert _select().configuration_options[VALUES].value_type == "list[str]"
+        assert _select().configuration_options[DIMENSION].value_type.serialize() == "str"
+        assert _select().configuration_options[VALUES].value_type.serialize() == "list[str]"
 
     def test_from_operational_forecast_source(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
