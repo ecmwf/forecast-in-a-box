@@ -127,11 +127,15 @@ describe('VisualisePage', () => {
     await expect
       .element(screen.getByText('GRIB directory on this host'))
       .toBeVisible()
-    // Both seeded GRIB runs offer an Add action.
+    // Both seeded GRIB runs offer an Add action; rows are disambiguated
+    // by short job id + block.
     await expect
       .element(
         screen.getByRole('button', { name: /add to comparison/i }).first(),
       )
+      .toBeVisible()
+    await expect
+      .element(screen.getByText(/job-comp/).first())
       .toBeVisible()
   })
 
