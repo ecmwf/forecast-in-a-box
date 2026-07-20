@@ -93,7 +93,7 @@ class SerializedBlockExpansion(FiabBaseModel):
     plugin: PluginCompositeId
     factory: BlockFactoryId
     restrictions: dict[ConfigurationOptionId, str] = Field(default_factory=dict)
-    """Serialized FableType restrictions (e.g., 'int', 'enumClosed[a,b]')"""
+    """Serialized FableType restrictions (e.g., 'int', "enumClosed['a','b']")"""
 
 
 class RoutableBlock(FiabBaseModel):

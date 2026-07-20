@@ -465,7 +465,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> Non
             {
                 "plugin": {"store": "localTest", "local": "single"},
                 "factory": "transform_increment",
-                "restrictions": {"amount": "enumClosed[1,2,3]"},
+                "restrictions": {"amount": "enumClosed['1','2','3']"},
             },
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join", "restrictions": {}},
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file", "restrictions": {}},
@@ -489,7 +489,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> Non
         {
             "plugin": {"store": "localTest", "local": "single"},
             "factory": "transform_increment",
-            "restrictions": {"amount": "enumClosed[1,2,3]"},
+            "restrictions": {"amount": "enumClosed['1','2','3']"},
         },
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join", "restrictions": {}},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file", "restrictions": {}},
@@ -601,7 +601,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> Non
 def test_blueprint_expand_restrictions(backend_client_user: httpx.Client) -> None:
     """The expand endpoint carries non-empty restrictions from test plugin hooks.
 
-    The test plugin returns enumClosed[1,2,3] as a restriction on the 'amount'
+    The test plugin returns enumClosed['1','2','3'] as a restriction on the 'amount'
     configuration option when expanding an int-producing block to transform_increment.
     It also returns the same restriction for transform_increment's own configuration.
     This test verifies both restrictions survive the full route round-trip.
@@ -625,8 +625,8 @@ def test_blueprint_expand_restrictions(backend_client_user: httpx.Client) -> Non
 
     expansions = response.json()["possible_expansions"]["source_42"]
     increment_expansion = next(e for e in expansions if e["factory"] == "transform_increment")
-    assert increment_expansion["restrictions"] == {"amount": "enumClosed[1,2,3]"}, (
-        "transform_increment expansion must carry an enumClosed[1,2,3] restriction on 'amount'"
+    assert increment_expansion["restrictions"] == {"amount": "enumClosed['1','2','3']"}, (
+        "transform_increment expansion must carry an enumClosed['1','2','3'] restriction on 'amount'"
     )
 
     transform_increment = RoutableBlock(
@@ -646,7 +646,7 @@ def test_blueprint_expand_restrictions(backend_client_user: httpx.Client) -> Non
     )
     response = backend_client_user.request(url="/blueprint/expand", method="put", json=builder.model_dump())
     assert response.is_success, response.text
-    assert response.json()["configuration_restrictions"]["transform_increment"] == {"amount": "enumClosed[1,2,3]"}
+    assert response.json()["configuration_restrictions"]["transform_increment"] == {"amount": "enumClosed['1','2','3']"}
 
 
 def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_user: httpx.Client) -> None:
