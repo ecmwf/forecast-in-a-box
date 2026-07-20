@@ -32,13 +32,13 @@ from fiab_core.types import (
     WrongType,
     parse,
 )
+from fiab_core.types import (
+    _parse as _parse_raw,
+)
 
 
 def _parse(expr: str) -> FableType:
-    """Parse a complete type expression, asserting there is no non-whitespace remainder."""
-    t, remainder = parse(expr)
-    assert not remainder.strip(), f"Expected empty remainder for {expr!r}, got {remainder!r}"
-    return t
+    return parse(expr)
 
 
 class TestStringType:
@@ -379,16 +379,15 @@ class TestFableTypeParse:
         assert t.validate_convert("1,2,3") == [[1], [2], [3]]
 
     def test_parse_invalid_type_raises_error(self) -> None:
-        with pytest.raises(NotFableType):
+        with pytest.raises(ValueError):
             parse("invalid_type")
-        # "string" parses as str with "ing" as remainder; the outer callsite rejects it
-        _, remainder = parse("string")
-        assert remainder == "ing"
+        with pytest.raises(ValueError, match="Unexpected trailing content"):
+            parse("string")
 
     def test_parse_empty_enum_raises_error(self) -> None:
-        with pytest.raises(NotFableType):
+        with pytest.raises(ValueError):
             parse("enumClosed[]")
-        with pytest.raises(NotFableType):
+        with pytest.raises(ValueError):
             parse("enumOpen[]")
 
     def test_parse_list_with_whitespace(self) -> None:
@@ -571,7 +570,7 @@ class TestUnionType:
         assert t.validate_convert("France") == "France"
 
     def test_parse_empty_union_raises_error(self) -> None:
-        with pytest.raises(NotFableType):
+        with pytest.raises(ValueError):
             parse("union[]")
 
     def test_parse_union_of_unions_now_supported(self) -> None:
@@ -622,48 +621,48 @@ class TestUnionType:
 
 
 class TestFableTypeParseRemainder:
-    """Tests for the remainder returned by parse"""
+    """Tests for the remainder returned by the internal parser."""
 
     def test_atomic_type_returns_remainder(self) -> None:
-        t, remainder = parse("int,str")
+        t, remainder = _parse_raw("int,str")
         assert isinstance(t, IntType)
         assert remainder == ",str"
 
     def test_list_type_returns_remainder(self) -> None:
-        t, remainder = parse("list[int],more")
+        t, remainder = _parse_raw("list[int],more")
         assert isinstance(t, ListType)
         assert remainder == ",more"
 
     def test_enum_type_returns_remainder(self) -> None:
-        t, remainder = parse("enumClosed[a,b],extra")
+        t, remainder = _parse_raw("enumClosed[a,b],extra")
         assert isinstance(t, ClosedEnumType)
         assert remainder == ",extra"
 
     def test_union_type_returns_remainder(self) -> None:
-        t, remainder = parse("union[int,str],extra")
+        t, remainder = _parse_raw("union[int,str],extra")
         assert isinstance(t, UnionType)
         assert remainder == ",extra"
 
     def test_nested_brackets_in_list_parsed_correctly(self) -> None:
-        t, remainder = parse("list[enumClosed[a,b]]suffix")
+        t, remainder = _parse_raw("list[enumClosed[a,b]]suffix")
         assert isinstance(t, ListType)
         assert isinstance(t.item_type, ClosedEnumType)
         assert remainder == "suffix"
 
     def test_unmatched_bracket_in_list_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            parse("list[int")
+            _parse_raw("list[int")
 
     def test_unmatched_bracket_in_union_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            parse("union[int,str")
+            _parse_raw("union[int,str")
 
     def test_unmatched_bracket_in_enum_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            parse("enumClosed[a,b")
+            _parse_raw("enumClosed[a,b")
 
     def test_union_with_enum_member(self) -> None:
-        t, remainder = parse("union[enumClosed[x,y],int]")
+        t, remainder = _parse_raw("union[enumClosed[x,y],int]")
         assert isinstance(t, UnionType)
         assert remainder == ""
         assert isinstance(t.types[0], ClosedEnumType)
@@ -673,4 +672,4 @@ class TestFableTypeParseRemainder:
 
     def test_extra_content_in_list_raises_error(self) -> None:
         with pytest.raises(NotFableType):
-            parse("list[int garbage]")
+            _parse_raw("list[int garbage]")

@@ -324,7 +324,7 @@ class GeoDomainType(UnionType):
         return "geodomain"
 
 
-def parse(type_expr: str) -> tuple[FableType, str]:
+def _parse(type_expr: str) -> tuple[FableType, str]:
     """Parse a type expression from the start of type_expr.
 
     Returns ``(parsed_type, remainder)`` where ``remainder`` is the unparsed
@@ -372,7 +372,7 @@ def parse(type_expr: str) -> tuple[FableType, str]:
     # list[...]
     if type_expr.startswith("list["):
         _, inner, remainder = _split_by_brackets(type_expr)
-        inner_type, inner_remainder = parse(inner)
+        inner_type, inner_remainder = _parse(inner)
         if inner_remainder.strip():
             raise NotFableType(f"Unexpected content after inner type in list: {inner_remainder!r}")
         return (ListType(inner_type), remainder)
@@ -389,7 +389,7 @@ def parse(type_expr: str) -> tuple[FableType, str]:
                     raise NotFableType(f"Expected ',' between union member types, got {remaining!r}")
                 remaining = remaining[1:].lstrip()
             first = False
-            t, remaining = parse(remaining)
+            t, remaining = _parse(remaining)
             remaining = remaining.lstrip()
             member_types.append(t)
         if not member_types:
@@ -401,3 +401,18 @@ def parse(type_expr: str) -> tuple[FableType, str]:
         "Expected one of: str, int, float, date, datetime, country, bboxWSEN, geodomain, "
         "enumClosed[...], enumOpen[...], list[...], union[...]"
     )
+
+
+def parse(type_expr: str | FableType) -> FableType:
+    """Parse a complete Fable type expression."""
+    if isinstance(type_expr, FableType):
+        return type_expr
+    if not isinstance(type_expr, str):
+        raise ValueError(f"Expected a Fable type expression string, got {type(type_expr).__name__}")
+    try:
+        parsed, remainder = _parse(type_expr)
+        if remainder.strip():
+            raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
+    except NotFableType as exc:
+        raise ValueError(str(exc)) from exc
+    return parsed

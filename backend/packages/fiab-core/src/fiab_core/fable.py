@@ -20,34 +20,16 @@ from qubed import Qube
 from typing_extensions import Self
 
 from fiab_core.pydantic_utils import FiabCoreBaseModel
-from fiab_core.types import FableType, NotFableType, parse
+from fiab_core.types import FableType, parse
 
 Error = str
 """Compiler/validator error message type alias."""
 
 
-def _parse_fable_type(value: str | FableType) -> FableType:
-    if isinstance(value, FableType):
-        return value
-    if not isinstance(value, str):
-        raise ValueError(f"Expected a Fable type expression string, got {type(value).__name__}")
-    try:
-        parsed, remainder = parse(value)
-        if remainder.strip():
-            raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
-    except NotFableType as exc:
-        raise ValueError(str(exc)) from exc
-    return parsed
-
-
-def _serialize_fable_type(value: FableType) -> str:
-    return value.serialize()
-
-
 FableTypeField = Annotated[
     FableType,
-    BeforeValidator(_parse_fable_type),
-    PlainSerializer(_serialize_fable_type, return_type=str),
+    BeforeValidator(parse),
+    PlainSerializer(lambda value: value.serialize(), return_type=str),
     WithJsonSchema({"type": "string"}),
 ]
 
@@ -214,12 +196,7 @@ class BlueprintTemplateExampleInput(FiabCoreBaseModel):
     @model_validator(mode="after")
     def _validate_type_hint(self) -> Self:
         if self.type_hint is not None:
-            try:
-                _, remainder = parse(self.type_hint)
-                if remainder.strip():
-                    raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
-            except NotFableType as exc:
-                raise ValueError(str(exc)) from exc
+            parse(self.type_hint)
         return self
 
 
