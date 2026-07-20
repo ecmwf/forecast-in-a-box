@@ -579,6 +579,8 @@ function SlotRunTrack({
                 title={failed[i] ? notServed : undefined}
                 className={cn(
                   'min-w-0 flex-1 rounded-[1px]',
+                  // Selected step stands taller than the rest.
+                  i === currentIndex && 'h-3 self-center rounded-sm',
                   failed[i]
                     ? TRACK_FAILED_CLASS[slot]
                     : available
