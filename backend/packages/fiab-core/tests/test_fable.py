@@ -122,7 +122,9 @@ def test_blueprint_template_environment_rejects_unknown_field() -> None:
 
 def test_blueprint_template_example_input_accepts_valid_type_hint() -> None:
     inp = BlueprintTemplateExampleInput(example_value="hello", type_hint="str")
-    assert inp.type_hint == "str"
+    assert isinstance(inp.type_hint, StringType)
+    assert inp.type_hint.serialize() == "str"
+    assert inp.model_dump()["type_hint"] == "str"
 
 
 def test_blueprint_template_example_input_accepts_none_type_hint() -> None:
