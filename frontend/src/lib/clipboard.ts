@@ -23,12 +23,15 @@ export function copyToClipboard(
   mime: ClipboardMime,
   data: Promise<Blob | string | null>,
 ): Promise<void> {
+  const payload = data.then((value) => normalize(value, mime))
+  // Not every path consumes the payload (unavailable API, stubbed write) —
+  // pre-mark rejections handled so they never surface as unhandled.
+  void payload.catch(() => {})
   // Runtime guard despite lib.dom types: absent in insecure contexts.
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
     return Promise.reject(new Error('Clipboard API is not available'))
   }
-  const payload = data.then((value) => normalize(value, mime))
   let item: ClipboardItem
   try {
     item = new ClipboardItem({ [mime]: payload })
