@@ -86,7 +86,8 @@ export function LegendImage({ url, title }: { url: string; title: string }) {
         <img
           src={url}
           alt={`${title} legend`}
-          className="h-auto max-h-32 w-full object-contain"
+          // Cap to the box but never upscale — small icon legends blur when stretched full-width.
+          className="max-h-32 max-w-full object-contain"
           loading="lazy"
           onError={() => setFailed(true)}
         />

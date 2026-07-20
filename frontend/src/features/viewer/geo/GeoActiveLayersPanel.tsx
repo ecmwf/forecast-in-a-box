@@ -207,7 +207,7 @@ export function GeoActiveLayersPanel({
     focusSlot === 'a' ? sources.a : focusSlot === 'b' ? sources.b : null
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
+    <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
       <div className="space-y-2.5 border-b border-border bg-muted/40 px-3 pt-2.5 pb-3">
         <div className="flex items-center justify-between">
           <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -610,7 +610,7 @@ function ActivePairCard({
           <GripVertical className="h-4 w-4" />
         </span>
         <P
-          className="min-w-0 flex-1 truncate text-sm font-medium"
+          className="line-clamp-2 min-w-0 flex-1 text-sm leading-tight font-medium break-words"
           title={title}
         >
           {title}
@@ -760,7 +760,7 @@ function ActiveSourceSection({
                     <GripVertical className="h-4 w-4" />
                   </span>
                   <P
-                    className="min-w-0 flex-1 truncate text-sm font-medium"
+                    className="line-clamp-2 min-w-0 flex-1 text-sm leading-tight font-medium break-words"
                     title={title}
                   >
                     {title}

@@ -405,7 +405,8 @@ export interface LayerGroup {
 
 const TITLE_LEVEL_RE =
   /^(.+?)\s+(?:at\s+)?([0-9]+(?:\.[0-9]+)?)\s*(hPa|mb|millibars?)\s*$/i
-const NAME_LEVEL_RE = /^(.+?)_(\d+)$/
+// Require the `@pl` scope, else DWD `name_<n>` suffixes read as hPa levels.
+const NAME_LEVEL_RE = /^(.+?@pl)_(\d+)$/
 
 /**
  * ECMWF / IFS / AIFS short-name → human-readable mapping. SkinnyWMS often
