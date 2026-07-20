@@ -158,14 +158,14 @@ class OperationalForecastSource(Source):
         date = basetime.date().isoformat()
         time = self._convert_time(basetime.time().hour)
 
-        subqube = fc_qube.select({"time": time})
-        actions = {}
+        subqube = fc_qube.select({"time": time}).compress()
+        actions = []
         for levtype in subqube.axes()[LEVTYPE]:
             path = f"levtype={levtype}"
             levtype_actions = {}
             ens_branches = set()
             for index, datacube in enumerate(subqube.select({LEVTYPE: levtype}).datacubes()):
-                ens_branch = str(datacube[PARAM])
+                ens_branch = f"{path}/{datacube[PARAM]}"
                 datacube_path = f"{ens_branch}/{index}"
                 expansion_datacube = datacube.copy()
                 coords = {PARAM: datacube[PARAM]}
@@ -199,8 +199,8 @@ class OperationalForecastSource(Source):
             merged = merge(**levtype_actions)
             for branch in ens_branches:
                 merged = merged.combine_branches(dim=ENSEMBLE, path=branch)
-            actions[path] = merged
-        final_action = merge(**actions)
+            actions.append(merged)
+        final_action = merge(*actions)
         return Either.ok(final_action)
 
 

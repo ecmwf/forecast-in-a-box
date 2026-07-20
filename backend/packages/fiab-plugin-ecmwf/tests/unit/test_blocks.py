@@ -74,25 +74,6 @@ def _block_instance(
     )
 
 
-class _TinyForecastPreset:
-    def as_qube(self, ens_dim: ConfigurationOptionId, *, include_member_zero: bool = False) -> Qube:
-        numbers = [0, 1] if include_member_zero else [1]
-        return Qube.from_datacube(
-            {
-                "time": ["0000"],
-                "levtype": ["sfc"],
-                PARAM: ["2t"],
-                STEP: [0, 6],
-                ens_dim: numbers,
-                "levelist": [0, 1],
-            }
-        )
-
-    def is_member_zero(self, datacube: dict[str, object]) -> bool:
-        numbers = datacube[ENSEMBLE]
-        return isinstance(numbers, list) and 0 in numbers
-
-
 @pytest.fixture
 def dummy_blockinstance() -> BlockInstance:
     return BlockInstance.from_block(
@@ -283,7 +264,6 @@ class TestOperationalForecastSource:
         assert contains(output, "number")
 
     def test_compile_builds_action_from_catalogue(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setitem(FORECAST_DATASETS, "aifs-ens", _TinyForecastPreset())
         block = OperationalForecastSource()
         block_instance = BlockInstance.from_block(
             BlockFactoryId("operationalForecastSource"),
@@ -298,6 +278,7 @@ class TestOperationalForecastSource:
             OperationalForecastSource.configuration_options,
         )
         action = block.compile({}, block_instance).get_or_raise()
+        action = action.select({PARAM: ["2t", "u"], STEP: [0, 6], ENSEMBLE: [1]}, expand=True)
         for _, array in nodetree_arrays(action.nodes):
             assert array.sizes[STEP] == 2
             assert array.sizes[ENSEMBLE] > 0
