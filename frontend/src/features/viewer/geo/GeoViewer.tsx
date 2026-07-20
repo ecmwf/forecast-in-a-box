@@ -691,16 +691,18 @@ export function GeoViewer({
     [],
   )
 
+  // Immediate, extent-constrained nudge — the WASD rAF loop calls this
+  // each frame, so per-frame moves compose into one smooth pan.
   const onPan = useCallback((dx: number, dy: number) => {
     const view = viewRef.current
-    if (!view) return
-    const center = view.getCenter()
-    const resolution = view.getResolution()
-    if (!center || resolution === undefined) return
-    view.animate({
-      center: [center[0] + dx * resolution, center[1] - dy * resolution],
-      duration: 100,
-    })
+    const center = view?.getCenter()
+    const resolution = view?.getResolution()
+    if (!view || !center || resolution === undefined) return
+    const target: [number, number] = [
+      center[0] + dx * resolution,
+      center[1] - dy * resolution,
+    ]
+    view.setCenter(view.getConstrainedCenter(target, resolution) ?? target)
   }, [])
 
   useGeoShortcuts({
