@@ -27,6 +27,7 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Sink, Source, Transform
 from fiab_core.types import ClosedEnumType, DatetimeType, GeoDomainType, ListType, ParameterType, StringType
+from pymetkit import ParamDB
 from qubed import Qube
 
 from .block_utils import (
@@ -53,7 +54,7 @@ from .block_utils import (
     _parse_axis_value,
 )
 from .datasets import load_datasets
-from .qubed_utils import axes, common_dimensions, contains, dimensions, select
+from .qubed_utils import axes, common_dimensions, contains, dimensions, expand, select
 
 logger = logging.getLogger(__name__)
 
@@ -106,13 +107,14 @@ class OperationalForecastSource(Source):
     ) -> BlockInstanceOutput:
         forecast = block.config_as_str(FORECAST)
         basetime = block.config_as_datetime(BASETIME)
+        date = basetime.strftime("%Y%m%d")
         time = self._convert_time(basetime.time().hour)
 
         ifs_qoutput = QubedOutput(dataqube=FORECAST_DATASETS[forecast].as_qube(ens_dim=ENSEMBLE, include_member_zero=True))
         if not contains(ifs_qoutput, {"time": time}):
             raise ValueError(f"Invalid time: must be in {axes(ifs_qoutput)['time']}")
 
-        return select(ifs_qoutput, {"time": time})
+        return expand(select(ifs_qoutput, {"time": time}), {"date": [date]})
 
     def compile(
         self,
@@ -122,6 +124,7 @@ class OperationalForecastSource(Source):
         forecast = block.config_as_str(FORECAST)
         fc_preset = FORECAST_DATASETS[forecast]
         fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
+        paramdb = ParamDB()
 
         basetime = block.config_as_datetime(BASETIME)
         date = basetime.strftime("%Y%m%d")
@@ -150,7 +153,7 @@ class OperationalForecastSource(Source):
                                         "requests": [
                                             dict(
                                                 {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
-                                                param=p,
+                                                param=paramdb.param_id_to_shortname(int(p)),
                                                 step=step,
                                             )
                                         ],
@@ -301,7 +304,7 @@ class Select(Transform):
         dimension = self._selected_dimension(block)
         if dimension == PARAM:
             values = [_param_key_to_param_id(value) for value in self._selected_values(block)]
-            selected = inputs[input_task].select({dimension: values if len(values) > 1 else values[0]}, expand=True)
+            selected = inputs[input_task].select({dimension: values}, expand=True)
         else:
             values = [_parse_axis_value(value) for value in self._selected_values(block)]
             selected = inputs[input_task].select({dimension: values if len(values) > 1 else values[0]})
