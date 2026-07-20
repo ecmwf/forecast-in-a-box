@@ -8,6 +8,8 @@
 # nor does it submit to any jurisdiction.
 
 
+from typing import cast
+
 import pytest
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.nodetree import datacubes
@@ -35,6 +37,7 @@ from fiab_plugin_ecmwf.block_utils import (
     TYPE,
     _param_id_to_param_key,
 )
+from fiab_plugin_ecmwf.blocks import OperationalForecastSource
 from fiab_plugin_ecmwf.products.blocks import (
     CustomThresholdProbability,
     EnsembleStatistics,
@@ -118,7 +121,7 @@ class TestEnsembleStatistics:
         ).get_or_raise()
         requests = datacubes(action.nodes)
         assert len(requests) == 2
-        expected = [{PARAM: ["131"], TYPE: ["em"], STEP: ["0", "6", "12"]}, {PARAM: ["167", "151"], TYPE: ["em"], STEP: ["0", "6", "12"]}]
+        expected = [{PARAM: ["167", "151"], TYPE: ["em"], STEP: ["0", "6", "12"]}, {PARAM: ["131"], TYPE: ["em"], STEP: ["0", "6", "12"]}]
         for index, request in enumerate(requests):
             for dim, value in expected[index].items():
                 assert request[dim] == sorted(value)
@@ -152,6 +155,12 @@ class TestPredefinedThresholdProb:
         assert output_axes[TYPE] == {"ep"}
         assert output_axes[STEP] == {12}
         assert output_axes[LEVTYPE] == {"sfc"}
+
+    def test_intersect(self, dummy_blockinstance: BlockInstance) -> None:
+        oper_output = cast(QubedOutput, OperationalForecastSource().validate(block=dummy_blockinstance, inputs={}, restrictions={}))
+        block = PredefinedThresholdProbability()
+
+        assert block.intersect(other=oper_output)  # type: ignore[arg-type]
 
     def test_validator_adds_parameters_restrictions(
         self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
