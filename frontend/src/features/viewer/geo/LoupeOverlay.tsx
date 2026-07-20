@@ -27,8 +27,12 @@ const SOURCE_SIZE_PX = LOUPE_SIZE_PX / LOUPE_ZOOM
 
 export function LoupeOverlay({
   containerRef,
+  mirror = null,
 }: {
   containerRef: RefObject<HTMLDivElement | null>
+  /** Sibling panel's cursor fraction — mirrors the loupe onto this map
+   *  while the pointer is over the other side-by-side panel. */
+  mirror?: { x: number; y: number } | null
 }) {
   const [active, setActive] = useState(false)
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
@@ -64,8 +68,19 @@ export function LoupeOverlay({
     setPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
   }
 
+  // Local cursor wins; else mirror the sibling panel's cursor fraction
+  // (same geographic point — both panels share the view).
+  const box = containerRef.current
+  const drawPos =
+    pos ??
+    (mirror && box
+      ? { x: mirror.x * box.clientWidth, y: mirror.y * box.clientHeight }
+      : null)
+  const drawX = drawPos?.x ?? null
+  const drawY = drawPos?.y ?? null
+
   useEffect(() => {
-    if (!active || !pos) return
+    if (!active || drawX === null || drawY === null) return
     const container = containerRef.current
     const loupe = canvasRef.current
     if (!container || !loupe) return
@@ -81,8 +96,8 @@ export function LoupeOverlay({
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, loupe.width, loupe.height)
         drawCompositedViewport(container, ctx, {
-          originX: pos.x - SOURCE_SIZE_PX / 2,
-          originY: pos.y - SOURCE_SIZE_PX / 2,
+          originX: drawX - SOURCE_SIZE_PX / 2,
+          originY: drawY - SOURCE_SIZE_PX / 2,
           scale: loupe.width / SOURCE_SIZE_PX,
         })
         // Crosshair through the magnified centre.
@@ -99,7 +114,7 @@ export function LoupeOverlay({
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [active, pos, containerRef])
+  }, [active, drawX, drawY, containerRef])
 
   if (!active) return null
   return (
@@ -113,7 +128,7 @@ export function LoupeOverlay({
         onPointerMove={onShieldMove}
         onPointerLeave={() => setPos(null)}
       />
-      {pos && (
+      {drawPos && (
         <>
           {/* Exactly the region the loupe magnifies. */}
           <div
@@ -122,8 +137,8 @@ export function LoupeOverlay({
             style={{
               width: SOURCE_SIZE_PX,
               height: SOURCE_SIZE_PX,
-              left: pos.x,
-              top: pos.y,
+              left: drawPos.x,
+              top: drawPos.y,
               transform: 'translate(-50%, -50%)',
             }}
           />
@@ -133,8 +148,8 @@ export function LoupeOverlay({
             style={{
               width: LOUPE_SIZE_PX,
               height: LOUPE_SIZE_PX,
-              left: pos.x,
-              top: pos.y,
+              left: drawPos.x,
+              top: drawPos.y,
               transform: 'translate(-50%, -118%)',
             }}
           >

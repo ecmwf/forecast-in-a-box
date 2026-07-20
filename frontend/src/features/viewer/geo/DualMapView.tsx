@@ -325,7 +325,7 @@ function DualMapPanel({
         ref={containerRef}
         className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
       />
-      <LoupeOverlay containerRef={containerRef} />
+      <LoupeOverlay containerRef={containerRef} mirror={cross} />
       <OverlayHoverCard hover={overlayHover} />
       <PinnedLegendsBar
         items={pinnedLegends.filter((i) => i.slot === source.slot)}
