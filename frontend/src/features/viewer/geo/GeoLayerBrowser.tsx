@@ -94,7 +94,8 @@ export function GeoLayerBrowser({
   const [search, setSearch] = useState('')
   const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
   const [selectedLevels, setSelectedLevels] = useState<Set<number>>(new Set())
-  const [grouped, setGrouped] = useState(true)
+  // Flat by default — prefix grouping fragments mixed catalogs; opt in via the toggle.
+  const [grouped, setGrouped] = useState(false)
   const query = search.trim().toLowerCase()
 
   // Per-panel selection browses one catalog at a time: "All" would
@@ -126,7 +127,7 @@ export function GeoLayerBrowser({
   }
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
+    <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
       <div className="space-y-2 border-b border-border bg-muted/40 px-3 pt-2.5 pb-2.5">
         <div className="flex items-center gap-1.5">
           <button
@@ -499,7 +500,7 @@ function PairRow({
     >
       <span
         className={cn(
-          'min-w-0 flex-1 truncate font-medium',
+          'line-clamp-2 min-w-0 flex-1 leading-tight font-medium break-words',
           compact ? 'font-mono text-xs' : 'text-sm',
         )}
         title={label}
@@ -618,7 +619,10 @@ function UnlinkedSourceSection({
                     active && 'bg-primary/10',
                   )}
                 >
-                  <span className="min-w-0 flex-1 truncate" title={label}>
+                  <span
+                    className="line-clamp-2 min-w-0 flex-1 leading-tight break-words"
+                    title={label}
+                  >
                     {label}
                   </span>
                   {active ? (
