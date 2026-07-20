@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -67,3 +67,39 @@ def test_launch_gateway_local_forwards_shared_path_to_process_args(monkeypatch: 
     assert captured["target"] is gateway_service._local_process_entrypoint
     assert captured["args"][3] == "/mnt/shared"
     gateway_service.GatewayConnectionManager.gateway_connection = None
+
+
+def test_get_current_cascade_proc_returns_local_pid(monkeypatch: pytest.MonkeyPatch) -> None:
+    process = type("Process", (), {"pid": 42, "exitcode": None})()
+    connection = gateway_service.LocalProcess(
+        logs_directory=cast(Any, object()),
+        process=process,
+        gateway_url="tcp://localhost:1234",
+    )
+    monkeypatch.setattr(gateway_service.GatewayConnectionManager, "gateway_connection", connection)
+
+    assert gateway_service.get_current_cascade_proc() == 42
+
+
+def test_get_current_cascade_proc_returns_unmanaged_for_remote_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gateway_service.GatewayConnectionManager, "gateway_connection", gateway_service.RemoteUrl())
+
+    assert gateway_service.get_current_cascade_proc() == "unmanaged"
+
+
+def test_get_current_cascade_proc_identifies_remote_tunnel(monkeypatch: pytest.MonkeyPatch) -> None:
+    handle = gateway_service.tunnel.ConnectionHandle(
+        host="gateway.example",
+        control_path="/tmp/control",
+        local_port=1234,
+        remote_port=5678,
+    )
+    connection = gateway_service.RemoteTunnel(handle=handle)
+    monkeypatch.setattr(gateway_service.GatewayConnectionManager, "gateway_connection", connection)
+    monkeypatch.setattr(gateway_service.tunnel, "status", lambda _: True)
+
+    process_id = gateway_service.get_current_cascade_proc()
+
+    assert isinstance(process_id, str)
+    assert len(process_id) == 8
+    assert process_id == gateway_service.get_current_cascade_proc()

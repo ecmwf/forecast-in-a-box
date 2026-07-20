@@ -265,3 +265,25 @@ async def test_poll_and_update_failed_job_exposes_cached_values_as_available() -
     assert detail.status == "failed"
     # Only the task with a locally cached value is available
     assert detail.available_task_ids == [TaskId("task-text")]
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_completed_job_with_changed_gateway_exposes_cached_values_and_lost_tasks() -> None:
+    outputs = RunOutputs(
+        outputs={
+            TaskId("task-text"): RunOutputCharacteristic(
+                original_block=BlockInstanceId("sink"), mime_type="text/plain", value="cached output"
+            ),
+            TaskId("task-image"): RunOutputCharacteristic(original_block=BlockInstanceId("sink2"), mime_type="image/png", value=None),
+        }
+    )
+    execution = _make_running_execution(outputs)
+    execution.status = "completed"
+    execution.cascade_proc = 41
+
+    with patch("forecastbox.domain.run.service.get_current_cascade_proc", return_value=42):
+        detail = await service.poll_and_update(cast(Run, execution))
+
+    assert detail.status == "completed"
+    assert detail.available_task_ids == [TaskId("task-text")]
+    assert detail.lost_task_ids == {TaskId("task-image"): "Gateway Proc changed"}

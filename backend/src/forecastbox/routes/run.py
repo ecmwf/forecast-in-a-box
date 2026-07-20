@@ -30,6 +30,7 @@ from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, Response
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import BlockInstanceId
+from pydantic import Field
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
@@ -106,6 +107,7 @@ class RunDetailResponse(FiabBaseModel):
     error: str | None = None
     progress: str | None = None
     cascade_job_id: str | None = None
+    lost_task_ids: dict[TaskId, str] = Field(default_factory=dict)
     outputs: RunOutputsResponse | None = None
     completed_block_ids: list[BlockInstanceId] | None = None
     planned_block_ids: list[BlockInstanceId] | None = None
@@ -186,6 +188,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
         error=domain_detail.error,
         progress=domain_detail.progress,
         cascade_job_id=domain_detail.cascade_job_id,
+        lost_task_ids=domain_detail.lost_task_ids,
         outputs=outputs_response,
         completed_block_ids=maybe_list(domain_detail.completed_block_ids),
         planned_block_ids=maybe_list(domain_detail.planned_block_ids),
