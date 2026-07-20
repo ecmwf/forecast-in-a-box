@@ -33,6 +33,7 @@ const mockJobsResponse: JobExecutionList = {
       error: null,
       progress: '45',
       cascade_job_id: null,
+      lost_task_ids: {},
       outputs: null,
     },
     {
@@ -46,6 +47,7 @@ const mockJobsResponse: JobExecutionList = {
       error: null,
       progress: '100',
       cascade_job_id: null,
+      lost_task_ids: {},
       outputs: null,
     },
     {
@@ -59,6 +61,7 @@ const mockJobsResponse: JobExecutionList = {
       error: null,
       progress: '100',
       cascade_job_id: null,
+      lost_task_ids: {},
       outputs: null,
     },
     {
@@ -72,6 +75,7 @@ const mockJobsResponse: JobExecutionList = {
       error: 'OOM',
       progress: '60',
       cascade_job_id: null,
+      lost_task_ids: {},
       outputs: null,
     },
     {
@@ -85,6 +89,7 @@ const mockJobsResponse: JobExecutionList = {
       error: null,
       progress: '0',
       cascade_job_id: null,
+      lost_task_ids: {},
       outputs: null,
     },
   ],

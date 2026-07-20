@@ -30,6 +30,18 @@ describe('JobExecutionDetailSchema', () => {
     const result = JobExecutionDetailSchema.parse(baseDetail)
     expect(result.completed_block_ids).toBeUndefined()
     expect(result.planned_block_ids).toBeUndefined()
+    expect(result.lost_task_ids).toEqual({})
+  })
+
+  it('parses lost task reasons from completed runs', () => {
+    const result = JobExecutionDetailSchema.parse({
+      ...baseDetail,
+      status: 'completed',
+      lost_task_ids: { 'task-image': 'Gateway Proc changed' },
+    })
+    expect(result.lost_task_ids).toEqual({
+      'task-image': 'Gateway Proc changed',
+    })
   })
 
   it('parses populated block-id arrays from /run/get during a running job', () => {

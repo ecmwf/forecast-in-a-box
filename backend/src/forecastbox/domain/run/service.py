@@ -33,12 +33,14 @@ from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
 from cascade.low.func import Either
 from fiab_core.fable import BlockInstanceId, is_textual
+from pydantic import Field
 
 import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
-from forecastbox.domain.gateway.service import get_gateway_url
+from forecastbox.domain.gateway.exceptions import GatewayExited, GatewayNotStarted
+from forecastbox.domain.gateway.service import get_current_cascade_proc, get_gateway_url
 from forecastbox.domain.run.background import execute_background
 from forecastbox.domain.run.cascade import RunOutputCharacteristic, RunOutputs, stored_output_max_length
 from forecastbox.domain.run.db import CompilerRuntimeContext
@@ -83,6 +85,7 @@ class RunDetail(FiabBaseModel):
     progress: str | None = None
     cascade_job_id: str | None = None
     available_task_ids: list[TaskId] | None = None
+    lost_task_ids: dict[TaskId, str] = Field(default_factory=dict)
     outputs: dict | None = None
     completed_block_ids: set[BlockInstanceId] | None = None
     planned_block_ids: set[BlockInstanceId] | None = None
@@ -210,11 +213,28 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
     status = cast(RunStatus, execution.status)
 
     # Derive available_task_ids from stored outputs without calling cascade for terminal states:
-    # completed → assume all outputs are available; failed → only those with a locally cached value.
+    # completed → assume all outputs are available while the same gateway process is active;
+    # failed → only those with a locally cached value.
     raw_outputs = cast(dict | None, execution.outputs)
+    stored_cascade_proc = cast(int | str | None, getattr(execution, "cascade_proc", None))
     available_task_ids: list[TaskId] | None
+    lost_task_ids: dict[TaskId, str] = {}
     if status == "completed":
-        available_task_ids = [TaskId(k) for k in (raw_outputs or {}).get("outputs", {}).keys()]
+        try:
+            current_cascade_proc = get_current_cascade_proc()
+        except (GatewayExited, GatewayNotStarted):
+            current_cascade_proc = None
+        if current_cascade_proc is not None and stored_cascade_proc == current_cascade_proc:
+            available_task_ids = [TaskId(k) for k in (raw_outputs or {}).get("outputs", {}).keys()]
+        elif raw_outputs:
+            try:
+                cached_outputs = RunOutputs.model_validate(raw_outputs)
+                available_task_ids = [tid for tid, char in cached_outputs.outputs.items() if char.value is not None]
+                lost_task_ids = {tid: "Gateway Proc changed" for tid, char in cached_outputs.outputs.items() if char.value is None}
+            except Exception:
+                available_task_ids = []
+        else:
+            available_task_ids = []
     elif status == "failed":
         if raw_outputs:
             try:
@@ -256,6 +276,7 @@ async def poll_and_update(execution: Run, detailed_report: bool = False) -> RunD
             progress=progress_override if progress_override is not None else cast(str | None, execution.progress),
             cascade_job_id=cascade_job_id,
             available_task_ids=available_task_ids,
+            lost_task_ids=lost_task_ids,
             outputs=raw_outputs,
             completed_block_ids=completed_block_ids,
             planned_block_ids=planned_block_ids,

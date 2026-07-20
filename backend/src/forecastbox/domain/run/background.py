@@ -24,6 +24,7 @@ from cascade.low.core import TaskId
 from fiab_core.fable import BlockInstanceId
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder
+from forecastbox.domain.gateway.service import get_current_cascade_proc
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.global_db import GlyphResolutionBuckets
 from forecastbox.domain.glyphs.resolution import (
@@ -126,7 +127,15 @@ def execute_background(
                 )
             except TooLargeEntry as e:
                 logger.warning(f"failed to cache compilation detail for {run_id=}, {attempt_count=}: {repr(e)}")
-            (run_async(db.update_run_runtime(run_id, attempt_count, cascade_job_id=response.job_id, outputs=run_outputs.model_dump())),)
+            run_async(
+                db.update_run_runtime(
+                    run_id,
+                    attempt_count,
+                    cascade_job_id=response.job_id,
+                    cascade_proc=get_current_cascade_proc(),
+                    outputs=run_outputs.model_dump(),
+                )
+            )
         else:
             error = (response.error or "no error provided by cascade")[:255]
             run_async(db.update_run_runtime(run_id, attempt_count, status="failed", error=error))

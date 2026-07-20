@@ -1703,29 +1703,12 @@ def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, a
 def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: httpx.Client) -> None:
     """Kill the gateway while a job is active; verify the expected status transitions.
 
-    A simple text-output job is submitted and completed before the gateway is killed.
-    After the restart, its output must still be fetchable from the locally cached value.
+    A simple two-output job is submitted and completed before the gateway is killed.
+    After the restart, its cached text output remains available while the uncached
+    binary output is reported as lost.
     """
-    # --- Step 1: submit a simple job that completes quickly and has a textual output ---
-    source_text = RoutableBlock(
-        instance_id=BlockInstanceId("source_text"),
-        plugin=testPluginId,
-        factory=BlockFactoryId("source_text"),
-        instance=BlockInstance(
-            configuration_values=_config({"text": "gateway-restart-test-output"}),
-            input_ids={},
-        ),
-    )
-    text_sink = RoutableBlock(
-        instance_id=BlockInstanceId("text_sink"),
-        plugin=testPluginId,
-        factory=BlockFactoryId("sink_file"),
-        instance=BlockInstance(
-            configuration_values=_config({"fname": f"{tmpdir}/gwrestart_${{runId}}.txt"}),
-            input_ids={"data": BlockInstanceId("source_text")},
-        ),
-    )
-    simple_builder = BlueprintBuilder(blocks=[source_text, text_sink])
+    # --- Step 1: submit a simple job that completes quickly and has textual and binary outputs ---
+    simple_builder = _make_builder_source_and_two_sinks(str(tmpdir))
     simple_save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=simple_builder).model_dump())
     assert simple_save_resp.is_success, simple_save_resp.text
     simple_blueprint_id = simple_save_resp.json()["blueprint_id"]
@@ -1743,6 +1726,9 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
     simple_available = [tid for tid, char in simple_outputs.items() if char["is_available"] and "sink_file" in tid]
     assert len(simple_available) == 1, f"Expected exactly one available sink_file task, got: {simple_outputs}"
     simple_sink_task_id = simple_available[0]
+    simple_image_tasks = [tid for tid, char in simple_outputs.items() if char["is_available"] and "sink_image" in tid]
+    assert len(simple_image_tasks) == 1, f"Expected exactly one available sink_image task, got: {simple_outputs}"
+    simple_image_task_id = simple_image_tasks[0]
 
     # Sanity check: output is accessible while cascade is still up
     content_resp = backend_client_user.get("/run/outputContent", params={"run_id": simple_run_id, "dataset_id": simple_sink_task_id})
@@ -1812,6 +1798,12 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
         return None
 
     retry_until(poll_evicted, verify_evicted, attempts=30, sleep=1.0, error_msg=f"Run {run_id} never reached 'evicted from gateway'")
+
+    # The completed job's cached text output remains available, while its uncached binary output is lost.
+    restarted_simple_detail = backend_client_user.get("/run/get", params={"run_id": simple_run_id}).raise_for_status().json()
+    assert restarted_simple_detail["lost_task_ids"] == {simple_image_task_id: "Gateway Proc changed"}
+    assert restarted_simple_detail["outputs"]["outputs"][simple_sink_task_id]["is_available"] is True
+    assert restarted_simple_detail["outputs"]["outputs"][simple_image_task_id]["is_available"] is False
 
     # --- Step 4: verify the completed simple job's text output is still fetchable ---
     # The gateway no longer holds the result, but it must be served from the local DB cache.

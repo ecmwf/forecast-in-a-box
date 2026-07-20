@@ -203,6 +203,28 @@ def status_gateway() -> str:
         assert_never(gateway_connection)
 
 
+def get_current_cascade_proc() -> int | str:
+    """Return an id of the currently active and connected gateway process."""
+    gateway_connection = GatewayConnectionManager.gateway_connection
+    if gateway_connection is None:
+        raise GatewayNotStarted("Gateway was not started")
+    if isinstance(gateway_connection, LocalProcess):
+        if gateway_connection.process.exitcode is not None:
+            raise GatewayExited(gateway_connection.process.exitcode)
+        if gateway_connection.process.pid is None:
+            raise GatewayNotStarted("Gateway process has no pid")
+        return gateway_connection.process.pid
+    elif isinstance(gateway_connection, RemoteTunnel):
+        if tunnel.status(gateway_connection.handle):
+            return uuid.uuid5(uuid.NAMESPACE_OID, repr(gateway_connection.handle)).hex[:8]
+        raise GatewayExited(255)
+    elif isinstance(gateway_connection, RemoteUrl):
+        # TODO put something better here
+        return "unmanaged"
+    else:
+        assert_never(gateway_connection)
+
+
 def stop_gateway() -> None:
     with GatewayConnectionManager.lock:
         gateway_connection = GatewayConnectionManager.gateway_connection

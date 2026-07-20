@@ -77,6 +77,7 @@ const baseRun: JobExecutionDetail = {
   error: null,
   progress: '42.5',
   cascade_job_id: null,
+  lost_task_ids: {},
   outputs: null,
 }
 
