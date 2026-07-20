@@ -42,6 +42,7 @@ export function createViewerView(): View {
     extent: WEB_MERCATOR_EXTENT,
     smoothExtentConstraint: false,
     constrainResolution: false,
+    // No showFullExtent: wheel fills the window (Maps-style, no void); fit-to-globe still frames the world.
   })
 }
 

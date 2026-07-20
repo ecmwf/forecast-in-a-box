@@ -24,6 +24,7 @@ import {
   IMAGERY_BASEMAPS,
   REFERENCE_OVERLAY_Z,
   SKINNYWMS_BASEMAP,
+  WEB_MERCATOR_EXTENT,
   makeBasemapLayer,
   makeDataLayerSource,
   makeSkinnyWmsBasemap,
@@ -160,7 +161,11 @@ export function useBasemap(options: {
     source.on('imageloadstart', incLoading)
     source.on('imageloadend', decLoading)
     source.on('imageloaderror', decLoading)
-    const overlay = new ImageLayer({ source, zIndex: REFERENCE_OVERLAY_Z })
+    const overlay = new ImageLayer({
+      source,
+      zIndex: REFERENCE_OVERLAY_Z,
+      extent: WEB_MERCATOR_EXTENT,
+    })
     overlay.setOpacity(opacityRef.current)
     referenceLayerRef.current = overlay
     map.addLayer(overlay)

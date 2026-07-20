@@ -126,9 +126,11 @@ export type BasemapLayer = ExternalBasemapLayer | ImageLayer<ImageWMS>
 export function makeBasemapLayer(
   opt: ExternalBasemapOption,
 ): ExternalBasemapLayer {
-  // Vector tiles via Mapbox-style JSON. declutter: true prevents label
-  // overlap at low zoom.
-  const layer = new VectorTileLayer<VectorTileSource>({ declutter: true })
+  // Vector tiles (Mapbox-style JSON). declutter: no label overlap; extent: one world so margins stay empty.
+  const layer = new VectorTileLayer<VectorTileSource>({
+    declutter: true,
+    extent: WEB_MERCATOR_EXTENT,
+  })
   // Empty CSS suppresses ol-mapbox-style's broken jsdelivr fontsource fetch; labels fall back to stack fonts.
   applyMapboxStyle(layer, opt.styleUrl, { webfonts: '/empty-font.css' }).catch(
     (err) => log.error('Failed to apply vector basemap style', { error: err }),
@@ -175,7 +177,8 @@ export function makeWmsImageBasemap(
     TRANSPARENT: 'FALSE',
   })
   source.setAttributions(opt.attribution)
-  return new ImageLayer({ source })
+  // Clip to ±85°: out-of-bounds BBOXes come back stretched from some servers.
+  return new ImageLayer({ source, extent: WEB_MERCATOR_EXTENT })
 }
 
 // SkinnyWMS's `background` layer as a basemap — ImageWMS, like the data layers.
@@ -190,5 +193,5 @@ export function makeSkinnyWmsBasemap(
     // Opaque — it's the base layer.
     TRANSPARENT: 'FALSE',
   })
-  return new ImageLayer({ source })
+  return new ImageLayer({ source, extent: WEB_MERCATOR_EXTENT })
 }
