@@ -24,6 +24,7 @@
  * yields to it).
  */
 
+import { useEffect } from 'react'
 import {
   formatForDisplay,
   useHotkey,
@@ -44,8 +45,10 @@ export const COMPARE_KEYS = {
   pan: ['W', 'A', 'S', 'D'],
 } as const
 
-/** Pixels per pan keypress (matches OL's KeyboardPan default feel). */
-const PAN_STEP_PX = 128
+/** Continuous pan speed (px/s) while a WASD/arrow key is held. */
+const PAN_SPEED_PX_PER_SEC = 900
+/** Cap per-frame dt so a backgrounded tab doesn't lurch on return. */
+const MAX_FRAME_S = 0.05
 
 /**
  * Arrows/WASD must yield to widgets that consume them: the swipe
@@ -93,9 +96,6 @@ export function useGeoShortcuts(handlers: {
     onPan,
   } = handlers
   const opts = { ignoreInputs: true }
-  const pan = (dx: number, dy: number) => {
-    if (!panBlocked()) onPan(dx * PAN_STEP_PX, dy * PAN_STEP_PX)
-  }
 
   useHotkey(COMPARE_KEYS.sidebars, () => onToggleSidebars(), opts)
   useHotkey(COMPARE_KEYS.modes[0], () => onMode(COMPARE_MODES[0]), opts)
@@ -112,14 +112,63 @@ export function useGeoShortcuts(handlers: {
     ...opts,
     enabled: onAnnotateDisarm.enabled,
   })
-  useHotkey(COMPARE_KEYS.pan[0], () => pan(0, -1), opts)
-  useHotkey(COMPARE_KEYS.pan[1], () => pan(-1, 0), opts)
-  useHotkey(COMPARE_KEYS.pan[2], () => pan(0, 1), opts)
-  useHotkey(COMPARE_KEYS.pan[3], () => pan(1, 0), opts)
-  useHotkey('ArrowUp', () => pan(0, -1), opts)
-  useHotkey('ArrowLeft', () => pan(-1, 0), opts)
-  useHotkey('ArrowDown', () => pan(0, 1), opts)
-  useHotkey('ArrowRight', () => pan(1, 0), opts)
+  // Continuous panning: hold WASD/arrows and a rAF loop moves the shared
+  // camera at a constant velocity — OS key-repeat is laggy and choppy.
+  useEffect(() => {
+    const VEC: Record<string, [number, number]> = {
+      w: [0, -1],
+      s: [0, 1],
+      a: [-1, 0],
+      d: [1, 0],
+      arrowup: [0, -1],
+      arrowdown: [0, 1],
+      arrowleft: [-1, 0],
+      arrowright: [1, 0],
+    }
+    const held = new Set<string>()
+    let raf = 0
+    let last = 0
+    const tick = (t: number) => {
+      const dt = last ? Math.min(MAX_FRAME_S, (t - last) / 1000) : 0
+      last = t
+      let dx = 0
+      let dy = 0
+      for (const k of held) {
+        dx += VEC[k][0]
+        dy += VEC[k][1]
+      }
+      if (dx || dy) {
+        onPan(dx * PAN_SPEED_PX_PER_SEC * dt, dy * PAN_SPEED_PX_PER_SEC * dt)
+      }
+      if (held.size) {
+        raf = requestAnimationFrame(tick)
+      } else {
+        raf = 0
+        last = 0
+      }
+    }
+    const down = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase()
+      if (!(k in VEC) || panBlocked()) return
+      const el = e.target as HTMLElement | null
+      if (el?.closest('input, textarea, select, [contenteditable="true"]'))
+        return
+      e.preventDefault()
+      held.add(k)
+      if (!raf) raf = requestAnimationFrame(tick)
+    }
+    const up = (e: KeyboardEvent) => held.delete(e.key.toLowerCase())
+    const blur = () => held.clear()
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', blur)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', blur)
+      cancelAnimationFrame(raf)
+    }
+  }, [onPan])
 }
 
 /**
