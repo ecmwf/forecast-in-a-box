@@ -30,10 +30,7 @@ export function CuratedWmsList() {
 
   // Probe stores URLs via `new URL(...).toString()` — match that form.
   const inBasket = useMemo(
-    () =>
-      new Set(
-        entries.flatMap((e) => (e.kind === 'wms' ? [e.url] : [])),
-      ),
+    () => new Set(entries.flatMap((e) => (e.kind === 'wms' ? [e.url] : []))),
     [entries],
   )
 

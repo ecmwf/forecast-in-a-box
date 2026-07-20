@@ -32,11 +32,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber } from '../format'
-import {
-  COMPARE_KEYS,
-  keyLabel,
-  useShortcutReveal,
-} from './useGeoShortcuts'
+import { COMPARE_KEYS, keyLabel, useShortcutReveal } from './useGeoShortcuts'
 import { COMPARE_MODES } from './types'
 import type { LinkMode } from './useCompareSelection'
 import type { SourceSlot } from './layer-pairing'
@@ -151,40 +147,40 @@ export function GeoToolbar({
             {t('toolbar.compareCta')}
           </Button>
         ) : (
-        <div
-          role="group"
-          aria-label={t('page.title')}
-          className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
-        >
-          {COMPARE_MODES.map((id, index) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onModeChange(id)}
-              aria-pressed={mode === id}
-              title={
-                EXPERIMENTAL.has(id)
-                  ? `${t('modes.experimental')} (${keyLabel(COMPARE_KEYS.modes[index])})`
-                  : `(${keyLabel(COMPARE_KEYS.modes[index])})`
-              }
-              className={cn(
-                'relative inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium transition-colors',
-                mode === id
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <KeyBadge
-                label={keyLabel(COMPARE_KEYS.modes[index])}
-                show={reveal}
-              />
-              {t(`modes.${id}`)}
-              {EXPERIMENTAL.has(id) && (
-                <FlaskConical className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-              )}
-            </button>
-          ))}
-        </div>
+          <div
+            role="group"
+            aria-label={t('page.title')}
+            className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
+          >
+            {COMPARE_MODES.map((id, index) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => onModeChange(id)}
+                aria-pressed={mode === id}
+                title={
+                  EXPERIMENTAL.has(id)
+                    ? `${t('modes.experimental')} (${keyLabel(COMPARE_KEYS.modes[index])})`
+                    : `(${keyLabel(COMPARE_KEYS.modes[index])})`
+                }
+                className={cn(
+                  'relative inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium transition-colors',
+                  mode === id
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <KeyBadge
+                  label={keyLabel(COMPARE_KEYS.modes[index])}
+                  show={reveal}
+                />
+                {t(`modes.${id}`)}
+                {EXPERIMENTAL.has(id) && (
+                  <FlaskConical className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                )}
+              </button>
+            ))}
+          </div>
         )}
         <div className="flex items-center gap-3">
           {!solo && (
@@ -346,7 +342,7 @@ export function GeoToolbar({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-4 -ml-1"
+                      className="-ml-1 h-7 w-4"
                       title={t('toolbar.copyOptions')}
                       aria-label={t('toolbar.copyOptions')}
                     />

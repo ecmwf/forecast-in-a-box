@@ -53,13 +53,13 @@ async function renderViewer(port: number) {
   const queryClient = new QueryClient()
   return await render(
     <QueryClientProvider client={queryClient}>
-    <I18nextProvider i18n={i18n}>
-      {/* Browser-mode tests have no Tailwind CSS — size the host explicitly
+      <I18nextProvider i18n={i18n}>
+        {/* Browser-mode tests have no Tailwind CSS — size the host explicitly
           so the OL map has a real viewport. */}
-      <div style={{ width: 900, height: 600 }}>
-        <WmsViewer baseUrl={`http://localhost:${port}`} />
-      </div>
-    </I18nextProvider>
+        <div style={{ width: 900, height: 600 }}>
+          <WmsViewer baseUrl={`http://localhost:${port}`} />
+        </div>
+      </I18nextProvider>
     </QueryClientProvider>,
   )
 }

@@ -131,7 +131,11 @@ export function GeoActiveLayersPanel({
   sources: { a: PanelSlotSource; b: PanelSlotSource | null }
   overlays: OverlayControls
   annotations: AnnotationControls
-  preload: { enabled: boolean; setEnabled: (v: boolean) => void; available: boolean }
+  preload: {
+    enabled: boolean
+    setEnabled: (v: boolean) => void
+    available: boolean
+  }
   pins: LegendPins
   onCollapse: () => void
 }) {

@@ -25,7 +25,11 @@ import type { PairedLayer, SourceSlot } from './layer-pairing'
 
 export type LinkMode = 'linked' | 'unlinked'
 
-function moveItem<T>(list: ReadonlyArray<T>, from: number, to: number): Array<T> {
+function moveItem<T>(
+  list: ReadonlyArray<T>,
+  from: number,
+  to: number,
+): Array<T> {
   if (from === to || from < 0 || to < 0) return [...list]
   if (from >= list.length || to >= list.length) return [...list]
   const next = [...list]

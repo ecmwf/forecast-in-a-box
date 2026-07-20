@@ -30,7 +30,10 @@ function runCopyImage(item: OutputItem, ctx: ActionContext): Promise<void> {
   // and SVG-as-text is what users actually want for editors and notebooks.
   const isSvg = ctx.resolvedAdapter.id === 'image-vector'
   const copied = isSvg
-    ? copyToClipboard('text/plain', blob.then((b) => b.text()))
+    ? copyToClipboard(
+        'text/plain',
+        blob.then((b) => b.text()),
+      )
     : // Wire blobs can carry opaque types, so key off the item's MIME.
       copyToClipboard(
         item.mimeType === 'image/jpeg' ? 'image/jpeg' : 'image/png',

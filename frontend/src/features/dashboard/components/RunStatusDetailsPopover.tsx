@@ -80,11 +80,7 @@ function StatusRow({ status, count, isLoading, runId }: StatusRowProps) {
   // A lone running run links straight to its detail page.
   if (runId) {
     return (
-      <Link
-        to="/runs/$jobId"
-        params={{ jobId: runId }}
-        className={rowClass}
-      >
+      <Link to="/runs/$jobId" params={{ jobId: runId }} className={rowClass}>
         {content}
       </Link>
     )

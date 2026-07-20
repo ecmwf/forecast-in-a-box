@@ -47,9 +47,7 @@ export function RunSourceList({
   )
   const blueprintByJob = useMemo(
     () =>
-      new Map(
-        (jobsList?.runs ?? []).map((r) => [r.run_id, r.blueprint_id]),
-      ),
+      new Map((jobsList?.runs ?? []).map((r) => [r.run_id, r.blueprint_id])),
     [jobsList],
   )
   const hasMore = paged && (jobsList?.total ?? 0) > scan
@@ -122,7 +120,11 @@ function RunSourceRow({
           </P>
           {row.runCreatedAt && (
             <span className="shrink-0 rounded bg-muted px-1.5 font-mono text-[11px] text-muted-foreground tabular-nums">
-              {formatInZone(new Date(row.runCreatedAt), timeZone, 'dd MMM HH:mm')}
+              {formatInZone(
+                new Date(row.runCreatedAt),
+                timeZone,
+                'dd MMM HH:mm',
+              )}
             </span>
           )}
         </div>

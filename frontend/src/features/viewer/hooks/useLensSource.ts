@@ -35,9 +35,7 @@ import type {
 const CAPABILITIES_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
 
 /** Cache identity for one server's parsed capabilities. */
-export function wmsCapabilitiesKey(
-  baseUrl: string,
-): ReadonlyArray<string> {
+export function wmsCapabilitiesKey(baseUrl: string): ReadonlyArray<string> {
   return ['wms-capabilities', baseUrl]
 }
 

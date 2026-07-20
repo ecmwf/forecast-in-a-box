@@ -47,9 +47,9 @@ describe('CuratedWmsList', () => {
         .toBeVisible()
     }
     await expect.element(screen.getByText('eccharts.ecmwf.int')).toBeVisible()
-    expect(screen.getByRole('button', { name: /add/i }).elements()).toHaveLength(
-      CURATED_WMS_SERVERS.length,
-    )
+    expect(
+      screen.getByRole('button', { name: /add/i }).elements(),
+    ).toHaveLength(CURATED_WMS_SERVERS.length)
   })
 
   it('probes and adds with the curated name as label', async () => {
@@ -62,9 +62,7 @@ describe('CuratedWmsList', () => {
 
     await expect
       .poll(() => useComparisonStore.getState().entries)
-      .toEqual([
-        expect.objectContaining({ kind: 'wms', label: 'ECMWF' }),
-      ])
+      .toEqual([expect.objectContaining({ kind: 'wms', label: 'ECMWF' })])
     // The row flips to a disabled "Added" state.
     await expect
       .element(screen.getByRole('button', { name: /added/i }))
@@ -100,9 +98,7 @@ describe('CuratedWmsList', () => {
 
     // Probe settles; nothing added, button usable again.
     await expect
-      .poll(() =>
-        (row.querySelector('button') as HTMLButtonElement).disabled,
-      )
+      .poll(() => (row.querySelector('button') as HTMLButtonElement).disabled)
       .toBe(false)
     expect(useComparisonStore.getState().entries).toHaveLength(0)
   })
