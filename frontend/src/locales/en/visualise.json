@@ -198,6 +198,13 @@
     "failed": "Could not capture the map view",
     "open": "Export"
   },
+  "scale": {
+    "dependent": "Zoom-dependent",
+    "dependentHint": "This layer is only served within a limited zoom range.",
+    "outOfRangeHint": "Outside this layer's zoom range — click to jump to where it's shown.",
+    "zoomInToReveal": "Zoom in to reveal",
+    "zoomOutToReveal": "Zoom out to reveal"
+  },
   "overlays": {
     "title": "Context overlays",
     "upload": "Add GeoJSON",

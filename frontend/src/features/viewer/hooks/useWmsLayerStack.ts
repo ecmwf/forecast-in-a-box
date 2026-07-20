@@ -182,6 +182,9 @@ export function useWmsLayerStack(
           source,
           opacity: effectiveOpacity,
           zIndex: z,
+          // Scale limits: OL skips out-of-range steps instead of a blank GetMap.
+          minResolution: layer.scale?.minRes,
+          maxResolution: layer.scale?.maxRes,
         })
         const entry: ManagedLayer = {
           layer: olLayer,

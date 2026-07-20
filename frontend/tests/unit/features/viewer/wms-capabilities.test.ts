@@ -12,15 +12,21 @@ import { describe, expect, it } from 'vitest'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
   appendWmsParams,
+  combineScaleBands,
   expandTimeSteps,
   groupLayers,
   parseCapabilities,
   partitionGroups,
   rebaseLensUrl,
+  scaleBandState,
+  scaleBandTargetResolution,
   skinnyWmsBasemap,
   toWmsEndpoint,
   uniquePressureLevels,
 } from '@/features/viewer/wms-capabilities'
+
+/** OGC standardized rendering pixel size — mirrors the parser's constant. */
+const PX_M = 0.00028
 
 /** Minimal WMS 1.3.0 capabilities document in the shape SkinnyWMS emits. */
 function capabilitiesXml({
@@ -134,6 +140,94 @@ describe('parseCapabilities', () => {
 
   it('throws on malformed XML', () => {
     expect(() => parseCapabilities('<WMS_Capabilities><unclosed')).toThrow()
+  })
+})
+
+describe('parseCapabilities — scale bands', () => {
+  const withLayer = (inner: string) => `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0">
+  <Capability>
+    <Request><GetMap/></Request>
+    <Layer>
+      <Title>root</Title>
+      ${inner}
+    </Layer>
+  </Capability>
+</WMS_Capabilities>`
+
+  it('parses WMS 1.3.0 min/max scale denominators into a resolution band', () => {
+    const caps = parseCapabilities(
+      withLayer(`<Layer>
+        <Name>basemap_2km</Name><Title>2 km Basemap</Title>
+        <MinScaleDenominator>750001</MinScaleDenominator>
+        <MaxScaleDenominator>1.5e+06</MaxScaleDenominator>
+      </Layer>`),
+    )
+    expect(caps.layers[0].scale?.minRes).toBeCloseTo(750001 * PX_M, 3)
+    expect(caps.layers[0].scale?.maxRes).toBeCloseTo(1_500_000 * PX_M, 3)
+  })
+
+  it('leaves the opposite side unbounded when only one denominator exists', () => {
+    const caps = parseCapabilities(
+      withLayer(`<Layer>
+        <Name>basemap_500m</Name><Title>500 m</Title>
+        <MaxScaleDenominator>350000</MaxScaleDenominator>
+      </Layer>`),
+    )
+    expect(caps.layers[0].scale).toEqual({ minRes: 0, maxRes: 350000 * PX_M })
+  })
+
+  it('falls back to WMS 1.1.1 ScaleHint (pixel diagonal → resolution)', () => {
+    const caps = parseCapabilities(
+      withLayer(`<Layer>
+        <Name>l</Name><Title>l</Title>
+        <ScaleHint min="100" max="500"/>
+      </Layer>`),
+    )
+    expect(caps.layers[0].scale?.minRes).toBeCloseTo(100 / Math.SQRT2, 6)
+    expect(caps.layers[0].scale?.maxRes).toBeCloseTo(500 / Math.SQRT2, 6)
+  })
+
+  it('omits the band for unconstrained layers', () => {
+    const caps = parseCapabilities(
+      withLayer(`<Layer><Name>l</Name><Title>l</Title></Layer>`),
+    )
+    expect(caps.layers[0].scale).toBeUndefined()
+  })
+})
+
+describe('scale band helpers', () => {
+  it('classifies resolution as too-coarse / too-fine / in-range', () => {
+    const band = { minRes: 200, maxRes: 400 }
+    expect(scaleBandState(band, 1000)).toBe('zoom-in') // too zoomed out
+    expect(scaleBandState(band, 100)).toBe('zoom-out') // too zoomed in
+    expect(scaleBandState(band, 300)).toBe('in-range')
+    expect(scaleBandState(band, 400)).toBe('zoom-in') // max exclusive
+    expect(scaleBandState(band, 200)).toBe('in-range') // min inclusive
+  })
+
+  it('intersects two bands — a pair shows only where both do', () => {
+    expect(
+      combineScaleBands(
+        { minRes: 200, maxRes: 400 },
+        { minRes: 300, maxRes: 800 },
+      ),
+    ).toEqual({ minRes: 300, maxRes: 400 })
+    expect(combineScaleBands(undefined, { minRes: 1, maxRes: 2 })).toEqual({
+      minRes: 1,
+      maxRes: 2,
+    })
+    expect(combineScaleBands(undefined, undefined)).toBeUndefined()
+  })
+
+  it('targets a resolution inside the band', () => {
+    expect(scaleBandTargetResolution({ minRes: 200, maxRes: 400 })).toBeCloseTo(
+      Math.sqrt(200 * 400),
+    )
+    expect(scaleBandTargetResolution({ minRes: 0, maxRes: 400 })).toBe(200)
+    expect(scaleBandTargetResolution({ minRes: 200, maxRes: Infinity })).toBe(
+      400,
+    )
   })
 })
 
