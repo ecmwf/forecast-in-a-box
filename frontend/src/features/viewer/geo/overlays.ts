@@ -49,6 +49,8 @@ const OVERLAY_STYLE = new Style({
     radius: 5,
     fill: new Fill({ color: 'rgba(22, 163, 74, 0.9)' }),
     stroke: new Stroke({ color: 'white', width: 1.5 }),
+    // none: markers always draw and never block labels (incl. their own); labels declutter vs each other.
+    declutterMode: 'none',
   }),
 })
 
@@ -173,6 +175,8 @@ export function useContextOverlays(
           : OVERLAY_STYLE,
         zIndex: OVERLAY_Z,
         visible: overlay.visible,
+        // Hide colliding labels; shares the basemap's declutter group (true), overlay wins ties.
+        declutter: true,
       })
       // Marks the layer for the hover-inspection hit test.
       layer.set('contextOverlay', true)
