@@ -71,8 +71,32 @@ function KeyBadge({ label, show }: { label: string; show: boolean }) {
   )
 }
 
+/** Source-focus control (A · both · B); selected A/B use their source colour. */
+const FOCUS_CHOICES = [
+  {
+    slot: 'a',
+    label: 'A',
+    title: 'viewA',
+    on: 'bg-blue-600 text-white shadow-sm dark:bg-blue-500',
+  },
+  {
+    slot: null,
+    label: 'A·B',
+    title: 'viewBoth',
+    on: 'bg-background text-foreground shadow-sm',
+  },
+  {
+    slot: 'b',
+    label: 'B',
+    title: 'viewB',
+    on: 'bg-orange-600 text-white shadow-sm dark:bg-orange-500',
+  },
+] as const
+
 export function GeoToolbar({
   solo = false,
+  focusSlot = null,
+  onFocusChange,
   onRequestAddSource,
   mode,
   onModeChange,
@@ -99,6 +123,9 @@ export function GeoToolbar({
 }: {
   /** Single-source: modes + link hidden, "Compare…" CTA in their place. */
   solo?: boolean
+  /** View only one source (null = both); collapses the combination modes. */
+  focusSlot?: SourceSlot | null
+  onFocusChange?: (slot: SourceSlot | null) => void
   onRequestAddSource?: () => void
   mode: CompareMode
   onModeChange: (mode: CompareMode) => void
@@ -147,43 +174,75 @@ export function GeoToolbar({
             {t('toolbar.compareCta')}
           </Button>
         ) : (
-          <div
-            role="group"
-            aria-label={t('page.title')}
-            className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
-          >
-            {COMPARE_MODES.map((id, index) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => onModeChange(id)}
-                aria-pressed={mode === id}
-                title={
-                  EXPERIMENTAL.has(id)
-                    ? `${t('modes.experimental')} (${keyLabel(COMPARE_KEYS.modes[index])})`
-                    : `(${keyLabel(COMPARE_KEYS.modes[index])})`
-                }
-                className={cn(
-                  'relative inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium transition-colors',
-                  mode === id
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <KeyBadge
-                  label={keyLabel(COMPARE_KEYS.modes[index])}
-                  show={reveal}
-                />
-                {t(`modes.${id}`)}
-                {EXPERIMENTAL.has(id) && (
-                  <FlaskConical className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                )}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            {/* Source focus: view A, both, or B. */}
+            <div
+              role="group"
+              aria-label={t('focus.aria')}
+              className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
+            >
+              {FOCUS_CHOICES.map(({ slot, label, title, on }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => onFocusChange?.(slot)}
+                  aria-pressed={focusSlot === slot}
+                  title={t(`focus.${title}`)}
+                  className={cn(
+                    'rounded-md px-2 py-1 text-sm font-medium transition-colors',
+                    focusSlot === slot
+                      ? on
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="h-5 w-px bg-border" aria-hidden="true" />
+            {/* Combination modes — inert while focused on one source. */}
+            <div
+              role="group"
+              aria-label={t('page.title')}
+              className={cn(
+                'flex items-center gap-0.5 rounded-lg bg-muted p-0.5 transition-opacity',
+                focusSlot !== null && 'opacity-40',
+              )}
+            >
+              {COMPARE_MODES.map((id, index) => (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={focusSlot !== null}
+                  onClick={() => onModeChange(id)}
+                  aria-pressed={mode === id}
+                  title={
+                    EXPERIMENTAL.has(id)
+                      ? `${t('modes.experimental')} (${keyLabel(COMPARE_KEYS.modes[index])})`
+                      : `(${keyLabel(COMPARE_KEYS.modes[index])})`
+                  }
+                  className={cn(
+                    'relative inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium transition-colors disabled:pointer-events-none',
+                    mode === id
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <KeyBadge
+                    label={keyLabel(COMPARE_KEYS.modes[index])}
+                    show={reveal}
+                  />
+                  {t(`modes.${id}`)}
+                  {EXPERIMENTAL.has(id) && (
+                    <FlaskConical className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         <div className="flex items-center gap-3">
-          {!solo && (
+          {!solo && focusSlot === null && (
             <label className="flex items-center gap-2 text-sm">
               <Switch
                 size="sm"
@@ -385,7 +444,7 @@ export function GeoToolbar({
           </Button>
         </div>
       </div>
-      {!solo && (
+      {!solo && focusSlot === null && (
         <ModeActionRow
           mode={mode}
           options={options}

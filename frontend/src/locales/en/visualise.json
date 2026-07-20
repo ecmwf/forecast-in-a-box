@@ -91,6 +91,12 @@
     "bError": "Second source failed:",
     "removeB": "Remove B"
   },
+  "focus": {
+    "aria": "Source focus",
+    "viewA": "View only A",
+    "viewBoth": "View both (compare)",
+    "viewB": "View only B"
+  },
   "modes": {
     "swipe": "Swipe",
     "side": "Side by side",

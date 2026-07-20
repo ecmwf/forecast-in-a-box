@@ -72,6 +72,7 @@ function pairMatchesSearch(pair: PairedLayer, query: string): boolean {
 
 export function GeoLayerBrowser({
   hasB = true,
+  focusSlot = null,
   pairs,
   selection,
   sourceA,
@@ -80,6 +81,8 @@ export function GeoLayerBrowser({
 }: {
   /** Solo hides the slot filter and the A/B availability chips. */
   hasB?: boolean
+  /** View only one source: browse just that catalog, filter UI hidden. */
+  focusSlot?: SourceSlot | null
   pairs: ReadonlyArray<PairedLayer>
   selection: CompareSelection
   sourceA: LensSource
@@ -99,9 +102,10 @@ export function GeoLayerBrowser({
   // so unlinked mode offers just A | B.
   const unlinked = selection.linkMode !== 'linked'
   const effectiveFilter: SlotFilter =
-    unlinked && (slotFilter === 'all' || slotFilter === 'both')
+    focusSlot ??
+    (unlinked && (slotFilter === 'all' || slotFilter === 'both')
       ? 'a'
-      : slotFilter
+      : slotFilter)
 
   const filteredPairs = useMemo(
     () => pairs.filter((pair) => pairMatchesSearch(pair, query)),
@@ -166,7 +170,7 @@ export function GeoLayerBrowser({
           />
         </div>
         {/* All | A | B availability filter (just A | B when unlinked). */}
-        {hasB && (
+        {hasB && focusSlot === null && (
           <div
             role="group"
             aria-label={t('browser.filterAria')}
@@ -228,7 +232,17 @@ export function GeoLayerBrowser({
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-2">
-        {selection.linkMode === 'linked' ? (
+        {focusSlot !== null ? (
+          <UnlinkedSourceSection
+            slot={focusSlot}
+            source={focusSlot === 'a' ? sourceA : sourceB}
+            selection={selection}
+            query={query}
+            slotFilter={effectiveFilter}
+            selectedLevels={selectedLevels}
+            grouped={grouped}
+          />
+        ) : selection.linkMode === 'linked' ? (
           <LinkedSections
             partitioned={partitioned}
             selectedLevels={selectedLevels}
