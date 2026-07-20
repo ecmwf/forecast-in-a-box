@@ -24,7 +24,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ImageLayer from 'ol/layer/Image'
-import { DEFAULT_LAYER_OPACITY, makeDataLayerSource } from '../ol-layers'
+import {
+  DEFAULT_LAYER_OPACITY,
+  WEB_MERCATOR_EXTENT,
+  makeDataLayerSource,
+} from '../ol-layers'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
@@ -182,6 +186,8 @@ export function useWmsLayerStack(
           source,
           opacity: effectiveOpacity,
           zIndex: z,
+          // Clip to ±85° so a zoomed-out BBOX never goes out-of-bounds (→ stretched).
+          extent: WEB_MERCATOR_EXTENT,
           // Scale limits: OL skips out-of-range steps instead of a blank GetMap.
           minResolution: layer.scale?.minRes,
           maxResolution: layer.scale?.maxRes,
