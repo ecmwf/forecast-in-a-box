@@ -193,7 +193,7 @@ class ClosedEnumType(FableType):
         return value
 
     def serialize(self) -> str:
-        items_str = ",".join(self.items)
+        items_str = ",".join(f"'{item}'" for item in self.items)
         return f"enumClosed[{items_str}]"
 
 
@@ -209,7 +209,7 @@ class OpenEnumType(FableType):
         return value
 
     def serialize(self) -> str:
-        items_str = ",".join(self.items)
+        items_str = ",".join(f"'{item}'" for item in self.items)
         return f"enumOpen[{items_str}]"
 
 
@@ -334,9 +334,9 @@ def parse(type_expr: str) -> tuple[FableType, str]:
 
     Supports:
     - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'country', 'bboxWSEN'
-    - Enumerations: 'enumClosed[item1,item2]', 'enumOpen[item1,item2]'
+    - Enumerations: "enumClosed['item1','item2']", "enumOpen['item1','item2']"
     - Lists: 'list[int]', 'list[enumClosed[...]]', etc.
-    - Union: 'union[int,str]', 'union[enumClosed[a,b],date]', etc.
+    - Union: 'union[int,str]', "union[enumClosed['a','b'],date]", etc.
 
     Raises NotFableType if the expression cannot be parsed.
     """

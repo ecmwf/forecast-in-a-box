@@ -170,6 +170,9 @@ class TestDatetimeType:
 class TestClosedEnumType:
     """Tests for ClosedEnumType"""
 
+    def test_serialize_quotes_items(self) -> None:
+        assert ClosedEnumType(["option1", "option2"]).serialize() == "enumClosed['option1','option2']"
+
     def test_convert_valid_enum_value(self) -> None:
         t = ClosedEnumType(["option1", "option2", "option3"])
         assert t.validate_convert("option1") == "option1"
@@ -196,6 +199,9 @@ class TestClosedEnumType:
 
 class TestOpenEnumType:
     """Tests for OpenEnumType"""
+
+    def test_serialize_quotes_items(self) -> None:
+        assert OpenEnumType(["option1", "option2"]).serialize() == "enumOpen['option1','option2']"
 
     def test_convert_any_string(self) -> None:
         t = OpenEnumType(["option1", "option2"])
@@ -337,6 +343,7 @@ class TestFableTypeParse:
     def test_parse_closed_enum(self) -> None:
         t = _parse("enumClosed[option1,option2,option3]")
         assert isinstance(t, ClosedEnumType)
+        assert t.serialize() == "enumClosed['option1','option2','option3']"
         assert t.validate_convert("option1") == "option1"
         with pytest.raises(WrongType):
             t.validate_convert("invalid")
@@ -344,6 +351,7 @@ class TestFableTypeParse:
     def test_parse_open_enum(self) -> None:
         t = _parse("enumOpen[option1,option2]")
         assert isinstance(t, OpenEnumType)
+        assert t.serialize() == "enumOpen['option1','option2']"
         assert t.validate_convert("any_value") == "any_value"
 
     def test_parse_list_of_int(self) -> None:
@@ -361,7 +369,7 @@ class TestFableTypeParse:
         assert isinstance(t, ListType)
         assert isinstance(t.item_type, ClosedEnumType)
         assert t.validate_convert("a,b,a") == ["a", "b", "a"]
-        assert t.serialize() == "list[enumClosed[a,b]]"
+        assert t.serialize() == "list[enumClosed['a','b']]"
 
     def test_parse_nested_list_now_supported(self) -> None:
         t = _parse("list[list[int]]")
@@ -395,6 +403,7 @@ class TestFableTypeParse:
     def test_parse_enum_with_quoted_items(self) -> None:
         t = _parse("enumClosed['a', 'b', 'c']")
         assert isinstance(t, ClosedEnumType)
+        assert t.serialize() == "enumClosed['a','b','c']"
         assert t.validate_convert("b") == "b"
 
 

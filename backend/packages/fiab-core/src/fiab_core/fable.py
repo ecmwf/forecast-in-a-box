@@ -37,14 +37,10 @@ def _parse_fable_type(value: str | FableType) -> FableType:
             raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
     except NotFableType as exc:
         raise ValueError(str(exc)) from exc
-    setattr(parsed, "_fable_type_expression", value)
     return parsed
 
 
 def _serialize_fable_type(value: FableType) -> str:
-    original_expression = getattr(value, "_fable_type_expression", None)
-    if isinstance(original_expression, str):
-        return original_expression
     return value.serialize()
 
 
