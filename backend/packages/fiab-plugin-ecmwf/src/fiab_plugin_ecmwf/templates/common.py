@@ -10,6 +10,7 @@
 """Values shared by this plugin's blueprint templates."""
 
 from fiab_core.fable import BlueprintTemplateExampleInput
+from fiab_core.types import ClosedEnumType, StringType, GeoDomainType
 
 # `[shortName]` is the sink's own metadata templating, not a glyph.
 GRIB_OUTPUT_PATH = "${outputRoot}/${runId}__${attemptCount}/[shortName].grib"
@@ -21,14 +22,14 @@ OUTPUT_ROOT = BlueprintTemplateExampleInput(
     example_value="/tmp/outputRoot",
     display_name="Output Root Location",
     display_description="Each attempt writes to its own folder below this path",
-    type_hint="str",
+    type_hint=StringType(),
 )
 
 FORECAST_SOURCE = BlueprintTemplateExampleInput(
     example_value="ecmwf-open-data",
     display_name="Forecast Source",
     display_description="Where to download the forecast from",
-    type_hint="enumClosed['mars', 'ecmwf-open-data']",
+    type_hint=ClosedEnumType(["mars", "ecmwf-open-data"]),
 )
 
 
@@ -38,7 +39,7 @@ def map_area(example_value: str) -> BlueprintTemplateExampleInput:
         example_value=example_value,
         display_name="Map Area",
         display_description="Area the map plot covers",
-        type_hint="geodomain",
+        type_hint=GeoDomainType(),
     )
 
 
@@ -46,5 +47,5 @@ MAP_FORMAT = BlueprintTemplateExampleInput(
     example_value="png",
     display_name="Output Format",
     display_description="Image format for the map plot",
-    type_hint="enumClosed['png', 'pdf', 'svg']",
+    type_hint=ClosedEnumType(["png", "pdf", "svg"]),
 )

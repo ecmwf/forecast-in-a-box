@@ -15,6 +15,7 @@ from fiab_core.fable import (
     BlueprintTemplateBlock,
     ConfigurationOptionId,
 )
+from fiab_core.types import ClosedEnumType, StringType
 
 from fiab_plugin_ecmwf.templates.common import (
     FORECAST_SOURCE,

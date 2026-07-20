@@ -544,7 +544,7 @@ class TestAnemoiCatalogueIntegration:
     """Verify catalogue / enum types at the plugin registration level."""
 
     def test_checkpoint_enum_type_matches_registered_provider(self, registered_provider: None) -> None:
-        assert get_checkpoint_enum_type() == "enumClosed['dummy_store:dummy_ckpt']"
+        assert get_checkpoint_enum_type().serialize() == "enumClosed['dummy_store:dummy_ckpt']"
 
     def test_plugin_expander_includes_anemoi_transform(self, anemoi_source_output: QubedOutput) -> None:
         """AnemoiTransform should appear in expansions for a QubedOutput that has 'param'."""
