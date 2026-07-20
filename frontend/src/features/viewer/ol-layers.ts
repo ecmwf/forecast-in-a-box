@@ -129,8 +129,9 @@ export function makeBasemapLayer(
   // Vector tiles via Mapbox-style JSON. declutter: true prevents label
   // overlap at low zoom.
   const layer = new VectorTileLayer<VectorTileSource>({ declutter: true })
-  applyMapboxStyle(layer, opt.styleUrl).catch((err) =>
-    log.error('Failed to apply vector basemap style', { error: err }),
+  // Empty CSS suppresses ol-mapbox-style's broken jsdelivr fontsource fetch; labels fall back to stack fonts.
+  applyMapboxStyle(layer, opt.styleUrl, { webfonts: '/empty-font.css' }).catch(
+    (err) => log.error('Failed to apply vector basemap style', { error: err }),
   )
   return layer
 }
