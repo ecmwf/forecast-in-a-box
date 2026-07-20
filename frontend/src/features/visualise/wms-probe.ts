@@ -24,13 +24,21 @@ import {
   parseCapabilities,
   toWmsEndpoint,
 } from '@/features/viewer/wms-capabilities'
+import { wmsCapabilitiesKey } from '@/features/viewer/hooks/useLensSource'
+import { queryClient } from '@/lib/queryClient'
 
 export type WmsProbeResult =
   | { ok: true; baseUrl: string; label: string }
-  | { ok: false; reason: 'invalid-url' | 'unreachable' | 'parse' }
+  | { ok: false; reason: 'invalid-url' | 'unreachable' | 'parse' | 'timeout' }
   | { ok: false; reason: 'http'; status: number }
 
-export async function probeWmsEndpoint(raw: string): Promise<WmsProbeResult> {
+// Generous: real met-service capabilities run to MBs and 20+ seconds.
+const PROBE_TIMEOUT_MS = 30_000
+
+export async function probeWmsEndpoint(
+  raw: string,
+  { timeoutMs = PROBE_TIMEOUT_MS }: { timeoutMs?: number } = {},
+): Promise<WmsProbeResult> {
   let parsed: URL
   try {
     parsed = new URL(raw.trim())
@@ -48,16 +56,22 @@ export async function probeWmsEndpoint(raw: string): Promise<WmsProbeResult> {
         toWmsEndpoint(baseUrl),
         'service=WMS&version=1.3.0&request=GetCapabilities',
       ),
+      { signal: AbortSignal.timeout(timeoutMs) },
     )
     if (!res.ok) return { ok: false, reason: 'http', status: res.status }
     const xml = await res.text()
     try {
-      parseCapabilities(xml)
+      // Seed the capabilities cache — activating the source is instant
+      // instead of re-downloading a multi-MB document.
+      queryClient.setQueryData(wmsCapabilitiesKey(baseUrl), parseCapabilities(xml))
     } catch {
       return { ok: false, reason: 'parse' }
     }
     return { ok: true, baseUrl, label: parsed.host }
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      return { ok: false, reason: 'timeout' }
+    }
     // Network failure or CORS rejection — the browser can't tell them apart.
     return { ok: false, reason: 'unreachable' }
   }

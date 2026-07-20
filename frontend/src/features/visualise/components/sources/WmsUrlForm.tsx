@@ -21,7 +21,7 @@ import { P } from '@/components/base/typography'
 import { showToast } from '@/lib/toast'
 
 type WmsFormError =
-  | { reason: 'invalid-url' | 'unreachable' | 'parse' }
+  | { reason: 'invalid-url' | 'unreachable' | 'parse' | 'timeout' }
   | { reason: 'http'; status: number }
   | null
 
@@ -68,7 +68,9 @@ export function WmsUrlForm() {
           ? t('picker.wmsUrl.errorUnreachable')
           : error.reason === 'http'
             ? t('picker.wmsUrl.errorHttp', { status: error.status })
-            : t('picker.wmsUrl.errorParse')
+            : error.reason === 'timeout'
+              ? t('picker.wmsUrl.errorTimeout')
+              : t('picker.wmsUrl.errorParse')
 
   return (
     <div className="space-y-1.5">

@@ -19,6 +19,7 @@ import { useState } from 'react'
 import { ArrowRight, Earth, Rows3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
+import { CuratedWmsList } from './sources/CuratedWmsList'
 import { HostPathForm } from './sources/HostPathForm'
 import { RunSourceList } from './sources/RunSourceList'
 import { WmsUrlForm } from './sources/WmsUrlForm'
@@ -61,6 +62,7 @@ export function VisualiseHub() {
         </section>
         <section className="min-w-0 space-y-5 rounded-lg border border-border bg-card p-4">
           <WmsUrlForm />
+          <CuratedWmsList />
           <HostPathForm />
         </section>
       </div>
