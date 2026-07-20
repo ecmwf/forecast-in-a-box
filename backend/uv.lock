@@ -1361,14 +1361,14 @@ wheels = [
 
 [[package]]
 name = "ecmwf-opendata"
-version = "0.3.29"
+version = "0.3.31"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "multiurl", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f0/ab/b2c74dcffd462fa2e5d6a2144be63ad4bb6ddc608c4a8bfe2033e1acdede/ecmwf_opendata-0.3.29.tar.gz", hash = "sha256:bf8a78ea71eb704884870bd234069d59caf9fb7edca794641e9be0a7d359df98", size = 29741, upload-time = "2026-04-23T17:12:38.253Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6f/d5/c2b1a389f71b780d9ff7a0b49d2f86091da133c217cc5e159f4bb637c71b/ecmwf_opendata-0.3.31.tar.gz", hash = "sha256:dcc6a96697b622a72c31f456b321e5d66381f8f98d00f53b3e811887dc870510", size = 30861, upload-time = "2026-07-16T10:59:31.607Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/2a/b2a925b4e2830901f6e9064b90892eb3aba4b4ca8564bbaa5acc18666727/ecmwf_opendata-0.3.29-py3-none-any.whl", hash = "sha256:2bbfab8a7fe2dc3d2d835e296f338be0f35872cbfa1d485c286f51e230de7df1", size = 22313, upload-time = "2026-04-23T17:12:37.265Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/48/017410a9f30a2bfb32655d1dbfa02778e5eafa8708e9e0ad7c01b8be73e1/ecmwf_opendata-0.3.31-py3-none-any.whl", hash = "sha256:9498263d6a1bbe2094ce9831640afb9b772ddc79274e81a82ac28a4e9cf8dd3c", size = 23657, upload-time = "2026-07-16T10:59:30.533Z" },
 ]
 
 [[package]]
@@ -2578,7 +2578,7 @@ wheels = [
 
 [[package]]
 name = "multiurl"
-version = "0.3.7"
+version = "0.3.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "python-dateutil", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -2586,9 +2586,9 @@ dependencies = [
     { name = "requests", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "tqdm", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6c/ce/a00c9b44f43c4620ca004e4acb4c1e266b1ab48d2f6ad9e402f6bdbe44d4/multiurl-0.3.7.tar.gz", hash = "sha256:4201563fc8989baca7b525fdc69d4cd5a6c0cef4f303559710b9890021aab6d9", size = 18945, upload-time = "2025-07-29T11:57:04.109Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d3/35/a08c568e63fda8cb1b7f3168409c026d2b407ab6d82da09cea078b01c2d7/multiurl-0.3.9.tar.gz", hash = "sha256:799b7998bfabd4e15d51ba09d08eb5d0716762655bae6e09db00a14c3bfaeae6", size = 20044, upload-time = "2026-06-18T07:43:38.756Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/cf/be4e93afbfa0def2cd6fac9302071db0bd6d0617999ecbf53f92b9398de3/multiurl-0.3.7-py3-none-any.whl", hash = "sha256:054f42974064f103be0ed55b43f0c32fc435a47dc7353a9adaffa643b99fa380", size = 21524, upload-time = "2025-07-29T11:57:03.191Z" },
+    { url = "https://files.pythonhosted.org/packages/59/f1/2374970b2ad0ab20e28a0cd12eec1c234567fef31064f0903396d55ae3f1/multiurl-0.3.9-py3-none-any.whl", hash = "sha256:5acedb53343bb47ff6188405dc33e10c1f1713591de8929a69b966d4d395d88e", size = 22610, upload-time = "2026-06-18T07:43:37.727Z" },
 ]
 
 [[package]]
