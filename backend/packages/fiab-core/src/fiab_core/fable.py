@@ -15,7 +15,7 @@ import abc
 from typing import Annotated, Any, Literal, NewType
 
 from earthkit.workflows.fluent import Action
-from pydantic import BeforeValidator, ConfigDict, Field, PlainSerializer, WithJsonSchema, model_validator
+from pydantic import BeforeValidator, ConfigDict, Field, PlainSerializer, WithJsonSchema
 from qubed import Qube
 from typing_extensions import Self
 
@@ -188,16 +188,12 @@ class BlueprintTemplateExampleInput(FiabCoreBaseModel):
     is assumed to take them from the underlying configuration option, or,
     in the glyph case, assume no data."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     example_value: str
     display_name: str | None = None
     display_description: str | None = None
-    type_hint: str | None = None
-
-    @model_validator(mode="after")
-    def _validate_type_hint(self) -> Self:
-        if self.type_hint is not None:
-            parse(self.type_hint)
-        return self
+    type_hint: FableTypeField | None = None
 
 
 class BlueprintTemplate(FiabCoreBaseModel):
