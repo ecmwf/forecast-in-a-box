@@ -30,6 +30,7 @@ import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
 import { useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
+import { LoadErrorBadge } from './SingleMapView'
 import { LoupeOverlay } from './LoupeOverlay'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
@@ -246,7 +247,7 @@ function DualMapPanel({
     incLoading,
     decLoading,
   })
-  useWmsLayerStack(mapRef, source.baseUrl, source.layers, {
+  const stack = useWmsLayerStack(mapRef, source.baseUrl, source.layers, {
     zBase: 100,
     masterOpacity: source.hiddenAtTime ? 0 : source.masterOpacity,
     activeOrder: source.activeOrder,
@@ -254,6 +255,7 @@ function DualMapPanel({
     resolveTime: source.resolveTime,
     incLoading,
     decLoading,
+    onLoadResult: source.onLoadResult,
   })
 
   useMeasure(mapRef, measureMode, measureClearNonce)
@@ -349,6 +351,9 @@ function DualMapPanel({
         <div className="absolute top-10 left-2 z-10 rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
           {t('timeline.gap', { slot: source.slot.toUpperCase() })}
         </div>
+      )}
+      {stack.errorCount > 0 && !source.hiddenAtTime && (
+        <LoadErrorBadge slot={source.slot.toUpperCase()} side="left" />
       )}
       {source.timeTag && (
         <div className="absolute top-10 left-2 z-10 rounded-md border border-border bg-background/90 px-2 py-1 font-mono text-xs font-medium shadow-sm backdrop-blur-sm">

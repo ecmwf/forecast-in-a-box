@@ -14,6 +14,7 @@ import { buildSourceTimeIndex } from '@/features/viewer/geo/compare-timeline'
 import {
   defaultToleranceMs,
   effectiveAvailability,
+  effectiveFailures,
   formatOffset,
   medianStepMs,
   offsetBounds,
@@ -126,6 +127,31 @@ describe('effectiveAvailability', () => {
   })
 })
 
+describe('effectiveFailures', () => {
+  const axis = [0, 1, 2, 3, 4].map((i) => T00 + i * 6 * HOUR)
+
+  it('exact mode marks the failing epoch at its own axis position', () => {
+    const failed = new Set([T00 + 6 * HOUR])
+    expect(
+      effectiveFailures(axis, sixHourly, failed, 'exact', 0, HOUR),
+    ).toEqual([false, true, false, false, false])
+  })
+
+  it('a shift moves the mark with the displayed window', () => {
+    // Sampling at t + 6h: axis position 0 displays the T06 step.
+    const failed = new Set([T00 + 6 * HOUR])
+    expect(
+      effectiveFailures(axis, sixHourly, failed, 'nearest', 6 * HOUR, HOUR),
+    ).toEqual([true, false, false, false, false])
+  })
+
+  it('no failures → all clear without resolving', () => {
+    expect(
+      effectiveFailures(axis, sixHourly, new Set(), 'exact', 0, HOUR),
+    ).toEqual([false, false, false, false, false])
+  })
+})
+
 describe('medianStepMs', () => {
   it('returns the median inter-step interval, 6 h for sparse axes', () => {
     expect(medianStepMs(sixHourly)).toBe(6 * HOUR)
@@ -152,10 +178,7 @@ describe('offsetBounds', () => {
     const [min, max] = offsetBounds(sixHourly, shifted)
     expect(min).toBe(-12 * HOUR)
     expect(max).toBe(36 * HOUR)
-    expect(offsetBounds(sixHourly, sixHourly)).toEqual([
-      -24 * HOUR,
-      24 * HOUR,
-    ])
+    expect(offsetBounds(sixHourly, sixHourly)).toEqual([-24 * HOUR, 24 * HOUR])
   })
 
   it('falls back to ±48 h when either axis is empty', () => {

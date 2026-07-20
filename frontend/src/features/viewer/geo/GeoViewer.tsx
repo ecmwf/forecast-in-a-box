@@ -49,11 +49,13 @@ import { useCompareSelection } from './useCompareSelection'
 import {
   defaultToleranceMs,
   effectiveAvailability,
+  effectiveFailures,
   formatOffset,
   medianStepMs,
   offsetBounds,
   resolveSourceTime,
 } from './time-link'
+import { useGetMapFailureLog } from './getmap-failures'
 import { GeoToolbar } from './GeoToolbar'
 import { GeoExportDialog } from './GeoExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
@@ -133,12 +135,26 @@ export function GeoViewer({
   // destroy the pair-key selection that carries over when B arrives.
   const zeroOverlap = hasB && bothReady && pairing.overlapCount === 0
   useEffect(() => {
-    if (zeroOverlap && selection.linkMode === 'linked') {
-      selection.setLinkMode('unlinked', { auto: true })
+    if (!bothReady) return
+    if (zeroOverlap) {
+      if (selection.linkMode === 'linked') {
+        selection.setLinkMode('unlinked', { auto: true })
+      }
+    } else if (selection.autoUnlinked && (!hasB || pairing.overlapCount > 0)) {
+      // The auto-unlink was situational — undo it once sources share
+      // layers again (a manual unlink is never overridden).
+      selection.setLinkMode('linked')
     }
     // Intentionally keyed on the meaningful bits only — the selection
     // object's identity changes every render.
-  }, [zeroOverlap, selection.linkMode])
+  }, [
+    zeroOverlap,
+    bothReady,
+    hasB,
+    pairing.overlapCount,
+    selection.linkMode,
+    selection.autoUnlinked,
+  ])
 
   const activeOrderA = selection.activeOrderFor('a')
   const activeOrderB = selection.activeOrderFor('b')
@@ -366,14 +382,79 @@ export function GeoViewer({
     }
   }, [timeline, timeIndexA, timeIndexB, timeLinkMode, offsetMs])
 
-  const resolveTimeFor = useCallback(
-    (slot: SourceSlot) => {
-      const resolved = slot === 'a' ? resolvedA : resolvedB
-      return (layer: ParsedLayer): string | null =>
-        layer.time ? resolved.raw : null
-    },
-    [resolvedA, resolvedB],
+  // Stable per-slot identities: these feed effect deps in the layer
+  // stacks, where a fresh closure per render would reconcile every render.
+  const resolveTimeA = useMemo(
+    () =>
+      (layer: ParsedLayer): string | null =>
+        layer.time ? resolvedA.raw : null,
+    [resolvedA],
   )
+  const resolveTimeB = useMemo(
+    () =>
+      (layer: ParsedLayer): string | null =>
+        layer.time ? resolvedB.raw : null,
+    [resolvedB],
+  )
+
+  // -------- GetMap failure cache (advertised-but-not-served instants) --
+  const failures = useGetMapFailureLog()
+  const { report: reportLoad, clearSlot: clearFailures } = failures
+  const onLoadResultA = useCallback(
+    (layer: string, time: string | null, ok: boolean) =>
+      reportLoad('a', layer, time, ok),
+    [reportLoad],
+  )
+  const onLoadResultB = useCallback(
+    (layer: string, time: string | null, ok: boolean) =>
+      reportLoad('b', layer, time, ok),
+    [reportLoad],
+  )
+  // Marks are evidence about ONE capability set — drop them when the
+  // source or its advertised content changes (a new model run). Layer
+  // identity is content-tracked (TanStack structural sharing), so a
+  // no-change background refetch keeps the marks.
+  useEffect(
+    () => clearFailures('a'),
+    [clearFailures, a.baseUrl, sourceA.layers],
+  )
+  useEffect(
+    () => clearFailures('b'),
+    [clearFailures, b?.baseUrl, sourceB.layers],
+  )
+  // Marks projected onto the shared axis exactly like availability, so a
+  // mark paints where the failing instant is actually displayed.
+  const trackFailures = useMemo(() => {
+    const resolveMode =
+      timeLinkMode === 'nearest' || timeLinkMode === 'offset'
+        ? ('nearest' as const)
+        : ('exact' as const)
+    return {
+      a: effectiveFailures(
+        timeline.epochs,
+        timeIndexA,
+        failures.failedEpochs.a,
+        resolveMode,
+        0,
+        defaultToleranceMs(timeIndexA),
+      ),
+      b: effectiveFailures(
+        timeline.epochs,
+        timeIndexB,
+        failures.failedEpochs.b,
+        resolveMode,
+        timeLinkMode === 'offset' ? offsetMs : 0,
+        defaultToleranceMs(timeIndexB),
+      ),
+    }
+  }, [
+    timeline.epochs,
+    timeIndexA,
+    timeIndexB,
+    failures.failedEpochs,
+    timeLinkMode,
+    offsetMs,
+  ])
 
   // Offset tag relative to the SHARED axis (A's requested instant), so a
   // fixed-Δ B honestly reads e.g. "B +6 h".
@@ -667,7 +748,8 @@ export function GeoViewer({
     decorationLayers: sourceA.decorationLayers,
     activeOrder: activeOrderA,
     layerOpacities: selection.opacitiesFor('a'),
-    resolveTime: resolveTimeFor('a'),
+    resolveTime: resolveTimeA,
+    onLoadResult: onLoadResultA,
     timeSteps: rawStepsA,
     hiddenAtTime: resolvedA.hidden,
     timeTag: timeTagFor('a'),
@@ -687,7 +769,8 @@ export function GeoViewer({
         decorationLayers: sourceB.decorationLayers,
         activeOrder: activeOrderB,
         layerOpacities: selection.opacitiesFor('b'),
-        resolveTime: resolveTimeFor('b'),
+        resolveTime: resolveTimeB,
+        onLoadResult: onLoadResultB,
         timeSteps: rawStepsB,
         hiddenAtTime: resolvedB.hidden,
         timeTag: timeTagFor('b'),
@@ -859,7 +942,9 @@ export function GeoViewer({
             pins={{ pinned: pinnedLegends, toggle: togglePinLegend }}
             sources={{
               a: { label: a.label, baseUrl: a.baseUrl, lens: sourceA },
-              b: b ? { label: b.label, baseUrl: b.baseUrl, lens: sourceB } : null,
+              b: b
+                ? { label: b.label, baseUrl: b.baseUrl, lens: sourceB }
+                : null,
             }}
             onCollapse={() => setLeftCollapsed(true)}
           />
@@ -930,6 +1015,7 @@ export function GeoViewer({
       <GeoTimeSlider
         hasB={hasB}
         timeline={displayTimeline}
+        failures={trackFailures}
         index={safeStep}
         onChange={onTimeChange}
         linkMode={timeLinkMode}

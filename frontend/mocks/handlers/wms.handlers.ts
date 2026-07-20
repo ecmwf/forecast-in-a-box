@@ -19,7 +19,11 @@
  */
 
 import { HttpResponse, http } from 'msw'
-import { serveCapabilities } from '../data/wms.data'
+import {
+  getMapFailsFor,
+  recordGetMap,
+  serveCapabilities,
+} from '../data/wms.data'
 
 // Translucent 1×1 PNGs (red / blue) — GetMap alternates the color by
 // port so two mock lenses are visually distinguishable and comparison
@@ -77,7 +81,10 @@ const EMPTY_MAPBOX_STYLE = {
 export const wmsHandlers = [
   http.get('*/wms', ({ request }) => {
     const url = new URL(request.url)
-    const req = (url.searchParams.get('request') ?? '').toLowerCase()
+    // WMS params are case-insensitive keys: OL sends REQUEST, we send request.
+    const param = (key: string) =>
+      url.searchParams.get(key) ?? url.searchParams.get(key.toUpperCase())
+    const req = (param('request') ?? '').toLowerCase()
     const port = Number(url.port)
 
     if (req === 'getcapabilities') {
@@ -89,7 +96,14 @@ export const wmsHandlers = [
         headers: { ...CORS, 'Content-Type': 'text/xml' },
       })
     }
-    // GetMap and anything else image-like.
+    // GetMap and anything else image-like. Registered failure TIMEs get
+    // a WMS service exception (stale-capabilities servers do this).
+    if (req === 'getmap') recordGetMap(port, param('TIME'))
+    if (req === 'getmap' && getMapFailsFor(port, param('TIME'))) {
+      return new HttpResponse('<ServiceExceptionReport/>', {
+        headers: { ...CORS, 'Content-Type': 'text/xml' },
+      })
+    }
     return pngResponse(port)
   }),
 

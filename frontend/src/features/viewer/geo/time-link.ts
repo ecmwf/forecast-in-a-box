@@ -161,3 +161,31 @@ export function effectiveAvailability(
     return !resolveSourceTime(index, target, 'nearest', toleranceMs).hidden
   })
 }
+
+/**
+ * Failure marks as the tracks should DISPLAY them: would this source, at
+ * this axis position, resolve to an instant whose last request failed?
+ * Mirrors effectiveAvailability so a mark lands where the failing instant
+ * is actually shown (offset mode shifts B's marks with its window).
+ */
+export function effectiveFailures(
+  epochs: ReadonlyArray<number>,
+  index: SourceTimeIndex,
+  failedEpochs: ReadonlySet<number>,
+  mode: 'exact' | 'nearest',
+  shiftMs: number,
+  toleranceMs: number,
+): Array<boolean> {
+  if (failedEpochs.size === 0 || index.epochs.length === 0) {
+    return epochs.map(() => false)
+  }
+  return epochs.map((epoch) => {
+    const resolved = resolveSourceTime(
+      index,
+      epoch + shiftMs,
+      mode,
+      toleranceMs,
+    )
+    return resolved.epoch !== null && failedEpochs.has(resolved.epoch)
+  })
+}

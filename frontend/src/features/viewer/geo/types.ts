@@ -23,6 +23,8 @@ export interface CompareMapSource {
   layerOpacities: ReadonlyMap<string, number>
   /** Raw TIME string THIS server advertised for the current instant. */
   resolveTime: (layer: ParsedLayer) => string | null
+  /** Per-request load outcomes (feeds the GetMap failure cache). */
+  onLoadResult?: (layerName: string, time: string | null, ok: boolean) => void
   /** All raw TIME strings of the active selection (prefetch). */
   timeSteps: ReadonlyArray<string>
   /** Base stack opacity: global × per-source tier (mode factors and

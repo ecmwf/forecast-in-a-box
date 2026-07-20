@@ -18,7 +18,13 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  TriangleAlert,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber, formatStep } from '../format'
 import { availabilityRange, overlapRange } from './compare-timeline'
@@ -46,6 +52,13 @@ const TRACK_ON_CLASS: Record<SourceSlot, string> = {
   b: 'bg-orange-600 dark:bg-orange-500',
 }
 
+/** Failed loads stay in the slot's hue — a light tint says "this slot
+ *  advertises the instant but its server does not serve it". */
+const TRACK_FAILED_CLASS: Record<SourceSlot, string> = {
+  a: 'bg-blue-300 dark:bg-blue-500/40',
+  b: 'bg-orange-300 dark:bg-orange-500/40',
+}
+
 export interface IndependentAxis {
   epochs: ReadonlyArray<number>
   index: number
@@ -65,6 +78,7 @@ export interface OffsetMeta {
 export function GeoTimeSlider({
   hasB = true,
   timeline,
+  failures,
   index,
   onChange,
   linkMode,
@@ -80,6 +94,8 @@ export function GeoTimeSlider({
   /** Solo hides the link select, B track, and B/A∩B clip presets. */
   hasB?: boolean
   timeline: CompareTimeline
+  /** Axis-aligned "advertised but not served" marks (GetMap failures). */
+  failures: Record<SourceSlot, ReadonlyArray<boolean>>
   index: number
   onChange: (index: number) => void
   linkMode: TimeLinkMode
@@ -130,12 +146,26 @@ export function GeoTimeSlider({
   const hasSharedAxis = linkMode !== 'independent' && steps.length > 0
   if (linkMode !== 'independent' && steps.length === 0) return null
 
+  // The light track tint needs words: warn while any failure mark is
+  // visible in the current window (tracks are hidden in independent mode).
+  const hasVisibleFailures =
+    linkMode !== 'independent' &&
+    (hasB ? (['a', 'b'] as const) : (['a'] as const)).some((slot) =>
+      failures[slot].slice(rangeStart, rangeEnd + 1).some(Boolean),
+    )
+
   return (
     <div className="space-y-2 rounded-md border border-border bg-card px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {tCompare('timeline.label')}
         </span>
+        {hasVisibleFailures && (
+          <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
+            <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+            {tCompare('timeline.notServedHint')}
+          </span>
+        )}
         <div className="flex items-center gap-2">
           {hasB && (
             <Select
@@ -203,10 +233,9 @@ export function GeoTimeSlider({
               const hovered =
                 hoverIndex !== null && hoverIndex < steps.length
                   ? {
-                      fraction:
-                        rangeLen > 1
-                          ? (hoverIndex - rangeStart) / (rangeLen - 1)
-                          : 0,
+                      // Cell-centered: step i spans [i/n, (i+1)/n) of the
+                      // track, so its anchor is the middle of that span.
+                      fraction: (hoverIndex - rangeStart + 0.5) / rangeLen,
                       epoch: steps[hoverIndex],
                       perSide: hoverTimes(steps[hoverIndex]),
                     }
@@ -221,23 +250,24 @@ export function GeoTimeSlider({
                   )}
                   {(hasB ? (['a', 'b'] as const) : (['a'] as const)).map(
                     (slot) => (
-                    <SlotRunTrack
-                      key={slot}
-                      slot={slot}
-                      availability={timeline.availability[slot].slice(
-                        rangeStart,
-                        rangeEnd + 1,
-                      )}
-                      currentIndex={safeIndex - rangeStart}
-                      hoverIndex={
-                        hoverIndex === null ? null : hoverIndex - rangeStart
-                      }
-                      hoverLabel={hovered?.perSide?.[slot] ?? null}
-                      onHover={(i) =>
-                        setHoverIndex(i === null ? null : i + rangeStart)
-                      }
-                      onJump={(i) => onChange(i + rangeStart)}
-                    />
+                      <SlotRunTrack
+                        key={slot}
+                        slot={slot}
+                        availability={timeline.availability[slot].slice(
+                          rangeStart,
+                          rangeEnd + 1,
+                        )}
+                        failed={failures[slot].slice(rangeStart, rangeEnd + 1)}
+                        currentIndex={safeIndex - rangeStart}
+                        hoverIndex={
+                          hoverIndex === null ? null : hoverIndex - rangeStart
+                        }
+                        hoverLabel={hovered?.perSide?.[slot] ?? null}
+                        onHover={(i) =>
+                          setHoverIndex(i === null ? null : i + rangeStart)
+                        }
+                        onJump={(i) => onChange(i + rangeStart)}
+                      />
                     ),
                   )}
                 </>
@@ -481,6 +511,7 @@ const TRACK_CELL_LIMIT = 240
 function SlotRunTrack({
   slot,
   availability,
+  failed,
   currentIndex,
   hoverIndex,
   hoverLabel,
@@ -489,6 +520,8 @@ function SlotRunTrack({
 }: {
   slot: SourceSlot
   availability: ReadonlyArray<boolean>
+  /** Per-position "advertised but not served" marks (⊆ availability). */
+  failed: ReadonlyArray<boolean>
   currentIndex: number
   hoverIndex: number | null
   /** This side's resolved instant at the hovered position, when the
@@ -498,24 +531,32 @@ function SlotRunTrack({
   onJump: (index: number) => void
 }) {
   const { t } = useTranslation('visualise')
+  const notServed = t('timeline.notServed')
   const cells = availability.length <= TRACK_CELL_LIMIT
   const runs = useMemo(() => {
     if (cells) return null
-    const out: Array<{ available: boolean; length: number }> = []
-    for (const available of availability) {
+    const out: Array<{ state: 'on' | 'off' | 'failed'; length: number }> = []
+    availability.forEach((available, i) => {
+      const state = failed[i] ? 'failed' : available ? 'on' : 'off'
       const last = out.at(-1)
-      if (last && last.available === available) last.length++
-      else out.push({ available, length: 1 })
-    }
+      if (last && last.state === state) last.length++
+      else out.push({ state, length: 1 })
+    })
     return out
-  }, [availability, cells])
+  }, [availability, failed, cells])
+  // Step i renders as the CELL spanning [i/n, (i+1)/n) of the track —
+  // markers anchor to cell centers and the pointer maps by containing
+  // cell, so the step under the cursor is the one that gets picked.
   const pct = (index: number) =>
-    availability.length > 1 ? (index / (availability.length - 1)) * 100 : 0
+    availability.length > 0 ? ((index + 0.5) / availability.length) * 100 : 0
 
-  const indexFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+  const indexFromPointer = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-    return Math.round(frac * (availability.length - 1))
+    return Math.min(
+      availability.length - 1,
+      Math.floor(frac * availability.length),
+    )
   }
 
   return (
@@ -529,24 +570,20 @@ function SlotRunTrack({
         className="relative flex h-2 cursor-pointer items-stretch gap-px py-0"
         onPointerMove={(e) => onHover(indexFromPointer(e))}
         onPointerLeave={() => onHover(null)}
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect()
-          const frac = Math.min(
-            1,
-            Math.max(0, (e.clientX - rect.left) / rect.width),
-          )
-          onJump(Math.round(frac * (availability.length - 1)))
-        }}
+        onClick={(e) => onJump(indexFromPointer(e))}
       >
         {cells
           ? availability.map((available, i) => (
               <span
                 key={i}
+                title={failed[i] ? notServed : undefined}
                 className={cn(
                   'min-w-0 flex-1 rounded-[1px]',
-                  available
-                    ? TRACK_ON_CLASS[slot]
-                    : 'bg-border/60 dark:bg-border/40',
+                  failed[i]
+                    ? TRACK_FAILED_CLASS[slot]
+                    : available
+                      ? TRACK_ON_CLASS[slot]
+                      : 'bg-border/60 dark:bg-border/40',
                 )}
               />
             ))
@@ -554,11 +591,14 @@ function SlotRunTrack({
               <span
                 key={i}
                 style={{ flexGrow: run.length }}
+                title={run.state === 'failed' ? notServed : undefined}
                 className={cn(
                   'min-w-0 basis-0 rounded-sm',
-                  run.available
-                    ? TRACK_ON_CLASS[slot]
-                    : 'border border-dashed border-border bg-transparent',
+                  run.state === 'failed'
+                    ? TRACK_FAILED_CLASS[slot]
+                    : run.state === 'on'
+                      ? TRACK_ON_CLASS[slot]
+                      : 'border border-dashed border-border bg-transparent',
                 )}
               />
             ))}
@@ -582,9 +622,9 @@ function SlotRunTrack({
               'pointer-events-none absolute z-10 rounded border border-border bg-background px-1 py-px font-mono text-[10px] whitespace-nowrap shadow-sm',
               slot === 'a' ? 'bottom-full mb-0.5' : 'top-full mt-0.5',
               anchorClass(
-                availability.length > 1
-                  ? hoverIndex / (availability.length - 1)
-                  : 0,
+                availability.length > 0
+                  ? (hoverIndex + 0.5) / availability.length
+                  : 0.5,
               ),
             )}
             style={{ left: `${pct(hoverIndex)}%` }}
