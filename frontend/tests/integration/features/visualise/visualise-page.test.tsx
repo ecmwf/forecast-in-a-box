@@ -134,9 +134,7 @@ describe('VisualisePage', () => {
         screen.getByRole('button', { name: /add to comparison/i }).first(),
       )
       .toBeVisible()
-    await expect
-      .element(screen.getByText(/job-comp/).first())
-      .toBeVisible()
+    await expect.element(screen.getByText(/job-comp/).first()).toBeVisible()
   })
 
   it('activates two sources as A/B and auto-starts one lens per directory', async () => {
@@ -244,7 +242,9 @@ describe('VisualisePage', () => {
     // Two-line items: name plus a kind badge and the short job id.
     const optionA = screen.getByRole('option', { name: /Run A/ })
     await expect.element(optionA).toBeVisible()
-    await expect.element(optionA.getByText('Run', { exact: true })).toBeVisible()
+    await expect
+      .element(optionA.getByText('Run', { exact: true }))
+      .toBeVisible()
     await expect.element(optionA.getByText('job-comp')).toBeVisible()
   })
 

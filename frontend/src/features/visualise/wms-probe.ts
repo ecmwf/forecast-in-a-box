@@ -63,7 +63,10 @@ export async function probeWmsEndpoint(
     try {
       // Seed the capabilities cache — activating the source is instant
       // instead of re-downloading a multi-MB document.
-      queryClient.setQueryData(wmsCapabilitiesKey(baseUrl), parseCapabilities(xml))
+      queryClient.setQueryData(
+        wmsCapabilitiesKey(baseUrl),
+        parseCapabilities(xml),
+      )
     } catch {
       return { ok: false, reason: 'parse' }
     }

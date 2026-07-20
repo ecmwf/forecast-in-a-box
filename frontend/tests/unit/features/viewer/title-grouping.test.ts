@@ -44,7 +44,12 @@ describe('groupByTitlePrefix', () => {
 
   it('only groups at word boundaries', () => {
     const groups = groupByTitlePrefix(
-      titled(['Airmass', 'Air temperature 2m', 'Air temperature pl', 'Air quality']),
+      titled([
+        'Airmass',
+        'Air temperature 2m',
+        'Air temperature pl',
+        'Air quality',
+      ]),
       (x) => x.title,
     )
     // "Air" prefixes three titles, but "Airmass" must not join them.
@@ -55,13 +60,19 @@ describe('groupByTitlePrefix', () => {
       'temperature pl',
     ])
     expect(
-      groups.flatMap((g) => (g.prefix === null ? g.items : [])).map((i) => i.shortTitle),
+      groups
+        .flatMap((g) => (g.prefix === null ? g.items : []))
+        .map((i) => i.shortTitle),
     ).toContain('Airmass')
   })
 
   it('falls back to the full title when the suffix would be empty', () => {
     const groups = groupByTitlePrefix(
-      titled(['Total precipitation', 'Total precipitation 6h', 'Total precipitation 12h']),
+      titled([
+        'Total precipitation',
+        'Total precipitation 6h',
+        'Total precipitation 12h',
+      ]),
       (x) => x.title,
     )
     expect(groups[0].prefix).toBe('Total precipitation')

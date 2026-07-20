@@ -71,7 +71,10 @@ export function groupByTitlePrefix<T>(
   while (i < sorted.length) {
     const prefix =
       i + MIN_RUN - 1 < sorted.length
-        ? commonWordPrefix(getTitle(sorted[i]), getTitle(sorted[i + MIN_RUN - 1]))
+        ? commonWordPrefix(
+            getTitle(sorted[i]),
+            getTitle(sorted[i + MIN_RUN - 1]),
+          )
         : ''
     if (prefix.length < MIN_PREFIX_CHARS) {
       flat.push({ item: sorted[i], shortTitle: getTitle(sorted[i]) })

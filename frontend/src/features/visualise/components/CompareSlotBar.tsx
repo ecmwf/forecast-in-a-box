@@ -104,7 +104,10 @@ export function CompareSlotBar({
 }
 
 /** Trigger-suffix that distinguishes same-named sources at a glance. */
-function triggerSuffix(entry: ComparisonEntry, timeZone: string): string | null {
+function triggerSuffix(
+  entry: ComparisonEntry,
+  timeZone: string,
+): string | null {
   if (entry.kind === 'output' && entry.runCreatedAt) {
     return formatInZone(new Date(entry.runCreatedAt), timeZone, 'dd MMM HH:mm')
   }
