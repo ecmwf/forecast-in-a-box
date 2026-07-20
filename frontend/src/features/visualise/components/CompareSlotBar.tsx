@@ -17,7 +17,7 @@
 
 import { ArrowLeftRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { entryDisplayName, entryRef } from '../entry-ref'
+import { entryDetail, entryDisplayName, entryRef } from '../entry-ref'
 import type { ComparisonEntry } from '../entry-ref'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { formatInZone, useAppTimeZone } from '@/lib/datetime'
 
 const SLOT_BADGE: Record<'a' | 'b', string> = {
   a: 'bg-blue-600 text-white dark:bg-blue-500',
@@ -102,6 +103,15 @@ export function CompareSlotBar({
   )
 }
 
+/** Trigger-suffix that distinguishes same-named sources at a glance. */
+function triggerSuffix(entry: ComparisonEntry, timeZone: string): string | null {
+  if (entry.kind === 'output' && entry.runCreatedAt) {
+    return formatInZone(new Date(entry.runCreatedAt), timeZone, 'dd MMM HH:mm')
+  }
+  // wms/path labels already carry their host / directory name.
+  return null
+}
+
 function SlotPicker({
   slot,
   entries,
@@ -117,7 +127,9 @@ function SlotPicker({
   actions?: ReadonlyArray<{ value: string; label: string }>
 }) {
   const { t } = useTranslation('visualise')
+  const timeZone = useAppTimeZone()
   const current = entries.find((e) => entryRef(e) === value)
+  const suffix = current ? triggerSuffix(current, timeZone) : null
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <span
@@ -135,21 +147,47 @@ function SlotPicker({
         }}
       >
         <SelectTrigger
-          className="h-9 w-56 text-sm"
+          className="h-9 w-64 text-sm"
           aria-label={t('slots.pickerAria', { slot: slot.toUpperCase() })}
         >
           {/* Base UI shows the raw value for programmatically-set
               selections — render the display name explicitly. */}
           <SelectValue placeholder={t('slots.placeholder')}>
-            {current ? entryDisplayName(current) : null}
+            {current ? (
+              <span className="flex min-w-0 items-baseline gap-1.5">
+                <span className="min-w-0 truncate">
+                  {entryDisplayName(current)}
+                </span>
+                {suffix && (
+                  <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
+                    {suffix}
+                  </span>
+                )}
+              </span>
+            ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="min-w-[360px]">
           {entries.map((entry) => {
             const ref = entryRef(entry)
+            const { kind, detail } = entryDetail(entry)
+            const date = triggerSuffix(entry, timeZone)
             return (
               <SelectItem key={ref} value={ref}>
-                {entryDisplayName(entry)}
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="min-w-0 truncate">
+                    {entryDisplayName(entry)}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="rounded bg-muted px-1 font-mono text-[10px] uppercase">
+                      {t(`slots.kind.${kind}`)}
+                    </span>
+                    <span className="truncate font-mono">{detail}</span>
+                    {date && (
+                      <span className="shrink-0 tabular-nums">{date}</span>
+                    )}
+                  </span>
+                </span>
               </SelectItem>
             )
           })}

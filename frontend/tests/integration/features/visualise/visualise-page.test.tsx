@@ -235,6 +235,19 @@ describe('VisualisePage', () => {
     await expect.element(pickerB).toHaveTextContent('Pick a source…')
   })
 
+  it('identifies sources in the slot dropdown with kind and id', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderVisualisePage()
+
+    await screen.getByLabelText('Source for slot B').click()
+    // Two-line items: name plus a kind badge and the short job id.
+    const optionA = screen.getByRole('option', { name: /Run A/ })
+    await expect.element(optionA).toBeVisible()
+    await expect.element(optionA.getByText('Run', { exact: true })).toBeVisible()
+    await expect.element(optionA.getByText('job-comp')).toBeVisible()
+  })
+
   it('allows the same source in both slots', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
     useComparisonStore.getState().addEntry(RUN_B)

@@ -113,6 +113,28 @@ export function decodeEntryRef(ref: string): DecodedEntryRef | null {
  */
 export const SLOT_B_OFF = 'off'
 
+/** Kind + distinguishing detail for pickers (dates formatted by caller). */
+export function entryDetail(entry: ComparisonEntry): {
+  kind: 'run' | 'wms' | 'folder'
+  detail: string
+} {
+  switch (entry.kind) {
+    case 'output':
+      return { kind: 'run', detail: entry.jobId.slice(0, 8) }
+    case 'wms':
+      try {
+        return { kind: 'wms', detail: new URL(entry.url).host }
+      } catch {
+        return { kind: 'wms', detail: entry.url }
+      }
+    case 'path':
+      return {
+        kind: 'folder',
+        detail: entry.path.replace(/\/$/, '').split('/').pop() ?? entry.path,
+      }
+  }
+}
+
 /** Human-readable name for toasts and chips. */
 export function entryDisplayName(
   entry: NewComparisonEntry | ComparisonEntry,
