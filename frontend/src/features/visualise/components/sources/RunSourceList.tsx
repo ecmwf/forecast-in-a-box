@@ -115,12 +115,19 @@ function RunSourceRow({
   return (
     <li className="flex items-center gap-3 py-2">
       <div className="min-w-0 flex-1">
-        <P className="truncate text-sm font-medium">{name}</P>
+        {/* Re-runs share the blueprint name — the date chip never truncates. */}
+        <div className="flex items-baseline gap-2">
+          <P className="min-w-0 truncate text-sm font-medium" title={name}>
+            {name}
+          </P>
+          {row.runCreatedAt && (
+            <span className="shrink-0 rounded bg-muted px-1.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+              {formatInZone(new Date(row.runCreatedAt), timeZone, 'dd MMM HH:mm')}
+            </span>
+          )}
+        </div>
         <P className="truncate font-mono text-[11px] text-muted-foreground/70">
-          {row.blockId}
-          {row.runCreatedAt
-            ? ` · ${formatInZone(new Date(row.runCreatedAt), timeZone, 'yyyy-MM-dd HH:mm')}`
-            : ''}
+          {row.jobId.slice(0, 8)} · {row.blockId}
         </P>
       </div>
       <AddToComparisonButton entry={entry} />
