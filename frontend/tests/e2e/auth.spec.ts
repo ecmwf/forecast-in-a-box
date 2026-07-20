@@ -143,9 +143,9 @@ test.describe('Anonymous Authentication', () => {
     await page.waitForLoadState('networkidle')
     await expect(page).toHaveURL(/admin\/sources/)
 
-    // Navigate back to dashboard
+    // Navigate back to the dashboard (the /overview route)
     await page.goto('/overview')
     await page.waitForLoadState('networkidle')
-    await expect(page).toHaveURL(/dashboard/)
+    await expect(page).toHaveURL(/overview/)
   })
 })

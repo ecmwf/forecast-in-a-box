@@ -286,8 +286,8 @@ test.describe('Execution Detail Page', () => {
         await backLink.first().click()
         await page.waitForLoadState('networkidle')
 
-        // Should be back on executions list
-        await expect(page).toHaveURL(/\/executions$/)
+        // Should be back on the executions list (the /runs route)
+        await expect(page).toHaveURL(/\/runs$/)
       }
     }
   })
