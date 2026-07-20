@@ -655,7 +655,7 @@ class TestSelect:
 
 
 def test_anemoi_catalogue_value_types_are_canonical(registered_provider: None) -> None:
-    assert get_checkpoint_enum_type() == "enumClosed['dummy_store:dummy_ckpt']"
+    assert get_checkpoint_enum_type().serialize() == "enumClosed['dummy_store:dummy_ckpt']"
 
 
 class TestGribSink:
