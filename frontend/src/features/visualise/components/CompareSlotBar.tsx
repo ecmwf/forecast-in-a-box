@@ -10,12 +10,13 @@
 
 /**
  * First-class A/B slot assignment: two labelled pickers over the basket
- * entries with an explicit swap button between them — replaces the old
- * invisible "click a chip to make it B" gesture. Picking the other slot's
- * current source swaps the pair.
+ * entries with a swap button between them. B is cleared via a dedicated
+ * X (never a fake Select item — a controlled Select re-commits its old
+ * value on animated close, resurrecting B); A's entry is badged in the
+ * B list, so picking it is the discoverable self-compare path.
  */
 
-import { ArrowLeftRight } from 'lucide-react'
+import { ArrowLeftRight, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryDetail, entryDisplayName, entryRef } from '../entry-ref'
 import type { ComparisonEntry } from '../entry-ref'
@@ -34,10 +35,6 @@ const SLOT_BADGE: Record<'a' | 'b', string> = {
   a: 'bg-blue-600 text-white dark:bg-blue-500',
   b: 'bg-orange-600 text-white dark:bg-orange-500',
 }
-
-/** B-picker action item values — namespaced so no entry ref collides. */
-const ITEM_SAME_AS_A = '__same-as-a'
-const ITEM_SINGLE_VIEW = '__single-view'
 
 export function CompareSlotBar({
   entries,
@@ -81,24 +78,21 @@ export function CompareSlotBar({
         slot="b"
         entries={entries}
         value={bRef}
-        onChange={(ref) => {
-          if (ref === ITEM_SAME_AS_A) {
-            if (aRef) onAssign('b', aRef)
-          } else if (ref === ITEM_SINGLE_VIEW) {
-            onSingleView()
-          } else {
-            onAssign('b', ref)
-          }
-        }}
-        actions={[
-          ...(aRef && bRef !== aRef
-            ? [{ value: ITEM_SAME_AS_A, label: t('slots.sameAsA') }]
-            : []),
-          ...(bRef
-            ? [{ value: ITEM_SINGLE_VIEW, label: t('slots.singleView') }]
-            : []),
-        ]}
+        onChange={(ref) => onAssign('b', ref)}
+        markRef={aRef}
       />
+      {bRef && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="-ml-1 h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+          onClick={onSingleView}
+          aria-label={t('slots.singleView')}
+          title={t('slots.singleView')}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   )
 }
@@ -120,14 +114,14 @@ function SlotPicker({
   entries,
   value,
   onChange,
-  actions = [],
+  markRef,
 }: {
   slot: 'a' | 'b'
   entries: ReadonlyArray<ComparisonEntry>
   value: string | undefined
   onChange: (ref: string) => void
-  /** Extra non-entry items rendered below the sources. */
-  actions?: ReadonlyArray<{ value: string; label: string }>
+  /** Badge this entry as the other slot's current source (self-compare hint). */
+  markRef?: string
 }) {
   const { t } = useTranslation('visualise')
   const timeZone = useAppTimeZone()
@@ -178,8 +172,21 @@ function SlotPicker({
             return (
               <SelectItem key={ref} value={ref}>
                 <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="min-w-0 truncate">
-                    {entryDisplayName(entry)}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="min-w-0 truncate">
+                      {entryDisplayName(entry)}
+                    </span>
+                    {markRef === ref && (
+                      <span
+                        title={t('slots.isA')}
+                        className={cn(
+                          'rounded px-1 font-mono text-[10px] font-bold',
+                          SLOT_BADGE.a,
+                        )}
+                      >
+                        A
+                      </span>
+                    )}
                   </span>
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className="rounded bg-muted px-1 font-mono text-[10px] uppercase">
@@ -194,14 +201,6 @@ function SlotPicker({
               </SelectItem>
             )
           })}
-          {actions.length > 0 && (
-            <div className="my-1 border-t border-border" role="presentation" />
-          )}
-          {actions.map((action) => (
-            <SelectItem key={action.value} value={action.value}>
-              <span className="text-muted-foreground">{action.label}</span>
-            </SelectItem>
-          ))}
         </SelectContent>
       </Select>
     </div>
