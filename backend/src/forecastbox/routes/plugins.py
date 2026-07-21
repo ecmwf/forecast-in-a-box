@@ -88,14 +88,16 @@ def update_plugin(
     major version is used (``>=major,<major+1``), ensuring the installed plugin
     stays within the same major-version family as the core library.
     """
+    target: Version | None = None
     if version is not None:
         try:
-            parsed: Version | None = Version(version)
+            target = Version(version)
         except InvalidVersion:
             raise HTTPException(status_code=422, detail=f"Invalid version string: {version!r}")
     else:
-        parsed = None
-    result = submit_update_single(pluginCompositeId, install=True, version=parsed)
+        # TODO here we want to explicitly pick the highest available version -- the same logic as in get_plugin_versions. But dont copy that, introduce helper functinos in this file: _pluginId2settingsAndSource(PluginCompositeId) -> tuple[PluginSettings, str] | None, _settings2Versions(PluginSettings, pipSource: str) -> PluginVersions. Refactor get_plugin_versions to use them, utilize them here too. Pick the first version if any to put as the target, if none present raise a client exception
+        pass
+    result = submit_update_single(pluginCompositeId, install=True, version=target)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return get_catalogue_redirect(request)
