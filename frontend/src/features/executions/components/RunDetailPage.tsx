@@ -318,6 +318,7 @@ export function RunDetailPage() {
               <StoredOutputsCard
                 jobId={jobId}
                 outputs={jobData.outputs}
+                lostTaskIds={jobData.lost_task_ids}
                 fable={fableData?.builder}
                 catalogue={catalogue}
                 runName={fableData?.display_name ?? undefined}
@@ -326,6 +327,7 @@ export function RunDetailPage() {
                 jobId={jobId}
                 status={jobData.status}
                 outputs={jobData.outputs}
+                lostTaskIds={jobData.lost_task_ids}
                 completedBlockIds={jobData.completed_block_ids}
                 plannedBlockIds={jobData.planned_block_ids}
                 toolbarSlot={toolbarSlot}

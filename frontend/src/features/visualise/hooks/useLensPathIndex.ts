@@ -25,9 +25,11 @@
 import { useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import type { JobExecutionDetail } from '@/api/types/job.types'
+import type { OutputAvailability } from '@/features/executions/outputs/availability'
 import { useJobsStatus } from '@/api/hooks/useJobs'
 import { storedDirQueryOptions } from '@/features/executions/outputs/stored-dir'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import { classifyOutput } from '@/features/executions/outputs/availability'
 
 /** Most-recent runs scanned for GRIB markers. */
 const INDEXED_RUNS = 20
@@ -40,13 +42,14 @@ export interface LensPathMatch {
 }
 
 export interface GribMarkerRow extends LensPathMatch {
-  isAvailable: boolean
+  availability: OutputAvailability
 }
 
 /**
  * One representative marker per sink block per run (a sink fans out to
  * one marker per cascade branch, all pointing at the same directory) —
- * mirrors StoredOutputsCard's row derivation. Only available markers.
+ * mirrors StoredOutputsCard's row derivation. Returns all blocks; callers
+ * filter by `availability`.
  */
 export function gribMarkerRows(
   runs: ReadonlyArray<JobExecutionDetail>,
@@ -57,11 +60,25 @@ export function gribMarkerRows(
     const byBlock = new Map<string, GribMarkerRow>()
     for (const [taskId, meta] of Object.entries(run.outputs)) {
       if (meta.mime_type !== GRIB_DIR_MIME) continue
+      const availability = classifyOutput(
+        meta.is_available,
+        taskId,
+        run.lost_task_ids,
+      )
       const existing = byBlock.get(meta.original_block)
       if (existing) {
-        if (!existing.isAvailable && meta.is_available) {
+        // Prefer an available marker; else surface a lost reason over pending.
+        if (
+          availability.state === 'available' &&
+          existing.availability.state !== 'available'
+        ) {
           existing.taskId = taskId
-          existing.isAvailable = true
+          existing.availability = availability
+        } else if (
+          availability.state === 'lost' &&
+          existing.availability.state === 'pending'
+        ) {
+          existing.availability = availability
         }
         continue
       }
@@ -70,19 +87,23 @@ export function gribMarkerRows(
         taskId,
         blockId: meta.original_block,
         runCreatedAt: run.created_at,
-        isAvailable: meta.is_available,
+        availability,
       })
     }
     rows.push(...byBlock.values())
   }
-  return rows.filter((r) => r.isAvailable)
+  return rows
 }
 
 export function useLensPathIndex(): ReadonlyMap<string, LensPathMatch> {
   const { data: jobsList } = useJobsStatus(1, INDEXED_RUNS)
 
+  // Only available markers have a resolvable on-disk directory to match a lens.
   const markers = useMemo<Array<GribMarkerRow>>(
-    () => gribMarkerRows(jobsList?.runs ?? []),
+    () =>
+      gribMarkerRows(jobsList?.runs ?? []).filter(
+        (m) => m.availability.state === 'available',
+      ),
     [jobsList],
   )
 
@@ -92,7 +113,7 @@ export function useLensPathIndex(): ReadonlyMap<string, LensPathMatch> {
       const index = new Map<string, LensPathMatch>()
       results.forEach((result, i) => {
         if (typeof result.data !== 'string' || !result.data) return
-        const { isAvailable: _drop, ...match } = markers[i]
+        const { availability: _drop, ...match } = markers[i]
         index.set(result.data, match)
       })
       return index

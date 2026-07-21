@@ -41,8 +41,12 @@ export function RunSourceList({
   const [scan, setScan] = useState(RUN_SCAN_WINDOW)
   const { data: jobsList } = useJobsStatus(1, paged ? scan : RUN_SCAN_WINDOW)
 
+  // Selectable when available, disabled when lost; pending stays hidden.
   const markerRows = useMemo(
-    () => gribMarkerRows(jobsList?.runs ?? []),
+    () =>
+      gribMarkerRows(jobsList?.runs ?? []).filter(
+        (r) => r.availability.state !== 'pending',
+      ),
     [jobsList],
   )
   const blueprintByJob = useMemo(
@@ -93,6 +97,7 @@ function RunSourceRow({
   filter: string
   blueprintId: string | undefined
 }) {
+  const { t } = useTranslation('visualise')
   const timeZone = useAppTimeZone()
   const { data: fableData } = useFableRetrieve(blueprintId)
   const runName = fableData?.display_name?.trim() ?? ''
@@ -110,9 +115,12 @@ function RunSourceRow({
   const haystack = `${name} ${row.blockId} ${row.jobId}`.toLowerCase()
   if (filter && !haystack.includes(filter)) return null
 
+  const lostReason =
+    row.availability.state === 'lost' ? row.availability.reason : undefined
+
   return (
     <li className="flex items-center gap-3 py-2">
-      <div className="min-w-0 flex-1">
+      <div className={`min-w-0 flex-1 ${lostReason ? 'opacity-60' : ''}`}>
         {/* Re-runs share the blueprint name — the date chip never truncates. */}
         <div className="flex items-baseline gap-2">
           <P className="min-w-0 truncate text-sm font-medium" title={name}>
@@ -131,8 +139,17 @@ function RunSourceRow({
         <P className="truncate font-mono text-[11px] text-muted-foreground/70">
           {row.jobId.slice(0, 8)} · {row.blockId}
         </P>
+        {lostReason && (
+          <P className="truncate text-[11px] text-muted-foreground italic">
+            {t('picker.lost')}: {lostReason}
+          </P>
+        )}
       </div>
-      <AddToComparisonButton entry={entry} />
+      <AddToComparisonButton
+        entry={entry}
+        disabled={lostReason !== undefined}
+        disabledReason={lostReason}
+      />
     </li>
   )
 }

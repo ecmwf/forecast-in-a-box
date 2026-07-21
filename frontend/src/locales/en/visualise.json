@@ -15,7 +15,8 @@
     "removed": "Removed from comparison: {{name}}",
     "full": "Comparison is full ({{max}} sources max)",
     "unknownSource": "A shared source could not be found and was removed from the link",
-    "invalidLink": "The comparison link contained an invalid source reference"
+    "invalidLink": "The comparison link contained an invalid source reference",
+    "sourceLost": "A shared source is no longer available and was removed from the link: {{reason}}"
   },
   "basket": {
     "title": "Sources",
@@ -41,6 +42,7 @@
     "searchEmpty": "Nothing matches the search.",
     "add": "Add",
     "added": "Added",
+    "lost": "No longer available",
     "files_one": "{{count}} file",
     "files_other": "{{count}} files",
     "wmsUrl": {

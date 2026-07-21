@@ -109,6 +109,12 @@ export function useHydrateComparisonFromUrl(): void {
           if (meta?.mime_type !== GRIB_DIR_MIME) {
             throw new Error(`task ${decoded.taskId} is not a stored output`)
           }
+          if (decoded.taskId in detail.lost_task_ids) {
+            const reason = detail.lost_task_ids[decoded.taskId]
+            showToast.error(t('toast.sourceLost', { reason }))
+            strip(ref)
+            return
+          }
           const result = addEntry({
             kind: 'output',
             jobId: decoded.jobId,

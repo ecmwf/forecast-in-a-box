@@ -124,6 +124,8 @@
   "outputs": {
     "generated": "Generated",
     "pending": "Pending",
+    "lost": "Not retained",
+    "lostTitle": "No longer available",
     "noOutputs": "No outputs available yet",
     "noOutputsRunning": "Outputs will appear here as they are generated.",
     "view": "View",
