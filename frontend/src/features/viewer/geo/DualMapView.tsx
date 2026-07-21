@@ -52,6 +52,8 @@ export function DualMapView({
   view,
   a,
   b,
+  loupeMirror = true,
+  loupeSizePx = 180,
   preload = false,
   pinnedLegends = [],
   onUnpinLegend = noop,
@@ -70,6 +72,10 @@ export function DualMapView({
   view: View
   a: CompareMapSource
   b: CompareMapSource
+  /** Mirror the hold-Z loupe onto both panels; else only the hovered one. */
+  loupeMirror?: boolean
+  /** Hold-Z loupe diameter in CSS pixels. */
+  loupeSizePx?: number
   /** Prefetch every active layer × time step into the HTTP cache. */
   preload?: boolean
   pinnedLegends?: ReadonlyArray<SlotLegendItem>
@@ -139,6 +145,8 @@ export function DualMapView({
         onUnpinLegend={onUnpinLegend}
         cross={cross}
         onCross={setCross}
+        loupeMirror={loupeMirror}
+        loupeSizePx={loupeSizePx}
         basemapId={basemapId}
         basemapOpacity={basemapOpacity}
         measureMode={measureMode}
@@ -159,6 +167,8 @@ export function DualMapView({
         onUnpinLegend={onUnpinLegend}
         cross={cross}
         onCross={setCross}
+        loupeMirror={loupeMirror}
+        loupeSizePx={loupeSizePx}
         basemapId={basemapId}
         basemapOpacity={basemapOpacity}
         measureMode={measureMode}
@@ -183,6 +193,8 @@ function DualMapPanel({
   onUnpinLegend,
   cross,
   onCross,
+  loupeMirror,
+  loupeSizePx,
   basemapId,
   basemapOpacity,
   measureMode,
@@ -202,6 +214,8 @@ function DualMapPanel({
   onUnpinLegend: (key: string) => void
   cross: CrossPosition
   onCross: (pos: CrossPosition) => void
+  loupeMirror: boolean
+  loupeSizePx: number
   basemapId: string
   basemapOpacity: number
   measureMode: MeasureMode
@@ -325,7 +339,11 @@ function DualMapPanel({
         ref={containerRef}
         className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
       />
-      <LoupeOverlay containerRef={containerRef} mirror={cross} />
+      <LoupeOverlay
+        containerRef={containerRef}
+        mirror={loupeMirror ? cross : null}
+        sizePx={loupeSizePx}
+      />
       <OverlayHoverCard hover={overlayHover} />
       <PinnedLegendsBar
         items={pinnedLegends.filter((i) => i.slot === source.slot)}

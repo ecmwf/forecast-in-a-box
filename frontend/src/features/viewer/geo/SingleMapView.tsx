@@ -134,7 +134,7 @@ export function SingleMapView({
   const swipeFractionRef = useRef(swipeFraction)
   const [flickerFrame, setFlickerFrame] = useState<'a' | 'b'>('a')
   const spyPixelRef = useRef<[number, number] | null>(null)
-  const { swipeOrientation, spyShape, spySizePx, blend } = options
+  const { swipeOrientation, spyShape, spySizePx, blend, loupeSizePx } = options
 
   const { mapRef, basemapLayerRef, tryFit, setFitBbox } = useOlMapBase(
     containerRef,
@@ -631,7 +631,7 @@ export function SingleMapView({
         </div>
       )}
 
-      <LoupeOverlay containerRef={containerRef} />
+      <LoupeOverlay containerRef={containerRef} sizePx={loupeSizePx} />
       <OverlayHoverCard hover={overlayHover} />
       <PinnedLegendsBar items={pinnedLegends} onUnpin={onUnpinLegend} />
 

@@ -64,6 +64,10 @@ export interface CompareModeOptions {
   spySizePx: number
   /** B-over-A weight in blend mode (0..1). */
   blend: number
+  /** Side-by-side: mirror the hold-Z loupe onto both panels (else only the hovered one). */
+  loupeMirror: boolean
+  /** Hold-Z loupe diameter in CSS pixels. */
+  loupeSizePx: number
 }
 
 /** One captured map for export: raw composited canvas + metadata. The

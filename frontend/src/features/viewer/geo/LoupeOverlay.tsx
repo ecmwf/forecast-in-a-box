@@ -10,7 +10,8 @@
 
 /**
  * Hold-Z magnifier for any compare map (single-map modes and each
- * side-by-side panel): a circular loupe above the cursor drawn from the
+ * side-by-side panel): a circular loupe near the cursor (above when
+ * there is headroom, else below, clamped into the map) drawn from the
  * map's composited canvas — raster zoom, honest about pixels, and the
  * active mode's clipping is baked in. While held, the cursor area shows
  * a dashed outline of exactly what the loupe magnifies, plus a
@@ -21,28 +22,41 @@ import { useEffect, useRef, useState } from 'react'
 import { drawCompositedViewport } from '../map-export'
 import type { RefObject } from 'react'
 
-const LOUPE_SIZE_PX = 180
+const DEFAULT_LOUPE_SIZE_PX = 180
 const LOUPE_ZOOM = 2
-const SOURCE_SIZE_PX = LOUPE_SIZE_PX / LOUPE_ZOOM
+const LOUPE_GAP_PX = 32
+
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.min(Math.max(v, lo), Math.max(lo, hi))
 
 export function LoupeOverlay({
   containerRef,
   mirror = null,
+  sizePx = DEFAULT_LOUPE_SIZE_PX,
 }: {
   containerRef: RefObject<HTMLDivElement | null>
   /** Sibling panel's cursor fraction — mirrors the loupe onto this map
    *  while the pointer is over the other side-by-side panel. */
   mirror?: { x: number; y: number } | null
+  /** Loupe diameter in CSS pixels. */
+  sizePx?: number
 }) {
   const [active, setActive] = useState(false)
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const sourceSize = sizePx / LOUPE_ZOOM
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'z' || e.repeat) return
       const target = e.target as HTMLElement | null
-      if (target && target.closest('input, textarea, select')) return
+      // Block only text entry — sliders/switches (range/checkbox) must not disable the loupe.
+      if (
+        target?.closest(
+          'input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]), textarea, select, [contenteditable="true"]',
+        )
+      )
+        return
       setActive(true)
     }
     const up = (e: KeyboardEvent) => {
@@ -79,6 +93,24 @@ export function LoupeOverlay({
   const drawX = drawPos?.x ?? null
   const drawY = drawPos?.y ?? null
 
+  // The map root clips overflow, so a fixed above-cursor offset pushes
+  // large loupes outside it. Float above the cursor while there is
+  // headroom, flip below near the top, and clamp into the container.
+  const half = sizePx / 2
+  const loupeCenter =
+    drawPos && box
+      ? {
+          x: clamp(drawPos.x, half, box.clientWidth - half),
+          y: clamp(
+            drawPos.y - LOUPE_GAP_PX - half >= half
+              ? drawPos.y - LOUPE_GAP_PX - half
+              : drawPos.y + LOUPE_GAP_PX + half,
+            half,
+            box.clientHeight - half,
+          ),
+        }
+      : drawPos
+
   useEffect(() => {
     if (!active || drawX === null || drawY === null) return
     const container = containerRef.current
@@ -96,9 +128,9 @@ export function LoupeOverlay({
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, loupe.width, loupe.height)
         drawCompositedViewport(container, ctx, {
-          originX: drawX - SOURCE_SIZE_PX / 2,
-          originY: drawY - SOURCE_SIZE_PX / 2,
-          scale: loupe.width / SOURCE_SIZE_PX,
+          originX: drawX - sourceSize / 2,
+          originY: drawY - sourceSize / 2,
+          scale: loupe.width / sourceSize,
         })
         // Crosshair through the magnified centre.
         ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)'
@@ -114,7 +146,7 @@ export function LoupeOverlay({
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [active, drawX, drawY, containerRef])
+  }, [active, drawX, drawY, sourceSize, containerRef])
 
   if (!active) return null
   return (
@@ -135,8 +167,8 @@ export function LoupeOverlay({
             aria-hidden="true"
             className="pointer-events-none absolute z-20 rounded-sm border border-dashed border-foreground/70 bg-foreground/5"
             style={{
-              width: SOURCE_SIZE_PX,
-              height: SOURCE_SIZE_PX,
+              width: sourceSize,
+              height: sourceSize,
               left: drawPos.x,
               top: drawPos.y,
               transform: 'translate(-50%, -50%)',
@@ -146,17 +178,17 @@ export function LoupeOverlay({
             aria-hidden="true"
             className="pointer-events-none absolute z-30 overflow-hidden rounded-full border-2 border-background shadow-lg ring-1 ring-border"
             style={{
-              width: LOUPE_SIZE_PX,
-              height: LOUPE_SIZE_PX,
-              left: drawPos.x,
-              top: drawPos.y,
-              transform: 'translate(-50%, -118%)',
+              width: sizePx,
+              height: sizePx,
+              left: (loupeCenter ?? drawPos).x,
+              top: (loupeCenter ?? drawPos).y,
+              transform: 'translate(-50%, -50%)',
             }}
           >
             <canvas
               ref={canvasRef}
-              width={LOUPE_SIZE_PX * 2}
-              height={LOUPE_SIZE_PX * 2}
+              width={sizePx * 2}
+              height={sizePx * 2}
               className="h-full w-full"
             />
           </div>

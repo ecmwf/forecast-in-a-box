@@ -121,7 +121,9 @@
       "rectangle": "Rectangle"
     },
     "spySize": "Spy size",
-    "loupeHint": "Hold Z to magnify"
+    "loupeHint": "Hold Z to magnify",
+    "loupeMirror": "Magnify both panels",
+    "loupeSize": "Magnifier size"
   },
   "timeline": {
     "label": "Valid time",

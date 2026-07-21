@@ -250,6 +250,8 @@ export function GeoViewer({
     spyShape: 'circle',
     spySizePx: 90,
     blend: 0.6,
+    loupeMirror: true,
+    loupeSizePx: 180,
   })
 
   // -------- Time-link policy (exact / nearest / offset / independent) --
@@ -1007,6 +1009,8 @@ export function GeoViewer({
               view={viewRef.current}
               a={mapSourceA}
               b={mapSourceB}
+              loupeMirror={modeOptions.loupeMirror}
+              loupeSizePx={modeOptions.loupeSizePx}
               preload={preloadTimeSteps}
               pinnedLegends={pinnedLegendItems}
               onUnpinLegend={unpinLegend}
