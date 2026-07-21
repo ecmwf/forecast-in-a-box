@@ -84,9 +84,8 @@ def update_plugin(
 
     If ``version`` is provided it must be a valid PEP 440 version string; the
     plugin will be pinned to exactly that version (``==version``).
-    If omitted, a compatibility range derived from the current ``fiab-core``
-    major version is used (``>=major,<major+1``), ensuring the installed plugin
-    stays within the same major-version family as the core library.
+    If omitted, the newest available version compatible with the installed
+    ``fiab-core`` is selected.
     """
     target: Version | None = None
     if version is not None:
@@ -95,8 +94,17 @@ def update_plugin(
         except InvalidVersion:
             raise HTTPException(status_code=422, detail=f"Invalid version string: {version!r}")
     else:
-        # TODO here we want to explicitly pick the highest available version -- the same logic as in get_plugin_versions. But dont copy that, introduce helper functinos in this file: _pluginId2settingsAndSource(PluginCompositeId) -> tuple[PluginSettings, str] | None, _settings2Versions(PluginSettings, pipSource: str) -> PluginVersions. Refactor get_plugin_versions to use them, utilize them here too. Pick the first version if any to put as the target, if none present raise a client exception
-        pass
+        settings_and_source = _pluginId2settingsAndSource(pluginCompositeId)
+        if settings_and_source is None:
+            raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
+        plugin_settings, pip_source = settings_and_source
+        versions = _settings2Versions(plugin_settings, pip_source)
+        if not versions.versions:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No compatible versions found for plugin {pluginCompositeId!r}",
+            )
+        target = Version(versions.versions[0])
     result = submit_update_single(pluginCompositeId, install=True, version=target)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
@@ -108,6 +116,25 @@ class PluginVersions(FiabBaseModel):
     """Compatible versions, sorted newest first."""
 
 
+def _pluginId2settingsAndSource(pluginCompositeId: PluginCompositeId) -> tuple[PluginSettings, str] | None:
+    store_detail = get_plugins_detail()
+    if pluginCompositeId in store_detail:
+        store_entry, _ = store_detail[pluginCompositeId]
+        pip_source = store_entry.pip_source
+        return PluginSettings(pip_source=pip_source, module_name=store_entry.module_name), pip_source
+    if pluginCompositeId in config.external.plugins:
+        plugin_settings = config.external.plugins[pluginCompositeId]
+        return plugin_settings, plugin_settings.pip_source
+    return None
+
+
+def _settings2Versions(pluginSettings: PluginSettings, pipSource: str) -> PluginVersions:
+    available = get_package_versions(pipSource)
+    compatible = get_compatible_versions(pluginSettings, available)
+    sorted_versions = sorted(compatible, key=lambda v: Version(v), reverse=True)
+    return PluginVersions(versions=sorted_versions)
+
+
 @router.get("/versions")
 def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends()]) -> PluginVersions:
     """Return available PyPI versions of a plugin that are compatible with the installed ``fiab-core``.
@@ -116,23 +143,10 @@ def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends(
     on PyPI are considered; locally-installed or git-sourced plugins will
     receive an empty list.
     """
-    pip_source: str | None = None
-
-    store_detail = get_plugins_detail()
-    if pluginCompositeId in store_detail:
-        store_entry, _ = store_detail[pluginCompositeId]
-        pip_source = store_entry.pip_source
-        plugin_settings = PluginSettings(pip_source=pip_source, module_name=store_entry.module_name)
-    elif pluginCompositeId in config.external.plugins:
-        plugin_settings = config.external.plugins[pluginCompositeId]
-        pip_source = plugin_settings.pip_source
-    else:
+    settings_and_source = _pluginId2settingsAndSource(pluginCompositeId)
+    if settings_and_source is None:
         raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-
-    available = get_package_versions(pip_source)
-    compatible = get_compatible_versions(plugin_settings, available)
-    sorted_versions = sorted(compatible, key=lambda v: Version(v), reverse=True)
-    return PluginVersions(versions=sorted_versions)
+    return _settings2Versions(*settings_and_source)
 
 
 @router.post("/install")
