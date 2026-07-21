@@ -339,7 +339,7 @@ describe('GeoViewer', () => {
 
     await screen.getByRole('button', { name: 'Basemap' }).click()
     await expect
-      .element(screen.getByRole('button', { name: /Sentinel-2 cloudless/ }))
+      .element(screen.getByRole('button', { name: /Carto Positron/ }))
       .toBeVisible()
     await expect
       .element(screen.getByRole('slider', { name: /Basemap opacity/ }))
