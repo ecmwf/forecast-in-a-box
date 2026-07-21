@@ -41,8 +41,8 @@ const navItems = [
     Icon: SlidersHorizontal,
     exact: false,
   },
-  // Exact: an open run highlights the run item, not this one — "Runs" stays a link to the list.
-  { to: '/runs', labelKey: 'nav.executions', Icon: Play, exact: true },
+  // Exact: an open run highlights the run item, not this one — "Execute" stays a link to the list.
+  { to: '/execute', labelKey: 'nav.executions', Icon: Play, exact: true },
 ] as const
 
 const itemClass = cn(
@@ -70,7 +70,7 @@ function RunNavItem({ jobId }: { jobId: string }) {
         className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50"
       />
       <Link
-        to="/runs/$jobId"
+        to="/execute/$jobId"
         params={{ jobId }}
         activeOptions={{ includeSearch: false }}
         className={cn(itemClass, 'max-w-40 gap-1 px-2 text-xs')}

@@ -48,7 +48,7 @@
     "label": "Main navigation",
     "overview": "Overview",
     "configuration": "Configure",
-    "executions": "Runs",
+    "executions": "Execute",
     "visualise": "Visualise"
   },
   "status": {
@@ -166,7 +166,7 @@
       "description": "Create a new forecast configuration"
     },
     "executions": {
-      "label": "Runs",
+      "label": "Execute",
       "description": "Monitor forecast job executions"
     },
     "admin": {

@@ -83,7 +83,7 @@ export function OutputsView({
 }: OutputsViewProps) {
   const { t } = useTranslation('executions')
   const navigate = useNavigate()
-  const search = useSearch({ from: '/_authenticated/runs/$jobId' })
+  const search = useSearch({ from: '/_authenticated/execute/$jobId' })
   const [activeViewer, setActiveViewer] = useState<{
     item: OutputItem
     adapter: OutputAdapter
@@ -186,7 +186,7 @@ export function OutputsView({
 
   const setActiveMimes = (next: ReadonlyArray<string>): void => {
     void navigate({
-      to: '/runs/$jobId',
+      to: '/execute/$jobId',
       params: { jobId },
       search: (prev) => ({
         ...prev,
@@ -198,7 +198,7 @@ export function OutputsView({
 
   const setGroupBy = (next: GroupBy): void => {
     void navigate({
-      to: '/runs/$jobId',
+      to: '/execute/$jobId',
       params: { jobId },
       search: (prev) => ({
         ...prev,

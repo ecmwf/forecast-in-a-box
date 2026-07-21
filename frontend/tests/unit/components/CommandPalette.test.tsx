@@ -46,7 +46,7 @@ const ALL_COMMANDS = [
   'Dataset Forecast',
   'Dashboard',
   'Configure',
-  'Runs',
+  'Execute',
   'Visualise',
   'Admin',
 ]
@@ -144,12 +144,12 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    // "journal" is a keyword of the Runs command — it appears in neither
-    // its label nor its description.
+    // "journal" is a keyword of the Execute command — it appears in
+    // neither its label nor its description.
     await screen.getByPlaceholder(PLACEHOLDER).fill('journal')
 
     await expect
-      .element(screen.getByRole('option', { name: /Runs/ }))
+      .element(screen.getByRole('option', { name: /Execute/ }))
       .toBeVisible()
     await expect
       .element(screen.getByRole('option', { name: /Dashboard/ }))
@@ -197,7 +197,7 @@ describe('CommandPalette', () => {
     await screen.getByPlaceholder(PLACEHOLDER).fill('executions')
     await userEvent.keyboard('{Enter}')
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/runs' })
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/execute' })
     expect(useCommandStore.getState().isOpen).toBe(false)
   })
 

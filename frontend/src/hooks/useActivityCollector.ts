@@ -141,7 +141,7 @@ function useCollectJobs() {
           description: capitalize(job.status),
           status: 'active',
           startedAt: serverTimeToLocal(job.created_at).getTime(),
-          navigateTo: `/runs/${job.run_id}`,
+          navigateTo: `/execute/${job.run_id}`,
         })
       }
     }

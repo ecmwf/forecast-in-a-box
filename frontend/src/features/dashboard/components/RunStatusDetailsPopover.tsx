@@ -80,7 +80,7 @@ function StatusRow({ status, count, isLoading, runId }: StatusRowProps) {
   // A lone running run links straight to its detail page.
   if (runId) {
     return (
-      <Link to="/runs/$jobId" params={{ jobId: runId }} className={rowClass}>
+      <Link to="/execute/$jobId" params={{ jobId: runId }} className={rowClass}>
         {content}
       </Link>
     )
@@ -112,7 +112,7 @@ export function RunStatusDetailsPopover({
       side={side}
       title={
         <Link
-          to="/runs"
+          to="/execute"
           className="flex items-center gap-2 transition-colors hover:text-primary"
         >
           <Clock className="h-4 w-4 text-primary" />
@@ -141,7 +141,7 @@ export function RunStatusDetailsPopover({
             </span>
           </div>
           <Link
-            to="/runs"
+            to="/execute"
             className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-muted/80"
           >
             {t('welcome.actions.manageExecutions')}

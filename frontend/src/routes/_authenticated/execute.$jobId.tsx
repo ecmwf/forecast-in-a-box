@@ -21,7 +21,7 @@ const searchSchema = z.object({
   groupBy: z.enum(['block', 'mime', 'block-and-mime']).optional(),
 })
 
-export const Route = createFileRoute('/_authenticated/runs/$jobId')({
+export const Route = createFileRoute('/_authenticated/execute/$jobId')({
   component: RunDetailPage,
   validateSearch: searchSchema,
 })

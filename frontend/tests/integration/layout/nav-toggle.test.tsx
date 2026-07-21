@@ -49,7 +49,7 @@ function createTestQueryClient() {
 function renderNavToggle(initialPath: string) {
   const rootRoute = createRootRoute({ component: () => <Outlet /> })
 
-  const routes = ['/overview', '/configure', '/runs', '/visualise'].map(
+  const routes = ['/overview', '/configure', '/execute', '/visualise'].map(
     (path) =>
       createRoute({
         getParentRoute: () => rootRoute,
@@ -84,7 +84,7 @@ describe('NavToggle', () => {
     const screen = await renderNavToggle('/overview')
     await expect.element(screen.getByText('Overview')).toBeVisible()
     await expect.element(screen.getByText('Configure')).toBeVisible()
-    await expect.element(screen.getByText('Runs')).toBeVisible()
+    await expect.element(screen.getByText('Execute')).toBeVisible()
     await expect.element(screen.getByText('Visualise')).toBeVisible()
   })
 
@@ -101,8 +101,8 @@ describe('NavToggle', () => {
   })
 
   it('marks Runs as active on /executions', async () => {
-    const screen = await renderNavToggle('/runs')
-    const link = screen.getByText('Runs')
+    const screen = await renderNavToggle('/execute')
+    const link = screen.getByText('Execute')
     await expect.element(link).toHaveAttribute('aria-current', 'page')
   })
 
@@ -115,7 +115,7 @@ describe('NavToggle', () => {
   it('does not mark inactive links with aria-current', async () => {
     const screen = await renderNavToggle('/overview')
     const configLink = screen.getByText('Configure')
-    const execLink = screen.getByText('Runs')
+    const execLink = screen.getByText('Execute')
     await expect.element(configLink).not.toHaveAttribute('aria-current')
     await expect.element(execLink).not.toHaveAttribute('aria-current')
   })

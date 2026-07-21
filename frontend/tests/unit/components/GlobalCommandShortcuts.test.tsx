@@ -59,7 +59,7 @@ describe('GlobalCommandShortcuts', () => {
 
     await userEvent.keyboard('ge')
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/runs' })
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/execute' })
   })
 
   it('stays inert while a text input is focused', async () => {

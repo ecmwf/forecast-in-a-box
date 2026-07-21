@@ -105,7 +105,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       category: 'Navigation',
       keywords: ['executions', 'history', 'past', 'runs', 'journal', 'jobs'],
       hotkey: ['G', 'E'],
-      action: () => navigate({ to: '/runs' }),
+      action: () => navigate({ to: '/execute' }),
     },
     {
       id: 'nav-visualise',
