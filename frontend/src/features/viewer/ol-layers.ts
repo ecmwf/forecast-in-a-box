@@ -72,27 +72,11 @@ export const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
   },
 ]
 
-// Curated public imagery basemaps — token-free, CORS-friendly, and
-// allowlisted in the CSP (vite csp-loopback-hosts adds their hosts).
-export const IMAGERY_BASEMAPS: ReadonlyArray<WmsImageBasemapOption> = [
-  {
-    type: 'wms-image',
-    id: 'eox-sentinel2-cloudless',
-    label: 'Sentinel-2 cloudless (EOX)',
-    url: 'https://tiles.maps.eox.at/wms',
-    layerName: 's2cloudless-2024_3857',
-    attribution:
-      'Sentinel-2 cloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data)',
-  },
-  {
-    type: 'wms-image',
-    id: 'gibs-bluemarble',
-    label: 'Blue Marble (NASA)',
-    url: 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi',
-    layerName: 'BlueMarble_ShadedRelief_Bathymetry',
-    attribution: 'NASA EOSDIS Global Imagery Browse Services (GIBS)',
-  },
-]
+// Curated public imagery basemaps. Empty pending licensing review: EOX
+// Sentinel-2 cloudless is CC-BY-NC-SA (commercial use needs a paid EOX
+// license) and NASA GIBS was pulled alongside it — add entries back here
+// once cleared (hosts must also join the vite CSP allowlist).
+export const IMAGERY_BASEMAPS: ReadonlyArray<WmsImageBasemapOption> = []
 
 // Fixed identity; the actual layers come from the lens capabilities.
 export const SKINNYWMS_BASEMAP: SkinnyWmsBasemapOption = {
