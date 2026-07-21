@@ -21,7 +21,6 @@ import {
   Download,
   Eraser,
   FlaskConical,
-  GitCompareArrows,
   Globe2,
   HelpCircle,
   Layers,
@@ -108,7 +107,6 @@ export function GeoToolbar({
   solo = false,
   focusSlot = null,
   onFocusChange,
-  onRequestAddSource,
   mode,
   onModeChange,
   linkMode,
@@ -134,12 +132,11 @@ export function GeoToolbar({
   onBasemapOpacityChange,
   onHelp,
 }: {
-  /** Single-source: modes + link hidden, "Compare…" CTA in their place. */
+  /** Single-source: comparison modes + link toggle hidden. */
   solo?: boolean
   /** View only one source (null = both); collapses the combination modes. */
   focusSlot?: SourceSlot | null
   onFocusChange?: (slot: SourceSlot | null) => void
-  onRequestAddSource?: () => void
   mode: CompareMode
   onModeChange: (mode: CompareMode) => void
   linkMode: LinkMode
@@ -191,18 +188,9 @@ export function GeoToolbar({
     <div className="space-y-2 rounded-md border border-border bg-muted/40 px-2.5 py-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {solo ? (
-          // The progressive-disclosure hinge: where the mode switcher will
-          // appear once a second source exists.
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5"
-            onClick={onRequestAddSource}
-            disabled={!onRequestAddSource}
-          >
-            <GitCompareArrows className="h-3.5 w-3.5" />
-            {t('toolbar.compareCta')}
-          </Button>
+          // Modes appear here once a second source exists ("Add source"
+          // in the page header is the way in).
+          <div />
         ) : (
           <div className="flex items-center gap-2">
             {/* Source focus: view A, both, or B. */}

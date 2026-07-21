@@ -22,6 +22,7 @@ import { Link } from '@tanstack/react-router'
 import { CuratedWmsList } from './sources/CuratedWmsList'
 import { HostPathForm } from './sources/HostPathForm'
 import { RunSourceList } from './sources/RunSourceList'
+import { RunningLensList } from './sources/RunningLensList'
 import { WmsUrlForm } from './sources/WmsUrlForm'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Input } from '@/components/ui/input'
@@ -40,6 +41,7 @@ export function VisualiseHub() {
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="min-w-0 space-y-3 rounded-lg border border-border bg-card p-4">
+          <RunningLensList />
           <P className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
             <Rows3 className="h-3.5 w-3.5" />
             {t('hub.previousResults')}

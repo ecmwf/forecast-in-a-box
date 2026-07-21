@@ -98,7 +98,6 @@ export function GeoViewer({
   b = null,
   mode,
   onModeChange,
-  onRequestAddSource,
   onRemoveB,
 }: {
   a: GeoViewerSource
@@ -106,8 +105,6 @@ export function GeoViewer({
   b?: GeoViewerSource | null
   mode: CompareMode
   onModeChange: (mode: CompareMode) => void
-  /** Solo-mode "Compare…" CTA in the toolbar. */
-  onRequestAddSource?: () => void
   /** Clear slot B (offered when B fails). */
   onRemoveB?: () => void
 }) {
@@ -942,7 +939,6 @@ export function GeoViewer({
         solo={!hasB}
         focusSlot={focusSlot}
         onFocusChange={setFocusSlot}
-        onRequestAddSource={onRequestAddSource}
         mode={mode}
         onModeChange={onModeChange}
         linkMode={selection.linkMode}

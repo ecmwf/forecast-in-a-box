@@ -37,7 +37,11 @@ import {
   resetJobsState,
   secondGribRunExecution,
 } from '@tests/../mocks/data/job.data'
-import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
+import {
+  injectMockLens,
+  listMockLenses,
+  resetLensState,
+} from '@tests/../mocks/data/lens.data'
 import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
@@ -193,10 +197,10 @@ describe('VisualisePage', () => {
     useComparisonStore.getState().addEntry(RUN_A)
     const screen = await renderVisualisePage()
 
-    // A auto-starts and the viewer mounts without a B: the toolbar shows
-    // the Compare CTA instead of the mode switcher, and B is unassigned.
+    // A auto-starts and the viewer mounts without a B: no mode switcher
+    // (adding B is the header's "Add source" job), and B is unassigned.
     await expect
-      .element(screen.getByText('Compare…'), { timeout: 8000 })
+      .element(screen.getByText(/display is static/), { timeout: 8000 })
       .toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Swipe' }).elements(),
@@ -204,6 +208,70 @@ describe('VisualisePage', () => {
     await expect
       .element(screen.getByLabelText('Source for slot B'))
       .toHaveTextContent('Pick a source…')
+  })
+
+  it('offers Stop only for stray lenses (no basket entry)', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    injectMockLens({
+      lens_instance_id: 'lens-stray-1',
+      status: 'running',
+      lens_name: 'skinnyWMS',
+      lens_params: { local_path: '/data/output/foreign-dir' },
+      ports: [54305],
+    })
+    const screen = await renderVisualisePage()
+    await expect.poll(() => listMockLenses(), { timeout: 8000 }).toHaveLength(2)
+
+    await screen.getByRole('button', { name: 'Manage sources' }).click()
+    const stopButtons = screen.getByRole('button', {
+      name: 'Stop lens server',
+    })
+    // Only the stray row gets a Stop — A's lens stops via source removal.
+    await expect.element(stopButtons).toBeVisible()
+    expect(stopButtons.elements()).toHaveLength(1)
+    ;(stopButtons.element() as HTMLElement).click()
+    await expect.poll(() => listMockLenses(), { timeout: 5000 }).toHaveLength(1)
+    expect(listMockLenses()[0].lens_params.local_path).toBe(
+      '/data/output/job-completed-001_1',
+    )
+  })
+
+  it('removing a source stops its now-orphaned lens', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderVisualisePage()
+    await expect.poll(() => listMockLenses(), { timeout: 8000 }).toHaveLength(2)
+
+    // Take B out of the view, then out of the basket (collected chip).
+    await screen.getByRole('button', { name: 'Single view' }).click()
+    await screen.getByRole('button', { name: 'Manage sources' }).click()
+    // Native click: the unstyled dialog's inert backdrop confuses
+    // Playwright hit-testing (see the stop-row test above).
+    const removeB = screen.getByRole('button', { name: /Remove Run B/ })
+    await expect.element(removeB).toBeVisible()
+    ;(removeB.element() as HTMLElement).click()
+
+    await expect.poll(() => listMockLenses(), { timeout: 5000 }).toHaveLength(1)
+    expect(listMockLenses()[0].lens_params.local_path).toBe(
+      '/data/output/job-completed-001_1',
+    )
+  })
+
+  it('Clear all empties the basket and the URL pair stays cleared', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderVisualisePage()
+
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toHaveTextContent('Run B')
+    await screen.getByRole('button', { name: 'Clear all' }).click()
+    // Hydration must not resurrect the active pair from the URL refs.
+    await expect
+      .element(screen.getByPlaceholder('Search runs and blocks…'))
+      .toBeVisible()
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
   })
 
   it("badges A's entry in the B picker; picking it self-compares", async () => {
@@ -314,31 +382,5 @@ describe('VisualisePage', () => {
       .element(screen.getByText('GRIB directory on this host'))
       .toBeVisible()
     expect(useComparisonStore.getState().entries).toHaveLength(0)
-  })
-
-  it('Stop lens servers stops them and pauses auto-start', async () => {
-    useComparisonStore.getState().addEntry(RUN_A)
-    useComparisonStore.getState().addEntry(RUN_B)
-    const screen = await renderVisualisePage()
-
-    await expect.poll(() => listMockLenses(), { timeout: 8000 }).toHaveLength(2)
-    // Wait for both to be running so the stop button targets them.
-    await expect
-      .poll(() => listMockLenses().every((l) => l.status === 'running'), {
-        timeout: 8000,
-      })
-      .toBe(true)
-
-    await screen.getByRole('button', { name: /stop lens servers/i }).click()
-    await expect.poll(() => listMockLenses(), { timeout: 5000 }).toHaveLength(0)
-
-    // Auto-start is paused: panels offer a manual start, no new lenses.
-    await expect
-      .element(screen.getByRole('button', { name: /^start lens$/i }).first(), {
-        timeout: 5000,
-      })
-      .toBeVisible()
-    await new Promise((r) => setTimeout(r, 1500))
-    expect(listMockLenses()).toHaveLength(0)
   })
 })

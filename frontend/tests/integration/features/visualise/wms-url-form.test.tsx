@@ -18,6 +18,14 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
+import {
+  Outlet,
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from '@tanstack/react-router'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import { resetLensState } from '@tests/../mocks/data/lens.data'
 import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
@@ -31,10 +39,29 @@ async function renderPicker() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  // The picker reads the /visualise URL pair (lens in-use guard), so it
+  // must render inside that route.
+  const rootRoute = createRootRoute({ component: () => <Outlet /> })
+  const authenticatedRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    id: '_authenticated',
+    component: () => <Outlet />,
+  })
+  const visualiseRoute = createRoute({
+    getParentRoute: () => authenticatedRoute,
+    path: '/visualise',
+    component: SourcePicker,
+  })
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([
+      authenticatedRoute.addChildren([visualiseRoute]),
+    ]),
+    history: createMemoryHistory({ initialEntries: ['/visualise'] }),
+  })
   return await render(
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
-        <SourcePicker />
+        <RouterProvider router={router} />
       </I18nextProvider>
     </QueryClientProvider>,
   )

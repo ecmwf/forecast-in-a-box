@@ -72,7 +72,12 @@ export function useHydrateComparisonFromUrl(): void {
 
     for (const ref of [search.a, search.b]) {
       if (!ref || ref === SLOT_B_OFF || processedRef.current.has(ref)) continue
-      if (entries.some((e) => entryRef(e) === ref)) continue
+      if (entries.some((e) => entryRef(e) === ref)) {
+        // Known ref: mark it handled so a later basket clear (races the
+        // async URL update) cannot resurrect it as a stub.
+        processedRef.current.add(ref)
+        continue
+      }
       processedRef.current.add(ref)
 
       const decoded = decodeEntryRef(ref)
