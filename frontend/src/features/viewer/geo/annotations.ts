@@ -10,9 +10,9 @@
 
 /**
  * Map annotations: numbered pins with a short on-map label, recorded per
- * comparison slot. A pin placed on side-by-side panel A belongs to A and
- * renders only there; single-map pins (slot null) belong to the combined
- * view and render everywhere. Pins are canvas-native (vector features
+ * comparison slot. A pin placed on side-by-side panel A — or while
+ * focused on A — belongs to A and renders only on A surfaces; combined-
+ * view pins (slot null) render everywhere. Pins are canvas-native (vector features
  * with Text styles), so the loupe and PNG exports include them for free;
  * the full texts are baked into exports as a numbered notes strip.
  */
@@ -26,6 +26,7 @@ import { Fill, Stroke, Style, Text } from 'ol/style'
 import CircleStyle from 'ol/style/Circle'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
+import type { FeatureLike } from 'ol/Feature'
 import type { SourceSlot } from './layer-pairing'
 
 /** Above data stacks and context overlays, below nothing that matters. */
@@ -46,6 +47,10 @@ let annotationCounter = 0
 export function nextAnnotationId(): string {
   annotationCounter += 1
   return `annotation-${annotationCounter}`
+}
+
+export function isAnnotationFeature(feature: FeatureLike): boolean {
+  return String(feature.getId() ?? '').startsWith('annotation-')
 }
 
 /** Should `annotation` render on a panel showing `panelSlot`?

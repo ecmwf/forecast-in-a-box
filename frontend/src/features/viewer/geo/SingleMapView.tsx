@@ -43,7 +43,7 @@ import { compositeMapToCanvas } from '../map-export'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
 import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
-import { useAnnotationLayer } from './annotations'
+import { isAnnotationFeature, useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
@@ -244,7 +244,8 @@ export function SingleMapView({
   const pointer = usePointerReadout(mapRef)
   useContextOverlays(mapRef, overlays)
   const overlayHover = useOverlayHover(mapRef, overlays)
-  useAnnotationLayer(mapRef, annotations, null, annotateArmed, {
+  // Pins follow the focus/per-slot mask; creations are attributed to it.
+  useAnnotationLayer(mapRef, annotations, captureOnly, annotateArmed, {
     onCreate: onAnnotationCreate,
     onEdit: onAnnotationEdit,
   })
@@ -543,7 +544,19 @@ export function SingleMapView({
         className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
         onClick={
           mode === 'flicker' && !solo && !annotateArmed
-            ? toggleFlicker
+            ? (e) => {
+                // A click landing on a pin is an edit, not a frame flip.
+                const map = mapRef.current
+                if (
+                  map?.forEachFeatureAtPixel(
+                    map.getEventPixel(e.nativeEvent),
+                    isAnnotationFeature,
+                    { hitTolerance: 8 },
+                  )
+                )
+                  return
+                toggleFlicker()
+              }
             : undefined
         }
       />
