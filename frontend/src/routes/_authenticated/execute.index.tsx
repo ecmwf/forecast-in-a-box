@@ -21,7 +21,7 @@ const searchSchema = z.object({
   group: z.enum(['none', 'date', 'schedule', 'tag']).optional(),
 })
 
-export const Route = createFileRoute('/_authenticated/runs/')({
+export const Route = createFileRoute('/_authenticated/execute/')({
   component: RunListPage,
   validateSearch: searchSchema,
 })

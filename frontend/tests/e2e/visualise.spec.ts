@@ -50,7 +50,7 @@ test.describe('Visualise page', () => {
     await establishSession(page)
 
     const nav = page.getByRole('navigation', { name: 'Main navigation' })
-    await expect(nav.getByText('Runs')).toBeVisible({ timeout: 10000 })
+    await expect(nav.getByText('Execute')).toBeVisible({ timeout: 10000 })
     await expect(nav.getByText('Visualise')).toBeVisible()
     await nav.getByText('Visualise').click()
     await page.waitForURL(/visualise/, { timeout: 10000 })

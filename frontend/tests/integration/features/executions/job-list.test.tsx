@@ -70,10 +70,10 @@ function renderJobList() {
   })
   const executionsRoute = createRoute({
     getParentRoute: () => authenticatedRoute,
-    path: '/runs',
+    path: '/execute',
     component: () => <Outlet />,
   })
-  // Index route id `/_authenticated/runs/` — matches RunListPage's getRouteApi call.
+  // Index route id `/_authenticated/execute/` — matches RunListPage's getRouteApi call.
   const listRoute = createRoute({
     getParentRoute: () => executionsRoute,
     path: '/',
@@ -90,7 +90,7 @@ function renderJobList() {
   ])
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ['/runs'] }),
+    history: createMemoryHistory({ initialEntries: ['/execute'] }),
   })
 
   return render(

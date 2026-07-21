@@ -168,7 +168,7 @@ function SubmitRunForm({
         description: t('activity.submitted'),
         status: 'active',
         startedAt: Date.now(),
-        navigateTo: `/runs/${response.run_id}`,
+        navigateTo: `/execute/${response.run_id}`,
       })
 
       showToast.success(t('submit.title'), trimmedName || undefined)
@@ -179,7 +179,7 @@ function SubmitRunForm({
 
       onOpenChange(false)
       navigate({
-        to: '/runs/$jobId',
+        to: '/execute/$jobId',
         params: { jobId: response.run_id },
       })
     } catch (err) {
