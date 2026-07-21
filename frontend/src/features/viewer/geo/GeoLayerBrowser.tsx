@@ -26,10 +26,12 @@ import {
   Loader2,
   Plus,
   Search,
+  TimerOff,
   X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { groupPairs } from './pair-grouping'
+import { pairIsStatic } from './layer-pairing'
 import { groupByTitlePrefix } from './title-grouping'
 import type { SlotFilter } from './pair-grouping'
 import type { PairedLayer, SourceSlot } from './layer-pairing'
@@ -507,6 +509,11 @@ function PairRow({
       >
         {label}
       </span>
+      {pairIsStatic(pair) && (
+        <span title={t('timeline.staticLayerHint')} className="shrink-0">
+          <TimerOff className="h-3 w-3 text-muted-foreground/70" />
+        </span>
+      )}
       {showChips && <SlotChips chipPair={pair} />}
       {active ? (
         <X className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

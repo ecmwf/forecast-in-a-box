@@ -134,6 +134,26 @@ describe('GeoViewer', () => {
       .toBeVisible()
   })
 
+  it('static layers get a hint bar instead of a collapsed timeline', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    // Nothing active yet — the bar is already present as the static hint.
+    await expect.element(screen.getByText(/display is static/)).toBeVisible()
+
+    // msl advertises no TIME: hint stays, card and browser rows say why.
+    await screen.getByText('Mean sea level pressure').first().click()
+    await expect.element(screen.getByText(/display is static/)).toBeVisible()
+    await expect
+      .element(screen.getByText('Static', { exact: true }))
+      .toBeVisible()
+
+    // A temporal layer swaps the hint for the real slider.
+    await screen.getByText('2 m temperature').first().click()
+    await expect.element(screen.getByText('1 / 3')).toBeVisible()
+    expect(screen.getByText(/display is static/).elements()).toHaveLength(0)
+  })
+
   it('exposes the swipe divider as an accessible slider', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
