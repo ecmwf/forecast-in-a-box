@@ -28,15 +28,22 @@ import {
   MessageSquarePlus,
   Ruler,
   SquareDashed,
+  Upload,
   ZoomIn,
 } from 'lucide-react'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber } from '../format'
+import {
+  downloadAnnotationsGeojson,
+  parseAnnotationsGeojson,
+} from './annotations'
 import { COMPARE_KEYS, keyLabel, useShortcutReveal } from './useGeoShortcuts'
 import { COMPARE_MODES } from './types'
 import type { LinkMode } from './useCompareSelection'
 import type { SourceSlot } from './layer-pairing'
 import type { CompareMode, CompareModeOptions } from './types'
+import type { MapAnnotation } from './annotations'
 import type { BasemapOption } from '../ol-layers'
 import { Button } from '@/components/ui/button'
 import {
@@ -51,9 +58,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { P } from '@/components/base/typography'
+import { showToast } from '@/lib/toast'
+import { createLogger } from '@/lib/logger'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
+
+const log = createLogger('GeoToolbar')
 
 const EXPERIMENTAL: ReadonlySet<CompareMode> = new Set([
   'flicker',
@@ -111,6 +122,8 @@ export function GeoToolbar({
   onMeasureClear,
   annotateArmed,
   onAnnotateToggle,
+  annotations,
+  onAnnotationsImport,
   onExport,
   onCopy,
   copySlots,
@@ -141,6 +154,8 @@ export function GeoToolbar({
   onMeasureClear: () => void
   annotateArmed: boolean
   onAnnotateToggle: () => void
+  annotations: ReadonlyArray<MapAnnotation>
+  onAnnotationsImport: (items: ReadonlyArray<Omit<MapAnnotation, 'id'>>) => void
   onExport: () => void
   /** Copy the view (null) or one slot's clean image. */
   onCopy: (only: SourceSlot | null) => void
@@ -154,6 +169,21 @@ export function GeoToolbar({
   onHelp: () => void
 }) {
   const { t } = useTranslation('visualise')
+  const annotationFileRef = useRef<HTMLInputElement>(null)
+
+  const onAnnotationFiles = async (files: FileList | null) => {
+    const file = files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      onAnnotationsImport(parseAnnotationsGeojson(text))
+    } catch (err) {
+      log.error('Annotations GeoJSON parse failed', { error: err })
+      showToast.error(t('annotations.importInvalid'))
+    }
+    if (annotationFileRef.current) annotationFileRef.current.value = ''
+  }
+
   const { t: tExec } = useTranslation('executions')
   const reveal = useShortcutReveal()
 
@@ -370,18 +400,58 @@ export function GeoToolbar({
           >
             <Eraser className="h-4 w-4" />
           </Button>
-          <Button
-            variant={annotateArmed ? 'secondary' : 'ghost'}
-            size="icon"
-            className="relative h-7 w-7"
-            aria-pressed={annotateArmed}
-            onClick={onAnnotateToggle}
-            title={`${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`}
-            aria-label={t('annotations.tool')}
-          >
-            <KeyBadge label={keyLabel(COMPARE_KEYS.annotate)} show={reveal} />
-            <MessageSquarePlus className="h-4 w-4" />
-          </Button>
+          <span className="flex items-center">
+            <Button
+              variant={annotateArmed ? 'secondary' : 'ghost'}
+              size="icon"
+              className="relative h-7 w-7"
+              aria-pressed={annotateArmed}
+              onClick={onAnnotateToggle}
+              title={`${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`}
+              aria-label={t('annotations.tool')}
+            >
+              <KeyBadge label={keyLabel(COMPARE_KEYS.annotate)} show={reveal} />
+              <MessageSquarePlus className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="-ml-1 h-7 w-4"
+                    title={t('annotations.options')}
+                    aria-label={t('annotations.options')}
+                  />
+                }
+              >
+                <ChevronDown className="h-3 w-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-60">
+                <DropdownMenuItem
+                  onClick={() => annotationFileRef.current?.click()}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {t('annotations.import')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={annotations.length === 0}
+                  onClick={() => downloadAnnotationsGeojson(annotations)}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {t('annotations.export')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <input
+              ref={annotationFileRef}
+              type="file"
+              accept=".json,.geojson,application/geo+json,application/json"
+              className="hidden"
+              aria-label={t('annotations.import')}
+              onChange={(e) => void onAnnotationFiles(e.target.files)}
+            />
+          </span>
           <span className="mx-1 h-5 w-px bg-border" />
           <span className="flex items-center">
             <Button

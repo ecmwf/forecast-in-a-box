@@ -64,8 +64,10 @@ export function DualMapView({
   overlays,
   annotations,
   annotateArmed,
+  annotationHighlightId,
   onAnnotationCreate,
   onAnnotationEdit,
+  onAnnotationMove,
   onRegisterFit,
   onRegisterCapture,
 }: {
@@ -87,11 +89,13 @@ export function DualMapView({
   overlays: ReadonlyArray<ContextOverlay>
   annotations: ReadonlyArray<MapAnnotation>
   annotateArmed: boolean
+  annotationHighlightId: string | null
   onAnnotationCreate: (
     coordinate: [number, number],
     slot: SourceSlot | null,
   ) => void
   onAnnotationEdit: (id: string) => void
+  onAnnotationMove: (id: string, coordinate: [number, number]) => void
   /** Register this component's fit-to-bbox action with the toolbar. */
   onRegisterFit: (fit: (() => void) | null) => void
   onRegisterCapture: (
@@ -154,8 +158,10 @@ export function DualMapView({
         overlays={overlays}
         annotations={annotations}
         annotateArmed={annotateArmed}
+        annotationHighlightId={annotationHighlightId}
         onAnnotationCreate={onAnnotationCreate}
         onAnnotationEdit={onAnnotationEdit}
+        onAnnotationMove={onAnnotationMove}
         onRegisterFit={registerFit}
         onRegisterCapture={registerCapture}
       />
@@ -176,8 +182,10 @@ export function DualMapView({
         overlays={overlays}
         annotations={annotations}
         annotateArmed={annotateArmed}
+        annotationHighlightId={annotationHighlightId}
         onAnnotationCreate={onAnnotationCreate}
         onAnnotationEdit={onAnnotationEdit}
+        onAnnotationMove={onAnnotationMove}
         onRegisterFit={registerFit}
         onRegisterCapture={registerCapture}
       />
@@ -202,8 +210,10 @@ function DualMapPanel({
   overlays,
   annotations,
   annotateArmed,
+  annotationHighlightId,
   onAnnotationCreate,
   onAnnotationEdit,
+  onAnnotationMove,
   onRegisterFit,
   onRegisterCapture,
 }: {
@@ -223,11 +233,13 @@ function DualMapPanel({
   overlays: ReadonlyArray<ContextOverlay>
   annotations: ReadonlyArray<MapAnnotation>
   annotateArmed: boolean
+  annotationHighlightId: string | null
   onAnnotationCreate: (
     coordinate: [number, number],
     slot: SourceSlot | null,
   ) => void
   onAnnotationEdit: (id: string) => void
+  onAnnotationMove: (id: string, coordinate: [number, number]) => void
   onRegisterFit: (slot: string, fit: (() => void) | null) => void
   onRegisterCapture: (
     slot: string,
@@ -283,10 +295,18 @@ function DualMapPanel({
   const pointer = usePointerReadout(mapRef)
   useContextOverlays(mapRef, overlays)
   const overlayHover = useOverlayHover(mapRef, overlays)
-  useAnnotationLayer(mapRef, annotations, source.slot, annotateArmed, {
-    onCreate: onAnnotationCreate,
-    onEdit: onAnnotationEdit,
-  })
+  useAnnotationLayer(
+    mapRef,
+    annotations,
+    source.slot,
+    annotateArmed,
+    {
+      onCreate: onAnnotationCreate,
+      onEdit: onAnnotationEdit,
+      onMove: onAnnotationMove,
+    },
+    annotationHighlightId,
+  )
 
   useEffect(() => {
     setFitBbox(source.bbox)
