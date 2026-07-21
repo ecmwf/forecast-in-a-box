@@ -712,6 +712,19 @@ export function GeoViewer({
     [],
   )
 
+  // Measure and annotate both consume map clicks — arming one disarms the other.
+  const toggleAnnotate = useCallback(() => {
+    setAnnotateArmed((armed) => !armed)
+    setMeasureMode('none')
+  }, [])
+  const setMeasureModeExclusive = useCallback(
+    (measure: 'none' | 'line' | 'area') => {
+      if (measure !== 'none') setAnnotateArmed(false)
+      setMeasureMode(measure)
+    },
+    [],
+  )
+
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
   const onPan = useCallback((dx: number, dy: number) => {
@@ -755,7 +768,7 @@ export function GeoViewer({
     onCopy: () => copyView(null),
     onExport: () => setExportOpen(true),
     onHelp: () => setHelpOpen((v) => !v),
-    onAnnotate: () => setAnnotateArmed((v) => !v),
+    onAnnotate: toggleAnnotate,
     onAnnotateDisarm: {
       enabled: annotateArmed && annotationDraft === null,
       disarm: () => setAnnotateArmed(false),
@@ -911,10 +924,10 @@ export function GeoViewer({
           setModeOptions((prev) => ({ ...prev, ...patch }))
         }
         measureMode={measureMode}
-        onMeasureMode={setMeasureMode}
+        onMeasureMode={setMeasureModeExclusive}
         onMeasureClear={() => setMeasureClearNonce((n) => n + 1)}
         annotateArmed={annotateArmed}
-        onAnnotateToggle={() => setAnnotateArmed((v) => !v)}
+        onAnnotateToggle={toggleAnnotate}
         onExport={() => setExportOpen(true)}
         onCopy={copyView}
         copySlots={hasB}

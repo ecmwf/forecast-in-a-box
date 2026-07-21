@@ -152,6 +152,8 @@ export function useMeasure(
       source,
       type: mode === 'line' ? 'LineString' : 'Polygon',
       style: MEASURE_STYLE,
+      // Vertex clicks must not leak into singleclick listeners (annotation edit/create).
+      stopClick: true,
     })
     map.addInteraction(draw)
 
