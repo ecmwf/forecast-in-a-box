@@ -942,11 +942,11 @@ wheels = [
 
 [[packages]]
 name = "multiurl"
-version = "0.3.7"
+version = "0.3.9"
 marker = "sys_platform == 'darwin' or sys_platform == 'linux'"
 index = "https://pypi.org/simple"
-sdist = { url = "https://files.pythonhosted.org/packages/6c/ce/a00c9b44f43c4620ca004e4acb4c1e266b1ab48d2f6ad9e402f6bdbe44d4/multiurl-0.3.7.tar.gz", upload-time = 2025-07-29T11:57:04Z, size = 18945, hashes = { sha256 = "4201563fc8989baca7b525fdc69d4cd5a6c0cef4f303559710b9890021aab6d9" } }
-wheels = [{ url = "https://files.pythonhosted.org/packages/93/cf/be4e93afbfa0def2cd6fac9302071db0bd6d0617999ecbf53f92b9398de3/multiurl-0.3.7-py3-none-any.whl", upload-time = 2025-07-29T11:57:03Z, size = 21524, hashes = { sha256 = "054f42974064f103be0ed55b43f0c32fc435a47dc7353a9adaffa643b99fa380" } }]
+sdist = { url = "https://files.pythonhosted.org/packages/d3/35/a08c568e63fda8cb1b7f3168409c026d2b407ab6d82da09cea078b01c2d7/multiurl-0.3.9.tar.gz", upload-time = 2026-06-18T07:43:38Z, size = 20044, hashes = { sha256 = "799b7998bfabd4e15d51ba09d08eb5d0716762655bae6e09db00a14c3bfaeae6" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/59/f1/2374970b2ad0ab20e28a0cd12eec1c234567fef31064f0903396d55ae3f1/multiurl-0.3.9-py3-none-any.whl", upload-time = 2026-06-18T07:43:37Z, size = 22610, hashes = { sha256 = "5acedb53343bb47ff6188405dc33e10c1f1713591de8929a69b966d4d395d88e" } }]
 
 [[packages]]
 name = "netcdf4"
