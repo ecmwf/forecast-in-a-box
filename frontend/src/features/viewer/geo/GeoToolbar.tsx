@@ -523,10 +523,34 @@ function ModeActionRow({
           <span className="font-mono font-bold">B</span>
         </label>
       )}
-      <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-        <ZoomIn className="h-3.5 w-3.5" />
-        {t('modes.loupeHint')}
-      </span>
+      {/* Loupe controls grouped on the right: the hint, plus the mirror
+          toggle when side-by-side. */}
+      <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <ZoomIn className="h-3.5 w-3.5" />
+          {t('modes.loupeHint')}
+        </span>
+        <label className="flex w-36 items-center gap-2">
+          <span className="shrink-0">{t('modes.loupeSize')}</span>
+          <Slider
+            value={[options.loupeSizePx]}
+            min={120}
+            max={360}
+            step={20}
+            onValueChange={(v) => onChange({ loupeSizePx: firstNumber(v) })}
+          />
+        </label>
+        {mode === 'side' && (
+          <label className="flex items-center gap-2">
+            <Switch
+              size="sm"
+              checked={options.loupeMirror}
+              onCheckedChange={(v) => onChange({ loupeMirror: v })}
+            />
+            {t('modes.loupeMirror')}
+          </label>
+        )}
+      </div>
     </div>
   )
 }
