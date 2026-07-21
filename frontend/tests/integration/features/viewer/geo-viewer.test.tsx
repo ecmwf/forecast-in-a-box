@@ -454,8 +454,8 @@ describe('GeoViewer', () => {
       .element(screen.getByText('Deep low over the gulf'))
       .toBeVisible()
 
-    // Edit via the list, then delete from the editor.
-    await screen.getByText('Deep low over the gulf').click()
+    // Edit via the row's pencil (row click pans instead), then delete.
+    await screen.getByRole('button', { name: 'Edit annotation 1' }).click()
     await expect.element(screen.getByText('Annotation 1')).toBeVisible()
     await screen.getByRole('button', { name: 'Delete' }).click()
     await expect

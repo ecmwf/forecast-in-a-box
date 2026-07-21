@@ -711,6 +711,36 @@ export function GeoViewer({
       setAnnotations((prev) => prev.filter((ann) => ann.id !== id)),
     [],
   )
+  const moveAnnotation = useCallback(
+    (id: string, coordinate: [number, number]) =>
+      setAnnotations((prev) =>
+        prev.map((ann) => (ann.id === id ? { ...ann, coordinate } : ann)),
+      ),
+    [],
+  )
+  const importAnnotations = useCallback(
+    (items: ReadonlyArray<Omit<MapAnnotation, 'id'>>) =>
+      setAnnotations((prev) => [
+        ...prev,
+        ...items.map((item) => ({ ...item, id: nextAnnotationId() })),
+      ]),
+    [],
+  )
+  // Sidebar-row hover echoes onto the map; row click pans to the pin.
+  const [annotationHighlightId, setAnnotationHighlightId] = useState<
+    string | null
+  >(null)
+  const locateAnnotation = useCallback(
+    (id: string) => {
+      const annotation = annotations.find((ann) => ann.id === id)
+      if (!annotation) return
+      viewRef.current?.animate({
+        center: annotation.coordinate,
+        duration: 350,
+      })
+    },
+    [annotations],
+  )
 
   // Measure and annotate both consume map clicks — arming one disarms the other.
   const toggleAnnotate = useCallback(() => {
@@ -928,6 +958,8 @@ export function GeoViewer({
         onMeasureClear={() => setMeasureClearNonce((n) => n + 1)}
         annotateArmed={annotateArmed}
         onAnnotateToggle={toggleAnnotate}
+        annotations={annotations}
+        onAnnotationsImport={importAnnotations}
         onExport={() => setExportOpen(true)}
         onCopy={copyView}
         copySlots={hasB}
@@ -991,6 +1023,8 @@ export function GeoViewer({
               items: annotations,
               edit: onAnnotationEdit,
               remove: removeAnnotationById,
+              locate: locateAnnotation,
+              setHighlight: setAnnotationHighlightId,
             }}
             opacity={{
               global: globalOpacity,
@@ -1032,8 +1066,10 @@ export function GeoViewer({
               overlays={overlays}
               annotations={annotations}
               annotateArmed={annotateArmed}
+              annotationHighlightId={annotationHighlightId}
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
+              onAnnotationMove={moveAnnotation}
               basemapId={basemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
@@ -1058,8 +1094,10 @@ export function GeoViewer({
               overlays={overlays}
               annotations={annotations}
               annotateArmed={annotateArmed}
+              annotationHighlightId={annotationHighlightId}
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
+              onAnnotationMove={moveAnnotation}
               basemapId={basemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}

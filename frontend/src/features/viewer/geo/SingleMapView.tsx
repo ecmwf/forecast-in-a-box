@@ -87,8 +87,10 @@ export function SingleMapView({
   overlays,
   annotations,
   annotateArmed,
+  annotationHighlightId,
   onAnnotationCreate,
   onAnnotationEdit,
+  onAnnotationMove,
   onRegisterFit,
   onRegisterCapture,
 }: {
@@ -111,11 +113,13 @@ export function SingleMapView({
   overlays: ReadonlyArray<ContextOverlay>
   annotations: ReadonlyArray<MapAnnotation>
   annotateArmed: boolean
+  annotationHighlightId: string | null
   onAnnotationCreate: (
     coordinate: [number, number],
     slot: SourceSlot | null,
   ) => void
   onAnnotationEdit: (id: string) => void
+  onAnnotationMove: (id: string, coordinate: [number, number]) => void
   onRegisterFit: (fit: (() => void) | null) => void
   onRegisterCapture: (
     capture: (() => Promise<Array<CaptureResult>>) | null,
@@ -245,10 +249,18 @@ export function SingleMapView({
   useContextOverlays(mapRef, overlays)
   const overlayHover = useOverlayHover(mapRef, overlays)
   // Pins follow the focus/per-slot mask; creations are attributed to it.
-  useAnnotationLayer(mapRef, annotations, captureOnly, annotateArmed, {
-    onCreate: onAnnotationCreate,
-    onEdit: onAnnotationEdit,
-  })
+  useAnnotationLayer(
+    mapRef,
+    annotations,
+    captureOnly,
+    annotateArmed,
+    {
+      onCreate: onAnnotationCreate,
+      onEdit: onAnnotationEdit,
+      onMove: onAnnotationMove,
+    },
+    annotationHighlightId,
+  )
 
   // Fit plumbing (union bbox of both sources).
   useEffect(() => {

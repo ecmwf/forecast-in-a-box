@@ -280,7 +280,13 @@
     "remove": "Remove annotation {{number}}",
     "empty": "Arm the annotate tool and click the map to record findings.",
     "slotShared": "Both",
-    "armedHint": "Click the map to add a note · Esc exits"
+    "armedHint": "Click the map to add a note · Esc exits",
+    "locate": "Show annotation {{number}} on the map",
+    "edit": "Edit annotation {{number}}",
+    "options": "Annotation options",
+    "export": "Download annotations (GeoJSON)",
+    "import": "Import annotations (GeoJSON)",
+    "importInvalid": "Not a valid annotations GeoJSON file"
   },
   "toolbar": {
     "compareCta": "Compare…",

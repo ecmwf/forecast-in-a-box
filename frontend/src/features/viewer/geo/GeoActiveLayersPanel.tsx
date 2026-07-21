@@ -20,10 +20,12 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronLeft,
+  Download,
   Eye,
   EyeOff,
   GripVertical,
   HelpCircle,
+  Pencil,
   Pin,
   Upload,
   X,
@@ -40,6 +42,7 @@ import {
 import { LegendImage } from '../components/LegendImage'
 import { SLOT_CHIP_CLASS } from './GeoLayerBrowser'
 import { parseGeojsonOverlay } from './overlays'
+import { downloadAnnotationsGeojson } from './annotations'
 import type { ScaleBand } from '../wms-capabilities'
 import type { ContextOverlay } from './overlays'
 import type { MapAnnotation } from './annotations'
@@ -73,6 +76,10 @@ export interface AnnotationControls {
   items: ReadonlyArray<MapAnnotation>
   edit: (id: string) => void
   remove: (id: string) => void
+  /** Pan the shared view to a pin (sidebar row click). */
+  locate: (id: string) => void
+  /** Echo sidebar-row hover as an enlarged pin; null clears. */
+  setHighlight: (id: string | null) => void
 }
 
 export interface OpacityTiers {
@@ -331,7 +338,8 @@ export function GeoActiveLayersPanel({
   )
 }
 
-/** Numbered findings pinned to the map: click to edit, X to remove. */
+/** Numbered findings: hover highlights the pin, row click pans to it,
+ *  pencil edits, X removes; download here, import via the toolbar menu. */
 function AnnotationsSection({
   annotations,
 }: {
@@ -341,12 +349,29 @@ function AnnotationsSection({
   if (annotations.items.length === 0) return null
   return (
     <div className="space-y-1.5 border-t border-border bg-muted/30 px-3 py-2.5">
-      <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {t('annotations.title')}
-      </P>
+      <div className="flex items-center justify-between gap-2">
+        <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          {t('annotations.title')}
+        </P>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={() => downloadAnnotationsGeojson(annotations.items)}
+          title={t('annotations.export')}
+          aria-label={t('annotations.export')}
+        >
+          <Download className="h-3 w-3" />
+        </Button>
+      </div>
       <ul className="space-y-1">
         {annotations.items.map((annotation, index) => (
-          <li key={annotation.id} className="flex items-start gap-1.5">
+          <li
+            key={annotation.id}
+            className="group flex items-start gap-1.5"
+            onMouseEnter={() => annotations.setHighlight(annotation.id)}
+            onMouseLeave={() => annotations.setHighlight(null)}
+          >
             <span
               className={cn(
                 'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold text-white',
@@ -366,11 +391,20 @@ function AnnotationsSection({
             </span>
             <button
               type="button"
-              onClick={() => annotations.edit(annotation.id)}
+              onClick={() => annotations.locate(annotation.id)}
               className="min-w-0 flex-1 rounded text-left text-xs leading-snug hover:bg-accent"
-              title={annotation.text}
+              title={t('annotations.locate', { number: index + 1 })}
             >
               <span className="line-clamp-2">{annotation.text}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => annotations.edit(annotation.id)}
+              aria-label={t('annotations.edit', { number: index + 1 })}
+              title={t('annotations.edit', { number: index + 1 })}
+              className="rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100"
+            >
+              <Pencil className="h-3 w-3" />
             </button>
             <button
               type="button"
