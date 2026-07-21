@@ -456,7 +456,7 @@ export function GeoToolbar({
   )
 }
 
-/** Contextual controls for the active mode (empty for side-by-side). */
+/** Contextual controls for the active mode (just the loupe hint for side/flicker). */
 function ModeActionRow({
   mode,
   options,
@@ -467,10 +467,10 @@ function ModeActionRow({
   onChange: (patch: Partial<CompareModeOptions>) => void
 }) {
   const { t } = useTranslation('visualise')
-  if (mode === 'side') return null
 
+  // Fixed-height row, always rendered — keeps the divider/toolbar height steady across modes.
   return (
-    <div className="flex flex-wrap items-center gap-4 border-t border-border/60 pt-2 text-sm">
+    <div className="flex min-h-9 flex-wrap items-center gap-4 border-t border-border/60 pt-2 text-sm">
       {mode === 'swipe' && (
         <Segmented
           aria={t('modes.orientationAria')}
