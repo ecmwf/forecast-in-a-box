@@ -187,8 +187,8 @@
     "swap": "Swap A and B",
     "placeholder": "Pick a source…",
     "pickerAria": "Source for slot {{slot}}",
-    "sameAsA": "Same as A",
     "singleView": "Single view",
+    "isA": "Currently source A",
     "kind": {
       "run": "Run",
       "wms": "WMS",

@@ -206,18 +206,21 @@ describe('VisualisePage', () => {
       .toHaveTextContent('Pick a source…')
   })
 
-  it('offers "Same as A" in the B picker for self-comparison', async () => {
+  it("badges A's entry in the B picker; picking it self-compares", async () => {
     useComparisonStore.getState().addEntry(RUN_A)
     const screen = await renderVisualisePage()
 
     await screen.getByLabelText('Source for slot B').click()
-    await screen.getByRole('option', { name: 'Same as A' }).click()
+    await expect
+      .element(screen.getByTitle('Currently source A'))
+      .toBeInTheDocument()
+    await screen.getByRole('option', { name: /Run A/ }).click()
     await expect
       .element(screen.getByLabelText('Source for slot B'))
       .toHaveTextContent('Run A')
   })
 
-  it('"Single view" clears B and materialization does not re-fill it', async () => {
+  it('the X clears B and materialization does not re-fill it', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
     useComparisonStore.getState().addEntry(RUN_B)
     const screen = await renderVisualisePage()
@@ -225,10 +228,33 @@ describe('VisualisePage', () => {
     const pickerB = screen.getByLabelText('Source for slot B')
     await expect.element(pickerB).toHaveTextContent('Run B')
 
-    await pickerB.click()
-    await screen.getByRole('option', { name: 'Single view' }).click()
+    await screen.getByRole('button', { name: 'Single view' }).click()
     await expect.element(pickerB).toHaveTextContent('Pick a source…')
-    // The `b=off` sentinel holds against the auto-fill effect.
+    // The `b=off` sentinel holds against the auto-fill effect, and the X
+    // is gone while B is empty.
+    await new Promise((r) => setTimeout(r, 1200))
+    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    expect(
+      screen.getByRole('button', { name: 'Single view' }).elements(),
+    ).toHaveLength(0)
+  })
+
+  it('the X ejects an external-WMS B (regression: fake Select items)', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry({
+      kind: 'wms',
+      url: 'http://localhost:54390/wms?',
+      label: 'maps.dwd.de',
+    })
+    registerMockWmsServer(54390, {
+      layers: [{ name: 'dwd:layer', title: 'DWD layer' }],
+    })
+    const screen = await renderVisualisePage()
+
+    const pickerB = screen.getByLabelText('Source for slot B')
+    await expect.element(pickerB).toHaveTextContent('maps.dwd.de')
+    await screen.getByRole('button', { name: 'Single view' }).click()
+    await expect.element(pickerB).toHaveTextContent('Pick a source…')
     await new Promise((r) => setTimeout(r, 1200))
     await expect.element(pickerB).toHaveTextContent('Pick a source…')
   })
