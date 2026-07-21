@@ -28,6 +28,9 @@ import {
 import type { RefObject } from 'react'
 import type { BasemapLayer } from '../ol-layers'
 
+// "Auto-fit done" flag on the shared View, so it survives a map remount (mode switch).
+const AUTOFIT_KEY = 'fiab:autoFitted'
+
 /** The default viewer View: Web-Mercator, world-constrained, Europe-framed. */
 export function createViewerView(): View {
   return new View({
@@ -79,7 +82,6 @@ export function useOlMapBase(
   const { view, resetKey, incLoading, decLoading } = options
   const mapRef = useRef<OlMap | null>(null)
   const basemapLayerRef = useRef<BasemapLayer | null>(null)
-  const fittedRef = useRef(false)
   const bboxRef = useRef<[number, number, number, number] | null>(null)
   // Keep the external view in a ref so a caller passing an inline-created
   // View doesn't retrigger the map effect (it must stay referentially
@@ -90,7 +92,9 @@ export function useOlMapBase(
   const tryFit = useCallback((force: boolean = false) => {
     const map = mapRef.current
     if (!map) return
-    if (!force && fittedRef.current) return
+    const olView = map.getView()
+    // Skip re-fitting once the shared View is framed — keep the camera across mode switches.
+    if (!force && olView.get(AUTOFIT_KEY)) return
     const size = map.getSize()
     if (!size || size[0] < 1 || size[1] < 1) return
     // Forced = "Fit to globe" button → full WMS bbox; unforced (initial
@@ -98,8 +102,7 @@ export function useOlMapBase(
     // the WMS bbox isn't known yet.
     const targetWgs84 =
       force && bboxRef.current ? bboxRef.current : INITIAL_VIEW_BBOX_WGS84
-    fittedRef.current = true
-    const olView = map.getView()
+    olView.set(AUTOFIT_KEY, true, true)
     const extent = transformExtent(
       targetWgs84,
       'EPSG:4326',
