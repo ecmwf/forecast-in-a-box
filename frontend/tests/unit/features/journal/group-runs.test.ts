@@ -25,6 +25,7 @@ function run(overrides: Partial<ForecastRunViewModel>): ForecastRunViewModel {
     createdAt: '2026-05-16T10:00:00',
     modelLabel: 'AIFS',
     outputCount: 1,
+    lostOutputCount: 0,
     outputKinds: [],
     tags: [],
     blueprintId: 'bp',

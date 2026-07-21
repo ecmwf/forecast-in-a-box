@@ -58,6 +58,7 @@
     "filterByDate": "Filter by this date",
     "outputs_one": "{{count}} output",
     "outputs_other": "{{count}} outputs",
+    "lost": "{{count}} not retained",
     "untitled": "Untitled forecast",
     "viewResults": "View Results",
     "viewError": "View Error",

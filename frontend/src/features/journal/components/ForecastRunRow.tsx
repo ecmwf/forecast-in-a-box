@@ -112,6 +112,14 @@ export const ForecastRunRow = memo(function ({
             )}
             <span aria-hidden>·</span>
             <span>{t('item.outputs', { count: run.outputCount })}</span>
+            {run.lostOutputCount > 0 && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="text-muted-foreground/80 italic">
+                  {t('item.lost', { count: run.lostOutputCount })}
+                </span>
+              </>
+            )}
           </div>
           <div className="flex flex-wrap items-start gap-2">
             {run.scheduleName && (

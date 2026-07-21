@@ -145,6 +145,7 @@ export const secondGribRunExecution: JobExecutionDetail = {
   error: null,
   progress: '100',
   cascade_job_id: 'cascade-008',
+  lost_task_ids: {},
   outputs: {
     'task-out-grib-b': {
       mime_type: 'text/plain; fiab-format=gribdir',

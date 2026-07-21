@@ -26,6 +26,8 @@ import type {
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { RunOutputs } from '@/api/types/job.types'
+import type { LostTaskIds } from '@/features/executions/outputs/availability'
+import { classifyOutput } from '@/features/executions/outputs/availability'
 import { getFactory } from '@/api/types/fable.types'
 import {
   useLensStatus,
@@ -63,6 +65,8 @@ function splitPath(path: string): { dir: string; name: string } {
 interface StoredOutputsCardProps {
   jobId: string
   outputs: RunOutputs | null
+  /** Reasons for outputs that are no longer retrievable. */
+  lostTaskIds?: LostTaskIds
   /** Optional: resolve human-readable sink titles from the run's fable. */
   fable?: FableBuilderV1
   catalogue?: BlockFactoryCatalogue
@@ -76,6 +80,8 @@ interface StoredOutputRow {
   taskId: string
   title: string
   isAvailable: boolean
+  /** Reason the sink's data is no longer retrievable. */
+  lostReason?: string
   /** Number of GRIB marker tasks the sink fanned out to. */
   count: number
 }
@@ -83,6 +89,7 @@ interface StoredOutputRow {
 export function StoredOutputsCard({
   jobId,
   outputs,
+  lostTaskIds = {},
   fable,
   catalogue,
   runName,
@@ -96,6 +103,11 @@ export function StoredOutputsCard({
     const byBlock = new Map<string, StoredOutputRow>()
     for (const [taskId, meta] of Object.entries(outputs)) {
       if (meta.mime_type !== GRIB_DIR_MIME) continue
+      const availability = classifyOutput(
+        meta.is_available,
+        taskId,
+        lostTaskIds,
+      )
       const existing = byBlock.get(meta.original_block)
       if (existing) {
         existing.count += 1
@@ -103,6 +115,13 @@ export function StoredOutputsCard({
         if (!existing.isAvailable && meta.is_available) {
           existing.taskId = taskId
           existing.isAvailable = true
+          existing.lostReason = undefined
+        } else if (
+          !existing.isAvailable &&
+          existing.lostReason === undefined &&
+          availability.state === 'lost'
+        ) {
+          existing.lostReason = availability.reason
         }
         continue
       }
@@ -116,11 +135,13 @@ export function StoredOutputsCard({
         taskId,
         title: factory?.title ?? meta.original_block,
         isAvailable: meta.is_available,
+        lostReason:
+          availability.state === 'lost' ? availability.reason : undefined,
         count: 1,
       })
     }
     return Array.from(byBlock.values())
-  }, [outputs, fable, catalogue])
+  }, [outputs, lostTaskIds, fable, catalogue])
 
   if (rows.length === 0) return null
 
@@ -280,8 +301,11 @@ function StoredOutputRowItem({
         ) : row.isAvailable ? (
           <P className="font-mono text-xs text-muted-foreground">…</P>
         ) : (
-          <P className="text-xs text-muted-foreground italic">
-            {t('storedOutputs.fileMissing')}
+          <P
+            className="text-xs text-muted-foreground italic"
+            title={row.lostReason}
+          >
+            {row.lostReason ?? t('storedOutputs.fileMissing')}
           </P>
         )}
         {/* Inline note: disabled buttons can't surface a title/tooltip. */}
@@ -303,6 +327,7 @@ function StoredOutputRowItem({
             runCreatedAt: null,
           }}
           disabled={!row.isAvailable}
+          disabledReason={row.lostReason}
         />
         {row.isAvailable && (
           <Button

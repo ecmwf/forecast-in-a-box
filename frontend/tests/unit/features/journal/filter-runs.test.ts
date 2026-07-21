@@ -26,6 +26,7 @@ function run(overrides: Partial<ForecastRunViewModel>): ForecastRunViewModel {
     createdAt: '2026-05-16T10:00:00',
     modelLabel: 'AIFS Single',
     outputCount: 2,
+    lostOutputCount: 0,
     outputKinds: ['image'],
     tags: ['europe'],
     blueprintId: 'bp-1',
