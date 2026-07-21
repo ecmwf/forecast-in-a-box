@@ -153,6 +153,9 @@
     "alignEndsHint": "Shift B so both series end together",
     "loadError": "Server returned no data for this time — {{slot}}",
     "notServed": "Advertised but not served",
+    "static": "No time-enabled layers active — the display is static.",
+    "staticBadge": "Static",
+    "staticLayerHint": "No time dimension — renders unchanged at every time step",
     "notServedHint": "Light segments: times this server advertises but did not serve"
   },
   "link": {

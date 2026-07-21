@@ -33,6 +33,11 @@ export interface PairedLayer {
   perSource: Partial<Record<SourceSlot, ParsedLayer>>
 }
 
+/** No side advertises a TIME dimension — renders unchanged at every step. */
+export function pairIsStatic(pair: PairedLayer): boolean {
+  return Object.values(pair.perSource).every((layer) => !layer.time)
+}
+
 export interface PairingResult {
   pairs: Array<PairedLayer>
   /** Pairs available in BOTH sources. 0 → selection must unlink. */

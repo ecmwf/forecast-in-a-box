@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Pause,
   Play,
+  TimerOff,
   TriangleAlert,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -155,7 +156,15 @@ export function GeoTimeSlider({
 
   const sharedAxis = focused || linkMode !== 'independent'
   const hasSharedAxis = sharedAxis && steps.length > 0
-  if (sharedAxis && steps.length === 0) return null
+  // Keep the bar present (no layout jump) and say WHY there is no slider.
+  if (sharedAxis && steps.length === 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-3 text-xs text-muted-foreground">
+        <TimerOff className="h-3.5 w-3.5 shrink-0" />
+        {tCompare('timeline.static')}
+      </div>
+    )
+  }
 
   // The light track tint needs words: warn while any failure mark is
   // visible in the current window (tracks are hidden in independent mode).
