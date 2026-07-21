@@ -710,7 +710,6 @@ describe('GeoViewer solo', () => {
 
     // A's layers are browsable; comparison affordances are absent.
     await expect.element(screen.getByText('2 m temperature')).toBeVisible()
-    await expect.element(screen.getByText('Compare…')).toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Swipe' }).elements(),
     ).toHaveLength(0)

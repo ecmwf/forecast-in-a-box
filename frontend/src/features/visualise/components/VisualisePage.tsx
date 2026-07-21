@@ -21,12 +21,13 @@
  */
 
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import { Loader2, Plus, Square, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
 import { SLOT_B_OFF, entryDisplayName, entryRef } from '../entry-ref'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
+import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
 import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
 
@@ -37,7 +38,6 @@ import { VisualiseHub } from './VisualiseHub'
 import type { ComparisonEntry } from '../entry-ref'
 import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/geo/types'
-import { useStopLens } from '@/api/hooks/useLens'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { H1 } from '@/components/base/typography'
@@ -50,7 +50,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { showToast } from '@/lib/toast'
 
 const GeoViewer = lazy(() =>
   import('@/features/viewer/geo/GeoViewer').then((m) => ({
@@ -145,6 +144,19 @@ export function VisualisePage() {
   const { a, b, assignSlot, swapSlots, clearSlotB } = useActivePair()
   useHydrateComparisonFromUrl()
 
+  // Clearing the basket must clear the URL pair too — hydration would
+  // otherwise resurrect the active refs as stub entries.
+  const stopOrphanedLenses = useStopOrphanedLenses()
+  const clearAll = () => {
+    const removed = entries
+    clear()
+    void stopOrphanedLenses(removed, [])
+    void navigate({
+      search: (prev) => ({ ...prev, a: undefined, b: undefined }),
+      replace: true,
+    })
+  }
+
   const mode: CompareMode = search.mode ?? 'swipe'
   const onModeChange = (next: CompareMode) => {
     void navigate({
@@ -158,29 +170,11 @@ export function VisualisePage() {
   }
 
   const [pickerOpen, setPickerOpen] = useState(false)
-  // "Stop lens servers" pauses auto-start so panels don't instantly
-  // restart what the user just stopped; per-panel Start clears it.
-  const [lensesPaused, setLensesPaused] = useState(false)
-  const stateA = useComparisonSource(a, { autoStart: !lensesPaused })
-  const stateB = useComparisonSource(b, { autoStart: !lensesPaused })
+  const stateA = useComparisonSource(a, { autoStart: true })
+  const stateB = useComparisonSource(b, { autoStart: true })
   const viewerFill = useViewportFill(
     entries.length > 0 && a !== null && stateA.phase === 'running',
   )
-
-  const stopMutation = useStopLens()
-  const activeLensIds = [stateA, stateB].flatMap((s) =>
-    s.phase === 'running' && s.lensId ? [s.lensId] : [],
-  )
-  const stopLenses = () => {
-    setLensesPaused(true)
-    for (const lensInstanceId of new Set(activeLensIds)) {
-      stopMutation.mutate(
-        { lensInstanceId },
-        { onError: (err) => showToast.error(err.message) },
-      )
-    }
-    showToast.info(t('lens.stopped'))
-  }
 
   return (
     // Slim constant gutter — a map workspace uses the width it can get.
@@ -219,33 +213,27 @@ export function VisualisePage() {
               }
             >
               <Plus className="h-3.5 w-3.5" />
-              {t('basket.addSource')}
+              {entries.length > 0
+                ? t('basket.manageSources')
+                : t('basket.addSource')}
             </DialogTrigger>
             <DialogContent className="max-h-[85vh] overflow-x-hidden overflow-y-auto sm:max-w-4xl">
               <DialogHeader>
-                <DialogTitle>{t('picker.title')}</DialogTitle>
+                <DialogTitle>
+                  {entries.length > 0
+                    ? t('basket.manageSources')
+                    : t('picker.title')}
+                </DialogTitle>
                 <DialogDescription>{t('page.description')}</DialogDescription>
               </DialogHeader>
               <SourcePicker />
             </DialogContent>
           </Dialog>
-          {activeLensIds.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={stopLenses}
-              className="gap-1.5"
-              title={t('lens.stopAllHint')}
-            >
-              <Square className="h-3.5 w-3.5" />
-              {t('lens.stopAll')}
-            </Button>
-          )}
           {entries.length > 0 && (
             <Button
               variant="outline"
               size="icon"
-              onClick={clear}
+              onClick={clearAll}
               className="h-8 w-8"
               title={t('basket.clear')}
               aria-label={t('basket.clear')}
@@ -287,7 +275,6 @@ export function VisualisePage() {
               }
               mode={mode}
               onModeChange={onModeChange}
-              onRequestAddSource={() => setPickerOpen(true)}
               onRemoveB={clearSlotB}
             />
           </Suspense>

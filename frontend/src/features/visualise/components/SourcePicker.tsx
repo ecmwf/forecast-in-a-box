@@ -16,26 +16,23 @@
  */
 
 import { useState } from 'react'
-import { FolderInput, Radar, Rows3 } from 'lucide-react'
+import { FolderInput, Rows3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryRef } from '../entry-ref'
-import { useLensPathIndex } from '../hooks/useLensPathIndex'
+import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
 import { useComparisonStore } from '../stores/comparisonStore'
-import { AddToComparisonButton } from './AddToComparisonButton'
 import { CompareBasketChip } from './CompareBasketChip'
 import { CuratedWmsList } from './sources/CuratedWmsList'
+import { RunningLensList } from './sources/RunningLensList'
 import { HostPathForm } from './sources/HostPathForm'
 import { RunSourceList } from './sources/RunSourceList'
 import { WmsUrlForm } from './sources/WmsUrlForm'
-import { useLensList } from '@/api/hooks/useLens'
 import { Input } from '@/components/ui/input'
 import { P } from '@/components/base/typography'
 
 export function SourcePicker() {
   const { t } = useTranslation('visualise')
   const [search, setSearch] = useState('')
-  const { data: lenses } = useLensList()
-  const pathIndex = useLensPathIndex()
 
   const query = search.trim().toLowerCase()
 
@@ -54,6 +51,8 @@ export function SourcePicker() {
           className="h-9"
         />
 
+        <RunningLensList query={query} />
+
         {/* Recent runs */}
         <section className="space-y-1">
           <SectionLabel icon={<Rows3 className="h-3.5 w-3.5" />}>
@@ -61,61 +60,6 @@ export function SourcePicker() {
           </SectionLabel>
           <RunSourceList query={query} />
         </section>
-
-        {/* Running lenses */}
-        {lenses && lenses.length > 0 && (
-          <section className="space-y-1">
-            <SectionLabel icon={<Radar className="h-3.5 w-3.5" />}>
-              {t('picker.runningLenses')}
-            </SectionLabel>
-            <ul className="divide-y divide-border">
-              {lenses.map((lens) => {
-                const path =
-                  typeof lens.lens_params.local_path === 'string'
-                    ? lens.lens_params.local_path
-                    : ''
-                const match = path ? pathIndex.get(path) : undefined
-                if (
-                  query &&
-                  !path.toLowerCase().includes(query) &&
-                  !lens.lens_name.toLowerCase().includes(query)
-                ) {
-                  return null
-                }
-                return (
-                  <li
-                    key={lens.lens_instance_id}
-                    className="flex items-center gap-3 py-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <P className="text-sm font-medium">{lens.lens_name}</P>
-                      <P className="font-mono text-xs break-all text-muted-foreground">
-                        {path}
-                      </P>
-                    </div>
-                    <AddToComparisonButton
-                      disabled={!match}
-                      disabledReason={t('entry.noMatch')}
-                      entry={
-                        match
-                          ? {
-                              kind: 'output',
-                              jobId: match.jobId,
-                              taskId: match.taskId,
-                              blockId: match.blockId,
-                              runName: '',
-                              blockTitle: match.blockId,
-                              runCreatedAt: match.runCreatedAt,
-                            }
-                          : { kind: 'path', path, label: path }
-                      }
-                    />
-                  </li>
-                )
-              })}
-            </ul>
-          </section>
-        )}
       </div>
 
       <div className="min-w-0 space-y-5">
@@ -155,6 +99,7 @@ function CollectedSources() {
   const { t } = useTranslation('visualise')
   const entries = useComparisonStore((s) => s.entries)
   const removeEntry = useComparisonStore((s) => s.removeEntry)
+  const stopOrphanedLenses = useStopOrphanedLenses()
   if (entries.length === 0) return null
   return (
     <section className="space-y-1.5">
@@ -169,7 +114,13 @@ function CollectedSources() {
               key={ref}
               entry={entry}
               slot={null}
-              onRemove={() => removeEntry(ref)}
+              onRemove={() => {
+                removeEntry(ref)
+                void stopOrphanedLenses(
+                  [entry],
+                  useComparisonStore.getState().entries,
+                )
+              }}
             />
           )
         })}

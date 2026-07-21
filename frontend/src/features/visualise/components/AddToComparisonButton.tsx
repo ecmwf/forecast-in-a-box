@@ -14,7 +14,7 @@
  * already in the basket shows a check and removes on click.
  */
 
-import { Check, GitCompareArrows } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryDisplayName, entryRef } from '../entry-ref'
 import {
@@ -22,6 +22,7 @@ import {
   useComparisonStore,
   useIsInComparison,
 } from '../stores/comparisonStore'
+import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
 import type { NewComparisonEntry } from '../entry-ref'
 import { Button } from '@/components/ui/button'
 import { showToast } from '@/lib/toast'
@@ -44,6 +45,7 @@ export function AddToComparisonButton({
   const inBasket = useIsInComparison(ref)
   const addEntry = useComparisonStore((s) => s.addEntry)
   const removeEntry = useComparisonStore((s) => s.removeEntry)
+  const stopOrphanedLenses = useStopOrphanedLenses()
 
   const name = entryDisplayName(entry)
   const label = inBasket ? t('entry.inBasket') : t('entry.add')
@@ -52,6 +54,7 @@ export function AddToComparisonButton({
   const onClick = () => {
     if (inBasket) {
       removeEntry(ref)
+      void stopOrphanedLenses([entry], useComparisonStore.getState().entries)
       showToast.info(t('toast.removed', { name }))
       return
     }
@@ -77,7 +80,7 @@ export function AddToComparisonButton({
       {inBasket ? (
         <Check className="h-3.5 w-3.5" />
       ) : (
-        <GitCompareArrows className="h-3.5 w-3.5" />
+        <Plus className="h-3.5 w-3.5" />
       )}
       {!iconOnly && label}
     </Button>

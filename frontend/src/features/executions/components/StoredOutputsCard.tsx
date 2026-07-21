@@ -38,7 +38,6 @@ import {
 import { buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
-import { AddToComparisonButton } from '@/features/visualise/components/AddToComparisonButton'
 import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
 import { showToast } from '@/lib/toast'
 import { cn, copyToClipboard } from '@/lib/utils'
@@ -316,19 +315,6 @@ function StoredOutputRowItem({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        <AddToComparisonButton
-          entry={{
-            kind: 'output',
-            jobId,
-            taskId: row.taskId,
-            blockId: row.blockId,
-            runName: runName ?? '',
-            blockTitle: row.title,
-            runCreatedAt: null,
-          }}
-          disabled={!row.isAvailable}
-          disabledReason={row.lostReason}
-        />
         {row.isAvailable && (
           <Button
             size="sm"

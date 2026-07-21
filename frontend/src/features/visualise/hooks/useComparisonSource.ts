@@ -56,6 +56,7 @@ export type ComparisonSourceState =
 
 /** In-flight lens starts keyed by path — shared across hook instances. */
 const pendingStartByPath = new Map<string, Promise<string>>()
+const startedIdByPath = new Map<string, string>()
 
 function ensureLensStarted(
   path: string,
@@ -63,9 +64,31 @@ function ensureLensStarted(
 ): Promise<string> {
   const existing = pendingStartByPath.get(path)
   if (existing) return existing
-  const promise = start(path).finally(() => pendingStartByPath.delete(path))
+  // Resolved promises stay cached: a sibling panel resolving its dir just
+  // after the start completes must adopt this lens, not start a second one
+  // (the 5 s lens-list poll lags). Failures and vanished lenses evict.
+  const promise = start(path).then(
+    (id) => {
+      startedIdByPath.set(path, id)
+      return id
+    },
+    (err: unknown) => {
+      evictLensStart(path)
+      throw err
+    },
+  )
   pendingStartByPath.set(path, promise)
   return promise
+}
+
+/** With `goneLensId`, evict only the start that actually died — a
+ *  sibling's fresh start (pending or resolved to a new id) must survive. */
+function evictLensStart(path: string, goneLensId?: string): void {
+  if (goneLensId !== undefined && startedIdByPath.get(path) !== goneLensId) {
+    return
+  }
+  pendingStartByPath.delete(path)
+  startedIdByPath.delete(path)
 }
 
 function pickMatchedLens(
@@ -160,11 +183,17 @@ export function useComparisonSource(
   useEffect(() => {
     if (!statusGone || !startedLensId) return
     setStartedLensId(null)
-    if (localPath) attemptedPathsRef.current.delete(localPath)
+    if (localPath) {
+      attemptedPathsRef.current.delete(localPath)
+      evictLensStart(localPath, startedLensId)
+    }
   }, [statusGone, startedLensId, localPath])
 
   const retry = useCallback(() => {
-    if (localPath) attemptedPathsRef.current.delete(localPath)
+    if (localPath) {
+      attemptedPathsRef.current.delete(localPath)
+      evictLensStart(localPath)
+    }
     setStartedLensId(null)
     setStartError(null)
   }, [localPath])

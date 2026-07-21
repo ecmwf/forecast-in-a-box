@@ -4,9 +4,9 @@
     "description": "View geographic outputs on a map — from past runs, external WMS servers, or host folders. Add a second source to compare."
   },
   "entry": {
-    "add": "Compare",
+    "add": "Add",
     "addAria": "Add to comparison",
-    "inBasket": "In comparison",
+    "inBasket": "Added",
     "removeAria": "Remove from comparison",
     "noMatch": "This lens could not be matched to a stored output"
   },
@@ -22,6 +22,7 @@
     "title": "Sources",
     "clear": "Clear all",
     "addSource": "Add source",
+    "manageSources": "Manage sources",
     "count_one": "{{count}} source",
     "count_other": "{{count}} sources",
     "setActive": "Click to compare as source B",
@@ -80,9 +81,7 @@
     "dirError": "Could not resolve the output directory",
     "retry": "Retry",
     "start": "Start lens",
-    "stopAll": "Stop lens servers",
-    "stopAllHint": "Stops the lens servers behind the current sources. They are never stopped automatically.",
-    "stopped": "Lens servers stopped",
+    "stopOne": "Stop lens server",
     "paused": "Auto-start paused — start lenses per panel"
   },
   "panel": {
@@ -292,7 +291,6 @@
     "importInvalid": "Not a valid annotations GeoJSON file"
   },
   "toolbar": {
-    "compareCta": "Compare…",
     "copyOptions": "Copy options",
     "copySlot": "Copy {{slot}} only"
   },
