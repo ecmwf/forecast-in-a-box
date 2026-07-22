@@ -28,14 +28,13 @@ test.describe('Navigation', () => {
     await expect(page.locator('body')).toBeVisible()
   })
 
-  test('navigates to dashboard', async ({ page }) => {
-    await page.goto('/')
+  test('header nav reaches the overview workspace', async ({ page }) => {
+    await page.goto('/execute')
 
-    // Look for a link or button to dashboard
-    const dashboardLink = page.getByRole('link', { name: /dashboard/i })
-    if (await dashboardLink.isVisible()) {
-      await dashboardLink.click()
-      await expect(page).toHaveURL(/dashboard/)
-    }
+    const overviewLink = page.getByRole('link', { name: 'Overview' })
+    await expect(overviewLink).toBeVisible()
+    await overviewLink.click()
+    await expect(page).toHaveURL(/\/overview/)
+    await expect(overviewLink).toHaveAttribute('aria-current', 'page')
   })
 })

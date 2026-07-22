@@ -110,7 +110,7 @@ src/
 │   ├── common/          # Shared components (LoadingSpinner, ErrorBoundary, etc.)
 │   ├── layout/          # AppShell, Header, Sidebar, Footer
 │   └── ui/              # shadcn/ui components (auto-generated, do not edit)
-├── features/            # Feature modules (admin, auth, dashboard, fable-builder, landing, plugins, sources, status)
+├── features/            # Feature modules (admin, auth, dashboard, executions, fable-builder, journal, landing, plugins, sources, status, viewer, visualise)
 ├── hooks/               # Shared custom hooks
 ├── lib/                 # Utilities (logger, toast, queryClient, utils)
 ├── locales/             # i18n translations (en/)
@@ -161,7 +161,8 @@ through i18next.
 - **Library:** `i18next` + `react-i18next`, initialised once in `src/lib/i18n.ts`.
 - **Resources:** one JSON file per namespace in `src/locales/en/` — `common`,
   `errors`, `validation`, `status`, `auth`, `landing`, `dashboard`, `plugins`,
-  `artifacts`, `executions`, `schedules`, `configure`, `glyphs`, `journal`.
+  `artifacts`, `executions`, `schedules`, `configure`, `glyphs`, `journal`,
+  `visualise`.
   `en` is currently the only locale; each feature owns its namespace, shared
   text lives in `common` / `errors`.
 - **Type safety:** `src/types/i18next.d.ts` derives key types from the JSON
