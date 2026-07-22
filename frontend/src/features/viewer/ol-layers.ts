@@ -26,6 +26,7 @@ import ImageWMS from 'ol/source/ImageWMS'
 import { fromLonLat } from 'ol/proj'
 import { applyStyle as applyMapboxStyle } from 'ol-mapbox-style'
 import { toWmsEndpoint } from './wms-capabilities'
+import type { LoadFunction } from 'ol/Image'
 import type VectorTileSource from 'ol/source/VectorTile'
 import { createLogger } from '@/lib/logger'
 
@@ -134,6 +135,51 @@ export function makeBasemapLayer(
  * cache keys. crossOrigin: 'anonymous' keeps the shared canvas untainted so
  * PNG export works.
  */
+/** Decode failure → error state: the source re-requests on revisit instead
+ *  of serving an abandoned forever-loading image. */
+const FAILED_IMAGE_SRC = 'data:image/gif;base64,invalid'
+
+/** Superseded (aborted) load — its error event is bookkeeping, not a
+ *  server failure. */
+export function isAbortedLoad(img: unknown): boolean {
+  return img instanceof HTMLImageElement && img.dataset.fiabAborted === '1'
+}
+
+/** The GetMap URL a load was issued for — `img.src` becomes a blob URL. */
+export function loadRequestUrl(img: unknown): string | null {
+  return img instanceof HTMLImageElement
+    ? (img.dataset.fiabRequestUrl ?? null)
+    : null
+}
+
+/** Fetch-based GetMap loader: a superseded request (pan/zoom/scrub) aborts
+ *  the previous one — at most one in flight per source, always the latest. */
+export function cancellingImageLoader(): LoadFunction {
+  let inFlight: AbortController | null = null
+  return (image, src) => {
+    inFlight?.abort()
+    const controller = new AbortController()
+    inFlight = controller
+    const img = image.getImage() as HTMLImageElement
+    img.dataset.fiabRequestUrl = src
+    delete img.dataset.fiabAborted
+    fetch(src, { signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`GetMap ${res.status}`)
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const revoke = () => URL.revokeObjectURL(url)
+        img.addEventListener('load', revoke, { once: true })
+        img.addEventListener('error', revoke, { once: true })
+        img.src = url
+      })
+      .catch(() => {
+        if (controller.signal.aborted) img.dataset.fiabAborted = '1'
+        img.src = FAILED_IMAGE_SRC
+      })
+  }
+}
+
 export function makeDataLayerSource(
   baseUrl: string,
   params: Record<string, string>,
@@ -147,6 +193,7 @@ export function makeDataLayerSource(
     crossOrigin: 'anonymous',
     hidpi: false,
     ratio: 1,
+    imageLoadFunction: cancellingImageLoader(),
   })
 }
 
