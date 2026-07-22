@@ -36,54 +36,40 @@ const log = createLogger('viewer')
 export interface ExternalBasemapOption {
   type: 'vector'
   id: string
-  label: string
+  labelKey: BasemapLabelKey
   // Mapbox-style JSON URL; ol-mapbox-style fetches it, builds the
   // source from its `sources` block, and applies styling.
   styleUrl: string
 }
 
+/** `visualise`-namespace keys — resolved with `t()` at render. */
+type BasemapLabelKey = 'basemaps.cartoPositron' | 'basemaps.skinnywms'
+
 // SkinnyWMS's own map — `background` as the base, borders overlaid.
 export interface SkinnyWmsBasemapOption {
   type: 'skinnywms'
   id: string
-  label: string
+  labelKey: BasemapLabelKey
 }
 
-// Public imagery served over plain WMS (satellite mosaics etc.).
-export interface WmsImageBasemapOption {
-  type: 'wms-image'
-  id: string
-  label: string
-  url: string
-  layerName: string
-  attribution: string
-}
+export type BasemapOption = ExternalBasemapOption | SkinnyWmsBasemapOption
 
-export type BasemapOption =
-  | ExternalBasemapOption
-  | SkinnyWmsBasemapOption
-  | WmsImageBasemapOption
-
+// Imagery basemaps (EOX cloudless, NASA GIBS) removed pending licensing
+// review — the wms-image machinery lives in git history.
 export const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
   {
     type: 'vector',
     id: 'carto-positron-vector',
-    label: 'Carto Positron',
+    labelKey: 'basemaps.cartoPositron',
     styleUrl: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
   },
 ]
-
-// Curated public imagery basemaps. Empty pending licensing review: EOX
-// Sentinel-2 cloudless is CC-BY-NC-SA (commercial use needs a paid EOX
-// license) and NASA GIBS was pulled alongside it — add entries back here
-// once cleared (hosts must also join the vite CSP allowlist).
-export const IMAGERY_BASEMAPS: ReadonlyArray<WmsImageBasemapOption> = []
 
 // Fixed identity; the actual layers come from the lens capabilities.
 export const SKINNYWMS_BASEMAP: SkinnyWmsBasemapOption = {
   type: 'skinnywms',
   id: 'skinnywms-native',
-  label: 'SkinnyWMS (native)',
+  labelKey: 'basemaps.skinnywms',
 }
 
 export const DEFAULT_BASEMAP_ID = BASEMAPS[0].id
@@ -206,21 +192,6 @@ export function makeDataLayerSource(
     ratio: 1,
     imageLoadFunction: cancellingImageLoader(),
   })
-}
-
-/** Imagery WMS basemap — same single-image mode as the data layers. */
-export function makeWmsImageBasemap(
-  opt: WmsImageBasemapOption,
-): ImageLayer<ImageWMS> {
-  const source = makeDataLayerSource(opt.url, {
-    LAYERS: opt.layerName,
-    STYLES: '',
-    FORMAT: 'image/jpeg',
-    TRANSPARENT: 'FALSE',
-  })
-  source.setAttributions(opt.attribution)
-  // Clip to ±85°: out-of-bounds BBOXes come back stretched from some servers.
-  return new ImageLayer({ source, extent: WEB_MERCATOR_EXTENT })
 }
 
 // SkinnyWMS's `background` layer as a basemap — ImageWMS, like the data layers.

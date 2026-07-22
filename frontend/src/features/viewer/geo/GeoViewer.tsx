@@ -29,12 +29,7 @@ import { Loader2, RefreshCw } from 'lucide-react'
 import { useLensSource } from '../hooks/useLensSource'
 import { createViewerView } from '../hooks/useOlMapBase'
 import { formatStep } from '../format'
-import {
-  BASEMAPS,
-  DEFAULT_BASEMAP_ID,
-  IMAGERY_BASEMAPS,
-  SKINNYWMS_BASEMAP,
-} from '../ol-layers'
+import { BASEMAPS, DEFAULT_BASEMAP_ID, SKINNYWMS_BASEMAP } from '../ol-layers'
 import {
   isLoopbackUrl,
   rebaseLensUrl,
@@ -574,12 +569,14 @@ export function GeoViewer({
     // single-map modes); dual panels fall back per-side when B lacks one.
     const hasSkinny =
       skinnyWmsBasemap(sourceA.decorationLayers).background !== null
-    return [
-      ...BASEMAPS,
-      ...IMAGERY_BASEMAPS,
-      ...(hasSkinny ? [SKINNYWMS_BASEMAP] : []),
-    ]
+    return [...BASEMAPS, ...(hasSkinny ? [SKINNYWMS_BASEMAP] : [])]
   }, [sourceA.decorationLayers])
+  // Snap back when a source swap drops the selected option.
+  useEffect(() => {
+    if (!availableBasemaps.some((opt) => opt.id === basemapId)) {
+      setBasemapId(DEFAULT_BASEMAP_ID)
+    }
+  }, [availableBasemaps, basemapId])
 
   // Time-step prefetch (default off — bandwidth-heavy).
   const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)
