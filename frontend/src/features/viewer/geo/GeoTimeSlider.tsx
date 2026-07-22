@@ -239,13 +239,16 @@ export function GeoTimeSlider({
         </div>
       ) : (
         <>
-          <Slider
-            value={[safeIndex]}
-            min={rangeStart}
-            max={rangeEnd}
-            step={1}
-            onValueChange={(v) => onChange(firstNumber(v))}
-          />
+          <label className="block">
+            <span className="sr-only">{tCompare('timeline.label')}</span>
+            <Slider
+              value={[safeIndex]}
+              min={rangeStart}
+              max={rangeEnd}
+              step={1}
+              onValueChange={(v) => onChange(firstNumber(v))}
+            />
+          </label>
           {/* Per-source availability tracks. Hover shows the instant and
               a shared cursor; click jumps to that step. */}
           <div className="relative grid grid-cols-[14px_1fr] items-center gap-x-2 gap-y-1">

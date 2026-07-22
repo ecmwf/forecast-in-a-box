@@ -19,7 +19,9 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  ChevronDown,
   ChevronLeft,
+  ChevronUp,
   Download,
   Eye,
   EyeOff,
@@ -300,6 +302,7 @@ export function GeoActiveLayersPanel({
                   key={pair.key}
                   pair={pair}
                   index={index}
+                  count={activePairs.length}
                   onReorder={selection.reorderPair}
                   selection={selection}
                   sources={sources}
@@ -581,10 +584,50 @@ function OpacityRow({
   )
 }
 
+/** Keyboard/touch path for the drag-reorder: nudge a row one step. */
+function MoveButtons({
+  name,
+  index,
+  count,
+  onMove,
+}: {
+  name: string
+  index: number
+  count: number
+  onMove: (from: number, to: number) => void
+}) {
+  const { t } = useTranslation('visualise')
+  return (
+    <>
+      <button
+        type="button"
+        disabled={index === 0}
+        onClick={() => onMove(index, index - 1)}
+        aria-label={t('sidebar.moveLayerUp', { name })}
+        title={t('sidebar.moveLayerUp', { name })}
+        className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+      >
+        <ChevronUp className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        disabled={index === count - 1}
+        onClick={() => onMove(index, index + 1)}
+        aria-label={t('sidebar.moveLayerDown', { name })}
+        title={t('sidebar.moveLayerDown', { name })}
+        className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+      >
+        <ChevronDown className="h-3.5 w-3.5" />
+      </button>
+    </>
+  )
+}
+
 /** Linked mode: one card per active PAIR, with both sources' legends. */
 function ActivePairCard({
   pair,
   index,
+  count,
   onReorder,
   selection,
   sources,
@@ -594,6 +637,7 @@ function ActivePairCard({
 }: {
   pair: PairedLayer
   index: number
+  count: number
   onReorder: (from: number, to: number) => void
   selection: CompareSelection
   sources: { a: PanelSlotSource; b: PanelSlotSource | null }
@@ -651,6 +695,12 @@ function ActivePairCard({
         >
           {title}
         </P>
+        <MoveButtons
+          name={title}
+          index={index}
+          count={count}
+          onMove={onReorder}
+        />
         <button
           type="button"
           onClick={() => selection.togglePair(pair.key)}
@@ -810,6 +860,14 @@ function ActiveSourceSection({
                   >
                     {title}
                   </P>
+                  <MoveButtons
+                    name={title}
+                    index={index}
+                    count={activeNames.length}
+                    onMove={(from, to) =>
+                      selection.reorderLayer(slot, from, to)
+                    }
+                  />
                   <button
                     type="button"
                     onClick={() => selection.toggleLayer(slot, name)}

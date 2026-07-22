@@ -184,6 +184,8 @@
     "globalOpacity": "Global opacity",
     "sourceOpacity": "All of {{slot}}",
     "removeLayer": "Remove {{name}}",
+    "moveLayerUp": "Move {{name}} up",
+    "moveLayerDown": "Move {{name}} down",
     "empty": "Add layers from the browser on the right."
   },
   "slots": {
