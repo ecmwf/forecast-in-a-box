@@ -13,6 +13,7 @@ import type OlImage from 'ol/Image'
 import {
   cancellingImageLoader,
   loadRequestUrl,
+  loadWasAborted,
 } from '@/features/viewer/ol-layers'
 
 const PNG_1PX =
@@ -60,10 +61,17 @@ describe('cancellingImageLoader', () => {
     expect(signals[0].aborted).toBe(true)
     expect(signals[1].aborted).toBe(false)
 
-    // Superseded: never settled (no error event → no OL console noise);
-    // fresh: blob URL.
+    // Superseded: settles as a flagged blank pixel — a LOADED (not error)
+    // state, so OL neither console.errors nor keeps `source.loading` (and
+    // with it rendercomplete + the panel counters) hostage forever.
     await vi.waitFor(() => expect(second.img.src).toContain('blob:'))
-    expect(first.img.src).toBe('')
+    await vi.waitFor(() => expect(first.img.src).toContain('data:image/png'))
+    expect(loadWasAborted(first.img)).toBe(true)
+    expect(loadWasAborted(second.img)).toBe(false)
+
+    // A later reuse of the element must shed the aborted flag.
+    load(first.wrapper, 'http://wms.test/?TIME=T12')
+    expect(loadWasAborted(first.img)).toBe(false)
   })
 
   it('keeps the request URL readable for TIME attribution', () => {

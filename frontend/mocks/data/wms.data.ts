@@ -34,6 +34,8 @@ export interface MockWmsServerConfig {
   failuresBeforeSuccess?: number
   /** GetMap TIME values answered with a WMS service exception. */
   failGetMapTimes?: Array<string>
+  /** Delay every GetMap response (exercises superseding/abort paths). */
+  getMapDelayMs?: number
 }
 
 interface MockWmsServer {
@@ -81,6 +83,11 @@ export function getMapRequests(port: number): ReadonlyArray<string | null> {
 export function getMapFailsFor(port: number, time: string | null): boolean {
   const times = servers.get(port)?.config.failGetMapTimes
   return !!time && !!times && times.includes(time)
+}
+
+/** Configured GetMap response delay for a port (0 = respond immediately). */
+export function getMapDelayFor(port: number): number {
+  return servers.get(port)?.config.getMapDelayMs ?? 0
 }
 
 /** Capabilities requests seen by a server (asserting retry behaviour). */

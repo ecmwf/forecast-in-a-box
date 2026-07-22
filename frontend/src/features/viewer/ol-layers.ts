@@ -138,11 +138,20 @@ export function makeBasemapLayer(
 /** Decode failure → error state for real load failures. */
 const FAILED_IMAGE_SRC = 'data:image/gif;base64,invalid'
 
+/** Valid 1×1 transparent PNG — settles superseded wrappers as LOADED. */
+const BLANK_IMAGE_SRC =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
 /** The GetMap URL a load was issued for — `img.src` becomes a blob URL. */
 export function loadRequestUrl(img: unknown): string | null {
   return img instanceof HTMLImageElement
     ? (img.dataset.fiabRequestUrl ?? null)
     : null
+}
+
+/** Did this load settle as a superseded (aborted) request? */
+export function loadWasAborted(img: unknown): boolean {
+  return img instanceof HTMLImageElement && img.dataset.fiabAborted === '1'
 }
 
 /** Fetch-based GetMap loader: a superseded request (pan/zoom/scrub) aborts
@@ -155,6 +164,7 @@ export function cancellingImageLoader(): LoadFunction {
     inFlight = controller
     const img = image.getImage() as HTMLImageElement
     img.dataset.fiabRequestUrl = src
+    delete img.dataset.fiabAborted
     fetch(src, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`GetMap ${res.status}`)
@@ -166,9 +176,16 @@ export function cancellingImageLoader(): LoadFunction {
         img.src = url
       })
       .catch(() => {
-        // Superseded: settle nothing — the source already replaced this
-        // wrapper, and failing it would console.error inside OL.
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted) {
+          // Superseded. The source already replaced this wrapper, but OL
+          // keeps `source.loading` true (blocking rendercomplete and the
+          // panel loading counters) until it settles — settle it as a
+          // blank LOADED pixel (an error src would console.error inside
+          // OL), flagged so load accounting ignores it.
+          img.dataset.fiabAborted = '1'
+          img.src = BLANK_IMAGE_SRC
+          return
+        }
         img.src = FAILED_IMAGE_SRC
       })
   }

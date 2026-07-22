@@ -28,6 +28,7 @@ import {
   DEFAULT_LAYER_OPACITY,
   WEB_MERCATOR_EXTENT,
   loadRequestUrl,
+  loadWasAborted,
   makeDataLayerSource,
 } from '../ol-layers'
 import { toWmsEndpoint } from '../wms-capabilities'
@@ -208,6 +209,9 @@ export function useWmsLayerStack(
         source.on('imageloadstart', incLoading)
         source.on('imageloadend', (evt) => {
           decLoading()
+          // A superseded wrapper settles as a blank pixel — balance the
+          // counter, but never record its TIME as actually served.
+          if (loadWasAborted(evt.image.getImage())) return
           if (entry.errored) {
             entry.errored = false
             syncErrorCount()
