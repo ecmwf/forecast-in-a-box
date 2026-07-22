@@ -45,3 +45,14 @@ Content-Security-Policy:
 - If you serve the backend on a different origin (e.g. `https://api.example.com`), add it to `connect-src`.
 - `'unsafe-inline'` in `style-src` is required because three.js and some UI libraries inject styles at runtime. If this is unacceptable, consider using a CSP nonce strategy.
 - `worker-src 'self'` can be removed in production if MSW is not used.
+
+### Geo viewer (map) origins
+
+The `/visualise` map viewer talks to origins beyond `'self'`; a proxy-level
+CSP must mirror the allowances the built `index.html` meta CSP carries, or
+those features silently fail:
+
+- **Basemap:** `https://basemaps.cartocdn.com` and `https://*.basemaps.cartocdn.com` in `img-src`, `connect-src`, `style-src`, and `font-src`.
+- **WMS lens servers** run on dynamic loopback ports next to the backend: `http://localhost:*` and `http://127.0.0.1:*` in `img-src` and `connect-src` (single-host deployments; a same-origin lens proxy needs only `'self'`).
+- **Curated WMS servers** (the built-in list in `src/features/visualise/curated-wms.ts`) are baked into production builds' `img-src`/`connect-src` automatically.
+- **Additional WMS hosts** users should be able to add by URL: set `FIAB_CSP_EXTRA_HOSTS` at build time (space-separated source expressions, e.g. `FIAB_CSP_EXTRA_HOSTS="https://my.wms.host https://other.example"`), and mirror them in the proxy CSP.
