@@ -15,6 +15,7 @@
  */
 
 import { Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { SourceSlot } from './layer-pairing'
 import { cn } from '@/lib/utils'
 
@@ -38,6 +39,7 @@ export function CompareSlotTag({
   /** Valid time this side currently displays. */
   timeLabel?: string | null
 }) {
+  const { t } = useTranslation('visualise')
   return (
     <div
       className={cn(
@@ -57,7 +59,7 @@ export function CompareSlotTag({
       {loading && (
         <Loader2
           role="status"
-          aria-label="loading"
+          aria-label={t('lens.loadingAria')}
           className="h-3 w-3 shrink-0 animate-spin text-muted-foreground"
         />
       )}

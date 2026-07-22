@@ -67,7 +67,7 @@ export function PinnedLegendsBar({
                 </P>
                 <img
                   src={url}
-                  alt={`${title} legend`}
+                  alt={t('lens.legendAlt', { title })}
                   className="mt-1 h-auto max-h-40 w-full object-contain"
                   loading="lazy"
                   onError={() =>

@@ -13,10 +13,13 @@
 import { useMemo, useState } from 'react'
 import { Check, Loader2, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useCuratedWmsServers } from '../../curated-wms'
-import { probeWmsEndpoint } from '../../wms-probe'
-import { useComparisonStore } from '../../stores/comparisonStore'
-import type { CuratedWmsServer } from '../../curated-wms'
+import type { CuratedWmsServer } from '@/features/visualise/curated-wms'
+import { useCuratedWmsServers } from '@/features/visualise/curated-wms'
+import { probeWmsEndpoint } from '@/features/visualise/wms-probe'
+import {
+  MAX_COMPARISON_ENTRIES,
+  useComparisonStore,
+} from '@/features/visualise/stores/comparisonStore'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { showToast } from '@/lib/toast'
@@ -62,7 +65,7 @@ export function CuratedWmsList() {
     if (added === 'added') {
       showToast.success(t('toast.added', { name: server.name }))
     } else if (added === 'full') {
-      showToast.error(t('toast.full', { max: 8 }))
+      showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
     }
   }
 

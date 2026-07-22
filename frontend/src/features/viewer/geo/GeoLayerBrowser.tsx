@@ -168,7 +168,7 @@ export function GeoLayerBrowser({
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('picker.searchPlaceholder')}
+            placeholder={t('browser.searchPlaceholder')}
             className="h-8 pl-7 text-sm"
           />
         </div>
@@ -214,6 +214,7 @@ export function GeoLayerBrowser({
                   key={level}
                   type="button"
                   onClick={() => toggleLevel(level)}
+                  aria-pressed={active}
                   className={cn(
                     'rounded border px-1.5 py-0.5 font-mono text-xs',
                     active
@@ -426,6 +427,7 @@ function PairGroupRow({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className="flex w-full items-start gap-2 px-2 py-1.5 text-left"
       >
         <ChevronDown
@@ -494,6 +496,7 @@ function PairRow({
     <button
       type="button"
       onClick={() => selection.togglePair(pair.key)}
+      aria-pressed={active}
       className={cn(
         'flex w-full items-center gap-2 rounded text-left transition-colors hover:bg-accent',
         compact ? 'px-1.5 py-1' : 'px-2 py-1.5',
@@ -622,6 +625,7 @@ function UnlinkedSourceSection({
                 <button
                   type="button"
                   onClick={() => selection.toggleLayer(slot, name)}
+                  aria-pressed={active}
                   className={cn(
                     'flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-accent',
                     active && 'bg-primary/10',
@@ -712,6 +716,7 @@ function TitlePrefixGroup({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className="flex w-full items-start gap-2 px-2 py-1.5 text-left"
       >
         <ChevronDown

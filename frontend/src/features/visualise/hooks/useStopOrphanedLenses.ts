@@ -17,8 +17,8 @@
 
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { storedDirQueryOptions } from '../../executions/outputs/stored-dir'
 import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
+import { storedDirQueryOptions } from '@/features/executions/outputs/stored-dir'
 import { lensKeys, useStopLens } from '@/api/hooks/useLens'
 
 /** Structural minimum — accepts basket entries with or without `addedAt`. */

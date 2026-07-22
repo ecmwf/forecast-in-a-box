@@ -13,7 +13,10 @@
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useComparisonStore } from '../../stores/comparisonStore'
+import {
+  MAX_COMPARISON_ENTRIES,
+  useComparisonStore,
+} from '@/features/visualise/stores/comparisonStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { P } from '@/components/base/typography'
@@ -33,7 +36,7 @@ export function HostPathForm() {
       showToast.success(t('toast.added', { name: label }))
       setPath('')
     } else if (result === 'full') {
-      showToast.error(t('toast.full', { max: 8 }))
+      showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
     }
   }
 
@@ -50,6 +53,9 @@ export function HostPathForm() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit()
           }}
+          name="host-path"
+          spellCheck={false}
+          aria-label={t('picker.hostPath.title')}
           placeholder={t('picker.hostPath.placeholder')}
           className="h-8 font-mono text-xs"
         />

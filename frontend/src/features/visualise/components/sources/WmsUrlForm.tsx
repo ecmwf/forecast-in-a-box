@@ -10,11 +10,14 @@
 
 /** Add an external WMS endpoint as a source after a GetCapabilities probe. */
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Globe, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { probeWmsEndpoint } from '../../wms-probe'
-import { useComparisonStore } from '../../stores/comparisonStore'
+import { probeWmsEndpoint } from '@/features/visualise/wms-probe'
+import {
+  MAX_COMPARISON_ENTRIES,
+  useComparisonStore,
+} from '@/features/visualise/stores/comparisonStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { P } from '@/components/base/typography'
@@ -27,6 +30,7 @@ type WmsFormError =
 
 export function WmsUrlForm() {
   const { t } = useTranslation('visualise')
+  const errorId = useId()
   const [url, setUrl] = useState('')
   const [probing, setProbing] = useState(false)
   const [error, setError] = useState<WmsFormError>(null)
@@ -55,7 +59,7 @@ export function WmsUrlForm() {
       showToast.success(t('toast.added', { name: result.label }))
       setUrl('')
     } else if (added === 'full') {
-      showToast.error(t('toast.full', { max: 8 }))
+      showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
     }
   }
 
@@ -91,6 +95,12 @@ export function WmsUrlForm() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') void submit()
           }}
+          type="url"
+          name="wms-url"
+          spellCheck={false}
+          aria-label={t('picker.wmsUrl.title')}
+          aria-invalid={errorText !== null || undefined}
+          aria-describedby={errorText ? errorId : undefined}
           placeholder={t('picker.wmsUrl.placeholder')}
           className="h-8 font-mono text-xs"
         />
@@ -105,7 +115,11 @@ export function WmsUrlForm() {
           {probing ? t('picker.wmsUrl.probing') : t('picker.wmsUrl.connect')}
         </Button>
       </div>
-      {errorText && <P className="text-xs text-destructive">{errorText}</P>}
+      {errorText && (
+        <P id={errorId} className="text-xs text-destructive">
+          {errorText}
+        </P>
+      )}
     </div>
   )
 }
