@@ -15,6 +15,7 @@ import {
   combineScaleBands,
   expandTimeSteps,
   groupLayers,
+  isLoopbackUrl,
   parseCapabilities,
   partitionGroups,
   rebaseLensUrl,
@@ -448,5 +449,19 @@ describe('toWmsEndpoint / appendWmsParams', () => {
     expect(
       appendWmsParams('http://h/wms?token=x', 'request=GetCapabilities'),
     ).toBe('http://h/wms?token=x&request=GetCapabilities')
+  })
+})
+
+describe('isLoopbackUrl', () => {
+  it('recognises our lens hosts', () => {
+    expect(isLoopbackUrl('http://localhost:54301/wms')).toBe(true)
+    expect(isLoopbackUrl('http://127.0.0.1:8080')).toBe(true)
+    expect(isLoopbackUrl('http://[::1]:9000/x')).toBe(true)
+  })
+
+  it('rejects external servers and junk', () => {
+    expect(isLoopbackUrl('https://maps.dwd.de/geoserver/ows?')).toBe(false)
+    expect(isLoopbackUrl('https://localhost.evil.example')).toBe(false)
+    expect(isLoopbackUrl('not a url')).toBe(false)
   })
 })
