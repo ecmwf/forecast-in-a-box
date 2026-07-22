@@ -27,7 +27,7 @@ from forecastbox.domain.lens.manager import (
     shutdown_all_lens_instances,
     stop_instance,
 )
-from forecastbox.utility.concurrent import FreePortsManager, NoFreePortsException
+from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
 
 
 @pytest.fixture(autouse=True)

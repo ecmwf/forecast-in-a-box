@@ -32,7 +32,7 @@ from forecastbox.domain.lens.manager import (
     start_skinny_wms,
     stop_instance,
 )
-from forecastbox.utility.concurrent import NoFreePortsException
+from forecastbox.utility.concurrency.ports import NoFreePortsException
 from forecastbox.utility.pydantic import FiabBaseModel
 
 PREFIX = "/api/v1/lens"

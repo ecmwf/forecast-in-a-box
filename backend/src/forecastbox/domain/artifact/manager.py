@@ -32,7 +32,7 @@ from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactI
 from forecastbox.domain.artifact.catalog import get_artifacts_catalog
 from forecastbox.domain.artifact.io import delete_artifact, download_artifact, list_storage
 from forecastbox.utility import tunnel
-from forecastbox.utility.concurrent import timed_acquire
+from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import config
 from forecastbox.utility.tunnel import CommandHandle
 

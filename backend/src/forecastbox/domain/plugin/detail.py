@@ -33,7 +33,7 @@ from forecastbox.domain.plugin.exceptions import PluginManagerBusy
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail
 from forecastbox.schemata.jobs import PluginState
-from forecastbox.utility.concurrent import timed_acquire
+from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 

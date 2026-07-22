@@ -40,7 +40,7 @@ from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.schemata.jobs import ExperimentDefinition, Run
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrent import timed_acquire
+from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.time import current_time
 

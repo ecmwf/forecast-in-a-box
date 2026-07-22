@@ -7,19 +7,39 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Persistence layer for user management, guarded by the shared db lock.
+"""Persistence layer for user management, guarded by a users-database-local lock.
 
-All writes and reads go through ``dbRetry`` from ``utility/db.py`` so that
-concurrent access to the user SQLite file is serialised the same way as every
-other domain db module.
+All writes and reads go through the local ``dbRetry`` helper so concurrent
+access to the user SQLite file is serialized independently from jobs persistence.
 """
 
+import asyncio
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
+
+import sqlalchemy.exc
 from pydantic import UUID4
 from sqlalchemy import delete, select, update
 
 import forecastbox.schemata.user as _user_module
 from forecastbox.schemata.user import UserTable
-from forecastbox.utility.db import dbRetry
+
+# TODO investigate the lock bypass -- not all db access locks, is that a bug or a feature?
+retries = 3
+dbLock = asyncio.Lock()
+T = TypeVar("T")
+
+
+async def dbRetry(func: Callable[[int], Awaitable[T]]) -> T:
+    for i in range(retries, -1, -1):
+        try:
+            async with dbLock:
+                return await func(i)
+        except sqlalchemy.exc.OperationalError:
+            if i == 0:
+                raise
+            await asyncio.sleep(0.1)
+    raise ValueError  # NOTE in case of retries misconfig, we dont want implicit None
 
 
 async def list_users() -> list[UserTable]:

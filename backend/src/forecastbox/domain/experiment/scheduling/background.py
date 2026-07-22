@@ -25,7 +25,7 @@ from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnab
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.service import execute
 from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
-from forecastbox.utility.concurrent import timed_acquire
+from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import config
 from forecastbox.utility.time import current_time
 

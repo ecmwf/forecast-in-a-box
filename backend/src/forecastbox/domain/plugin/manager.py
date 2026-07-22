@@ -50,7 +50,7 @@ from forecastbox.domain.plugin.db import (
 )
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrent import delayed_thread, timed_acquire
+from forecastbox.utility.concurrency.synchronization import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_version
 
