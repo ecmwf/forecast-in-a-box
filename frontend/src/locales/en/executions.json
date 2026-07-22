@@ -241,11 +241,6 @@
     "starting": "Starting SkinnyWMS…",
     "close": "Close"
   },
-  "activeLenses": {
-    "title": "Active lenses",
-    "visualise": "Visualise",
-    "stop": "Stop"
-  },
   "lens": {
     "layers": "Layers",
     "loadingLayers": "Loading layers…",
