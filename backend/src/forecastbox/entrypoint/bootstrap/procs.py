@@ -10,7 +10,7 @@ from multiprocessing.process import BaseProcess
 
 import psutil
 
-from forecastbox.utility.concurrent import shutdown_correctly
+from forecastbox.utility.concurrency.shutdown import shutdown_correctly
 
 logger = logging.getLogger(__name__)
 

@@ -23,7 +23,7 @@ from pyrsistent.typing import PMap
 from typing_extensions import Self
 
 from forecastbox.domain.plugin.manager import submit_update_single
-from forecastbox.utility.concurrent import timed_acquire
+from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
 from forecastbox.utility.httpx import fetch_content
 from forecastbox.utility.pydantic import FiabBaseModel

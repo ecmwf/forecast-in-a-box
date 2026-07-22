@@ -28,7 +28,9 @@ from cascade.low.func import assert_never
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
-from forecastbox.utility.concurrent import FreePortsManager, NoFreePortsException, shutdown_popen, timed_acquire
+from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
+from forecastbox.utility.concurrency.shutdown import shutdown_popen
+from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)

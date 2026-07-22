@@ -648,7 +648,7 @@ ThreadPoolExecutor
 run_in_executor
 asyncio.to_thread
 run_coroutine_threadsafe
-utility.concurrent
+utility.concurrency
 ```
 
 Each remaining occurrence must be either inside the new concurrency runtime,

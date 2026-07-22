@@ -7,7 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Common session maker invocation, db locking, retries"""
+"""Async locking, retries, and session helpers for jobs persistence.
+
+The lock in this module serializes access to the jobs SQLite database. The
+administrative users database has its own lock and retry helper in
+``domain.auth.db``.
+"""
 
 import asyncio
 import logging
@@ -19,7 +24,7 @@ import sqlalchemy.exc
 
 logger = logging.getLogger(__name__)
 retries = 3
-# TODO we have one lock per two sqlite files -- overkill
+# This lock is for jobs persistence only. The users database has a separate lock.
 lock = Lock()
 T = TypeVar("T")
 
