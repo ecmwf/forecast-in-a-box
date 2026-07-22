@@ -9,7 +9,7 @@
  */
 
 /**
- * WMS GetCapabilities helpers used by WmsViewer.
+ * WMS GetCapabilities helpers for the geo viewer.
  *
  * Parses the WMS 1.3.0 capabilities XML produced by SkinnyWMS into a flat
  * list of leaf layers, extracts the geographic bounding box for auto-fit,

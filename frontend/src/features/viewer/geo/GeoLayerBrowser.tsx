@@ -9,12 +9,11 @@
  */
 
 /**
- * Available-layers browser (right sidebar) for the compare viewer, using
- * the embedded viewer's proven structure: search, surface / pressure-level
- * sections, collapsible multi-level parameter groups, and a pressure-level
- * filter — plus, compare-specific: an All | A | B availability filter and
- * per-entry slot chips. Browse-only; the active selection is managed in
- * the left panel (GeoActiveLayersPanel).
+ * Available-layers browser (right sidebar) for the compare viewer:
+ * search, surface / pressure-level sections, collapsible multi-level
+ * parameter groups, a pressure-level filter, an All | A | B availability
+ * filter, and per-entry slot chips. Browse-only; the active selection is
+ * managed in the left panel (GeoActiveLayersPanel).
  */
 
 import { useMemo, useState } from 'react'
@@ -404,7 +403,7 @@ function LinkedSections({
   )
 }
 
-/** Collapsible multi-level parameter group (embedded-viewer pattern). */
+/** Collapsible multi-level parameter group. */
 function PairGroupRow({
   group,
   selection,

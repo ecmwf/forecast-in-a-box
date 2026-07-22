@@ -11,13 +11,17 @@
 /**
  * Per-slot panel chrome around a comparison source: slot tag + label
  * header, and honest lifecycle states (resolving/starting/failed/stopped)
- * while the lens comes up. A running source currently hosts the
- * single-source WmsViewer; the synchronized comparison viewer replaces
- * this body in the next phase (see GEO_COMPARISON_PLAN.md).
+ * while the lens comes up. Once a source serves, the page swaps in the
+ * GeoViewer — a running panel only bridges until then.
  */
 
-import { Suspense, lazy } from 'react'
-import { AlertTriangle, Loader2, Play, RefreshCw } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Play,
+  RefreshCw,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryDisplayName } from '../entry-ref'
 import { SLOT_BADGE_CLASS } from './CompareBasketChip'
@@ -26,10 +30,6 @@ import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
-
-const WmsViewer = lazy(
-  () => import('@/features/executions/components/WmsViewer'),
-)
 
 export function ComparePanel({
   slot,
@@ -58,19 +58,13 @@ export function ComparePanel({
         </P>
       </div>
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <PanelBody slot={slot} state={state} />
+        <PanelBody state={state} />
       </div>
     </div>
   )
 }
 
-function PanelBody({
-  slot,
-  state,
-}: {
-  slot: 'A' | 'B'
-  state: ComparisonSourceState
-}) {
+function PanelBody({ state }: { state: ComparisonSourceState }) {
   const { t } = useTranslation('visualise')
 
   switch (state.phase) {
@@ -129,15 +123,10 @@ function PanelBody({
       )
     case 'running':
       return (
-        <Suspense
-          fallback={
-            <Centered muted>
-              <Loader2 className="h-4 w-4 animate-spin" />
-            </Centered>
-          }
-        >
-          <WmsViewer key={`${slot}:${state.baseUrl}`} baseUrl={state.baseUrl} />
-        </Suspense>
+        <Centered muted>
+          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
+          {t('panel.serving')}
+        </Centered>
       )
   }
 }

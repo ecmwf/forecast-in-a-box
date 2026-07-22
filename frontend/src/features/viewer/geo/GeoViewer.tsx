@@ -553,7 +553,7 @@ export function GeoViewer({
     return specs
   }, [sourceA, sourceB, a.baseUrl, bBaseUrl, activeOrderA, activeOrderB])
 
-  // Basemap — one choice driving every panel, embedded-viewer options.
+  // Basemap — one choice driving every panel.
   const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
   const [basemapOpacity, setBasemapOpacity] = useState(1)
   const availableBasemaps = useMemo(() => {
@@ -643,7 +643,7 @@ export function GeoViewer({
     }
   }, [focusSlot, selection.linkMode])
 
-  // Sidebar collapse — same affordance as the embedded viewer.
+  // Sidebar collapse.
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)

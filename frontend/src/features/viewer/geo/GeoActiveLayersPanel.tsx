@@ -9,9 +9,9 @@
  */
 
 /**
- * Active-layers panel (left sidebar) for the compare viewer — mirrors the
- * embedded viewer's layout: what's on the map lives on the left, what's
- * available on the right. Hosts the opacity hierarchy:
+ * Active-layers panel (left sidebar) for the compare viewer: what's on
+ * the map lives on the left, what's available on the right. Hosts the
+ * opacity hierarchy:
  * global × per-source (all-of-A / all-of-B) × per-layer, plus per-source
  * legends and removal.
  */
