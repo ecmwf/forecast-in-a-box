@@ -9,7 +9,7 @@
 
 """Persistence layer for user management, guarded by a users-database-local lock.
 
-All writes and reads go through the local ``db_retry`` helper so concurrent
+All writes and reads go through the local ``dbRetry`` helper so concurrent
 access to the user SQLite file is serialized independently from jobs persistence.
 """
 
@@ -26,14 +26,14 @@ from forecastbox.schemata.user import UserTable
 
 # TODO investigate the lock bypass -- not all db access locks, is that a bug or a feature?
 retries = 3
-db_lock = asyncio.Lock()
+dbLock = asyncio.Lock()
 T = TypeVar("T")
 
 
-async def db_retry(func: Callable[[int], Awaitable[T]]) -> T:
+async def dbRetry(func: Callable[[int], Awaitable[T]]) -> T:
     for i in range(retries, -1, -1):
         try:
-            async with db_lock:
+            async with dbLock:
                 return await func(i)
         except sqlalchemy.exc.OperationalError:
             if i == 0:
@@ -50,7 +50,7 @@ async def list_users() -> list[UserTable]:
             query = select(UserTable)
             return (await session.execute(query)).unique().scalars().all()  # type: ignore[invalid-return-type] # NOTE db
 
-    return await db_retry(func)
+    return await dbRetry(func)
 
 
 async def get_user_by_id(user_id: UUID4) -> UserTable | None:
@@ -62,7 +62,7 @@ async def get_user_by_id(user_id: UUID4) -> UserTable | None:
             users = (await session.execute(query)).unique().scalars().all()
             return users[0] if users else None
 
-    return await db_retry(func)
+    return await dbRetry(func)
 
 
 async def delete_user_by_id(user_id: UUID4) -> None:
@@ -74,7 +74,7 @@ async def delete_user_by_id(user_id: UUID4) -> None:
             _ = await session.execute(stmt)
             await session.commit()
 
-    await db_retry(func)
+    await dbRetry(func)
 
 
 async def update_user_by_id(user_id: UUID4, update_dict: dict) -> UserTable | None:
@@ -89,7 +89,7 @@ async def update_user_by_id(user_id: UUID4, update_dict: dict) -> UserTable | No
             users = (await session.execute(query)).scalars().all()
             return users[0] if users else None
 
-    return await db_retry(func)
+    return await dbRetry(func)
 
 
 async def patch_user_by_id(user_id: UUID4, update_dict: dict) -> None:
@@ -101,4 +101,4 @@ async def patch_user_by_id(user_id: UUID4, update_dict: dict) -> None:
             _ = await session.execute(stmt)
             await session.commit()
 
-    await db_retry(func)
+    await dbRetry(func)

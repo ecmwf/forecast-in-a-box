@@ -31,8 +31,8 @@ async def test_db_retry_uses_local_lock_and_retries_operational_errors() -> None
             raise _operational_error()
         return "done"
 
-    async with auth_db.db_lock:
-        operation_task = asyncio.create_task(auth_db.db_retry(operation))
+    async with auth_db.dbLock:
+        operation_task = asyncio.create_task(auth_db.dbRetry(operation))
         await asyncio.sleep(0)
         assert calls == []
 
@@ -41,4 +41,4 @@ async def test_db_retry_uses_local_lock_and_retries_operational_errors() -> None
 
     assert calls == [3, 2, 1, 0]
     assert sleep.await_count == 3
-    assert auth_db.db_lock is not jobs_db.lock
+    assert auth_db.dbLock is not jobs_db.lock
