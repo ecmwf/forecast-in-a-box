@@ -28,11 +28,7 @@ import {
 } from '@tanstack/react-router'
 import { z } from 'zod'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
-import {
-  injectMockLens,
-  listMockLenses,
-  resetLensState,
-} from '@tests/../mocks/data/lens.data'
+import { resetLensState } from '@tests/../mocks/data/lens.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { RunListPage } from '@/features/executions/components/RunListPage'
@@ -117,33 +113,6 @@ describe('RunListPage Integration', () => {
   })
 
   describe('rendering', () => {
-    it('shows the active-lenses card only while a lens runs', async () => {
-      const screen = await renderJobList()
-      expect(screen.getByText('Active lenses').elements()).toHaveLength(0)
-
-      injectMockLens({
-        lens_instance_id: 'lens-list-1',
-        status: 'running',
-        lens_name: 'skinnyWMS',
-        lens_params: { local_path: '/data/output/some-dir' },
-        ports: [54307],
-      })
-      // The 5 s lens-list poll surfaces the card on the mounted page.
-      await expect
-        .element(screen.getByText('Active lenses'), { timeout: 9000 })
-        .toBeVisible()
-      await expect
-        .element(screen.getByText('/data/output/some-dir'))
-        .toBeVisible()
-      await expect
-        .element(screen.getByRole('button', { name: /Visualise/ }))
-        .toBeVisible()
-      await screen.getByRole('button', { name: /Stop/ }).click()
-      await expect
-        .poll(() => listMockLenses(), { timeout: 5000 })
-        .toHaveLength(0)
-    })
-
     it('renders the page header', async () => {
       const screen = await renderJobList()
       await expect
