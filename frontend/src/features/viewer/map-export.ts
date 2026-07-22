@@ -154,8 +154,7 @@ export interface LegendExportItem {
 /**
  * Compose a final export canvas from a raw map capture: optional baked
  * title bar (title + preformatted time) and a legend strip below the
- * map. Shared by the embedded viewer's PNG export and the compare
- * captures.
+ * map. Shared by PNG export and the compare captures.
  */
 export interface ExportNote {
   number: number
