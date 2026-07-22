@@ -44,7 +44,7 @@ import { LegendImage } from '../components/LegendImage'
 import { SLOT_CHIP_CLASS } from './GeoLayerBrowser'
 import { parseGeojsonOverlay } from './overlays'
 import { downloadAnnotationsGeojson } from './annotations'
-import { pairIsStatic } from './layer-pairing'
+import { layerIsTimeAware, pairIsStatic } from './layer-pairing'
 import type { ScaleBand } from '../wms-capabilities'
 import type { ContextOverlay } from './overlays'
 import type { MapAnnotation } from './annotations'
@@ -820,6 +820,15 @@ function ActiveSourceSection({
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
+                {layer !== undefined && !layerIsTimeAware(layer) && (
+                  <span
+                    className="mt-1.5 mr-2 inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground"
+                    title={t('timeline.staticLayerHint')}
+                  >
+                    <TimerOff className="h-3 w-3" />
+                    {t('timeline.staticBadge')}
+                  </span>
+                )}
                 <ScaleHint
                   band={layer?.scale}
                   resolution={resolution}

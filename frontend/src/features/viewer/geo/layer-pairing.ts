@@ -19,6 +19,7 @@
  * with the gap surfaced in the browser UI.
  */
 
+import { expandTimeSteps } from '../wms-capabilities'
 import type { LayerGroup, ParsedLayer } from '../wms-capabilities'
 
 export type SourceSlot = 'a' | 'b'
@@ -33,9 +34,25 @@ export interface PairedLayer {
   perSource: Partial<Record<SourceSlot, ParsedLayer>>
 }
 
-/** No side advertises a TIME dimension — renders unchanged at every step. */
+// Mirrors buildSourceTimeIndex: only steps Date.parse accepts feed the
+// axis, so a TIME dim expanding to unparseable strings is still static.
+const timeAwareCache = new WeakMap<ParsedLayer, boolean>()
+export function layerIsTimeAware(layer: ParsedLayer): boolean {
+  if (!layer.time) return false
+  const cached = timeAwareCache.get(layer)
+  if (cached !== undefined) return cached
+  const aware = expandTimeSteps(layer.time.raw).some((step) =>
+    Number.isFinite(Date.parse(step)),
+  )
+  timeAwareCache.set(layer, aware)
+  return aware
+}
+
+/** No side contributes time steps — renders unchanged at every step. */
 export function pairIsStatic(pair: PairedLayer): boolean {
-  return Object.values(pair.perSource).every((layer) => !layer.time)
+  return Object.values(pair.perSource).every(
+    (layer) => !layerIsTimeAware(layer),
+  )
 }
 
 export interface PairingResult {

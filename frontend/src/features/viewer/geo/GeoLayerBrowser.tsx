@@ -30,10 +30,11 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { groupPairs } from './pair-grouping'
-import { pairIsStatic } from './layer-pairing'
+import { layerIsTimeAware, pairIsStatic } from './layer-pairing'
 import { groupByTitlePrefix } from './title-grouping'
 import type { SlotFilter } from './pair-grouping'
 import type { PairedLayer, SourceSlot } from './layer-pairing'
+import type { ParsedLayer } from '../wms-capabilities'
 import type { CompareSelection } from './useCompareSelection'
 import type { LensSource } from '../hooks/useLensSource'
 import { Input } from '@/components/ui/input'
@@ -607,13 +608,14 @@ function UnlinkedSourceSection({
                   )
             return entries.map((entry) => ({
               name: entry.layer.name,
+              layer: entry.layer,
               label:
                 entry.level !== null
                   ? `${group.title} · ${entry.level} ${group.levelUnit ?? 'hPa'}`
                   : group.title,
             }))
           })
-          const row = (name: string, label: string) => {
+          const row = (name: string, label: string, layer: ParsedLayer) => {
             const active = selection.isLayerActive(slot, name)
             return (
               <li key={name}>
@@ -631,6 +633,14 @@ function UnlinkedSourceSection({
                   >
                     {label}
                   </span>
+                  {!layerIsTimeAware(layer) && (
+                    <span
+                      title={t('timeline.staticLayerHint')}
+                      className="shrink-0"
+                    >
+                      <TimerOff className="h-3 w-3 text-muted-foreground/70" />
+                    </span>
+                  )}
                   {active ? (
                     <X className="h-3 w-3 shrink-0 text-muted-foreground" />
                   ) : (
@@ -642,7 +652,9 @@ function UnlinkedSourceSection({
           }
           return titleClusters(rows, (r) => r.label, grouped).map((cluster) =>
             cluster.prefix === null ? (
-              cluster.items.map(({ item }) => row(item.name, item.label))
+              cluster.items.map(({ item }) =>
+                row(item.name, item.label, item.layer),
+              )
             ) : (
               <TitlePrefixGroup
                 key={`${cluster.prefix}:${query}`}
@@ -656,7 +668,7 @@ function UnlinkedSourceSection({
                 defaultOpen={query !== ''}
               >
                 {cluster.items.map(({ item, shortTitle }) =>
-                  row(item.name, shortTitle),
+                  row(item.name, shortTitle, item.layer),
                 )}
               </TitlePrefixGroup>
             ),

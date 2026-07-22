@@ -147,6 +147,17 @@ describe('GeoViewer', () => {
     await expect
       .element(screen.getByText('Static', { exact: true }))
       .toBeVisible()
+    // Browser rows carry the timer-off glyph for static layers.
+    const glyphCount = () =>
+      document.querySelectorAll(
+        '[title="No time dimension — renders unchanged at every time step"]',
+      ).length
+    expect(glyphCount()).toBeGreaterThan(0)
+
+    // The focused (per-source) browser path shows it too.
+    await screen.getByRole('button', { name: 'View only B' }).click()
+    await expect.poll(glyphCount).toBeGreaterThan(0)
+    await screen.getByRole('button', { name: 'View both (compare)' }).click()
 
     // A temporal layer swaps the hint for the real slider.
     await screen.getByText('2 m temperature').first().click()
