@@ -35,17 +35,24 @@ export type WmsProbeResult =
 // Generous: real met-service capabilities run to MBs and 20+ seconds.
 const PROBE_TIMEOUT_MS = 30_000
 
+/** Shared allowlist: WMS endpoints must be http(s). Null = rejected. */
+export function allowedWmsUrl(raw: string): URL | null {
+  try {
+    const parsed = new URL(raw.trim())
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? parsed
+      : null
+  } catch {
+    return null
+  }
+}
+
 export async function probeWmsEndpoint(
   raw: string,
   { timeoutMs = PROBE_TIMEOUT_MS }: { timeoutMs?: number } = {},
 ): Promise<WmsProbeResult> {
-  let parsed: URL
-  try {
-    parsed = new URL(raw.trim())
-  } catch {
-    return { ok: false, reason: 'invalid-url' }
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+  const parsed = allowedWmsUrl(raw)
+  if (!parsed) {
     return { ok: false, reason: 'invalid-url' }
   }
   const baseUrl = parsed.toString()

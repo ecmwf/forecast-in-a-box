@@ -43,6 +43,17 @@ import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { H1 } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -136,17 +147,18 @@ function useActivePair(): ActivePair & {
 }
 
 export function VisualisePage() {
-  const { t } = useTranslation('visualise')
+  const { t } = useTranslation(['visualise', 'common'])
   const search = route.useSearch()
   const navigate = route.useNavigate()
   const entries = useComparisonStore((s) => s.entries)
   const clear = useComparisonStore((s) => s.clear)
   const { a, b, assignSlot, swapSlots, clearSlotB } = useActivePair()
-  useHydrateComparisonFromUrl()
+  const { pendingExternal, resolveExternal } = useHydrateComparisonFromUrl()
 
   // Clearing the basket must clear the URL pair too — hydration would
   // otherwise resurrect the active refs as stub entries.
   const stopOrphanedLenses = useStopOrphanedLenses()
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const clearAll = () => {
     const removed = entries
     clear()
@@ -230,19 +242,82 @@ export function VisualisePage() {
             </DialogContent>
           </Dialog>
           {entries.length > 0 && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={clearAll}
-              className="h-8 w-8"
-              title={t('basket.clear')}
-              aria-label={t('basket.clear')}
+            <AlertDialog
+              open={clearConfirmOpen}
+              onOpenChange={setClearConfirmOpen}
             >
-              <BrushCleaning className="h-3.5 w-3.5" />
-            </Button>
+              <AlertDialogTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    title={t('basket.clear')}
+                    aria-label={t('basket.clear')}
+                  />
+                }
+              >
+                <BrushCleaning className="h-3.5 w-3.5" />
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {t('basket.clearConfirmTitle')}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('basket.clearConfirmBody', { count: entries.length })}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      clearAll()
+                      setClearConfirmOpen(false)
+                    }}
+                  >
+                    {t('basket.clear')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>
+
+      {/* External servers from a link need explicit consent; any close declines. */}
+      <AlertDialog
+        open={pendingExternal.length > 0}
+        onOpenChange={(open) => {
+          if (!open) resolveExternal('ignore')
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('hydrate.externalTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('hydrate.externalBody')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="space-y-1">
+            {pendingExternal.map((p) => (
+              <li
+                key={p.ref}
+                title={p.url}
+                className="truncate font-mono text-xs"
+              >
+                {p.url}
+              </li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('hydrate.externalIgnore')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => resolveExternal('add')}>
+              {t('hydrate.externalAdd')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {entries.length === 0 ? (
         <VisualiseHub />

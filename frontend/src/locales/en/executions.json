@@ -237,9 +237,7 @@
     "fileMissing": "File not yet written by the run",
     "externalTitle": "Use this WMS in another tool",
     "externalHint": "Copies a standard WMS GetCapabilities URL — paste it into QGIS, ArcGIS, or any other WMS-aware client to inspect the data there. The server keeps running until you stop it on this row.",
-    "wmsUnavailable": "The WMS viewer is not available on this server (SkinnyWMS not installed)",
-    "starting": "Starting SkinnyWMS…",
-    "close": "Close"
+    "wmsUnavailable": "The WMS viewer is not available on this server (SkinnyWMS not installed)"
   },
   "lens": {
     "layers": "Layers",
@@ -262,7 +260,8 @@
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
     "basemapOpacity": "Basemap opacity",
-    "legendUnavailable": "Legend unavailable"
+    "legendUnavailable": "Legend unavailable",
+    "legendAlt": "{{title}} legend"
   },
   "logs": {
     "title": "Gateway Log",
