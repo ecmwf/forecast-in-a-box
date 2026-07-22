@@ -53,8 +53,6 @@ implement Phase 1.
   registrations.
 - `routes/status.py` returns a six-field frozen dataclass and performs its
   current synchronous remote probes and direct scheduler/plugin status checks.
-  The frontend's Zod schema currently strips unknown response keys, but
-  frontend changes are explicitly outside this backend phase.
 
 ## Implementation steps
 
@@ -97,29 +95,32 @@ Modify `backend/src/forecastbox/utility/config.py`.
    | `PluginManagement` | 1 | 16 |
    | `JobsDb` | 1 | 128 |
 
-   It also defaults `failure_history_size` to `100` and
-   `shutdown_timeout_seconds` to `10`. `DispatcherSettings` defaults
-   `queue_capacity` to `1024`.
+   It also defaults `failure_history_size` to `100`,
+   `startup_timeout_seconds` to `10`, and `shutdown_timeout_seconds` to `10`.
+   `DispatcherSettings` defaults `queue_capacity` to `1024`.
 
 3. Add `concurrency` and `dispatcher` fields with default factories to
    `FIABConfig`. Keep the existing TOML and nested-environment behavior; no
    existing configuration file must acquire new keys.
 
-4. Validate at model construction/startup:
+4. Validate at model construction and runtime:
 
-   - all worker, pending-capacity, failure-history, shutdown-timeout, and
-     dispatcher-capacity values are positive;
-   - exactly the six required pool identifiers are configured (a partial
-     `pools` mapping is an error rather than silently creating an incomplete
-     runtime);
-   - `JobsDb` has exactly one worker;
-   - the initial serialized pools, `ArtifactIo` and `PluginManagement`, also
-     remain single-worker pools. Their one-worker setting represents a current
-     correctness constraint, not a tunable throughput choice.
+   - Pydantic validates that all worker, pending-capacity, failure-history,
+     startup-timeout, shutdown-timeout, and dispatcher-capacity values are
+     positive.
+   - `ConcurrencySettings.validate_runtime()` uses the repository's existing
+     `validate_runtime` collection pattern to report that exactly the six
+     required pool identifiers are configured. A partial `pools` mapping is an
+     error rather than silently creating an incomplete runtime.
+   - That runtime validation also requires exactly one worker for each
+     serialized correctness boundary: `JobsDb`, `ArtifactIo`, and
+     `PluginManagement`.
 
-   Use Pydantic validation for value constraints and an after-model validator
-   for cross-entry checks. The execution manager must defensively reject an
-   invalid registration as well, but configuration is the primary early error.
+   The FastAPI lifespan must call the existing
+   `forecastbox.utility.config.validate_runtime(config)` before schema
+   creation, so this validation runs for every backend launch path. The
+   execution manager must defensively reject an invalid registration as well,
+   but configuration is the primary early error.
 
 5. Do not add a configuration option for pools or threads that are not in the
    static enums, a database policy, startup tasks, a dispatcher handler, or
@@ -149,9 +150,9 @@ All status DTOs must contain only immutable, serializable snapshot data. The
 manager must copy/freeze mappings and bounded histories before returning them;
 callers cannot mutate manager state through a prior status result.
 
-Use a module-level instance rather than a generic singleton mechanism. Permit
-an explicit test-only reset/factory path so isolated unit tests do not attempt
-to restart a production-stopped manager.
+Use a module-level instance rather than a generic singleton mechanism. Do not
+add a test-only reset, factory, or other production API: a stopped production
+manager remains non-restartable.
 
 #### 2.2 Managed pools and task submission
 
@@ -181,7 +182,7 @@ Provide and enforce these methods:
 register_pool(pool_name, *, max_workers, max_pending, stage=0) -> None
 register_thread(thread_name, entrypoint, *, status_provider, stop_request=None,
                 stage, restart_policy=NEVER_RESTART) -> None
-start() -> StartStatus
+start(*, timeout: float) -> StartStatus
 stop_thread(thread_name, *, timeout) -> ThreadStatus
 restart_thread(thread_name) -> ThreadStatus
 submit_unmonitored(pool_name, task_name, task) -> Future[T]
@@ -227,8 +228,9 @@ Implement staged lifecycle behavior:
    exception representation and traceback, restart history, and physical
    liveness. The wrapper gives the entrypoint a manager-owned stop event.
 4. Wait for each stage resource to report readiness through its non-blocking
-   component status provider before advancing. On failed readiness or timeout,
-   abort startup and gracefully stop every resource already started.
+   component status provider before advancing, within the supplied startup
+   timeout. On failed readiness or timeout, abort startup and gracefully stop
+   every resource already started.
 5. `stop_thread()` sets only that thread's stop event, invokes its optional
    bounded `stop_request`, and joins within the supplied budget. It is
    idempotent for an already stopped known thread and errors for an unknown
@@ -320,8 +322,8 @@ may import a domain, route, schemata, or entrypoint module.
 
 ### 4. Wire discovery and lifecycle in `entrypoint/app.py`
 
-After both schema modules have completed creation, but before existing startup
-work begins:
+Before schema creation, call `validate_runtime(config)`. After both schema
+modules have completed creation, but before existing startup work begins:
 
 1. Build a small entrypoint-only discovery helper that iterates only immediate
    packages under `forecastbox.domain`.
@@ -334,7 +336,8 @@ work begins:
    current repository this completes with zero registrations.
 4. Register every configured `ConcurrentPools` entry at stage 0, register the
    dispatcher's entrypoint/status provider/stop request as the stage-0
-   `EventDispatcher` thread, then call `execution_manager.start()`.
+   `EventDispatcher` thread, then call
+   `execution_manager.start(timeout=config.concurrency.startup_timeout_seconds)`.
 5. Only after the runtime has started successfully, continue the existing
    scheduler start, release/version setup, artifact/store/plugin startup, and
    `ArtifactsProvider` setup unchanged. Do not route any of that work through
@@ -362,10 +365,13 @@ Modify `backend/src/forecastbox/routes/status.py`.
 2. Preserve every existing top-level status field and its current probing
    behavior. Phase 1 does not move scheduler or plugin detail under
    `concurrency`, make the route async, or move remote probes to the I/O pool.
+   The added manager snapshot must not introduce any additional heavyweight or
+   blocking status work.
 3. Fetching status must only read snapshots. It must not start, stop, restart,
    drain, or otherwise mutate manager or dispatcher state.
-4. Keep frontend types/mocks/components unchanged. Their update is explicitly
-   outside this backend migration phase; the added backend field is additive.
+4. Adding this new backend response field is explicitly permitted. Do not
+   consult, change, or test any frontend or other client implementation for
+   this additive backend-only contract expansion.
 
 ## Validation
 
@@ -376,8 +382,12 @@ Add focused backend unit coverage for the new utility modules and configuration.
    - values must be positive;
    - missing required pool names and non-single-worker serialized pools fail
      validation;
+   - the startup and shutdown timeout defaults are both 10 seconds;
    - a legacy configuration with no new sections still loads defaults.
 2. Execution manager:
+   - lifecycle tests patch every module-level `execution_manager` reference
+     they exercise to a fresh ordinary `ExecutionManager` instance; they do
+     not add or invoke a production-only reset/factory method;
    - registration and lifecycle gates reject invalid state transitions and
      duplicate resources;
    - pool warm-up observes the configured worker count without private
@@ -391,6 +401,11 @@ Add focused backend unit coverage for the new utility modules and configuration.
      post-shutdown non-restart behavior leave no live test resources;
    - status is immutable/snapshot-based and reports controlled unregistered
      thread diagnostics.
+
+   If a lifecycle behavior cannot be isolated safely with patched globals,
+   leave a concrete `# TODO` in the relevant test file identifying the missing
+   coverage rather than compromising the production lifecycle API. Tests must
+   remain safe under parallel execution.
 3. Dispatcher:
    - registration freeze, duplicate/unknown-pool validation, and optional
      discovery behavior are covered;
@@ -427,40 +442,3 @@ Add focused backend unit coverage for the new utility modules and configuration.
   without changing existing top-level fields or causing lifecycle side effects.
 - Lifespan startup/shutdown leaves no manager-owned resource running after a
   normal stop or a startup failure.
-
-## Open questions and implementation concerns
-
-1. **Startup readiness deadline:** the target design requires a readiness
-   timeout and rollback, but the specified configuration contains only
-   `shutdown_timeout_seconds`. Before implementation, decide whether startup
-   readiness uses that existing 10-second value, a documented fixed timeout,
-   or a new configuration field. A silent unlimited wait is not acceptable.
-*> response: introduce startup_timeout_seconds as well, with the same default of 10
-
-2. **Serialized-pool configurability:** this plan treats `ArtifactIo` and
-   `PluginManagement`, in addition to `JobsDb`, as fixed single-worker pools
-   because Phase 1 defines them as serialized correctness boundaries. Confirm
-   that users must not be permitted to raise those worker counts through
-   configuration. If only `JobsDb` is meant to be invariant, relax the two
-   validations before implementation while retaining their default of one.
-*> response: there should be the same validation for ArtifactIo and PluginManagement as for JobsDb -- you can implement it using the runtime_validate construct
-
-3. **Status API compatibility:** the existing route guidance normally avoids
-   changing established response classes without simultaneous client work, but
-   Phase 1 explicitly requires the additive `concurrency` object while
-   frontend work is excluded. Current Zod parsing strips unknown fields, so no
-   known client breaks; nevertheless, this intentional contract expansion
-   should be accepted in review.
-*> response: this is intentional. Make it explicit that adding new fields is ok, and that the developer should not consult any frontend or client implementation
-
-4. **Module-level lifecycle in tests:** a production manager is intentionally
-   non-restartable after shutdown, while unit tests need isolated fresh
-   instances. The test-only reset/factory must be inaccessible to application
-   code and must not weaken production lifecycle guarantees.
-*> response: the unit tests should mock the global instance in each test that deals with the lifecycle. There must be no test-only methods exposed in the production code -- if something cannot be easily unit tested, because the mocking would be complicated or interfering (keep in mind we run unit tests in parallel!), then leave a `# TODO` comment in the test file about concrete missing coverage, rather than compromise the production code
-
-5. **Existing status route behavior:** status remains synchronous and may block
-   on its current Cascade/model-repository probes. This phase only adds a
-   fast manager snapshot; converting those probes to the I/O pool is Phase
-   3.6 and must not be pulled forward.
-*> response: this is ok, the criterion is to not make the status "worse" eg by adding more heavyweight blocking. It is not the goal to fix it completely right away
