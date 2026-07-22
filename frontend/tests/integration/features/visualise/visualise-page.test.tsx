@@ -44,7 +44,10 @@ import {
   resetLensState,
   stopMockLens,
 } from '@tests/../mocks/data/lens.data'
-import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
+import {
+  registerMockWmsServer,
+  wmsCapabilitiesRequestCount,
+} from '@tests/../mocks/data/wms.data'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import i18n from '@/lib/i18n'
@@ -349,7 +352,7 @@ describe('VisualisePage', () => {
     },
   )
 
-  it('Clear all empties the basket and the URL pair stays cleared', async () => {
+  it('Clear all asks for confirmation, then empties basket and URL pair', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
     useComparisonStore.getState().addEntry(RUN_B)
     const screen = await renderVisualisePage()
@@ -357,7 +360,22 @@ describe('VisualisePage', () => {
     await expect
       .element(screen.getByLabelText('Source for slot B'))
       .toHaveTextContent('Run B')
+
+    // Cancel keeps everything.
     await screen.getByRole('button', { name: 'Clear all' }).click()
+    const dialog = screen.getByRole('alertdialog')
+    await expect.element(dialog).toBeVisible()
+    const cancel = dialog.getByRole('button', { name: 'Cancel' })
+    ;(cancel.element() as HTMLElement).click()
+    expect(useComparisonStore.getState().entries).toHaveLength(2)
+
+    // Confirm clears.
+    await screen.getByRole('button', { name: 'Clear all' }).click()
+    const confirm = screen
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Clear all' })
+    await expect.element(confirm).toBeVisible()
+    ;(confirm.element() as HTMLElement).click()
     // Hydration must not resurrect the active pair from the URL refs.
     await expect
       .element(screen.getByPlaceholder('Search runs and blocks…'))
@@ -474,5 +492,67 @@ describe('VisualisePage', () => {
       .element(screen.getByText('GRIB directory on this host'))
       .toBeVisible()
     expect(useComparisonStore.getState().entries).toHaveLength(0)
+  })
+
+  it('holds external WMS links behind a confirm; Add connects', async () => {
+    const port = 54390
+    registerMockWmsServer(port, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    const screen = await renderVisualisePage(
+      `?a=${encodeURIComponent(`wms:http://localhost:${port}`)}`,
+    )
+
+    await expect
+      .element(screen.getByText('Connect to external WMS server?'))
+      .toBeVisible()
+    // Held: nothing persisted, the server not contacted — a crafted link
+    // must not drive-by-connect a victim's browser.
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+    expect(wmsCapabilitiesRequestCount(port)).toBe(0)
+
+    const add = screen.getByRole('button', { name: 'Add and connect' })
+    ;(add.element() as HTMLElement).click()
+    await expect
+      .poll(() => useComparisonStore.getState().entries)
+      .toHaveLength(1)
+    await expect
+      .poll(() => wmsCapabilitiesRequestCount(port), { timeout: 8000 })
+      .toBeGreaterThan(0)
+  })
+
+  it('Ignore declines the external link without any contact', async () => {
+    const port = 54391
+    registerMockWmsServer(port, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    const screen = await renderVisualisePage(
+      `?a=${encodeURIComponent(`wms:http://localhost:${port}`)}`,
+    )
+
+    await expect
+      .element(screen.getByText('Connect to external WMS server?'))
+      .toBeVisible()
+    const ignore = screen.getByRole('button', { name: 'Ignore' })
+    ;(ignore.element() as HTMLElement).click()
+    // Stripped: back to the empty state, never contacted or persisted.
+    await expect
+      .element(screen.getByText('GRIB directory on this host'))
+      .toBeVisible()
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+    expect(wmsCapabilitiesRequestCount(port)).toBe(0)
+  })
+
+  it('rejects non-http(s) schemes in shared wms refs outright', async () => {
+    const screen = await renderVisualisePage(
+      `?a=${encodeURIComponent('wms:javascript:alert(1)')}`,
+    )
+    await expect
+      .element(screen.getByText('GRIB directory on this host'))
+      .toBeVisible()
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+    expect(
+      screen.getByText('Connect to external WMS server?').elements(),
+    ).toHaveLength(0)
   })
 })
