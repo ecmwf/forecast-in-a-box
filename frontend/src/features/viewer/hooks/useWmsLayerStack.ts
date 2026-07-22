@@ -27,6 +27,8 @@ import ImageLayer from 'ol/layer/Image'
 import {
   DEFAULT_LAYER_OPACITY,
   WEB_MERCATOR_EXTENT,
+  isAbortedLoad,
+  loadRequestUrl,
   makeDataLayerSource,
 } from '../ol-layers'
 import type { RefObject } from 'react'
@@ -55,7 +57,8 @@ function requestedTime(evt: ImageSourceEvent): string | null {
   const img = evt.image.getImage()
   if (!(img instanceof HTMLImageElement)) return null
   try {
-    return new URL(img.src).searchParams.get('TIME')
+    // The cancelling loader serves blob URLs — the request URL is stashed.
+    return new URL(loadRequestUrl(img) ?? img.src).searchParams.get('TIME')
   } catch {
     return null
   }
@@ -217,6 +220,8 @@ export function useWmsLayerStack(
         // it would masquerade as the newly requested instant.
         source.on('imageloaderror', (evt) => {
           decLoading()
+          // Superseded loads are bookkeeping, not server failures.
+          if (isAbortedLoad(evt.image.getImage())) return
           if (!entry.errored) {
             entry.errored = true
             syncErrorCount()
