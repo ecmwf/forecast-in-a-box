@@ -88,7 +88,7 @@ describe('NavToggle', () => {
     await expect.element(screen.getByText('Visualise')).toBeVisible()
   })
 
-  it('marks Overview as active on /dashboard', async () => {
+  it('marks Overview as active on /overview', async () => {
     const screen = await renderNavToggle('/overview')
     const link = screen.getByText('Overview')
     await expect.element(link).toHaveAttribute('aria-current', 'page')
@@ -100,7 +100,7 @@ describe('NavToggle', () => {
     await expect.element(link).toHaveAttribute('aria-current', 'page')
   })
 
-  it('marks Runs as active on /executions', async () => {
+  it('marks Execute as active on /execute', async () => {
     const screen = await renderNavToggle('/execute')
     const link = screen.getByText('Execute')
     await expect.element(link).toHaveAttribute('aria-current', 'page')

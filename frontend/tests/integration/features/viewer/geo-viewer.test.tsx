@@ -21,7 +21,10 @@ import { page } from '@vitest/browser/context'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
+import {
+  getMapRequests,
+  registerMockWmsServer,
+} from '@tests/../mocks/data/wms.data'
 import type { CompareMode } from '@/features/viewer/geo/types'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
 import i18n from '@/lib/i18n'
@@ -90,6 +93,18 @@ function Harness({
       </I18nextProvider>
     </QueryClientProvider>
   )
+}
+
+/** Unstyled env: the map containers collapse to 0×0 and OL never renders.
+ *  Tests that need real GetMap traffic or captures give maps pixels. */
+function injectMapSizing(): () => void {
+  const style = document.createElement('style')
+  style.textContent = `
+      [class*='h-full'][class*='overflow-hidden'][class*='rounded-md'] { position: relative; height: 400px; }
+      [class*='absolute'][class*='inset-0'] { position: absolute; inset: 0; }
+    `
+  document.head.append(style)
+  return () => style.remove()
 }
 
 describe('GeoViewer', () => {
@@ -419,15 +434,7 @@ describe('GeoViewer', () => {
         lastItem = items[0]
         return Promise.resolve()
       })
-    // Unstyled env: the map container collapses to 0×0 and OL never
-    // renders, so rendercomplete-gated captures hang. Give the map real
-    // pixels for this test — the payload promises must settle.
-    const style = document.createElement('style')
-    style.textContent = `
-      [class*='h-full'][class*='overflow-hidden'][class*='rounded-md'] { position: relative; height: 400px; }
-      [class*='absolute'][class*='inset-0'] { position: absolute; inset: 0; }
-    `
-    document.head.append(style)
+    const removeSizing = injectMapSizing()
     try {
       const screen = await render(<Harness portA={portA} portB={portB} />)
       await screen.getByText('2 m temperature').first().click()
@@ -449,7 +456,7 @@ describe('GeoViewer', () => {
       const blob = await lastItem!.getType('image/png')
       expect(blob.size).toBeGreaterThan(0)
     } finally {
-      style.remove()
+      removeSizing()
     }
   })
 
@@ -800,19 +807,34 @@ describe('GeoViewer solo', () => {
 describe('GeoViewer preload', () => {
   it('offers the preload toggle once a timeline exists', async () => {
     const { portA, portB } = registerDefaultPair()
-    const screen = await render(<Harness portA={portA} portB={portB} />)
+    const removeSizing = injectMapSizing()
+    try {
+      const screen = await render(<Harness portA={portA} portB={portB} />)
 
-    // No time-aware selection yet — no toggle.
-    expect(
-      screen.getByRole('switch', { name: 'Preload time steps' }).elements(),
-    ).toHaveLength(0)
+      // No time-aware selection yet — no toggle.
+      expect(
+        screen.getByRole('switch', { name: 'Preload time steps' }).elements(),
+      ).toHaveLength(0)
 
-    await screen.getByText('2 m temperature').first().click()
-    const toggle = screen.getByRole('switch', { name: 'Preload time steps' })
-    await expect.element(toggle).toBeInTheDocument()
-    // Programmatic click — the unstyled switch has no box to aim at.
-    ;(toggle.element() as HTMLElement).click()
-    await expect.element(toggle).toBeChecked()
+      await screen.getByText('2 m temperature').first().click()
+      const toggle = screen.getByRole('switch', { name: 'Preload time steps' })
+      await expect.element(toggle).toBeInTheDocument()
+      // The current instant (T00) loads; neighbours wait for the toggle.
+      await expect
+        .poll(() => getMapRequests(portA).length, { timeout: 8000 })
+        .toBeGreaterThan(0)
+      expect(getMapRequests(portA)).not.toContain('2026-07-06T06:00:00Z')
+
+      // Programmatic click — the unstyled switch has no box to aim at.
+      ;(toggle.element() as HTMLElement).click()
+      await expect.element(toggle).toBeChecked()
+      // Warm-up actually fetches the OTHER advertised step of A's 2t.
+      await expect
+        .poll(() => getMapRequests(portA), { timeout: 8000 })
+        .toContain('2026-07-06T06:00:00Z')
+    } finally {
+      removeSizing()
+    }
   })
 })
 
