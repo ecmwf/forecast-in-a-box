@@ -2,7 +2,7 @@
 
 ## Status
 
-First migration iteration. This document maps the current backend concerns onto
+Second migration iteration. This document maps the current backend concerns onto
 the target architecture in
 [`backend-concurrencyRework-design.md`](backend-concurrencyRework-design.md).
 The documents must be reviewed and updated together.
@@ -14,18 +14,19 @@ It also excludes test design.
 
 | Concern | Current ownership | Current behavior | Target ownership |
 | --- | --- | --- | --- |
-| Artifact catalog and downloads | `domain/artifact/manager.py` | Lazily creates a private one-worker `ThreadPoolExecutor`; shared immutable state records catalog, local files, and progress | Named one-worker artifact I/O pool initially; shared network pool only after SSH safety is resolved |
+| Artifact catalog and downloads | `domain/artifact/manager.py` | Lazily creates a private one-worker `ThreadPoolExecutor`; shared immutable state records catalog, local files, and progress | Named one-worker artifact I/O pool initially; shared I/O pool only after SSH safety is resolved |
 | Plugin loading and updates | `domain/plugin/manager.py` | Stores one ad hoc updater thread and the FastAPI loop; waits on async DB work with `run_coroutine_threadsafe` | Named serialized plugin-management pool plus jobs DB pool |
-| Plugin store initialization | `domain/plugin/store.py` | Creates one ad hoc thread for HTTP/file store discovery | Named network pool |
-| Scheduled execution | `domain/experiment/scheduling/background.py` | Custom long-lived thread stores the FastAPI loop, condition/event state, and liveness fields | Execution-manager long-lived thread plus jobs DB pool |
-| Run compilation/submission | `domain/run/service.py`, `domain/run/background.py` | Uses the asyncio default executor; worker retains the FastAPI loop for DB calls | Named run-submission pool plus jobs DB and artifact/network pools |
+| Plugin store initialization | `domain/plugin/store.py` | Creates one ad hoc thread for HTTP/file store discovery | Named I/O pool |
+| Scheduled execution | `domain/experiment/scheduling/background.py` | Custom long-lived thread stores the FastAPI loop, condition/event state, and liveness fields | Stage-1 execution-manager thread plus jobs DB pool |
+| Run compilation/submission | `domain/run/service.py`, `domain/run/background.py` | Uses the asyncio default executor; worker retains the FastAPI loop for DB calls | Named run-submission pool plus jobs DB and artifact/I/O pools |
 | Run log ZIP creation | `routes/run.py` | Uses the asyncio default executor | Named general pool |
 | Lens process start | `routes/lens.py`, `domain/lens/manager.py` | A synchronous FastAPI route starts a subprocess; FastAPI may run the route in a framework thread | Async route awaiting a named general-pool task; subprocess lifecycle remains domain-owned |
-| Root status probes | `routes/status.py` | Synchronous route performs network calls and directly inspects scheduler/plugin globals | Async route using named pools and composed execution/dispatcher status |
+| Root status probes | `routes/status.py` | Synchronous route performs network calls and directly inspects scheduler/plugin globals | Async route using named pools and one composed concurrency status |
 | Jobs SQLite access | `utility/db.py` and domain DB modules | One global `asyncio.Lock`; background threads send coroutines to the FastAPI loop | One-worker jobs DB pool, sync DB helpers, regular jobs lock |
 | Users SQLite access | Auth/admin DB modules | Shares the jobs async lock in some helpers; FastAPI Users sessions bypass that shared helper | Independent users async lock and retry path |
 | Cross-domain template reaction | `domain/plugin/manager.py` | In-body imports breach the domain hierarchy for ingest and unload | Producer events and consumer-owned handlers |
 | Notification delivery | None | No WebSocket endpoint or notification broker | Event handler plus process-local WebSocket hub |
+| Jobs database garbage collection | None | Versioned and tombstoned rows are retained indefinitely | Stage-2 periodic maintenance thread submitting cleanup to the jobs DB pool |
 | Startup/shutdown | `entrypoint/app.py` | Starts and joins each manager separately in a hand-written order | Configure, start, inspect, and stop the shared runtime |
 
 `utility/concurrent.py` also owns timed lock acquisition, free-port allocation,
@@ -49,35 +50,53 @@ Python exposes them, but are not migrated into the execution manager.
 - A jobs-database cutover is one coordinated migration across all jobs DB
   helpers and callers; two independent locking models must not write the file at
   the same time.
-- Keep existing route response fields during the transition. New operational
-  detail should be additive or exposed separately.
-*> review: we are actually fine moving/renaming route response fields -- the reviewer will notice when this happens and fire up independently the corresponding frontend refactoring -- mention this explicitly so that the developer working on this is not concerned by frontend
+- Route response fields may move or be renamed as part of this backend
+  migration. The developer should define the coherent target response without
+  preserving obsolete status fields; corresponding frontend refactoring is
+  explicitly separate and outside this plan.
 
-## Phase 1: add the runtime beside the old system
+## Phase 0: prepare utilities and isolate users persistence
 
-### 1.1 Split utility helpers without breaking old imports
+### 0.1 Split utility helpers and update all imports
 
 Create:
 
 ```text
 utility/concurrency/__init__.py
-utility/concurrency/manager.py
 utility/concurrency/ports.py
 utility/concurrency/shutdown.py
 utility/concurrency/synchronization.py
-utility/dispatcher.py
 ```
 
-Move or copy the free-port, shutdown, and timed-acquire implementations into
-their target modules. Keep `utility/concurrent.py` as a compatibility layer
-until all imports migrate. Do not move `delayed_thread`; it becomes obsolete
-when plugin startup uses `submit_after`.
-*> review: we do not want utility/concurrent.py as a compatibility layer, we want to actively change all imports to new locations. The `delayed_thread` should be moved as well, but marked (in docstring) as soon-to-be-deprecated 
+Move the free-port, shutdown, timed-acquire, and `delayed_thread`
+implementations into their target modules. `delayed_thread` belongs in
+`synchronization.py` and its docstring marks it as temporary pending migration
+to `submit_after`.
 
-### 1.2 Add central configuration
+Update every existing import in the same change and delete
+`utility/concurrent.py`. This includes production and test import paths so
+collection is not broken by the atomic move; it does not require designing new
+tests. Do not create a compatibility re-export module.
 
-Add pool sizes, pending limits, event queue capacity, failure history size, and
-shutdown timeout with backwards-compatible defaults. Validate:
+### 0.2 Isolate users database helpers
+
+Copy the current async lock and `dbRetry` behavior needed by administrative user
+operations into `domain/auth/db.py`, with explicit users-database names. Update
+that module's helpers to use the local implementation.
+
+Preserve the existing async SQLAlchemy/aiosqlite and FastAPI Users behavior; do
+not introduce execution-manager integration or a new database adapter. After
+this phase, `utility/db.py` serves only jobs persistence and the later atomic
+jobs conversion has no users-database callers.
+
+## Phase 1: add the runtime beside the old system
+
+### 1.1 Add central configuration
+
+Add pool sizes, pending limits, failure history size, and shutdown timeout under
+concurrency settings. Add event queue capacity under separate dispatcher
+settings. Both have backwards-compatible defaults. Define
+`ConcurrentPools` and `ConcurrentThreads` in `utility/config.py`. Validate:
 
 - positive worker and capacity counts;
 - required pool names;
@@ -88,43 +107,46 @@ Recommended initial pools:
 
 | Pool | Workers | Initial consumers |
 | --- | ---: | --- |
-| `general` | 2 | Compilation/submission, archive creation, short blocking setup |
-| `network` | 4 | Catalogs, downloads, store HTTP, status probes |
-| `run-submission` | 2 | Long run compilation/submission tasks and artifact waits |
-| `artifact-io` | 1 | Catalog scans and downloads while one SSH command handle is shared |
-| `plugin-management` | 1 | Pip/install/import/reload operations that must not overlap |
-| `jobs-db` | 1 | All jobs SQLite reads and writes |
+| `ConcurrentPools.General` | 2 | Archive creation and short blocking setup |
+| `ConcurrentPools.Io` | 4 | Store HTTP, status probes, and general network/disk transfers |
+| `ConcurrentPools.RunSubmission` | 2 | Long run compilation/submission tasks and artifact waits |
+| `ConcurrentPools.ArtifactIo` | 1 | Catalog scans and downloads while one SSH command handle is shared |
+| `ConcurrentPools.PluginManagement` | 1 | Pip/install/import/reload operations that must not overlap |
+| `ConcurrentPools.JobsDb` | 1 | All jobs SQLite reads and writes |
 
-The extra `plugin-management` pool is recommended because import and
+`ConcurrentPools.PluginManagement` is separate because import and
 environment mutation are serialized for correctness, not merely because they
-use network and disk. `artifact-io` preserves the existing serialization of a
-shared SSH command handle. `run-submission` prevents hour-long artifact waits
-from consuming all general-purpose capacity.
+use I/O. `ConcurrentPools.ArtifactIo` preserves the existing serialization of
+a shared SSH command handle. `ConcurrentPools.RunSubmission` prevents
+hour-long artifact waits from consuming all general-purpose capacity.
 
-### 1.3 Start the unused runtime
+### 1.2 Implement and start the unused runtime
+
+Add `utility/concurrency/manager.py` and `utility/dispatcher.py`.
 
 In `entrypoint/app.py`, after schema creation:
 
-1. Start all configured pools.
-2. Discover `domain.*.dispatchers`.
-3. Register and freeze handlers.
-4. Start `event-dispatcher` through the execution manager.
+1. Register every pool at stage 0.
+2. Discover `domain.*.dispatchers`, register handlers, and freeze registration.
+3. Register `ConcurrentThreads.EventDispatcher` at stage 0 with its entrypoint,
+   stop request, and status provider.
+4. Call `ExecutionManager.start()`, which warms all pools before starting the
+   dispatcher.
 
 At this stage, old scheduler and manager threads continue unchanged. The new
 pools may be mostly idle, which proves coexistence without double-owning work.
 
-The lifespan shutdown stops the dispatcher and execution manager after old
-components have been joined. As concerns migrate, remove their old join calls.
+The lifespan shutdown stops old components first, then asks the manager to stop
+its stage-0 dispatcher and pools. As concerns migrate, replace their direct
+joins with staged registrations.
 
-### 1.4 Add operational status
+### 1.3 Add operational status
 
-Compose execution and dispatcher snapshots into an operational status surface.
-Keep the current `api`, `cascade`, `ecmwf`, `scheduler`, `version`, and `plugins`
-fields while they remain public. Choose during review whether detailed pool and
-thread data is:
-
-- added as optional nested fields to `/api/v1/status`; or
-- exposed by a separate admin-only route.
+Extend the existing `/api/v1/status` response with
+`concurrency.pools` and `concurrency.threads`. The event dispatcher's registered
+component status appears under its thread entry. As each old component
+migrates, move its status under the corresponding concurrency object; retaining
+the former top-level field is not required.
 
 Do not make a GET status call restart threads. If restart is exposed, use an
 explicit mutating admin operation.
@@ -133,25 +155,7 @@ explicit mutating admin operation.
 
 This phase removes the reason background workers retain the FastAPI loop.
 
-### 2.1 Split users and jobs synchronization
-
-Replace the generic global lock in `utility/db.py` with explicitly named paths:
-
-- a regular `threading.RLock` and synchronous retry helper for jobs DB work;
-- an independent `asyncio.Lock` and async retry helper for users DB work.
-
-Update the FastAPI Users database adapter and admin user helpers to share the
-users lock. Acquire it around individual adapter persistence methods, not
-around the lifetime of the request-scoped session: an authenticated admin route
-may call an admin DB helper before the authentication dependency releases its
-session. Retryable adapter methods must roll back or replace failed session
-state before retry; otherwise they surface the operational error. They remain
-on the async users engine and never submit to `jobs-db`.
-
-This users change can land separately because it affects a different SQLite
-file.
-
-### 2.2 Convert the jobs runtime engine and DB helpers
+### 2.1 Convert the jobs runtime engine and DB helpers
 
 For `schemata/jobs.py`, add the synchronous engine/session maker used by runtime
 DB operations. Schema creation may remain in the existing startup path until
@@ -174,16 +178,17 @@ The synchronous retry wrapper holds the jobs `RLock`, retries the whole
 operation on SQLite `OperationalError`, and contains:
 
 ```python
-# TODO investigate concurrent reads
+# TODO investigate concurrent reads. SQLite should support concurrent readers,
+# but this first implementation deliberately serializes all access.
 ```
 
-### 2.3 Move every jobs DB caller in the same cutover
+### 2.2 Move every jobs DB caller in the same cutover
 
 Async services and routes use:
 
 ```python
-await execution_manager.submit_and_wait(
-    JOBS_DB_POOL,
+await execution_manager.awaitable_submit(
+    ConcurrentPools.JobsDb,
     task_name,
     partial(db_function, ...),
 )
@@ -193,7 +198,7 @@ Background workers use:
 
 ```python
 execution_manager.submit_unmonitored(
-    JOBS_DB_POOL,
+    ConcurrentPools.JobsDb,
     task_name,
     partial(db_function, ...),
 ).result()
@@ -224,13 +229,14 @@ Create an async-independent run submission boundary during this cutover:
 ```python
 def submit_run_sync(...) -> Either[ExecuteResult, str]:
     # Submit and wait for the initial jobs DB upsert, then enqueue the
-    # long-running execution task without waiting for it.
+    # long-running execution task to ConcurrentPools.RunSubmission without
+    # waiting for it.
     ...
 
 
 async def execute(...) -> Either[ExecuteResult, str]:
-    return await execution_manager.submit_and_wait(
-        GENERAL_POOL,
+    return await execution_manager.awaitable_submit(
+        ConcurrentPools.General,
         TaskName("run.submit"),
         partial(submit_run_sync, ...),
     )
@@ -238,17 +244,23 @@ async def execute(...) -> Either[ExecuteResult, str]:
 
 The scheduler can call `submit_run_sync` from its own managed thread after
 Phase 4; async routes retain the `execute` wrapper. Similarly, convert
-`experiment2runnable` into a synchronous operation submitted as one `jobs-db`
-task, so the scheduler can retrieve its result with a concurrent future and no
-async loop.
+`experiment2runnable` into a synchronous operation submitted as one
+`ConcurrentPools.JobsDb` task, so the scheduler can retrieve its result with a
+concurrent future and no async loop.
+
+The Phase 2 cutover therefore also removes the default-executor submission for
+this path. Phase 3.4 finishes consolidation of the background task and its
+status/failure ownership; it does not temporarily route new work through the
+old default executor.
 
 Search all jobs DB helpers and direct session-maker imports before switching.
 The cutover is complete only when no old runtime path can access the jobs file
 under the old async lock.
 
-### 2.4 Database migration risks
+### 2.3 Database migration risks
 
-- Do not submit from the jobs DB worker back to `jobs-db` and wait.
+- Do not submit from the jobs DB worker back to `ConcurrentPools.JobsDb` and
+  wait.
 - Do not hold domain state locks while waiting for a DB future.
 - Keep a transaction inside one database task.
 - Ensure SQLite connections are created and used on the worker thread expected
@@ -257,6 +269,8 @@ under the old async lock.
   fallback DB call.
 - Database tasks are not automatically retried by the execution manager; only
   the narrow SQLite retry policy applies.
+- This is one coordinated cutover. No async jobs access remains after its
+  merge, while Phase 0 has already removed users persistence from its scope.
 
 ## Phase 3: migrate executor-backed work
 
@@ -268,7 +282,7 @@ In `domain/artifact/manager.py`:
 
 - remove `ArtifactManager.executor` and `_ensure_pool`;
 - initially submit catalog refresh and downloads to the centrally configured
-  one-worker `artifact-io` pool;
+  one-worker `ConcurrentPools.ArtifactIo` pool;
 - keep the current immutable catalog, local availability, progress map, and
   short state lock;
 - use monitored submissions for fire-and-forget downloads;
@@ -284,7 +298,8 @@ The current private one-worker executor also serializes use of a shared SSH
 command handle; its lock protects handle creation/reconnection, not each command
 performed with that handle. Do not widen artifact work onto the shared network
 pool until command execution is serialized or each task receives an independent
-connection. After that refactor, file/HTTP-safe work may move to `network`.
+connection. After that refactor, file/HTTP-safe work may move to
+`ConcurrentPools.Io`.
 
 The existing delete/download race is not caused by this architecture and should
 not be expanded into this migration unless moving submission exposes it.
@@ -294,15 +309,15 @@ not be expanded into this migration unless moving submission exposes it.
 In `domain/plugin/store.py`:
 
 - remove `stores_updater`;
-- submit initialization to `network`;
+- submit initialization to `ConcurrentPools.Io`;
 - preserve immutable publication of the completed store map;
 - record failure through monitored task status and the existing domain-facing
   status/error surface as needed;
 - remove `join_stores_thread`.
 
-Store initialization now shares network capacity with other safe HTTP probes
-and becomes visible in the common pool status. Artifact catalog work remains on
-`artifact-io` until the shared SSH handle constraint is removed.
+Store initialization now shares I/O capacity with other safe HTTP probes and
+becomes visible in the common pool status. Artifact catalog work remains on
+`ConcurrentPools.ArtifactIo` until the shared SSH handle constraint is removed.
 
 ### 3.3 Plugin installation, import, and reload
 
@@ -311,7 +326,7 @@ In `domain/plugin/manager.py`:
 - remove `PluginManager.updater` and its manual thread creation;
 - remove `PluginManager.loop`;
 - submit initial load and single updates to the one-worker
-  `plugin-management` pool;
+  `ConcurrentPools.PluginManagement` pool;
 - keep the one-at-a-time behavior by pool configuration;
 - derive busy/failed status from manager task state plus existing domain errors;
 - use `submit_after(catalog_future, ...)` for initial loading instead of
@@ -330,10 +345,10 @@ plugin-management task while holding the plugin state lock.
 
 In `domain/run/service.py` and `domain/run/background.py`:
 
-- replace `loop.run_in_executor(None, ...)` with a monitored
-  `run-submission` task;
-- remove the event-loop parameter and local `run_async` bridge if it was not
-  already removed in the atomic Phase 2 caller cutover;
+- retain the monitored `ConcurrentPools.RunSubmission` path introduced by the
+  atomic Phase 2 caller cutover;
+- confirm the event-loop parameter and local `run_async` bridge were removed in
+  that cutover;
 - retain the Phase 2 jobs DB future calls;
 - preserve the current rule that every background failure records a failed run
   state;
@@ -341,37 +356,37 @@ In `domain/run/service.py` and `domain/run/background.py`:
 
 The task currently mixes compilation, database state changes, gateway network
 calls, and waiting for artifact downloads. The first migration may keep it as
-one general-pool task for behavioral safety. A later refinement may split
-network stages, but must preserve failure state and ordering.
+one run-submission task for behavioral safety. A later refinement may split I/O
+stages, but must preserve failure state and ordering.
 
 Artifact waits may last up to an hour, so they must not occupy the general pool.
 The initial configuration uses the dedicated, centrally managed
-`run-submission` pool. Its worker count remains a configuration decision based
-on the desired uniform progress across concurrent runs.
+`ConcurrentPools.RunSubmission` pool. Its worker count remains a configuration
+decision based on the desired uniform progress across concurrent runs.
 
 ### 3.5 Run log archive creation
 
 In `routes/run.py`, replace the default executor call with:
 
 ```python
-await execution_manager.submit_and_wait(
-    GENERAL_POOL,
+await execution_manager.awaitable_submit(
+    ConcurrentPools.General,
     TaskName("run.logs.build-archive"),
     _build_zip,
 )
 ```
 
-Keep gateway I/O out of the async loop as well. It may run on `network` before
-the archive task, or the complete existing blocking operation may initially run
-on `general`.
+Keep gateway I/O out of the async loop as well. It may run on
+`ConcurrentPools.Io` before the archive task, or the complete existing blocking
+operation may initially run on `ConcurrentPools.General`.
 
 ### 3.6 Blocking synchronous routes
 
 Convert migrated blocking route handlers to `async def` and explicitly submit
 their blocking sections. Initial cases:
 
-- lens subprocess startup to `general`;
-- root status network probes to `network`;
+- lens subprocess startup to `ConcurrentPools.General`;
+- root status network probes to `ConcurrentPools.Io`;
 - any route whose synchronous form currently relies on FastAPI/AnyIO's implicit
   worker pool.
 
@@ -388,13 +403,15 @@ After each route migration, verify it no longer calls `run_in_executor(None, ...
 In `domain/experiment/scheduling/background.py`:
 
 - replace `SchedulerThread` construction with an execution-manager long-lived
-  thread specification;
+  stage-1 `ConcurrentThreads.Scheduler` registration;
 - make the entrypoint accept the manager-owned stop event;
 - retain a domain-owned wake/prod event for schedule changes;
 - use `stop_event.wait(timeout)` or a bounded wakeable condition;
-- move liveness, native thread id, failure, and restart reporting to execution
-  status;
-- submit jobs DB operations to `jobs-db`;
+- register a non-blocking component status provider for scheduler liveness and
+  last/next iteration; let the manager add native thread id, failure, and
+  restart reporting;
+- register a stop request that wakes the scheduling condition;
+- submit jobs DB operations to `ConcurrentPools.JobsDb`;
 - retrieve the synchronous `experiment2runnable` jobs DB task and call the
   Phase 2 `submit_run_sync` service boundary;
 - remove the stored FastAPI loop and `run_coroutine_threadsafe`;
@@ -402,14 +419,16 @@ In `domain/experiment/scheduling/background.py`:
 
 Register the scheduler thread only when scheduling is enabled. A recommended
 restart policy is capped on-failure restart, requested by an explicit
-supervisor/admin action. The scheduling loop must tolerate being entered by a
-new `Thread` instance after failure.
+internal or admin operation. The scheduling loop must tolerate being entered by
+a new `Thread` instance after failure.
 
 `prod_scheduler()` remains a domain operation but only sets the wake event. It
 does not own or start the thread.
 
-Once migrated, preserve the existing `scheduler` status field by translating
-the execution snapshot into `off`, `up`, or `down`.
+Once migrated, move scheduler detail from the top-level status field to
+`concurrency.threads.scheduler`. When scheduling is disabled, expose a disabled
+registered/component state or omit the thread according to the final status
+DTO; do not retain a duplicate top-level field.
 
 ## Phase 5: remove the circular domain dependency with events
 
@@ -437,10 +456,12 @@ Create `domain/blueprint/dispatchers.py` and export its registration tuple.
 Move template conversion, glyph remapping, validation, upsert, soft-delete, and
 template-error persistence behind handlers owned by the blueprint domain.
 
-Register these handlers on `general`, never on `plugin-management` or
-`jobs-db`. The producer occupies the one-worker `plugin-management` pool while
-waiting for required dispatch completion, so using that pool for the handler
-would deadlock. The handler submits its DB operations to `jobs-db`.
+Register these handlers on `ConcurrentPools.General`, never on
+`ConcurrentPools.PluginManagement` or `ConcurrentPools.JobsDb`. The producer
+occupies the one-worker `ConcurrentPools.PluginManagement` pool while waiting
+for required dispatch completion, so using that pool for the handler would
+deadlock. The handler submits its DB operations to
+`ConcurrentPools.JobsDb`.
 
 The handler may read the producer's public plugin catalogue because blueprint
 already depends on plugin. Plugin code no longer imports blueprint at module or
@@ -486,11 +507,46 @@ After both flows migrate, delete `_ingest_plugin_templates`, the in-body
 blueprint imports, and the circularity notes from the domain package
 documentation.
 
-## Phase 6: proof-of-concept WebSocket notifications
+## Phase 6: add periodic jobs database garbage collection
+
+This is a new backend maintenance concern rather than a migration of an
+existing thread.
+
+Create a wakeable garbage-collector entrypoint and register it as
+`ConcurrentThreads.DatabaseGarbageCollector` at stage 2. It therefore starts
+after the stage-1 scheduler and stops before it. Register:
+
+- an entrypoint accepting the manager stop event;
+- a stop request that wakes its sleep condition;
+- a non-blocking status provider exposing last attempt/success, next wake,
+  activity, rows removed, and last failure;
+- an explicit-only capped restart policy.
+
+Each iteration submits one bounded, synchronous cleanup callable to
+`ConcurrentPools.JobsDb` and waits for the future. The collector thread does not
+open a SQLAlchemy session itself. The DB callable uses one transaction and
+deletes eligible rows in explicit referential order, so cancellation or timeout
+cannot commit only part of a cleanup cascade.
+
+Before implementation, resolve:
+
+- whether eligibility is limited to explicitly tombstoned entity families or
+  may include superseded immutable versions;
+- the retention age and periodic wake interval;
+- whether the first implementation needs an administrative prod;
+- which module may own a cross-entity cleanup transaction without violating
+  the domain hierarchy;
+- the concrete foreign-key/deletion order and batch limit.
+
+Do not treat an older immutable version as dead merely because a newer version
+exists. Version-specific references and historical API retrieval make that a
+separate retention decision.
+
+## Phase 7: proof-of-concept WebSocket notifications
 
 This is new backend behavior, not a migration of an existing endpoint.
 
-### 6.1 Add a small notification domain
+### 7.1 Add a small notification domain
 
 Add a process-local notification hub that owns:
 
@@ -517,12 +573,15 @@ context: dict[str, object]
 `recipient=None` means broadcast only if review explicitly approves that
 behavior.
 
-### 6.2 Register a notification handler
+### 7.2 Register a notification handler
 
 Add `domain/notification/dispatchers.py` with a handler for a name such as
-`notification.emitted`. The handler runs in a suitable named pool and asks the
-hub to enqueue the immutable notification onto matching per-connection async
-queues.
+`notification.emitted`. Register the handler on `ConcurrentPools.Io`; its work
+is a short thread-safe handoff to connection queues. Notification producers
+enqueue and continue rather than waiting for its dispatch receipt, preventing a
+producer from occupying the same pool while awaiting the handler. The handler
+asks the hub to enqueue the immutable notification onto matching per-connection
+async queues.
 
 Any background task can then call `submit_event(Event(...))`; it does not know
 about WebSockets or the async loop.
@@ -530,7 +589,7 @@ about WebSockets or the async loop.
 Dispatch completion means the notification was queued to connection buffers.
 It does not acknowledge network delivery.
 
-### 6.3 Add the WebSocket route
+### 7.3 Add the WebSocket route
 
 Add an auto-discovered route module with one endpoint, provisionally:
 
@@ -549,7 +608,7 @@ On connection:
 The endpoint does not poll execution state and does not read either database.
 No frontend contract is part of this change.
 
-### 6.4 Slow clients and shutdown
+### 7.4 Slow clients and shutdown
 
 Recommended PoC behavior:
 
@@ -560,7 +619,7 @@ Recommended PoC behavior:
 - close all sockets and unregister queues during lifespan shutdown before the
   dispatcher is stopped.
 
-### 6.5 PoC questions
+### 7.5 PoC questions
 
 1. What authentication mechanism should the WebSocket handshake use in
    authenticated mode?
@@ -572,7 +631,7 @@ Recommended PoC behavior:
 5. Does the first PoC need delivery acknowledgements or replay? The design
    recommends neither.
 
-## Phase 7: consolidate startup, shutdown, and status
+## Phase 8: consolidate startup, shutdown, and status
 
 Update `entrypoint/app.py` to the final sequence from the design document.
 Remove direct calls to:
@@ -589,16 +648,21 @@ On shutdown:
 
 1. stop accepting WebSocket/domain submissions;
 2. close notification sockets;
-3. signal scheduler and other producer threads;
-4. close and drain events within the deadline;
-5. stop the dispatcher;
-6. shut down pools;
+3. ask the manager to stop stage-2 garbage collection;
+4. stop stage-1 scheduler and other producer threads;
+5. stop stage-0 threads; the dispatcher's own stop request closes event intake
+   and performs its bounded best-effort drain;
+6. shut down pools only after long-lived threads return;
 7. retain existing external process and tunnel cleanup.
+
+Apply one shutdown deadline with fair-share slices for the remaining resource
+groups. A group may use its base slice plus time unused by earlier groups, but
+must not consume time reserved for all later groups.
 
 Use the execution snapshot for all migrated thread/pool health. Keep separate
 business checks, such as remote service reachability, outside the manager.
 
-## Phase 8: remove compatibility code
+## Phase 9: remove obsolete execution code
 
 After all call sites migrate:
 
@@ -607,8 +671,6 @@ After all call sites migrate:
 - delete `delayed_thread`;
 - remove `run_coroutine_threadsafe` and default-executor calls from backend
   business code;
-- migrate remaining imports from `utility/concurrent.py`;
-- delete `utility/concurrent.py`;
 - remove obsolete manual join/status helpers;
 - update backend concurrency guidance to describe the execution manager, event
   dispatcher, jobs DB pool, and independent users DB lock.
@@ -630,18 +692,19 @@ non-migrated exception.
 
 ## Recommended implementation order
 
-1. Runtime modules, configuration, discovery, lifecycle, and status.
-2. Users DB lock separation.
-3. Atomic jobs DB cutover, caller rewrite, and sync run/scheduler service
+1. Utility module split/import rewrite and users DB helper isolation.
+2. Runtime modules, configuration, staged lifecycle, discovery, and status.
+3. Atomic jobs DB cutover, caller rewrite, and synchronous run/scheduler service
    boundaries.
 4. Artifact I/O and store network work.
 5. Plugin serialized work and startup continuation.
 6. Run background work and route archive creation.
 7. Scheduler long-lived thread.
 8. Circular dependency events.
-9. WebSocket notification PoC.
-10. Blocking route cleanup, final startup/status consolidation, and removal of
-    compatibility code.
+9. Periodic jobs database garbage collection.
+10. WebSocket notification PoC.
+11. Blocking route cleanup, final staged startup/status consolidation, and
+    removal of obsolete execution code.
 
 The database cutover is intentionally early: every later background migration
 then uses the final sync database path and never needs a temporary event-loop
@@ -649,11 +712,7 @@ bridge.
 
 ## Cross-document decisions still required
 
-- Initial pool counts and whether run submission receives a dedicated pool.
-- Event completion receipts in the first dispatcher implementation.
-- Explicit versus periodic restart requests.
-- Status endpoint shape.
-- Event shutdown drain guarantee.
-- Single-process backend invariant.
+- Garbage-collection eligibility, retention age, wake interval, batching,
+  ownership, and cascade order.
 - Plugin unload event ordering.
 - WebSocket authentication, addressing, envelope, and overflow behavior.

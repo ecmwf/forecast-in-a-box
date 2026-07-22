@@ -2,9 +2,9 @@
 
 ## Status
 
-First design iteration. This document defines the target architecture and records
-decisions that still need review. It deliberately uses generic examples; concrete
-migration cases are in
+Second design iteration. This document defines the target architecture and
+records the remaining decisions that still need review. It deliberately uses
+generic examples; concrete migration cases are in
 [`backend-concurrencyRework-migration.md`](backend-concurrencyRework-migration.md).
 
 ## Goals
@@ -56,11 +56,13 @@ forecastbox/utility/dispatcher.py
 forecastbox/utility/db.py
 ```
 
-During migration, `utility/concurrent.py` remains as a compatibility module that
-re-exports or retains the old helpers. It is removed only after all old imports
-have moved. The new `concurrency/__init__.py` must not re-export symbols; callers
-import from the defining module.
-*> review: this could be simplified. First step, say, "phase 0", of the work would create this new org structure in the utility module and re-route all existing imports. Then "phase 1" is introducing the new code, "phase 2" individual migrations
+Migration begins with a preparatory phase that creates the concurrency package,
+moves every existing helper, updates all imports, and deletes
+`utility/concurrent.py`. `manager.py` and `utility/dispatcher.py` are then added
+with the new runtime in Phase 1. `delayed_thread` moves to
+`synchronization.py` with a docstring marking it for removal once dependency
+submission is available. The new `concurrency/__init__.py` must not re-export
+symbols; callers import from the defining module.
 
 Both new abstractions are general-purpose utility code. They must not import
 schemata, routes, entrypoint code, or domain modules.
@@ -72,39 +74,69 @@ definitions are data, while the entrypoint remains responsible for deciding
 which pools and long-lived threads to start.
 
 ```python
+from enum import StrEnum
+
+
+class ConcurrentPools(StrEnum):
+    General = "general"
+    Io = "io"
+    RunSubmission = "run-submission"
+    ArtifactIo = "artifact-io"
+    PluginManagement = "plugin-management"
+    JobsDb = "jobs-db"
+
+
+class ConcurrentThreads(StrEnum):
+    EventDispatcher = "event-dispatcher"
+    Scheduler = "scheduler"
+    DatabaseGarbageCollector = "database-garbage-collector"
+
+
 class PoolSettings(FiabBaseModel):
     max_workers: int
     max_pending: int
 
 
 class ConcurrencySettings(FiabBaseModel):
-    pools: dict[str, PoolSettings] = Field(
+    pools: dict[ConcurrentPools, PoolSettings] = Field(
         default_factory=lambda: {
-            "general": PoolSettings(max_workers=2, max_pending=32),
-            "network": PoolSettings(max_workers=4, max_pending=64),
-            "jobs-db": PoolSettings(max_workers=1, max_pending=128),
+            ConcurrentPools.General: PoolSettings(max_workers=2, max_pending=32),
+            ConcurrentPools.Io: PoolSettings(max_workers=4, max_pending=64),
+            ConcurrentPools.RunSubmission: PoolSettings(max_workers=2, max_pending=32),
+            ConcurrentPools.ArtifactIo: PoolSettings(max_workers=1, max_pending=64),
+            ConcurrentPools.PluginManagement: PoolSettings(max_workers=1, max_pending=16),
+            ConcurrentPools.JobsDb: PoolSettings(max_workers=1, max_pending=128),
         }
     )
-    event_queue_capacity: int = 1024
     failure_history_size: int = 100
     shutdown_timeout_seconds: float = 10
-```
-*> review: I would separate ConcurrencySettings and event queue capacity -- because event queue capacity deals with one particular customer of the ConcurrencySettings, ie, from the PoV of that module, event queue dispatcher is just another long lived thread like scheduler is
 
-Pool identifiers are validated at startup. `jobs-db` must have exactly one
-worker. Code should define shared `PoolName` constants rather than repeating raw
-strings.
-*> review: Include the PoolName enum in the python snippet for the config
+
+class DispatcherSettings(FiabBaseModel):
+    queue_capacity: int = 1024
+```
+
+Pool and thread identifiers are static enums in `utility/config.py`; dynamic
+task names remain a separate type. Pool definitions are validated at startup.
+`ConcurrentPools.JobsDb` must have exactly one worker. Dispatcher capacity is
+dispatcher configuration because the execution manager treats it like any
+other long-lived component.
 
 `max_pending` bounds submitted work that has not completed, including running
 tasks. `ThreadPoolExecutor` has an unbounded internal queue, so the manager must
 enforce this bound with its own semaphore and fail submission explicitly with a
 typed `SubmissionRejected` exception. Async callers must never block the event
 loop while waiting for capacity.
-*> review: do we want to introduce our own ThreadPoolExecutor wrapper, to abstract this? In other unrelated projects, I've run into limitations of ThreadPoolExecutor, so I can imagine we will one day replace it with a custom one... Or would we handle this wrapping logic in the submit methods that are in front of the thread pool executor?
 
-The exact defaults are an open decision; the important requirement is that all
-counts and queue limits are visible in one configuration object.
+Do not subclass `ThreadPoolExecutor`. Introduce a private `ManagedPool` adapter
+owned by the manager. It encapsulates the executor, capacity semaphore, worker
+registration, counters, submission, and shutdown. The public manager methods
+delegate to this adapter and never expose the executor. A future executor
+implementation can therefore replace `ManagedPool` internals without changing
+callers.
+
+The listed defaults are the accepted initial configuration. All counts and
+queue limits remain configurable in one concurrency object.
 
 ## Unified Execution Manager
 
@@ -115,7 +147,11 @@ module level in `utility/concurrency/manager.py`, configured and started by the
 FastAPI lifespan, and shut down by that lifespan. Low-level modules may import
 it without depending on the entrypoint.
 
-*> review: there already are Singletons of this kind across the codebase, most notably the plugin and artifact managers. Is it worth it to create some utility/singleton.py to standardize definition of those classes?
+Do not add a generic singleton utility. A module-level instance already has
+process-local singleton semantics, is directly type-checkable, and avoids
+concealing construction behind metaclasses or mutable class attributes. Other
+state managers can adopt module-level instances independently when migrated;
+that refactoring is not required by this design.
 
 The manager owns:
 
@@ -124,8 +160,9 @@ The manager owns:
 - stop events for long-lived threads;
 - task counters and monitored task failures;
 - thread failure and restart history;
-- lifecycle and submission gates.
-*> review: add "graceful shutdown logic of the pools and threads" to this? And "unified status endpoint"?
+- lifecycle and submission gates;
+- staged startup and graceful shutdown of pools and threads;
+- the unified concurrency status snapshot exposed by the backend status route.
 
 It does not own the business state manipulated by tasks.
 
@@ -134,14 +171,22 @@ It does not own the business state manipulated by tasks.
 Use semantic identifier types and immutable status DTOs:
 
 ```python
-PoolName = NewType("PoolName", str)
-ThreadName = NewType("ThreadName", str)
 TaskName = NewType("TaskName", str)
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class RestartPolicy:
+    max_restarts: int
+    minimum_interval_seconds: float
+
+
+NEVER_RESTART = RestartPolicy(max_restarts=0, minimum_interval_seconds=0)
 
 SyncTask = Callable[[], T]
 ThreadEntrypoint = Callable[[threading.Event], None]
+ThreadStatusProvider = Callable[[], ComponentStatus]
+ThreadStopRequest = Callable[[float], None]
 ```
-*> review: I think PoolName and ThreadName are probably enums, we are fine with these being static, defined in the configuration.py file. For TaskName, new type seems appropriate.
 
 Tasks are synchronous callables. Coroutine functions and returned coroutine
 objects are rejected. Async callers await a `concurrent.futures.Future` with
@@ -159,18 +204,40 @@ new -> starting -> running -> stopping -> stopped
 
 - Registration and pool/thread creation are permitted only in `new` or
   `starting`.
-- Task submission is permitted only in `running`.
-- Shutdown closes submission before stopping and joining owned resources.
+- External task submission is permitted only in `running`. During `starting`,
+  a manager-owned thread may submit to a pool that has already reported ready;
+  this is required for a newly started operational thread to verify database or
+  event dependencies before its stage is declared ready.
+- Startup processes registered resources in ascending stage order.
+- Shutdown processes registered resources in descending stage order and closes
+  general pool submission only after long-lived threads have stopped.
 - A stopped manager is not restarted. A fresh process, or an explicit
   test-only reset, creates a fresh instance.
-- Double registration, double start, submission before start, and submission
-  during shutdown are errors.
+- Double registration, double start, and submission before a destination pool
+  is ready are errors. During shutdown, external submission is rejected, while
+  not-yet-stopped managed threads may continue submitting to live lower-stage
+  pools so they can drain and terminate cleanly.
 
-`start_pool()` creates the executor at application startup, rather than lazily
-on first use. It warms all configured workers with a startup barrier so the
-status can verify the intended worker count without reading private executor
-attributes. Worker initializers register their thread identity with the
-manager.
+Registration records definitions but does not start resources. `start()`
+processes stages in ascending order. Within a stage it creates and warms pools
+before starting threads, then waits for every resource in that stage to report
+ready before advancing. Failure or readiness timeout aborts startup and
+gracefully stops everything already started.
+
+Pool creation warms all configured workers with a startup barrier so status can
+verify the intended worker count without reading private executor attributes.
+Worker initializers register their thread identity with the manager.
+
+The accepted initial stages are:
+
+| Stage | Resources | Reason |
+| ---: | --- | --- |
+| 0 | All pools, including `ConcurrentPools.JobsDb`; event dispatcher | Infrastructure required by later threads |
+| 1 | Operational producer threads | May use database, events, and shared pools |
+| 2 | Periodic database garbage collector | Starts last and stops first |
+
+The API accepts any non-negative stage so later use cases do not require a
+manager redesign.
 
 ### Public API
 
@@ -178,45 +245,55 @@ Names are illustrative, but the implementation should preserve these
 semantics:
 
 ```python
-execution_manager.start_pool(
-    pool_name: PoolName,
+execution_manager.register_pool(
+    pool_name: ConcurrentPools,
     *,
     max_workers: int,
     max_pending: int,
+    stage: int = 0,
 ) -> None
 
-execution_manager.start_thread(
-    thread_name: ThreadName,
+execution_manager.register_thread(
+    thread_name: ConcurrentThreads,
     entrypoint: ThreadEntrypoint,
     *,
-    restart_policy: RestartPolicy = RestartPolicy.NEVER,
+    status_provider: ThreadStatusProvider,
+    stop_request: ThreadStopRequest | None = None,
+    stage: int,
+    restart_policy: RestartPolicy = NEVER_RESTART,
 ) -> None
 
+execution_manager.start() -> StartStatus
+
 execution_manager.stop_thread(
-    thread_name: ThreadName,
+    thread_name: ConcurrentThreads,
     *,
     timeout: float,
 ) -> ThreadStatus
 
+execution_manager.restart_thread(
+    thread_name: ConcurrentThreads,
+) -> ThreadStatus
+
 execution_manager.submit_unmonitored(
-    pool_name: PoolName,
+    pool_name: ConcurrentPools,
     task_name: TaskName,
     task: SyncTask[T],
 ) -> Future[T]
 
 execution_manager.submit_monitored(
-    pool_name: PoolName,
+    pool_name: ConcurrentPools,
     task_name: TaskName,
     task: SyncTask[object],
 ) -> None
 
-await execution_manager.submit_and_wait(
-    pool_name: PoolName,
+await execution_manager.awaitable_submit(
+    pool_name: ConcurrentPools,
     task_name: TaskName,
     task: SyncTask[T],
 ) -> T
 
-execution_manager.status(*, restart: bool = False) -> ExecutionStatus
+execution_manager.status() -> ExecutionStatus
 execution_manager.shutdown(*, timeout: float) -> ShutdownStatus
 ```
 
@@ -232,10 +309,9 @@ adds a bounded failure record. Successful completed futures are discarded.
 Monitored task failure does not kill or restart a pool and does not retry the
 task.
 
-`submit_and_wait` is only an async convenience over `submit_unmonitored` and
+`awaitable_submit` is only an async convenience over `submit_unmonitored` and
 `asyncio.wrap_future`; it does not run work on the async loop's default
 executor.
-*> review: rename to awaitable_submit? That would be more clear I think?
 
 The manager should also have an internal receipt-bearing monitored submission
 used by the event dispatcher. It has the same monitoring behavior but returns
@@ -251,7 +327,7 @@ non-blocking continuation:
 ```python
 execution_manager.submit_after(
     dependency: Future[object],
-    pool_name: PoolName,
+    pool_name: ConcurrentPools,
     task_name: TaskName,
     task: SyncTask[object],
     *,
@@ -269,19 +345,33 @@ A long-lived entrypoint receives a manager-owned `threading.Event` and must
 return promptly after it is set. Its polling and condition waits must therefore
 be bounded or wakeable.
 
+Every registration includes a component status provider. It returns a compact,
+immutable `ComponentStatus` with readiness/health plus component-owned details,
+such as queue depth, last successful iteration, or next wake time. The provider
+must be lock-free or use a short bounded lock; it must perform no database,
+network, disk, or other potentially blocking I/O. The manager combines this
+component snapshot with the physical thread lifecycle fields it owns.
+
+An optional `stop_request(timeout)` lets a component close its own intake gate
+and wake internal waits. It must respect the supplied budget. The event
+dispatcher uses it to reject new events, wake its queue loop, and begin its own
+bounded drain; to the manager this is the same staged stop operation as any
+other registered thread.
+
 The manager wraps each entrypoint so an uncaught exception is recorded with
 thread name, timestamps, restart count, exception representation, and
 traceback. Python `Thread` objects are never reused; restart creates a new
 thread from the registered specification.
 
-`stop_thread` sets only that thread's stop event and joins it within the supplied
-deadline. It does not close pool submission or stop other threads. This permits
-producer threads to stop while the dispatcher and handler pools remain alive to
-drain already emitted events. Stopping an already stopped thread is
-idempotent; stopping an unknown thread is an error.
+`stop_thread` sets only that thread's stop event, calls its optional stop
+request, and joins it within the supplied deadline. It does not close pool
+submission or stop other threads. This permits producer threads to stop while
+the dispatcher and handler pools remain alive to drain already emitted events.
+Stopping an already stopped thread is idempotent; stopping an unknown thread is
+an error.
 
-`status(restart=True)` may restart only a dead thread whose policy permits it.
-It must not:
+`restart_thread` is an explicit mutating operation. It may restart only a dead
+thread whose policy permits it. It must not:
 
 - retry failed tasks;
 - recreate a stopped or broken pool in place;
@@ -290,8 +380,9 @@ It must not:
 - restart indefinitely.
 
 A restart policy should include a maximum count and minimum interval. The
-default is `NEVER`. Whether production status checks should request restart is
-an open decision; a read-only HTTP GET should not acquire hidden side effects.
+default is `NEVER`. Restart is requested only through an explicit internal or
+administrative operation. The read-only status endpoint never restarts
+resources as a side effect.
 
 ### Status
 
@@ -302,7 +393,7 @@ an open decision; a read-only HTTP GET should not acquire hidden side effects.
 - observed live worker count and thread names;
 - submitted, pending, active, succeeded, failed, and cancelled task counts;
 - each long-lived thread's alive flag, native thread id, start time, last stop
-  time, restart count, and last failure;
+  time, stage, restart count, last failure, and component status;
 - bounded recent monitored failures;
 - currently visible Python threads not registered with the manager.
 
@@ -311,8 +402,13 @@ attributes are inspected. A pool is unhealthy when it is broken, shut down
 unexpectedly, or has fewer live workers than configured after warm-up. A task
 failure is visible but does not by itself declare the pool dead.
 
-Status must not call arbitrary business health checks. Those remain separate
-and can be composed by an HTTP status route.
+The existing `/api/v1/status` route exposes this snapshot under
+`concurrency.pools` and `concurrency.threads`. Migrated thread-specific status,
+including scheduler and dispatcher detail, moves under its registered thread
+entry. Existing top-level status fields may move or be renamed during
+migration; corresponding client work is intentionally outside this backend
+change. Remote service probes remain separate from execution status and are
+composed by the same route.
 
 ### Reentrancy and deadlock protection
 
@@ -360,7 +456,7 @@ EventHandler = Callable[[Event], None]
 class DispatcherRegistration:
     handler_id: str
     event_name: EventName
-    pool_name: PoolName
+    pool_name: ConcurrentPools
     handler: EventHandler
 ```
 
@@ -393,8 +489,9 @@ are never silently dropped.
 call the non-blocking sync method and ignore the returned receipt.
 
 The dispatcher thread performs a bounded `queue.get` loop and is registered as
-a restartable long-lived thread in the execution manager. Shutdown also places
-a sentinel so it does not wait for the poll timeout.
+a restartable stage-0 long-lived thread in the execution manager. Its stop
+request first closes event intake, then places a sentinel so the queue loop can
+drain accepted events within its allocated shutdown budget before returning.
 
 ### Fan-out, ordering, and completion
 
@@ -473,19 +570,20 @@ added later only if a concrete use case requires it.
 - in-flight handler count;
 - recent queue and aggregate dispatch failures.
 
-The backend status surface should compose this with `ExecutionStatus`.
-
-*> review: I'm wondering -- wouldn't it be easier to make the status reporting of the long lived threads unified? I mean, for the pools, the manager completely owns the status reporting of the pool (queue lengths, alive threads, etc). Why wouldnt we mandate, when a long running thread is submitted, that it should specify entrypoint and status retrieval callable as well? That would make the overall status message programmatically composable very easily, just iterating over all the registered objects?
+The dispatcher supplies this as its registered component status provider. The
+execution manager composes it with physical thread state, so the backend status
+route can render every long-lived component by iterating one
+`ExecutionStatus.threads` mapping.
 
 ## Jobs database serialization
 
 The jobs SQLite database uses a synchronous SQLAlchemy engine and session maker
 for runtime operations. Every public database operation is a synchronous
-callable submitted to the `jobs-db` pool. Async services use
-`submit_and_wait`; background workers use the returned concurrent future and do
-not retain an event-loop reference.
+callable submitted to `ConcurrentPools.JobsDb`. Async services use
+`awaitable_submit`; background workers use the returned concurrent future and
+do not retain an event-loop reference.
 
-The `jobs-db` pool:
+`ConcurrentPools.JobsDb`:
 
 - has exactly one worker;
 - is started after schema creation;
@@ -495,13 +593,14 @@ The `jobs-db` pool:
   for schema setup, retries, and any explicitly allowed direct maintenance
   operation.
 
-*> review: there is a concern I did not realize -- say we initialize the managers, we can safely start the pools, as they have no requirements, they just sit there and wait. But as we go on starting the long lived threads, those may start doing things and have expectations, in particular, the scheduler thread expects the db to be already readable, ie, the corresponding thread must be alive and serving already. So maybe we need to have a tiered start logic? Like 'manager.add_long_lived_thread(jobs_db, stage=0); managed.add_long_lived_thread(scheduler, stage=1); ... and the manager would make sure that all threads from stage I are up and alive before starting any thread in stage I+1?
-
 The executor queue provides serialization in normal operation; the regular lock
 prevents accidental concurrent direct access during transitional or maintenance
-code. The lock is not used as a reason to run database work on arbitrary
+code. This serialization is required because SQLite permits only one concurrent
+writer. The lock is not used as a reason to run database work on arbitrary
 threads.
-*> review: you may want to add that this is due to SQLite internal limitation of no concurrent writes
+
+The pool is a stage-0 resource. It is warmed and reports ready before the
+manager starts any later-stage thread that may submit database work.
 
 Each submitted callable represents one complete database operation and owns its
 session/transaction. Read-modify-write sequences must be one callable, not
@@ -509,17 +608,16 @@ multiple separately queued calls. SQLite operational-error retries happen
 inside the database worker and retry the whole operation.
 
 ```python
-result = await execution_manager.submit_and_wait(
-    JOBS_DB_POOL,
+result = await execution_manager.awaitable_submit(
+    ConcurrentPools.JobsDb,
     TaskName("records.upsert"),
     partial(records_db.upsert, command),
 )
 ```
-*> review: JOBS_DB_POOL => ConcurrentPools.JobsDb
 
 ```python
 result = execution_manager.submit_unmonitored(
-    JOBS_DB_POOL,
+    ConcurrentPools.JobsDb,
     TaskName("records.upsert"),
     partial(records_db.upsert, command),
 ).result()
@@ -532,31 +630,44 @@ handler boundary.
 Add this comment beside the serialized jobs-database access:
 
 ```python
-# TODO investigate concurrent reads
+# TODO investigate concurrent reads. SQLite should support concurrent readers,
+# but the first implementation deliberately serializes all access so this
+# rework does not also need to solve read/write classification and consistency.
 ```
-*> review: add explanation -- smth like 'sqlite should in theory support concurrent reads, but we do not want to concern ourselves with that now. But this comment is to not forget to do the investigation in the future'.
 
 ### Users database
 
-The users SQLite database remains on its async SQLAlchemy/aiosqlite path. It has
-its own `asyncio.Lock`, separate retry helper, and no dependency on the
-execution manager or jobs-database lock. Authentication and administrative user
-operations must share that users-database lock.
+The users SQLite database is preserved and isolated rather than redesigned. In
+the preparatory migration phase, copy the current async lock and `dbRetry`
+behavior needed by administrative user helpers into `domain/auth/db.py`, give
+them explicit users-database names, and update those helpers to use the local
+implementation. The existing async SQLAlchemy/aiosqlite and FastAPI Users paths
+otherwise continue to work as they do today.
 
-The lock must be acquired at individual persistence-operation boundaries. It
-must not be held for the lifetime of an injected request-scoped session because
-an authenticated administrative request may perform another users-database
-operation before dependency teardown. The FastAPI Users database adapter should
-therefore be wrapped or subclassed with lock-aware methods. On an
-`OperationalError`, a retryable method rolls back/discards its failed session
-state before retrying; operations that cannot be safely replayed surface the
-error rather than pretending to succeed.
+The users database has no dependency on the execution manager, the synchronous
+jobs engine, or the jobs lock. After preparation, `utility/db.py` is
+jobs-database-only, so the coordinated jobs cutover cannot accidentally change
+authentication persistence.
 
-The two database locks, engines, session makers, and retry helpers must have
-explicit `jobs_` and `users_` names. There is no generic global lock spanning
-both files.
+## Periodic database maintenance
 
-*> review: keep in mind that the Users database thing should be "works kinda like today". The description you give here evokes me 'more work, more refactoring'. Try to emphasize the 'preserve and isolate' meaning more. Ideally, the things we need from utility/db.py for the users db to work, in particular the lock and the dbRetry, can be basically copied/replicated to the domain/auth/db.py. This could actually happen during the "phase 0", similarly to how I suggest to handle the utility/concurrent.py initial migration
+The staged thread model also supports periodic maintenance that is neither an
+event reaction nor a pool task initiated by a request. Register a database
+garbage-collector entrypoint as `ConcurrentThreads.DatabaseGarbageCollector` at
+stage 2, so it starts after operational producers and stops before them.
+
+The entrypoint sleeps on a wakeable condition for a configured interval. On
+wake it submits one bounded cleanup operation to `ConcurrentPools.JobsDb` and
+waits for that future. It never opens a database connection on its own thread.
+The cleanup transaction deletes eligible tombstoned rows in explicit
+referential order and commits atomically; timeout or shutdown leaves SQLite in
+a committed pre-cleanup or post-cleanup state, not a partially committed state.
+
+Its component status includes the last attempt, last success, next scheduled
+wake, rows removed, current activity, and last failure. An explicit prod
+operation may wake it for administrative use. Retention and eligibility rules
+remain an open domain decision; superseded versions must not be assumed
+collectable merely because a newer version exists.
 
 ## Startup sequence
 
@@ -564,14 +675,14 @@ The FastAPI lifespan performs these steps in order:
 
 1. Validate configuration.
 2. Create/check both database schemata.
-3. Configure and start all named pools.
-4. Discover and register event handlers.
-5. Freeze event registration.
-6. Start the event-dispatcher thread through the execution manager.
-7. Start other enabled long-lived threads through the execution manager.
-*> review: keep in mind my comment about stages and long lived threads. I'd say event dispatcher and jobs db are stage 0, and other threads are stage 1. Probably no need for stage 2 now, but we can make the manager be capable of handling that.
-8. Submit startup tasks and continuations to named pools.
-9. Yield control to FastAPI.
+3. Register all named pools with the execution manager.
+4. Discover and register event handlers, then freeze dispatcher registration.
+5. Register the event dispatcher at stage 0, operational long-lived threads at
+   stage 1, and the database garbage collector at stage 2.
+6. Call `ExecutionManager.start()`. It starts and verifies resources stage by
+   stage, with pools before threads in stage 0.
+7. Submit startup tasks and continuations to named pools.
+8. Yield control to FastAPI.
 
 No domain manager creates a thread or executor during import or lazily during a
 request.
@@ -580,29 +691,26 @@ request.
 
 Shutdown is bounded and reports incomplete joins:
 
-1. Close route-level/domain submission gates.
-2. Call `stop_thread` for producer long-lived threads and wake any domain-owned
-   waits.
-*> review: actually, the stages can be re-used in shutdown as well, in the reverse order. It won't be perfect, but still more graceful than a random order. Ie, first shut down stage N long lived threads, then N-1, then stage 0 (the db and events dispatcher), then the generic pools
-3. Stop accepting new external events.
-4. Allow already queued events and handler futures to drain within the shared
-   shutdown deadline.
-*> review: this should be concern of the events dispatcher itself, not of the manager. Basically, the stop call to the events dispatcher thread would make it close the gate first, then drain for allowed time, then terminate. But to the manager, it looks like "I've just issued a stop call to all stage-0 long lived threads"
-5. Call `stop_thread` for the event-dispatcher thread.
-6. Call `ExecutionManager.shutdown` with the remaining deadline. Only now does
-   the manager enter `stopping`, close all pool submission, and shut down pools;
-   pending work is not silently discarded.
-7. Shut down independently managed child processes and connections.
-8. Return a final status containing resources that did not stop.
+1. Close route-level/domain submission gates and close notification sockets.
+2. Stop long-lived threads in descending stage order: database garbage
+   collection, operational producers, then stage-0 infrastructure.
+3. For the event dispatcher, its registered stop request closes event intake
+   and performs its own bounded best-effort drain before its entrypoint returns.
+4. After all long-lived threads have been asked to stop, close general pool
+   submission and shut down pools. Pending work is not silently discarded.
+5. Shut down independently managed child processes and connections.
+6. Return a final status containing resources that did not stop.
 
 Events emitted after event intake closes fail explicitly. The first
 implementation provides bounded best-effort drain, not an unlimited guarantee.
-The manager must use one shared deadline rather than applying the full timeout
-independently to every resource.
-*> review: agreed with the shared deadline, though we should not give the full deadline to the first shutdown call, otherwise it may consume all, leaving others with 0. Say deadline is 'shutdown in 10 seconds' and there are 5 steps, so each step would get max of 2 seconds + extra left by previous steps
+The manager and entrypoint use one shared deadline with fair-share budgeting,
+not the full remaining deadline for the first operation. Divide the initial
+budget by the remaining shutdown groups. Each group receives at most its base
+share plus time left unused by earlier groups, preserving a minimum share for
+later stages and pool/process cleanup.
 
-The manager remains in `running` state through steps 1-5 so the dispatcher can
-submit handlers during drain. Route/domain gates and dispatcher intake are
+The manager keeps pool submission available while stopping long-lived threads,
+including during dispatcher drain. Route/domain gates and dispatcher intake are
 separate from the manager's final pool-submission gate.
 
 ## Architectural invariants
@@ -613,6 +721,9 @@ separate from the manager's final pool-submission gate.
   references.
 - Long-lived threads accept a stop event and are restartable only by explicit
   policy.
+- Managed resources start in ascending stage order and stop in descending
+  stage order.
+- Every long-lived thread provides non-blocking component status.
 - Event producers never import consumers.
 - Event registration happens before dispatch starts.
 - Jobs-database access occurs only on the single jobs-database worker, apart
@@ -623,31 +734,16 @@ separate from the manager's final pool-submission gate.
 
 ## Questions for review
 
-1. Are `general=2`, `network=4`, and `jobs-db=1` acceptable initial pools, or
-   should any serialized activity receive another dedicated one-worker pool?
-*> answer: acceptable. Maybe rename network to io -- mostly they are network2disk, sometimes memory2disk, sometimes network2memory, ...
-2. Should `status(restart=True)` remain an explicit internal/admin operation, or
-   should a periodic supervisor request restarts automatically?
-*> answer: lets keep it simple for now, must be explicit
-3. Is the event completion future required in the first implementation? It is
-   recommended because it preserves causal readiness without direct imports.
-*> answer: yes
-4. Is bounded best-effort event drain during shutdown sufficient, or must
-   shutdown wait indefinitely for queued events?
-*> answer: sufficient, staying up forever is worse than leaving db uncomplete (though ideally not corrupted... but sqlite should be robust enough)
-5. Should queue saturation reject immediately as proposed, or may background
-   producers block for a configured timeout? Async producers must always remain
-   non-blocking.
-*> answer: if the queue is full, it suggests something likely has gone wrong, and immediate rejection is a better idea
-6. Is one backend process/Uvicorn worker a supported invariant? The proposed
-   bus, manager state, and WebSocket fan-out are process-local.
-*> answer: process locality is supported, we don't expect to have multi worker setting any time soon
-7. Should execution details be added to the existing status response or exposed
-   through a separate administrative endpoint?
-*> answer: utilize the existing status endpoint. As we will be migrating, this will cause API change for the client who consume the current status endpoint, for example, the scheduler status will be nested differently -- today its I think top level field, but as we'll migrate it, it would move to eg concurrency.threads.scheduler -- that is ok   
-8. Is converting the jobs database to synchronous SQLAlchemy in one coordinated
-   cutover acceptable? The alternative is a dedicated thread owning a second
-   asyncio loop, which retains more complexity and library-created threads.
-*> answer: yes, one coordinated cutover is valid. We would not want a mixed up world. One PR that migrates all db accesses at once is fine (note also how I suggested first migrating the users db interactions to their own utility in "stage 0" -- this could happen first, and would shrink the scope of this all-DB-migration PR)
-
-*> review: there is one novel concern I forgot -- our database is in some sense 'immutable' today, that is, for some entities, when the user calls Update route, it actually triggers an insert of a new row with version+1. This will leave number of dead rows in the db. We will need another long lived thread, periodically to be woken up and delete tombstoned things in a cascade fashion. It does not change anything we discussed so far, but adds another interesting use case / example which is neither event, nor general purpose pool, nor existing long lived thread. But justifies the "staged long lived thread start/stop", ie, this one should probably start last and stop first.
+1. For database garbage collection, are only explicitly tombstoned entity
+   families eligible, or may superseded immutable versions also be removed?
+   The latter can break version-specific references and requires a retention
+   contract.
+2. What age threshold and wake interval should database garbage collection use,
+   and should an administrative prod be exposed in the first implementation?
+3. Which module should own the cross-entity cleanup transaction while
+   preserving the domain import hierarchy?
+4. For the event-based dependency migration, should removal reactions complete
+   before or after the producer removes its in-memory object?
+5. For the WebSocket proof of concept, what authentication, addressing,
+   envelope version, and slow-client overflow policies are required? Delivery
+   acknowledgement and replay are not recommended initially.
