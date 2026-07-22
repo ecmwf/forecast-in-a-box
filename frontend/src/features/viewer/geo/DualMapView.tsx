@@ -25,6 +25,7 @@ import { usePointerReadout } from '../hooks/usePointerReadout'
 import { useTimeStepPrefetch } from '../hooks/useTimeStepPrefetch'
 import { formatLatLon } from '../format'
 import { compositeMapToCanvas } from '../map-export'
+import { MapLoadingBar } from '../components/MapLoadingBar'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
 import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
@@ -359,6 +360,7 @@ function DualMapPanel({
         ref={containerRef}
         className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
       />
+      <MapLoadingBar loading={loadingCount > 0} slot={source.slot} />
       <LoupeOverlay
         containerRef={containerRef}
         mirror={loupeMirror ? cross : null}

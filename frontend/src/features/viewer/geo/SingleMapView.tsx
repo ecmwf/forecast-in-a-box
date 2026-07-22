@@ -40,6 +40,7 @@ import { usePointerReadout } from '../hooks/usePointerReadout'
 import { useTimeStepPrefetch } from '../hooks/useTimeStepPrefetch'
 import { formatLatLon } from '../format'
 import { compositeMapToCanvas } from '../map-export'
+import { MapLoadingBar } from '../components/MapLoadingBar'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
 import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
@@ -656,6 +657,14 @@ export function SingleMapView({
         </div>
       )}
 
+      <MapLoadingBar loading={loadingCount.a > 0} slot="a" />
+      {b !== null && (
+        <MapLoadingBar
+          loading={loadingCount.b > 0}
+          slot="b"
+          className="top-0.5"
+        />
+      )}
       <LoupeOverlay containerRef={containerRef} sizePx={loupeSizePx} />
       <OverlayHoverCard hover={overlayHover} />
       <PinnedLegendsBar items={pinnedLegends} onUnpin={onUnpinLegend} />
