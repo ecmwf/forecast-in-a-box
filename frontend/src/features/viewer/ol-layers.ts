@@ -135,15 +135,8 @@ export function makeBasemapLayer(
  * cache keys. crossOrigin: 'anonymous' keeps the shared canvas untainted so
  * PNG export works.
  */
-/** Decode failure → error state: the source re-requests on revisit instead
- *  of serving an abandoned forever-loading image. */
+/** Decode failure → error state for real load failures. */
 const FAILED_IMAGE_SRC = 'data:image/gif;base64,invalid'
-
-/** Superseded (aborted) load — its error event is bookkeeping, not a
- *  server failure. */
-export function isAbortedLoad(img: unknown): boolean {
-  return img instanceof HTMLImageElement && img.dataset.fiabAborted === '1'
-}
 
 /** The GetMap URL a load was issued for — `img.src` becomes a blob URL. */
 export function loadRequestUrl(img: unknown): string | null {
@@ -162,7 +155,6 @@ export function cancellingImageLoader(): LoadFunction {
     inFlight = controller
     const img = image.getImage() as HTMLImageElement
     img.dataset.fiabRequestUrl = src
-    delete img.dataset.fiabAborted
     fetch(src, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`GetMap ${res.status}`)
@@ -174,7 +166,9 @@ export function cancellingImageLoader(): LoadFunction {
         img.src = url
       })
       .catch(() => {
-        if (controller.signal.aborted) img.dataset.fiabAborted = '1'
+        // Superseded: settle nothing — the source already replaced this
+        // wrapper, and failing it would console.error inside OL.
+        if (controller.signal.aborted) return
         img.src = FAILED_IMAGE_SRC
       })
   }

@@ -27,7 +27,6 @@ import ImageLayer from 'ol/layer/Image'
 import {
   DEFAULT_LAYER_OPACITY,
   WEB_MERCATOR_EXTENT,
-  isAbortedLoad,
   loadRequestUrl,
   makeDataLayerSource,
 } from '../ol-layers'
@@ -224,8 +223,6 @@ export function useWmsLayerStack(
         // it would masquerade as the newly requested instant.
         source.on('imageloaderror', (evt) => {
           decLoading()
-          // Superseded loads are bookkeeping, not server failures.
-          if (isAbortedLoad(evt.image.getImage())) return
           if (!entry.errored) {
             entry.errored = true
             syncErrorCount()
