@@ -179,19 +179,23 @@ export function useAnnotationLayer(
     map.on('singleclick', onClick)
 
     // Drag repositions; a clean click still edits (no drag → singleclick).
-    const translate = new Translate({ layers: [layer], hitTolerance: 8 })
-    translate.on('translateend', (evt) => {
-      const feature = evt.features.item(0)
-      const id = feature.getId()
-      const geometry = feature.getGeometry()
-      if (typeof id !== 'string' || !(geometry instanceof Point)) return
-      const [x, y] = geometry.getCoordinates()
-      handlersRef.current.onMove(id, [x, y])
-    })
-    map.addInteraction(translate)
+    // Mounted only while pins exist — Translate hit-tests every pointermove.
+    let translate: Translate | null = null
+    if (visible.length > 0) {
+      translate = new Translate({ layers: [layer], hitTolerance: 8 })
+      translate.on('translateend', (evt) => {
+        const feature = evt.features.item(0)
+        const id = feature.getId()
+        const geometry = feature.getGeometry()
+        if (typeof id !== 'string' || !(geometry instanceof Point)) return
+        const [x, y] = geometry.getCoordinates()
+        handlersRef.current.onMove(id, [x, y])
+      })
+      map.addInteraction(translate)
+    }
 
     return () => {
-      map.removeInteraction(translate)
+      if (translate) map.removeInteraction(translate)
       map.un('singleclick', onClick)
       map.removeLayer(layer)
     }
