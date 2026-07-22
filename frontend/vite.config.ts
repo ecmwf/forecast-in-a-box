@@ -14,6 +14,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { visualizer } from 'rollup-plugin-visualizer'
 
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
+// Dependency-free data module — safe to share with the app bundle.
+import { CURATED_WMS_SERVERS } from './src/features/visualise/curated-wms'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -30,18 +32,19 @@ export default defineConfig(({ mode }) => {
       }),
       viteReact(),
       tailwindcss(),
-      // The WMS lens runs on a dynamic loopback port; CSP must let the page
-      // reach it in all builds, not just dev. External WMS comparison
-      // sources are user-entered arbitrary hosts: allowed wholesale in dev,
-      // opt-in per deployment via FIAB_CSP_EXTRA_HOSTS (space-separated
-      // source expressions, e.g. "https://eccharts.ecmwf.int") in prod.
+      // CSP: the WMS lens lives on dynamic loopback ports in every build.
+      // External WMS hosts: dev allows all; prod bakes in the curated list
+      // plus FIAB_CSP_EXTRA_HOSTS (space-separated source expressions).
       {
         name: 'csp-loopback-hosts',
         transformIndexHtml(html) {
+          const curatedOrigins = [
+            ...new Set(CURATED_WMS_SERVERS.map((s) => new URL(s.url).origin)),
+          ]
           const hosts = [
             'http://localhost:*',
             'http://127.0.0.1:*',
-            ...(isDev ? ['https:', 'http:'] : []),
+            ...(isDev ? ['https:', 'http:'] : curatedOrigins),
             ...(env.FIAB_CSP_EXTRA_HOSTS ? [env.FIAB_CSP_EXTRA_HOSTS] : []),
           ]
           return html.replaceAll(
