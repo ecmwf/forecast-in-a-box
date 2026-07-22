@@ -51,6 +51,7 @@ Python exposes them, but are not migrated into the execution manager.
   the same time.
 - Keep existing route response fields during the transition. New operational
   detail should be additive or exposed separately.
+*> review: we are actually fine moving/renaming route response fields -- the reviewer will notice when this happens and fire up independently the corresponding frontend refactoring -- mention this explicitly so that the developer working on this is not concerned by frontend
 
 ## Phase 1: add the runtime beside the old system
 
@@ -71,6 +72,7 @@ Move or copy the free-port, shutdown, and timed-acquire implementations into
 their target modules. Keep `utility/concurrent.py` as a compatibility layer
 until all imports migrate. Do not move `delayed_thread`; it becomes obsolete
 when plugin startup uses `submit_after`.
+*> review: we do not want utility/concurrent.py as a compatibility layer, we want to actively change all imports to new locations. The `delayed_thread` should be moved as well, but marked (in docstring) as soon-to-be-deprecated 
 
 ### 1.2 Add central configuration
 
