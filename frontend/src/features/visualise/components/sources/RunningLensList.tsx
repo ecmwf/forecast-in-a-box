@@ -34,9 +34,13 @@ export function RunningLensList({ query = '' }: { query?: string }) {
     () => new Set(basketEntries.map((e) => entryRef(e))),
     [basketEntries],
   )
-  const { data: lenses } = useLensList()
+  const { data: lensList } = useLensList()
   const pathIndex = useLensPathIndex()
 
+  // The registry keeps failed/terminated records — only live servers here.
+  const lenses = lensList?.filter(
+    (l) => l.status === 'running' || l.status === 'starting',
+  )
   if (!lenses || lenses.length === 0) return null
   return (
     <section className="space-y-1">

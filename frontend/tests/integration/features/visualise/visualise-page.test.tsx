@@ -38,9 +38,11 @@ import {
   secondGribRunExecution,
 } from '@tests/../mocks/data/job.data'
 import {
+  failMockLens,
   injectMockLens,
   listMockLenses,
   resetLensState,
+  stopMockLens,
 } from '@tests/../mocks/data/lens.data'
 import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
@@ -219,10 +221,25 @@ describe('VisualisePage', () => {
       lens_params: { local_path: '/data/output/foreign-dir' },
       ports: [54305],
     })
+    // Failed registry records must not surface as "running" rows.
+    injectMockLens({
+      lens_instance_id: 'lens-corpse-1',
+      status: 'failed',
+      lens_name: 'skinnyWMS',
+      lens_params: { local_path: '/data/output/corpse-dir' },
+      ports: [],
+    })
     const screen = await renderVisualisePage()
-    await expect.poll(() => listMockLenses(), { timeout: 8000 }).toHaveLength(2)
+    await expect
+      .poll(() => listMockLenses().filter((l) => l.status === 'running'), {
+        timeout: 8000,
+      })
+      .toHaveLength(2)
 
     await screen.getByRole('button', { name: 'Manage sources' }).click()
+    expect(screen.getByText('/data/output/corpse-dir').elements()).toHaveLength(
+      0,
+    )
     const stopButtons = screen.getByRole('button', {
       name: 'Stop lens server',
     })
@@ -230,10 +247,16 @@ describe('VisualisePage', () => {
     await expect.element(stopButtons).toBeVisible()
     expect(stopButtons.elements()).toHaveLength(1)
     ;(stopButtons.element() as HTMLElement).click()
-    await expect.poll(() => listMockLenses(), { timeout: 5000 }).toHaveLength(1)
-    expect(listMockLenses()[0].lens_params.local_path).toBe(
-      '/data/output/job-completed-001_1',
-    )
+    await expect
+      .poll(() => listMockLenses().filter((l) => l.status === 'running'), {
+        timeout: 5000,
+      })
+      .toHaveLength(1)
+    expect(
+      listMockLenses()
+        .filter((l) => l.status === 'running')
+        .map((l) => l.lens_params.local_path),
+    ).toEqual(['/data/output/job-completed-001_1'])
   })
 
   it('removing a source stops its now-orphaned lens', async () => {
@@ -251,11 +274,80 @@ describe('VisualisePage', () => {
     await expect.element(removeB).toBeVisible()
     ;(removeB.element() as HTMLElement).click()
 
-    await expect.poll(() => listMockLenses(), { timeout: 5000 }).toHaveLength(1)
-    expect(listMockLenses()[0].lens_params.local_path).toBe(
-      '/data/output/job-completed-001_1',
-    )
+    await expect
+      .poll(() => listMockLenses().filter((l) => l.status === 'running'), {
+        timeout: 5000,
+      })
+      .toHaveLength(1)
+    expect(
+      listMockLenses()
+        .filter((l) => l.status === 'running')
+        .map((l) => l.lens_params.local_path),
+    ).toEqual(['/data/output/job-completed-001_1'])
   })
+
+  it(
+    'recovers when a serving lens is stopped elsewhere',
+    { timeout: 40000 },
+    async () => {
+      useComparisonStore.getState().addEntry(RUN_A)
+      const screen = await renderVisualisePage()
+      await expect
+        .poll(() => listMockLenses(), { timeout: 8000 })
+        .toHaveLength(1)
+      await expect
+        .element(screen.getByText('Compare…').first(), { timeout: 8000 })
+        .not.toBeInTheDocument()
+      const firstId = listMockLenses()[0].lens_instance_id
+
+      // Killed behind the page's back (run-list card, another tab).
+      stopMockLens(firstId)
+      // The running-liveness poll surfaces the 404; auto-start revives.
+      await expect
+        .poll(
+          () => listMockLenses().filter((l) => l.lens_instance_id !== firstId),
+          { timeout: 25000 },
+        )
+        .toHaveLength(1)
+    },
+  )
+
+  it(
+    'revives a lens the backend marks failed after it served',
+    { timeout: 40000 },
+    async () => {
+      useComparisonStore.getState().addEntry(RUN_A)
+      const screen = await renderVisualisePage()
+      await expect
+        .poll(() => listMockLenses(), { timeout: 8000 })
+        .toHaveLength(1)
+      // Wait until the lens actually SERVES (viewer mounted) and the
+      // status poll has observed `running` — a lens that never served
+      // must keep the honest failed phase instead of reviving.
+      await expect
+        .element(screen.getByText(/display is static/), { timeout: 10000 })
+        .toBeVisible()
+      await new Promise((r) => setTimeout(r, 2200))
+      const firstId = listMockLenses()[0].lens_instance_id
+
+      // External stop on the real backend keeps the record, status failed.
+      failMockLens(firstId)
+      // Revival starts a fresh instance AND purges the failed record.
+      await expect
+        .poll(
+          () => {
+            const lensesNow = listMockLenses()
+            return (
+              lensesNow.length === 1 &&
+              lensesNow[0].status === 'running' &&
+              lensesNow[0].lens_instance_id !== firstId
+            )
+          },
+          { timeout: 25000 },
+        )
+        .toBe(true)
+    },
+  )
 
   it('Clear all empties the basket and the URL pair stays cleared', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
