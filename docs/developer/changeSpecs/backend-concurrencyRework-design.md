@@ -2,9 +2,9 @@
 
 ## Status
 
-Second design iteration. This document defines the target architecture and
-records the remaining decisions that still need review. It deliberately uses
-generic examples; concrete migration cases are in
+Final design iteration. This document defines the target architecture and
+records explicitly deferred follow-up work. It deliberately uses generic
+examples; concrete migration cases are in
 [`backend-concurrencyRework-migration.md`](backend-concurrencyRework-migration.md).
 
 ## Goals
@@ -15,7 +15,7 @@ generic examples; concrete migration cases are in
 - Keep the async request loop responsive without treating higher throughput as
   the primary goal.
 - Provide one process-local event bus for indirect, one-to-many reactions and
-  notification delivery.
+  notification handoff.
 - Remove the need for background threads to retain the FastAPI event loop only
   to perform jobs-database operations.
 - Serialize jobs-database access on a dedicated worker while preserving a
@@ -30,6 +30,7 @@ generic examples; concrete migration cases are in
   pool is not part of this change.
 - Durable messaging, replay, delivery across processes, or delivery after a
   backend restart.
+- A real WebSocket endpoint or notification delivery contract.
 - Replacing domain-owned immutable state snapshots and their short critical
   sections.
 - Concurrent jobs-database reads in the first implementation.
@@ -339,6 +340,10 @@ The continuation is registered on the dependency future and only submits the
 task after completion. It consumes and records dependency failure. It does not
 occupy a worker while waiting.
 
+The first manager contract waits on one future. A later workflow may need
+`submit_after_all` for a group of prerequisites, but group aggregation is not
+part of this rework and must not be added speculatively.
+
 ### Long-lived threads
 
 A long-lived entrypoint receives a manager-owned `threading.Event` and must
@@ -446,7 +451,18 @@ Event names use a namespaced past-tense convention such as
 `producer.resource.changed`. A producer owns the name and payload contract.
 Consumers validate payloads into their own typed dataclass or Pydantic model.
 
-*> review: there is an interesting interplay between Events and submit_after. Recall the domain hierarchy we have -- you could add somewhere in the design doc a guideline like "if a certain concern is linear, aligned with domain hierarchy, but varies in terms of resources and locks used, submit_after is the right abstraction (a good example is the backrgound job compilation). But if a concern goes in the opposite direction of hierarchy or transversally, is loosely coupled, or has a dynamic fan out, it should rely on Events (good examples are the plugin template ingest or websocket notifications). This comment does not change anything in your plans, you got that distinction correctly. But I would still like to have a brief paragraph somewhere in this document along these lines. Keep in mind that this document will be used at some point to update the general purpose development guidelines, so this sort of general statements is useful
+### Choosing continuations or events
+
+Use `submit_after` when a concern is a linear workflow that follows the allowed
+dependency hierarchy but successive steps need different pools, locks, or
+resource limits. The producer knows the next operation and needs its completion
+to advance.
+
+Use events when a reaction crosses or reverses the dependency hierarchy, is
+loosely coupled, has dynamic fan-out, or should allow consumers to be added
+without changing the producer. Event producers publish facts; they do not
+encode the consumer sequence. Do not use the event bus merely as an indirect
+function call for an otherwise linear same-direction workflow.
 
 ### Registration contract
 
@@ -514,6 +530,12 @@ without importing the consumer. Producers should normally emit and continue.
 Synchronous waits must not form cycles or wait on a handler scheduled to the
 same saturated pool.
 
+When a producer must complete a reaction before applying its next in-memory
+state transition, it awaits the dispatch receipt first. The handler should be
+idempotent so a failed caller may safely retry and cause the reaction again.
+This is at-least-once-safe application behavior, not an at-least-once delivery
+guarantee from the in-memory dispatcher.
+
 The internal receipt-bearing submission has one owner for capacity accounting:
 its completion callback releases pool capacity exactly once, while both the
 manager monitor and dispatch aggregator may safely inspect `future.exception()`.
@@ -521,8 +543,8 @@ The aggregate callback must not resubmit work while holding manager or
 dispatcher registry locks.
 
 Delivery is at most once and in memory. "Completed" means all handlers returned;
-for a notification handler it may only mean that data was queued for a socket,
-not that a client received it.
+for the notification PoC it means only that the async-loop handoff was
+scheduled, not that any client received data.
 
 ### Discovery
 
@@ -658,18 +680,32 @@ event reaction nor a pool task initiated by a request. Register a database
 garbage-collector entrypoint as `ConcurrentThreads.DatabaseGarbageCollector` at
 stage 2, so it starts after operational producers and stops before them.
 
-The entrypoint sleeps on a wakeable condition for a configured interval. On
-wake it submits one bounded cleanup operation to `ConcurrentPools.JobsDb` and
-waits for that future. It never opens a database connection on its own thread.
-The cleanup transaction deletes eligible tombstoned rows in explicit
-referential order and commits atomically; timeout or shutdown leaves SQLite in
-a committed pre-cleanup or post-cleanup state, not a partially committed state.
+This effort implements only a lifecycle proof of concept, not garbage
+collection policy. The entrypoint wakes every 10 minutes using a hardcoded
+interval, submits one simple read-only query from one domain to
+`ConcurrentPools.JobsDb`, waits for that future, records the result, and sleeps
+again. It never opens a database connection on its own thread. There is no
+configuration field and no administrative prod.
 
 Its component status includes the last attempt, last success, next scheduled
-wake, rows removed, current activity, and last failure. An explicit prod
-operation may wake it for administrative use. Retention and eligibility rules
-remain an open domain decision; superseded versions must not be assumed
-collectable merely because a newer version exists.
+wake, current activity, query result summary, and last failure. Actual
+tombstone/version eligibility, deletion transactions, batching, cascade order,
+and dynamic discovery of domain cleanup callables are explicitly deferred to a
+separate design.
+
+## Async-loop notification handoff proof of concept
+
+This effort proves event delivery back into the FastAPI loop without adding a
+WebSocket route or network contract. A process-local
+`ActiveWebsocketClientRegistry` stores the running async loop. A
+`notification.emitted` handler runs in `ConcurrentPools.General` and asks the
+registry to use `loop.call_soon_threadsafe` to create a small task on that loop.
+The task only logs at debug level that the event would have been sent.
+
+The placeholder has no clients, authentication, addressing, per-connection
+queues, overflow behavior, replay, or acknowledgement. Its name reserves the
+future integration point; actual WebSocket behavior requires a separate
+design. Business/background producers know only the notification event.
 
 ## Startup sequence
 
@@ -678,13 +714,14 @@ The FastAPI lifespan performs these steps in order:
 1. Validate configuration.
 2. Create/check both database schemata.
 3. Register all named pools with the execution manager.
-4. Discover and register event handlers, then freeze dispatcher registration.
-5. Register the event dispatcher at stage 0, operational long-lived threads at
+4. Initialize `ActiveWebsocketClientRegistry` with the running loop.
+5. Discover and register event handlers, then freeze dispatcher registration.
+6. Register the event dispatcher at stage 0, operational long-lived threads at
    stage 1, and the database garbage collector at stage 2.
-6. Call `ExecutionManager.start()`. It starts and verifies resources stage by
+7. Call `ExecutionManager.start()`. It starts and verifies resources stage by
    stage, with pools before threads in stage 0.
-7. Submit startup tasks and continuations to named pools.
-8. Yield control to FastAPI.
+8. Submit startup tasks and continuations to named pools.
+9. Yield control to FastAPI.
 
 No domain manager creates a thread or executor during import or lazily during a
 request.
@@ -693,15 +730,17 @@ request.
 
 Shutdown is bounded and reports incomplete joins:
 
-1. Close route-level/domain submission gates and close notification sockets.
+1. Close route-level/domain submission gates.
 2. Stop long-lived threads in descending stage order: database garbage
    collection, operational producers, then stage-0 infrastructure.
 3. For the event dispatcher, its registered stop request closes event intake
    and performs its own bounded best-effort drain before its entrypoint returns.
-4. After all long-lived threads have been asked to stop, close general pool
+4. After the dispatcher returns, clear the loop reference held by
+   `ActiveWebsocketClientRegistry`.
+5. After all long-lived threads have been asked to stop, close general pool
    submission and shut down pools. Pending work is not silently discarded.
-5. Shut down independently managed child processes and connections.
-6. Return a final status containing resources that did not stop.
+6. Shut down independently managed child processes and connections.
+7. Return a final status containing resources that did not stop.
 
 Events emitted after event intake closes fail explicitly. The first
 implementation provides bounded best-effort drain, not an unlimited guarantee.
@@ -719,8 +758,9 @@ separate from the manager's final pool-submission gate.
 
 - Only the entrypoint starts or stops the concurrency runtime.
 - Only the execution manager creates application-owned threads and executors.
-- Domain code submits named callables; it does not store executor or event-loop
-  references.
+- Business domain code submits named callables; it does not store executor or
+  event-loop references. Explicit async-loop adapters may retain the loop solely
+  to bridge managed sync work back into FastAPI.
 - Long-lived threads accept a stop event and are restartable only by explicit
   policy.
 - Managed resources start in ascending stage order and stop in descending
@@ -734,23 +774,15 @@ separate from the manager's final pool-submission gate.
 - No work is silently dropped because a queue is full or shutdown has started.
 - Status is a snapshot; it does not execute business work.
 
-## Questions for review
+## Deferred follow-up design
 
-1. For database garbage collection, are only explicitly tombstoned entity
-   families eligible, or may superseded immutable versions also be removed?
-   The latter can break version-specific references and requires a retention
-   contract.
-*> answer: we should not design the database garbage collection here fully. This whole concurrency rework/migration effort should conclude with the garbage collector standalone long lived thread reporting something and periodically waking, doing some simple select, and sleeping back -- as a PoC, to be specified later. I mentioned it because I want to have the "stages" initialization/shutdown structure in place, and want to see "multiple long lived threads can work with the db pool independently" in action. This same thing pertains to the notifications-websocket thing, we don't need to implement the actual sending, just demonstrate the "dispatcher -> async-loop-aware long-lived-thread" means in this new concurrency setting
-2. What age threshold and wake interval should database garbage collection use,
-   and should an administrative prod be exposed in the first implementation?
-*> answer: no prod exposed, wake once every 10 minutes (don't even introduce a config for it now, its just a PoC)
-3. Which module should own the cross-entity cleanup transaction while
-   preserving the domain import hierarchy?
-*> answer: this is a good question. We will _probably_ design it by the collector doing some dynamic discovery, like is done with schemata, event handlers, etc. But again, not need to be part of this spec; a single domain db's query can be hardcoded
-4. For the event-based dependency migration, should removal reactions complete
-   before or after the producer removes its in-memory object?
-*> answer: my reasoning is _before_, and that the removal should not fail in case its executed twice, ie, I would like a "safe at least once" semantics -- is that sound?
-5. For the WebSocket proof of concept, what authentication, addressing,
-   envelope version, and slow-client overflow policies are required? Delivery
-   acknowledgement and replay are not recommended initially.
-*> answer: I would even say the actual WebSocket is not part of the PoC, ie, we just want some placeholder object called ActiveWebsocketClientRegistry, which would hold the loop, receive the events via dispatcher, and would submit (from the general sync pool) an async task to the loop which only log debugs a 'Event would have been sent'
+No open design questions remain for this concurrency rework. Separate future
+specifications may address:
+
+- actual tombstone/version garbage collection, including dynamic discovery,
+  eligibility, retention, batching, and cascade order;
+- a real WebSocket endpoint and its authentication, addressing, buffering,
+  overflow, replay, acknowledgement, and shutdown contracts;
+- continuation after a group of futures;
+- manager-owned higher-level serialized resources that can queue constrained
+  operations before assigning them to a shared pool.

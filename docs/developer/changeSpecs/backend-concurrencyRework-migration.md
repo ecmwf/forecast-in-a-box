@@ -2,7 +2,7 @@
 
 ## Status
 
-Second migration iteration. This document maps the current backend concerns onto
+Final migration iteration. This document maps the current backend concerns onto
 the target architecture in
 [`backend-concurrencyRework-design.md`](backend-concurrencyRework-design.md).
 The documents must be reviewed and updated together.
@@ -25,8 +25,8 @@ It also excludes test design.
 | Jobs SQLite access | `utility/db.py` and domain DB modules | One global `asyncio.Lock`; background threads send coroutines to the FastAPI loop | One-worker jobs DB pool, sync DB helpers, regular jobs lock |
 | Users SQLite access | Auth/admin DB modules | Shares the jobs async lock in some helpers; FastAPI Users sessions bypass that shared helper | Independent users async lock and retry path |
 | Cross-domain template reaction | `domain/plugin/manager.py` | In-body imports breach the domain hierarchy for ingest and unload | Producer events and consumer-owned handlers |
-| Notification delivery | None | No WebSocket endpoint or notification broker | Event handler plus process-local WebSocket hub |
-| Jobs database garbage collection | None | Versioned and tombstoned rows are retained indefinitely | Stage-2 periodic maintenance thread submitting cleanup to the jobs DB pool |
+| Notification delivery | None | No WebSocket endpoint or notification broker | Event-to-async-loop logging PoC through `ActiveWebsocketClientRegistry`; no endpoint |
+| Jobs database garbage collection | None | Versioned and tombstoned rows are retained indefinitely | Stage-2 periodic thread submitting a simple read-only PoC query to the jobs DB pool |
 | Startup/shutdown | `entrypoint/app.py` | Starts and joins each manager separately in a hand-written order | Configure, start, inspect, and stop the shared runtime |
 
 `utility/concurrent.py` also owns timed lock acquisition, free-port allocation,
@@ -333,12 +333,18 @@ In `domain/plugin/manager.py`:
   `delayed_thread`;
 - remove `join_updater_thread`.
 
-*> review: why do we keep plugin installation in a dedicated pool? If we are worried about modifying the plugin manager state concurrently, we have a lock, no? If we are worried about calling pip install concurrently (which I guess should not be done), we could perhaps later solve with another lock (which could lead to a sort of starvation or undesired occupation -- but I think we will anyway later need some sort of high level resource object which the execution manager would own, and would keep an internal queue prior to submitting to pools). No need to solve this fully, but I want you to put the reason for "dedicate pool" here, and tell the developer to propagate it to the code as the comment, including future refactor options (no need to be detailed or complete, just a brief "why single pool, and an option to fix later). With the SSH handle and artifact downloads, you did it perfectly -- yes we need dedicated pool because of the ssh handle at first, but removing that issue (eg by having thread-local handle or something) will allow us to move to a common io pool
+The dedicated one-worker pool is temporary serialization for process-global
+package/import mutation: concurrent `pip install`, module reload, and catalogue
+publication must not overlap. The plugin state lock protects short immutable
+snapshot swaps; it must not be held across a long `pip` operation. Add this
+reason as a code comment beside the pool choice. A future manager-owned
+serialized resource queue could gate package mutation and then use
+`ConcurrentPools.Io`, allowing this dedicated pool to be removed without
+relying on a long-held domain lock.
 
-`submit_after` should skip initial load when the catalog dependency failed
-unless existing behavior is explicitly retained. The current helper proceeds
-after dependency failure; this needs a deliberate decision rather than an
-accidental carry-over.
+`submit_after` skips initial load when the catalog dependency failed, records
+the dependency failure, and leaves plugin readiness false. Do not preserve the
+current helper's behavior of continuing after that failure.
 
 Plugin DB work uses the jobs DB pool from Phase 2. Do not wait for a
 plugin-management task while holding the plugin state lock.
@@ -361,7 +367,11 @@ calls, and waiting for artifact downloads. The first migration may keep it as
 one run-submission task for behavioral safety. A later refinement may split I/O
 stages, but must preserve failure state and ordering.
 
-*> review: I would additionally include a comment here that this may require a change of the design of the execution manager -- current design supports submit_after a single future, but possibly there would be more artifacts in a job so we would want to submit after a group of futures complete. Mention that here, but explicitly say it should not be addressed during this effort, it should only be documented as a later refactoring effort
+Multiple required artifacts may eventually justify a manager API such as
+`submit_after_all` that waits for a group of futures before continuing. The
+current manager intentionally supports one dependency future only. Do not add
+group aggregation during this effort; document it as a later execution-manager
+refactor when the run workflow itself is split.
 
 Artifact waits may last up to an hour, so they must not occupy the general pool.
 The initial configuration uses the dedicated, centrally managed
@@ -482,13 +492,13 @@ For changed templates:
 For unload:
 
 1. Emit `plugin.templates.removed` with the stable id.
-2. Wait for completion if route success must mean templates are removed.
-3. Remove in-memory plugin state at the agreed point.
+2. Wait for successful dispatch completion.
+3. Only then remove the in-memory plugin state.
 
-The exact unload ordering is an open decision. Removing templates before
-unpublishing gives stronger consistency on handler failure; unpublishing first
-prevents new use immediately. The handler only needs the id for deletion, so
-either is technically possible.
+Template removal must be idempotent. If dispatch fails, leave the in-memory
+plugin published and fail the operation; a caller retry may emit the same event
+again safely. This provides at-least-once-safe application behavior without
+changing the dispatcher's process-local at-most-once delivery contract.
 
 ### 5.3 Failure and readiness semantics
 
@@ -511,129 +521,80 @@ After both flows migrate, delete `_ingest_plugin_templates`, the in-body
 blueprint imports, and the circularity notes from the domain package
 documentation.
 
-## Phase 6: add periodic jobs database garbage collection
+## Phase 6: add a periodic jobs database maintenance PoC
 
-This is a new backend maintenance concern rather than a migration of an
-existing thread.
+This is a lifecycle and DB-pool proof of concept, not an implementation of
+garbage-collection policy.
 
-Create a wakeable garbage-collector entrypoint and register it as
-`ConcurrentThreads.DatabaseGarbageCollector` at stage 2. It therefore starts
-after the stage-1 scheduler and stops before it. Register:
+Create a wakeable entrypoint named
+`ConcurrentThreads.DatabaseGarbageCollector` and register it at stage 2. It
+therefore starts after the stage-1 scheduler and stops before it. Register:
 
 - an entrypoint accepting the manager stop event;
 - a stop request that wakes its sleep condition;
 - a non-blocking status provider exposing last attempt/success, next wake,
-  activity, rows removed, and last failure;
+  current activity, query result summary, and last failure;
 - an explicit-only capped restart policy.
 
-Each iteration submits one bounded, synchronous cleanup callable to
-`ConcurrentPools.JobsDb` and waits for the future. The collector thread does not
-open a SQLAlchemy session itself. The DB callable uses one transaction and
-deletes eligible rows in explicit referential order, so cancellation or timeout
-cannot commit only part of a cleanup cascade.
+Hardcode a 10-minute wake interval; do not add configuration or an
+administrative prod. Each iteration submits one simple, read-only query from one
+existing domain to `ConcurrentPools.JobsDb`, waits for the future, records its
+summary, and sleeps again. The maintenance thread never opens a SQLAlchemy
+session itself.
 
-Before implementation, resolve:
+Do not delete rows, design retention, traverse cascades, or add dynamic cleanup
+discovery in this effort. Those belong to a later garbage-collection
+specification. This PoC exists to demonstrate that multiple independently
+managed long-lived threads can use the serialized DB pool and expose unified
+status.
 
-- whether eligibility is limited to explicitly tombstoned entity families or
-  may include superseded immutable versions;
-- the retention age and periodic wake interval;
-- whether the first implementation needs an administrative prod;
-- which module may own a cross-entity cleanup transaction without violating
-  the domain hierarchy;
-- the concrete foreign-key/deletion order and batch limit.
+## Phase 7: add an event-to-async-loop notification PoC
 
-Do not treat an older immutable version as dead merely because a newer version
-exists. Version-specific references and historical API retrieval make that a
-separate retention decision.
+This proves the concurrency bridge needed by future notifications. It does not
+add a WebSocket route, client contract, or actual network delivery.
 
-## Phase 7: proof-of-concept WebSocket notifications
+### 7.1 Add `ActiveWebsocketClientRegistry`
 
-This is new backend behavior, not a migration of an existing endpoint.
+Add a process-local placeholder named `ActiveWebsocketClientRegistry`. It owns
+only:
 
-### 7.1 Add a small notification domain
+- the FastAPI event-loop reference set during lifespan startup;
+- a method callable from a managed sync worker that uses
+  `loop.call_soon_threadsafe` to create a coroutine task on that loop;
+- lifecycle state that rejects use before initialization or after shutdown.
 
-Add a process-local notification hub that owns:
+The scheduled coroutine logs at debug level that the supplied event would have
+been sent. The placeholder has no active clients, authentication, recipient
+selection, connection queues, overflow handling, replay, or acknowledgement.
+Its event-loop reference is an explicit adapter exception; background business
+workers do not retain the loop.
 
-- active connection/subscription ids;
-- recipient identity;
-- one bounded `asyncio.Queue` per connection;
-- register, unregister, and fan-out operations;
-- the FastAPI loop reference needed only to use
-  `loop.call_soon_threadsafe(queue.put_nowait, message)` from a dispatcher
-  handler.
+### 7.2 Register the notification handler
 
-This loop reference belongs to the WebSocket adapter/hub, not to background
-business workers or database code.
+Add `domain/notification/dispatchers.py` with a handler for
+`notification.emitted`. Register it on `ConcurrentPools.General`, as required
+for this PoC. The handler forwards the event to
+`ActiveWebsocketClientRegistry`, which schedules the debug-log coroutine on the
+FastAPI loop.
 
-Define a notification event payload containing at least:
+Notification producers enqueue and continue rather than waiting for the
+dispatch receipt, preventing a producer from occupying the same pool while
+awaiting the handler. Any background task can submit the event without knowing
+about the async loop or future WebSocket implementation.
 
-```python
-recipient: str | None
-level: Literal["info", "warning", "error"]
-message: str
-context: dict[str, object]
-```
+As the concrete demonstration during Phase 7, update the stage-2 maintenance
+PoC from Phase 6 to emit `notification.emitted` after its read-only query
+completes. The resulting path is: managed maintenance thread -> jobs DB pool ->
+event dispatcher -> general pool handler -> FastAPI-loop debug task.
 
-`recipient=None` means broadcast only if review explicitly approves that
-behavior.
+### 7.3 Lifespan integration
 
-### 7.2 Register a notification handler
+Initialize the registry with the running loop before notification events can be
+handled. Keep it available while the event dispatcher drains during shutdown,
+then clear its loop reference after the dispatcher returns and before the
+FastAPI lifespan exits.
 
-Add `domain/notification/dispatchers.py` with a handler for a name such as
-`notification.emitted`. Register the handler on `ConcurrentPools.Io`; its work
-is a short thread-safe handoff to connection queues. Notification producers
-enqueue and continue rather than waiting for its dispatch receipt, preventing a
-producer from occupying the same pool while awaiting the handler. The handler
-asks the hub to enqueue the immutable notification onto matching per-connection
-async queues.
-
-Any background task can then call `submit_event(Event(...))`; it does not know
-about WebSockets or the async loop.
-
-Dispatch completion means the notification was queued to connection buffers.
-It does not acknowledge network delivery.
-
-### 7.3 Add the WebSocket route
-
-Add an auto-discovered route module with one endpoint, provisionally:
-
-```text
-/api/v1/notifications
-```
-
-On connection:
-
-1. Authenticate the user with the existing backend auth mode.
-2. Accept the socket.
-3. Register a bounded queue in the hub.
-4. Await queue items and send JSON messages.
-5. Unregister in `finally` on disconnect or cancellation.
-
-The endpoint does not poll execution state and does not read either database.
-No frontend contract is part of this change.
-
-### 7.4 Slow clients and shutdown
-
-Recommended PoC behavior:
-
-- bounded queue per connection;
-- when full, record the condition and disconnect that slow client rather than
-  blocking the dispatcher or silently dropping arbitrary messages;
-- no replay for clients that reconnect;
-- close all sockets and unregister queues during lifespan shutdown before the
-  dispatcher is stopped.
-
-### 7.5 PoC questions
-
-1. What authentication mechanism should the WebSocket handshake use in
-   authenticated mode?
-2. Is broadcast (`recipient=None`) allowed, or must every notification be
-   addressed?
-3. What stable JSON envelope and version field should the PoC expose?
-4. Is disconnecting a slow client acceptable, or should oldest notifications
-   be dropped with an explicit overflow message?
-5. Does the first PoC need delivery acknowledgements or replay? The design
-   recommends neither.
+No route or frontend change is part of this PoC.
 
 ## Phase 8: consolidate startup, shutdown, and status
 
@@ -650,12 +611,12 @@ join algorithms.
 
 On shutdown:
 
-1. stop accepting WebSocket/domain submissions;
-2. close notification sockets;
-3. ask the manager to stop stage-2 garbage collection;
-4. stop stage-1 scheduler and other producer threads;
-5. stop stage-0 threads; the dispatcher's own stop request closes event intake
+1. stop accepting route/domain submissions;
+2. ask the manager to stop the stage-2 maintenance PoC;
+3. stop stage-1 scheduler and other producer threads;
+4. stop stage-0 threads; the dispatcher's own stop request closes event intake
    and performs its bounded best-effort drain;
+5. clear the loop reference in `ActiveWebsocketClientRegistry`;
 6. shut down pools only after long-lived threads return;
 7. retain existing external process and tunnel cleanup.
 
@@ -705,8 +666,8 @@ non-migrated exception.
 6. Run background work and route archive creation.
 7. Scheduler long-lived thread.
 8. Circular dependency events.
-9. Periodic jobs database garbage collection.
-10. WebSocket notification PoC.
+9. Periodic jobs database maintenance PoC.
+10. Event-to-async-loop notification PoC.
 11. Blocking route cleanup, final staged startup/status consolidation, and
     removal of obsolete execution code.
 
@@ -714,9 +675,14 @@ The database cutover is intentionally early: every later background migration
 then uses the final sync database path and never needs a temporary event-loop
 bridge.
 
-## Cross-document decisions still required
+## Deferred follow-up work
 
-- Garbage-collection eligibility, retention age, wake interval, batching,
-  ownership, and cascade order.
-- Plugin unload event ordering.
-- WebSocket authentication, addressing, envelope, and overflow behavior.
+No open decisions remain for this migration scope. Later specifications may
+cover:
+
+- real garbage collection, including dynamic discovery, eligibility, retention,
+  batching, ownership, and cascade order;
+- a real WebSocket endpoint and delivery contract;
+- group-future continuations;
+- manager-owned serialized resource queues that can replace temporary
+  dedicated pools.
