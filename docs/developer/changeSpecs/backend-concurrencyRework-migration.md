@@ -333,6 +333,8 @@ In `domain/plugin/manager.py`:
   `delayed_thread`;
 - remove `join_updater_thread`.
 
+*> review: why do we keep plugin installation in a dedicated pool? If we are worried about modifying the plugin manager state concurrently, we have a lock, no? If we are worried about calling pip install concurrently (which I guess should not be done), we could perhaps later solve with another lock (which could lead to a sort of starvation or undesired occupation -- but I think we will anyway later need some sort of high level resource object which the execution manager would own, and would keep an internal queue prior to submitting to pools). No need to solve this fully, but I want you to put the reason for "dedicate pool" here, and tell the developer to propagate it to the code as the comment, including future refactor options (no need to be detailed or complete, just a brief "why single pool, and an option to fix later). With the SSH handle and artifact downloads, you did it perfectly -- yes we need dedicated pool because of the ssh handle at first, but removing that issue (eg by having thread-local handle or something) will allow us to move to a common io pool
+
 `submit_after` should skip initial load when the catalog dependency failed
 unless existing behavior is explicitly retained. The current helper proceeds
 after dependency failure; this needs a deliberate decision rather than an
@@ -358,6 +360,8 @@ The task currently mixes compilation, database state changes, gateway network
 calls, and waiting for artifact downloads. The first migration may keep it as
 one run-submission task for behavioral safety. A later refinement may split I/O
 stages, but must preserve failure state and ordering.
+
+*> review: I would additionally include a comment here that this may require a change of the design of the execution manager -- current design supports submit_after a single future, but possibly there would be more artifacts in a job so we would want to submit after a group of futures complete. Mention that here, but explicitly say it should not be addressed during this effort, it should only be documented as a later refactoring effort
 
 Artifact waits may last up to an hour, so they must not occupy the general pool.
 The initial configuration uses the dedicated, centrally managed

@@ -446,6 +446,8 @@ Event names use a namespaced past-tense convention such as
 `producer.resource.changed`. A producer owns the name and payload contract.
 Consumers validate payloads into their own typed dataclass or Pydantic model.
 
+*> review: there is an interesting interplay between Events and submit_after. Recall the domain hierarchy we have -- you could add somewhere in the design doc a guideline like "if a certain concern is linear, aligned with domain hierarchy, but varies in terms of resources and locks used, submit_after is the right abstraction (a good example is the backrgound job compilation). But if a concern goes in the opposite direction of hierarchy or transversally, is loosely coupled, or has a dynamic fan out, it should rely on Events (good examples are the plugin template ingest or websocket notifications). This comment does not change anything in your plans, you got that distinction correctly. But I would still like to have a brief paragraph somewhere in this document along these lines. Keep in mind that this document will be used at some point to update the general purpose development guidelines, so this sort of general statements is useful
+
 ### Registration contract
 
 ```python
@@ -738,12 +740,17 @@ separate from the manager's final pool-submission gate.
    families eligible, or may superseded immutable versions also be removed?
    The latter can break version-specific references and requires a retention
    contract.
+*> answer: we should not design the database garbage collection here fully. This whole concurrency rework/migration effort should conclude with the garbage collector standalone long lived thread reporting something and periodically waking, doing some simple select, and sleeping back -- as a PoC, to be specified later. I mentioned it because I want to have the "stages" initialization/shutdown structure in place, and want to see "multiple long lived threads can work with the db pool independently" in action. This same thing pertains to the notifications-websocket thing, we don't need to implement the actual sending, just demonstrate the "dispatcher -> async-loop-aware long-lived-thread" means in this new concurrency setting
 2. What age threshold and wake interval should database garbage collection use,
    and should an administrative prod be exposed in the first implementation?
+*> answer: no prod exposed, wake once every 10 minutes (don't even introduce a config for it now, its just a PoC)
 3. Which module should own the cross-entity cleanup transaction while
    preserving the domain import hierarchy?
+*> answer: this is a good question. We will _probably_ design it by the collector doing some dynamic discovery, like is done with schemata, event handlers, etc. But again, not need to be part of this spec; a single domain db's query can be hardcoded
 4. For the event-based dependency migration, should removal reactions complete
    before or after the producer removes its in-memory object?
+*> answer: my reasoning is _before_, and that the removal should not fail in case its executed twice, ie, I would like a "safe at least once" semantics -- is that sound?
 5. For the WebSocket proof of concept, what authentication, addressing,
    envelope version, and slow-client overflow policies are required? Delivery
    acknowledgement and replay are not recommended initially.
+*> answer: I would even say the actual WebSocket is not part of the PoC, ie, we just want some placeholder object called ActiveWebsocketClientRegistry, which would hold the loop, receive the events via dispatcher, and would submit (from the general sync pool) an async task to the loop which only log debugs a 'Event would have been sent'
