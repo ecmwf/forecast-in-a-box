@@ -480,9 +480,17 @@ export function GeoViewer({
   const [captureAction, setCaptureAction] = useState<
     (() => Promise<Array<CaptureResult>>) | null
   >(null)
+  // Mirrored in a ref: captureFor invokes the action AFTER waiting out a
+  // captureOnly re-render, so it must read the registration made for that
+  // render — its own state binding still closes over captureOnly = null.
+  const captureActionRef = useRef<(() => Promise<Array<CaptureResult>>) | null>(
+    null,
+  )
   const onRegisterCapture = useCallback(
-    (capture: (() => Promise<Array<CaptureResult>>) | null) =>
-      setCaptureAction(() => capture),
+    (capture: (() => Promise<Array<CaptureResult>>) | null) => {
+      captureActionRef.current = capture
+      setCaptureAction(() => capture)
+    },
     [],
   )
   const [exportOpen, setExportOpen] = useState(false)
@@ -493,15 +501,16 @@ export function GeoViewer({
   const captureFor = async (
     only: SourceSlot | null,
   ): Promise<Array<CaptureResult>> => {
-    if (!captureAction) throw new Error('Capture unavailable')
-    if (only === null) return captureAction()
+    const capture = captureActionRef.current
+    if (!capture) throw new Error('Capture unavailable')
+    if (only === null) return capture()
     setCaptureOnly(only)
     try {
       // Two frames: React commit, then OL applies the opacity change.
       await new Promise((r) =>
         requestAnimationFrame(() => requestAnimationFrame(r)),
       )
-      const results = await captureAction()
+      const results = await (captureActionRef.current ?? capture)()
       return results.filter((c) => c.slot === only)
     } finally {
       setCaptureOnly(null)

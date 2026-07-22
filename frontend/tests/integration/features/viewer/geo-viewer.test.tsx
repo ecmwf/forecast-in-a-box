@@ -412,26 +412,45 @@ describe('GeoViewer', () => {
 
   it('offers copy-to-clipboard with a synchronously built PNG item', async () => {
     const { portA, portB } = registerDefaultPair()
-    let itemTypes: ReadonlyArray<string> = []
+    let lastItem: ClipboardItem | null = null
     const write = vi
       .spyOn(navigator.clipboard, 'write')
       .mockImplementation((items) => {
-        itemTypes = items[0].types
+        lastItem = items[0]
         return Promise.resolve()
       })
-    const screen = await render(<Harness portA={portA} portB={portB} />)
-    await screen.getByText('2 m temperature').first().click()
+    // Unstyled env: the map container collapses to 0×0 and OL never
+    // renders, so rendercomplete-gated captures hang. Give the map real
+    // pixels for this test — the payload promises must settle.
+    const style = document.createElement('style')
+    style.textContent = `
+      [class*='h-full'][class*='overflow-hidden'][class*='rounded-md'] { position: relative; height: 400px; }
+      [class*='absolute'][class*='inset-0'] { position: absolute; inset: 0; }
+    `
+    document.head.append(style)
+    try {
+      const screen = await render(<Harness portA={portA} portB={portB} />)
+      await screen.getByText('2 m temperature').first().click()
 
-    await screen.getByRole('button', { name: 'Copy map to clipboard' }).click()
-    // Item constructed synchronously in the gesture (Safari rule). The
-    // payload blob itself needs a sized map — covered by unit tests.
-    expect(write).toHaveBeenCalledTimes(1)
-    expect(itemTypes).toContain('image/png')
+      await screen
+        .getByRole('button', { name: 'Copy map to clipboard' })
+        .click()
+      // Item constructed synchronously in the gesture (Safari rule).
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(lastItem!.types).toContain('image/png')
+      await expect(lastItem!.getType('image/png')).resolves.toBeInstanceOf(Blob)
 
-    // Per-slot copy via the split-button menu.
-    await screen.getByRole('button', { name: 'Copy options' }).click()
-    await screen.getByRole('menuitem', { name: 'Copy A only' }).click()
-    expect(write).toHaveBeenCalledTimes(2)
+      // Per-slot copy via the split-button menu. The payload must actually
+      // produce pixels: a stale captureOnly closure once filtered every
+      // capture out and rejected here.
+      await screen.getByRole('button', { name: 'Copy options' }).click()
+      await screen.getByRole('menuitem', { name: 'Copy A only' }).click()
+      expect(write).toHaveBeenCalledTimes(2)
+      const blob = await lastItem!.getType('image/png')
+      expect(blob.size).toBeGreaterThan(0)
+    } finally {
+      style.remove()
+    }
   })
 
   it('offers measure tools that toggle exclusively', async () => {
