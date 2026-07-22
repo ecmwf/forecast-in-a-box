@@ -18,6 +18,9 @@
  * through our known base URL) and ISO 8601 time-interval expansion.
  */
 
+// The singleton, not `@/lib/i18n` — no init side-effect in a plain module.
+import i18n from 'i18next'
+
 export interface ParsedStyle {
   name: string
   legendUrl?: string
@@ -424,46 +427,55 @@ const TITLE_LEVEL_RE =
 const NAME_LEVEL_RE = /^(.+?@pl)_(\d+)$/
 
 /**
- * ECMWF / IFS / AIFS short-name → human-readable mapping. SkinnyWMS often
+ * ECMWF / IFS / AIFS short-name → human-readable lookup. SkinnyWMS often
  * exposes these short codes verbatim as layer names (e.g. `q@pl_500`,
  * `2t`, `msl`), which are unfriendly in a parameter picker. Lookups are
  * tried with the `@<scope>` suffix stripped, then on the raw input, then
  * fall through to the input unchanged.
  *
  * Keep this list focused on what AIFS / IFS forecasts commonly emit; we
- * don't aim for full GRIB code coverage.
+ * don't aim for full GRIB code coverage. Display names live in
+ * `visualise.json` `wmsParams.*` — tsc checks every code has an entry.
  */
-const PARAM_NAMES: Record<string, string> = {
+const PARAM_CODES = [
   // Pressure-level (3D)
-  t: 'Temperature',
-  q: 'Specific humidity',
-  u: 'U component of wind',
-  v: 'V component of wind',
-  'u/v': 'Wind (u, v components)',
-  w: 'Vertical velocity',
-  z: 'Geopotential',
-  gh: 'Geopotential height',
-  d: 'Divergence',
-  vo: 'Relative vorticity',
-  r: 'Relative humidity',
+  't',
+  'q',
+  'u',
+  'v',
+  'u/v',
+  'w',
+  'z',
+  'gh',
+  'd',
+  'vo',
+  'r',
   // Surface (2D)
-  '2t': '2 m temperature',
-  '2d': '2 m dewpoint temperature',
-  '10u': '10 m U wind',
-  '10v': '10 m V wind',
-  '10u/10v': '10 m wind (u, v components)',
-  '100u': '100 m U wind',
-  '100v': '100 m V wind',
-  '100u/100v': '100 m wind (u, v components)',
-  skt: 'Skin temperature',
-  sp: 'Surface pressure',
-  msl: 'Mean sea level pressure',
-  tp: 'Total precipitation',
-  tcw: 'Total column water',
-  tcwv: 'Total column water vapour',
-  sst: 'Sea surface temperature',
-  sd: 'Snow depth',
-  ci: 'Sea-ice cover',
+  '2t',
+  '2d',
+  '10u',
+  '10v',
+  '10u/10v',
+  '100u',
+  '100v',
+  '100u/100v',
+  'skt',
+  'sp',
+  'msl',
+  'tp',
+  'tcw',
+  'tcwv',
+  'sst',
+  'sd',
+  'ci',
+] as const
+type ParamCode = (typeof PARAM_CODES)[number]
+const PARAM_CODE_SET: ReadonlySet<string> = new Set(PARAM_CODES)
+
+function paramName(code: string): string | null {
+  return PARAM_CODE_SET.has(code)
+    ? i18n.t(`visualise:wmsParams.${code as ParamCode}`)
+    : null
 }
 
 interface HumanizedParam {
@@ -474,7 +486,7 @@ interface HumanizedParam {
 function humanizeParam(short: string): HumanizedParam {
   // Strip a single `@<scope>` suffix (e.g. `@pl`, `@sfc`, `@ml`) before lookup.
   const cleaned = short.toLowerCase().replace(/@\w+$/, '').trim()
-  const human = PARAM_NAMES[cleaned] ?? PARAM_NAMES[short.toLowerCase()]
+  const human = paramName(cleaned) ?? paramName(short.toLowerCase())
   return human
     ? { title: human, subtitle: short }
     : { title: short, subtitle: null }

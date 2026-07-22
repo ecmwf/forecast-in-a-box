@@ -632,7 +632,7 @@ export function SingleMapView({
             }
           }}
           className={cn(
-            'absolute z-20 touch-none outline-none',
+            'absolute z-20 touch-none outline-none focus-visible:ring-2 focus-visible:ring-ring',
             swipeOrientation === 'vertical'
               ? 'inset-y-0 w-6 -translate-x-1/2 cursor-ew-resize'
               : 'inset-x-0 h-6 -translate-y-1/2 cursor-ns-resize',

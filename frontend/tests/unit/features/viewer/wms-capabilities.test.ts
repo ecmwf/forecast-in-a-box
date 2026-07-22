@@ -9,6 +9,8 @@
  */
 
 import { describe, expect, it } from 'vitest'
+// Init side-effect: humanizeParam resolves display names through i18next.
+import '@/lib/i18n'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
   appendWmsParams,

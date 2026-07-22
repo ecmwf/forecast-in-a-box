@@ -729,7 +729,9 @@ function ActivePairCard({
         onZoomTo={onZoomToResolution}
       />
       <label className="mt-2 block">
-        <span className="sr-only">{`${title} opacity`}</span>
+        <span className="sr-only">
+          {t('sidebar.layerOpacity', { name: title })}
+        </span>
         <Slider
           value={[Math.round(selection.pairOpacity(pair.key) * 100)]}
           min={0}
@@ -893,7 +895,9 @@ function ActiveSourceSection({
                   onZoomTo={onZoomToResolution}
                 />
                 <label className="mt-2 block">
-                  <span className="sr-only">{`${title} opacity`}</span>
+                  <span className="sr-only">
+                    {t('sidebar.layerOpacity', { name: title })}
+                  </span>
                   <Slider
                     value={[
                       Math.round(selection.layerOpacity(slot, name) * 100),

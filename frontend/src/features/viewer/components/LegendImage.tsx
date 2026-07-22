@@ -66,11 +66,10 @@ export function LegendImage({ url, title }: { url: string; title: string }) {
   return (
     <Popover
       open={hovered}
+      // Both directions: click/Enter opens too — zoom must not be hover-only.
       onOpenChange={(o) => {
-        if (!o) {
-          cancelTimer()
-          setHovered(false)
-        }
+        cancelTimer()
+        setHovered(o)
       }}
     >
       <PopoverTrigger
@@ -85,7 +84,7 @@ export function LegendImage({ url, title }: { url: string; title: string }) {
       >
         <img
           src={url}
-          alt={`${title} legend`}
+          alt={t('lens.legendAlt', { title })}
           // Cap to the box but never upscale — small icon legends blur when stretched full-width.
           className="max-h-32 max-w-full object-contain"
           loading="lazy"
@@ -102,7 +101,7 @@ export function LegendImage({ url, title }: { url: string; title: string }) {
       >
         <img
           src={url}
-          alt={`${title} legend`}
+          alt={t('lens.legendAlt', { title })}
           className="h-auto max-h-[70vh] w-auto max-w-[640px] object-contain"
           loading="lazy"
         />
