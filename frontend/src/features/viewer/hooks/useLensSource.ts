@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   appendWmsParams,
   groupLayers,
+  isLoopbackUrl,
   parseCapabilities,
   partitionGroups,
   toWmsEndpoint,
@@ -32,7 +33,13 @@ import type {
 } from '../wms-capabilities'
 
 // GetCapabilities retry — lens `running` precedes WMS-port readiness.
-const CAPABILITIES_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
+// Loopback = our own lens: a cold SkinnyWMS boot can take tens of
+// seconds, so keep trying (~35 s) instead of parking on an error the
+// next attempt would clear. External servers keep the snappy ladder.
+const EXTERNAL_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
+const LOOPBACK_RETRY_DELAYS_MS = [
+  300, 600, 1200, 2400, 4800, 5000, 5000, 5000, 5000, 5000,
+] as const
 
 /** Cache identity for one server's parsed capabilities. */
 export function wmsCapabilitiesKey(baseUrl: string): ReadonlyArray<string> {
@@ -60,6 +67,10 @@ export interface LensSource {
 
 /** `baseUrl: null` yields an inert source: no fetch, empty layers. */
 export function useLensSource(baseUrl: string | null): LensSource {
+  const retryDelays =
+    baseUrl !== null && isLoopbackUrl(baseUrl)
+      ? LOOPBACK_RETRY_DELAYS_MS
+      : EXTERNAL_RETRY_DELAYS_MS
   const query = useQuery({
     queryKey: wmsCapabilitiesKey(baseUrl ?? ''),
     enabled: baseUrl !== null,
@@ -74,12 +85,9 @@ export function useLensSource(baseUrl: string | null): LensSource {
       if (!res.ok) throw new Error(`GetCapabilities ${res.status}`)
       return parseCapabilities(await res.text())
     },
-    retry: (failureCount) =>
-      failureCount <= CAPABILITIES_RETRY_DELAYS_MS.length,
+    retry: (failureCount) => failureCount <= retryDelays.length,
     retryDelay: (failureCount) =>
-      CAPABILITIES_RETRY_DELAYS_MS[
-        Math.min(failureCount, CAPABILITIES_RETRY_DELAYS_MS.length) - 1
-      ],
+      retryDelays[Math.min(failureCount, retryDelays.length) - 1],
     // Stale-while-revalidate: cached instantly, silently refreshed every
     // 5 min while viewed — new model runs extend the time axis.
     staleTime: 5 * 60_000,

@@ -35,7 +35,11 @@ import {
   IMAGERY_BASEMAPS,
   SKINNYWMS_BASEMAP,
 } from '../ol-layers'
-import { rebaseLensUrl, skinnyWmsBasemap } from '../wms-capabilities'
+import {
+  isLoopbackUrl,
+  rebaseLensUrl,
+  skinnyWmsBasemap,
+} from '../wms-capabilities'
 import { canvasToPngBlob, joinCanvasesHorizontally } from '../map-export'
 import { CollapsedSidebarHandle } from '../components/CollapsedSidebarHandle'
 import { composeCaptures } from './export-pipeline'
@@ -879,7 +883,9 @@ export function GeoViewer({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 rounded-md border border-border bg-card p-6 text-center text-sm">
         <P className="max-w-md text-destructive">{sourceA.error}</P>
-        <P className="text-xs text-muted-foreground">{t('panel.corsHint')}</P>
+        {!isLoopbackUrl(a.baseUrl) && (
+          <P className="text-xs text-muted-foreground">{t('panel.corsHint')}</P>
+        )}
         <Button
           variant="outline"
           size="sm"

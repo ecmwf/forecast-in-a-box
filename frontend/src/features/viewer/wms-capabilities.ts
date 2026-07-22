@@ -53,6 +53,21 @@ export interface ParsedCapabilities {
   supportsGetFeatureInfo: boolean
 }
 
+/** Loopback origins host our own lens servers — never CORS territory,
+ *  and worth a patient capabilities retry while SkinnyWMS boots. */
+export function isLoopbackUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname
+    return (
+      host === 'localhost' ||
+      host === '[::1]' ||
+      /^127(\.\d{1,3}){3}$/.test(host)
+    )
+  } catch {
+    return false
+  }
+}
+
 const DEFAULT_BBOX: [number, number, number, number] = [-180, -90, 180, 90]
 const XLINK_NS = 'http://www.w3.org/1999/xlink'
 
