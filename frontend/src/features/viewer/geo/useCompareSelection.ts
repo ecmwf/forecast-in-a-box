@@ -108,19 +108,26 @@ export function useCompareSelection(
     [linkedOrder, linkedOpacities, pairByKey],
   )
 
+  // Memoized: consumers hang memos and effects off the returned identities
+  // (time-index expansion, the stacks' reconcile deps, the prefetch loop) —
+  // deriving fresh objects per call would churn them all every render.
+  const derived = useMemo(
+    () => ({ a: deriveForSlot('a'), b: deriveForSlot('b') }),
+    [deriveForSlot],
+  )
   const activeOrderFor = useCallback(
     (slot: SourceSlot) =>
       linkMode === 'linked'
-        ? deriveForSlot(slot).activeOrder
+        ? derived[slot].activeOrder
         : perSource[slot].activeOrder,
-    [linkMode, deriveForSlot, perSource],
+    [linkMode, derived, perSource],
   )
   const opacitiesFor = useCallback(
     (slot: SourceSlot) =>
       linkMode === 'linked'
-        ? deriveForSlot(slot).layerOpacities
+        ? derived[slot].layerOpacities
         : perSource[slot].layerOpacities,
-    [linkMode, deriveForSlot, perSource],
+    [linkMode, derived, perSource],
   )
 
   const togglePair = useCallback((key: string) => {
