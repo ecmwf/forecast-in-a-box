@@ -360,7 +360,10 @@ function DualMapPanel({
         ref={containerRef}
         className={cn('absolute inset-0', annotateArmed && 'cursor-copy')}
       />
-      <MapLoadingBar loading={loadingCount > 0} slot={source.slot} />
+      <MapLoadingBar
+        loading={loadingCount > 0 || source.layersLoading}
+        slot={source.slot}
+      />
       <LoupeOverlay
         containerRef={containerRef}
         mirror={loupeMirror ? cross : null}
@@ -384,7 +387,7 @@ function DualMapPanel({
       <CompareSlotTag
         slot={source.slot}
         label={source.label}
-        loading={loadingCount > 0}
+        loading={loadingCount > 0 || source.layersLoading}
         timeLabel={source.timeLabel}
       />
       {source.hiddenAtTime && (

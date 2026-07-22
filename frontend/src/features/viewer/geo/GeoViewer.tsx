@@ -844,6 +844,7 @@ export function GeoViewer({
     resolveTime: resolveTimeA,
     onLoadResult: onLoadResultA,
     timeSteps: rawStepsA,
+    layersLoading: sourceA.loadingLayers || sourceA.retrying,
     hiddenAtTime: resolvedA.hidden,
     timeTag: timeTagFor('a'),
     timeLabel:
@@ -865,6 +866,7 @@ export function GeoViewer({
         resolveTime: resolveTimeB,
         onLoadResult: onLoadResultB,
         timeSteps: rawStepsB,
+        layersLoading: sourceB.loadingLayers || sourceB.retrying,
         hiddenAtTime: resolvedB.hidden,
         timeTag: timeTagFor('b'),
         timeLabel:
