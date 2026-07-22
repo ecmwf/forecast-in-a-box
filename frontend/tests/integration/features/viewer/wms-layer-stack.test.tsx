@@ -40,8 +40,6 @@ const LAYER: ParsedLayer = {
   time: { raw: `${T00},${T06}` },
 }
 
-const noop = () => {}
-
 type LoadResult = [string, string | null, boolean]
 
 function Harness({
@@ -59,6 +57,7 @@ function Harness({
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<OlMap | null>(null)
   const [, setReady] = useState(false)
+  const [loading, setLoading] = useState(0)
 
   useEffect(() => {
     const map = new OlMap({
@@ -78,8 +77,8 @@ function Harness({
     // Deliberately a fresh closure every render — the real viewer churns
     // identities too, and the stack must absorb that without refetching.
     resolveTime: () => time,
-    incLoading: noop,
-    decLoading: noop,
+    incLoading: () => setLoading((n) => n + 1),
+    decLoading: () => setLoading((n) => n - 1),
     onLoadResult,
   })
 
@@ -90,6 +89,7 @@ function Harness({
         style={{ width: 300, height: 200, position: 'relative' }}
       />
       <output data-testid="errors">{stack.errorCount}</output>
+      <output data-testid="loading">{loading}</output>
       <output data-testid="visible">
         {String(stack.stackRef.current[0]?.getVisible() ?? 'none')}
       </output>
@@ -207,5 +207,47 @@ describe('useWmsLayerStack load failures', () => {
     await expect
       .poll(() => getMapRequests(portB).length, { timeout: 8000 })
       .toBeGreaterThan(0)
+  })
+
+  it('drains the loading counter after a superseded GetMap and never records its TIME', async () => {
+    const port = nextPort++
+    // Slow server: the T00 GetMap is still in flight when we scrub away,
+    // so its wrapper gets aborted. It must settle silently — a wrapper
+    // stuck LOADING strands the counter (and rendercomplete) forever.
+    registerMockWmsServer(port, {
+      layers: [{ name: '2t', title: '2 m temperature', time: `${T00},${T06}` }],
+      getMapDelayMs: 5000,
+    })
+    const results: Array<LoadResult> = []
+    const onLoadResult = (layer: string, time: string | null, ok: boolean) => {
+      results.push([layer, time, ok])
+    }
+
+    const screen = await render(
+      <Harness port={port} time={T00} onLoadResult={onLoadResult} />,
+    )
+    await expect
+      .poll(() => getMapRequests(port).length, { timeout: 8000 })
+      .toBeGreaterThan(0)
+    await expect
+      .poll(() => screen.getByTestId('loading').element().textContent)
+      .toBe('1')
+
+    // Successor answers promptly — only the abandoned load is slow.
+    registerMockWmsServer(port, {
+      layers: [{ name: '2t', title: '2 m temperature', time: `${T00},${T06}` }],
+    })
+    await screen.rerender(
+      <Harness port={port} time={T06} onLoadResult={onLoadResult} />,
+    )
+
+    await expect
+      .poll(() => screen.getByTestId('loading').element().textContent, {
+        timeout: 8000,
+      })
+      .toBe('0')
+    // Only the winning TIME is accounted — the aborted T00 never
+    // masquerades as served.
+    expect(results).toEqual([['2t', T06, true]])
   })
 })

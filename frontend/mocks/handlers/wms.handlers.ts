@@ -18,8 +18,9 @@
  * state, never on rendered pixels.
  */
 
-import { HttpResponse, http } from 'msw'
+import { HttpResponse, delay, http } from 'msw'
 import {
+  getMapDelayFor,
   getMapFailsFor,
   recordGetMap,
   serveCapabilities,
@@ -79,7 +80,7 @@ const EMPTY_MAPBOX_STYLE = {
 }
 
 export const wmsHandlers = [
-  http.get('*/wms', ({ request }) => {
+  http.get('*/wms', async ({ request }) => {
     const url = new URL(request.url)
     // WMS params are case-insensitive keys: OL sends REQUEST, we send request.
     const param = (key: string) =>
@@ -98,7 +99,11 @@ export const wmsHandlers = [
     }
     // GetMap and anything else image-like. Registered failure TIMEs get
     // a WMS service exception (stale-capabilities servers do this).
-    if (req === 'getmap') recordGetMap(port, param('TIME'))
+    if (req === 'getmap') {
+      recordGetMap(port, param('TIME'))
+      const delayMs = getMapDelayFor(port)
+      if (delayMs > 0) await delay(delayMs)
+    }
     if (req === 'getmap' && getMapFailsFor(port, param('TIME'))) {
       return new HttpResponse('<ServiceExceptionReport/>', {
         headers: { ...CORS, 'Content-Type': 'text/xml' },
