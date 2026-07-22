@@ -67,18 +67,21 @@ export function useStartSkinnyWms() {
 
 /**
  * Polls the lens until it reaches a terminal state. Polling cadence:
- * 1 s while `starting`, stops once the instance is `running`, `failed`,
- * or `terminated` so we don't keep hitting the backend after success.
+ * 1 s while `starting`; a slow liveness poll while `running` — a lens
+ * stopped elsewhere (run-list card, another tab) must surface as a 404,
+ * not keep serving a dead base URL. Terminal states stop polling.
  */
 export function useLensStatus(lensInstanceId: string | undefined) {
   return useQuery<LensInstanceDetailResponse>({
     queryKey: lensKeys.status(lensInstanceId ?? ''),
     queryFn: () => getLensStatus(lensInstanceId!),
     enabled: !!lensInstanceId,
+    // 404 is the "instance gone" signal consumed by useComparisonSource.
+    meta: { expectedErrorStatuses: [404] },
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      if (!status) return 1000
-      return status === 'starting' ? 1000 : false
+      if (!status || status === 'starting') return 1000
+      return status === 'running' ? 15_000 : false
     },
     refetchOnWindowFocus: false,
     retry: false,

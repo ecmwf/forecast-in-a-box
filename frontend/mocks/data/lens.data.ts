@@ -107,6 +107,12 @@ const DEFAULT_LENS_WMS_CONFIG = {
   ],
 }
 
+/** Real-backend external stop: the record stays, status flips to failed. */
+export function failMockLens(id: string): void {
+  const instance = lensState[id] as (typeof lensState)[string] | undefined
+  if (instance) instance.detail = { ...instance.detail, status: 'failed' }
+}
+
 export function stopMockLens(id: string): boolean {
   if (!(id in lensState)) return false
   delete lensState[id]

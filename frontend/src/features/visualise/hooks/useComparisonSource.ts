@@ -34,7 +34,7 @@ import {
   useLensStatus,
   useStartSkinnyWms,
 } from '@/api/hooks/useLens'
-import { buildLensBaseUrl } from '@/api/endpoints/lens'
+import { buildLensBaseUrl, stopLens } from '@/api/endpoints/lens'
 import { ApiClientError } from '@/api/client'
 import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
 
@@ -173,30 +173,53 @@ export function useComparisonSource(
   const detail = statusQuery.data ?? matched
 
   // A 404 on the status poll means the instance vanished (stopped from
-  // this page or elsewhere) — that's "gone", not "failed". Forget it so
-  // the state machine re-derives: auto-start restarts it, or a paused
-  // page lands on `stopped` with a manual Start.
+  // this page or elsewhere) — that's "gone", not "failed". The backend
+  // may instead keep the record with status `failed`/`terminated` after
+  // an external stop: a lens that already SERVED counts as gone too,
+  // while one that never served keeps the honest failed phase (no
+  // crash-looping a broken directory).
+  const servedIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (startedLensId && statusQuery.data?.status === 'running') {
+      servedIdsRef.current.add(startedLensId)
+    }
+  }, [startedLensId, statusQuery.data?.status])
+  const diedAfterServing =
+    !!startedLensId &&
+    servedIdsRef.current.has(startedLensId) &&
+    (statusQuery.data?.status === 'failed' ||
+      statusQuery.data?.status === 'terminated')
   const statusGone =
-    statusQuery.isError &&
-    statusQuery.error instanceof ApiClientError &&
-    statusQuery.error.status === 404
+    (statusQuery.isError &&
+      statusQuery.error instanceof ApiClientError &&
+      statusQuery.error.status === 404) ||
+    diedAfterServing
   useEffect(() => {
     if (!statusGone || !startedLensId) return
+    servedIdsRef.current.delete(startedLensId)
     setStartedLensId(null)
     if (localPath) {
       attemptedPathsRef.current.delete(localPath)
       evictLensStart(localPath, startedLensId)
     }
-  }, [statusGone, startedLensId, localPath])
+    if (diedAfterServing) {
+      // Purge the failed record — the registry keeps it otherwise, and a
+      // corpse sharing the revived lens's path reads as a duplicate.
+      stopLens(startedLensId).catch(() => undefined)
+    }
+  }, [statusGone, diedAfterServing, startedLensId, localPath])
 
   const retry = useCallback(() => {
     if (localPath) {
       attemptedPathsRef.current.delete(localPath)
-      evictLensStart(localPath)
+      // Evict only the instance we know failed — rejected starts already
+      // self-evict, and a blanket evict could clobber a sibling's fresh
+      // in-flight start and spawn a duplicate server.
+      if (startedLensId) evictLensStart(localPath, startedLensId)
     }
     setStartedLensId(null)
     setStartError(null)
-  }, [localPath])
+  }, [localPath, startedLensId])
 
   // -------- Phase derivation --------
 
@@ -221,8 +244,8 @@ export function useComparisonSource(
   const terminal =
     startError !== null ||
     (!!lensId && statusQuery.isError && !statusGone) ||
-    detail?.status === 'failed' ||
-    detail?.status === 'terminated'
+    ((detail?.status === 'failed' || detail?.status === 'terminated') &&
+      !diedAfterServing)
   if (terminal) {
     return {
       phase: 'failed',

@@ -28,6 +28,15 @@ const log = createLogger('QueryClient')
  */
 const queryCache = new QueryCache({
   onError: (error, query) => {
+    // Statuses a query consumes as signal (e.g. the lens-status liveness
+    // poll reads 404 as "instance gone") — no log, no toast.
+    if (
+      error instanceof ApiClientError &&
+      Array.isArray(query.meta?.expectedErrorStatuses) &&
+      query.meta.expectedErrorStatuses.includes(error.status)
+    ) {
+      return
+    }
     log.error('Query failed:', {
       queryKey: query.queryKey,
       error: error instanceof Error ? error.message : error,
