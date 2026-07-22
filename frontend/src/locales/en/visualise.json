@@ -7,7 +7,7 @@
     "add": "Add",
     "addAria": "Add to comparison",
     "inBasket": "Added",
-    "removeAria": "Remove from comparison",
+    "removeAria": "Added — remove from comparison",
     "noMatch": "This lens could not be matched to a stored output"
   },
   "toast": {
@@ -106,6 +106,7 @@
     "spy": "Spy",
     "blend": "Blend",
     "experimental": "Experimental mode — under evaluation",
+    "groupAria": "Comparison mode",
     "swipeHandle": "Comparison divider",
     "flickerHint": "Click the map or press Space to flip between A and B",
     "showing": "Showing: {{slot}}",

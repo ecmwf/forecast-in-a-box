@@ -222,7 +222,7 @@ export function GeoToolbar({
             {/* Combination modes — inert while focused on one source. */}
             <div
               role="group"
-              aria-label={t('page.title')}
+              aria-label={t('modes.groupAria')}
               className={cn(
                 'flex items-center gap-0.5 rounded-lg bg-muted p-0.5 transition-opacity',
                 focusSlot !== null && 'opacity-40',

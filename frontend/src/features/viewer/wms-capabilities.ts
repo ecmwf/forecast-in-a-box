@@ -12,8 +12,8 @@
  * WMS GetCapabilities helpers for the geo viewer.
  *
  * Parses the WMS 1.3.0 capabilities XML produced by SkinnyWMS into a flat
- * list of leaf layers, extracts the geographic bounding box for auto-fit,
- * and detects FeatureInfo support. Two helpers handle URL rebasing
+ * list of leaf layers and extracts the geographic bounding box for
+ * auto-fit. Two helpers handle URL rebasing
  * (capabilities embed the lens server's bind address, which we redirect
  * through our known base URL) and ISO 8601 time-interval expansion.
  */
@@ -53,7 +53,6 @@ export interface ParsedCapabilities {
   decorationLayers: Array<ParsedLayer>
   /** [minLon, minLat, maxLon, maxLat] in WGS84 (EPSG:4326). */
   bbox: [number, number, number, number]
-  supportsGetFeatureInfo: boolean
 }
 
 /** Loopback origins host our own lens servers — never CORS territory,
@@ -161,10 +160,6 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
     throw new Error('GetCapabilities XML parse failed')
   }
 
-  const supportsGetFeatureInfo = !!doc.querySelector(
-    'Capability > Request > GetFeatureInfo',
-  )
-
   const root = doc.querySelector('Capability > Layer')
   const bbox = parseBbox(root) ?? DEFAULT_BBOX
 
@@ -176,7 +171,7 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
     ;(isDecorationLayer(layer) ? decorationLayers : layers).push(layer)
   }
 
-  return { layers, decorationLayers, bbox, supportsGetFeatureInfo }
+  return { layers, decorationLayers, bbox }
 }
 
 function collectLeafLayers(el: Element, out: Array<ParsedLayer>): void {

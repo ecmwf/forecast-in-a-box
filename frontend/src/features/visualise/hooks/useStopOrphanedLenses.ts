@@ -19,7 +19,10 @@ import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { LensInstanceDetailResponse } from '@/api/types/lens.types'
 import { storedDirQueryOptions } from '@/features/executions/outputs/stored-dir'
+import { createLogger } from '@/lib/logger'
 import { lensKeys, useStopLens } from '@/api/hooks/useLens'
+
+const log = createLogger('useStopOrphanedLenses')
 
 /** Structural minimum — accepts basket entries with or without `addedAt`. */
 type EntryLike =
@@ -41,7 +44,10 @@ export function useStopOrphanedLenses(): (
         if (entry.kind === 'output') {
           return queryClient
             .ensureQueryData(storedDirQueryOptions(entry.jobId, entry.taskId))
-            .catch(() => null)
+            .catch((err: unknown) => {
+              log.debug('Output dir unresolved; lens kept', { error: err })
+              return null
+            })
         }
         return null
       }

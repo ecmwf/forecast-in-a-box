@@ -65,6 +65,13 @@ function panBlocked(): boolean {
   )
 }
 
+/** Letter keys yield to open dialogs — C must not copy behind a modal. */
+function dialogOpen(): boolean {
+  return (
+    document.querySelector('[role="dialog"], [role="alertdialog"]') !== null
+  )
+}
+
 /** Platform-aware display label for a hotkey (TanStack formatting). */
 export function keyLabel(hotkey: string): string {
   return formatForDisplay(hotkey)
@@ -96,18 +103,45 @@ export function useGeoShortcuts(handlers: {
     onPan,
   } = handlers
   const opts = { ignoreInputs: true }
+  const gated = (fn: () => void) => () => {
+    if (!dialogOpen()) fn()
+  }
 
-  useHotkey(COMPARE_KEYS.sidebars, () => onToggleSidebars(), opts)
-  useHotkey(COMPARE_KEYS.modes[0], () => onMode(COMPARE_MODES[0]), opts)
-  useHotkey(COMPARE_KEYS.modes[1], () => onMode(COMPARE_MODES[1]), opts)
-  useHotkey(COMPARE_KEYS.modes[2], () => onMode(COMPARE_MODES[2]), opts)
-  useHotkey(COMPARE_KEYS.modes[3], () => onMode(COMPARE_MODES[3]), opts)
-  useHotkey(COMPARE_KEYS.modes[4], () => onMode(COMPARE_MODES[4]), opts)
-  useHotkey(COMPARE_KEYS.fit, () => onFit?.(), opts)
-  useHotkey(COMPARE_KEYS.copy, () => onCopy(), opts)
-  useHotkey(COMPARE_KEYS.export, () => onExport(), opts)
-  useHotkey(COMPARE_KEYS.help, () => onHelp(), opts)
-  useHotkey(COMPARE_KEYS.annotate, () => onAnnotate(), opts)
+  useHotkey(COMPARE_KEYS.sidebars, gated(onToggleSidebars), opts)
+  useHotkey(
+    COMPARE_KEYS.modes[0],
+    gated(() => onMode(COMPARE_MODES[0])),
+    opts,
+  )
+  useHotkey(
+    COMPARE_KEYS.modes[1],
+    gated(() => onMode(COMPARE_MODES[1])),
+    opts,
+  )
+  useHotkey(
+    COMPARE_KEYS.modes[2],
+    gated(() => onMode(COMPARE_MODES[2])),
+    opts,
+  )
+  useHotkey(
+    COMPARE_KEYS.modes[3],
+    gated(() => onMode(COMPARE_MODES[3])),
+    opts,
+  )
+  useHotkey(
+    COMPARE_KEYS.modes[4],
+    gated(() => onMode(COMPARE_MODES[4])),
+    opts,
+  )
+  useHotkey(
+    COMPARE_KEYS.fit,
+    gated(() => onFit?.()),
+    opts,
+  )
+  useHotkey(COMPARE_KEYS.copy, gated(onCopy), opts)
+  useHotkey(COMPARE_KEYS.export, gated(onExport), opts)
+  useHotkey(COMPARE_KEYS.help, gated(onHelp), opts)
+  useHotkey(COMPARE_KEYS.annotate, gated(onAnnotate), opts)
   useHotkey('Escape', () => onAnnotateDisarm.disarm(), {
     ...opts,
     enabled: onAnnotateDisarm.enabled,

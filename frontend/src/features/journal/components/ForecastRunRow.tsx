@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** One run row in the Forecast Journal — shared by the dashboard and /executions. */
+/** One run row in the Forecast Journal — shared by the dashboard and /execute. */
 
 import { memo, useState } from 'react'
 import { Bookmark, CalendarClock, Pencil, Star } from 'lucide-react'
