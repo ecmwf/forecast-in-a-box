@@ -9,28 +9,38 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { ParsedLayer } from '@/features/executions/components/wms-capabilities'
+// Init side-effect: humanizeParam resolves display names through i18next.
+import '@/lib/i18n'
+import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
+  appendWmsParams,
+  combineScaleBands,
   expandTimeSteps,
   groupLayers,
+  isLoopbackUrl,
   parseCapabilities,
   partitionGroups,
   rebaseLensUrl,
+  scaleBandState,
+  scaleBandTargetResolution,
   skinnyWmsBasemap,
+  toWmsEndpoint,
   uniquePressureLevels,
-} from '@/features/executions/components/wms-capabilities'
+} from '@/features/viewer/wms-capabilities'
+
+/** OGC standardized rendering pixel size — mirrors the parser's constant. */
+const PX_M = 0.00028
 
 /** Minimal WMS 1.3.0 capabilities document in the shape SkinnyWMS emits. */
 function capabilitiesXml({
   withBbox = true,
-  withGetFeatureInfo = true,
-}: { withBbox?: boolean; withGetFeatureInfo?: boolean } = {}): string {
+}: { withBbox?: boolean } = {}): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
   <Capability>
     <Request>
       <GetMap/>
-      ${withGetFeatureInfo ? '<GetFeatureInfo/>' : ''}
+      <GetFeatureInfo/>
     </Request>
     <Layer>
       <Title>WMS server</Title>
@@ -120,18 +130,96 @@ describe('parseCapabilities', () => {
     expect(t2?.time?.raw).toBe('2026-06-10T06:00:00Z,2026-06-10T12:00:00Z')
   })
 
-  it('detects GetFeatureInfo support', () => {
-    expect(parseCapabilities(capabilitiesXml()).supportsGetFeatureInfo).toBe(
-      true,
-    )
-    expect(
-      parseCapabilities(capabilitiesXml({ withGetFeatureInfo: false }))
-        .supportsGetFeatureInfo,
-    ).toBe(false)
-  })
-
   it('throws on malformed XML', () => {
     expect(() => parseCapabilities('<WMS_Capabilities><unclosed')).toThrow()
+  })
+})
+
+describe('parseCapabilities — scale bands', () => {
+  const withLayer = (inner: string) => `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0">
+  <Capability>
+    <Request><GetMap/></Request>
+    <Layer>
+      <Title>root</Title>
+      ${inner}
+    </Layer>
+  </Capability>
+</WMS_Capabilities>`
+
+  it('parses WMS 1.3.0 min/max scale denominators into a resolution band', () => {
+    const caps = parseCapabilities(
+      withLayer(`<Layer>
+        <Name>basemap_2km</Name><Title>2 km Basemap</Title>
+        <MinScaleDenominator>750001</MinScaleDenominator>
+        <MaxScaleDenominator>1.5e+06</MaxScaleDenominator>
+      </Layer>`),
+    )
+    expect(caps.layers[0].scale?.minRes).toBeCloseTo(750001 * PX_M, 3)
+    expect(caps.layers[0].scale?.maxRes).toBeCloseTo(1_500_000 * PX_M, 3)
+  })
+
+  it('leaves the opposite side unbounded when only one denominator exists', () => {
+    const caps = parseCapabilities(
+      withLayer(`<Layer>
+        <Name>basemap_500m</Name><Title>500 m</Title>
+        <MaxScaleDenominator>350000</MaxScaleDenominator>
+      </Layer>`),
+    )
+    expect(caps.layers[0].scale).toEqual({ minRes: 0, maxRes: 350000 * PX_M })
+  })
+
+  it('falls back to WMS 1.1.1 ScaleHint (pixel diagonal → resolution)', () => {
+    const caps = parseCapabilities(
+      withLayer(`<Layer>
+        <Name>l</Name><Title>l</Title>
+        <ScaleHint min="100" max="500"/>
+      </Layer>`),
+    )
+    expect(caps.layers[0].scale?.minRes).toBeCloseTo(100 / Math.SQRT2, 6)
+    expect(caps.layers[0].scale?.maxRes).toBeCloseTo(500 / Math.SQRT2, 6)
+  })
+
+  it('omits the band for unconstrained layers', () => {
+    const caps = parseCapabilities(
+      withLayer(`<Layer><Name>l</Name><Title>l</Title></Layer>`),
+    )
+    expect(caps.layers[0].scale).toBeUndefined()
+  })
+})
+
+describe('scale band helpers', () => {
+  it('classifies resolution as too-coarse / too-fine / in-range', () => {
+    const band = { minRes: 200, maxRes: 400 }
+    expect(scaleBandState(band, 1000)).toBe('zoom-in') // too zoomed out
+    expect(scaleBandState(band, 100)).toBe('zoom-out') // too zoomed in
+    expect(scaleBandState(band, 300)).toBe('in-range')
+    expect(scaleBandState(band, 400)).toBe('zoom-in') // max exclusive
+    expect(scaleBandState(band, 200)).toBe('in-range') // min inclusive
+  })
+
+  it('intersects two bands — a pair shows only where both do', () => {
+    expect(
+      combineScaleBands(
+        { minRes: 200, maxRes: 400 },
+        { minRes: 300, maxRes: 800 },
+      ),
+    ).toEqual({ minRes: 300, maxRes: 400 })
+    expect(combineScaleBands(undefined, { minRes: 1, maxRes: 2 })).toEqual({
+      minRes: 1,
+      maxRes: 2,
+    })
+    expect(combineScaleBands(undefined, undefined)).toBeUndefined()
+  })
+
+  it('targets a resolution inside the band', () => {
+    expect(scaleBandTargetResolution({ minRes: 200, maxRes: 400 })).toBeCloseTo(
+      Math.sqrt(200 * 400),
+    )
+    expect(scaleBandTargetResolution({ minRes: 0, maxRes: 400 })).toBe(200)
+    expect(scaleBandTargetResolution({ minRes: 200, maxRes: Infinity })).toBe(
+      400,
+    )
   })
 })
 
@@ -199,6 +287,17 @@ describe('expandTimeSteps', () => {
     ])
   })
 
+  it('steps whole-month periods on the calendar (no drift)', () => {
+    // A fixed 30.4375-day month drifts off the server's advertised
+    // instants — satellite archives (P1M over decades) then 404.
+    expect(expandTimeSteps('2025-11-01/2026-02-01/P1M')).toEqual([
+      '2025-11-01T00:00:00.000Z',
+      '2025-12-01T00:00:00.000Z',
+      '2026-01-01T00:00:00.000Z',
+      '2026-02-01T00:00:00.000Z',
+    ])
+  })
+
   it('falls back to the raw segment when the interval is malformed', () => {
     expect(expandTimeSteps('not-a-date/also-not/PT6H')).toEqual([
       'not-a-date/also-not/PT6H',
@@ -228,6 +327,16 @@ describe('rebaseLensUrl', () => {
 
   it('returns the input unchanged when it is not an absolute URL', () => {
     expect(rebaseLensUrl('not a url', 'http://h:1')).toBe('not a url')
+  })
+
+  it('keeps advertised URLs verbatim for external (non-bare-origin) bases', () => {
+    // ecCharts-style base with path + token query: grafting would produce
+    // /wms/?token=…/wms/?token=…&request=GetLegend… — a garbage URL.
+    const advertised =
+      'https://eccharts.ecmwf.int/wms/?token=public&request=GetLegend&layers=z500'
+    expect(
+      rebaseLensUrl(advertised, 'https://eccharts.ecmwf.int/wms/?token=public'),
+    ).toBe(advertised)
   })
 })
 
@@ -295,5 +404,55 @@ describe('partitionGroups / uniquePressureLevels', () => {
 
   it('collects the union of pressure levels, descending', () => {
     expect(uniquePressureLevels(groups)).toEqual([850, 500, 300])
+  })
+})
+
+describe('toWmsEndpoint / appendWmsParams', () => {
+  it('appends /wms to bare origins (the lens convention)', () => {
+    expect(toWmsEndpoint('http://localhost:19000')).toBe(
+      'http://localhost:19000/wms',
+    )
+    expect(toWmsEndpoint('http://localhost:19000/')).toBe(
+      'http://localhost:19000/wms',
+    )
+  })
+
+  it('keeps full endpoints with a path and/or query verbatim', () => {
+    expect(toWmsEndpoint('https://eccharts.ecmwf.int/wms/?token=public')).toBe(
+      'https://eccharts.ecmwf.int/wms/?token=public',
+    )
+    expect(toWmsEndpoint('https://geo.example.org/geoserver/ows')).toBe(
+      'https://geo.example.org/geoserver/ows',
+    )
+    expect(toWmsEndpoint('http://host:1/?foo=bar')).toBe(
+      'http://host:1/?foo=bar',
+    )
+  })
+
+  it('passes non-URL input through unchanged', () => {
+    expect(toWmsEndpoint('not a url')).toBe('not a url')
+  })
+
+  it('joins params with the correct separator', () => {
+    expect(appendWmsParams('http://h/wms', 'request=GetCapabilities')).toBe(
+      'http://h/wms?request=GetCapabilities',
+    )
+    expect(
+      appendWmsParams('http://h/wms?token=x', 'request=GetCapabilities'),
+    ).toBe('http://h/wms?token=x&request=GetCapabilities')
+  })
+})
+
+describe('isLoopbackUrl', () => {
+  it('recognises our lens hosts', () => {
+    expect(isLoopbackUrl('http://localhost:54301/wms')).toBe(true)
+    expect(isLoopbackUrl('http://127.0.0.1:8080')).toBe(true)
+    expect(isLoopbackUrl('http://[::1]:9000/x')).toBe(true)
+  })
+
+  it('rejects external servers and junk', () => {
+    expect(isLoopbackUrl('https://maps.dwd.de/geoserver/ows?')).toBe(false)
+    expect(isLoopbackUrl('https://localhost.evil.example')).toBe(false)
+    expect(isLoopbackUrl('not a url')).toBe(false)
   })
 })

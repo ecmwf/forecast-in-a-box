@@ -147,6 +147,19 @@ describe('runDetailToViewModel', () => {
     expect(vm.outputCount).toBe(3)
   })
 
+  it('counts lost outputs from lost_task_ids', () => {
+    const vm = runDetailToViewModel({
+      run: {
+        ...baseRun,
+        lost_task_ids: { 'task-a': 'Gateway Proc changed' },
+      },
+      blueprint,
+      catalogue,
+      isBookmarked: false,
+    })
+    expect(vm.lostOutputCount).toBe(1)
+  })
+
   it('derives output kinds from the sink-block titles', () => {
     const vm = runDetailToViewModel({
       run: baseRun,

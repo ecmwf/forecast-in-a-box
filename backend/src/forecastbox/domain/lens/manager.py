@@ -114,6 +114,10 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             # call the lens directly on its own port, i.e. cross-origin.
             # SkinnyWMS honours this via flask-cors on all endpoints.
             "SKINNYWMS_CORS_ORIGINS": "*",
+            # SkinnyWMS localizes naive UTC GRIB datetimes via astimezone(),
+            # shifting advertised times by the host's UTC offset — pin UTC.
+            # Proper fix upstream: GRIBField replace(tzinfo=utc).
+            "TZ": "UTC",
         }
         process: subprocess.Popen[bytes] = subprocess.Popen(
             cmd,

@@ -9,14 +9,17 @@
  */
 
 /**
- * WMS GetCapabilities helpers used by WmsViewer.
+ * WMS GetCapabilities helpers for the geo viewer.
  *
  * Parses the WMS 1.3.0 capabilities XML produced by SkinnyWMS into a flat
- * list of leaf layers, extracts the geographic bounding box for auto-fit,
- * and detects FeatureInfo support. Two helpers handle URL rebasing
+ * list of leaf layers and extracts the geographic bounding box for
+ * auto-fit. Two helpers handle URL rebasing
  * (capabilities embed the lens server's bind address, which we redirect
  * through our known base URL) and ISO 8601 time-interval expansion.
  */
+
+// The singleton, not `@/lib/i18n` — no init side-effect in a plain module.
+import i18n from 'i18next'
 
 export interface ParsedStyle {
   name: string
@@ -33,6 +36,14 @@ export interface ParsedLayer {
   title: string
   styles: Array<ParsedStyle>
   time?: ParsedTime
+  /** Resolution range the server serves this in (scale limits); absent = every zoom. */
+  scale?: ScaleBand
+}
+
+/** Resolution range (m/px) a layer serves within; unbounded sides are 0 / Infinity. */
+export interface ScaleBand {
+  minRes: number
+  maxRes: number
 }
 
 export interface ParsedCapabilities {
@@ -42,7 +53,21 @@ export interface ParsedCapabilities {
   decorationLayers: Array<ParsedLayer>
   /** [minLon, minLat, maxLon, maxLat] in WGS84 (EPSG:4326). */
   bbox: [number, number, number, number]
-  supportsGetFeatureInfo: boolean
+}
+
+/** Loopback origins host our own lens servers — never CORS territory,
+ *  and worth a patient capabilities retry while SkinnyWMS boots. */
+export function isLoopbackUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname
+    return (
+      host === 'localhost' ||
+      host === '[::1]' ||
+      /^127(\.\d{1,3}){3}$/.test(host)
+    )
+  } catch {
+    return false
+  }
 }
 
 const DEFAULT_BBOX: [number, number, number, number] = [-180, -90, 180, 90]
@@ -135,10 +160,6 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
     throw new Error('GetCapabilities XML parse failed')
   }
 
-  const supportsGetFeatureInfo = !!doc.querySelector(
-    'Capability > Request > GetFeatureInfo',
-  )
-
   const root = doc.querySelector('Capability > Layer')
   const bbox = parseBbox(root) ?? DEFAULT_BBOX
 
@@ -150,7 +171,7 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
     ;(isDecorationLayer(layer) ? decorationLayers : layers).push(layer)
   }
 
-  return { layers, decorationLayers, bbox, supportsGetFeatureInfo }
+  return { layers, decorationLayers, bbox }
 }
 
 function collectLeafLayers(el: Element, out: Array<ParsedLayer>): void {
@@ -189,7 +210,66 @@ function parseLayer(el: Element): ParsedLayer | null {
     }
   }
 
-  return { name, title, styles, time }
+  return { name, title, styles, time, scale: parseScaleBand(el) }
+}
+
+/** OGC rendering pixel size (0.28 mm): scaleDenominator = resolution / 0.00028. */
+const OGC_PIXEL_M = 0.00028
+
+/** Scale limits → resolution band: WMS 1.3.0 denominators, else 1.1.1 ScaleHint (÷√2); undefined if unconstrained. */
+function parseScaleBand(el: Element): ScaleBand | undefined {
+  let minRes = 0
+  let maxRes = Infinity
+  const minDenom = numOf(el, 'MinScaleDenominator')
+  const maxDenom = numOf(el, 'MaxScaleDenominator')
+  if (!Number.isNaN(minDenom) || !Number.isNaN(maxDenom)) {
+    if (!Number.isNaN(minDenom)) minRes = minDenom * OGC_PIXEL_M
+    if (!Number.isNaN(maxDenom)) maxRes = maxDenom * OGC_PIXEL_M
+  } else {
+    const hints = directChildren(el, 'ScaleHint')
+    if (hints.length > 0) {
+      const min = hints[0].getAttribute('min')
+      const max = hints[0].getAttribute('max')
+      if (min && Number.isFinite(Number(min)) && Number(min) > 0) {
+        minRes = Number(min) / Math.SQRT2
+      }
+      if (max && Number.isFinite(Number(max))) maxRes = Number(max) / Math.SQRT2
+    }
+  }
+  if (minRes >= maxRes) return undefined // degenerate/inverted
+  return minRes > 0 || Number.isFinite(maxRes) ? { minRes, maxRes } : undefined
+}
+
+/** Intersection of two bands — a pair shows only where both do. */
+export function combineScaleBands(
+  a: ScaleBand | undefined,
+  b: ScaleBand | undefined,
+): ScaleBand | undefined {
+  if (!a) return b
+  if (!b) return a
+  return {
+    minRes: Math.max(a.minRes, b.minRes),
+    maxRes: Math.min(a.maxRes, b.maxRes),
+  }
+}
+
+export type ScaleState = 'in-range' | 'zoom-in' | 'zoom-out'
+
+/** Where a resolution sits vs a band: zoom-in = too coarse, zoom-out = too fine. */
+export function scaleBandState(
+  band: ScaleBand,
+  resolution: number,
+): ScaleState {
+  if (resolution >= band.maxRes) return 'zoom-in'
+  if (resolution < band.minRes) return 'zoom-out'
+  return 'in-range'
+}
+
+/** A resolution comfortably inside the band to animate the view to. */
+export function scaleBandTargetResolution(band: ScaleBand): number {
+  const { minRes, maxRes } = band
+  if (minRes > 0 && Number.isFinite(maxRes)) return Math.sqrt(minRes * maxRes)
+  return Number.isFinite(maxRes) ? maxRes / 2 : minRes * 2
 }
 
 function parseBbox(
@@ -254,15 +334,38 @@ function expandSingleTimeSegment(seg: string): Array<string> {
   const start = Date.parse(startStr)
   const end = Date.parse(endStr)
   if (Number.isNaN(start) || Number.isNaN(end)) return [seg]
+
+  // Whole-month/year periods (satellite archives: P1M across decades)
+  // must step the calendar — a fixed 30.4375-day approximation drifts off
+  // the server's advertised instants within a few steps, and servers with
+  // nearestValue=0 reject the drifted TIME outright.
+  const calendarMonths = parseWholeMonthPeriod(periodStr)
+  const out: Array<string> = []
+  if (calendarMonths !== null) {
+    const d = new Date(start)
+    while (d.getTime() <= end) {
+      out.push(d.toISOString())
+      d.setUTCMonth(d.getUTCMonth() + calendarMonths)
+      if (out.length > 10000) break
+    }
+    return out
+  }
+
   const periodMs = parseIsoPeriodMs(periodStr)
   if (periodMs === null || periodMs <= 0) return [seg]
-  const out: Array<string> = []
   for (let t = start; t <= end; t += periodMs) {
     out.push(new Date(t).toISOString())
     // Safety cap — a malformed forecast period shouldn't OOM the tab.
     if (out.length > 10000) break
   }
   return out
+}
+
+/** P1M/P3M/P1Y… → total months; null when days/times are involved. */
+function parseWholeMonthPeriod(input: string): number | null {
+  const m = /^P(?:(\d+)Y)?(?:(\d+)M)?$/.exec(input)
+  if (!m || (!m[1] && !m[2])) return null
+  return (m[1] ? Number(m[1]) : 0) * 12 + (m[2] ? Number(m[2]) : 0)
 }
 
 const PERIOD_RE =
@@ -315,49 +418,59 @@ export interface LayerGroup {
 
 const TITLE_LEVEL_RE =
   /^(.+?)\s+(?:at\s+)?([0-9]+(?:\.[0-9]+)?)\s*(hPa|mb|millibars?)\s*$/i
-const NAME_LEVEL_RE = /^(.+?)_(\d+)$/
+// Require the `@pl` scope, else DWD `name_<n>` suffixes read as hPa levels.
+const NAME_LEVEL_RE = /^(.+?@pl)_(\d+)$/
 
 /**
- * ECMWF / IFS / AIFS short-name → human-readable mapping. SkinnyWMS often
+ * ECMWF / IFS / AIFS short-name → human-readable lookup. SkinnyWMS often
  * exposes these short codes verbatim as layer names (e.g. `q@pl_500`,
  * `2t`, `msl`), which are unfriendly in a parameter picker. Lookups are
  * tried with the `@<scope>` suffix stripped, then on the raw input, then
  * fall through to the input unchanged.
  *
  * Keep this list focused on what AIFS / IFS forecasts commonly emit; we
- * don't aim for full GRIB code coverage.
+ * don't aim for full GRIB code coverage. Display names live in
+ * `visualise.json` `wmsParams.*` — tsc checks every code has an entry.
  */
-const PARAM_NAMES: Record<string, string> = {
+const PARAM_CODES = [
   // Pressure-level (3D)
-  t: 'Temperature',
-  q: 'Specific humidity',
-  u: 'U component of wind',
-  v: 'V component of wind',
-  'u/v': 'Wind (u, v components)',
-  w: 'Vertical velocity',
-  z: 'Geopotential',
-  gh: 'Geopotential height',
-  d: 'Divergence',
-  vo: 'Relative vorticity',
-  r: 'Relative humidity',
+  't',
+  'q',
+  'u',
+  'v',
+  'u/v',
+  'w',
+  'z',
+  'gh',
+  'd',
+  'vo',
+  'r',
   // Surface (2D)
-  '2t': '2 m temperature',
-  '2d': '2 m dewpoint temperature',
-  '10u': '10 m U wind',
-  '10v': '10 m V wind',
-  '10u/10v': '10 m wind (u, v components)',
-  '100u': '100 m U wind',
-  '100v': '100 m V wind',
-  '100u/100v': '100 m wind (u, v components)',
-  skt: 'Skin temperature',
-  sp: 'Surface pressure',
-  msl: 'Mean sea level pressure',
-  tp: 'Total precipitation',
-  tcw: 'Total column water',
-  tcwv: 'Total column water vapour',
-  sst: 'Sea surface temperature',
-  sd: 'Snow depth',
-  ci: 'Sea-ice cover',
+  '2t',
+  '2d',
+  '10u',
+  '10v',
+  '10u/10v',
+  '100u',
+  '100v',
+  '100u/100v',
+  'skt',
+  'sp',
+  'msl',
+  'tp',
+  'tcw',
+  'tcwv',
+  'sst',
+  'sd',
+  'ci',
+] as const
+type ParamCode = (typeof PARAM_CODES)[number]
+const PARAM_CODE_SET: ReadonlySet<string> = new Set(PARAM_CODES)
+
+function paramName(code: string): string | null {
+  return PARAM_CODE_SET.has(code)
+    ? i18n.t(`visualise:wmsParams.${code as ParamCode}`)
+    : null
 }
 
 interface HumanizedParam {
@@ -368,7 +481,7 @@ interface HumanizedParam {
 function humanizeParam(short: string): HumanizedParam {
   // Strip a single `@<scope>` suffix (e.g. `@pl`, `@sfc`, `@ml`) before lookup.
   const cleaned = short.toLowerCase().replace(/@\w+$/, '').trim()
-  const human = PARAM_NAMES[cleaned] ?? PARAM_NAMES[short.toLowerCase()]
+  const human = paramName(cleaned) ?? paramName(short.toLowerCase())
   return human
     ? { title: human, subtitle: short }
     : { title: short, subtitle: null }
@@ -508,9 +621,39 @@ export function uniquePressureLevels(
  */
 export function rebaseLensUrl(url: string, baseUrl: string): string {
   try {
+    // Rebasing exists for loopback lens servers that advertise internal
+    // origins. External endpoints carry a path and/or query in the base
+    // (e.g. `…/wms/?token=…`) and advertise public URLs — grafting the
+    // base onto those doubles the path/query, so use them verbatim.
+    const base = new URL(baseUrl)
+    if (base.pathname !== '/' || base.search !== '') return url
     const upstream = new URL(url)
     return `${baseUrl.replace(/\/$/, '')}${upstream.pathname}${upstream.search}`
   } catch {
     return url
   }
+}
+
+/**
+ * Resolve a source's WMS request endpoint. Lens sources are bare origins
+ * (`http://host:port`) whose service lives at `/wms`; external servers
+ * arrive as full endpoints that may carry a path and/or query (e.g.
+ * `https://eccharts.ecmwf.int/wms/?token=…`) and must be used verbatim —
+ * appending `/wms` to those produces garbage URLs.
+ */
+export function toWmsEndpoint(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl)
+    if (url.pathname !== '/' || url.search !== '') return baseUrl
+    return `${baseUrl.replace(/\/+$/, '')}/wms`
+  } catch {
+    return baseUrl
+  }
+}
+
+/** Append WMS query params with the correct `?`/`&` separator. */
+export function appendWmsParams(endpoint: string, query: string): string {
+  return endpoint.includes('?')
+    ? `${endpoint}&${query}`
+    : `${endpoint}?${query}`
 }

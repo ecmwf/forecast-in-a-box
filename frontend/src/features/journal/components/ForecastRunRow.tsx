@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** One run row in the Forecast Journal — shared by the dashboard and /executions. */
+/** One run row in the Forecast Journal — shared by the dashboard and /execute. */
 
 import { memo, useState } from 'react'
 import { Bookmark, CalendarClock, Pencil, Star } from 'lucide-react'
@@ -75,7 +75,7 @@ export const ForecastRunRow = memo(function ({
         <div className="min-w-0 grow">
           <div className="mb-1 flex min-w-0 items-center gap-1.5">
             <Link
-              to="/executions/$jobId"
+              to="/execute/$jobId"
               params={{ jobId: run.runId }}
               className="min-w-0 truncate text-sm font-medium hover:underline"
             >
@@ -112,6 +112,14 @@ export const ForecastRunRow = memo(function ({
             )}
             <span aria-hidden>·</span>
             <span>{t('item.outputs', { count: run.outputCount })}</span>
+            {run.lostOutputCount > 0 && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="text-muted-foreground/80 italic">
+                  {t('item.lost', { count: run.lostOutputCount })}
+                </span>
+              </>
+            )}
           </div>
           <div className="flex flex-wrap items-start gap-2">
             {run.scheduleName && (
@@ -251,7 +259,7 @@ function RunAction({ run }: { run: ForecastRunViewModel }) {
 
   return (
     <Link
-      to="/executions/$jobId"
+      to="/execute/$jobId"
       params={{ jobId: run.runId }}
       className={cn('text-sm font-semibold hover:underline', variant.className)}
     >

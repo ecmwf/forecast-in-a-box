@@ -30,6 +30,7 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { NavToggle } from '@/components/layout/NavToggle'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import i18n from '@/lib/i18n'
 
 function createTestQueryClient() {
@@ -48,12 +49,13 @@ function createTestQueryClient() {
 function renderNavToggle(initialPath: string) {
   const rootRoute = createRootRoute({ component: () => <Outlet /> })
 
-  const routes = ['/dashboard', '/configure', '/executions'].map((path) =>
-    createRoute({
-      getParentRoute: () => rootRoute,
-      path,
-      component: () => <NavToggle />,
-    }),
+  const routes = ['/overview', '/configure', '/execute', '/visualise'].map(
+    (path) =>
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path,
+        component: () => <NavToggle />,
+      }),
   )
 
   const routeTree = rootRoute.addChildren(routes)
@@ -72,42 +74,71 @@ function renderNavToggle(initialPath: string) {
 
 describe('NavToggle', () => {
   it('renders a navigation landmark', async () => {
-    const screen = await renderNavToggle('/dashboard')
+    const screen = await renderNavToggle('/overview')
     await expect
       .element(screen.getByRole('navigation', { name: 'Main navigation' }))
       .toBeVisible()
   })
 
-  it('renders all three nav links', async () => {
-    const screen = await renderNavToggle('/dashboard')
+  it('renders all four nav links', async () => {
+    const screen = await renderNavToggle('/overview')
     await expect.element(screen.getByText('Overview')).toBeVisible()
-    await expect.element(screen.getByText('Configuration')).toBeVisible()
-    await expect.element(screen.getByText('Executions')).toBeVisible()
+    await expect.element(screen.getByText('Configure')).toBeVisible()
+    await expect.element(screen.getByText('Execute')).toBeVisible()
+    await expect.element(screen.getByText('Visualise')).toBeVisible()
   })
 
-  it('marks Overview as active on /dashboard', async () => {
-    const screen = await renderNavToggle('/dashboard')
+  it('marks Overview as active on /overview', async () => {
+    const screen = await renderNavToggle('/overview')
     const link = screen.getByText('Overview')
     await expect.element(link).toHaveAttribute('aria-current', 'page')
   })
 
-  it('marks Configuration as active on /configure', async () => {
+  it('marks Configure as active on /configure', async () => {
     const screen = await renderNavToggle('/configure')
-    const link = screen.getByText('Configuration')
+    const link = screen.getByText('Configure')
     await expect.element(link).toHaveAttribute('aria-current', 'page')
   })
 
-  it('marks Executions as active on /executions', async () => {
-    const screen = await renderNavToggle('/executions')
-    const link = screen.getByText('Executions')
+  it('marks Execute as active on /execute', async () => {
+    const screen = await renderNavToggle('/execute')
+    const link = screen.getByText('Execute')
+    await expect.element(link).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('marks Visualise as active on /visualise', async () => {
+    const screen = await renderNavToggle('/visualise')
+    const link = screen.getByText('Visualise')
     await expect.element(link).toHaveAttribute('aria-current', 'page')
   })
 
   it('does not mark inactive links with aria-current', async () => {
-    const screen = await renderNavToggle('/dashboard')
-    const configLink = screen.getByText('Configuration')
-    const execLink = screen.getByText('Executions')
+    const screen = await renderNavToggle('/overview')
+    const configLink = screen.getByText('Configure')
+    const execLink = screen.getByText('Execute')
     await expect.element(configLink).not.toHaveAttribute('aria-current')
     await expect.element(execLink).not.toHaveAttribute('aria-current')
+  })
+
+  it('shows Visualise without a badge while the basket is empty', async () => {
+    const screen = await renderNavToggle('/overview')
+    await expect.element(screen.getByText('Visualise')).toBeVisible()
+    expect(screen.getByText('0').elements()).toHaveLength(0)
+  })
+
+  it('shows the basket count badge once sources are collected', async () => {
+    useComparisonStore.getState().addEntry({
+      kind: 'path',
+      path: '/data/a',
+      label: 'A',
+    })
+    useComparisonStore.getState().addEntry({
+      kind: 'path',
+      path: '/data/b',
+      label: 'B',
+    })
+    const screen = await renderNavToggle('/overview')
+    await expect.element(screen.getByText('Visualise')).toBeVisible()
+    await expect.element(screen.getByText('2')).toBeVisible()
   })
 })

@@ -71,7 +71,7 @@ function renderDetailPage(jobId: string, search = '') {
 
   const detailRoute = createRoute({
     getParentRoute: () => authenticatedRoute,
-    path: '/executions/$jobId',
+    path: '/execute/$jobId',
     component: () => (
       <AuthContext.Provider value={anonymousAuth}>
         <RunDetailPage />
@@ -85,7 +85,7 @@ function renderDetailPage(jobId: string, search = '') {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({
-      initialEntries: [`/executions/${jobId}${search}`],
+      initialEntries: [`/execute/${jobId}${search}`],
     }),
   })
 
@@ -151,7 +151,9 @@ describe('RunDetailPage Integration', () => {
   describe('actions', () => {
     it('renders restart button', async () => {
       const screen = await renderDetailPage('job-completed-001')
-      await expect.element(screen.getByText('Restart')).toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'Restart' }))
+        .toBeVisible()
     })
 
     it('renders three-dots menu', async () => {

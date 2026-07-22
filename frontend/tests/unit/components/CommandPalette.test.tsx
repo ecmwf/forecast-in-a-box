@@ -46,7 +46,8 @@ const ALL_COMMANDS = [
   'Dataset Forecast',
   'Dashboard',
   'Configure',
-  'Executions',
+  'Execute',
+  'Visualise',
   'Admin',
 ]
 
@@ -143,12 +144,12 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    // "journal" is a keyword of the Executions command — it appears in neither
-    // its label nor its description.
+    // "journal" is a keyword of the Execute command — it appears in
+    // neither its label nor its description.
     await screen.getByPlaceholder(PLACEHOLDER).fill('journal')
 
     await expect
-      .element(screen.getByRole('option', { name: /Executions/ }))
+      .element(screen.getByRole('option', { name: /Execute/ }))
       .toBeVisible()
     await expect
       .element(screen.getByRole('option', { name: /Dashboard/ }))
@@ -171,7 +172,7 @@ describe('CommandPalette', () => {
 
     await screen.getByRole('option', { name: /Dashboard/ }).click()
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/dashboard' })
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/overview' })
     expect(useCommandStore.getState().isOpen).toBe(false)
   })
 
@@ -196,7 +197,7 @@ describe('CommandPalette', () => {
     await screen.getByPlaceholder(PLACEHOLDER).fill('executions')
     await userEvent.keyboard('{Enter}')
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/executions' })
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/execute' })
     expect(useCommandStore.getState().isOpen).toBe(false)
   })
 

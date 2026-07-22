@@ -317,3 +317,13 @@
     0 0 0 5px color-mix(in oklch, #10b981 70%, transparent),
     0 0 12px 3px color-mix(in oklch, #10b981 45%, transparent);
 }
+
+/* Map loading bar: indeterminate sweep along the panel's top edge. */
+@keyframes map-loading-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}

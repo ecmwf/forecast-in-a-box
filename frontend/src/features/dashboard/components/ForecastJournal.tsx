@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** Dashboard widget: the most recent runs. The full list lives at /executions. */
+/** Dashboard widget: the most recent runs. The full list lives at /execute. */
 
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
@@ -97,7 +97,7 @@ export function ForecastJournal({ variant, shadow }: ForecastJournalProps) {
       footer={
         <div className="border-t border-border p-4 text-center">
           <Link
-            to="/executions"
+            to="/execute"
             className="inline-flex items-center text-sm font-medium text-primary hover:underline"
           >
             {t('viewAll')}

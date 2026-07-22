@@ -15,14 +15,23 @@
  * - rows derive from GribSink marker outputs (one per sink block, deduped
  *   across that sink's tasks) with the directory resolved from the payload
  * - unavailable markers hide the WMS action
+ * - Visualise navigates to /visualise with the output pinned solo
  * - Start WMS server boots the lens on the resolved directory → poll until
- *   running → Copy + View + Stop controls appear → Stop tears it down
+ *   running → Copy + Stop controls appear → Stop tears it down
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
+import {
+  Outlet,
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from '@tanstack/react-router'
 import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import type { RunOutputs } from '@/api/types/job.types'
@@ -52,17 +61,40 @@ const outputsWithMarkers: RunOutputs = {
   },
 }
 
-async function renderCard(outputs: RunOutputs | null) {
+async function renderCard(outputs: RunOutputs | null, runName?: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  return await render(
+  // Memory router: the card renders at '/', Visualise navigates away.
+  const rootRoute = createRootRoute({ component: () => <Outlet /> })
+  const indexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/',
+    component: () => (
+      <StoredOutputsCard
+        jobId="job-completed-001"
+        outputs={outputs}
+        runName={runName}
+      />
+    ),
+  })
+  const visualiseRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/visualise',
+    component: () => null,
+  })
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([indexRoute, visualiseRoute]),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
+  const screen = await render(
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
-        <StoredOutputsCard jobId="job-completed-001" outputs={outputs} />
+        <RouterProvider router={router} />
       </I18nextProvider>
     </QueryClientProvider>,
   )
+  return { screen, router }
 }
 
 beforeEach(() => {
@@ -72,7 +104,7 @@ beforeEach(() => {
 
 describe('StoredOutputsCard', () => {
   it('renders one row per sink block and resolves the directory from the payload', async () => {
-    const screen = await renderCard(outputsWithMarkers)
+    const { screen } = await renderCard(outputsWithMarkers)
     await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
     // Two marker tasks, one sink block — exactly one row.
     expect(screen.getByText('block_sink_1').elements()).toHaveLength(1)
@@ -81,7 +113,7 @@ describe('StoredOutputsCard', () => {
   })
 
   it('renders nothing without marker outputs', async () => {
-    const screen = await renderCard({
+    const { screen } = await renderCard({
       'task-out-1': {
         mime_type: 'image/png',
         original_block: 'sink_temperature_map',
@@ -92,7 +124,7 @@ describe('StoredOutputsCard', () => {
   })
 
   it('shows no WMS action while the marker output is unavailable', async () => {
-    const screen = await renderCard({
+    const { screen } = await renderCard({
       'task-out-grib': {
         mime_type: GRIB_DIR_MIME,
         original_block: 'block_sink_1',
@@ -110,7 +142,7 @@ describe('StoredOutputsCard', () => {
 
   it('disables lens actions when SkinnyWMS is not installed on the server', async () => {
     resetLensState({ skinnyWmsInstalled: false })
-    const screen = await renderCard(outputsWithMarkers)
+    const { screen } = await renderCard(outputsWithMarkers)
     // Rows still render (the path is useful information on its own) …
     await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
     // … but the Start WMS action is disabled with an explanatory title.
@@ -123,19 +155,16 @@ describe('StoredOutputsCard', () => {
       .toHaveAttribute('title', expect.stringContaining('not available'))
   })
 
-  it('Start WMS server boots the lens; Copy/View/Stop appear; Stop tears it down', async () => {
-    const screen = await renderCard(outputsWithMarkers)
+  it('Start WMS server boots the lens; Copy/Stop appear; Stop tears it down', async () => {
+    const { screen } = await renderCard(outputsWithMarkers)
     // Wait for the payload-resolved directory (enables the Start button).
     await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
 
     await screen.getByRole('button', { name: /start wms server/i }).click()
 
-    // Once running, Copy + View + Stop replace the Start button.
+    // Once running, Copy + Stop replace the Start button.
     await expect
       .element(screen.getByRole('button', { name: /copy wms url/i }))
-      .toBeVisible()
-    await expect
-      .element(screen.getByRole('button', { name: /^view$/i }))
       .toBeVisible()
     expect(listMockLenses()).toHaveLength(1)
     expect(listMockLenses()[0].status).toBe('running')
@@ -153,5 +182,17 @@ describe('StoredOutputsCard', () => {
       .element(screen.getByRole('button', { name: /start wms server/i }))
       .toBeVisible()
     await expect.poll(() => listMockLenses()).toHaveLength(0)
+  })
+
+  it('Visualise opens /visualise with the output pinned as a single view', async () => {
+    const { screen, router } = await renderCard(outputsWithMarkers)
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+
+    await screen.getByRole('button', { name: /^visualise$/i }).click()
+    await expect.poll(() => router.state.location.pathname).toBe('/visualise')
+    expect(router.state.location.search).toEqual({
+      a: 'run:job-completed-001~task-out-grib',
+      b: 'off',
+    })
   })
 })

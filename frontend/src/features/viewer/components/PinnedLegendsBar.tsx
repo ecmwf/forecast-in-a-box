@@ -1,0 +1,94 @@
+/*
+ * (C) Copyright 2026- ECMWF and individual contributors.
+ *
+ * This software is licensed under the terms of the Apache Licence Version 2.0
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
+ * granted to it by virtue of its status as an intergovernmental organisation nor
+ * does it submit to any jurisdiction.
+ */
+
+import { useState } from 'react'
+import { PinOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
+import { P } from '@/components/base/typography'
+import { cn } from '@/lib/utils'
+
+/** One pinned legend; `url` must already be browser-reachable (rebased). */
+export interface PinnedLegendItem {
+  key: string
+  title: string
+  url: string
+}
+
+/**
+ * Floating strip at the bottom of the map area listing every legend the
+ * user has pinned. Responsive grid: 1 / 2 / 3 columns based on viewport
+ * width so a wide screen can show three legends side-by-side. Each card
+ * shows the layer title, the legend image, and an unpin button.
+ */
+export function PinnedLegendsBar({
+  items,
+  onUnpin,
+}: {
+  items: ReadonlyArray<PinnedLegendItem>
+  onUnpin: (key: string) => void
+}) {
+  const { t } = useTranslation('executions')
+  // Advertised legends whose endpoint failed — their cards are dropped.
+  const [failedKeys, setFailedKeys] = useState<ReadonlySet<string>>(new Set())
+  const shown = items.filter((i) => !failedKeys.has(i.key))
+  if (shown.length === 0) return null
+  // Pick column count to match item count exactly (so the strip always
+  // fills the row), capped at 3 on very wide screens. Special case: 4
+  // items become 2×2 instead of 3+1, which the user explicitly preferred
+  // over an unbalanced last row. With a single legend we cap the grid to
+  // a narrower width and centre it — full-width-with-aspect-ratio makes
+  // the card unnecessarily tall.
+  const gridClass =
+    shown.length === 1
+      ? 'grid-cols-1 sm:max-w-md sm:mx-auto'
+      : shown.length === 2 || shown.length === 4
+        ? 'grid-cols-1 sm:grid-cols-2'
+        : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 max-h-[45%] overflow-y-auto">
+      <div className="pointer-events-auto m-3">
+        <div className={cn('grid gap-2', gridClass)}>
+          {shown.map(({ key, title, url }) => (
+            <div
+              key={key}
+              className="flex items-start gap-2 rounded border border-border bg-card px-2 py-2"
+            >
+              <div className="min-w-0 flex-1">
+                <P className="truncate text-xs font-medium" title={title}>
+                  {title}
+                </P>
+                <img
+                  src={url}
+                  alt={t('lens.legendAlt', { title })}
+                  className="mt-1 h-auto max-h-40 w-full object-contain"
+                  loading="lazy"
+                  onError={() =>
+                    setFailedKeys((prev) => new Set(prev).add(key))
+                  }
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0"
+                onClick={() => onUnpin(key)}
+                aria-label={t('lens.unpinLegend')}
+                title={t('lens.unpinLegend')}
+              >
+                <PinOff className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

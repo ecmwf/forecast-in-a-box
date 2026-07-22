@@ -12,49 +12,51 @@ import { Copy } from 'lucide-react'
 import { fetchJobResultBlob } from '../useJobResult'
 import type { ActionContext, OutputAction, OutputItem } from '../types'
 import i18n from '@/lib/i18n'
+import { copyToClipboard } from '@/lib/clipboard'
 import { createLogger } from '@/lib/logger'
 import { queryClient } from '@/lib/queryClient'
 import { showToast } from '@/lib/toast'
 
 const log = createLogger('OutputAction.copyImage')
 
-async function runCopyImage(
-  item: OutputItem,
-  ctx: ActionContext,
-): Promise<void> {
-  try {
-    // Shared cache — reuses the blob if a viewer or thumbnail already loaded it.
-    const { blob } = await fetchJobResultBlob(
-      queryClient,
-      item.jobId,
-      item.taskId,
-    )
-    // SVG: copy source as text. ClipboardItem(`image/svg+xml`) is rejected by
-    // most browsers (Chrome restricts clipboard MIMEs to a small allowlist),
-    // and SVG-as-text is what users actually want for editors and notebooks.
-    if (ctx.resolvedAdapter.id === 'image-vector') {
-      const text = await blob.text()
-      await navigator.clipboard.writeText(text)
-      showToast.success(i18n.t('executions:outputs.copy.svgSuccess'))
-      return
-    }
-    // Clipboard accepts only image/png and image/jpeg; the wire blob's .type
-    // may be a cascade-set opaque, so set the key explicitly.
-    const clipboardMime: 'image/png' | 'image/jpeg' =
-      item.mimeType === 'image/jpeg' ? 'image/jpeg' : 'image/png'
-    const tagged = new Blob([blob], { type: clipboardMime })
-    await navigator.clipboard.write([
-      new ClipboardItem({ [clipboardMime]: tagged }),
-    ])
-    showToast.success(i18n.t('executions:outputs.copy.imageSuccess'))
-  } catch (err) {
-    log.error('Failed to copy image', {
-      taskId: item.taskId,
-      mime: item.mimeType,
-      error: err,
+function runCopyImage(item: OutputItem, ctx: ActionContext): Promise<void> {
+  // No await before the copy call — the item must be built inside the
+  // gesture (Safari). Shared cache reuses an already-loaded blob.
+  const blob = fetchJobResultBlob(queryClient, item.jobId, item.taskId).then(
+    (result) => result.blob,
+  )
+  // SVG: copy source as text. ClipboardItem(`image/svg+xml`) is rejected by
+  // most browsers (Chrome restricts clipboard MIMEs to a small allowlist),
+  // and SVG-as-text is what users actually want for editors and notebooks.
+  const isSvg = ctx.resolvedAdapter.id === 'image-vector'
+  const copied = isSvg
+    ? copyToClipboard(
+        'text/plain',
+        blob.then((b) => b.text()),
+      )
+    : // Wire blobs can carry opaque types, so key off the item's MIME.
+      copyToClipboard(
+        item.mimeType === 'image/jpeg' ? 'image/jpeg' : 'image/png',
+        blob,
+      )
+  return copied
+    .then(() => {
+      showToast.success(
+        i18n.t(
+          isSvg
+            ? 'executions:outputs.copy.svgSuccess'
+            : 'executions:outputs.copy.imageSuccess',
+        ),
+      )
     })
-    showToast.error(i18n.t('executions:outputs.copy.error'))
-  }
+    .catch((err: unknown) => {
+      log.error('Failed to copy image', {
+        taskId: item.taskId,
+        mime: item.mimeType,
+        error: err,
+      })
+      showToast.error(i18n.t('executions:outputs.copy.error'))
+    })
 }
 
 export const copyImageAction: OutputAction = {

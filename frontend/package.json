@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 3000",
-    "dev:mock": "VITE_ENABLE_MOCKS=true vite --port 3000",
+    "dev:mock": "VITE_ENABLE_MOCKS=true vite --port ${VITE_PORT:-3000}",
     "build": "vite build && tsc",
     "prodbuild": "vite build && tsc",
     "serve": "vite preview",

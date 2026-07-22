@@ -163,7 +163,7 @@
   },
   "notification": {
     "newModels": "New models and model versions have been published in the",
-    "registryLink": "ECMWF registry"
+    "registryLink": "model registry"
   },
   "mock": {
     "models": {

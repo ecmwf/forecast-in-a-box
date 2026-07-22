@@ -24,6 +24,7 @@ import { artifactsHandlers } from './artifacts.handlers'
 import { scheduleHandlers } from './schedule.handlers'
 import { statusHandlers } from './status.handlers'
 import { usersHandlers } from './users.handlers'
+import { wmsHandlers } from './wms.handlers'
 
 export const handlers = [
   ...authHandlers,
@@ -36,4 +37,5 @@ export const handlers = [
   ...scheduleHandlers,
   ...statusHandlers,
   ...usersHandlers,
+  ...wmsHandlers,
 ]

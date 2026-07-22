@@ -31,6 +31,8 @@ export interface OutputItem {
   /** Source block identifier — used as the human-readable card label and group key. */
   originalBlock: string
   isAvailable: boolean
+  /** Reason a produced output is no longer retrievable; absent = pending. */
+  lostReason?: string
 }
 
 export interface ActionContext {

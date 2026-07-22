@@ -102,7 +102,7 @@ export function AuthenticatedHeader() {
         {/* Logo — flex-1 balances the actions so the nav stays centred. */}
         <div className="flex min-w-0 flex-1 items-center">
           <Link
-            to="/dashboard"
+            to="/overview"
             className="flex min-w-0 items-center gap-2 sm:gap-3"
             aria-label={t('userMenu.dashboard')}
           >

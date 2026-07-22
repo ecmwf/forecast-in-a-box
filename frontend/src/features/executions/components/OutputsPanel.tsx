@@ -9,12 +9,15 @@
  */
 
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
+import type { LostTaskIds } from '@/features/executions/outputs/availability'
 import { OutputsView } from '@/features/executions/outputs/OutputsView'
 
 interface OutputsPanelProps {
   jobId: string
   status: JobStatus
   outputs: RunOutputs | null
+  /** Reasons for outputs that are no longer retrievable. */
+  lostTaskIds?: LostTaskIds
   /** Drive skeleton highlights for blocks currently being processed. */
   completedBlockIds?: ReadonlyArray<string> | null
   /** Used to show block-level skeletons before any outputs payload arrives. */
@@ -27,6 +30,7 @@ export function OutputsPanel({
   jobId,
   status,
   outputs,
+  lostTaskIds,
   completedBlockIds,
   plannedBlockIds,
   toolbarSlot,
@@ -39,6 +43,7 @@ export function OutputsPanel({
       jobId={jobId}
       status={status}
       outputs={outputs}
+      lostTaskIds={lostTaskIds}
       completedBlockIds={completedBlockIds}
       plannedBlockIds={plannedBlockIds}
       toolbarSlot={toolbarSlot}

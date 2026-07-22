@@ -12,15 +12,16 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedVisualiseRouteImport } from './routes/_authenticated/visualise'
 import { Route as AuthenticatedPresetsRouteImport } from './routes/_authenticated/presets'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
 import { Route as AuthenticatedConfigureRouteImport } from './routes/_authenticated/configure'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedSchedulesIndexRouteImport } from './routes/_authenticated/schedules.index'
-import { Route as AuthenticatedExecutionsIndexRouteImport } from './routes/_authenticated/executions.index'
+import { Route as AuthenticatedExecuteIndexRouteImport } from './routes/_authenticated/execute.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedSchedulesScheduleIdRouteImport } from './routes/_authenticated/schedules.$scheduleId'
-import { Route as AuthenticatedExecutionsJobIdRouteImport } from './routes/_authenticated/executions.$jobId'
+import { Route as AuthenticatedExecuteJobIdRouteImport } from './routes/_authenticated/execute.$jobId'
 import { Route as AuthenticatedConfigureFableIdRouteImport } from './routes/_authenticated/configure.$fableId'
 import { Route as AuthenticatedAdminVariablesRouteImport } from './routes/_authenticated/admin/variables'
 import { Route as AuthenticatedAdminPluginsRouteImport } from './routes/_authenticated/admin/plugins'
@@ -45,14 +46,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedVisualiseRoute = AuthenticatedVisualiseRouteImport.update({
+  id: '/visualise',
+  path: '/visualise',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedPresetsRoute = AuthenticatedPresetsRouteImport.update({
   id: '/presets',
   path: '/presets',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const AuthenticatedOverviewRoute = AuthenticatedOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedConfigureRoute = AuthenticatedConfigureRouteImport.update({
@@ -71,10 +77,10 @@ const AuthenticatedSchedulesIndexRoute =
     path: '/schedules/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedExecutionsIndexRoute =
-  AuthenticatedExecutionsIndexRouteImport.update({
-    id: '/executions/',
-    path: '/executions/',
+const AuthenticatedExecuteIndexRoute =
+  AuthenticatedExecuteIndexRouteImport.update({
+    id: '/execute/',
+    path: '/execute/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
@@ -88,10 +94,10 @@ const AuthenticatedSchedulesScheduleIdRoute =
     path: '/schedules/$scheduleId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedExecutionsJobIdRoute =
-  AuthenticatedExecutionsJobIdRouteImport.update({
-    id: '/executions/$jobId',
-    path: '/executions/$jobId',
+const AuthenticatedExecuteJobIdRoute =
+  AuthenticatedExecuteJobIdRouteImport.update({
+    id: '/execute/$jobId',
+    path: '/execute/$jobId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedConfigureFableIdRoute =
@@ -154,16 +160,17 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/configure': typeof AuthenticatedConfigureRouteWithChildren
-  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/overview': typeof AuthenticatedOverviewRoute
   '/presets': typeof AuthenticatedPresetsRoute
+  '/visualise': typeof AuthenticatedVisualiseRoute
   '/admin/artifacts': typeof AuthenticatedAdminArtifactsRouteWithChildren
   '/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
   '/admin/variables': typeof AuthenticatedAdminVariablesRouteWithChildren
   '/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
-  '/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
+  '/execute/$jobId': typeof AuthenticatedExecuteJobIdRoute
   '/schedules/$scheduleId': typeof AuthenticatedSchedulesScheduleIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
-  '/executions/': typeof AuthenticatedExecutionsIndexRoute
+  '/execute/': typeof AuthenticatedExecuteIndexRoute
   '/schedules/': typeof AuthenticatedSchedulesIndexRoute
   '/admin/artifacts/$artifactId': typeof AuthenticatedAdminArtifactsArtifactIdRoute
   '/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
@@ -175,13 +182,14 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/configure': typeof AuthenticatedConfigureRouteWithChildren
-  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/overview': typeof AuthenticatedOverviewRoute
   '/presets': typeof AuthenticatedPresetsRoute
+  '/visualise': typeof AuthenticatedVisualiseRoute
   '/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
-  '/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
+  '/execute/$jobId': typeof AuthenticatedExecuteJobIdRoute
   '/schedules/$scheduleId': typeof AuthenticatedSchedulesScheduleIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
-  '/executions': typeof AuthenticatedExecutionsIndexRoute
+  '/execute': typeof AuthenticatedExecuteIndexRoute
   '/schedules': typeof AuthenticatedSchedulesIndexRoute
   '/admin/artifacts/$artifactId': typeof AuthenticatedAdminArtifactsArtifactIdRoute
   '/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
@@ -196,16 +204,17 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/configure': typeof AuthenticatedConfigureRouteWithChildren
-  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/overview': typeof AuthenticatedOverviewRoute
   '/_authenticated/presets': typeof AuthenticatedPresetsRoute
+  '/_authenticated/visualise': typeof AuthenticatedVisualiseRoute
   '/_authenticated/admin/artifacts': typeof AuthenticatedAdminArtifactsRouteWithChildren
   '/_authenticated/admin/plugins': typeof AuthenticatedAdminPluginsRouteWithChildren
   '/_authenticated/admin/variables': typeof AuthenticatedAdminVariablesRouteWithChildren
   '/_authenticated/configure/$fableId': typeof AuthenticatedConfigureFableIdRoute
-  '/_authenticated/executions/$jobId': typeof AuthenticatedExecutionsJobIdRoute
+  '/_authenticated/execute/$jobId': typeof AuthenticatedExecuteJobIdRoute
   '/_authenticated/schedules/$scheduleId': typeof AuthenticatedSchedulesScheduleIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
-  '/_authenticated/executions/': typeof AuthenticatedExecutionsIndexRoute
+  '/_authenticated/execute/': typeof AuthenticatedExecuteIndexRoute
   '/_authenticated/schedules/': typeof AuthenticatedSchedulesIndexRoute
   '/_authenticated/admin/artifacts/$artifactId': typeof AuthenticatedAdminArtifactsArtifactIdRoute
   '/_authenticated/admin/plugins/$pluginId': typeof AuthenticatedAdminPluginsPluginIdRoute
@@ -220,16 +229,17 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin'
     | '/configure'
-    | '/dashboard'
+    | '/overview'
     | '/presets'
+    | '/visualise'
     | '/admin/artifacts'
     | '/admin/plugins'
     | '/admin/variables'
     | '/configure/$fableId'
-    | '/executions/$jobId'
+    | '/execute/$jobId'
     | '/schedules/$scheduleId'
     | '/admin/'
-    | '/executions/'
+    | '/execute/'
     | '/schedules/'
     | '/admin/artifacts/$artifactId'
     | '/admin/plugins/$pluginId'
@@ -241,13 +251,14 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/configure'
-    | '/dashboard'
+    | '/overview'
     | '/presets'
+    | '/visualise'
     | '/configure/$fableId'
-    | '/executions/$jobId'
+    | '/execute/$jobId'
     | '/schedules/$scheduleId'
     | '/admin'
-    | '/executions'
+    | '/execute'
     | '/schedules'
     | '/admin/artifacts/$artifactId'
     | '/admin/plugins/$pluginId'
@@ -261,16 +272,17 @@ export interface FileRouteTypes {
     | '/about'
     | '/_authenticated/admin'
     | '/_authenticated/configure'
-    | '/_authenticated/dashboard'
+    | '/_authenticated/overview'
     | '/_authenticated/presets'
+    | '/_authenticated/visualise'
     | '/_authenticated/admin/artifacts'
     | '/_authenticated/admin/plugins'
     | '/_authenticated/admin/variables'
     | '/_authenticated/configure/$fableId'
-    | '/_authenticated/executions/$jobId'
+    | '/_authenticated/execute/$jobId'
     | '/_authenticated/schedules/$scheduleId'
     | '/_authenticated/admin/'
-    | '/_authenticated/executions/'
+    | '/_authenticated/execute/'
     | '/_authenticated/schedules/'
     | '/_authenticated/admin/artifacts/$artifactId'
     | '/_authenticated/admin/plugins/$pluginId'
@@ -308,6 +320,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/visualise': {
+      id: '/_authenticated/visualise'
+      path: '/visualise'
+      fullPath: '/visualise'
+      preLoaderRoute: typeof AuthenticatedVisualiseRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/presets': {
       id: '/_authenticated/presets'
       path: '/presets'
@@ -315,11 +334,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPresetsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+    '/_authenticated/overview': {
+      id: '/_authenticated/overview'
+      path: '/overview'
+      fullPath: '/overview'
+      preLoaderRoute: typeof AuthenticatedOverviewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/configure': {
@@ -343,11 +362,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSchedulesIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/executions/': {
-      id: '/_authenticated/executions/'
-      path: '/executions'
-      fullPath: '/executions/'
-      preLoaderRoute: typeof AuthenticatedExecutionsIndexRouteImport
+    '/_authenticated/execute/': {
+      id: '/_authenticated/execute/'
+      path: '/execute'
+      fullPath: '/execute/'
+      preLoaderRoute: typeof AuthenticatedExecuteIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin/': {
@@ -364,11 +383,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSchedulesScheduleIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/executions/$jobId': {
-      id: '/_authenticated/executions/$jobId'
-      path: '/executions/$jobId'
-      fullPath: '/executions/$jobId'
-      preLoaderRoute: typeof AuthenticatedExecutionsJobIdRouteImport
+    '/_authenticated/execute/$jobId': {
+      id: '/_authenticated/execute/$jobId'
+      path: '/execute/$jobId'
+      fullPath: '/execute/$jobId'
+      preLoaderRoute: typeof AuthenticatedExecuteJobIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/configure/$fableId': {
@@ -523,22 +542,24 @@ const AuthenticatedConfigureRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedConfigureRoute: typeof AuthenticatedConfigureRouteWithChildren
-  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedOverviewRoute: typeof AuthenticatedOverviewRoute
   AuthenticatedPresetsRoute: typeof AuthenticatedPresetsRoute
-  AuthenticatedExecutionsJobIdRoute: typeof AuthenticatedExecutionsJobIdRoute
+  AuthenticatedVisualiseRoute: typeof AuthenticatedVisualiseRoute
+  AuthenticatedExecuteJobIdRoute: typeof AuthenticatedExecuteJobIdRoute
   AuthenticatedSchedulesScheduleIdRoute: typeof AuthenticatedSchedulesScheduleIdRoute
-  AuthenticatedExecutionsIndexRoute: typeof AuthenticatedExecutionsIndexRoute
+  AuthenticatedExecuteIndexRoute: typeof AuthenticatedExecuteIndexRoute
   AuthenticatedSchedulesIndexRoute: typeof AuthenticatedSchedulesIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
   AuthenticatedConfigureRoute: AuthenticatedConfigureRouteWithChildren,
-  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedOverviewRoute: AuthenticatedOverviewRoute,
   AuthenticatedPresetsRoute: AuthenticatedPresetsRoute,
-  AuthenticatedExecutionsJobIdRoute: AuthenticatedExecutionsJobIdRoute,
+  AuthenticatedVisualiseRoute: AuthenticatedVisualiseRoute,
+  AuthenticatedExecuteJobIdRoute: AuthenticatedExecuteJobIdRoute,
   AuthenticatedSchedulesScheduleIdRoute: AuthenticatedSchedulesScheduleIdRoute,
-  AuthenticatedExecutionsIndexRoute: AuthenticatedExecutionsIndexRoute,
+  AuthenticatedExecuteIndexRoute: AuthenticatedExecuteIndexRoute,
   AuthenticatedSchedulesIndexRoute: AuthenticatedSchedulesIndexRoute,
 }
 

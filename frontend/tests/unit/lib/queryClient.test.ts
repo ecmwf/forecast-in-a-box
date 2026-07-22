@@ -10,6 +10,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { queryClient } from '@/lib/queryClient'
+import { ApiClientError } from '@/api/client'
+import { showToast } from '@/lib/toast'
 
 // Mock dependencies
 vi.mock('@/lib/logger', () => ({
@@ -68,6 +70,35 @@ describe('queryClient', () => {
     it('has retry configured', () => {
       const defaults = queryClient.getDefaultOptions()
       expect(defaults.queries?.retry).toBeDefined()
+    })
+  })
+
+  describe('expected error statuses', () => {
+    const failWith = async (status: number, meta?: Record<string, unknown>) => {
+      const key = ['expected-status-test', status, JSON.stringify(meta)]
+      // Seed data: the refresh toast only fires for queries that had data.
+      queryClient.setQueryData(key, 'seeded')
+      await queryClient
+        .fetchQuery({
+          queryKey: key,
+          queryFn: () => {
+            throw new ApiClientError('gone', status, 'Not Found')
+          },
+          retry: false,
+          staleTime: 0,
+          ...(meta ? { meta } : {}),
+        })
+        .catch(() => undefined)
+    }
+
+    it('suppresses the refresh toast for declared statuses', async () => {
+      await failWith(404, { expectedErrorStatuses: [404] })
+      expect(showToast.error).not.toHaveBeenCalled()
+    })
+
+    it('still toasts for undeclared statuses', async () => {
+      await failWith(500, { expectedErrorStatuses: [404] })
+      expect(showToast.error).toHaveBeenCalled()
     })
   })
 
