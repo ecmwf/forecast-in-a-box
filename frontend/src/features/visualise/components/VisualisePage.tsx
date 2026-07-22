@@ -21,7 +21,7 @@
  */
 
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { BrushCleaning, Loader2, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
 import { SLOT_B_OFF, entryDisplayName, entryRef } from '../entry-ref'
@@ -238,7 +238,7 @@ export function VisualisePage() {
               title={t('basket.clear')}
               aria-label={t('basket.clear')}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <BrushCleaning className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>

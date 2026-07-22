@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
-import { buildPairs } from '@/features/viewer/geo/layer-pairing'
+import { buildPairs, pairIsStatic } from '@/features/viewer/geo/layer-pairing'
 import { groupLayers } from '@/features/viewer/wms-capabilities'
 
 const layer = (name: string, title: string): ParsedLayer => ({
@@ -71,5 +71,40 @@ describe('buildPairs', () => {
     const b = groupLayers([layer('tp', 'Total precipitation')])
     const { overlapCount } = buildPairs(a, b)
     expect(overlapCount).toBe(0)
+  })
+})
+
+describe('pairIsStatic', () => {
+  const base = {
+    key: 'k',
+    title: 'T',
+    subtitle: null,
+    level: null,
+    levelUnit: null,
+  }
+  const mkLayer = (time?: string) => ({
+    name: 'x',
+    title: 'X',
+    styles: [],
+    ...(time !== undefined ? { time: { raw: time } } : {}),
+  })
+
+  it('static when no side advertises TIME', () => {
+    expect(pairIsStatic({ ...base, perSource: { a: mkLayer() } })).toBe(true)
+  })
+
+  it('time-aware when any side has parseable steps', () => {
+    expect(
+      pairIsStatic({
+        ...base,
+        perSource: { a: mkLayer(), b: mkLayer('2026-07-06T00:00:00Z') },
+      }),
+    ).toBe(false)
+  })
+
+  it('static when the TIME dim expands to nothing parseable', () => {
+    expect(
+      pairIsStatic({ ...base, perSource: { a: mkLayer('not-a-date/junk') } }),
+    ).toBe(true)
   })
 })

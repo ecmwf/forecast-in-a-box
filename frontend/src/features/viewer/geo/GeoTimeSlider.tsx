@@ -301,20 +301,6 @@ export function GeoTimeSlider({
             onClipChange={onClipChange}
           />
           <div className="flex items-center justify-between gap-2">
-            <Button
-              variant={playing ? 'default' : 'outline'}
-              size="icon"
-              className="h-7 w-7"
-              disabled={steps.length <= 1}
-              onClick={() => setPlaying((p) => !p)}
-              aria-label={playing ? t('lens.pause') : t('lens.play')}
-            >
-              {playing ? (
-                <Pause className="h-3.5 w-3.5" />
-              ) : (
-                <Play className="h-3.5 w-3.5" />
-              )}
-            </Button>
             <span className="font-mono text-xs text-muted-foreground tabular-nums">
               {safeIndex - rangeStart + 1} / {rangeLen}
               {clip && (
@@ -323,6 +309,7 @@ export function GeoTimeSlider({
                 </span>
               )}
             </span>
+            {/* Transport cluster in media order: prev · play · next. */}
             <div className="flex items-center gap-1">
               <Button
                 variant="outline"
@@ -335,6 +322,20 @@ export function GeoTimeSlider({
                 aria-label={t('lens.prevStep')}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={playing ? 'default' : 'outline'}
+                size="icon"
+                className="h-7 w-7"
+                disabled={steps.length <= 1}
+                onClick={() => setPlaying((p) => !p)}
+                aria-label={playing ? t('lens.pause') : t('lens.play')}
+              >
+                {playing ? (
+                  <Pause className="h-3.5 w-3.5" />
+                ) : (
+                  <Play className="h-3.5 w-3.5" />
+                )}
               </Button>
               <Button
                 variant="outline"
