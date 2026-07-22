@@ -50,6 +50,15 @@ interface ActivityState {
 
 const COMPLETED_CAP = 50
 
+/** v1 records predate the /executions→/execute and /dashboard→/overview
+ *  route renames — persisted notification links must follow. */
+export function rewriteLegacyRoute(path: string): string {
+  return path
+    .replace(/^\/executions(?=\/|$)/, '/execute')
+    .replace(/^\/runs(?=\/|$)/, '/execute')
+    .replace(/^\/dashboard(?=\/|$)/, '/overview')
+}
+
 function evictOldestCompleted(
   tasks: Partial<Record<string, ActivityTask>>,
 ): Partial<Record<string, ActivityTask>> {
@@ -152,6 +161,22 @@ export const useActivityStore = create<ActivityState>()(
             ),
           ),
         }),
+        migrate: (persisted, version) => {
+          const state = persisted as {
+            tasks?: Partial<Record<string, ActivityTask>>
+          }
+          if (version >= 2 || !state.tasks) return state
+          return {
+            tasks: Object.fromEntries(
+              Object.entries(state.tasks).map(([id, task]) => [
+                id,
+                task?.navigateTo !== undefined
+                  ? { ...task, navigateTo: rewriteLegacyRoute(task.navigateTo) }
+                  : task,
+              ]),
+            ),
+          }
+        },
       },
     ),
     { name: 'ActivityStore' },

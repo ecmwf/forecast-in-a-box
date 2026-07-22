@@ -113,7 +113,7 @@ export const STORE_VERSIONS = {
   ui: 6, // v6: Add application timezone preference
   config: 1,
   fableBuilder: 2, // v2: Removed configDisplayMode, added isMiniMapOpen
-  activity: 1,
+  activity: 2, // v2: navigateTo rewritten for /executions→/execute, /dashboard→/overview
   comparison: 1,
 } as const
 
