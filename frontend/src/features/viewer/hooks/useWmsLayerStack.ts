@@ -31,6 +31,7 @@ import {
   loadRequestUrl,
   makeDataLayerSource,
 } from '../ol-layers'
+import { toWmsEndpoint } from '../wms-capabilities'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
@@ -165,7 +166,9 @@ export function useWmsLayerStack(
       const effectiveOpacity = perLayer * masterOpacity
       const z = zBase + (activeOrder.length - idx) // index 0 → highest z
 
-      const paramsKey = JSON.stringify(params)
+      // baseUrl is part of the identity: a slot swap serves the SAME
+      // layer names from the other server — params alone would not move.
+      const paramsKey = `${baseUrl}|${JSON.stringify(params)}`
       const existing = managed.get(layerName)
       if (existing) {
         // Guarded: reconciles also run for opacity/order changes and
@@ -174,6 +177,7 @@ export function useWmsLayerStack(
         if (existing.paramsKey !== paramsKey) {
           existing.paramsKey = paramsKey
           existing.lastTime = time
+          existing.source.setUrl(toWmsEndpoint(baseUrl))
           existing.source.updateParams(params)
           // Hidden-on-error layers never re-request (OL culls invisible
           // layers) — unhide so the refreshed params get retried. No stale

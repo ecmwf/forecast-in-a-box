@@ -184,4 +184,28 @@ describe('useWmsLayerStack load failures', () => {
       })
       .toBe('0')
   })
+
+  it('follows a baseUrl change (slot swap) despite identical layer names', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    for (const port of [portA, portB]) {
+      registerMockWmsServer(port, {
+        layers: [
+          { name: '2t', title: '2 m temperature', time: `${T00},${T06}` },
+        ],
+      })
+    }
+
+    const screen = await render(<Harness port={portA} time={T00} />)
+    await expect
+      .poll(() => getMapRequests(portA).length, { timeout: 8000 })
+      .toBeGreaterThan(0)
+    expect(getMapRequests(portB)).toHaveLength(0)
+
+    // Swap: same layer name, other server — the pixels must follow.
+    await screen.rerender(<Harness port={portB} time={T00} />)
+    await expect
+      .poll(() => getMapRequests(portB).length, { timeout: 8000 })
+      .toBeGreaterThan(0)
+  })
 })
