@@ -28,6 +28,7 @@ from fastapi.templating import Jinja2Templates
 from fiab_core.artifacts import ArtifactsProvider
 from starlette.exceptions import HTTPException
 
+import forecastbox.domain
 import forecastbox.routes
 import forecastbox.schemata
 from forecastbox.domain.admin import get_local_release
@@ -38,38 +39,105 @@ from forecastbox.domain.gateway.service import shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
 from forecastbox.domain.plugin.manager import PluginManager, join_updater_thread, submit_load_plugins
 from forecastbox.domain.plugin.store import join_stores_thread, submit_initialize_stores
-from forecastbox.utility.config import config
+from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.config import ConcurrentThreads, config, validate_runtime
+from forecastbox.utility.dispatcher import (
+    DispatcherRegistration,
+    event_dispatcher_entrypoint,
+    freeze_registration,
+    register_dispatcher,
+)
+from forecastbox.utility.dispatcher import (
+    status as dispatcher_status,
+)
+from forecastbox.utility.dispatcher import (
+    stop_request as dispatcher_stop_request,
+)
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
 logger = logging.getLogger(__name__)
 
 
+def _discover_dispatchers() -> None:
+    for package_info in pkgutil.iter_modules(forecastbox.domain.__path__):
+        if not package_info.ispkg:
+            continue
+        module_name = f"forecastbox.domain.{package_info.name}.dispatchers"
+        try:
+            module = importlib.import_module(module_name)
+        except ModuleNotFoundError as error:
+            if error.name == module_name:
+                continue
+            raise
+        registrations = getattr(module, "dispatchers", None)
+        if not isinstance(registrations, tuple):
+            raise TypeError(f"{module_name} must export a dispatchers tuple")
+        for registration in registrations:
+            if not isinstance(registration, DispatcherRegistration):
+                raise TypeError(f"{module_name} contains a malformed dispatcher registration")
+            register_dispatcher(registration)
+    freeze_registration()
+
+
+def _start_execution_runtime() -> None:
+    _discover_dispatchers()
+    for pool_name, settings in config.concurrency.pools.items():
+        execution_manager.register_pool(
+            pool_name,
+            max_workers=settings.max_workers,
+            max_pending=settings.max_pending,
+            stage=0,
+        )
+    execution_manager.register_thread(
+        ConcurrentThreads.EventDispatcher.value,
+        event_dispatcher_entrypoint,
+        status_provider=dispatcher_status,
+        stop_request=dispatcher_stop_request,
+        stage=0,
+    )
+    execution_manager.start(timeout=config.concurrency.startup_timeout_seconds)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.debug(f"Starting FIAB with config: {config}")
-    for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
-        module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
-        if hasattr(module, "create_db_and_tables"):
-            await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
-    if config.backend.allow_scheduler:
-        start_scheduler()
-    release_time, release_version = get_local_release()
-    app.version = f"{release_version}@{release_time}"
-    submit_initialize_stores()
-    ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
-    ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path))
-    catalog_ready = submit_refresh_catalog()
-    PluginManager.loop = asyncio.get_running_loop()
-    submit_load_plugins(start_after=catalog_ready)
-    yield
-    if config.backend.allow_scheduler:
-        stop_scheduler()
-    shutdown_all_lens_instances()
-    await shutdown_processes()
-    shutdown_tunnels()
-    join_updater_thread(timeout_sec=10)
-    join_stores_thread(timeout_sec=10)
-    join_artifact_manager(timeout_sec=10)
+    validate_runtime(config)
+    try:
+        for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
+            module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
+            if hasattr(module, "create_db_and_tables"):
+                await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
+        _start_execution_runtime()
+    except BaseException:
+        execution_manager.shutdown(timeout=config.concurrency.shutdown_timeout_seconds)
+        raise
+
+    try:
+        if config.backend.allow_scheduler:
+            start_scheduler()
+        release_time, release_version = get_local_release()
+        app.version = f"{release_version}@{release_time}"
+        submit_initialize_stores()
+        ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
+        ArtifactsProvider.register_get_artifact_local_path(
+            lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path)
+        )
+        catalog_ready = submit_refresh_catalog()
+        PluginManager.loop = asyncio.get_running_loop()
+        submit_load_plugins(start_after=catalog_ready)
+        yield
+    finally:
+        try:
+            if config.backend.allow_scheduler:
+                stop_scheduler()
+            shutdown_all_lens_instances()
+            await shutdown_processes()
+            shutdown_tunnels()
+            join_updater_thread(timeout_sec=10)
+            join_stores_thread(timeout_sec=10)
+            join_artifact_manager(timeout_sec=10)
+        finally:
+            execution_manager.shutdown(timeout=config.concurrency.shutdown_timeout_seconds)
 
 
 app = FastAPI(

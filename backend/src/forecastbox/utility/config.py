@@ -11,6 +11,7 @@ import logging
 import os
 import threading
 import urllib.parse
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self
 
@@ -38,6 +39,62 @@ class StatusMessage:
 
     # NOTE this class is here as this is a low place in hierarchy, and we dont want circular imports
     gateway_running = "running"
+
+
+class ConcurrentPools(StrEnum):
+    General = "general"
+    Io = "io"
+    RunSubmission = "run-submission"
+    ArtifactIo = "artifact-io"
+    PluginManagement = "plugin-management"
+    JobsDb = "jobs-db"
+
+
+class ConcurrentThreads(StrEnum):
+    EventDispatcher = "event-dispatcher"
+    Scheduler = "scheduler"
+    DatabaseGarbageCollector = "database-garbage-collector"
+
+
+class PoolSettings(FiabBaseModel):
+    max_workers: int = Field(gt=0)
+    max_pending: int = Field(gt=0)
+
+
+def _default_concurrency_pools() -> dict[ConcurrentPools, PoolSettings]:
+    return {
+        ConcurrentPools.General: PoolSettings(max_workers=2, max_pending=32),
+        ConcurrentPools.Io: PoolSettings(max_workers=4, max_pending=64),
+        ConcurrentPools.RunSubmission: PoolSettings(max_workers=2, max_pending=32),
+        ConcurrentPools.ArtifactIo: PoolSettings(max_workers=1, max_pending=64),
+        ConcurrentPools.PluginManagement: PoolSettings(max_workers=1, max_pending=16),
+        ConcurrentPools.JobsDb: PoolSettings(max_workers=1, max_pending=128),
+    }
+
+
+class ConcurrencySettings(FiabBaseModel):
+    pools: dict[ConcurrentPools, PoolSettings] = Field(default_factory=_default_concurrency_pools)
+    failure_history_size: int = Field(default=100, gt=0)
+    startup_timeout_seconds: float = Field(default=10, gt=0)
+    shutdown_timeout_seconds: float = Field(default=10, gt=0)
+
+    def validate_runtime(self) -> list[str]:
+        errors: list[str] = []
+        required_pools = set(ConcurrentPools)
+        configured_pools = set(self.pools)
+        if configured_pools != required_pools:
+            missing = sorted(pool.value for pool in required_pools - configured_pools)
+            unexpected = sorted(pool.value for pool in configured_pools - required_pools)
+            errors.append(f"pools must contain exactly the six required identifiers: missing={missing}, unexpected={unexpected}")
+        for pool_name in (ConcurrentPools.JobsDb, ConcurrentPools.ArtifactIo, ConcurrentPools.PluginManagement):
+            pool = self.pools.get(pool_name)
+            if pool is not None and pool.max_workers != 1:
+                errors.append(f"{pool_name.value} must have exactly one worker")
+        return errors
+
+
+class DispatcherSettings(FiabBaseModel):
+    queue_capacity: int = Field(default=1024, gt=0)
 
 
 class DatabaseSettings(FiabBaseModel):
@@ -341,6 +398,8 @@ class FIABConfig(BaseSettings):
     external: ExternalServicesSettings = Field(default_factory=ExternalServicesSettings)
     backend: BackendSettings = Field(default_factory=BackendSettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
+    concurrency: ConcurrencySettings = Field(default_factory=ConcurrencySettings)
+    dispatcher: DispatcherSettings = Field(default_factory=DispatcherSettings)
 
     @classmethod
     def settings_customise_sources(
