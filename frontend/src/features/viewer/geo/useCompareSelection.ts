@@ -195,45 +195,41 @@ export function useCompareSelection(
 
   const setLinkMode = useCallback(
     (mode: LinkMode, options?: { auto?: boolean }) => {
-      setLinkModeState((prevMode) => {
-        if (prevMode === mode) return prevMode
+      if (mode !== linkMode) {
         if (mode === 'unlinked') {
           // Lossless: copy the derived per-source projections.
           setPerSource({ a: deriveForSlot('a'), b: deriveForSlot('b') })
         } else {
           // Rebuild pair order from the union of both sides' active layers.
-          setPerSource((current) => {
-            const order: Array<string> = []
-            const opacities = new Map<string, number>()
-            for (const pair of pairByKey.values()) {
-              const aName = pair.perSource.a?.name
-              const bName = pair.perSource.b?.name
-              const aActive =
-                aName !== undefined && current.a.activeOrder.includes(aName)
-              const bActive =
-                bName !== undefined && current.b.activeOrder.includes(bName)
-              if (!aActive && !bActive) continue
-              order.push(pair.key)
-              const opacity =
-                (aName !== undefined
-                  ? current.a.layerOpacities.get(aName)
-                  : undefined) ??
-                (bName !== undefined
-                  ? current.b.layerOpacities.get(bName)
-                  : undefined) ??
-                DEFAULT_LAYER_OPACITY
-              opacities.set(pair.key, opacity)
-            }
-            setLinkedOrder(order)
-            setLinkedOpacities(opacities)
-            return current
-          })
+          const order: Array<string> = []
+          const opacities = new Map<string, number>()
+          for (const pair of pairByKey.values()) {
+            const aName = pair.perSource.a?.name
+            const bName = pair.perSource.b?.name
+            const aActive =
+              aName !== undefined && perSource.a.activeOrder.includes(aName)
+            const bActive =
+              bName !== undefined && perSource.b.activeOrder.includes(bName)
+            if (!aActive && !bActive) continue
+            order.push(pair.key)
+            const opacity =
+              (aName !== undefined
+                ? perSource.a.layerOpacities.get(aName)
+                : undefined) ??
+              (bName !== undefined
+                ? perSource.b.layerOpacities.get(bName)
+                : undefined) ??
+              DEFAULT_LAYER_OPACITY
+            opacities.set(pair.key, opacity)
+          }
+          setLinkedOrder(order)
+          setLinkedOpacities(opacities)
         }
-        return mode
-      })
+        setLinkModeState(mode)
+      }
       setAutoUnlinked(mode === 'unlinked' ? (options?.auto ?? false) : false)
     },
-    [deriveForSlot, pairByKey],
+    [linkMode, perSource, deriveForSlot, pairByKey],
   )
 
   const clear = useCallback(() => {

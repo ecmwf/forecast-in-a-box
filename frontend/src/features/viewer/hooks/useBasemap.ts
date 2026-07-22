@@ -31,15 +31,8 @@ import {
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
-import type { ParsedLayer, SkinnyWmsBasemap } from '../wms-capabilities'
+import type { ParsedLayer } from '../wms-capabilities'
 import type { BasemapLayer, BasemapOption } from '../ol-layers'
-
-export interface BasemapControl {
-  /** Basemap choices offered to the user for this lens. */
-  availableBasemaps: ReadonlyArray<BasemapOption>
-  /** Decoration layers split into native background + reference overlay. */
-  skinnyBasemap: SkinnyWmsBasemap
-}
 
 export function useBasemap(options: {
   mapRef: RefObject<OlMap | null>
@@ -51,7 +44,7 @@ export function useBasemap(options: {
   opacity?: number
   incLoading: () => void
   decLoading: () => void
-}): BasemapControl {
+}): void {
   const {
     mapRef,
     basemapLayerRef,
@@ -185,6 +178,4 @@ export function useBasemap(options: {
     incLoading,
     decLoading,
   ])
-
-  return { availableBasemaps, skinnyBasemap }
 }

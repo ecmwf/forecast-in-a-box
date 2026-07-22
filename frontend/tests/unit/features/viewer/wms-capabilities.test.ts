@@ -34,14 +34,13 @@ const PX_M = 0.00028
 /** Minimal WMS 1.3.0 capabilities document in the shape SkinnyWMS emits. */
 function capabilitiesXml({
   withBbox = true,
-  withGetFeatureInfo = true,
-}: { withBbox?: boolean; withGetFeatureInfo?: boolean } = {}): string {
+}: { withBbox?: boolean } = {}): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
   <Capability>
     <Request>
       <GetMap/>
-      ${withGetFeatureInfo ? '<GetFeatureInfo/>' : ''}
+      <GetFeatureInfo/>
     </Request>
     <Layer>
       <Title>WMS server</Title>
@@ -129,16 +128,6 @@ describe('parseCapabilities', () => {
     const caps = parseCapabilities(capabilitiesXml())
     const t2 = caps.layers.find((l) => l.name === '2t')
     expect(t2?.time?.raw).toBe('2026-06-10T06:00:00Z,2026-06-10T12:00:00Z')
-  })
-
-  it('detects GetFeatureInfo support', () => {
-    expect(parseCapabilities(capabilitiesXml()).supportsGetFeatureInfo).toBe(
-      true,
-    )
-    expect(
-      parseCapabilities(capabilitiesXml({ withGetFeatureInfo: false }))
-        .supportsGetFeatureInfo,
-    ).toBe(false)
   })
 
   it('throws on malformed XML', () => {

@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** Dashboard widget: the most recent runs. The full list lives at /executions. */
+/** Dashboard widget: the most recent runs. The full list lives at /execute. */
 
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'

@@ -797,9 +797,9 @@ export function GeoViewer({
       setLeftCollapsed(collapse)
       setRightCollapsed(collapse)
     },
-    // Mode keys are comparison-only.
+    // Mode keys are comparison-only and inert while focused on one source.
     onMode: (next) => {
-      if (hasB) onModeChange(next)
+      if (hasB && focusSlot === null) onModeChange(next)
     },
     onFit: fitAction,
     onCopy: () => copyView(null),

@@ -22,15 +22,9 @@ import {
   groupLayers,
   isLoopbackUrl,
   parseCapabilities,
-  partitionGroups,
   toWmsEndpoint,
-  uniquePressureLevels,
 } from '../wms-capabilities'
-import type {
-  LayerGroup,
-  ParsedLayer,
-  PartitionedGroups,
-} from '../wms-capabilities'
+import type { LayerGroup, ParsedLayer } from '../wms-capabilities'
 
 // GetCapabilities retry — lens `running` precedes WMS-port readiness.
 // Loopback = our own lens: a cold SkinnyWMS boot can take tens of
@@ -60,8 +54,6 @@ export interface LensSource {
   /** True between failed attempts while the retry ladder is running. */
   retrying: boolean
   groups: Array<LayerGroup>
-  partitioned: PartitionedGroups
-  allLevels: Array<number>
   retry: () => void
 }
 
@@ -99,8 +91,6 @@ export function useLensSource(baseUrl: string | null): LensSource {
 
   const layers = query.data?.layers ?? NO_LAYERS
   const groups = useMemo<Array<LayerGroup>>(() => groupLayers(layers), [layers])
-  const partitioned = useMemo(() => partitionGroups(groups), [groups])
-  const allLevels = useMemo(() => uniquePressureLevels(groups), [groups])
 
   return {
     layers,
@@ -110,8 +100,6 @@ export function useLensSource(baseUrl: string | null): LensSource {
     loadingLayers: baseUrl !== null && query.isPending,
     retrying: query.isFetching && query.failureCount > 0,
     groups,
-    partitioned,
-    allLevels,
     retry: () => void query.refetch(),
   }
 }

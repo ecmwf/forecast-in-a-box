@@ -37,6 +37,9 @@ import {
 import { buildLensBaseUrl, stopLens } from '@/api/endpoints/lens'
 import { ApiClientError } from '@/api/client'
 import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('useComparisonSource')
 
 export type ComparisonSourceState =
   | { phase: 'idle' }
@@ -205,7 +208,9 @@ export function useComparisonSource(
     if (diedAfterServing) {
       // Purge the failed record — the registry keeps it otherwise, and a
       // corpse sharing the revived lens's path reads as a duplicate.
-      stopLens(startedLensId).catch(() => undefined)
+      stopLens(startedLensId).catch((err: unknown) =>
+        log.debug('Failed to purge dead lens record', { error: err }),
+      )
     }
   }, [statusGone, diedAfterServing, startedLensId, localPath])
 

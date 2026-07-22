@@ -11,7 +11,7 @@
 import type { JobStatus } from '@/api/types/job.types'
 
 /**
- * The shape both run surfaces — the dashboard journal and /executions —
+ * The shape both run surfaces — the dashboard journal and /execute —
  * render. Built by the adapters from a raw run plus its blueprint.
  */
 export interface ForecastRunViewModel {
