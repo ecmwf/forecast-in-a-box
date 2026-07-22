@@ -325,7 +325,7 @@ export function GeoToolbar({
                       b.id === basemapId && 'bg-accent font-medium',
                     )}
                   >
-                    <span>{b.label}</span>
+                    <span>{t(b.labelKey)}</span>
                     {b.id === basemapId && (
                       <span className="text-xs text-muted-foreground">✓</span>
                     )}

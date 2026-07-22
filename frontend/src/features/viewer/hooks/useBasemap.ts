@@ -21,14 +21,12 @@ import { skinnyWmsBasemap } from '../wms-capabilities'
 import {
   BASEMAPS,
   DEFAULT_BASEMAP_ID,
-  IMAGERY_BASEMAPS,
   REFERENCE_OVERLAY_Z,
   SKINNYWMS_BASEMAP,
   WEB_MERCATOR_EXTENT,
   makeBasemapLayer,
   makeDataLayerSource,
   makeSkinnyWmsBasemap,
-  makeWmsImageBasemap,
 } from '../ol-layers'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
@@ -64,7 +62,13 @@ export function useBasemap(options: {
     incLoading,
     decLoading,
   } = options
-  const previousBasemapIdRef = useRef<string>(DEFAULT_BASEMAP_ID)
+  // What this map actually shows. The skinny basemap is served BY the
+  // lens (key includes baseUrl); a rebuilt map arrives showing the
+  // default — both cases must re-apply.
+  const appliedRef = useRef<{ map: OlMap | null; key: string }>({
+    map: null,
+    key: DEFAULT_BASEMAP_ID,
+  })
   const referenceLayerRef = useRef<ImageLayer<ImageWMS> | null>(null)
   const opacityRef = useRef(opacity)
   opacityRef.current = opacity
@@ -78,7 +82,6 @@ export function useBasemap(options: {
   const availableBasemaps = useMemo<ReadonlyArray<BasemapOption>>(
     () => [
       ...BASEMAPS,
-      ...IMAGERY_BASEMAPS,
       ...(skinnyBasemap.background ? [SKINNYWMS_BASEMAP] : []),
     ],
     [skinnyBasemap.background],
@@ -90,9 +93,17 @@ export function useBasemap(options: {
     const map = mapRef.current
     const oldLayer = basemapLayerRef.current
     if (!map || !oldLayer) return
-    if (previousBasemapIdRef.current === basemapId) return
-    previousBasemapIdRef.current = basemapId
+    if (appliedRef.current.map !== map) {
+      // A (re)built map mounts the default basemap (useOlMapBase).
+      appliedRef.current = { map, key: DEFAULT_BASEMAP_ID }
+    }
     const opt = availableBasemaps.find((b) => b.id === basemapId) ?? BASEMAPS[0]
+    const key =
+      opt.type === 'skinnywms' && skinnyBasemap.background
+        ? `${opt.id}|${baseUrl}`
+        : opt.id
+    if (appliedRef.current.key === key) return
+    appliedRef.current = { map, key }
     let newLayer: BasemapLayer
     if (opt.type === 'skinnywms' && skinnyBasemap.background) {
       const skinny = makeSkinnyWmsBasemap(
@@ -104,13 +115,6 @@ export function useBasemap(options: {
       source?.on('imageloadend', decLoading)
       source?.on('imageloaderror', decLoading)
       newLayer = skinny
-    } else if (opt.type === 'wms-image') {
-      const imagery = makeWmsImageBasemap(opt)
-      const source = imagery.getSource()
-      source?.on('imageloadstart', incLoading)
-      source?.on('imageloadend', decLoading)
-      source?.on('imageloaderror', decLoading)
-      newLayer = imagery
     } else {
       // Carto basemap — or skinnywms with no background, which falls back.
       const external = opt.type === 'skinnywms' ? BASEMAPS[0] : opt

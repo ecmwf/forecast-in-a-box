@@ -152,6 +152,9 @@ export function useOlMapBase(
     return () => {
       ro.disconnect()
       map.setTarget(undefined)
+      // Detach from the shared View (setView unlistens the old view's
+      // listeners) — else every discarded map leaks through it.
+      map.setView(createViewerView())
       mapRef.current = null
     }
   }, [containerRef, resetKey, tryFit, incLoading, decLoading])
