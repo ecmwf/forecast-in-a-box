@@ -12,7 +12,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type OlImage from 'ol/Image'
 import {
   cancellingImageLoader,
-  isAbortedLoad,
   loadRequestUrl,
 } from '@/features/viewer/ol-layers'
 
@@ -61,11 +60,10 @@ describe('cancellingImageLoader', () => {
     expect(signals[0].aborted).toBe(true)
     expect(signals[1].aborted).toBe(false)
 
-    // Superseded: flagged and failed; fresh: blob URL, not flagged.
-    await vi.waitFor(() => expect(isAbortedLoad(first.img)).toBe(true))
-    expect(first.img.src).toContain('data:image/gif')
+    // Superseded: never settled (no error event → no OL console noise);
+    // fresh: blob URL.
     await vi.waitFor(() => expect(second.img.src).toContain('blob:'))
-    expect(isAbortedLoad(second.img)).toBe(false)
+    expect(first.img.src).toBe('')
   })
 
   it('keeps the request URL readable for TIME attribution', () => {
@@ -81,7 +79,7 @@ describe('cancellingImageLoader', () => {
     )
   })
 
-  it('fails the image on HTTP errors without the aborted flag', async () => {
+  it('fails the image on HTTP errors', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => Promise.resolve(new Response('nope', { status: 500 }))),
@@ -90,6 +88,5 @@ describe('cancellingImageLoader', () => {
     const { wrapper, img } = fakeImage()
     load(wrapper, 'http://wms.test/?TIME=T00')
     await vi.waitFor(() => expect(img.src).toContain('data:image/gif'))
-    expect(isAbortedLoad(img)).toBe(false)
   })
 })
