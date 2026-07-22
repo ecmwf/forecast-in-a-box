@@ -578,7 +578,7 @@ export function SingleMapView({
           slot="a"
           label={a.label}
           side="left"
-          loading={loadingCount.a > 0}
+          loading={loadingCount.a > 0 || a.layersLoading}
           timeLabel={a.timeLabel}
         />
       )}
@@ -587,7 +587,7 @@ export function SingleMapView({
           slot="b"
           label={b.label}
           side="right"
-          loading={loadingCount.b > 0}
+          loading={loadingCount.b > 0 || b.layersLoading}
           timeLabel={b.timeLabel}
         />
       )}
@@ -657,10 +657,10 @@ export function SingleMapView({
         </div>
       )}
 
-      <MapLoadingBar loading={loadingCount.a > 0} slot="a" />
+      <MapLoadingBar loading={loadingCount.a > 0 || a.layersLoading} slot="a" />
       {b !== null && (
         <MapLoadingBar
-          loading={loadingCount.b > 0}
+          loading={loadingCount.b > 0 || b.layersLoading}
           slot="b"
           className="top-0.5"
         />

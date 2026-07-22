@@ -27,6 +27,8 @@ export interface CompareMapSource {
   onLoadResult?: (layerName: string, time: string | null, ok: boolean) => void
   /** All raw TIME strings of the active selection (prefetch). */
   timeSteps: ReadonlyArray<string>
+  /** Capabilities still loading/retrying — the layer list is not final. */
+  layersLoading: boolean
   /** Base stack opacity: global × per-source tier (mode factors and
    *  time-gap hiding are applied by the map components on top). */
   masterOpacity: number
