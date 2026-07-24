@@ -18,7 +18,7 @@ from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, NewType, Protocol, TypeVar, cast
+from typing import Any, NewType, Protocol, TypeVar, cast, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, SerializeAsAny
 
@@ -32,11 +32,13 @@ SyncTask = Callable[[], T]
 ThreadEntrypoint = Callable[[threading.Event], None]
 
 
-class ComponentStatusProtocol(Protocol):
+@runtime_checkable
+class ComponentReady(Protocol):
+    # TODO: encode intersection type of Protocol, BaseModel
     def is_ready(self) -> bool: ...
 
 
-StatusProvider = Callable[[], ComponentStatusProtocol]
+ComponentStatusProvider = Callable[[], ComponentReady]
 StopRequest = Callable[[float], None]
 
 
@@ -311,7 +313,7 @@ class ManagedPool:
 class _ThreadRecord:
     thread_name: ConcurrentThreads
     entrypoint: ThreadEntrypoint
-    status_provider: StatusProvider
+    status_provider: ComponentStatusProvider
     stop_request: StopRequest | None
     stage: int
     restart_policy: RestartPolicy
@@ -350,7 +352,7 @@ class ExecutionManager:
         thread_name: ConcurrentThreads,
         entrypoint: ThreadEntrypoint,
         *,
-        status_provider: StatusProvider,
+        status_provider: ComponentStatusProvider,
         stop_request: StopRequest | None = None,
         stage: int,
         restart_policy: RestartPolicy = NEVER_RESTART,
@@ -391,12 +393,9 @@ class ExecutionManager:
     def _thread_snapshot(self, record: _ThreadRecord) -> ThreadStatus:
         try:
             component = record.status_provider()
-            if not isinstance(component, BaseModel):
-                raise TypeError("status provider must return a Pydantic model")
-            is_ready = getattr(component, "is_ready", None)
-            if not callable(is_ready):
-                raise TypeError("status provider result must define is_ready()")
-            ready = is_ready()
+            if not isinstance(component, ComponentStatus) or not isinstance(component, ComponentReady):
+                raise TypeError("status provider must return a Pydantic model implementing is_ready()")
+            ready = component.is_ready()
             if not isinstance(ready, bool):
                 raise TypeError("status provider is_ready() must return bool")
         except BaseException as error:
