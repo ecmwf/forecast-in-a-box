@@ -82,12 +82,14 @@ def _discover_dispatchers() -> None:
 def _start_execution_runtime() -> None:
     _discover_dispatchers()
     for pool_name, settings in config.backend.concurrency.pools.items():
+        logger.debug(f"registering {pool_name=}")
         execution_manager.register_pool(
             pool_name,
             max_workers=settings.max_workers,
             max_pending=settings.max_pending,
             stage=0,
         )
+    logger.debug("registering event dispatcher thread")
     execution_manager.register_thread(
         ConcurrentThreads.EventDispatcher,
         event_dispatcher_entrypoint,

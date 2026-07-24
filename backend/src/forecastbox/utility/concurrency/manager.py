@@ -10,6 +10,7 @@
 
 import asyncio
 import inspect
+import logging
 import threading
 import time
 import traceback
@@ -30,6 +31,7 @@ T = TypeVar("T")
 TaskName = NewType("TaskName", str)
 SyncTask = Callable[[], T]
 ThreadEntrypoint = Callable[[threading.Event], None]
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -393,13 +395,16 @@ class ExecutionManager:
     def _thread_snapshot(self, record: _ThreadRecord) -> ThreadStatus:
         try:
             component = record.status_provider()
-            if not isinstance(component, ComponentStatus) or not isinstance(component, ComponentReady):
-                raise TypeError("status provider must return a Pydantic model implementing is_ready()")
+            if not isinstance(component, StatusModel):
+                raise TypeError("status provider must return a StatusModel instance")
+            if not isinstance(component, ComponentReady):
+                raise TypeError("status provider must return the ComponentReady protocol")
             ready = component.is_ready()
             if not isinstance(ready, bool):
                 raise TypeError("status provider is_ready() must return bool")
         except BaseException as error:
             component = ComponentStatus(ready=False, health="failure", detail=repr(error))
+            logger.debug(f"failed into {component=}")
             ready = False
         alive = record.thread.is_alive() if record.thread is not None else False
         return ThreadStatus(
@@ -438,6 +443,7 @@ class ExecutionManager:
         started_stages: list[int] = []
         try:
             for stage in stages:
+                logger.debug(f"starting {stage=}")
                 if time.monotonic() >= deadline:
                     raise StartupError("execution manager startup timed out")
                 for pool in self._pools.values():
@@ -450,6 +456,7 @@ class ExecutionManager:
                         self._start_thread(record)
                 for record in self._threads.values():
                     if record.stage == stage:
+                        logger.debug(f"waiting for ready of {record=}")
                         self._wait_for_ready(record, deadline)
                 started_stages.append(stage)
             with self._lock:

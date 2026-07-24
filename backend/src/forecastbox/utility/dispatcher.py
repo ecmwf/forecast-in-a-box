@@ -10,6 +10,7 @@
 
 import asyncio
 import inspect
+import logging
 import threading
 import time
 from collections import deque
@@ -29,6 +30,7 @@ from forecastbox.utility.concurrency.manager import (
 from forecastbox.utility.config import ConcurrentPools, DispatcherSettings, config
 from forecastbox.utility.structural import freeze_recursively
 
+logger = logging.getLogger(__name__)
 EventName = NewType("EventName", str)
 
 
