@@ -9,8 +9,10 @@
 
 """Background execution of a run: compilation, context persistence, and cascade submission.
 
-Runs in the run-submission pool. Jobs-database reads and writes are submitted as
-synchronous tasks to ``ConcurrentPools.JobsDb`` and waited on from this worker.
+Runs in the run-submission pool so the caller can return an
+``ExecuteResult`` immediately without waiting for compilation or cascade
+submission. Jobs-database reads and writes are submitted as synchronous tasks
+to ``ConcurrentPools.JobsDb`` and waited on from this worker.
 """
 
 import logging
@@ -60,7 +62,13 @@ def execute_background(
     compiler_runtime_context: db.CompilerRuntimeContext,
     auth_context: AuthContext,
 ) -> None:
-    """Compile a blueprint and submit it to cascade, updating the Run row as we go."""
+    """Compile a blueprint and submit it to cascade, updating the Run row as we go.
+
+    ``submit_time`` is the ``created_at`` timestamp recorded when the Run row
+    was first inserted; it becomes ``submitDatetime`` in the intrinsic glyphs
+    so retries preserve the original submission time. ``startDatetime`` is the
+    moment this worker actually begins executing.
+    """
     logger.debug(f"starting background compilation of {run_id=}")
 
     try:
@@ -81,6 +89,13 @@ def execute_background(
         builder = BlueprintBuilder.model_validate(getattr(blueprint, "builder"))
         local_values: dict[str, str] = builder.local_glyphs
 
+        # Persist only the glyphs actually referenced in the builder, keeping
+        # the stored context lean. Expand from the referenced roots to capture
+        # the full transitive dependency closure, then persist the raw
+        # pre-expansion values for those glyphs. Intrinsics are excluded
+        # because they are always recomputed. This lets a restart re-expand a
+        # composite glyph such as "${root}/${runId}" even if the intermediate
+        # dependency later disappears from the global DB.
         referenced_glyph_names = {
             name for block in builder.blocks for name in cast(ExtractedGlyphs, extract_glyphs(block.instance).t).glyphs
         }

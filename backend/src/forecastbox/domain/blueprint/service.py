@@ -392,7 +392,11 @@ def validate_expand_sync(
 async def validate_expand(
     blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
 ) -> BlueprintValidationExpansion:
-    """Validate and expand a partially-constructed BlueprintBuilder."""
+    """Validate and expand a partially-constructed BlueprintBuilder.
+
+    Uses the same contract as ``validate_expand_sync`` after first loading the
+    caller-visible global glyph buckets from the jobs database.
+    """
     global_buckets = await _await_jobs_db(
         "blueprint.glyphs.get-resolution",
         partial(global_db.get_glyphs_for_resolution, auth_context),

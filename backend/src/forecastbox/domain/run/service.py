@@ -197,7 +197,15 @@ async def execute(
     compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
 ) -> Either[ExecuteResult, str]:  # type: ignore[invalid-argument]
-    """Submit synchronous run creation to the General pool and return its result."""
+    """Always create a Run linked to the given Blueprint.
+
+    The route-facing async wrapper awaits ``submit_run_sync`` on the General
+    pool so it still returns an ``ExecuteResult`` immediately without waiting
+    for compilation or cascade submission. When ``run_id`` is supplied the new
+    attempt is appended under that existing id; otherwise the database layer
+    generates a fresh id. Experiment metadata is stored on the row when
+    provided and preserved on restart.
+    """
     return await execution_manager.awaitable_submit(
         ConcurrentPools.General,
         TaskName("run.submit"),

@@ -12,6 +12,10 @@
 Each helper owns its session and transaction and must be submitted to the
 ``ConcurrentPools.JobsDb`` worker by a route, service, or background-thread
 orchestrator.
+
+This table records unversioned application state such as install history and
+per-plugin configuration. ``upsert_plugin_state`` owns all mutable columns and
+performs a partial update: arguments left as ``None`` keep their stored value.
 """
 
 import datetime as dt
@@ -64,7 +68,22 @@ def upsert_plugin_state(
     excluded_templates: list[str] | None = None,
     glyph_remapping: dict[str, str] | None = None,
 ) -> None:
-    """Insert or update the PluginState row for ``plugin_id``."""
+    """Insert or update the PluginState row for ``plugin_id``.
+
+    On first install this creates a row with empty defaults for
+    ``excluded_templates``, ``glyph_remapping``, and ``template_errors``, with
+    ``asset_ingest_needed=True`` and ``enabled=True`` unless explicitly
+    overridden.
+
+    On later calls, only explicitly provided non-``None`` arguments are
+    written. ``asset_ingest_needed`` stays true once set, and is also forced to
+    true when the version changes, the plugin is re-enabled,
+    ``excluded_templates`` changes, or ``glyph_remapping`` changes.
+
+    Raises ``PluginNotFound`` if ``version`` is ``None`` and no existing row is
+    found, because that means the caller is trying to update a plugin that has
+    never been installed.
+    """
     ref_time = current_time("dbref")
     plugin_errors_raw = [e.model_dump() for e in plugin_errors] if plugin_errors is not None else None
 
@@ -117,7 +136,7 @@ def upsert_plugin_state(
 
 
 def get_plugin_state(plugin_id: str) -> PluginStateRecord | None:
-    """Return the PluginState row for ``plugin_id``, or ``None`` if absent."""
+    """Return the PluginState row for ``plugin_id``, or ``None`` if not yet installed."""
 
     def function(i: int) -> PluginStateRecord | None:
         with _jobs_module.session_maker() as session:
@@ -139,7 +158,12 @@ def get_all_plugin_states() -> list[PluginStateRecord]:
 
 
 def update_template_errors(*, plugin_id: str, template_errors: dict[str, str]) -> None:
-    """Persist per-template validation errors for ``plugin_id``."""
+    """Persist per-template validation errors for ``plugin_id``.
+
+    An empty dict clears any recorded errors. A non-empty dict maps each
+    template ``display_name`` to its latest validation error string. If no
+    ``PluginState`` row exists yet the call is silently skipped.
+    """
 
     def function(i: int) -> None:
         with _jobs_module.session_maker() as session:
@@ -152,7 +176,13 @@ def update_template_errors(*, plugin_id: str, template_errors: dict[str, str]) -
 
 
 def clear_asset_ingest_needed(*, plugin_id: str) -> None:
-    """Clear the ``asset_ingest_needed`` flag immediately before template ingestion."""
+    """Clear the ``asset_ingest_needed`` flag immediately before template ingestion.
+
+    Clearing before, rather than after, ingestion prevents a partial failure
+    from leaving the flag set and triggering a spurious re-ingest; detailed
+    per-template failures are persisted separately. If no row exists the call
+    is a no-op.
+    """
 
     def function(i: int) -> None:
         with _jobs_module.session_maker() as session:

@@ -12,6 +12,10 @@
 Each helper owns its session and transaction and must be submitted to the
 ``ConcurrentPools.JobsDb`` worker by a route, service, or background-thread
 orchestrator.
+
+Authorization remains helper-specific: route-facing list/update/delete helpers
+apply ownership scoping, while ``get_experiment_definition`` is the
+intentional internal no-auth lookup documented below.
 """
 
 import datetime as dt
@@ -50,7 +54,7 @@ class ExperimentDefinitionRecord:
 
 @dataclass(frozen=True, eq=True, slots=True)
 class ExperimentLatest:
-    """A visible version paired with the entity's true creation time."""
+    """A visible ExperimentDefinition version paired with the entity's true creation time."""
 
     experiment: ExperimentDefinitionRecord
     created_at: dt.datetime
@@ -86,7 +90,15 @@ def upsert_experiment_definition(
     display_description: str | None = None,
     tags: list[str] | None = None,
 ) -> tuple[ExperimentDefinitionId, int]:
-    """Insert a new version of an ExperimentDefinition and return ``(id, version)``."""
+    """Insert a new version of an ExperimentDefinition and return ``(id, version)``.
+
+    If ``experiment_definition_id`` is omitted a fresh UUID is generated and
+    version 1 is inserted. For updates, the caller must own the latest visible
+    version or have admin access.
+
+    Raises ``ExperimentNotFound`` if an explicit id does not exist and
+    ``ExperimentAccessDenied`` if the actor is not allowed to modify it.
+    """
     id_provided = experiment_definition_id is not None
     experiment_id = experiment_definition_id if experiment_definition_id is not None else ExperimentDefinitionId(str(uuid.uuid4()))
     ref_time = current_time("dbref")
@@ -146,7 +158,15 @@ def upsert_experiment_definition(
 def get_experiment_definition(
     experiment_definition_id: ExperimentDefinitionId, version: int | None = None
 ) -> ExperimentDefinitionRecord | None:
-    """Return a specific or the latest non-deleted version of an ExperimentDefinition."""
+    """Return a specific or the latest non-deleted version of an ExperimentDefinition.
+
+    No authorization is applied; possession of the experiment id is treated as
+    sufficient read access. Internal callers rely on this after following a
+    validated foreign key or after performing their own ownership check. Route
+    handlers exposing an ExperimentDefinition by id must not use this helper.
+    Use ``list_experiment_definitions`` with ``experiment_definition_id`` set
+    instead so the same ownership scoping as the list endpoint is applied.
+    """
 
     def function(i: int) -> ExperimentDefinitionRecord | None:
         with _jobs_module.session_maker() as session:
@@ -181,7 +201,23 @@ def list_experiment_definitions(
     experiment_definition_id: ExperimentDefinitionId | None = None,
     version: int | None = None,
 ) -> Iterable[ExperimentLatest]:
-    """Return the latest (or pinned) visible version of each ExperimentDefinition."""
+    """Return the latest or pinned visible version of each ExperimentDefinition.
+
+    Admins and passthrough callers see all experiment definitions.
+    Authenticated non-admin users see only their own.
+
+    ``experiment_definition_id`` narrows the result to a single entity.
+    Combined with ``limit=1`` it backs the route-layer "get" lookup while
+    still applying the same ownership scoping as the list endpoint, so there
+    is deliberately no separate unauthenticated single-row query for route
+    handlers. ``version`` optionally pins that entity to a specific version
+    instead of its latest one; it is only meaningful together with
+    ``experiment_definition_id``.
+
+    Each returned row is paired with the entity's true ``created_at`` from the
+    first version. The returned version's own ``created_at`` still represents
+    that version's effective ``updated_at``.
+    """
 
     def function(i: int) -> list[ExperimentLatest]:
         with _jobs_module.session_maker() as session:
@@ -191,6 +227,13 @@ def list_experiment_definitions(
                 func.min(ExperimentDefinition.created_at).label("first_created_at"),
             ).where(ExperimentDefinition.is_deleted.is_(False))
             if experiment_definition_id is not None:
+                # Safe and cheap to filter here: experiment_definition_id is
+                # the GROUP BY key itself, so restricting rows before grouping
+                # cannot change max_version/first_created_at for the remaining
+                # group. Do not move created_by/experiment_type here: they vary
+                # per version row, so a pre-aggregation filter would mean "some
+                # version matches" and could even change which version is
+                # selected as the latest.
                 subq = subq.where(ExperimentDefinition.experiment_definition_id == experiment_definition_id)
             subq = subq.group_by(ExperimentDefinition.experiment_definition_id).subquery()
 
@@ -222,7 +265,11 @@ def count_experiment_definitions(
     auth_context: AuthContext,
     experiment_type: str | None = None,
 ) -> int:
-    """Return the number of distinct visible ExperimentDefinition ids."""
+    """Return the number of distinct visible ExperimentDefinition ids.
+
+    Admins and passthrough callers count all experiment definitions.
+    Authenticated non-admin users count only their own.
+    """
 
     def function(i: int) -> int:
         with _jobs_module.session_maker() as session:
@@ -252,7 +299,11 @@ def count_experiment_definitions(
 
 
 def soft_delete_experiment_definition(experiment_id: ExperimentDefinitionId, *, auth_context: AuthContext) -> None:
-    """Mark all versions of an ExperimentDefinition as deleted."""
+    """Mark all versions of an ExperimentDefinition as deleted.
+
+    Raises ``ExperimentNotFound`` if the experiment does not exist and
+    ``ExperimentAccessDenied`` if the actor is not the owner or an admin.
+    """
 
     def function(i: int) -> None:
         with _jobs_module.session_maker() as session:

@@ -83,7 +83,7 @@ def get_experiment_next(experiment_id: ExperimentDefinitionId) -> ExperimentNext
 
 
 def delete_experiment_next(experiment_id: ExperimentDefinitionId) -> None:
-    """Remove the next scheduled run entry for an experiment."""
+    """Remove the next scheduled run entry for an experiment, clearing the pending tick."""
 
     def function(i: int) -> None:
         with _jobs_module.session_maker() as session:
@@ -94,7 +94,14 @@ def delete_experiment_next(experiment_id: ExperimentDefinitionId) -> None:
 
 
 def get_schedulable_experiments(now: dt.datetime) -> list[tuple[ExperimentNextRecord, ExperimentDefinitionRecord]]:
-    """Return due ExperimentNext rows joined with the latest cron schedule version."""
+    """Return due ExperimentNext rows joined with the latest cron schedule version.
+
+    Joins ``ExperimentNext`` with the latest non-deleted
+    ``ExperimentDefinition`` of type ``cron_schedule``. Disabled schedules have
+    their ``ExperimentNext`` row deleted at update time, so they should not
+    appear here, but the scheduler thread still treats their presence as an
+    error and deletes the stale row.
+    """
 
     def function(i: int) -> list[tuple[ExperimentNextRecord, ExperimentDefinitionRecord]]:
         with _jobs_module.session_maker() as session:

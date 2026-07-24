@@ -107,7 +107,15 @@ def upsert_run(
     compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
 ) -> tuple[RunId, int, dt.datetime]:
-    """Insert a new attempt of a Run and return ``(id, attempt_count, created_at)``."""
+    """Insert a new attempt of a Run and return ``(id, attempt_count, created_at)``.
+
+    If ``run_id`` is omitted a fresh UUID is generated and attempt 1 is
+    inserted. If ``run_id`` is supplied the next attempt number is derived from
+    the database and a missing run raises ``KeyError``.
+
+    No actor-level authorization is enforced on creation; any caller may
+    create an execution.
+    """
     supplied_run_id = run_id
     effective_run_id = run_id if run_id is not None else RunId(str(uuid.uuid4()))
     ref_time = current_time("dbref")
@@ -149,7 +157,12 @@ def get_run(
     *,
     auth_context: AuthContext,
 ) -> RunRecord:
-    """Return a specific or the latest non-deleted attempt of a Run."""
+    """Return a specific or the latest non-deleted attempt of a Run.
+
+    Raises ``RunNotFound`` if the execution does not exist and
+    ``RunAccessDenied`` if the actor is an authenticated non-admin who does
+    not own it.
+    """
 
     def function(i: int) -> RunRecord:
         with _jobs_module.session_maker() as session:
@@ -172,7 +185,11 @@ def get_run(
 
 
 def update_run_runtime(run_id: RunId, attempt_count: int, **kwargs: object) -> None:
-    """Update mutable runtime fields on a specific Run attempt."""
+    """Update mutable runtime fields on a specific Run attempt.
+
+    No actor-level authorization is applied; this is an internal system
+    operation used while a run is executing.
+    """
     ref_time = current_time("dbref")
 
     def function(i: int) -> None:
@@ -186,7 +203,12 @@ def update_run_runtime(run_id: RunId, attempt_count: int, **kwargs: object) -> N
 
 
 def list_runs(*, auth_context: AuthContext, offset: int = 0, limit: int | None = None) -> Iterable[RunRecord]:
-    """Return the latest non-deleted attempt of every Run, with optional paging."""
+    """Return the latest non-deleted attempt of every Run, with optional paging.
+
+    Admins and anonymous actors see all executions. Authenticated non-admins
+    see only executions they created. Results are ordered by creation time
+    descending.
+    """
 
     def function(i: int) -> list[RunRecord]:
         with _jobs_module.session_maker() as session:
@@ -230,7 +252,12 @@ def count_runs(*, auth_context: AuthContext) -> int:
 
 
 def soft_delete_run(run_id: RunId, *, auth_context: AuthContext) -> None:
-    """Mark all attempts of a Run as deleted."""
+    """Mark all attempts of a Run as deleted.
+
+    Raises ``RunNotFound`` if the execution does not exist and
+    ``RunAccessDenied`` if the actor is an authenticated non-admin who does
+    not own it.
+    """
 
     def function(i: int) -> None:
         with _jobs_module.session_maker() as session:
@@ -254,7 +281,12 @@ def list_runs_by_experiment(
     offset: int = 0,
     limit: int | None = None,
 ) -> Iterable[RunRecord]:
-    """Return the latest non-deleted attempt of each execution linked to an experiment."""
+    """Return the latest non-deleted attempt of each execution linked to an experiment.
+
+    Admins and anonymous actors see all linked executions. Authenticated
+    non-admins see only their own. Results are ordered by creation time
+    descending.
+    """
 
     def function(i: int) -> list[RunRecord]:
         with _jobs_module.session_maker() as session:

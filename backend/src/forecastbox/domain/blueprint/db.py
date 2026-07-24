@@ -12,6 +12,10 @@
 Each helper owns its session and transaction and must be submitted to the
 ``ConcurrentPools.JobsDb`` worker by a route, service, or background-thread
 orchestrator.
+
+Authorization remains helper-specific: route-facing list/update/delete helpers
+apply ownership scoping, while ``get_blueprint`` is the intentional internal
+no-auth lookup documented below.
 """
 
 import datetime as dt
@@ -51,7 +55,7 @@ class BlueprintRecord:
 
 @dataclass(frozen=True, eq=True, slots=True)
 class BlueprintLatest:
-    """A visible version paired with the entity's true creation time."""
+    """A visible Blueprint version paired with the entity's true creation time."""
 
     blueprint: BlueprintRecord
     created_at: dt.datetime
@@ -87,7 +91,17 @@ def upsert_blueprint(
     parent_id: str | None = None,
     expected_version: int | None = None,
 ) -> tuple[BlueprintId, int]:
-    """Insert a new version of a Blueprint and return ``(id, version)``."""
+    """Insert a new version of a Blueprint and return ``(id, version)``.
+
+    If ``blueprint_id`` is omitted a fresh UUID is generated and version 1 is
+    inserted. If ``blueprint_id`` is supplied the next version is derived from
+    the database.
+
+    Raises ``BlueprintNotFound`` if the id does not exist yet,
+    ``BlueprintAccessDenied`` if the actor is not the owner or an admin, and
+    ``BlueprintVersionConflict`` if ``expected_version`` is provided and does
+    not match the current maximum version.
+    """
     id_provided = blueprint_id is not None
     effective_blueprint_id = blueprint_id if blueprint_id is not None else BlueprintId(str(uuid.uuid4()))
     ref_time = current_time("dbref")
@@ -104,6 +118,7 @@ def upsert_blueprint(
                     raise BlueprintVersionConflict(
                         f"Version conflict for Blueprint {effective_blueprint_id!r}: expected version {expected_version}, current is {max_version}."
                     )
+                # Ownership check on the latest (non-deleted) version.
                 owner_query = (
                     select(Blueprint.created_by)
                     .where(
@@ -147,7 +162,15 @@ def upsert_blueprint(
 
 
 def get_blueprint(blueprint_id: BlueprintId, version: int | None = None) -> BlueprintRecord | None:
-    """Return a specific or the latest non-deleted version of a Blueprint."""
+    """Return a specific or the latest non-deleted version of a Blueprint.
+
+    No authorization is applied; possession of the blueprint id is treated as
+    sufficient read access. Internal callers such as scheduling and run
+    execution rely on this after already following a validated foreign key.
+    Route handlers exposing a Blueprint to a caller by id must not use this
+    helper. Use ``list_blueprints`` with ``blueprint_id`` set instead so the
+    same ownership scoping as the list endpoint is applied.
+    """
 
     def function(i: int) -> BlueprintRecord | None:
         with _jobs_module.session_maker() as session:
@@ -183,7 +206,26 @@ def list_blueprints(
     blueprint_id: BlueprintId | None = None,
     version: int | None = None,
 ) -> Iterable[BlueprintLatest]:
-    """Return the latest (or a pinned) visible version of each Blueprint."""
+    """Return the latest or a pinned visible version of each Blueprint.
+
+    Admins and passthrough callers see all blueprints. Authenticated non-admin
+    users see only their own blueprints and plugin templates. Results are
+    ordered by the returned version's ``created_at`` descending.
+
+    ``created_by`` and ``source`` are optional caller-supplied filters applied
+    at the outer query level so paging counts and ordering stay correct.
+
+    ``blueprint_id`` narrows the result to a single entity. Combined with
+    ``limit=1`` it backs the route-layer "get" lookup while still applying the
+    same ownership scoping as the list endpoint, so there is deliberately no
+    separate unauthenticated single-row query for route handlers. ``version``
+    optionally pins that entity to a specific version instead of its latest
+    one; it is only meaningful together with ``blueprint_id``.
+
+    Each returned row is paired with the entity's true ``created_at`` from the
+    first version. The returned version's own ``created_at`` still represents
+    that version's effective ``updated_at``.
+    """
 
     def function(i: int) -> list[BlueprintLatest]:
         with _jobs_module.session_maker() as session:
@@ -193,6 +235,17 @@ def list_blueprints(
                 func.min(Blueprint.created_at).label("first_created_at"),
             ).where(Blueprint.is_deleted.is_(False))
             if blueprint_id is not None:
+                # Safe and cheap to filter here: blueprint_id is the GROUP BY key itself, so
+                # restricting rows before grouping cannot change max_version/first_created_at
+                # for the remaining group -- it just avoids aggregating over every other
+                # blueprint. NOTE: created_by and source are deliberately NOT filtered here --
+                # unlike blueprint_id, they are attributes of individual version rows and are
+                # not guaranteed constant across a blueprint's versions (``source`` is
+                # recomputed from ``display_name`` on every save; ``created_by`` reflects
+                # whoever authored that particular version, e.g. an admin editing another
+                # user's blueprint). Filtering them pre-aggregation would match "any version
+                # satisfies the filter" instead of "the returned version does", and could even
+                # change which version is picked as the latest one.
                 subq = subq.where(Blueprint.blueprint_id == blueprint_id)
             subq = subq.group_by(Blueprint.blueprint_id).subquery()
 
@@ -224,7 +277,10 @@ def list_blueprints(
 
 
 def count_blueprints(*, auth_context: AuthContext, created_by: str | None = None, source: BlueprintSource | None = None) -> int:
-    """Return the total number of distinct non-deleted Blueprint ids visible to the actor."""
+    """Return the total number of distinct non-deleted Blueprint ids visible to the actor.
+
+    ``created_by`` and ``source`` are optional caller-supplied filters.
+    """
 
     def function(i: int) -> int:
         with _jobs_module.session_maker() as session:
@@ -247,7 +303,12 @@ def count_blueprints(*, auth_context: AuthContext, created_by: str | None = None
 
 
 def find_plugin_template_id(*, created_by: str, display_name: str) -> BlueprintId | None:
-    """Return the latest non-deleted plugin-template blueprint id for one display name."""
+    """Return the latest non-deleted plugin-template blueprint id for one display name.
+
+    Returns ``None`` if no matching row exists. Template ingestion uses this to
+    decide whether to append a new version to an existing blueprint or create a
+    fresh one.
+    """
 
     def function(i: int) -> BlueprintId | None:
         with _jobs_module.session_maker() as session:
@@ -270,7 +331,13 @@ def find_plugin_template_id(*, created_by: str, display_name: str) -> BlueprintI
 
 
 def soft_delete_blueprint(blueprint_id: BlueprintId, *, expected_version: int, auth_context: AuthContext) -> None:
-    """Mark all versions of a Blueprint as deleted."""
+    """Mark all versions of a Blueprint as deleted.
+
+    Raises ``BlueprintNotFound`` if the blueprint does not exist,
+    ``BlueprintAccessDenied`` if the actor is not the owner or an admin, and
+    ``BlueprintVersionConflict`` if ``expected_version`` does not match the
+    current latest version.
+    """
 
     def function(i: int) -> None:
         with _jobs_module.session_maker() as session:
@@ -298,7 +365,11 @@ def soft_delete_blueprint(blueprint_id: BlueprintId, *, expected_version: int, a
 
 
 def soft_delete_plugin_template(*, created_by: str, display_name: str) -> None:
-    """Mark all plugin-template rows for one display name as deleted."""
+    """Mark all plugin-template rows for one display name as deleted.
+
+    Performs a bulk update keyed on ``(created_by, display_name)`` without
+    version or auth checks because the calling plugin owns these rows.
+    """
 
     def function(i: int) -> None:
         with _jobs_module.session_maker() as session:
@@ -317,7 +388,12 @@ def soft_delete_plugin_template(*, created_by: str, display_name: str) -> None:
 
 
 def soft_delete_all_plugin_templates(*, created_by: str) -> None:
-    """Mark all plugin-template rows owned by one plugin as deleted."""
+    """Mark all plugin-template rows owned by one plugin as deleted.
+
+    Used when a plugin is disabled to remove all its blueprint templates at
+    once. Performs a bulk update without version or auth checks because the
+    calling plugin owns these rows.
+    """
 
     def function(i: int) -> None:
         with _jobs_module.session_maker() as session:

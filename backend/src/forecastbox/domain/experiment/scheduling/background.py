@@ -98,10 +98,12 @@ class SchedulerThread(threading.Thread):
                         f"older than max_acceptable_delay_hours ({runnable.max_acceptable_delay_hours} hours)."
                     )
                 elif not is_valid:
+                    # NOTE this should not happen -- we have locks etc preventing this
                     logger.error("Skipping {experiment_id} at {scheduled_at}: it is not valid!")
                 else:
                     exec_result = submit_run_sync(
                         runnable.blueprint,
+                        # NOTE the is_admin may be True, but we dont know and its not important for this call
                         AuthContext(
                             user_id=runnable.created_by,
                             is_admin=False,
@@ -154,6 +156,10 @@ class SchedulerThread(threading.Thread):
                 if not acquired:
                     logger.warning("Scheduler could not acquire scheduler_lock within timeout, skipping iteration.")
                     continue
+                # Deliberately hold scheduler_lock across the full try_schedule
+                # cycle, including JobsDb waits, so schedule mutations cannot
+                # race reading a due schedule, submitting its run, and
+                # recording its next occurrence.
                 sleep_duration = self._try_schedule()
 
             if sleep_duration > 0:
@@ -196,6 +202,7 @@ def stop_scheduler() -> None:
             raise ValueError("unexpected stop")
         Globals.scheduler.stop()
         Globals.scheduler.prod()
+        # just in case it wasnt even started
         if Globals.scheduler.is_alive():
             Globals.scheduler.join(1)
         if Globals.scheduler.is_alive():
@@ -219,6 +226,7 @@ def status_scheduler() -> str:
     if not Globals.scheduler.is_alive():
         logger.warning("scheduler reported down due to thread not being alive")
         return "down"
+    # we do this just for ensuring a multithread sync
     Globals.scheduler.liveness_signal.wait(0)
     now = current_time("liveness")
     if (

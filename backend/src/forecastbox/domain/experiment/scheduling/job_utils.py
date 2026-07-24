@@ -40,7 +40,11 @@ class RunnableExperiment:
 
 
 def experiment2runnable(experiment_id: ExperimentDefinitionId, exec_time: dt.datetime) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
-    """Convert an ExperimentDefinition into a RunnableExperiment for the given execution time."""
+    """Convert an ExperimentDefinition into a RunnableExperiment for the given execution time.
+
+    Loads the linked Blueprint and builds a ``CompilerRuntimeContext`` for the
+    run.
+    """
     exp = experiment_db.get_experiment_definition(experiment_id)
     if exp is None:
         return Either.error(f"ExperimentDefinition {experiment_id!r} not found")
