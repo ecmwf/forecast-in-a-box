@@ -18,8 +18,10 @@ examples; concrete migration cases are in
   notification handoff.
 - Remove the need for background threads to retain the FastAPI event loop only
   to perform jobs-database operations.
-- Serialize jobs-database access on a dedicated worker while preserving a
-  separate async synchronization model for the users database.
+- Serialize jobs-database access with one regular lock, using a dedicated
+  one-worker pool only to bridge async callers to synchronous database
+  operations, while preserving a separate async synchronization model for the
+  users database.
 - Support incremental adoption: the new runtime may coexist with old
   implementations, but one concrete concern must never be owned by both.
 
@@ -119,9 +121,12 @@ class DispatcherSettings(FiabBaseModel):
 
 Pool and thread identifiers are static enums in `utility/config.py`; dynamic
 task names remain a separate type. Pool definitions are validated at startup.
-`ConcurrentPools.JobsDb` must have exactly one worker. Dispatcher capacity is
-dispatcher configuration because the execution manager treats it like any
-other long-lived component.
+`ConcurrentPools.JobsDb` must have exactly one worker. It is the async bridge
+for an already serialized resource, so additional workers would only wait on
+the same jobs-database lock and would not increase throughput. Keeping this
+bridge separate prevents queued async database operations from consuming the
+general pool. Dispatcher capacity is dispatcher configuration because the
+execution manager treats it like any other long-lived component.
 
 `max_pending` bounds submitted work that has not completed, including running
 tasks. `ThreadPoolExecutor` has an unbounded internal queue, so the manager must
@@ -482,8 +487,9 @@ Handler ids are globally unique and stable enough to appear in status output.
 Registration is permitted only before dispatch starts. Duplicate ids and
 unknown pool names fail startup.
 
-Handlers are ordinary synchronous functions. Database work is submitted to the
-database pool rather than performed directly on a different pool.
+Handlers are ordinary synchronous functions. They call synchronous locked
+database helpers directly from their assigned worker rather than submitting
+back through the async jobs DB bridge.
 
 ### Queue and submission
 
@@ -602,34 +608,52 @@ route can render every long-lived component by iterating one
 ## Jobs database serialization
 
 The jobs SQLite database uses a synchronous SQLAlchemy engine and session maker
-for runtime operations. Every public database operation is a synchronous
-callable submitted to `ConcurrentPools.JobsDb`. Async services use
-`awaitable_submit`; background workers use the returned concurrent future and
-do not retain an event-loop reference.
+for runtime operations. Every public database operation is synchronous and
+acquires the regular jobs `threading.RLock` in `utility/db.py`. Async services
+submit these operations to `ConcurrentPools.JobsDb` with `awaitable_submit`.
+Synchronous pool workers and long-lived threads call them directly from their
+current thread and do not retain an event-loop reference.
 
 `ConcurrentPools.JobsDb`:
 
 - has exactly one worker;
 - is started after schema creation;
-- serializes reads and writes;
-- owns connections used for runtime operations;
-- uses a regular `threading.RLock` in `utility/db.py` as a defensive invariant
-  for schema setup, retries, and any explicitly allowed direct maintenance
-  operation.
+- provides bounded admission and execution isolation for async database work;
+- does not exclusively own runtime connections or database access;
+- relies on the same jobs `RLock` as every synchronous caller.
 
-The executor queue provides serialization in normal operation; the regular lock
-prevents accidental concurrent direct access during transitional or maintenance
-code. This serialization is required because SQLite permits only one concurrent
-writer. The lock is not used as a reason to run database work on arbitrary
-threads.
+The regular lock is the serialization mechanism for all in-process jobs
+database reads and writes. The one-worker executor prevents async submissions
+from executing concurrently, while direct synchronous callers contend for the
+same lock. `threading.RLock` does not guarantee fairness between those sources,
+but neither source bypasses the database safety invariant. The expected
+synchronous producers are bounded application-owned pools and long-lived
+threads; if sustained contention develops, lock wait time and pool saturation
+should be measured before adding a higher-level serialized resource queue.
+
+The separate one-worker pool is retained because async code must leave the
+event loop to execute synchronous SQLAlchemy work. Sending it to the general
+pool would allow waiting database operations to consume general-purpose worker
+capacity without increasing database concurrency. More than one jobs DB worker
+would have the same problem within the dedicated pool because only one worker
+can hold the database lock.
 
 The pool is a stage-0 resource. It is warmed and reports ready before the
-manager starts any later-stage thread that may submit database work.
+application accepts async database work.
 
-Each submitted callable represents one complete database operation and owns its
-session/transaction. Read-modify-write sequences must be one callable, not
-multiple separately queued calls. SQLite operational-error retries happen
-inside the database worker and retry the whole operation.
+Each callable represents one complete database operation and owns its
+session/transaction. The same boundary applies whether async code submits it or
+synchronous code invokes it directly. Read-modify-write sequences must be one
+locked callable, not multiple separately locked calls. SQLite operational-error
+retries happen inside that locked callable and retry the whole operation.
+
+Sessions are created, used, committed or rolled back, and closed on the thread
+executing the operation. Sessions and active SQLAlchemy result objects are
+never passed between threads. Returned ORM or data values must be fully
+materialized before the session closes and must not depend on lazy loading. The
+synchronous engine's SQLite connection and SQLAlchemy pool configuration must
+explicitly support a pooled connection being checked out by different threads
+over its lifetime; the jobs lock prevents simultaneous use.
 
 ```python
 result = await execution_manager.awaitable_submit(
@@ -640,16 +664,15 @@ result = await execution_manager.awaitable_submit(
 ```
 
 ```python
-result = execution_manager.submit_unmonitored(
-    ConcurrentPools.JobsDb,
-    TaskName("records.upsert"),
-    partial(records_db.upsert, command),
-).result()
+result = records_db.upsert(command)
 ```
 
-Database helper modules expose synchronous functions. They do not submit
-themselves back to the same pool; orchestration happens at their service or
-handler boundary.
+Database helper modules expose synchronous functions and acquire the jobs lock
+internally. They never submit themselves to a pool. Async orchestration submits
+the complete helper call to `ConcurrentPools.JobsDb`; synchronous orchestration
+calls the helper directly. Code already running on the jobs DB worker must call
+nested private implementation helpers directly rather than submitting back to
+the same pool.
 
 Add this comment beside the serialized jobs-database access:
 
@@ -682,10 +705,10 @@ stage 2, so it starts after operational producers and stops before them.
 
 This effort implements only a lifecycle proof of concept, not garbage
 collection policy. The entrypoint wakes every 10 minutes using a hardcoded
-interval, submits one simple read-only query from one domain to
-`ConcurrentPools.JobsDb`, waits for that future, records the result, and sleeps
-again. It never opens a database connection on its own thread. There is no
-configuration field and no administrative prod.
+interval, directly calls one simple locked read-only query from one domain,
+records the result, and sleeps again. The operation creates and closes its
+session on the maintenance thread under the same jobs lock as every other
+caller. There is no configuration field and no administrative prod.
 
 Its component status includes the last attempt, last success, next scheduled
 wake, current activity, query result summary, and last failure. Actual
@@ -768,8 +791,9 @@ separate from the manager's final pool-submission gate.
 - Every long-lived thread provides non-blocking component status.
 - Event producers never import consumers.
 - Event registration happens before dispatch starts.
-- Jobs-database access occurs only on the single jobs-database worker, apart
-  from explicitly locked startup/maintenance operations.
+- Every jobs-database operation is synchronous, operation-local, and protected
+  by the jobs `RLock`; async callers reach it through the single jobs-database
+  worker, while synchronous callers invoke it directly.
 - Users-database synchronization is independent.
 - No work is silently dropped because a queue is full or shutdown has started.
 - Status is a snapshot; it does not execute business work.

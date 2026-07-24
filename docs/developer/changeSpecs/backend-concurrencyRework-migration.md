@@ -15,18 +15,18 @@ It also excludes test design.
 | Concern | Current ownership | Current behavior | Target ownership |
 | --- | --- | --- | --- |
 | Artifact catalog and downloads | `domain/artifact/manager.py` | Lazily creates a private one-worker `ThreadPoolExecutor`; shared immutable state records catalog, local files, and progress | Named one-worker artifact I/O pool initially; shared I/O pool only after SSH safety is resolved |
-| Plugin loading and updates | `domain/plugin/manager.py` | Stores one ad hoc updater thread and the FastAPI loop; waits on async DB work with `run_coroutine_threadsafe` | Named serialized plugin-management pool plus jobs DB pool |
+| Plugin loading and updates | `domain/plugin/manager.py` | Stores one ad hoc updater thread and the FastAPI loop; waits on async DB work with `run_coroutine_threadsafe` | Named serialized plugin-management pool plus direct locked jobs DB access |
 | Plugin store initialization | `domain/plugin/store.py` | Creates one ad hoc thread for HTTP/file store discovery | Named I/O pool |
-| Scheduled execution | `domain/experiment/scheduling/background.py` | Custom long-lived thread stores the FastAPI loop, condition/event state, and liveness fields | Stage-1 execution-manager thread plus jobs DB pool |
-| Run compilation/submission | `domain/run/service.py`, `domain/run/background.py` | Uses the asyncio default executor; worker retains the FastAPI loop for DB calls | Named run-submission pool plus jobs DB and artifact/I/O pools |
+| Scheduled execution | `domain/experiment/scheduling/background.py` | Custom long-lived thread stores the FastAPI loop, condition/event state, and liveness fields | Stage-1 execution-manager thread plus direct locked jobs DB access |
+| Run compilation/submission | `domain/run/service.py`, `domain/run/background.py` | Uses the asyncio default executor; worker retains the FastAPI loop for DB calls | Named run-submission pool plus direct locked jobs DB access and artifact/I/O pools |
 | Run log ZIP creation | `routes/run.py` | Uses the asyncio default executor | Named general pool |
 | Lens process start | `routes/lens.py`, `domain/lens/manager.py` | A synchronous FastAPI route starts a subprocess; FastAPI may run the route in a framework thread | Async route awaiting a named general-pool task; subprocess lifecycle remains domain-owned |
 | Root status probes | `routes/status.py` | Synchronous route performs network calls and directly inspects scheduler/plugin globals | Async route using named pools and one composed concurrency status |
-| Jobs SQLite access | `utility/db.py` and domain DB modules | One global `asyncio.Lock`; background threads send coroutines to the FastAPI loop | One-worker jobs DB pool, sync DB helpers, regular jobs lock |
+| Jobs SQLite access | `utility/db.py` and domain DB modules | One global `asyncio.Lock`; background threads send coroutines to the FastAPI loop | Sync DB helpers under one regular jobs lock; one-worker jobs DB pool as the async bridge |
 | Users SQLite access | Auth/admin DB modules | Shares the jobs async lock in some helpers; FastAPI Users sessions bypass that shared helper | Independent users async lock and retry path |
 | Cross-domain template reaction | `domain/plugin/manager.py` | In-body imports breach the domain hierarchy for ingest and unload | Producer events and consumer-owned handlers |
 | Notification delivery | None | No WebSocket endpoint or notification broker | Event-to-async-loop logging PoC through `ActiveWebsocketClientRegistry`; no endpoint |
-| Jobs database garbage collection | None | Versioned and tombstoned rows are retained indefinitely | Stage-2 periodic thread submitting a simple read-only PoC query to the jobs DB pool |
+| Jobs database garbage collection | None | Versioned and tombstoned rows are retained indefinitely | Stage-2 periodic thread directly calling a simple locked read-only PoC query |
 | Startup/shutdown | `entrypoint/app.py` | Starts and joins each manager separately in a hand-written order | Configure, start, inspect, and stop the shared runtime |
 
 `utility/concurrent.py` also owns timed lock acquisition, free-port allocation,
@@ -112,7 +112,7 @@ Recommended initial pools:
 | `ConcurrentPools.RunSubmission` | 2 | Long run compilation/submission tasks and artifact waits |
 | `ConcurrentPools.ArtifactIo` | 1 | Catalog scans and downloads while one SSH command handle is shared |
 | `ConcurrentPools.PluginManagement` | 1 | Pip/install/import/reload operations that must not overlap |
-| `ConcurrentPools.JobsDb` | 1 | All jobs SQLite reads and writes |
+| `ConcurrentPools.JobsDb` | 1 | Async bridge to locked synchronous jobs SQLite operations |
 
 `ConcurrentPools.PluginManagement` is separate because import and
 environment mutation are serialized for correctness, not merely because they
@@ -172,7 +172,7 @@ Convert all jobs database helper modules together:
 
 Each public operation becomes synchronous and owns one complete
 session/transaction. Combine current multi-call read-modify-write operations
-into one submitted callable so no other database task can interleave.
+into one locked callable so no other database operation can interleave.
 
 The synchronous retry wrapper holds the jobs `RLock`, retries the whole
 operation on SQLite `OperationalError`, and contains:
@@ -184,7 +184,8 @@ operation on SQLite `OperationalError`, and contains:
 
 ### 2.2 Move every jobs DB caller in the same cutover
 
-Async services and routes use:
+Async services and routes submit database-only calls through the one-worker
+jobs DB pool:
 
 ```python
 await execution_manager.awaitable_submit(
@@ -194,15 +195,19 @@ await execution_manager.awaitable_submit(
 )
 ```
 
-Background workers use:
+Synchronous services, pool workers, and long-lived threads call the same locked
+database functions directly:
 
 ```python
-execution_manager.submit_unmonitored(
-    ConcurrentPools.JobsDb,
-    task_name,
-    partial(db_function, ...),
-).result()
+result = db_function(...)
 ```
+
+The jobs DB pool is an async-to-sync bridge, not the exclusive owner of
+database access or connections. It remains separate from
+`ConcurrentPools.General` so queued async database operations cannot occupy all
+general-purpose workers while waiting for the jobs lock. It has one worker
+because additional workers cannot increase throughput for a resource
+serialized by one lock.
 
 Remove:
 
@@ -221,16 +226,15 @@ The same Phase 2 cutover must update every jobs DB caller, including:
 
 This caller rewrite is not deferred to the later thread-ownership phases.
 Existing threads may remain temporarily, but their DB calls must already use
-jobs DB futures rather than passing now-synchronous results to
+the synchronous locked helpers directly rather than passing coroutines to
 `run_coroutine_threadsafe`.
 
 Create an async-independent run submission boundary during this cutover:
 
 ```python
 def submit_run_sync(...) -> Either[ExecuteResult, str]:
-    # Submit and wait for the initial jobs DB upsert, then enqueue the
-    # long-running execution task to ConcurrentPools.RunSubmission without
-    # waiting for it.
+    # Perform the initial locked jobs DB upsert, then enqueue the long-running
+    # execution task to ConcurrentPools.RunSubmission without waiting for it.
     ...
 
 
@@ -244,9 +248,9 @@ async def execute(...) -> Either[ExecuteResult, str]:
 
 The scheduler can call `submit_run_sync` from its own managed thread after
 Phase 4; async routes retain the `execute` wrapper. Similarly, convert
-`experiment2runnable` into a synchronous operation submitted as one
-`ConcurrentPools.JobsDb` task, so the scheduler can retrieve its result with a
-concurrent future and no async loop.
+`experiment2runnable` into a synchronous operation whose database work is one
+locked operation, so the scheduler can call it directly with no async loop.
+Async callers submit it to `ConcurrentPools.JobsDb`.
 
 The Phase 2 cutover therefore also removes the default-executor submission for
 this path. Phase 3.4 finishes consolidation of the background task and its
@@ -261,16 +265,26 @@ under the old async lock.
 
 - Do not submit from the jobs DB worker back to `ConcurrentPools.JobsDb` and
   wait.
-- Do not hold domain state locks while waiting for a DB future.
-- Keep a transaction inside one database task.
-- Ensure SQLite connections are created and used on the worker thread expected
-  by the selected SQLAlchemy pool configuration.
+- Keep a transaction and every read-modify-write sequence inside one locked
+  database operation.
+- Create, use, commit or roll back, and close each session on the thread
+  executing the operation. Do not pass sessions or active SQLAlchemy result
+  objects between threads. Fully materialize returned ORM or data values before
+  closing the session, without relying on lazy loading.
+- Configure the synchronous SQLite engine and SQLAlchemy pool explicitly so a
+  connection may be checked out by different threads over its lifetime. The
+  jobs lock prevents simultaneous in-process use.
 - Treat queue saturation as an explicit service-busy failure, not as a direct
-  fallback DB call.
+  fallback DB call from async code.
 - Database tasks are not automatically retried by the execution manager; only
   the narrow SQLite retry policy applies.
-- This is one coordinated cutover. No async jobs access remains after its
-  merge, while Phase 0 has already removed users persistence from its scope.
+- Keep database helpers free of waits on futures, pool submissions, and domain
+  locks while holding the jobs lock. Synchronous callers may hold their domain
+  lock before entering the database layer only where that existing lock order
+  is deliberate and consistent.
+- This is one coordinated cutover. No async jobs engine or session access
+  remains after its merge, while Phase 0 has already removed users persistence
+  from its scope.
 
 ## Phase 3: migrate executor-backed work
 
@@ -346,7 +360,8 @@ relying on a long-held domain lock.
 the dependency failure, and leaves plugin readiness false. Do not preserve the
 current helper's behavior of continuing after that failure.
 
-Plugin DB work uses the jobs DB pool from Phase 2. Do not wait for a
+Plugin-management workers call the locked synchronous jobs DB helpers directly.
+Async plugin DB callers use the jobs DB pool from Phase 2. Do not wait for a
 plugin-management task while holding the plugin state lock.
 
 ### 3.4 Run compilation and submission
@@ -357,7 +372,7 @@ In `domain/run/service.py` and `domain/run/background.py`:
   atomic Phase 2 caller cutover;
 - confirm the event-loop parameter and local `run_async` bridge were removed in
   that cutover;
-- retain the Phase 2 jobs DB future calls;
+- retain the Phase 2 direct locked jobs DB calls from synchronous workers;
 - preserve the current rule that every background failure records a failed run
   state;
 - preserve immediate route return after the initial run row is committed.
@@ -425,9 +440,9 @@ In `domain/experiment/scheduling/background.py`:
   last/next iteration; let the manager add native thread id, failure, and
   restart reporting;
 - register a stop request that wakes the scheduling condition;
-- submit jobs DB operations to `ConcurrentPools.JobsDb`;
-- retrieve the synchronous `experiment2runnable` jobs DB task and call the
-  Phase 2 `submit_run_sync` service boundary;
+- call synchronous locked jobs DB operations directly;
+- call the synchronous `experiment2runnable` operation and the Phase 2
+  `submit_run_sync` service boundary directly;
 - remove the stored FastAPI loop and `run_coroutine_threadsafe`;
 - remove `Globals.scheduler` after all call sites use the manager thread id.
 
@@ -474,8 +489,8 @@ Register these handlers on `ConcurrentPools.General`, never on
 `ConcurrentPools.PluginManagement` or `ConcurrentPools.JobsDb`. The producer
 occupies the one-worker `ConcurrentPools.PluginManagement` pool while waiting
 for required dispatch completion, so using that pool for the handler would
-deadlock. The handler submits its DB operations to
-`ConcurrentPools.JobsDb`.
+deadlock. The synchronous handler calls locked DB operations directly from the
+general pool worker.
 
 The handler may read the producer's public plugin catalogue because blueprint
 already depends on plugin. Plugin code no longer imports blueprint at module or
@@ -537,15 +552,14 @@ therefore starts after the stage-1 scheduler and stops before it. Register:
 - an explicit-only capped restart policy.
 
 Hardcode a 10-minute wake interval; do not add configuration or an
-administrative prod. Each iteration submits one simple, read-only query from one
-existing domain to `ConcurrentPools.JobsDb`, waits for the future, records its
-summary, and sleeps again. The maintenance thread never opens a SQLAlchemy
-session itself.
+administrative prod. Each iteration directly calls one simple, locked read-only
+query from one existing domain, records its summary, and sleeps again. The
+operation creates and closes its SQLAlchemy session on the maintenance thread.
 
 Do not delete rows, design retention, traverse cascades, or add dynamic cleanup
 discovery in this effort. Those belong to a later garbage-collection
 specification. This PoC exists to demonstrate that multiple independently
-managed long-lived threads can use the serialized DB pool and expose unified
+managed long-lived threads can use the shared jobs DB lock and expose unified
 status.
 
 ## Phase 7: add an event-to-async-loop notification PoC
@@ -584,8 +598,9 @@ about the async loop or future WebSocket implementation.
 
 As the concrete demonstration during Phase 7, update the stage-2 maintenance
 PoC from Phase 6 to emit `notification.emitted` after its read-only query
-completes. The resulting path is: managed maintenance thread -> jobs DB pool ->
-event dispatcher -> general pool handler -> FastAPI-loop debug task.
+completes. The resulting path is: managed maintenance thread -> locked jobs DB
+operation -> event dispatcher -> general pool handler -> FastAPI-loop debug
+task.
 
 ### 7.3 Lifespan integration
 
@@ -638,7 +653,8 @@ After all call sites migrate:
   business code;
 - remove obsolete manual join/status helpers;
 - update backend concurrency guidance to describe the execution manager, event
-  dispatcher, jobs DB pool, and independent users DB lock.
+  dispatcher, jobs DB lock and async bridge pool, and independent users DB
+  lock.
 
 Perform a final source inventory for:
 
