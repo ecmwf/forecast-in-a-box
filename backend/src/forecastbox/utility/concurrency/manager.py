@@ -14,20 +14,29 @@ import threading
 import time
 import traceback
 from collections import deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import StrEnum
-from types import MappingProxyType
-from typing import Any, NewType, TypeVar, cast
+from typing import Any, NewType, Protocol, TypeVar, cast
+
+from pydantic import BaseModel, ConfigDict, SerializeAsAny
 
 from forecastbox.utility.config import ConcurrentPools, ConcurrentThreads, config
+from forecastbox.utility.pydantic import FiabBaseModel
+from forecastbox.utility.structural import freeze_mapping
 
 T = TypeVar("T")
 TaskName = NewType("TaskName", str)
 SyncTask = Callable[[], T]
 ThreadEntrypoint = Callable[[threading.Event], None]
-StatusProvider = Callable[[], object]
+
+
+class ComponentStatusProtocol(Protocol):
+    def is_ready(self) -> bool: ...
+
+
+StatusProvider = Callable[[], ComponentStatusProtocol]
 StopRequest = Callable[[float], None]
 
 
@@ -39,19 +48,15 @@ class ExecutionLifecycle(StrEnum):
     stopped = "stopped"
 
 
-Lifecycle = ExecutionLifecycle
-
-
 @dataclass(frozen=True, eq=True, slots=True)
 class RestartPolicy:
     """A finite restart budget for one managed long-lived thread."""
 
-    def __init__(self, max_restarts: int = 0) -> None:
-        if max_restarts < 0:
-            raise ValueError("max_restarts must be non-negative")
-        object.__setattr__(self, "max_restarts", max_restarts)
-
     max_restarts: int = 0
+
+    def __post_init__(self) -> None:
+        if self.max_restarts < 0:
+            raise ValueError("max_restarts must be non-negative")
 
 
 NEVER_RESTART = RestartPolicy()
@@ -77,24 +82,28 @@ class SubmissionRejected(ExecutionManagerError):
     """Raised when a task cannot be accepted by a managed pool."""
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class ComponentStatus:
+class StatusModel(FiabBaseModel):
+    model_config = ConfigDict(frozen=True)
+
+
+class ComponentStatus(StatusModel):
     ready: bool
     health: str = "unknown"
     detail: str = ""
 
+    def is_ready(self) -> bool:
+        return self.ready
 
-@dataclass(frozen=True, eq=True, slots=True)
-class MonitoredFailure:
-    pool_name: ConcurrentPools | str
+
+class MonitoredFailure(StatusModel):
+    pool_name: ConcurrentPools
     task_name: TaskName
     exception_type: str
     message: str
     traceback: str
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class PoolStatus:
+class PoolStatus(StatusModel):
     pool_name: ConcurrentPools
     stage: int
     max_workers: int
@@ -110,13 +119,12 @@ class PoolStatus:
     accepting: bool
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class ThreadStatus:
-    thread_name: str
+class ThreadStatus(StatusModel):
+    thread_name: ConcurrentThreads
     stage: int
     alive: bool
     ready: bool
-    component_status: object
+    component_status: SerializeAsAny[BaseModel]
     started_at: float | None
     stopped_at: float | None
     uncaught_exception: str | None
@@ -125,37 +133,30 @@ class ThreadStatus:
     restart_limit: int
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class StartStatus:
+class StartStatus(StatusModel):
     lifecycle: ExecutionLifecycle
     success: bool
     started_stages: tuple[int, ...]
     error: str | None = None
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class ShutdownStatus:
+class ShutdownStatus(StatusModel):
     lifecycle: ExecutionLifecycle
     complete: bool
-    incomplete_threads: tuple[str, ...]
+    incomplete_threads: tuple[ConcurrentThreads, ...]
     incomplete_pools: tuple[ConcurrentPools, ...]
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class ExecutionStatus:
+class ExecutionStatus(StatusModel):
     lifecycle: ExecutionLifecycle
     healthy: bool
-    pools: Mapping[ConcurrentPools, PoolStatus]
-    threads: Mapping[str, ThreadStatus]
+    pools: dict[ConcurrentPools, PoolStatus]
+    threads: dict[ConcurrentThreads, ThreadStatus]
     monitored_failures: tuple[MonitoredFailure, ...]
     unregistered_threads: tuple[str, ...]
 
 
 _worker_context = threading.local()
-
-
-def _freeze_mapping(values: Mapping[Any, Any]) -> Mapping[Any, Any]:
-    return MappingProxyType(dict(values))
 
 
 class ManagedPool:
@@ -242,7 +243,6 @@ class ManagedPool:
             finally:
                 with self._lock:
                     self._active -= 1
-                _worker_context.pool_name = None
 
         try:
             future = executor.submit(wrapped)
@@ -309,7 +309,7 @@ class ManagedPool:
 
 @dataclass
 class _ThreadRecord:
-    thread_name: str
+    thread_name: ConcurrentThreads
     entrypoint: ThreadEntrypoint
     status_provider: StatusProvider
     stop_request: StopRequest | None
@@ -333,37 +333,21 @@ class ExecutionManager:
         self._lock = threading.RLock()
         self._lifecycle = ExecutionLifecycle.new
         self._pools: dict[ConcurrentPools, ManagedPool] = {}
-        self._threads: dict[str, _ThreadRecord] = {}
+        self._threads: dict[ConcurrentThreads, _ThreadRecord] = {}
         self._ready_stages: set[int] = set()
         self._monitored_failures: deque[MonitoredFailure] = deque(maxlen=failure_history_size)
 
-    @staticmethod
-    def _pool_name(pool_name: ConcurrentPools | str) -> ConcurrentPools:
-        try:
-            return ConcurrentPools(pool_name)
-        except ValueError as error:
-            raise RegistrationError(f"unknown pool: {pool_name}") from error
-
-    def has_pool(self, pool_name: ConcurrentPools | str) -> bool:
-        try:
-            normalized = self._pool_name(pool_name)
-        except RegistrationError:
-            return False
-        with self._lock:
-            return normalized in self._pools
-
-    def register_pool(self, pool_name: ConcurrentPools | str, *, max_workers: int, max_pending: int, stage: int = 0) -> None:
-        normalized = self._pool_name(pool_name)
+    def register_pool(self, pool_name: ConcurrentPools, *, max_workers: int, max_pending: int, stage: int = 0) -> None:
         with self._lock:
             if self._lifecycle not in (ExecutionLifecycle.new, ExecutionLifecycle.starting):
                 raise LifecycleError("pools can only be registered before or during startup")
-            if normalized in self._pools:
-                raise RegistrationError(f"duplicate pool: {normalized.value}")
-            self._pools[normalized] = ManagedPool(normalized, max_workers, max_pending, stage)
+            if pool_name in self._pools:
+                raise RegistrationError(f"duplicate pool: {pool_name.value}")
+            self._pools[pool_name] = ManagedPool(pool_name, max_workers, max_pending, stage)
 
     def register_thread(
         self,
-        thread_name: str,
+        thread_name: ConcurrentThreads,
         entrypoint: ThreadEntrypoint,
         *,
         status_provider: StatusProvider,
@@ -401,34 +385,22 @@ class ExecutionManager:
             finally:
                 record.stopped_at = time.time()
 
-        record.thread = threading.Thread(name=f"fiab-{record.thread_name}", target=run)
+        record.thread = threading.Thread(name=f"fiab-{record.thread_name.value}", target=run)
         record.thread.start()
-
-    @staticmethod
-    def _provider_ready(provider: object) -> bool:
-        if isinstance(provider, bool):
-            return provider
-        if provider is None:
-            return False
-        ready = getattr(provider, "ready", None)
-        if isinstance(ready, bool):
-            return ready
-        running = getattr(provider, "running", None)
-        if isinstance(running, bool):
-            return running
-        state = getattr(provider, "state", None)
-        if isinstance(state, str):
-            return state in {"ready", "running", "up"}
-        if isinstance(provider, str):
-            return provider in {"ready", "running", "up"}
-        return False
 
     def _thread_snapshot(self, record: _ThreadRecord) -> ThreadStatus:
         try:
             component = record.status_provider()
-            ready = self._provider_ready(component)
+            if not isinstance(component, BaseModel):
+                raise TypeError("status provider must return a Pydantic model")
+            is_ready = getattr(component, "is_ready", None)
+            if not callable(is_ready):
+                raise TypeError("status provider result must define is_ready()")
+            ready = is_ready()
+            if not isinstance(ready, bool):
+                raise TypeError("status provider is_ready() must return bool")
         except BaseException as error:
-            component = ComponentStatus(False, "failure", repr(error))
+            component = ComponentStatus(ready=False, health="failure", detail=repr(error))
             ready = False
         alive = record.thread.is_alive() if record.thread is not None else False
         return ThreadStatus(
@@ -483,7 +455,11 @@ class ExecutionManager:
                 started_stages.append(stage)
             with self._lock:
                 self._lifecycle = ExecutionLifecycle.running
-            return StartStatus(ExecutionLifecycle.running, True, tuple(started_stages))
+            return StartStatus(
+                lifecycle=ExecutionLifecycle.running,
+                success=True,
+                started_stages=tuple(started_stages),
+            )
         except BaseException as error:
             self._abort_startup(deadline)
             if isinstance(error, StartupError):
@@ -513,7 +489,7 @@ class ExecutionManager:
         thread.join(remaining)
         return not thread.is_alive()
 
-    def stop_thread(self, thread_name: str, *, timeout: float) -> ThreadStatus:
+    def stop_thread(self, thread_name: ConcurrentThreads, *, timeout: float) -> ThreadStatus:
         with self._lock:
             record = self._threads.get(thread_name)
             if record is None:
@@ -521,7 +497,7 @@ class ExecutionManager:
         self._stop_record(record, time.monotonic() + max(timeout, 0))
         return self._thread_snapshot(record)
 
-    def restart_thread(self, thread_name: str) -> ThreadStatus:
+    def restart_thread(self, thread_name: ConcurrentThreads) -> ThreadStatus:
         with self._lock:
             if self._lifecycle is not ExecutionLifecycle.running:
                 raise LifecycleError("threads can only be restarted while the manager is running")
@@ -550,23 +526,22 @@ class ExecutionManager:
                 return
             raise SubmissionRejected(f"manager is not accepting submissions: {self._lifecycle.value}")
 
-    def _pool(self, pool_name: ConcurrentPools | str) -> ManagedPool:
-        normalized = self._pool_name(pool_name)
+    def _pool(self, pool_name: ConcurrentPools) -> ManagedPool:
         with self._lock:
-            pool = self._pools.get(normalized)
+            pool = self._pools.get(pool_name)
         if pool is None:
-            raise SubmissionRejected(f"pool is not registered: {normalized.value}")
+            raise SubmissionRejected(f"pool is not registered: {pool_name.value}")
         return pool
 
-    def submit_unmonitored(self, pool_name: ConcurrentPools | str, task_name: TaskName | str, task: SyncTask[T]) -> Future[T]:
+    def submit_unmonitored(self, pool_name: ConcurrentPools, task_name: TaskName, task: SyncTask[T]) -> Future[T]:
         pool = self._pool(pool_name)
         self._can_submit(pool)
-        return pool.submit(TaskName(str(task_name)), task)
+        return pool.submit(task_name, task)
 
-    def _record_failure(self, pool_name: ConcurrentPools | str, task_name: TaskName | str, error: BaseException) -> None:
+    def _record_failure(self, pool_name: ConcurrentPools, task_name: TaskName, error: BaseException) -> None:
         failure = MonitoredFailure(
             pool_name=pool_name,
-            task_name=TaskName(str(task_name)),
+            task_name=task_name,
             exception_type=type(error).__name__,
             message=str(error),
             traceback="".join(traceback.format_exception(type(error), error, error.__traceback__)),
@@ -574,7 +549,7 @@ class ExecutionManager:
         with self._lock:
             self._monitored_failures.append(failure)
 
-    def _submit_monitored_receipt(self, pool_name: ConcurrentPools | str, task_name: TaskName | str, task: SyncTask[T]) -> Future[T]:
+    def _submit_monitored_receipt(self, pool_name: ConcurrentPools, task_name: TaskName, task: SyncTask[T]) -> Future[T]:
         future = self.submit_unmonitored(pool_name, task_name, task)
 
         def record_failure(done: Future[T]) -> None:
@@ -588,18 +563,18 @@ class ExecutionManager:
         future.add_done_callback(record_failure)
         return future
 
-    def submit_monitored(self, pool_name: ConcurrentPools | str, task_name: TaskName | str, task: SyncTask[T]) -> None:
+    def submit_monitored(self, pool_name: ConcurrentPools, task_name: TaskName, task: SyncTask[T]) -> None:
         self._submit_monitored_receipt(pool_name, task_name, task)
 
-    async def awaitable_submit(self, pool_name: ConcurrentPools | str, task_name: TaskName | str, task: SyncTask[T]) -> T:
+    async def awaitable_submit(self, pool_name: ConcurrentPools, task_name: TaskName, task: SyncTask[T]) -> T:
         future = self.submit_unmonitored(pool_name, task_name, task)
         return await asyncio.wrap_future(future)
 
     def submit_after(
         self,
         dependency: Future[Any],
-        pool_name: ConcurrentPools | str,
-        task_name: TaskName | str,
+        pool_name: ConcurrentPools,
+        task_name: TaskName,
         task: SyncTask[T],
         *,
         run_if_dependency_failed: bool = False,
@@ -610,7 +585,7 @@ class ExecutionManager:
                 done.result()
             except BaseException as error:
                 dependency_failed = True
-                self._record_failure("dependency", task_name, error)
+                self._record_failure(pool_name, task_name, error)
             if dependency_failed and not run_if_dependency_failed:
                 return
             try:
@@ -634,8 +609,8 @@ class ExecutionManager:
         return ExecutionStatus(
             lifecycle=lifecycle,
             healthy=healthy,
-            pools=cast(Mapping[ConcurrentPools, PoolStatus], _freeze_mapping(pool_statuses)),
-            threads=cast(Mapping[str, ThreadStatus], _freeze_mapping(threads)),
+            pools=dict(freeze_mapping(pool_statuses)),
+            threads=dict(freeze_mapping(threads)),
             monitored_failures=failures,
             unregistered_threads=unregistered,
         )
@@ -645,10 +620,15 @@ class ExecutionManager:
             raise ValueError("shutdown timeout must be positive")
         with self._lock:
             if self._lifecycle is ExecutionLifecycle.stopped:
-                return ShutdownStatus(ExecutionLifecycle.stopped, True, (), ())
+                return ShutdownStatus(
+                    lifecycle=ExecutionLifecycle.stopped,
+                    complete=True,
+                    incomplete_threads=(),
+                    incomplete_pools=(),
+                )
             self._lifecycle = ExecutionLifecycle.stopping
         deadline = time.monotonic() + timeout
-        incomplete_threads: list[str] = []
+        incomplete_threads: list[ConcurrentThreads] = []
         records = sorted(self._threads.values(), key=lambda item: item.stage, reverse=True)
         for record in records:
             if not self._stop_record(record, deadline):
@@ -671,4 +651,4 @@ class FutureCancelledError(RuntimeError):
     """Internal failure representation for monitored cancellation."""
 
 
-execution_manager = ExecutionManager(config.concurrency.failure_history_size)
+execution_manager = ExecutionManager(config.backend.concurrency.failure_history_size)

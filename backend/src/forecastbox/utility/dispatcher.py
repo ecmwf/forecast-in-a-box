@@ -18,15 +18,16 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from functools import partial
 from queue import Empty, Full, Queue
-from types import MappingProxyType
 from typing import Any, NewType, cast
 
 from forecastbox.utility.concurrency.manager import (
     ExecutionManager,
+    StatusModel,
     TaskName,
     execution_manager,
 )
 from forecastbox.utility.config import ConcurrentPools, DispatcherSettings, config
+from forecastbox.utility.structural import freeze_recursively
 
 EventName = NewType("EventName", str)
 
@@ -51,16 +52,6 @@ class DispatcherRegistrationError(DispatcherError):
     """Raised for invalid dispatcher registrations."""
 
 
-def _freeze_payload(value: object) -> object:
-    if isinstance(value, Mapping):
-        return MappingProxyType({key: _freeze_payload(item) for key, item in value.items()})
-    if isinstance(value, list):
-        return tuple(_freeze_payload(item) for item in value)
-    if isinstance(value, set):
-        return frozenset(_freeze_payload(item) for item in value)
-    return value
-
-
 @dataclass(frozen=True, eq=True, slots=True)
 class Event:
     """An event payload containing stable plain data, never runtime resources."""
@@ -69,7 +60,7 @@ class Event:
     kwargs: Mapping[str, object]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "kwargs", _freeze_payload(dict(self.kwargs)))
+        object.__setattr__(self, "kwargs", freeze_recursively(dict(self.kwargs)))
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -99,8 +90,7 @@ class AggregateDispatchError(DispatcherError):
         super().__init__(f"handlers failed for event {result.event_name}: {', '.join(result.failed_handlers)}")
 
 
-@dataclass(frozen=True, eq=True, slots=True)
-class DispatcherStatus:
+class DispatcherStatus(StatusModel):
     state: str
     accepting: bool
     running: bool
@@ -115,6 +105,9 @@ class DispatcherStatus:
     in_flight_handlers: int
     queue_failures: tuple[str, ...]
     aggregate_failures: tuple[str, ...]
+
+    def is_ready(self) -> bool:
+        return self.running
 
 
 @dataclass
@@ -295,20 +288,20 @@ class EventDispatcher:
                 dispatched=self._dispatched,
                 completed=self._completed,
                 failed=self._failed,
-                handler_counts_by_event=MappingProxyType(dict(self._handler_counts)),
+                handler_counts_by_event=dict(self._handler_counts),
                 in_flight_handlers=self._in_flight_handlers,
                 queue_failures=tuple(self._queue_failures),
                 aggregate_failures=tuple(self._aggregate_failures),
             )
 
 
-_dispatcher = EventDispatcher(execution_manager, config.dispatcher)
+_dispatcher = EventDispatcher(execution_manager, config.backend.dispatcher)
 
 
 def _current_dispatcher() -> EventDispatcher:
     global _dispatcher
     if _dispatcher.manager is not execution_manager:
-        _dispatcher = EventDispatcher(execution_manager, config.dispatcher)
+        _dispatcher = EventDispatcher(execution_manager, config.backend.dispatcher)
     return _dispatcher
 
 

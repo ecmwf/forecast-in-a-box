@@ -81,7 +81,7 @@ def _discover_dispatchers() -> None:
 
 def _start_execution_runtime() -> None:
     _discover_dispatchers()
-    for pool_name, settings in config.concurrency.pools.items():
+    for pool_name, settings in config.backend.concurrency.pools.items():
         execution_manager.register_pool(
             pool_name,
             max_workers=settings.max_workers,
@@ -89,13 +89,13 @@ def _start_execution_runtime() -> None:
             stage=0,
         )
     execution_manager.register_thread(
-        ConcurrentThreads.EventDispatcher.value,
+        ConcurrentThreads.EventDispatcher,
         event_dispatcher_entrypoint,
         status_provider=dispatcher_status,
         stop_request=dispatcher_stop_request,
         stage=0,
     )
-    execution_manager.start(timeout=config.concurrency.startup_timeout_seconds)
+    execution_manager.start(timeout=config.backend.concurrency.startup_timeout_seconds)
 
 
 @asynccontextmanager
@@ -109,7 +109,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
         _start_execution_runtime()
     except BaseException:
-        execution_manager.shutdown(timeout=config.concurrency.shutdown_timeout_seconds)
+        execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
         raise
 
     try:
@@ -137,7 +137,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             join_stores_thread(timeout_sec=10)
             join_artifact_manager(timeout_sec=10)
         finally:
-            execution_manager.shutdown(timeout=config.concurrency.shutdown_timeout_seconds)
+            execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
 
 
 app = FastAPI(

@@ -284,6 +284,8 @@ class BackendSettings(FiabBaseModel):
     launch_browser: bool = True
     """Whether a browser window should be opened after start. Used only when
     entrypoint.main.launch_all module is used"""
+    concurrency: ConcurrencySettings = Field(default_factory=ConcurrencySettings)
+    dispatcher: DispatcherSettings = Field(default_factory=DispatcherSettings)
 
     def local_url(self) -> str:
         return f"http://localhost:{self.uvicorn_port}"
@@ -398,8 +400,6 @@ class FIABConfig(BaseSettings):
     external: ExternalServicesSettings = Field(default_factory=ExternalServicesSettings)
     backend: BackendSettings = Field(default_factory=BackendSettings)
     cascade: CascadeSettings = Field(default_factory=CascadeSettings)
-    concurrency: ConcurrencySettings = Field(default_factory=ConcurrencySettings)
-    dispatcher: DispatcherSettings = Field(default_factory=DispatcherSettings)
 
     @classmethod
     def settings_customise_sources(
