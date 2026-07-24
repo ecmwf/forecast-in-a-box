@@ -247,6 +247,15 @@ maybeReplaceLauncher() {
         if [ "$previousRelease" != "$selectedRelease" ] ; then
             >&2 echo "Launcher presumed to come from $previousRelease but desired release is $selectedRelease. Will replace"
             replaceLauncher $selectedRelease
+            # NOTE the release has changed, so the previously cached lock file (and its
+            # associated version timestamp) refer to the old release and must be
+            # invalidated, otherwise maybeDownloadLock will keep the stale one around
+            # forever (it only downloads when the file is missing) and the venv will
+            # never pick up the new release's dependencies/version.
+            if [ -f "$LOCK" ] ; then
+                >&2 echo "Removing stale pylock at $LOCK due to release change"
+                rm -f "$LOCK" "$LOCK.timestamp"
+            fi
             launcherPath=$(readlink -f "$0")
             exec "$launcherPath" "$@"
         fi
