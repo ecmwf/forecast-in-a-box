@@ -19,6 +19,7 @@ from fastapi import APIRouter, Request
 from forecastbox.domain.experiment.scheduling.background import status_scheduler
 from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.plugin.manager import status_brief
+from forecastbox.utility.concurrency.manager import ExecutionStatus, execution_manager
 from forecastbox.utility.config import config
 
 PREFIX = "/api/v1/status"
@@ -36,6 +37,7 @@ class StatusResponse:
     scheduler: str
     version: str
     plugins: str
+    concurrency: ExecutionStatus
 
 
 @router.get("")
@@ -72,4 +74,4 @@ def get_status(request: Request) -> StatusResponse:
     except Exception:
         status["ecmwf"] = "down"
 
-    return StatusResponse(**status)
+    return StatusResponse(**status, concurrency=execution_manager.status())

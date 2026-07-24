@@ -1,0 +1,5 @@
+Result: Completed
+
+Phase 1 adds the centrally owned execution manager, six configured bounded pools, the process-local event dispatcher, staged lifecycle management, immutable operational status snapshots, and FastAPI lifespan/status wiring. Existing scheduler, artifact, plugin, database, run, route, and domain operations remain on their original execution paths; the new pools are started but intentionally mostly idle, and dispatcher discovery currently completes with zero handlers.
+
+During implementation, concurrency and dispatcher settings were nested under BackendSettings, and status contracts use frozen Pydantic models rather than dataclasses so they serialize directly for API responses. Status providers are required at runtime to return a Pydantic model exposing is_ready(); the intersection of that protocol and BaseModel remains documented as a type-checking TODO. Subsequent phases should preserve enum-only pool/thread identifiers, bounded non-blocking submission, immutable payload freezing, and the rule that domain work must not migrate into the new runtime until explicitly planned.
