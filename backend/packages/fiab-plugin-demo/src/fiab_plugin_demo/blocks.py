@@ -20,6 +20,7 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Product, Sink, Transform
+from fiab_core.types import ListType, StringType
 
 DIR = ConfigurationOptionId("dir")
 PARAM = ConfigurationOptionId("param")
@@ -100,7 +101,7 @@ class NetCDFOutputSink(_DemoSink):
         DIR: BlockConfigurationOption(
             title="Directory",
             description="Output directory (e.g. '/path/to/output')",
-            value_type="str",
+            value_type=StringType(),
         )
     }
 
@@ -112,7 +113,7 @@ class GRIBOutputSink(_DemoSink):
         DIR: BlockConfigurationOption(
             title="Directory",
             description="Output directory (e.g. '/path/to/output')",
-            value_type="str",
+            value_type=StringType(),
         )
     }
 
@@ -124,7 +125,7 @@ class FilterParam(_DemoTransform):
         PARAM: BlockConfigurationOption(
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
-            value_type="list[str]",
+            value_type=ListType(StringType()),
         )
     }
 
@@ -136,7 +137,7 @@ class InterpolationTransform(_DemoTransform):
         PARAM: BlockConfigurationOption(
             title="Grid",
             description="GridSpec to interpolate",
-            value_type="str",
+            value_type=StringType(),
         )
     }
 

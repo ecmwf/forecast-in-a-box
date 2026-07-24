@@ -16,6 +16,7 @@ from fiab_core.fable import (
     BlueprintTemplateExampleInput,
     ConfigurationOptionId,
 )
+from fiab_core.types import ClosedEnumType, StringType
 
 template = BlueprintTemplate(
     display_name="Prototype Template",
@@ -87,13 +88,13 @@ template = BlueprintTemplate(
             example_value="/tmp/outputRoot",
             display_name="Output Root Location",
             display_description="The GRIB files will be saved to a {runId}.{attemptCount} folder in here",
-            type_hint="str",
+            type_hint=StringType(),
         ),
         "forecastSource": BlueprintTemplateExampleInput(
             example_value="ecmwf-open-data",
             display_name="Forecast Source",
             display_description="Where to download the forecast from",
-            type_hint="enumClosed[mars,ecmwf-open-data]",
+            type_hint=ClosedEnumType(["mars", "ecmwf-open-data"]),
         ),
     },
 )

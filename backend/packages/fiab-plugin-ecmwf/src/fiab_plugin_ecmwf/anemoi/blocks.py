@@ -26,6 +26,7 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
 from fiab_core.tools.validators import positive
+from fiab_core.types import DatetimeType, IntType, OpenEnumType
 
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
@@ -124,23 +125,23 @@ class AnemoiSource(Source):
         INPUT_SOURCE: BlockConfigurationOption(
             title="Input Source",
             description="Source of the initial conditions",
-            value_type="enumOpen['mars', 'opendata', 'polytope']",
+            value_type=OpenEnumType(["mars", "opendata", "polytope"]),
             default_value="opendata",
         ),
         LEAD_TIME: BlockConfigurationOption(
             title="Lead time",
             description="Lead time of the forecast",
-            value_type="int",
+            value_type=IntType(),
         ),
         BASE_TIME: BlockConfigurationOption(
             title="Base time",
             description="Base time of the forecast",
-            value_type="datetime",
+            value_type=DatetimeType(),
         ),
         ENSEMBLE: BlockConfigurationOption(
             title="Ensemble Member",
             description="ID of ensemble member.",
-            value_type="int",
+            value_type=IntType(),
             default_value="1",
         ),
     }
@@ -193,18 +194,18 @@ class AnemoiInputSource(Source):
         INPUT_SOURCE: BlockConfigurationOption(
             title="Input Source",
             description="Source of the initial conditions",
-            value_type="enumOpen['mars', 'opendata', 'polytope']",
+            value_type=OpenEnumType(["mars", "opendata", "polytope"]),
             default_value="opendata",
         ),
         BASE_TIME: BlockConfigurationOption(
             title="Base time",
             description="Base time of the forecast",
-            value_type="datetime",
+            value_type=DatetimeType(),
         ),
         ENSEMBLE: BlockConfigurationOption(
             title="Ensemble Member",
             description="ID of ensemble member.",
-            value_type="int",
+            value_type=IntType(),
             default_value="1",
         ),
     }
@@ -249,7 +250,7 @@ class AnemoiTransform(Transform):
         LEAD_TIME: BlockConfigurationOption(
             title="Lead time",
             description="Lead time of the forecast",
-            value_type="int",
+            value_type=IntType(),
         ),
     }
 

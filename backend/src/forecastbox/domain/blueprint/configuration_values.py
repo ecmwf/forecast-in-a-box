@@ -25,9 +25,9 @@ def convert_known_configuration_values(
             continue
         raw_value = block_instance.configuration_values[option_id]
         try:
-            converted[option_id] = option.parsed_value_type.validate_convert(raw_value)
+            converted[option_id] = option.value_type.validate_convert(raw_value)
         except (TypeError, WrongType) as exc:
-            errors.append(f"Invalid value for configuration option {option_id!r}: expected {option.value_type}. {exc}")
+            errors.append(f"Invalid value for configuration option {option_id!r}: expected {option.value_type.serialize()}. {exc}")
     if errors:
         return Either.error(errors)
     return Either.ok(converted)

@@ -20,6 +20,11 @@ Provides parsing, validation, and conversion for a small set of type expressions
 - union[FableType, ...] (union types)
 """
 
+# TODO there is a problem that enums are untyped. Currently, an integer-only enum
+# like closedEnum[1, 2] parses ok but serialized as closedEnum['1', '2'], which is odd.
+# We want to introduce closedEnum<type>[], and parse values with that type. We want to
+# mandate the quotes on the input.
+
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Any, Iterable, Literal, get_args
@@ -193,7 +198,7 @@ class ClosedEnumType(FableType):
         return value
 
     def serialize(self) -> str:
-        items_str = ",".join(self.items)
+        items_str = ",".join(f"'{item}'" for item in self.items)
         return f"enumClosed[{items_str}]"
 
 
@@ -209,7 +214,7 @@ class OpenEnumType(FableType):
         return value
 
     def serialize(self) -> str:
-        items_str = ",".join(self.items)
+        items_str = ",".join(f"'{item}'" for item in self.items)
         return f"enumOpen[{items_str}]"
 
 
@@ -324,7 +329,7 @@ class GeoDomainType(UnionType):
         return "geodomain"
 
 
-def parse(type_expr: str) -> tuple[FableType, str]:
+def _parse(type_expr: str) -> tuple[FableType, str]:
     """Parse a type expression from the start of type_expr.
 
     Returns ``(parsed_type, remainder)`` where ``remainder`` is the unparsed
@@ -334,9 +339,9 @@ def parse(type_expr: str) -> tuple[FableType, str]:
 
     Supports:
     - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'country', 'bboxWSEN'
-    - Enumerations: 'enumClosed[item1,item2]', 'enumOpen[item1,item2]'
+    - Enumerations: "enumClosed['item1','item2']", "enumOpen['item1','item2']"
     - Lists: 'list[int]', 'list[enumClosed[...]]', etc.
-    - Union: 'union[int,str]', 'union[enumClosed[a,b],date]', etc.
+    - Union: 'union[int,str]', "union[enumClosed['a','b'],date]", etc.
 
     Raises NotFableType if the expression cannot be parsed.
     """
@@ -372,7 +377,7 @@ def parse(type_expr: str) -> tuple[FableType, str]:
     # list[...]
     if type_expr.startswith("list["):
         _, inner, remainder = _split_by_brackets(type_expr)
-        inner_type, inner_remainder = parse(inner)
+        inner_type, inner_remainder = _parse(inner)
         if inner_remainder.strip():
             raise NotFableType(f"Unexpected content after inner type in list: {inner_remainder!r}")
         return (ListType(inner_type), remainder)
@@ -389,7 +394,7 @@ def parse(type_expr: str) -> tuple[FableType, str]:
                     raise NotFableType(f"Expected ',' between union member types, got {remaining!r}")
                 remaining = remaining[1:].lstrip()
             first = False
-            t, remaining = parse(remaining)
+            t, remaining = _parse(remaining)
             remaining = remaining.lstrip()
             member_types.append(t)
         if not member_types:
@@ -401,3 +406,18 @@ def parse(type_expr: str) -> tuple[FableType, str]:
         "Expected one of: str, int, float, date, datetime, country, bboxWSEN, geodomain, "
         "enumClosed[...], enumOpen[...], list[...], union[...]"
     )
+
+
+def parse(type_expr: str | FableType) -> FableType:
+    """Parse a complete Fable type expression."""
+    if isinstance(type_expr, FableType):
+        return type_expr
+    if not isinstance(type_expr, str):
+        raise ValueError(f"Expected a Fable type expression string, got {type(type_expr).__name__}")
+    try:
+        parsed, remainder = _parse(type_expr)
+        if remainder.strip():
+            raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
+    except NotFableType as exc:
+        raise ValueError(str(exc)) from exc
+    return parsed

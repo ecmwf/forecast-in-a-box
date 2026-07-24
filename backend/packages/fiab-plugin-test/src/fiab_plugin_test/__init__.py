@@ -23,7 +23,7 @@ from fiab_core.fable import (
     RawOutput,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
-from fiab_core.types import FableType, parse
+from fiab_core.types import ClosedEnumType, FableType, FloatType, IntType, StringType, parse
 
 TEXT = ConfigurationOptionId("text")
 DURATION = ConfigurationOptionId("duration")
@@ -32,10 +32,10 @@ AMOUNT = ConfigurationOptionId("amount")
 FNAME = ConfigurationOptionId("fname")
 
 
-def _get_checkpoint_enum_type() -> str:
+def _get_checkpoint_enum_type() -> FableType:
     available = ArtifactsProvider.get_artifacts_lookup()
-    values = ", ".join(f"'{CompositeArtifactId.to_str(k)}'" for k in available.keys())
-    return f"enumClosed[{values}]"
+    values = [CompositeArtifactId.to_str(k) for k in available]
+    return ClosedEnumType(values)
 
 
 catalogue = lambda: BlockFactoryCatalogue(
@@ -51,7 +51,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             kind="source",
             title="Source Text",
             description="Returns the input text",
-            configuration_options={TEXT: BlockConfigurationOption(title="", description="", value_type="str")},
+            configuration_options={TEXT: BlockConfigurationOption(title="", description="", value_type=StringType())},
             inputs=[],
         ),
         BlockFactoryId("source_sleep"): BlockFactory(
@@ -59,8 +59,8 @@ catalogue = lambda: BlockFactoryCatalogue(
             title="Source Sleep",
             description="Sleeps for a duration, then retuns the input text",
             configuration_options={
-                TEXT: BlockConfigurationOption(title="", description="", value_type="str"),
-                DURATION: BlockConfigurationOption(title="", description="", value_type="float"),
+                TEXT: BlockConfigurationOption(title="", description="", value_type=StringType()),
+                DURATION: BlockConfigurationOption(title="", description="", value_type=FloatType()),
             },
             inputs=[],
         ),
@@ -81,7 +81,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             kind="transform",
             title="Increment",
             description="Adds the amount to the input",
-            configuration_options={AMOUNT: BlockConfigurationOption(title="", description="", value_type="int")},
+            configuration_options={AMOUNT: BlockConfigurationOption(title="", description="", value_type=IntType())},
             inputs=["a"],
         ),
         BlockFactoryId("product_join"): BlockFactory(
@@ -95,7 +95,7 @@ catalogue = lambda: BlockFactoryCatalogue(
             kind="sink",
             title="File",
             description="Saves the input to a file",
-            configuration_options={FNAME: BlockConfigurationOption(title="", description="", value_type="str")},
+            configuration_options={FNAME: BlockConfigurationOption(title="", description="", value_type=StringType())},
             inputs=["data"],
         ),
         BlockFactoryId("sink_image"): BlockFactory(
@@ -112,7 +112,7 @@ catalogue = lambda: BlockFactoryCatalogue(
 def validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
     restrictions: ConfigurationOptionRestriction = {}
     if factory_id == BlockFactoryId("transform_increment"):
-        restrictions = {AMOUNT: parse("enumClosed[1,2,3]")[0]}
+        restrictions = {AMOUNT: parse("enumClosed[1,2,3]")}
     if factory_id in ("sink_file",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
     elif factory_id in ("sink_image",):
@@ -131,7 +131,7 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
             return [
                 BlockExpansion(
                     factory=BlockFactoryId("transform_increment"),
-                    restrictions={AMOUNT: parse("enumClosed[1,2,3]")[0]},
+                    restrictions={AMOUNT: parse("enumClosed[1,2,3]")},
                 ),
                 BlockExpansion(factory=BlockFactoryId("product_join")),
                 BlockExpansion(factory=BlockFactoryId("sink_file")),
