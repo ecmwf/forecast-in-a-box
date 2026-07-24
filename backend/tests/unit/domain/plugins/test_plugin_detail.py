@@ -81,7 +81,7 @@ def _make_db_state(
 
 
 def _patch_db(states: list[MagicMock]) -> object:
-    return patch("forecastbox.domain.plugin.detail.get_all_plugin_states", new=AsyncMock(return_value=states))
+    return patch("forecastbox.domain.plugin.detail._await_jobs_db", new=AsyncMock(return_value=states))
 
 
 def _patch_store(detail: dict | None = None) -> object:
@@ -469,6 +469,32 @@ async def test_raises_plugin_manager_busy_when_lock_not_acquired() -> None:
             await build_plugin_listing()
 
     busy_lock.release()
+
+
+@pytest.mark.asyncio
+async def test_build_plugin_listing_releases_lock_before_waiting_for_db() -> None:
+    plugin = _make_plugin("alpha")
+    state = _make_db_state(_PLUGIN_A)
+    lock = threading.Lock()
+
+    async def fake_await_jobs_db(task_name: str, task: object) -> object:
+        del task_name, task
+        assert not lock.locked()
+        return [state]
+
+    with (
+        patch("forecastbox.domain.plugin.detail.PluginManager") as mock_pm,
+        patch("forecastbox.domain.plugin.detail._await_jobs_db", new=AsyncMock(side_effect=fake_await_jobs_db)),
+        _patch_store(),
+        _patch_time(),
+    ):
+        mock_pm.lock = lock
+        mock_pm.plugins = pmap({_PLUGIN_A: plugin})
+        mock_pm.errors = pmap()
+
+        result = await build_plugin_listing()
+
+    assert _PLUGIN_A in result.plugins
 
 
 # ---------------------------------------------------------------------------

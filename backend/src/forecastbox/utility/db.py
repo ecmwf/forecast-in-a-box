@@ -2,80 +2,83 @@
 #
 # This software is licensed under the terms of the Apache Licence Version 2.0
 # which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
-#
 # In applying this licence, ECMWF does not waive the privileges and immunities
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Async locking, retries, and session helpers for jobs persistence.
+"""Synchronous locking, retries, and session helpers for jobs persistence.
 
 The lock in this module serializes access to the jobs SQLite database. The
 administrative users database has its own lock and retry helper in
 ``domain.auth.db``.
 """
 
-import asyncio
-import logging
-from asyncio import Lock
+import sqlite3
+import threading
+import time
 from collections.abc import Callable
-from typing import Any, Awaitable, TypeVar
+from typing import Any, TypeVar, cast
 
 import sqlalchemy.exc
+from sqlalchemy.orm import Session, sessionmaker
 
-logger = logging.getLogger(__name__)
 retries = 3
-# This lock is for jobs persistence only. The users database has a separate lock.
-lock = Lock()
+# TODO investigate concurrent reads. SQLite should support concurrent readers,
+# but the first implementation deliberately serializes all access so this
+# rework does not also need to solve read/write classification and consistency.
+lock = threading.RLock()
 T = TypeVar("T")
+SessionMaker = sessionmaker[Session]
 
 # TODO integrate with sqlalchemy typing system
 
 
-async def dbRetry(func: Callable[[int], Awaitable[T]]) -> T:
+def dbRetry(func: Callable[[int], T]) -> T:
     for i in range(retries, -1, -1):
         try:
-            async with lock:
-                return await func(i)
-        except sqlalchemy.exc.OperationalError:
+            with lock:
+                return func(i)
+        except (sqlite3.OperationalError, sqlalchemy.exc.OperationalError):
             if i == 0:
                 raise
-            await asyncio.sleep(0.1)
-    raise ValueError  # NOTE in case of retries misconfig, we dont want implicit None
+            time.sleep(0.1)
+    raise ValueError("dbRetry exhausted without returning")
 
 
-async def executeAndCommit(stmt: Any, session_maker: Any) -> None:
-    async def func(i: int) -> None:
-        async with session_maker() as session:
-            await session.execute(stmt)
-            await session.commit()
+def executeAndCommit(stmt: Any, session_maker: SessionMaker) -> None:
+    def func(i: int) -> None:
+        with session_maker() as session:
+            session.execute(stmt)
+            session.commit()
 
-    await dbRetry(func)
+    dbRetry(func)
 
 
-async def addAndCommit(entity: Any, session_maker: Any) -> None:
-    async def func(i: int) -> None:
-        async with session_maker() as session:
+def addAndCommit(entity: Any, session_maker: SessionMaker) -> None:
+    def func(i: int) -> None:
+        with session_maker() as session:
             session.add(entity)
-            await session.commit()
+            session.commit()
 
-    await dbRetry(func)
+    dbRetry(func)
 
 
-async def querySingle(query: Any, session_maker: Any) -> Any:
-    async def func(i: int) -> Any:
-        async with session_maker() as session:
-            result = await session.execute(query)
+def querySingle(query: Any, session_maker: SessionMaker) -> Any:
+    def func(i: int) -> Any:
+        with session_maker() as session:
+            result = session.execute(query)
             maybe_row = result.first()
-            rv = maybe_row if maybe_row is None else maybe_row[0]
-            return rv
+            return maybe_row if maybe_row is None else maybe_row[0]
 
-    return await dbRetry(func)
+    return dbRetry(func)
 
 
-async def queryCount(query: Any, session: Any) -> int:
-    # TODO scalar_one
-    result = (await session.execute(query)).scalar()
-    if result is None or not isinstance(result, int):
-        raise TypeError(result)
-    else:
-        return result
+def queryCount(query: Any, session_maker: SessionMaker) -> int:
+    def func(i: int) -> int:
+        with session_maker() as session:
+            result = session.execute(query).scalar()
+            if result is None or not isinstance(result, int):
+                raise TypeError(result)
+            return cast(int, result)
+
+    return dbRetry(func)

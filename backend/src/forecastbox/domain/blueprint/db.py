@@ -7,20 +7,25 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Persistence layer for Blueprint, with auth-scoped authorization.
+"""Synchronous persistence helpers for Blueprint.
 
-Uses the same session maker as ``forecastbox.schemata.jobs`` so that all tables
-share a single SQLite connection pool and in-process tests can monkeypatch
-a single ``async_session_maker`` attribute to inject an in-memory database.
+Each helper owns its session and transaction and must be submitted to the
+``ConcurrentPools.JobsDb`` worker by a route, service, or background-thread
+orchestrator.
+
+Authorization remains helper-specific: route-facing list/update/delete helpers
+apply ownership scoping, while ``get_blueprint`` is the intentional internal
+no-auth lookup documented below.
 """
 
 import datetime as dt
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy import func, or_, select, update
+from sqlalchemy.orm import Session
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound, BlueprintVersionConflict
@@ -28,69 +33,114 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.schemata.jobs import Blueprint, BlueprintSource
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
+from forecastbox.utility.db import dbRetry
 from forecastbox.utility.time import current_time
 
 
-async def upsert_blueprint(
+@dataclass(frozen=True, eq=True, slots=True)
+class BlueprintRecord:
+    blueprint_id: str
+    version: int
+    created_by: str
+    created_at: dt.datetime
+    source: BlueprintSource
+    parent_id: str | None
+    display_name: str | None
+    display_description: str | None
+    tags: list[dict[str, Any]] | None
+    builder: dict[str, Any] | None
+    fiabcore_major: int
+    is_deleted: bool
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class BlueprintLatest:
+    """A visible Blueprint version paired with the entity's true creation time."""
+
+    blueprint: BlueprintRecord
+    created_at: dt.datetime
+
+
+def _to_record(row: Blueprint) -> BlueprintRecord:
+    return BlueprintRecord(
+        blueprint_id=cast(str, row.blueprint_id),
+        version=cast(int, row.version),
+        created_by=cast(str, row.created_by),
+        created_at=cast(dt.datetime, row.created_at),
+        source=cast(BlueprintSource, row.source),
+        parent_id=cast(str | None, row.parent_id),
+        display_name=cast(str | None, row.display_name),
+        display_description=cast(str | None, row.display_description),
+        tags=cast(list[dict[str, Any]] | None, row.tags),
+        builder=cast(dict[str, Any] | None, row.builder),
+        fiabcore_major=cast(int, row.fiabcore_major),
+        is_deleted=cast(bool, row.is_deleted),
+    )
+
+
+def upsert_blueprint(
     *,
     auth_context: AuthContext,
     blueprint_id: BlueprintId | None = None,
     source: BlueprintSource,
     created_by: str,
-    builder: dict | None = None,
+    builder: dict[str, Any] | None = None,
     display_name: str | None = None,
     display_description: str | None = None,
-    tags: list[dict] | None = None,
+    tags: list[dict[str, Any]] | None = None,
     parent_id: str | None = None,
     expected_version: int | None = None,
 ) -> tuple[BlueprintId, int]:
     """Insert a new version of a Blueprint and return ``(id, version)``.
 
-    If ``blueprint_id`` is omitted a fresh UUID is generated (version 1).
-    If ``blueprint_id`` is supplied the next version is derived from the DB;
-    raises ``BlueprintNotFound`` if it does not exist yet,
+    If ``blueprint_id`` is omitted a fresh UUID is generated and version 1 is
+    inserted. If ``blueprint_id`` is supplied the next version is derived from
+    the database.
+
+    Raises ``BlueprintNotFound`` if the id does not exist yet,
     ``BlueprintAccessDenied`` if the actor is not the owner or an admin, and
-    ``BlueprintVersionConflict`` if ``expected_version`` is provided and does not
-    match the current maximum version.
+    ``BlueprintVersionConflict`` if ``expected_version`` is provided and does
+    not match the current maximum version.
     """
     id_provided = blueprint_id is not None
-    blueprint_id = blueprint_id if blueprint_id is not None else BlueprintId(str(uuid.uuid4()))
+    effective_blueprint_id = blueprint_id if blueprint_id is not None else BlueprintId(str(uuid.uuid4()))
     ref_time = current_time("dbref")
 
-    async def function(i: int) -> int:
-        async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(select(func.max(Blueprint.version)).where(Blueprint.blueprint_id == blueprint_id))
-            max_version: int | None = result.scalar()
+    def function(i: int) -> int:
+        with _jobs_module.session_maker() as session:
+            result = session.execute(select(func.max(Blueprint.version)).where(Blueprint.blueprint_id == effective_blueprint_id))
+            max_version = cast(int | None, result.scalar())
 
             if id_provided:
                 if max_version is None:
-                    raise BlueprintNotFound(f"No Blueprint with id={blueprint_id!r} exists; cannot add a new version.")
+                    raise BlueprintNotFound(f"No Blueprint with id={effective_blueprint_id!r} exists; cannot add a new version.")
                 if expected_version is not None and max_version != expected_version:
                     raise BlueprintVersionConflict(
-                        f"Version conflict for Blueprint {blueprint_id!r}: expected version {expected_version}, current is {max_version}."
+                        f"Version conflict for Blueprint {effective_blueprint_id!r}: expected version {expected_version}, current is {max_version}."
                     )
                 # Ownership check on the latest (non-deleted) version.
                 owner_query = (
                     select(Blueprint.created_by)
                     .where(
-                        Blueprint.blueprint_id == blueprint_id,
+                        Blueprint.blueprint_id == effective_blueprint_id,
                         Blueprint.is_deleted.is_(False),
                     )
                     .order_by(Blueprint.version.desc())
                     .limit(1)
                 )
-                owner_result = await session.execute(owner_query)
+                owner_result = session.execute(owner_query)
                 row = owner_result.first()
                 if row is not None:
-                    owner: str = row[0]
+                    owner = cast(str, row[0])
                     if not auth_context.allowed(owner):
-                        raise BlueprintAccessDenied(f"User {auth_context.user_id!r} is not allowed to modify Blueprint {blueprint_id!r}.")
+                        raise BlueprintAccessDenied(
+                            f"User {auth_context.user_id!r} is not allowed to modify Blueprint {effective_blueprint_id!r}."
+                        )
 
             new_version = (max_version or 0) + 1
             session.add(
                 Blueprint(
-                    blueprint_id=blueprint_id,
+                    blueprint_id=effective_blueprint_id,
                     version=new_version,
                     created_by=created_by,
                     created_at=ref_time,
@@ -104,52 +154,49 @@ async def upsert_blueprint(
                     is_deleted=False,
                 )
             )
-            await session.commit()
+            session.commit()
             return new_version
 
-    new_version = await dbRetry(function)
-    return blueprint_id, new_version
+    new_version = dbRetry(function)
+    return effective_blueprint_id, new_version
 
 
-async def get_blueprint(blueprint_id: BlueprintId, version: int | None = None) -> Blueprint | None:
+def get_blueprint(blueprint_id: BlueprintId, version: int | None = None) -> BlueprintRecord | None:
     """Return a specific or the latest non-deleted version of a Blueprint.
 
-    No authorization is applied; possession of the blueprint ID is treated as
-    sufficient read access. This is intentional and relied upon by internal
-    callers (scheduling, run execution, ...) that already possess a validated
-    foreign key to the blueprint. Route handlers exposing a Blueprint to a
-    caller by id must NOT use this function -- use ``list_blueprints`` (with
-    ``blueprint_id`` set) instead, which applies the same ownership scoping as
-    the list endpoint.
+    No authorization is applied; possession of the blueprint id is treated as
+    sufficient read access. Internal callers such as scheduling and run
+    execution rely on this after already following a validated foreign key.
+    Route handlers exposing a Blueprint to a caller by id must not use this
+    helper. Use ``list_blueprints`` with ``blueprint_id`` set instead so the
+    same ownership scoping as the list endpoint is applied.
     """
-    if version is not None:
-        query = select(Blueprint).where(
-            Blueprint.blueprint_id == blueprint_id,
-            Blueprint.version == version,
-            Blueprint.is_deleted.is_(False),
-        )
-    else:
-        query = (
-            select(Blueprint)
-            .where(
-                Blueprint.blueprint_id == blueprint_id,
-                Blueprint.is_deleted.is_(False),
-            )
-            .order_by(Blueprint.version.desc())
-            .limit(1)
-        )
-    return await querySingle(query, _jobs_module.async_session_maker)
+
+    def function(i: int) -> BlueprintRecord | None:
+        with _jobs_module.session_maker() as session:
+            if version is not None:
+                query = select(Blueprint).where(
+                    Blueprint.blueprint_id == blueprint_id,
+                    Blueprint.version == version,
+                    Blueprint.is_deleted.is_(False),
+                )
+            else:
+                query = (
+                    select(Blueprint)
+                    .where(
+                        Blueprint.blueprint_id == blueprint_id,
+                        Blueprint.is_deleted.is_(False),
+                    )
+                    .order_by(Blueprint.version.desc())
+                    .limit(1)
+                )
+            row = session.execute(query).scalar_one_or_none()
+            return None if row is None else _to_record(row)
+
+    return dbRetry(function)
 
 
-@dataclass
-class BlueprintLatest:
-    """A Blueprint (a specific or the latest visible version) paired with the entity's true creation time."""
-
-    blueprint: Blueprint
-    created_at: dt.datetime
-
-
-async def list_blueprints(
+def list_blueprints(
     *,
     auth_context: AuthContext,
     offset: int = 0,
@@ -159,30 +206,29 @@ async def list_blueprints(
     blueprint_id: BlueprintId | None = None,
     version: int | None = None,
 ) -> Iterable[BlueprintLatest]:
-    """Return the latest (or a pinned) non-deleted version of every Blueprint visible to the caller, with optional paging.
+    """Return the latest or a pinned visible version of each Blueprint.
 
-    Admins and passthrough callers (``auth_context.has_admin()``) see all blueprints.
-    Authenticated non-admin users see only their own blueprints and plugin templates.
-    Orders by creation time, descending.
+    Admins and passthrough callers see all blueprints. Authenticated non-admin
+    users see only their own blueprints and plugin templates. Results are
+    ordered by the returned version's ``created_at`` descending.
 
-    ``created_by`` and ``source`` are optional caller-supplied filters applied at the
-    outer query level so that paging counts and ordering remain correct.
+    ``created_by`` and ``source`` are optional caller-supplied filters applied
+    at the outer query level so paging counts and ordering stay correct.
 
-    ``blueprint_id`` narrows the result to a single entity; combined with ``limit=1``
-    this backs a single "get" lookup while still applying the same ownership scoping
-    as the list endpoint -- there is deliberately no separate, unauthenticated
-    single-row query for route handlers (see ``get_blueprint`` for the internal,
-    unauthenticated equivalent). ``version`` optionally pins that entity to a specific
-    version instead of its latest one; it is only meaningful together with
-    ``blueprint_id``.
+    ``blueprint_id`` narrows the result to a single entity. Combined with
+    ``limit=1`` it backs the route-layer "get" lookup while still applying the
+    same ownership scoping as the list endpoint, so there is deliberately no
+    separate unauthenticated single-row query for route handlers. ``version``
+    optionally pins that entity to a specific version instead of its latest
+    one; it is only meaningful together with ``blueprint_id``.
 
-    Each returned row is paired with the entity's true ``created_at``
-    (the first version's creation time), alongside the returned version's own
-    ``created_at`` which represents that version's ``updated_at``.
+    Each returned row is paired with the entity's true ``created_at`` from the
+    first version. The returned version's own ``created_at`` still represents
+    that version's effective ``updated_at``.
     """
 
-    async def function(i: int) -> list[BlueprintLatest]:
-        async with _jobs_module.async_session_maker() as session:
+    def function(i: int) -> list[BlueprintLatest]:
+        with _jobs_module.session_maker() as session:
             subq = select(
                 Blueprint.blueprint_id,
                 func.max(Blueprint.version).label("max_version"),
@@ -224,67 +270,67 @@ async def list_blueprints(
             query = query.order_by(Blueprint.created_at.desc()).offset(offset)
             if limit is not None:
                 query = query.limit(limit)
-            result = await session.execute(query)
-            return [BlueprintLatest(blueprint=r[0], created_at=r[1]) for r in result.all()]
+            result = session.execute(query)
+            return [BlueprintLatest(blueprint=_to_record(row[0]), created_at=cast(dt.datetime, row[1])) for row in result.all()]
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def count_blueprints(*, auth_context: AuthContext, created_by: str | None = None, source: BlueprintSource | None = None) -> int:
+def count_blueprints(*, auth_context: AuthContext, created_by: str | None = None, source: BlueprintSource | None = None) -> int:
     """Return the total number of distinct non-deleted Blueprint ids visible to the actor.
 
     ``created_by`` and ``source`` are optional caller-supplied filters.
     """
 
-    async def function(i: int) -> int:
-        async with _jobs_module.async_session_maker() as session:
-            subq = select(func.count(func.distinct(Blueprint.blueprint_id))).where(Blueprint.is_deleted.is_(False))
+    def function(i: int) -> int:
+        with _jobs_module.session_maker() as session:
+            query = select(func.count(func.distinct(Blueprint.blueprint_id))).where(Blueprint.is_deleted.is_(False))
             if not auth_context.has_admin():
-                subq = subq.where(
+                query = query.where(
                     or_(
                         Blueprint.source == "plugin_template",
                         Blueprint.created_by == auth_context.user_id,
                     )
                 )
             if created_by is not None:
-                subq = subq.where(Blueprint.created_by == created_by)
+                query = query.where(Blueprint.created_by == created_by)
             if source is not None:
-                subq = subq.where(Blueprint.source == source)
-            result = await session.execute(subq)
-            return result.scalar() or 0
+                query = query.where(Blueprint.source == source)
+            result = session.execute(query)
+            return cast(int, result.scalar() or 0)
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def find_plugin_template_id(*, created_by: str, display_name: str) -> BlueprintId | None:
-    """Return the blueprint_id of the latest non-deleted ``plugin_template`` row owned by a plugin.
+def find_plugin_template_id(*, created_by: str, display_name: str) -> BlueprintId | None:
+    """Return the latest non-deleted plugin-template blueprint id for one display name.
 
-    Returns ``None`` if no matching row exists.  Used by template ingestion to
+    Returns ``None`` if no matching row exists. Template ingestion uses this to
     decide whether to append a new version to an existing blueprint or create a
     fresh one.
     """
-    query = (
-        select(Blueprint.blueprint_id)
-        .where(
-            Blueprint.source == "plugin_template",
-            Blueprint.created_by == created_by,
-            Blueprint.display_name == display_name,
-            Blueprint.is_deleted.is_(False),
-        )
-        .order_by(Blueprint.version.desc())
-        .limit(1)
-    )
 
-    async def function(i: int) -> BlueprintId | None:
-        async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(query)
+    def function(i: int) -> BlueprintId | None:
+        with _jobs_module.session_maker() as session:
+            query = (
+                select(Blueprint.blueprint_id)
+                .where(
+                    Blueprint.source == "plugin_template",
+                    Blueprint.created_by == created_by,
+                    Blueprint.display_name == display_name,
+                    Blueprint.is_deleted.is_(False),
+                )
+                .order_by(Blueprint.version.desc())
+                .limit(1)
+            )
+            result = session.execute(query)
             row = result.first()
             return BlueprintId(str(row[0])) if row is not None else None
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def soft_delete_blueprint(blueprint_id: BlueprintId, *, expected_version: int, auth_context: AuthContext) -> None:
+def soft_delete_blueprint(blueprint_id: BlueprintId, *, expected_version: int, auth_context: AuthContext) -> None:
     """Mark all versions of a Blueprint as deleted.
 
     Raises ``BlueprintNotFound`` if the blueprint does not exist,
@@ -292,50 +338,73 @@ async def soft_delete_blueprint(blueprint_id: BlueprintId, *, expected_version: 
     ``BlueprintVersionConflict`` if ``expected_version`` does not match the
     current latest version.
     """
-    existing = await get_blueprint(blueprint_id)
-    if existing is None:
-        raise BlueprintNotFound(f"No Blueprint with id={blueprint_id!r}.")
-    if cast(int, existing.version) != expected_version:
-        raise BlueprintVersionConflict(
-            f"Version conflict for Blueprint {blueprint_id!r}: expected version {expected_version}, current is {existing.version}."
-        )
-    if not auth_context.allowed(cast(str, existing.created_by)):
-        raise BlueprintAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete Blueprint {blueprint_id!r}.")
-    stmt = update(Blueprint).where(Blueprint.blueprint_id == blueprint_id).values(is_deleted=True)
-    await executeAndCommit(stmt, _jobs_module.async_session_maker)
+
+    def function(i: int) -> None:
+        with _jobs_module.session_maker() as session:
+            existing = session.execute(
+                select(Blueprint)
+                .where(
+                    Blueprint.blueprint_id == blueprint_id,
+                    Blueprint.is_deleted.is_(False),
+                )
+                .order_by(Blueprint.version.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            if existing is None:
+                raise BlueprintNotFound(f"No Blueprint with id={blueprint_id!r}.")
+            if cast(int, existing.version) != expected_version:
+                raise BlueprintVersionConflict(
+                    f"Version conflict for Blueprint {blueprint_id!r}: expected version {expected_version}, current is {existing.version}."
+                )
+            if not auth_context.allowed(cast(str, existing.created_by)):
+                raise BlueprintAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete Blueprint {blueprint_id!r}.")
+            session.execute(update(Blueprint).where(Blueprint.blueprint_id == blueprint_id).values(is_deleted=True))
+            session.commit()
+
+    dbRetry(function)
 
 
-async def soft_delete_plugin_template(*, created_by: str, display_name: str) -> None:
-    """Mark all ``plugin_template`` rows owned by a plugin with a given display name as deleted.
+def soft_delete_plugin_template(*, created_by: str, display_name: str) -> None:
+    """Mark all plugin-template rows for one display name as deleted.
 
     Performs a bulk update keyed on ``(created_by, display_name)`` without
     version or auth checks because the calling plugin owns these rows.
     """
-    stmt = (
-        update(Blueprint)
-        .where(
-            Blueprint.source == "plugin_template",
-            Blueprint.created_by == created_by,
-            Blueprint.display_name == display_name,
-        )
-        .values(is_deleted=True)
-    )
-    await executeAndCommit(stmt, _jobs_module.async_session_maker)
+
+    def function(i: int) -> None:
+        with _jobs_module.session_maker() as session:
+            session.execute(
+                update(Blueprint)
+                .where(
+                    Blueprint.source == "plugin_template",
+                    Blueprint.created_by == created_by,
+                    Blueprint.display_name == display_name,
+                )
+                .values(is_deleted=True)
+            )
+            session.commit()
+
+    dbRetry(function)
 
 
-async def soft_delete_all_plugin_templates(*, created_by: str) -> None:
-    """Mark all ``plugin_template`` rows owned by a plugin as deleted, regardless of display name.
+def soft_delete_all_plugin_templates(*, created_by: str) -> None:
+    """Mark all plugin-template rows owned by one plugin as deleted.
 
-    Used when a plugin is disabled to remove all its blueprint templates at once.
-    Performs a bulk update without version or auth checks because the calling plugin
-    owns these rows.
+    Used when a plugin is disabled to remove all its blueprint templates at
+    once. Performs a bulk update without version or auth checks because the
+    calling plugin owns these rows.
     """
-    stmt = (
-        update(Blueprint)
-        .where(
-            Blueprint.source == "plugin_template",
-            Blueprint.created_by == created_by,
-        )
-        .values(is_deleted=True)
-    )
-    await executeAndCommit(stmt, _jobs_module.async_session_maker)
+
+    def function(i: int) -> None:
+        with _jobs_module.session_maker() as session:
+            session.execute(
+                update(Blueprint)
+                .where(
+                    Blueprint.source == "plugin_template",
+                    Blueprint.created_by == created_by,
+                )
+                .values(is_deleted=True)
+            )
+            session.commit()
+
+    dbRetry(function)

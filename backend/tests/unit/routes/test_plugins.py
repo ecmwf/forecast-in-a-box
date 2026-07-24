@@ -258,7 +258,7 @@ async def test_template_example_values_returns_examples() -> None:
     state = _make_plugin_state()
     with (
         patch("forecastbox.routes.plugins.PluginManager") as mock_pm,
-        patch("forecastbox.routes.plugins.get_plugin_state", new=AsyncMock(return_value=state)),
+        patch("forecastbox.routes.plugins._await_jobs_db", new=AsyncMock(return_value=state)),
     ):
         mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
         result = await get_template_example_values(_PLUGIN_ID, "myTemplate")
@@ -272,7 +272,7 @@ async def test_template_example_values_applies_remapping() -> None:
     state = _make_plugin_state(remapping={"exampleGlyph": "renamedGlyph"})
     with (
         patch("forecastbox.routes.plugins.PluginManager") as mock_pm,
-        patch("forecastbox.routes.plugins.get_plugin_state", new=AsyncMock(return_value=state)),
+        patch("forecastbox.routes.plugins._await_jobs_db", new=AsyncMock(return_value=state)),
     ):
         mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
         result = await get_template_example_values(_PLUGIN_ID, "myTemplate")
@@ -307,7 +307,7 @@ async def test_template_example_values_403_excluded() -> None:
     state = _make_plugin_state(excluded=["myTemplate"])
     with (
         patch("forecastbox.routes.plugins.PluginManager") as mock_pm,
-        patch("forecastbox.routes.plugins.get_plugin_state", new=AsyncMock(return_value=state)),
+        patch("forecastbox.routes.plugins._await_jobs_db", new=AsyncMock(return_value=state)),
     ):
         mock_pm.plugins = pmap({_PLUGIN_ID: plugin})
         with pytest.raises(HTTPException) as exc_info:

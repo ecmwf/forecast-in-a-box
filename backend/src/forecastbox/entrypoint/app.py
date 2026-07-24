@@ -9,8 +9,8 @@
 
 """FastAPI Entrypoint"""
 
-import asyncio
 import importlib
+import inspect
 import logging
 import os
 import pkgutil
@@ -31,6 +31,7 @@ from starlette.exceptions import HTTPException
 import forecastbox.domain
 import forecastbox.routes
 import forecastbox.schemata
+import forecastbox.schemata.jobs as jobs_schema
 from forecastbox.domain.admin import get_local_release
 from forecastbox.domain.artifact.base import get_artifact_local_path
 from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
@@ -53,6 +54,7 @@ from forecastbox.utility.dispatcher import (
 from forecastbox.utility.dispatcher import (
     stop_request as dispatcher_stop_request,
 )
+from forecastbox.utility.exception import register_handlers
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
 logger = logging.getLogger(__name__)
@@ -108,7 +110,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
             module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
             if hasattr(module, "create_db_and_tables"):
-                await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
+                maybe_result = module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
+                if inspect.isawaitable(maybe_result):
+                    await maybe_result
+        jobs_schema.engine.dispose()
         _start_execution_runtime()
     except BaseException:
         execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
@@ -125,7 +130,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path)
         )
         catalog_ready = submit_refresh_catalog()
-        PluginManager.loop = asyncio.get_running_loop()
         submit_load_plugins(start_after=catalog_ready)
         yield
     finally:
@@ -140,6 +144,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             join_artifact_manager(timeout_sec=10)
         finally:
             execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
+            jobs_schema.engine.dispose()
 
 
 app = FastAPI(
@@ -149,6 +154,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+register_handlers(app)
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
