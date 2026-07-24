@@ -120,6 +120,7 @@ For every converted operation:
 5. Retain ORM result objects only as detached, read-only values at the
    submission boundary. Callers must not defer relationship loading or session
    work outside the jobs worker.
+*> note: we generally dont want to leak ORM objects out of the domain service boundary, we want to convert to a dedicated dataclass/pydantic model asap -- as described by the general backend guidelines. However, it is possible that in some cases in the existing codebase, ORM objects leak more than they should. You can mention that this is a good opportunity for eradicating this without exception -- basically no ORM object should ever be returned from the JobsDb worker thread. The developer is not to make sweeping architecture changes -- simply creating a (minimal) dataclass where an ORM leaked before with identical fields is the right fix. I don't think there ever was a case where an ORM mutation outside of a DB code was happening -- if that however would be the case, the developer should refactor for a proper DB layer handling
 
 Update module documentation to describe synchronous helpers and the
 `JobsDb`-submission contract. Remove references to monkeypatching
@@ -155,6 +156,7 @@ boundaries, returning an explicit HTTP 503 service-busy response rather than
 falling through to an internal error. Background and scheduler callers must
 log and retain their existing failure reporting behavior; they must not open a
 direct fallback connection when the jobs queue is saturated or stopping.
+*> note: generally, every domain defines its own exceptions and translations into http codes. However, the SubmissionRejected etc are common to all domains, hence we would like some sort of common handler. You should describe a solution that 1/ creates utility/exception.py, which imports various custom exceptions from across utility (we can start with just the utility/concurrent/manager ecxeptions), and exposes a `def register_handlers(app)` and does the `app.exception_handler` -- almost always those would be about plain "try later" error code with a brief detail about the exception (like which pool was busy)
 
 For `domain/plugin/detail.py`, capture the immutable plugin/error snapshots
 while holding `PluginManager.lock`, release that lock, then await the
@@ -270,19 +272,24 @@ relevant persistence operation succeeds.
    serialized database task is required by the concurrency design, but review
    should confirm that queue serialization plus post-commit `prod_scheduler()`
    preserves the intended schedule-update race semantics.
+*> note: actually, I'm hesitant here. I think we best keep the lock locked for the duration of the db operations in the scheduler thread. I know it goes against the original design, but the scheduler is an important unique resource, and if we were strict here, the transaction boundary would be too long, and most importantly, it would leak over submissions to other pools, so honestly this is unsolvable. Consider the following: try_schedule needs db access to get schedule information, then it needs to compile and submit, then it needs to update database. And we cannot allow any schedule mutation during this whole process -- but the compile and submit cannot happen as a part of database transaction. The only solution I can imagine now would be to have the schedule db entities immutable and insert a version+1 row instead of update, and then we could separate the transaction in two by passing the version as the stable row identifier. But lets not do that now. What downsides are there to keeping the lock over the db operation submits? I don't think we would result in a deadlock/livelock, because the scheduler thread is unique. I would be fine if we say "this is a temporary breach to the no-lock rule, until scheduling is converted into immutable". Wdyt?
 2. The synchronous engine will coexist briefly with the async schema-creation
    engine. Review should confirm whether startup schema creation remains async
    for this phase or is also converted, and confirm the exact disposal location
    so neither engine is disposed while it can still be used.
+*> note: well, we best have the schema creation sync for jobs db and async for users db, because thats what sort of engine we will need. But the schema creation logic is dynamic. Hence I think we best move the jobs db creation to be async, and the schema creation discovery gets extended with "if is coroutine then await it otherwise execute sync". Calling await in the lifecycle startup has no benefits because the app is not yet running, ie, there is no other async task that could actually run. My question is just -- will this cause issues in terms of "we run the schema creation in the main thread, not in the JobsDB thread"? Note that the schema creation runs _before_ the JobsDb pool. We could reorder this, but I'd prefer not to for now
 3. Plugin template ingestion currently combines plugin management, glyph
    database reads, and blueprint validation in an async helper. Extracting a
    synchronous composition must preserve its intentionally per-template
    best-effort behavior and must not accidentally perform validation while
    `PluginManager.lock` is held.
+*> note: plugin ingestion does not need strong guarantees at the moment. I think the best solution would be to have the async helper `_ingest_plugin_templates` execute in the plugin updater thread (which is not the same as holding the lock, but still prevents some race conditions as it occupies the resource), submit small db updates (clearing asset ingest, soft deleting templates, getting glyphs for validation, etc) and waiting for the result in each case (thus keeping the thread occupied). To put it other way -- I would rather occupy the plugin thread for long and have more small JobsDb calls from there, compared to eg occuppying the JobsDb pool with a longer running "transaction" that eg validates the template inside. This will be actually an improvement over the current codebase where the template ingest occupied the async loop, thats less desirable.
 4. Passing SQLAlchemy entities out of a completed jobs task is safe only for
    already-loaded scalar columns used by callers. If any converted caller
    requires lazy relationships, replace the cross-boundary ORM object with a
    plain immutable DTO rather than extending the session lifetime.
+*> note: this is something I commented above -- lets replace all these situations with a new dataclass wherever needed (we prefer dataclasses over DTOs, even though they are a bit less performant)
 5. The target HTTP representation for `SubmissionRejected` should be agreed
    during review (shared 503 detail versus route-specific errors), but direct
    database fallback is prohibited in either choice.
+*> note: also commented above -- you can have a common handler (a route-specific try-catch can always override this because its evaluated sooner)
