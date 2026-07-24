@@ -21,7 +21,6 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.db import CompilerRuntimeContext
-from forecastbox.schemata.jobs import Blueprint
 from forecastbox.utility.time import value_dt2str
 
 
@@ -29,7 +28,7 @@ from forecastbox.utility.time import value_dt2str
 class RunnableExperiment:
     """Carries the Blueprint and all metadata needed to submit and track a scheduled run."""
 
-    blueprint: Blueprint
+    blueprint: blueprint_db.BlueprintRecord
     created_by: str
     next_run_at: dt.datetime | None
     scheduled_at: dt.datetime
@@ -40,12 +39,9 @@ class RunnableExperiment:
     compiler_runtime_context: CompilerRuntimeContext
 
 
-async def experiment2runnable(experiment_id: ExperimentDefinitionId, exec_time: dt.datetime) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
-    """Convert an ExperimentDefinition into a RunnableExperiment for the given execution time.
-
-    Loads the linked Blueprint and builds a CompilerRuntimeContext for the run.
-    """
-    exp = await experiment_db.get_experiment_definition(experiment_id)
+def experiment2runnable(experiment_id: ExperimentDefinitionId, exec_time: dt.datetime) -> Either[RunnableExperiment, str]:  # type: ignore[invalid-argument]
+    """Convert an ExperimentDefinition into a RunnableExperiment for the given execution time."""
+    exp = experiment_db.get_experiment_definition(experiment_id)
     if exp is None:
         return Either.error(f"ExperimentDefinition {experiment_id!r} not found")
 
@@ -54,8 +50,8 @@ async def experiment2runnable(experiment_id: ExperimentDefinitionId, exec_time: 
     max_acceptable_delay_hours = int(exp_def.get("max_acceptable_delay_hours", 24))
 
     job_def_id = BlueprintId(str(exp.blueprint_id))  # ty:ignore[invalid-argument-type]
-    job_def_version = cast(int, exp.blueprint_version)
-    job_def = await blueprint_db.get_blueprint(job_def_id, job_def_version)
+    job_def_version = exp.blueprint_version
+    job_def = blueprint_db.get_blueprint(job_def_id, job_def_version)
     if job_def is None:
         return Either.error(f"Blueprint {job_def_id!r} v{job_def_version} not found")
 
@@ -63,7 +59,7 @@ async def experiment2runnable(experiment_id: ExperimentDefinitionId, exec_time: 
 
     rv = RunnableExperiment(
         blueprint=job_def,
-        created_by=cast(str, exp.created_by),
+        created_by=exp.created_by,
         next_run_at=next_run_at,
         scheduled_at=exec_time,
         experiment_id=experiment_id,

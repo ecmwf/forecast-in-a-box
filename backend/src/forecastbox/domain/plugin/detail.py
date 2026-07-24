@@ -13,31 +13,38 @@ These classes are both frontend-exposed (serialised as JSON in HTTP responses) a
 consumed internally by the service layer.  Changes to field names or structure affect
 the frontend contract; coordinate with frontend consumers before making breaking changes.
 
-The public entry-point is ``build_plugin_listing()``.  It acquires the PluginManager
-lock for the duration of the in-memory snapshot capture *and* the database reads, so
-that both are taken from the same logical point in time.  This is not a fully
-transactional read (the SQLite reads are not inside a DB transaction), but it is
-sufficient for a consistent UI snapshot.  The lock is held only for the duration of
-these fast operations; long-running work must not be done under it.
+The public entry-point is ``build_plugin_listing()``. It acquires the
+``PluginManager`` lock only long enough to capture immutable in-memory snapshots,
+then releases it before awaiting the jobs-database read. This avoids lock-held
+database waits while preserving a coherent in-memory view for the listing.
 """
 
 import logging
+from collections.abc import Callable
+from functools import partial
+from typing import TypeVar
 
 from fiab_core.fable import PluginCompositeId
 from fiab_core.plugin import Plugin
 from pydantic import Field
 
-from forecastbox.domain.plugin.db import get_all_plugin_states
+from forecastbox.domain.plugin.db import PluginStateRecord, get_all_plugin_states
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail
-from forecastbox.schemata.jobs import PluginState
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
+from forecastbox.utility.config import ConcurrentPools
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
+
+
+async def _await_jobs_db(task_name: str, task: Callable[[], T]) -> T:
+    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +117,7 @@ def _build_detail(
     remote_info: PluginRemoteInfo | None,
     plugin_in_memory: Plugin | None,
     in_memory_errors: PluginErrors,
-    db_state: PluginState | None,
+    db_state: PluginStateRecord | None,
 ) -> PluginDetail:
     generic_data = PluginGenericData(store_info=store_entry, remote_info=remote_info)
 
@@ -171,21 +178,21 @@ async def build_plugin_listing() -> PluginListing:
     """Build and return the full plugin listing.
 
     Acquires the PluginManager lock, captures in-memory plugin and error snapshots,
-    then performs all DB reads while still holding the lock to ensure a consistent
-    view.  Raises ``PluginManagerBusy`` if the lock cannot be acquired within the
-    timeout, which the route layer translates to a 503 response.
+    releases that lock, then reads persisted plugin state from the jobs database.
+    Raises ``PluginManagerBusy`` if the lock cannot be acquired within the timeout,
+    which the route layer translates to a 503 response.
     """
     with timed_acquire(PluginManager.lock, 0.5) as acquired:
         if not acquired:
             raise PluginManagerBusy("plugin manager lock could not be acquired; retry later")
         plugins_snapshot: dict[PluginCompositeId, Plugin] = dict(PluginManager.plugins)
         errors_snapshot: dict[PluginCompositeId, PluginErrors] = dict(PluginManager.errors)
-        db_states = await get_all_plugin_states()
+    db_states = await _await_jobs_db("plugin.get-all-states", get_all_plugin_states)
 
     store_detail = get_plugins_detail()
 
     # Index DB states by parsed PluginCompositeId
-    states_by_id: dict[PluginCompositeId, PluginState] = {}
+    states_by_id: dict[PluginCompositeId, PluginStateRecord] = {}
     for state in db_states:
         try:
             pid = PluginCompositeId.from_str(state.plugin_id)  # type: ignore[arg-type]

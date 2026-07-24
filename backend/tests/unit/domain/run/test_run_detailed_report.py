@@ -20,6 +20,12 @@ from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 
 
+async def _await_jobs_db(task_name: str, task: object) -> object:
+    if task_name == "run.update-runtime":
+        return None
+    return task()
+
+
 def _run_detail(
     *,
     completed_block_ids: set[BlockInstanceId] | None = None,
@@ -76,7 +82,7 @@ async def test_poll_and_update_requests_detailed_report_and_translates_to_block_
         patch("forecastbox.domain.run.service.client.request_response", return_value=response) as mock_request,
         patch("forecastbox.domain.run.service.retrieve_compilation_detail", return_value=compilation_detail) as mock_retrieve,
         patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://localhost:8067"),
-        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=AsyncMock()),
+        patch("forecastbox.domain.run.service._await_jobs_db", new=AsyncMock(side_effect=_await_jobs_db)),
     ):
         detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
 
@@ -117,7 +123,7 @@ async def test_poll_and_update_disables_detailed_report_when_cache_misses() -> N
             "forecastbox.domain.run.service.retrieve_compilation_detail", side_effect=CompilationDetailNotFound("missing")
         ) as mock_retrieve,
         patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://localhost:8067"),
-        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=AsyncMock()),
+        patch("forecastbox.domain.run.service._await_jobs_db", new=AsyncMock(side_effect=_await_jobs_db)),
     ):
         detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
 
@@ -174,10 +180,8 @@ async def test_get_run_asks_for_detailed_report_while_list_runs_does_not() -> No
     )
 
     with (
-        patch("forecastbox.routes.run.db.get_run", new=AsyncMock(return_value=execution)),
+        patch("forecastbox.routes.run._await_jobs_db", new=AsyncMock(side_effect=[execution, 1, [execution]])),
         patch("forecastbox.routes.run.service.poll_and_update", new=AsyncMock(side_effect=[detailed, detailed])) as mock_poll,
-        patch("forecastbox.routes.run.db.count_runs", new=AsyncMock(return_value=1)),
-        patch("forecastbox.routes.run.db.list_runs", new=AsyncMock(return_value=[execution])),
     ):
         response = await get_run(RunLookup(run_id=RunId("run-1")), AuthContext(user_id="user", is_admin=True))
         assert response.completed_block_ids == [BlockInstanceId("block-a")]

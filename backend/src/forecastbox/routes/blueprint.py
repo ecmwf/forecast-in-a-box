@@ -27,7 +27,9 @@ Glyph routes:
 
 import datetime as dt
 import logging
-from typing import Annotated, Any, Literal, cast
+from collections.abc import Callable
+from functools import partial
+from typing import Annotated, Any, Literal, TypeVar, cast
 
 from cascade.low.func import assert_never
 from fastapi import APIRouter, Depends, status
@@ -61,13 +63,16 @@ from forecastbox.domain.glyphs.jinja_interpolation import get_custom_functions
 from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
-from forecastbox.schemata.jobs import BlueprintSource, GlobalGlyph
+from forecastbox.schemata.jobs import BlueprintSource
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 PREFIX = "/api/v1/blueprint"
 
 router = APIRouter(
@@ -76,6 +81,10 @@ router = APIRouter(
 )
 
 _CORE_VERSION_MISMATCH_KEY = "CoreVersionMismatch"
+
+
+async def _await_jobs_db(task_name: str, task: Callable[[], T]) -> T:
+    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
 
 
 def _maybe_append_coreversion_mismatch(tags: list[Tag], entity_coreversion: int, current_coreversion: int) -> None:
@@ -337,15 +346,22 @@ async def list_blueprints(
     - ``source``: restrict to blueprints with this source (``plugin_template``,
       ``user_defined``, or ``oneoff_execution``).  Returns 422 for unknown values.
     """
-    total = await db.count_blueprints(auth_context=auth_context, created_by=filters.created_by, source=filters.source)
+    total = await _await_jobs_db(
+        "blueprint.count",
+        partial(db.count_blueprints, auth_context=auth_context, created_by=filters.created_by, source=filters.source),
+    )
     start = pagination.start()
     page_defs = list(
-        await db.list_blueprints(
-            auth_context=auth_context,
-            offset=start,
-            limit=pagination.page_size,
-            created_by=filters.created_by,
-            source=filters.source,
+        await _await_jobs_db(
+            "blueprint.list",
+            partial(
+                db.list_blueprints,
+                auth_context=auth_context,
+                offset=start,
+                limit=pagination.page_size,
+                created_by=filters.created_by,
+                source=filters.source,
+            ),
         )
     )
     current_fiabcore_major = get_fiabcore_version().major
@@ -425,10 +441,14 @@ async def delete_blueprint(
     ``version`` must match the current latest version; returns 409 if it does not.
     """
     try:
-        await db.soft_delete_blueprint(
-            request.blueprint_id,
-            expected_version=request.version,
-            auth_context=auth_context,
+        await _await_jobs_db(
+            "blueprint.soft-delete",
+            partial(
+                db.soft_delete_blueprint,
+                request.blueprint_id,
+                expected_version=request.version,
+                auth_context=auth_context,
+            ),
         )
     except BlueprintVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
@@ -503,7 +523,7 @@ def _build_intrinsic_glyphs(glyph_key: str | None) -> list[IntrinsicGlyphRespons
     return result
 
 
-def _row_to_global_response(row: GlobalGlyph) -> GlobalGlyphResponse:
+def _row_to_global_response(row: global_db.GlobalGlyphRecord) -> GlobalGlyphResponse:
     return GlobalGlyphResponse(
         global_glyph_id=GlobalGlyphId(str(row.global_glyph_id)),  # ty:ignore[invalid-argument-type]
         key=str(row.key),
@@ -542,11 +562,21 @@ async def list_available_glyphs(
     global_items: list[GlobalGlyphResponse] = []
     global_total = 0
     if want_global:
-        global_total = await global_db.count_global_glyphs(auth_context, key=glyph_key)
+        global_total = await _await_jobs_db(
+            "glyph.count",
+            partial(global_db.count_global_glyphs, auth_context, key=glyph_key),
+        )
         if remainder.current_page_remaining > 0:
             rows = list(
-                await global_db.list_global_glyphs(
-                    auth_context, offset=remainder.offset_shifted, limit=remainder.current_page_remaining, key=glyph_key
+                await _await_jobs_db(
+                    "glyph.list",
+                    partial(
+                        global_db.list_global_glyphs,
+                        auth_context,
+                        offset=remainder.offset_shifted,
+                        limit=remainder.current_page_remaining,
+                        key=glyph_key,
+                    ),
                 )
             )
             global_items = [_row_to_global_response(row) for row in rows]
@@ -601,7 +631,10 @@ async def post_global_glyph(
             status_code=403,
             detail="Only admins may create or update public global glyphs.",
         )
-    row = await global_db.upsert_global_glyph(request.key, request.value, request.public, request.overriddable, auth_context)
+    row = await _await_jobs_db(
+        "glyph.upsert",
+        partial(global_db.upsert_global_glyph, request.key, request.value, request.public, request.overriddable, auth_context),
+    )
     return _row_to_global_response(row)
 
 
@@ -615,6 +648,9 @@ async def delete_global_glyph(
     Returns 404 if the glyph does not exist or is not visible to the caller.
     Returns 403 if the caller is not the owner and is not an admin.
     """
-    row = await global_db.delete_global_glyph(request.global_glyph_id, auth_context)
+    row = await _await_jobs_db(
+        "glyph.delete",
+        partial(global_db.delete_global_glyph, request.global_glyph_id, auth_context),
+    )
     if row is None:
         raise HTTPException(status_code=404, detail=f"GlobalGlyph {request.global_glyph_id!r} not found or not accessible.")

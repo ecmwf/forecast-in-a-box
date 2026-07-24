@@ -7,10 +7,10 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""ORM models and database setup for the jobs database.
+"""ORM models and synchronous database setup for the jobs database.
 
 Tables are versioned/immutable (Blueprint, ExperimentDefinition) or
-append-only with a mutable runtime state (Run).  Soft-delete is
+append-only with a mutable runtime state (Run). Soft-delete is
 supported on all main tables via `is_deleted`.
 
 Exposes ``create_db_and_tables`` so the entrypoint can discover and run it
@@ -20,9 +20,9 @@ via automatic schemata iteration.
 
 from typing import Literal
 
-from sqlalchemy import JSON, Boolean, CheckConstraint, Column, ForeignKeyConstraint, Integer, String, UniqueConstraint
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import JSON, Boolean, CheckConstraint, Column, ForeignKeyConstraint, Integer, String, UniqueConstraint, create_engine
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from forecastbox.utility.config import config
 from forecastbox.utility.time import UTCDateTime
@@ -40,7 +40,7 @@ class Blueprint(Base):
     """Captures everything needed to execute a job.
 
     Immutable once written; a new version is appended for each save.
-    The composite primary key is (blueprint_id, version).  `source` distinguishes
+    The composite primary key is (blueprint_id, version). `source` distinguishes
     plugin templates, user-defined blueprints, and one-off runs.
     `parent_id` tracks lineage without pinning a version.
     """
@@ -54,7 +54,7 @@ class Blueprint(Base):
 
     # TODO later -- make sure entity validates this
     source = Column(String(64), nullable=False)
-    # Optional lineage reference – deliberately no version to keep it discoverable
+    # Optional lineage reference - deliberately no version to keep it discoverable
     parent_id = Column(String(255), nullable=True)
 
     display_name = Column(String(255), nullable=True)
@@ -73,13 +73,13 @@ class GlobalGlyph(Base):
     """A user-defined glyph available for interpolation in all blueprint configurations.
 
     The combination of (created_by, key) is unique, so each user may define their own
-    glyph for the same key name independently.  Public glyphs (created by admins only)
+    glyph for the same key name independently. Public glyphs (created by admins only)
     carry an additional ``overriddable`` flag that controls resolution priority:
     public-overriddable glyphs have the lowest priority and can be shadowed by a user's
     own private glyph; public-nonoverridable glyphs have the highest priority and always win.
 
     Invariant: ``overriddable`` must be NULL when ``public=False``, and non-NULL when
-    ``public=True``.  This is enforced at both the schema and domain layers.
+    ``public=True``. This is enforced at both the schema and domain layers.
     """
 
     __tablename__ = "global_glyph"
@@ -219,12 +219,12 @@ class PluginState(Base):
     enabled = Column(Boolean, nullable=False, default=True)
 
 
-async_url = f"sqlite+aiosqlite:///{config.db.sqlite_jobdb_path}"
-async_engine = create_async_engine(async_url, pool_pre_ping=True)
-async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
+sync_url = f"sqlite:///{config.db.sqlite_jobdb_path}"
+engine: Engine = create_engine(sync_url, pool_pre_ping=True, connect_args={"check_same_thread": False})
+session_maker = sessionmaker(engine, class_=Session, expire_on_commit=False)
 
 
-async def create_db_and_tables() -> None:
+def create_db_and_tables() -> None:
     """Create the jobs database and all its tables on startup."""
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    with engine.begin() as conn:
+        Base.metadata.create_all(conn)

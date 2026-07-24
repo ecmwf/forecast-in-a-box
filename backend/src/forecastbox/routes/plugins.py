@@ -15,7 +15,9 @@ Contains:
 """
 
 import logging
-from typing import Annotated
+from collections.abc import Callable
+from functools import partial
+from typing import Annotated, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
@@ -36,11 +38,13 @@ from forecastbox.domain.plugin.manager import (
 )
 from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
-from forecastbox.utility.config import PluginSettings, config
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools, PluginSettings, config
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 PREFIX = "/api/v1/plugin"
 
@@ -48,6 +52,10 @@ router = APIRouter(
     tags=["blueprint"],
     responses={404: {"description": "Not found"}},
 )
+
+
+async def _await_jobs_db(task_name: str, task: Callable[[], T]) -> T:
+    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
 
 
 # ---------------------------------------------------------------------------
@@ -185,11 +193,15 @@ async def update_plugin_settings_endpoint(
     """Persist plugin settings (enabled flag, exclusions, remapping) and trigger a re-ingest."""
     plugin_id_str = PluginCompositeId.to_str(body.pluginCompositeId)
     try:
-        await upsert_plugin_state(
-            plugin_id=plugin_id_str,
-            enabled=body.isEnabled,
-            excluded_templates=body.excluded_templates,
-            glyph_remapping=body.glyph_remapping,
+        await _await_jobs_db(
+            "plugin.upsert-state",
+            partial(
+                upsert_plugin_state,
+                plugin_id=plugin_id_str,
+                enabled=body.isEnabled,
+                excluded_templates=body.excluded_templates,
+                glyph_remapping=body.glyph_remapping,
+            ),
         )
     except PluginNotFound:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id_str} not found")
@@ -232,7 +244,10 @@ async def get_template_example_values(
         )
 
     plugin_id_str = PluginCompositeId.to_str(pluginCompositeId)
-    plugin_state = await get_plugin_state(plugin_id_str)
+    plugin_state = await _await_jobs_db(
+        "plugin.get-state",
+        partial(get_plugin_state, plugin_id_str),
+    )
     if plugin_state is None:
         raise HTTPException(status_code=404, detail=f"Plugin {PluginCompositeId.to_str(pluginCompositeId)!r} not installed")
     excluded_set: set[str] = set(plugin_state.excluded_templates) if plugin_state.excluded_templates else set()  # type: ignore[arg-type]

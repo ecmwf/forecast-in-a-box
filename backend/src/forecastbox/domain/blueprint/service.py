@@ -23,8 +23,10 @@ No HTTP exceptions are raised here; callers are responsible for mapping
 import datetime as dt
 import logging
 from collections import defaultdict
+from collections.abc import Callable
+from functools import partial
 from itertools import groupby
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 from fiab_core.fable import (
     BlockFactoryId,
@@ -44,20 +46,28 @@ from pydantic import Field
 from forecastbox.domain.blueprint import db
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.configuration_values import convert_known_configuration_values
-from forecastbox.domain.blueprint.db import upsert_blueprint
 from forecastbox.domain.blueprint.exceptions import BlueprintNotFound
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db, resolution
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
+from forecastbox.domain.glyphs.global_db import GlyphResolutionBuckets
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values, remap_glyph_names
 from forecastbox.domain.plugin.manager import PluginManager
+from forecastbox.schemata.jobs import BlueprintSource
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools
 from forecastbox.utility.graph import topological_order
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
+
+
+async def _await_jobs_db(task_name: str, task: Callable[[], T]) -> T:
+    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
 
 
 class Tag(FiabBaseModel):
@@ -174,15 +184,15 @@ class BlueprintSaveCommand(FiabBaseModel):
 # ---------------------------------------------------------------------------
 
 
-async def validate_expand(
-    blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
+def validate_expand_sync(
+    blueprint: BlueprintBuilder, global_buckets: GlyphResolutionBuckets, *, validate_only: bool = False
 ) -> BlueprintValidationExpansion:
     """Validate and expand a partially-constructed BlueprintBuilder.
 
     Returns structured validation errors and possible completion options.
     The presence of errors does not affect the return (callers decide how to
-    surface them). Intrinsic and global glyphs visible to the caller, along
-    with local glyphs defined on the builder, are all considered known.
+    surface them). Intrinsic and caller-visible global glyphs, along with local
+    glyphs defined on the builder, are all considered known.
 
     When ``validate_only`` is True, ``possible_sources`` and
     ``possible_expansions`` are omitted from the result (saves work when the
@@ -213,7 +223,6 @@ async def validate_expand(
     outputs = {}
 
     intrinsic_values = cast(dict[str, str], get_values_and_examples())
-    global_buckets = await global_db.get_glyphs_for_resolution(auth_context)
     local_glyphs = blueprint.local_glyphs
 
     all_glyphs_raw = merge_glyph_values(
@@ -380,6 +389,17 @@ async def validate_expand(
     )
 
 
+async def validate_expand(
+    blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
+) -> BlueprintValidationExpansion:
+    """Validate and expand a partially-constructed BlueprintBuilder."""
+    global_buckets = await _await_jobs_db(
+        "blueprint.glyphs.get-resolution",
+        partial(global_db.get_glyphs_for_resolution, auth_context),
+    )
+    return validate_expand_sync(blueprint, global_buckets, validate_only=validate_only)
+
+
 def template_to_builder(template: BlueprintTemplate, plugin_id: PluginCompositeId) -> BlueprintBuilder:
     """Convert a ``BlueprintTemplate`` to a ``BlueprintBuilder`` suitable for persistence.
 
@@ -508,17 +528,21 @@ async def save_builder(
     Raises ``BlueprintNotFound`` or ``BlueprintAccessDenied`` from the db layer.
     """
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
-    blueprint_id, version = await upsert_blueprint(
-        auth_context=auth_context,
-        blueprint_id=blueprint_id,
-        source=source,
-        created_by=auth_context.user_id,
-        builder=payload.builder.model_dump(mode="json"),
-        display_name=payload.display_name,
-        display_description=payload.display_description,
-        tags=[t.model_dump() for t in payload.tags] if payload.tags else None,
-        parent_id=payload.parent_id,
-        expected_version=expected_version,
+    blueprint_id, version = await _await_jobs_db(
+        "blueprint.upsert",
+        partial(
+            db.upsert_blueprint,
+            auth_context=auth_context,
+            blueprint_id=blueprint_id,
+            source=cast(BlueprintSource, source),
+            created_by=auth_context.user_id,
+            builder=payload.builder.model_dump(mode="json"),
+            display_name=payload.display_name,
+            display_description=payload.display_description,
+            tags=[t.model_dump() for t in payload.tags] if payload.tags else None,
+            parent_id=payload.parent_id,
+            expected_version=expected_version,
+        ),
     )
     return BlueprintSaveResult(blueprint_id=blueprint_id, blueprint_version=version)
 
@@ -531,7 +555,12 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None, auth_cont
     Raises ``BlueprintNotFound`` if the id does not exist, is not visible to
     ``auth_context``, or has no builder spec.
     """
-    results = list(await db.list_blueprints(auth_context=auth_context, blueprint_id=blueprint_id, version=version, limit=1))
+    results = list(
+        await _await_jobs_db(
+            "blueprint.list",
+            partial(db.list_blueprints, auth_context=auth_context, blueprint_id=blueprint_id, version=version, limit=1),
+        )
+    )
     if not results:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} not found.")
     latest = results[0]

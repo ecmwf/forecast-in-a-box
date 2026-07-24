@@ -7,11 +7,14 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for PluginManager utility functions -- status_brief and plugins_ready."""
+"""Unit tests for PluginManager utility functions and sync template ingestion."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from forecastbox.domain.plugin.manager import plugins_ready, status_brief
+from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
+
+from forecastbox.domain.plugin.manager import PluginManager, _ingest_plugin_templates, plugins_ready, status_brief
 
 
 def _make_manager(*, updater_error: str | None, alive: bool) -> MagicMock:
@@ -63,3 +66,28 @@ def test_plugins_ready_false_when_failed() -> None:
         mock_pm.updater_error = "crash"
         mock_pm.updater = MagicMock(is_alive=MagicMock(return_value=False))
         assert plugins_ready() is False
+
+
+def test_plugin_manager_has_no_stored_loop_and_ingestion_uses_jobs_db_helper() -> None:
+    assert not hasattr(PluginManager, "loop")
+
+    plugin_id = PluginCompositeId(store=PluginStoreId("test"), local=PluginId("plugin"))
+    plugin = MagicMock(blueprint_templates=())
+    state = SimpleNamespace(asset_ingest_needed=True, excluded_templates=[], glyph_remapping={})
+    seen: list[str] = []
+
+    def fake_jobs_db_result(task_name: str, task: object) -> object:
+        del task
+        seen.append(task_name)
+        if task_name == "plugin.get-state":
+            return state
+        return None
+
+    with patch("forecastbox.domain.plugin.manager._jobs_db_result", side_effect=fake_jobs_db_result):
+        _ingest_plugin_templates(plugin_id, plugin)
+
+    assert seen == [
+        "plugin.get-state",
+        "plugin.clear-asset-ingest-needed",
+        "plugin.update-template-errors",
+    ]

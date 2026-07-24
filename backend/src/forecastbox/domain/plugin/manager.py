@@ -26,13 +26,15 @@ or when running the initial plugin load -- but inside the updater threads,
 we lock for longer.
 """
 
-import asyncio
 import importlib
 import logging
 import re
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import Future
+from functools import partial
+from typing import TypeVar
 
 from cascade.low.func import Either
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
@@ -41,6 +43,7 @@ from packaging.version import Version
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
+from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.plugin.compatibility import install_plugin_compatibly
 from forecastbox.domain.plugin.db import (
     clear_asset_ingest_needed,
@@ -50,11 +53,13 @@ from forecastbox.domain.plugin.db import (
 )
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import delayed_thread, timed_acquire
-from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
+from forecastbox.utility.config import ConcurrentPools, PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_version
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 
 class PluginManager:
@@ -63,7 +68,14 @@ class PluginManager:
     errors: PMap[PluginCompositeId, PluginErrors] = pmap()
     updater: threading.Thread | None = None
     updater_error: str | None = None
-    loop: asyncio.AbstractEventLoop | None = None
+
+
+def _jobs_db_result(task_name: str, task: Callable[[], T]) -> T:
+    return execution_manager.submit_unmonitored(ConcurrentPools.JobsDb, TaskName(task_name), task).result()
+
+
+async def _await_jobs_db(task_name: str, task: Callable[[], T]) -> T:
+    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
 
 
 def load_single(plugin: PluginSettings) -> Either[Plugin, str]:  # type: ignore[invalid-argument]
@@ -85,15 +97,6 @@ def load_single(plugin: PluginSettings) -> Either[Plugin, str]:  # type: ignore[
     return Either.error("\n".join(errors))
 
 
-def _run_async_from_thread(coro: object) -> object:  # type: ignore[type-arg]
-    """Dispatch *coro* to the event loop stashed on PluginManager and block until done."""
-    loop = PluginManager.loop
-    if loop is None:
-        # TODO -- send an event to bring down the whole app, not just the thread in question
-        raise RuntimeError("PluginManager.loop is not set; cannot dispatch DB write from updater thread")
-    return asyncio.run_coroutine_threadsafe(coro, loop).result()  # type: ignore[arg-type]
-
-
 def _version_from_install(installed: dict[str, str], module_name: str) -> str | None:
     """Look up a plugin's newly-installed version from the pip install output dict.
 
@@ -107,7 +110,7 @@ def _version_from_install(installed: dict[str, str], module_name: str) -> str | 
     return None
 
 
-async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin) -> None:
+def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin) -> None:
     """Upsert each blueprint template exposed by the plugin into the DB.
 
     Skips ingestion entirely if ``asset_ingest_needed`` is not set on the plugin's
@@ -132,12 +135,12 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
         remap_builder_glyphs,
         resolve_builder_with_examples,
         template_to_builder,
-        validate_expand,
+        validate_expand_sync,
     )
 
     plugin_id_str = PluginCompositeId.to_str(plugin_id)
 
-    state = await get_plugin_state(plugin_id_str)
+    state = _jobs_db_result("plugin.get-state", partial(get_plugin_state, plugin_id_str))
     if state is None:
         raise RuntimeError(
             f"_ingest_plugin_templates called for {plugin_id_str!r} but no PluginState row exists; "
@@ -147,7 +150,7 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
         logger.debug(f"skipping template ingestion for {plugin_id_str!r}: asset_ingest_needed is False")
         return
 
-    await clear_asset_ingest_needed(plugin_id=plugin_id_str)
+    _jobs_db_result("plugin.clear-asset-ingest-needed", partial(clear_asset_ingest_needed, plugin_id=plugin_id_str))
 
     auth = AuthContext(user_id=plugin_id_str, is_admin=True)
 
@@ -159,15 +162,25 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
     for template in plugin.blueprint_templates:
         try:
             if template.display_name in excluded_set:
-                await soft_delete_plugin_template(created_by=plugin_id_str, display_name=template.display_name)
+                _jobs_db_result(
+                    "plugin.soft-delete-template",
+                    partial(soft_delete_plugin_template, created_by=plugin_id_str, display_name=template.display_name),
+                )
                 logger.debug(f"soft-deleted excluded template {template.display_name!r} from plugin {plugin_id_str!r}")
                 continue
-            existing_id = await find_plugin_template_id(created_by=plugin_id_str, display_name=template.display_name)
+            existing_id = _jobs_db_result(
+                "plugin.find-template-id",
+                partial(find_plugin_template_id, created_by=plugin_id_str, display_name=template.display_name),
+            )
             builder = template_to_builder(template, plugin_id)
             if glyph_remapping:
                 builder = remap_builder_glyphs(builder, glyph_remapping)
             validation_builder = resolve_builder_with_examples(builder, template.example_values, template.example_glyphs)
-            result = await validate_expand(validation_builder, auth, validate_only=True)
+            global_buckets = _jobs_db_result(
+                "plugin.get-glyphs-for-validation",
+                partial(global_db.get_glyphs_for_resolution, auth),
+            )
+            result = validate_expand_sync(validation_builder, global_buckets, validate_only=True)
             all_errors: list[str] = list(result.global_errors)
             for block_errs in result.block_errors.values():
                 all_errors.extend(block_errs)
@@ -177,21 +190,28 @@ async def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin)
                     f"template {template.display_name!r} from plugin {plugin_id_str!r} failed validation, skipping upsert: {all_errors}"
                 )
                 continue
-            await upsert_blueprint(
-                auth_context=auth,
-                blueprint_id=existing_id,
-                source="plugin_template",
-                created_by=plugin_id_str,
-                builder=builder.model_dump(mode="json"),
-                display_name=template.display_name,
-                display_description=template.display_description,
+            _jobs_db_result(
+                "plugin.upsert-template-blueprint",
+                partial(
+                    upsert_blueprint,
+                    auth_context=auth,
+                    blueprint_id=existing_id,
+                    source="plugin_template",
+                    created_by=plugin_id_str,
+                    builder=builder.model_dump(mode="json"),
+                    display_name=template.display_name,
+                    display_description=template.display_description,
+                ),
             )
             logger.debug(f"ingested template {template.display_name!r} from plugin {plugin_id_str!r}")
         except Exception as e:
             template_errors[template.display_name] = repr(e)
             logger.error(f"failed to ingest template {template.display_name!r} from plugin {plugin_id_str!r}: {repr(e)}")
 
-    await update_template_errors(plugin_id=plugin_id_str, template_errors=template_errors)
+    _jobs_db_result(
+        "plugin.update-template-errors",
+        partial(update_template_errors, plugin_id=plugin_id_str, template_errors=template_errors),
+    )
 
 
 def load_plugins(plugins: PluginsSettings) -> None:
@@ -201,8 +221,8 @@ def load_plugins(plugins: PluginsSettings) -> None:
         errors: dict[PluginCompositeId, PluginErrors] = {}
         for pluginKey, pluginSettings in plugins.items():
             plugin_id_str = PluginCompositeId.to_str(pluginKey)
-            db_state = _run_async_from_thread(get_plugin_state(plugin_id_str))
-            if db_state is not None and not db_state.enabled:  # type: ignore[union-attr]
+            db_state = _jobs_db_result("plugin.get-state", partial(get_plugin_state, plugin_id_str))
+            if db_state is not None and not db_state.enabled:
                 logger.info(f"skipping disabled plugin {pluginKey}")
                 continue
             installed_versions: dict[str, str] = {}
@@ -226,20 +246,23 @@ def load_plugins(plugins: PluginsSettings) -> None:
 
             if install_error is not None:
                 logger.error(f"install failed for {pluginKey}: {install_error}")
-                _run_async_from_thread(
-                    upsert_plugin_state(
+                _jobs_db_result(
+                    "plugin.upsert-state",
+                    partial(
+                        upsert_plugin_state,
                         plugin_id=plugin_id_str,
                         version="install failed",
                         enabled=True,
                         plugin_errors=PluginErrors([PluginError(source="install", severity="error", detail=install_error)]),
-                    )
+                    ),
                 )
                 continue
             if installed_versions:
                 version_str = _version_from_install(installed_versions, pluginSettings.module_name)
                 if version_str is not None:
-                    _run_async_from_thread(
-                        upsert_plugin_state(plugin_id=plugin_id_str, version=version_str, plugin_errors=PluginErrors([]))
+                    _jobs_db_result(
+                        "plugin.upsert-state",
+                        partial(upsert_plugin_state, plugin_id=plugin_id_str, version=version_str, plugin_errors=PluginErrors([])),
                     )
                 else:
                     # pip does not report the version if it isn't changed -> this branch is not necessarily a bug
@@ -262,20 +285,25 @@ def load_plugins(plugins: PluginsSettings) -> None:
                     lookup[pluginKey] = plugin_result.t
                     version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
                     logger.debug(f"plugin {pluginKey} loaded with success: True and version {version_imported}")
-                    fresh_state = _run_async_from_thread(get_plugin_state(plugin_id_str))
+                    fresh_state = _jobs_db_result("plugin.get-state", partial(get_plugin_state, plugin_id_str))
                     if fresh_state is None:
                         # NOTE this is unexpected state -- it is either developer editable install, or db wipe. We prefer to report,
                         # but dont prevent template ingest
                         err_msg = f"plugin {pluginKey} state not found -- install originally failed?"
                         logger.error(err_msg)
                         errors[pluginKey] = PluginErrors([PluginError(source="load", severity="error", detail=err_msg)])
-                        _run_async_from_thread(
-                            upsert_plugin_state(
-                                plugin_id=plugin_id_str, version=version_imported, enabled=True, plugin_errors=PluginErrors([])
-                            )
+                        _jobs_db_result(
+                            "plugin.upsert-state",
+                            partial(
+                                upsert_plugin_state,
+                                plugin_id=plugin_id_str,
+                                version=version_imported,
+                                enabled=True,
+                                plugin_errors=PluginErrors([]),
+                            ),
                         )
                     else:
-                        db_ver: str = fresh_state.plugin_version  # type: ignore[assignment]
+                        db_ver = fresh_state.plugin_version
                         if db_ver != version_imported:
                             mismatch_msg = f"version mismatch: DB has {db_ver!r} but {version_imported!r} is imported"
                             logger.warning(f"plugin {pluginKey}: {mismatch_msg}")
@@ -293,7 +321,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
             PluginManager.errors = pmap(errors)
 
         for pluginKey, plugin_result in lookup.items():
-            _run_async_from_thread(_ingest_plugin_templates(pluginKey, plugin_result))
+            _ingest_plugin_templates(pluginKey, plugin_result)
 
         logger.debug("global plugin loading finished")
     except Exception as e:
@@ -306,20 +334,22 @@ def load_plugins(plugins: PluginsSettings) -> None:
 def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, install: bool, version: Version | None) -> None:
     plugin_id_str = PluginCompositeId.to_str(pluginId)
     try:
-        db_state = _run_async_from_thread(get_plugin_state(plugin_id_str))
-        if db_state is not None and not db_state.enabled:  # type: ignore[union-attr]
+        db_state = _jobs_db_result("plugin.get-state", partial(get_plugin_state, plugin_id_str))
+        if db_state is not None and not db_state.enabled:
             logger.info(f"skipping disabled plugin {pluginId} in update_single")
             return
         installed_versions: dict[str, str] = {}
         if install:
             install_result = install_plugin_compatibly(pluginSettings.pip_source, version)
             if install_result.e:
-                _run_async_from_thread(
-                    upsert_plugin_state(
+                _jobs_db_result(
+                    "plugin.upsert-state",
+                    partial(
+                        upsert_plugin_state,
                         plugin_id=plugin_id_str,
                         version="install failed",
                         plugin_errors=PluginErrors([PluginError(source="install", severity="error", detail=install_result.e)]),
-                    )
+                    ),
                 )
                 raise RuntimeError(f"install failed for {pluginId}: {install_result.e}")
             installed_versions = install_result.t or {}
@@ -348,11 +378,17 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             elif pluginId in PluginManager.errors:
                 PluginManager.errors = PluginManager.errors.remove(pluginId)
         if version_install is not None:
-            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, version=version_install, plugin_errors=PluginErrors([])))
+            _jobs_db_result(
+                "plugin.upsert-state",
+                partial(upsert_plugin_state, plugin_id=plugin_id_str, version=version_install, plugin_errors=PluginErrors([])),
+            )
         else:
-            _run_async_from_thread(upsert_plugin_state(plugin_id=plugin_id_str, plugin_errors=PluginErrors([])))
+            _jobs_db_result(
+                "plugin.upsert-state",
+                partial(upsert_plugin_state, plugin_id=plugin_id_str, plugin_errors=PluginErrors([])),
+            )
         if result.t is not None:
-            _run_async_from_thread(_ingest_plugin_templates(pluginId, result.t))
+            _ingest_plugin_templates(pluginId, result.t)
         logger.debug(f"single plugin loading finished: {pluginId}")
     except Exception as e:
         logger.exception(f"updating thread failed with {repr(e)}")
@@ -376,7 +412,10 @@ async def unload_single(pluginId: PluginCompositeId) -> None:
     # on blueprint domain), and will be fixed later by refactoring into events.
     from forecastbox.domain.blueprint.db import soft_delete_all_plugin_templates
 
-    await soft_delete_all_plugin_templates(created_by=plugin_id_str)
+    await _await_jobs_db(
+        "plugin.soft-delete-all-templates",
+        partial(soft_delete_all_plugin_templates, created_by=plugin_id_str),
+    )
 
 
 def submit_load_plugins(start_after: Future[None]) -> None:
@@ -396,10 +435,10 @@ def status_brief() -> str:
     # NOTE this may be called without locking, we don't risk collection mutation during iteration
     if PluginManager.updater_error is not None:
         return f"failure: {PluginManager.updater_error}"
-    elif PluginManager.updater.is_alive():
+    updater = PluginManager.updater
+    if updater is not None and updater.is_alive():
         return "running"
-    else:
-        return "ok"
+    return "ok"
 
 
 def plugins_ready() -> bool:

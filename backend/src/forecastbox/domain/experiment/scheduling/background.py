@@ -7,29 +7,31 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""The main loop of the scheduler -- checks the ScheduledRun table, submits jobs.
-Runs in its own thread, submitting async work to the main event loop via
-asyncio.run_coroutine_threadsafe to avoid cross-loop issues with asyncio primitives
-(e.g. the asyncio.Lock in db/core.py).
+"""The main loop of the scheduler -- checks the ScheduledRun table and submits jobs.
+
+Runs in its own thread. Jobs-database reads and writes are submitted as
+synchronous tasks to ``ConcurrentPools.JobsDb`` and waited on from this worker.
 """
 
-import asyncio
 import datetime as dt
 import logging
 import threading
-from typing import Any, cast
+from collections.abc import Callable
+from functools import partial
+from typing import TypeVar, cast
 
 from forecastbox.domain.experiment.scheduling import db
-from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
-from forecastbox.domain.run.service import execute
-from forecastbox.utility.auth import PASSTHROUGH_USER_ID, AuthContext
+from forecastbox.domain.run.service import submit_run_sync
+from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
-from forecastbox.utility.config import config
+from forecastbox.utility.config import ConcurrentPools, config
 from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 # NOTE this lock can be locked externally, eg when updating schedules. For all operations
 # potentially involving the ScheduleNext table etc, as well as scheduler instance itself
@@ -46,18 +48,17 @@ timeout_acquire_background = 60  # leisure timeout for the scheduler background 
 sleep_duration_min: int = 15 * 60
 
 
+def _jobs_db_result(task_name: str, task: Callable[[], T]) -> T:
+    return execution_manager.submit_unmonitored(ConcurrentPools.JobsDb, TaskName(task_name), task).result()
+
+
 class SchedulerThread(threading.Thread):
-    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._loop = loop
         self.stop_event = threading.Event()
         self.sleep_condition = threading.Condition()
         self.liveness_timestamp: dt.datetime | None = None
         self.liveness_signal = threading.Event()
-
-    def _run_async(self, coro: Any) -> Any:
-        """Submit a coroutine to the main event loop and block until it completes."""
-        return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
 
     def mark_alive(self) -> dt.datetime:
         self.liveness_timestamp = current_time("liveness")
@@ -69,14 +70,20 @@ class SchedulerThread(threading.Thread):
         now = self.mark_alive()
         logger.debug(f"Scheduler inquiry at {now}")
 
-        schedulable = self._run_async(db.get_schedulable_experiments(now))
+        schedulable = _jobs_db_result(
+            "scheduler.get-schedulable-experiments",
+            partial(db.get_schedulable_experiments, now),
+        )
 
         for exp_next, exp_def in schedulable:
             experiment_id = ExperimentDefinitionId(cast(str, exp_next.experiment_id))  # ty:ignore[invalid-argument-type]
             scheduled_at = cast(dt.datetime, exp_next.scheduled_at)
             logger.debug(f"Processing scheduled experiment {experiment_id} at {scheduled_at}")
 
-            get_spec_result = self._run_async(experiment2runnable(experiment_id, scheduled_at))
+            get_spec_result = _jobs_db_result(
+                "scheduler.experiment-to-runnable",
+                partial(experiment2runnable, experiment_id, scheduled_at),
+            )
             try:
                 is_valid = (not exp_def.is_deleted) and (cast(dict, exp_def.experiment_definition)["enabled"])
             except (TypeError, KeyError) as e:
@@ -91,39 +98,44 @@ class SchedulerThread(threading.Thread):
                         f"older than max_acceptable_delay_hours ({runnable.max_acceptable_delay_hours} hours)."
                     )
                 elif not is_valid:
-                    # NOTE this should not happen -- we have locks etc preventing this
                     logger.error("Skipping {experiment_id} at {scheduled_at}: it is not valid!")
                 else:
-                    exec_result = self._run_async(
-                        execute(
-                            runnable.blueprint,
-                            # NOTE the is_admin may be True, but we dont know and its not important for this call
-                            AuthContext(
-                                user_id=runnable.created_by,
-                                is_admin=False,
-                            ),
-                            experiment_id=experiment_id,
-                            experiment_version=cast(int, exp_def.version),
-                            compiler_runtime_context=runnable.compiler_runtime_context,
-                            experiment_context=f"scheduled_at={runnable.scheduled_at.isoformat()}",
-                        )
+                    exec_result = submit_run_sync(
+                        runnable.blueprint,
+                        AuthContext(
+                            user_id=runnable.created_by,
+                            is_admin=False,
+                        ),
+                        experiment_id=experiment_id,
+                        experiment_version=cast(int, exp_def.version),
+                        compiler_runtime_context=runnable.compiler_runtime_context,
+                        experiment_context=f"scheduled_at={runnable.scheduled_at.isoformat()}",
                     )
                     if exec_result.t is not None:
                         logger.debug(f"Execution {exec_result.t.run_id} submitted for experiment {experiment_id}")
                     else:
                         logger.error(f"Failed to submit experiment {experiment_id}: {exec_result.e}")
 
-                self._run_async(db.delete_experiment_next(experiment_id))
+                _jobs_db_result(
+                    "scheduler.delete-experiment-next",
+                    partial(db.delete_experiment_next, experiment_id),
+                )
                 if runnable.next_run_at and is_valid:
-                    self._run_async(db.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=runnable.next_run_at))
+                    _jobs_db_result(
+                        "scheduler.upsert-experiment-next",
+                        partial(db.upsert_experiment_next, experiment_id=experiment_id, scheduled_at=runnable.next_run_at),
+                    )
                     logger.debug(f"Next run for {experiment_id}: {runnable.next_run_at}")
                 else:
                     logger.warning(f"No next run computed for {experiment_id}")
             else:
                 logger.error(f"Could not create runnable for experiment {experiment_id}: {get_spec_result.e}")
-                self._run_async(db.delete_experiment_next(experiment_id))
+                _jobs_db_result(
+                    "scheduler.delete-experiment-next",
+                    partial(db.delete_experiment_next, experiment_id),
+                )
 
-        next_schedulable_at = self._run_async(db.next_schedulable_experiment())
+        next_schedulable_at = _jobs_db_result("scheduler.next-schedulable-experiment", db.next_schedulable_experiment)
 
         sleep_duration = sleep_duration_min
         if next_schedulable_at:
@@ -167,13 +179,12 @@ class Globals:
 
 
 def start_scheduler() -> None:
-    loop = asyncio.get_running_loop()
     with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
         if not acquired:
             raise ValueError("Could not acquire scheduler_lock within timeout during start")
         if Globals.scheduler is not None:
             raise ValueError("double start")
-        Globals.scheduler = SchedulerThread(loop)
+        Globals.scheduler = SchedulerThread()
         Globals.scheduler.start()
 
 
@@ -185,7 +196,7 @@ def stop_scheduler() -> None:
             raise ValueError("unexpected stop")
         Globals.scheduler.stop()
         Globals.scheduler.prod()
-        if Globals.scheduler.is_alive():  # just in case it wasnt even started
+        if Globals.scheduler.is_alive():
             Globals.scheduler.join(1)
         if Globals.scheduler.is_alive():
             logger.warning(f"scheduler thread {Globals.scheduler.name} / {Globals.scheduler.native_id} is alive despite stop/join!")
@@ -208,7 +219,7 @@ def status_scheduler() -> str:
     if not Globals.scheduler.is_alive():
         logger.warning("scheduler reported down due to thread not being alive")
         return "down"
-    Globals.scheduler.liveness_signal.wait(0)  # we do this just for ensuring a multithread sync
+    Globals.scheduler.liveness_signal.wait(0)
     now = current_time("liveness")
     if (
         Globals.scheduler.liveness_timestamp is None

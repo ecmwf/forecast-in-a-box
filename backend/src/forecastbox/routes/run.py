@@ -21,7 +21,10 @@ import logging
 import os
 import pathlib
 import zipfile
-from typing import Annotated, Literal, cast
+from collections.abc import Callable
+from dataclasses import asdict
+from functools import partial
+from typing import Annotated, Literal, TypeVar, cast
 
 import orjson
 from cascade.controller.report import JobId
@@ -41,6 +44,8 @@ from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools
 from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -48,11 +53,16 @@ from forecastbox.utility.pydantic import FiabBaseModel
 PREFIX = "/api/v1/run"
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 router = APIRouter(
     tags=["execution"],
     responses={404: {"description": "Not found"}},
 )
+
+
+async def _await_jobs_db(task_name: str, task: Callable[[], T]) -> T:
+    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
 
 
 # ---------------------------------------------------------------------------
@@ -198,13 +208,16 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
 async def _resolve_run_with_cascade(
     execution_spec: RunLookup,
     auth_context: AuthContext,
-) -> tuple[db.Run, str]:
+) -> tuple[db.RunRecord, str]:
     """Fetch a Run and validate it has a cascade_job_id.
 
     Raises HTTP 404 if not found or access denied, HTTP 409 if not yet submitted.
     """
     try:
-        execution = await db.get_run(execution_spec.run_id, execution_spec.attempt_count, auth_context=auth_context)
+        execution = await _await_jobs_db(
+            "run.get",
+            partial(db.get_run, execution_spec.run_id, execution_spec.attempt_count, auth_context=auth_context),
+        )
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {execution_spec.run_id!r} not found.")
     except RunAccessDenied:
@@ -288,12 +301,17 @@ async def list_runs(
 
     Admins see all executions; regular users see only their own.
     """
-    total = await db.count_runs(auth_context=auth_context)
+    total = await _await_jobs_db("run.count", partial(db.count_runs, auth_context=auth_context))
     start = pagination.start()
     total_pages = pagination.total_pages(total)
     if start >= total and total > 0:
         raise HTTPException(status_code=404, detail="Page number out of range.")
-    executions = list(await db.list_runs(auth_context=auth_context, offset=start, limit=pagination.page_size))
+    executions = list(
+        await _await_jobs_db(
+            "run.list",
+            partial(db.list_runs, auth_context=auth_context, offset=start, limit=pagination.page_size),
+        )
+    )
     details = [_to_run_detail(await service.poll_and_update(e)) for e in executions]
     return RunListResponse(runs=details, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages)
 
@@ -304,7 +322,10 @@ async def get_run(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> RunDetailResponse:
     try:
-        execution = await db.get_run(spec.run_id, spec.attempt_count, auth_context=auth_context)
+        execution = await _await_jobs_db(
+            "run.get",
+            partial(db.get_run, spec.run_id, spec.attempt_count, auth_context=auth_context),
+        )
         domain_detail = await service.poll_and_update(execution, detailed_report=True)
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
@@ -358,7 +379,10 @@ async def delete_run(
     Returns 409 if it does not match.
     """
     try:
-        current = await db.get_run(request.run_id, auth_context=auth_context)
+        current = await _await_jobs_db(
+            "run.get",
+            partial(db.get_run, request.run_id, auth_context=auth_context),
+        )
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
     except RunAccessDenied:
@@ -382,7 +406,10 @@ async def delete_run(
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
         try:
-            await db.soft_delete_run(request.run_id, auth_context=auth_context)
+            await _await_jobs_db(
+                "run.soft-delete",
+                partial(db.soft_delete_run, request.run_id, auth_context=auth_context),
+            )
         except (RunNotFound, RunAccessDenied):
             pass
 
@@ -398,7 +425,10 @@ async def restart_run(
     Returns 409 if it does not match.
     """
     try:
-        current = await db.get_run(request.run_id, auth_context=auth_context)
+        current = await _await_jobs_db(
+            "run.get",
+            partial(db.get_run, request.run_id, auth_context=auth_context),
+        )
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
     except RunAccessDenied:
@@ -475,5 +505,5 @@ async def get_run_logs(
 ) -> Response:
     """Return a zip archive of logs for the given execution attempt."""
     db_entity, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
-    entity_dict = {col.name: getattr(db_entity, col.name) for col in db_entity.__table__.columns}
+    entity_dict = asdict(db_entity)
     return await _build_run_logs_response(cascade_job_id, orjson.dumps(entity_dict))

@@ -24,6 +24,8 @@ from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
 from pydantic import PositiveInt
 
+import forecastbox.domain.experiment.db as experiment_db
+import forecastbox.domain.run.db as run_db
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment import service
@@ -31,7 +33,6 @@ from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, Exp
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.types import RunId
-from forecastbox.schemata.jobs import ExperimentDefinition
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -142,22 +143,22 @@ class ExperimentRunsResponse(FiabBaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _experiment_to_detail(exp: ExperimentDefinition, entity_created_at: dt.datetime) -> ExperimentDetail:
+def _experiment_to_detail(exp: experiment_db.ExperimentDefinitionRecord, entity_created_at: dt.datetime) -> ExperimentDetail:
     exp_def = cast(dict, exp.experiment_definition) or {}
     return ExperimentDetail(
         experiment_id=ExperimentDefinitionId(str(exp.experiment_definition_id)),  # ty:ignore[invalid-argument-type]
-        experiment_version=cast(int, exp.version),
+        experiment_version=exp.version,
         blueprint_id=BlueprintId(str(exp.blueprint_id)),  # ty:ignore[invalid-argument-type]
-        blueprint_version=cast(int, exp.blueprint_version),
+        blueprint_version=exp.blueprint_version,
         cron_expr=str(exp_def.get("cron_expr", "")),
         max_acceptable_delay_hours=int(exp_def.get("max_acceptable_delay_hours", 24)),
         enabled=bool(exp_def.get("enabled", True)),
         created_at=value_dt2str(entity_created_at),
-        updated_at=value_dt2str(cast(dt.datetime, exp.created_at)),
-        user=cast(str, exp.created_by),
-        display_name=cast(str | None, exp.display_name),
-        display_description=cast(str | None, exp.display_description),
-        tags=cast(list[str] | None, exp.tags),
+        updated_at=value_dt2str(exp.created_at),
+        user=exp.created_by,
+        display_name=exp.display_name,
+        display_description=exp.display_description,
+        tags=exp.tags,
     )
 
 
@@ -235,7 +236,7 @@ async def update_experiment(
         current = await service.get_schedule(auth_context, update.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    if cast(int, current.experiment.version) != update.version:
+    if current.experiment.version != update.version:
         raise HTTPException(
             status_code=409,
             detail=(
@@ -278,7 +279,7 @@ async def delete_experiment(
         current = await service.get_schedule(auth_context, request.experiment_id)
     except ExperimentNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    if cast(int, current.experiment.version) != request.version:
+    if current.experiment.version != request.version:
         raise HTTPException(
             status_code=409,
             detail=(
