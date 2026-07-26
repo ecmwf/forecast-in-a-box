@@ -64,6 +64,7 @@
     "ecmwfData": "ECMWF Data",
     "scheduler": "Scheduler",
     "plugins": "Plugins",
+    "concurrency": "Concurrency",
     "refresh": "Refresh Status",
     "lastUpdated": "Last updated"
   },
