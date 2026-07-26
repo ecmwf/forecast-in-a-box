@@ -340,7 +340,11 @@ function ActivityTaskRow({
       <div className="min-w-0 flex-1">
         <P className="truncate text-sm font-medium">{task.label}</P>
         <div className="flex items-center gap-2">
-          <P className="truncate text-xs text-muted-foreground">
+          {/* Failure descriptions carry the backend reason and outrun the row. */}
+          <P
+            className="truncate text-xs text-muted-foreground"
+            title={task.description}
+          >
             {task.description}
           </P>
         </div>
