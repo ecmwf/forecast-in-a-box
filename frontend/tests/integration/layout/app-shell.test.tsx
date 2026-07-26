@@ -63,9 +63,15 @@ describe('Layout', () => {
         </AuthContext.Provider>,
       )
 
-      await expect.element(screen.getByAltText('ECMWF')).toBeVisible()
+      // Exact: the member-states strip's alt also contains "ECMWF".
+      await expect
+        .element(screen.getByAltText('ECMWF', { exact: true }))
+        .toBeVisible()
       await expect
         .element(screen.getByAltText('Destination Earth'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByAltText(/member and co-operating states/))
         .toBeVisible()
     })
   })

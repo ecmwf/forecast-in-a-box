@@ -96,7 +96,8 @@
     "help": "Help",
     "about": "About",
     "logoEcmwf": "ECMWF",
-    "logoDestinationEarth": "Destination Earth"
+    "logoDestinationEarth": "Destination Earth",
+    "memberStates": "Flags of the ECMWF member and co-operating states"
   },
   "userMenu": {
     "dashboard": "Dashboard",
