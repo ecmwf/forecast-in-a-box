@@ -6,7 +6,10 @@
     <!-- .ico first for legacy; browsers that understand SVG prefer it. -->
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <meta name="theme-color" content="#006197" />
+    <!-- Overwritten before paint by theme-init.js, then by ThemeProvider. -->
+    <meta name="theme-color" content="#ffffff" />
+    <!-- Blocking: the theme class must land before first paint. -->
+    <script src="/theme-init.js"></script>
     <meta name="description" content="Forecast-In-A-Box" />
     <meta
       http-equiv="Content-Security-Policy"
