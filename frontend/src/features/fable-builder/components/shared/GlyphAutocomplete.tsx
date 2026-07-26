@@ -30,11 +30,7 @@ import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
 export type AutocompleteSource =
-  | 'local'
-  | 'global'
-  | 'intrinsic'
-  | 'filter'
-  | 'helperGlobal'
+  'local' | 'global' | 'intrinsic' | 'filter' | 'helperGlobal'
 
 export interface AutocompleteCandidate {
   /** Identifier inserted on selection. */

@@ -41,8 +41,7 @@ function describeBlock(fable: FableBuilderV1, blockId: string): string {
   const factory = block.factory_id.factory
   if (factory === 'select') {
     const dimension = block.configuration_values['dimension'] as
-      | string
-      | undefined
+      string | undefined
     return dimension != null && dimension !== ''
       ? `Select ${dimension}`
       : 'Select'

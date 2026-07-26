@@ -186,8 +186,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   }
   const cachedConfigRestrictions = selectedBlockId
     ? (lastConfigRestrictionsRef.current[selectedBlockId] as
-        | Record<string, string>
-        | undefined)
+        Record<string, string> | undefined)
     : undefined
   const configRestrictions = {
     ...(pendingRestrictions ?? {}),

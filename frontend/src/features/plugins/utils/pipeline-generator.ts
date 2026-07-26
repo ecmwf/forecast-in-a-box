@@ -63,8 +63,7 @@ export function generatePluginPipeline(
   const { pluginId, catalogue, includeDefaults = true } = options
 
   const pluginCatalogue = catalogue[pluginId] as
-    | (typeof catalogue)[string]
-    | undefined
+    (typeof catalogue)[string] | undefined
   if (!pluginCatalogue) {
     return { fable: { blocks: {} }, blockMapping: new Map() }
   }

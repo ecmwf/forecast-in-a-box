@@ -217,8 +217,7 @@ export function FableFormCanvas({ catalogue }: FableFormCanvasProps) {
   // Handle clicking on a block from within a card (downstream connection click)
   const handleCardBlockClick = (blockId: BlockInstanceId) => {
     const block = fable.blocks[blockId] as
-      | (typeof fable.blocks)[string]
-      | undefined
+      (typeof fable.blocks)[string] | undefined
     if (!block) return
     const blockFactory = getFactory(catalogue, block.factory_id)
     if (blockFactory) {

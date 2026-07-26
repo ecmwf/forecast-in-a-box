@@ -315,8 +315,7 @@ export default function GeoDomainMap({
         if (disabledRef.current || modeRef.current !== 'draw') return false
         const feature = boxSource.getFeatures().at(0)
         const extent = feature?.getGeometry()?.getExtent() as
-          | OlExtent
-          | undefined
+          OlExtent | undefined
         if (!feature || !extent) return false
         const handle = hitHandle(event.pixel, extent)
         if (handle) {
@@ -344,8 +343,7 @@ export default function GeoDomainMap({
       handleDragEvent: (event) => {
         const context = dragRef.current
         const extent = context?.feature.getGeometry()?.getExtent() as
-          | OlExtent
-          | undefined
+          OlExtent | undefined
         if (!context || !extent) return
         context.moved = true
         const [x, y] = event.coordinate

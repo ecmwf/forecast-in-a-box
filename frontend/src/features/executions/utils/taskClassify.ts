@@ -22,12 +22,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 
 export type TaskKind =
-  | 'select'
-  | 'inference'
-  | 'payload'
-  | 'plot'
-  | 'transform'
-  | 'unknown'
+  'select' | 'inference' | 'payload' | 'plot' | 'transform' | 'unknown'
 
 export interface TaskKindMeta {
   /** Lucide icon to render in the node header. */
@@ -38,12 +33,7 @@ export interface TaskKindMeta {
   accentBorder: string
   /** i18n key (under executions.compilation.taskKind) for the label. */
   labelKey:
-    | 'select'
-    | 'inference'
-    | 'payload'
-    | 'plot'
-    | 'transform'
-    | 'unknown'
+    'select' | 'inference' | 'payload' | 'plot' | 'transform' | 'unknown'
 }
 
 // Hues aligned with BLOCK_KIND_METADATA so the compilation views share the

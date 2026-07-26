@@ -93,8 +93,7 @@ export function ConfigSummaryCard({
           {configuredValues.map(([key, value]) => {
             // The key may be absent at runtime; cast to surface undefined.
             const option = factory.configuration_options[key] as
-              | BlockConfigurationOption
-              | undefined
+              BlockConfigurationOption | undefined
             return (
               <div
                 key={key}

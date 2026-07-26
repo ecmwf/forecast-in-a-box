@@ -9,50 +9,45 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AboutRouteImport } from './routes/about'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedPresetsRouteImport } from './routes/_authenticated/presets'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedConfigureRouteImport } from './routes/_authenticated/configure'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as AuthenticatedSchedulesIndexRouteImport } from './routes/_authenticated/schedules.index'
-import { Route as AuthenticatedExecutionsIndexRouteImport } from './routes/_authenticated/executions.index'
+import { Route as AuthenticatedConfigureRouteImport } from './routes/_authenticated/configure'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedPresetsRouteImport } from './routes/_authenticated/presets'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
-import { Route as AuthenticatedSchedulesScheduleIdRouteImport } from './routes/_authenticated/schedules.$scheduleId'
-import { Route as AuthenticatedExecutionsJobIdRouteImport } from './routes/_authenticated/executions.$jobId'
-import { Route as AuthenticatedConfigureFableIdRouteImport } from './routes/_authenticated/configure.$fableId'
-import { Route as AuthenticatedAdminVariablesRouteImport } from './routes/_authenticated/admin/variables'
-import { Route as AuthenticatedAdminPluginsRouteImport } from './routes/_authenticated/admin/plugins'
 import { Route as AuthenticatedAdminArtifactsRouteImport } from './routes/_authenticated/admin/artifacts'
-import { Route as AuthenticatedAdminVariablesIndexRouteImport } from './routes/_authenticated/admin/variables.index'
-import { Route as AuthenticatedAdminPluginsIndexRouteImport } from './routes/_authenticated/admin/plugins.index'
+import { Route as AuthenticatedAdminPluginsRouteImport } from './routes/_authenticated/admin/plugins'
+import { Route as AuthenticatedAdminVariablesRouteImport } from './routes/_authenticated/admin/variables'
+import { Route as AuthenticatedConfigureFableIdRouteImport } from './routes/_authenticated/configure.$fableId'
+import { Route as AuthenticatedExecutionsIndexRouteImport } from './routes/_authenticated/executions.index'
+import { Route as AuthenticatedExecutionsJobIdRouteImport } from './routes/_authenticated/executions.$jobId'
+import { Route as AuthenticatedSchedulesIndexRouteImport } from './routes/_authenticated/schedules.index'
+import { Route as AuthenticatedSchedulesScheduleIdRouteImport } from './routes/_authenticated/schedules.$scheduleId'
 import { Route as AuthenticatedAdminArtifactsIndexRouteImport } from './routes/_authenticated/admin/artifacts.index'
-import { Route as AuthenticatedAdminPluginsPluginIdRouteImport } from './routes/_authenticated/admin/plugins.$pluginId'
 import { Route as AuthenticatedAdminArtifactsArtifactIdRouteImport } from './routes/_authenticated/admin/artifacts.$artifactId'
+import { Route as AuthenticatedAdminPluginsIndexRouteImport } from './routes/_authenticated/admin/plugins.index'
+import { Route as AuthenticatedAdminPluginsPluginIdRouteImport } from './routes/_authenticated/admin/plugins.$pluginId'
+import { Route as AuthenticatedAdminVariablesIndexRouteImport } from './routes/_authenticated/admin/variables.index'
 
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedPresetsRoute = AuthenticatedPresetsRouteImport.update({
-  id: '/presets',
-  path: '/presets',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedConfigureRoute = AuthenticatedConfigureRouteImport.update({
@@ -60,50 +55,25 @@ const AuthenticatedConfigureRoute = AuthenticatedConfigureRouteImport.update({
   path: '/configure',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedSchedulesIndexRoute =
-  AuthenticatedSchedulesIndexRouteImport.update({
-    id: '/schedules/',
-    path: '/schedules/',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedExecutionsIndexRoute =
-  AuthenticatedExecutionsIndexRouteImport.update({
-    id: '/executions/',
-    path: '/executions/',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
+const AuthenticatedPresetsRoute = AuthenticatedPresetsRouteImport.update({
+  id: '/presets',
+  path: '/presets',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
-const AuthenticatedSchedulesScheduleIdRoute =
-  AuthenticatedSchedulesScheduleIdRouteImport.update({
-    id: '/schedules/$scheduleId',
-    path: '/schedules/$scheduleId',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedExecutionsJobIdRoute =
-  AuthenticatedExecutionsJobIdRouteImport.update({
-    id: '/executions/$jobId',
-    path: '/executions/$jobId',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedConfigureFableIdRoute =
-  AuthenticatedConfigureFableIdRouteImport.update({
-    id: '/$fableId',
-    path: '/$fableId',
-    getParentRoute: () => AuthenticatedConfigureRoute,
-  } as any)
-const AuthenticatedAdminVariablesRoute =
-  AuthenticatedAdminVariablesRouteImport.update({
-    id: '/variables',
-    path: '/variables',
+const AuthenticatedAdminArtifactsRoute =
+  AuthenticatedAdminArtifactsRouteImport.update({
+    id: '/artifacts',
+    path: '/artifacts',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminPluginsRoute =
@@ -112,23 +82,41 @@ const AuthenticatedAdminPluginsRoute =
     path: '/plugins',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-const AuthenticatedAdminArtifactsRoute =
-  AuthenticatedAdminArtifactsRouteImport.update({
-    id: '/artifacts',
-    path: '/artifacts',
+const AuthenticatedAdminVariablesRoute =
+  AuthenticatedAdminVariablesRouteImport.update({
+    id: '/variables',
+    path: '/variables',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-const AuthenticatedAdminVariablesIndexRoute =
-  AuthenticatedAdminVariablesIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedAdminVariablesRoute,
+const AuthenticatedConfigureFableIdRoute =
+  AuthenticatedConfigureFableIdRouteImport.update({
+    id: '/$fableId',
+    path: '/$fableId',
+    getParentRoute: () => AuthenticatedConfigureRoute,
   } as any)
-const AuthenticatedAdminPluginsIndexRoute =
-  AuthenticatedAdminPluginsIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedAdminPluginsRoute,
+const AuthenticatedExecutionsIndexRoute =
+  AuthenticatedExecutionsIndexRouteImport.update({
+    id: '/executions/',
+    path: '/executions/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedExecutionsJobIdRoute =
+  AuthenticatedExecutionsJobIdRouteImport.update({
+    id: '/executions/$jobId',
+    path: '/executions/$jobId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSchedulesIndexRoute =
+  AuthenticatedSchedulesIndexRouteImport.update({
+    id: '/schedules/',
+    path: '/schedules/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSchedulesScheduleIdRoute =
+  AuthenticatedSchedulesScheduleIdRouteImport.update({
+    id: '/schedules/$scheduleId',
+    path: '/schedules/$scheduleId',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedAdminArtifactsIndexRoute =
   AuthenticatedAdminArtifactsIndexRouteImport.update({
@@ -136,17 +124,29 @@ const AuthenticatedAdminArtifactsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAdminArtifactsRoute,
   } as any)
+const AuthenticatedAdminArtifactsArtifactIdRoute =
+  AuthenticatedAdminArtifactsArtifactIdRouteImport.update({
+    id: '/$artifactId',
+    path: '/$artifactId',
+    getParentRoute: () => AuthenticatedAdminArtifactsRoute,
+  } as any)
+const AuthenticatedAdminPluginsIndexRoute =
+  AuthenticatedAdminPluginsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminPluginsRoute,
+  } as any)
 const AuthenticatedAdminPluginsPluginIdRoute =
   AuthenticatedAdminPluginsPluginIdRouteImport.update({
     id: '/$pluginId',
     path: '/$pluginId',
     getParentRoute: () => AuthenticatedAdminPluginsRoute,
   } as any)
-const AuthenticatedAdminArtifactsArtifactIdRoute =
-  AuthenticatedAdminArtifactsArtifactIdRouteImport.update({
-    id: '/$artifactId',
-    path: '/$artifactId',
-    getParentRoute: () => AuthenticatedAdminArtifactsRoute,
+const AuthenticatedAdminVariablesIndexRoute =
+  AuthenticatedAdminVariablesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminVariablesRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -287,11 +287,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -301,25 +301,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/presets': {
-      id: '/_authenticated/presets'
-      path: '/presets'
-      fullPath: '/presets'
-      preLoaderRoute: typeof AuthenticatedPresetsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/configure': {
@@ -329,25 +322,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConfigureRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/schedules/': {
-      id: '/_authenticated/schedules/'
-      path: '/schedules'
-      fullPath: '/schedules/'
-      preLoaderRoute: typeof AuthenticatedSchedulesIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/executions/': {
-      id: '/_authenticated/executions/'
-      path: '/executions'
-      fullPath: '/executions/'
-      preLoaderRoute: typeof AuthenticatedExecutionsIndexRouteImport
+    '/_authenticated/presets': {
+      id: '/_authenticated/presets'
+      path: '/presets'
+      fullPath: '/presets'
+      preLoaderRoute: typeof AuthenticatedPresetsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin/': {
@@ -357,32 +343,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/schedules/$scheduleId': {
-      id: '/_authenticated/schedules/$scheduleId'
-      path: '/schedules/$scheduleId'
-      fullPath: '/schedules/$scheduleId'
-      preLoaderRoute: typeof AuthenticatedSchedulesScheduleIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/executions/$jobId': {
-      id: '/_authenticated/executions/$jobId'
-      path: '/executions/$jobId'
-      fullPath: '/executions/$jobId'
-      preLoaderRoute: typeof AuthenticatedExecutionsJobIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/configure/$fableId': {
-      id: '/_authenticated/configure/$fableId'
-      path: '/$fableId'
-      fullPath: '/configure/$fableId'
-      preLoaderRoute: typeof AuthenticatedConfigureFableIdRouteImport
-      parentRoute: typeof AuthenticatedConfigureRoute
-    }
-    '/_authenticated/admin/variables': {
-      id: '/_authenticated/admin/variables'
-      path: '/variables'
-      fullPath: '/admin/variables'
-      preLoaderRoute: typeof AuthenticatedAdminVariablesRouteImport
+    '/_authenticated/admin/artifacts': {
+      id: '/_authenticated/admin/artifacts'
+      path: '/artifacts'
+      fullPath: '/admin/artifacts'
+      preLoaderRoute: typeof AuthenticatedAdminArtifactsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/plugins': {
@@ -392,26 +357,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPluginsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/artifacts': {
-      id: '/_authenticated/admin/artifacts'
-      path: '/artifacts'
-      fullPath: '/admin/artifacts'
-      preLoaderRoute: typeof AuthenticatedAdminArtifactsRouteImport
+    '/_authenticated/admin/variables': {
+      id: '/_authenticated/admin/variables'
+      path: '/variables'
+      fullPath: '/admin/variables'
+      preLoaderRoute: typeof AuthenticatedAdminVariablesRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/variables/': {
-      id: '/_authenticated/admin/variables/'
-      path: '/'
-      fullPath: '/admin/variables/'
-      preLoaderRoute: typeof AuthenticatedAdminVariablesIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminVariablesRoute
+    '/_authenticated/configure/$fableId': {
+      id: '/_authenticated/configure/$fableId'
+      path: '/$fableId'
+      fullPath: '/configure/$fableId'
+      preLoaderRoute: typeof AuthenticatedConfigureFableIdRouteImport
+      parentRoute: typeof AuthenticatedConfigureRoute
     }
-    '/_authenticated/admin/plugins/': {
-      id: '/_authenticated/admin/plugins/'
-      path: '/'
-      fullPath: '/admin/plugins/'
-      preLoaderRoute: typeof AuthenticatedAdminPluginsIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminPluginsRoute
+    '/_authenticated/executions/': {
+      id: '/_authenticated/executions/'
+      path: '/executions'
+      fullPath: '/executions/'
+      preLoaderRoute: typeof AuthenticatedExecutionsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/executions/$jobId': {
+      id: '/_authenticated/executions/$jobId'
+      path: '/executions/$jobId'
+      fullPath: '/executions/$jobId'
+      preLoaderRoute: typeof AuthenticatedExecutionsJobIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/schedules/': {
+      id: '/_authenticated/schedules/'
+      path: '/schedules'
+      fullPath: '/schedules/'
+      preLoaderRoute: typeof AuthenticatedSchedulesIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/schedules/$scheduleId': {
+      id: '/_authenticated/schedules/$scheduleId'
+      path: '/schedules/$scheduleId'
+      fullPath: '/schedules/$scheduleId'
+      preLoaderRoute: typeof AuthenticatedSchedulesScheduleIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin/artifacts/': {
       id: '/_authenticated/admin/artifacts/'
@@ -420,6 +406,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminArtifactsIndexRouteImport
       parentRoute: typeof AuthenticatedAdminArtifactsRoute
     }
+    '/_authenticated/admin/artifacts/$artifactId': {
+      id: '/_authenticated/admin/artifacts/$artifactId'
+      path: '/$artifactId'
+      fullPath: '/admin/artifacts/$artifactId'
+      preLoaderRoute: typeof AuthenticatedAdminArtifactsArtifactIdRouteImport
+      parentRoute: typeof AuthenticatedAdminArtifactsRoute
+    }
+    '/_authenticated/admin/plugins/': {
+      id: '/_authenticated/admin/plugins/'
+      path: '/'
+      fullPath: '/admin/plugins/'
+      preLoaderRoute: typeof AuthenticatedAdminPluginsIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminPluginsRoute
+    }
     '/_authenticated/admin/plugins/$pluginId': {
       id: '/_authenticated/admin/plugins/$pluginId'
       path: '/$pluginId'
@@ -427,12 +427,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPluginsPluginIdRouteImport
       parentRoute: typeof AuthenticatedAdminPluginsRoute
     }
-    '/_authenticated/admin/artifacts/$artifactId': {
-      id: '/_authenticated/admin/artifacts/$artifactId'
-      path: '/$artifactId'
-      fullPath: '/admin/artifacts/$artifactId'
-      preLoaderRoute: typeof AuthenticatedAdminArtifactsArtifactIdRouteImport
-      parentRoute: typeof AuthenticatedAdminArtifactsRoute
+    '/_authenticated/admin/variables/': {
+      id: '/_authenticated/admin/variables/'
+      path: '/'
+      fullPath: '/admin/variables/'
+      preLoaderRoute: typeof AuthenticatedAdminVariablesIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminVariablesRoute
     }
   }
 }
