@@ -158,8 +158,12 @@ This phase removes the reason background workers retain the FastAPI loop.
 ### 2.1 Convert the jobs runtime engine and DB helpers
 
 For `schemata/jobs.py`, add the synchronous engine/session maker used by runtime
-DB operations. Schema creation may remain in the existing startup path until
+DB operations. Schema creation will remain in the existing startup path until
 the cutover, but runtime access after cutover uses the sync session maker.
+The discovery and invocation of the schema creation code must be modified,
+since the jobs DB will use sync session maker but the users DB will stay async.
+The invocation thus needs to assess whether the callable is a coroutine or not,
+and either await or invoke directly.
 
 Convert all jobs database helper modules together:
 
@@ -170,9 +174,14 @@ Convert all jobs database helper modules together:
 - `domain/plugin/db.py`
 - `domain/run/db.py`
 
-Each public operation becomes synchronous and owns one complete
-session/transaction. Combine current multi-call read-modify-write operations
-into one locked callable so no other database operation can interleave.
+Do not change the interfaces of the DB operations and scope of locks -- in particular,
+do not merge them into bigger transaction-like operations, and do not split them
+into atomic either. This is just a migration of session maker.
+
+You may need to introduce new dataclasses in case an ORM object is returned directly
+from a db operation that is invoked across thread boundary (from JobsDb pool).
+If there is a db operation that is only ever invoked directly from sync code and
+returns an ORM object, you do not need to change that.
 
 The synchronous retry wrapper holds the jobs `RLock`, retries the whole
 operation on SQLite `OperationalError`, and contains:
@@ -249,8 +258,8 @@ async def execute(...) -> Either[ExecuteResult, str]:
 The scheduler can call `submit_run_sync` from its own managed thread after
 Phase 4; async routes retain the `execute` wrapper. Similarly, convert
 `experiment2runnable` into a synchronous operation whose database work is one
-locked operation, so the scheduler can call it directly with no async loop.
-Async callers submit it to `ConcurrentPools.JobsDb`.
+or more locked operations, so the scheduler can call it directly with no
+async loop. Async callers submit them to `ConcurrentPools.JobsDb`.
 
 The Phase 2 cutover therefore also removes the default-executor submission for
 this path. Phase 3.4 finishes consolidation of the background task and its
@@ -265,8 +274,7 @@ under the old async lock.
 
 - Do not submit from the jobs DB worker back to `ConcurrentPools.JobsDb` and
   wait.
-- Keep a transaction and every read-modify-write sequence inside one locked
-  database operation.
+- Do not change the scope of the lock for database operations.
 - Create, use, commit or roll back, and close each session on the thread
   executing the operation. Do not pass sessions or active SQLAlchemy result
   objects between threads. Fully materialize returned ORM or data values before

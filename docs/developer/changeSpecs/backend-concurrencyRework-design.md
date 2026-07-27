@@ -643,8 +643,11 @@ application accepts async database work.
 
 Each callable represents one complete database operation and owns its
 session/transaction. The same boundary applies whether async code submits it or
-synchronous code invokes it directly. Read-modify-write sequences must be one
-locked callable, not multiple separately locked calls. SQLite operational-error
+synchronous code invokes it directly -- the async code should not hijack the
+pool for general purpose work, but instead submit only single DB operation,
+with a single lock. A read-modify-write sequence that would in sync code
+execute over two lock steps interleaved with some business logic corresponds 
+to two callables submitted to the JobsDb pool. SQLite operational-error
 retries happen inside that locked callable and retry the whole operation.
 
 Sessions are created, used, committed or rolled back, and closed on the thread
