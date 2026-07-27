@@ -84,7 +84,7 @@ def ensure_completed(backend_client: httpx.Client, job_id: str, sleep: float = 0
         if progress["status"] == "failed":
             raise RuntimeError(f"Job {job_id} failed: {progress['error']}")
         # TODO parse response with corresponding class, define a method `not_failed` instead
-        assert progress["status"] in {"submitted", "running", "completed"}
+        assert progress["status"] in {"submitted", "preparing", "running", "completed"}
         return True if progress["status"] == "completed" else None
 
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Failed to finish job {job_id}")

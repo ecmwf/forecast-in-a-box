@@ -13,6 +13,7 @@ import datetime as dt
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any, cast
 
 from sqlalchemy import Select, delete, func, or_, select, update
 
@@ -22,6 +23,18 @@ from forecastbox.schemata.jobs import GlobalGlyph
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, querySingle
 from forecastbox.utility.time import current_time
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class GlobalGlyphRecord:
+    global_glyph_id: GlobalGlyphId
+    key: str
+    value: str
+    public: bool
+    overriddable: bool | None
+    created_by: str
+    created_at: dt.datetime
+    updated_at: dt.datetime
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -36,10 +49,23 @@ class GlyphResolutionBuckets:
     public_nonoverridable: dict[str, str]
 
 
+def _to_global_glyph_record(row: GlobalGlyph) -> GlobalGlyphRecord:
+    return GlobalGlyphRecord(
+        global_glyph_id=GlobalGlyphId(str(cast(Any, row.global_glyph_id))),
+        key=cast(str, row.key),
+        value=cast(str, row.value),
+        public=cast(bool, row.public),
+        overriddable=cast(bool | None, row.overriddable),
+        created_by=cast(str, row.created_by),
+        created_at=cast(dt.datetime, row.created_at),
+        updated_at=cast(dt.datetime, row.updated_at),
+    )
+
+
 def _visibility_filter(query: Select, auth_context: AuthContext) -> Select:  # type: ignore[type-arg]
     """Restrict a query to rows the caller is allowed to see.
 
-    Admins and passthrough callers see every glyph.  Non-admins see their own
+    Admins and passthrough callers see every glyph. Non-admins see their own
     glyphs plus any glyph that has ``public=True``.
     """
     if not auth_context.has_admin():
@@ -52,7 +78,13 @@ def _visibility_filter(query: Select, auth_context: AuthContext) -> Select:  # t
     return query
 
 
-async def upsert_global_glyph(key: str, value: str, public: bool, overriddable: bool | None, auth_context: AuthContext) -> GlobalGlyph:
+def upsert_global_glyph(
+    key: str,
+    value: str,
+    public: bool,
+    overriddable: bool | None,
+    auth_context: AuthContext,
+) -> GlobalGlyphRecord:
     """Insert or update a GlobalGlyph by (created_by, key) and return it.
 
     Each user owns their own glyph per key; callers can only upsert their own rows.
@@ -64,9 +96,9 @@ async def upsert_global_glyph(key: str, value: str, public: bool, overriddable: 
     """
     ref_time = current_time("dbref")
 
-    async def function(i: int) -> GlobalGlyph:
-        async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(
+    def function(i: int) -> GlobalGlyphRecord:
+        with _jobs_module.sync_session_maker() as session:
+            result = session.execute(
                 select(GlobalGlyph).where(
                     GlobalGlyph.key == key,
                     GlobalGlyph.created_by == auth_context.user_id,
@@ -74,45 +106,45 @@ async def upsert_global_glyph(key: str, value: str, public: bool, overriddable: 
             )
             existing: GlobalGlyph | None = result.scalar_one_or_none()
             if existing is not None:
-                glyph_id: GlobalGlyphId = GlobalGlyphId(str(existing.global_glyph_id))  # ty:ignore[invalid-argument-type]
-                await session.execute(
+                glyph_id = GlobalGlyphId(str(existing.global_glyph_id))
+                session.execute(
                     update(GlobalGlyph)
                     .where(GlobalGlyph.global_glyph_id == glyph_id)
                     .values(value=value, public=public, overriddable=overriddable, updated_at=ref_time)
                 )
-                await session.commit()
-                refreshed = await session.execute(select(GlobalGlyph).where(GlobalGlyph.global_glyph_id == glyph_id))
-                return refreshed.scalar_one()
-            else:
-                new = GlobalGlyph(
-                    global_glyph_id=GlobalGlyphId(str(uuid.uuid4())),  # ty:ignore[invalid-argument-type]
-                    key=key,
-                    value=value,
-                    public=public,
-                    overriddable=overriddable,
-                    created_by=auth_context.user_id,
-                    created_at=ref_time,
-                    updated_at=ref_time,
-                )
-                session.add(new)
-                await session.commit()
-                return new
+                session.commit()
+                refreshed = session.execute(select(GlobalGlyph).where(GlobalGlyph.global_glyph_id == glyph_id)).scalar_one()
+                return _to_global_glyph_record(refreshed)
+            new = GlobalGlyph(
+                global_glyph_id=GlobalGlyphId(str(uuid.uuid4())),
+                key=key,
+                value=value,
+                public=public,
+                overriddable=overriddable,
+                created_by=auth_context.user_id,
+                created_at=ref_time,
+                updated_at=ref_time,
+            )
+            session.add(new)
+            session.commit()
+            return _to_global_glyph_record(new)
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def get_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContext) -> GlobalGlyph | None:
+def get_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContext) -> GlobalGlyphRecord | None:
     """Return a GlobalGlyph visible to the caller by its stable id, or None if not found or not visible."""
     query = _visibility_filter(
         select(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id),
         auth_context,
     )
-    return await querySingle(query, _jobs_module.async_session_maker)
+    row = querySingle(query, _jobs_module.sync_session_maker)
+    return None if row is None else _to_global_glyph_record(row)
 
 
-async def list_global_glyphs(
+def list_global_glyphs(
     auth_context: AuthContext, offset: int = 0, limit: int | None = None, key: str | None = None
-) -> Iterable[GlobalGlyph]:
+) -> Iterable[GlobalGlyphRecord]:
     """Return GlobalGlyphs visible to the caller, ordered by key, with optional paging.
 
     Admins see all glyphs.  Non-admins see their own glyphs plus all public glyphs.
@@ -120,8 +152,8 @@ async def list_global_glyphs(
     When ``key`` is given, only glyphs whose key matches exactly are returned.
     """
 
-    async def function(i: int) -> list[GlobalGlyph]:
-        async with _jobs_module.async_session_maker() as session:
+    def function(i: int) -> list[GlobalGlyphRecord]:
+        with _jobs_module.sync_session_maker() as session:
             query = _visibility_filter(
                 select(GlobalGlyph).order_by(GlobalGlyph.key).offset(offset),
                 auth_context,
@@ -130,30 +162,30 @@ async def list_global_glyphs(
                 query = query.where(GlobalGlyph.key == key)
             if limit is not None:
                 query = query.limit(limit)
-            result = await session.execute(query)
-            return [r[0] for r in result.all()]
+            result = session.execute(query)
+            return [_to_global_glyph_record(r[0]) for r in result.all()]
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def count_global_glyphs(auth_context: AuthContext, key: str | None = None) -> int:
+def count_global_glyphs(auth_context: AuthContext, key: str | None = None) -> int:
     """Return the total number of GlobalGlyphs visible to the caller.
 
     When ``key`` is given, only glyphs whose key matches exactly are counted.
     """
 
-    async def function(i: int) -> int:
-        async with _jobs_module.async_session_maker() as session:
+    def function(i: int) -> int:
+        with _jobs_module.sync_session_maker() as session:
             query = _visibility_filter(select(func.count()).select_from(GlobalGlyph), auth_context)
             if key is not None:
                 query = query.where(GlobalGlyph.key == key)
-            result = await session.execute(query)
+            result = session.execute(query)
             return result.scalar() or 0
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def get_glyphs_for_resolution(auth_context: AuthContext) -> GlyphResolutionBuckets:
+def get_glyphs_for_resolution(auth_context: AuthContext) -> GlyphResolutionBuckets:
     """Fetch global glyphs split into three resolution tiers for the given caller.
 
     Returns a ``GlyphResolutionBuckets`` with:
@@ -165,11 +197,9 @@ async def get_glyphs_for_resolution(auth_context: AuthContext) -> GlyphResolutio
     the most recently updated one wins within each public tier.
     """
 
-    async def function(i: int) -> GlyphResolutionBuckets:
-        async with _jobs_module.async_session_maker() as session:
-            pub_rows_result = await session.execute(
-                select(GlobalGlyph).where(GlobalGlyph.public.is_(True)).order_by(GlobalGlyph.updated_at)
-            )
+    def function(i: int) -> GlyphResolutionBuckets:
+        with _jobs_module.sync_session_maker() as session:
+            pub_rows_result = session.execute(select(GlobalGlyph).where(GlobalGlyph.public.is_(True)).order_by(GlobalGlyph.updated_at))
             pub_overriddable: dict[str, str] = {}
             pub_nonoverridable: dict[str, str] = {}
             for row in pub_rows_result.scalars():
@@ -178,7 +208,7 @@ async def get_glyphs_for_resolution(auth_context: AuthContext) -> GlyphResolutio
                 else:
                     pub_nonoverridable[str(row.key)] = str(row.value)
 
-            user_result = await session.execute(
+            user_result = session.execute(
                 select(GlobalGlyph).where(
                     GlobalGlyph.public.is_(False),
                     GlobalGlyph.created_by == auth_context.user_id,
@@ -192,10 +222,10 @@ async def get_glyphs_for_resolution(auth_context: AuthContext) -> GlyphResolutio
                 public_nonoverridable=pub_nonoverridable,
             )
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def delete_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContext) -> GlobalGlyph | None:
+def delete_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContext) -> GlobalGlyphRecord | None:
     """Delete a GlobalGlyph by id if the caller is allowed to do so.
 
     Returns the deleted row on success, or ``None`` if the glyph does not exist
@@ -207,23 +237,24 @@ async def delete_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: Auth
     is enforced via ``auth_context.allowed``.
     """
 
-    async def function(i: int) -> GlobalGlyph | None:
-        async with _jobs_module.async_session_maker() as session:
+    def function(i: int) -> GlobalGlyphRecord | None:
+        with _jobs_module.sync_session_maker() as session:
             # Fetch with visibility filter so non-admins cannot see (and thus
             # cannot attempt to delete) glyphs that are not visible to them.
             query = _visibility_filter(
                 select(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id),
                 auth_context,
             )
-            result = await session.execute(query)
+            result = session.execute(query)
             row: GlobalGlyph | None = result.scalar_one_or_none()
             if row is None:
                 return None
             if not auth_context.allowed(str(row.created_by)):
                 # Visible but not owned — caller is not admin and not the owner.
                 return None
-            await session.execute(delete(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id))
-            await session.commit()
-            return row
+            dto = _to_global_glyph_record(row)
+            session.execute(delete(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id))
+            session.commit()
+            return dto
 
-    return await dbRetry(function)
+    return dbRetry(function)

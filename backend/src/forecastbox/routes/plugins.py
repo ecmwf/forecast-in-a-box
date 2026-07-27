@@ -15,7 +15,8 @@ Contains:
 """
 
 import logging
-from typing import Annotated
+from functools import partial
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
@@ -25,17 +26,13 @@ from packaging.version import InvalidVersion, Version
 from forecastbox.domain.auth.users import UserRead
 from forecastbox.domain.glyphs.resolution import remap_glyph_names
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
-from forecastbox.domain.plugin.db import get_plugin_state, upsert_plugin_state
+from forecastbox.domain.plugin.db import PluginStateRecord, get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.detail import PluginListing, build_plugin_listing
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy, PluginNotFound
-from forecastbox.domain.plugin.manager import (
-    PluginManager,
-    submit_update_single,
-    uninstall_plugin,
-    unload_single,
-)
+from forecastbox.domain.plugin.manager import PluginManager, submit_update_single, uninstall_plugin, unload_single
 from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
+from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.config import PluginSettings, config
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -61,10 +58,7 @@ async def get_plugin_list() -> PluginListing:
     try:
         return await build_plugin_listing()
     except PluginManagerBusy:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Plugin manager is busy; retry later",
-        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugin manager is busy; retry later")
 
 
 # TODO ideally we'd return the redirect here, but that is basically guaranteed to end up with a 503 because
@@ -139,7 +133,7 @@ def _settings2Versions(pluginSettings: PluginSettings, pipSource: str) -> Plugin
 def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends()]) -> PluginVersions:
     """Return available PyPI versions of a plugin that are compatible with the installed ``fiab-core``.
 
-    Compatibility is defined as equal major version.  Only versions published
+    Compatibility is defined as equal major version. Only versions published
     on PyPI are considered; locally-installed or git-sourced plugins will
     receive an empty list.
     """
@@ -160,19 +154,19 @@ def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin
 async def uninstall_plugin_endpoint(
     request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
 ) -> Response:
-    await uninstall_plugin(pluginCompositeId)
+    uninstall_plugin(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 
 class PluginSettingsUpdateRequest(FiabBaseModel):
     pluginCompositeId: PluginCompositeId
     isEnabled: bool | None = None
-    """Enable or disable the plugin.  ``None`` leaves the stored value unchanged."""
+    """Enable or disable the plugin. ``None`` leaves the stored value unchanged."""
     excluded_templates: list[str] | None = None
-    """Names of templates to exclude.  ``None`` leaves the stored list unchanged;
+    """Names of templates to exclude. ``None`` leaves the stored list unchanged;
     an empty list explicitly clears all exclusions."""
     glyph_remapping: dict[str, str] | None = None
-    """Glyph rename map to persist.  ``None`` leaves the stored map unchanged;
+    """Glyph rename map to persist. ``None`` leaves the stored map unchanged;
     an empty dict explicitly clears all remappings."""
 
 
@@ -185,16 +179,20 @@ async def update_plugin_settings_endpoint(
     """Persist plugin settings (enabled flag, exclusions, remapping) and trigger a re-ingest."""
     plugin_id_str = PluginCompositeId.to_str(body.pluginCompositeId)
     try:
-        await upsert_plugin_state(
-            plugin_id=plugin_id_str,
-            enabled=body.isEnabled,
-            excluded_templates=body.excluded_templates,
-            glyph_remapping=body.glyph_remapping,
+        await execution_manager.await_jobs_db(
+            "plugin.state.upsert",
+            partial(
+                upsert_plugin_state,
+                plugin_id=plugin_id_str,
+                enabled=body.isEnabled,
+                excluded_templates=body.excluded_templates,
+                glyph_remapping=body.glyph_remapping,
+            ),
         )
     except PluginNotFound:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id_str} not found")
     if body.isEnabled is False:
-        await unload_single(body.pluginCompositeId)
+        unload_single(body.pluginCompositeId)
     result = submit_update_single(body.pluginCompositeId, install=False, version=None)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
@@ -232,14 +230,20 @@ async def get_template_example_values(
         )
 
     plugin_id_str = PluginCompositeId.to_str(pluginCompositeId)
-    plugin_state = await get_plugin_state(plugin_id_str)
+    plugin_state = cast(
+        PluginStateRecord | None,
+        await execution_manager.await_jobs_db(
+            "plugin.state.get",
+            partial(get_plugin_state, plugin_id_str),
+        ),
+    )
     if plugin_state is None:
         raise HTTPException(status_code=404, detail=f"Plugin {PluginCompositeId.to_str(pluginCompositeId)!r} not installed")
-    excluded_set: set[str] = set(plugin_state.excluded_templates) if plugin_state.excluded_templates else set()  # type: ignore[arg-type]
+    excluded_set = set(plugin_state.excluded_templates)
     if displayName in excluded_set:
         raise HTTPException(status_code=403, detail=f"Template {displayName!r} is excluded")
 
-    glyph_remapping: dict[str, str] = dict(plugin_state.glyph_remapping) if plugin_state.glyph_remapping else {}  # type: ignore[no-matching-overload]
+    glyph_remapping = dict(plugin_state.glyph_remapping)
 
     remapped_example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, BlueprintTemplateExampleInput]] = {
         BlockInstanceId(block_id): {
@@ -253,7 +257,4 @@ async def get_template_example_values(
         for key, inp in template.example_glyphs.items()
     }
 
-    return TemplateExampleValuesResponse(
-        example_values=remapped_example_values,
-        example_glyphs=remapped_example_glyphs,
-    )
+    return TemplateExampleValuesResponse(example_values=remapped_example_values, example_glyphs=remapped_example_glyphs)

@@ -10,7 +10,7 @@
 """Service layer for the experiment / cron-schedule domain.
 
 Owns create/update/delete/get/list schedule operations previously embedded in
-route code.  No HTTP exceptions are raised here; callers are responsible for
+route code. No HTTP exceptions are raised here; callers are responsible for
 mapping domain exceptions to HTTP responses.
 
 Authorization is enforced here:
@@ -23,6 +23,7 @@ Authorization is enforced here:
 import datetime as dt
 import logging
 from collections.abc import Iterable
+from functools import partial
 from typing import cast
 
 import forecastbox.domain.blueprint.db as blueprint_db
@@ -31,15 +32,12 @@ import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.run.db as run_db
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentNotFound, SchedulerBusy
-from forecastbox.domain.experiment.scheduling.background import (
-    prod_scheduler,
-    scheduler_lock,
-    timeout_acquire_request,
-)
+from forecastbox.domain.experiment.scheduling.background import prod_scheduler, scheduler_lock, timeout_acquire_request
 from forecastbox.domain.experiment.scheduling.dt_utils import calculate_next_run, parse_crontab
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
-from forecastbox.schemata.jobs import ExperimentDefinition, Run
+from forecastbox.domain.run.db import RunRecord
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.time import current_time
@@ -86,32 +84,45 @@ async def create_schedule(
     except ValueError as e:
         raise ValueError(f"Invalid crontab: {cron_expr} => {e}") from e
 
-    job_def = await blueprint_db.get_blueprint(blueprint_id, blueprint_version)
+    job_def = cast(
+        blueprint_db.BlueprintRecord | None,
+        await execution_manager.await_jobs_db(
+            "blueprint.get",
+            partial(blueprint_db.get_blueprint, blueprint_id, blueprint_version),
+        ),
+    )
     if job_def is None:
         raise ExperimentNotFound(f"Blueprint {blueprint_id!r} not found")
-
-    job_def_id = BlueprintId(str(job_def.blueprint_id))  # ty:ignore[invalid-argument-type]
-    job_def_version = cast(int, job_def.version)
 
     experiment_definition_payload = {
         "cron_expr": cron_expr,
         "max_acceptable_delay_hours": max_acceptable_delay_hours,
         "enabled": True,
     }
-    experiment_id, _ = await experiment_db.upsert_experiment_definition(
-        auth_context=auth_context,
-        blueprint_id=job_def_id,
-        blueprint_version=job_def_version,
-        experiment_type="cron_schedule",
-        created_by=auth_context.user_id,
-        experiment_definition=experiment_definition_payload,
-        display_name=display_name,
-        display_description=display_description,
-        tags=tags,
+    experiment_id, _ = cast(
+        tuple[ExperimentDefinitionId, int],
+        await execution_manager.await_jobs_db(
+            "experiment.definition.upsert",
+            partial(
+                experiment_db.upsert_experiment_definition,
+                auth_context=auth_context,
+                blueprint_id=job_def.blueprint_id,
+                blueprint_version=job_def.version,
+                experiment_type="cron_schedule",
+                created_by=auth_context.user_id,
+                experiment_definition=experiment_definition_payload,
+                display_name=display_name,
+                display_description=display_description,
+                tags=tags,
+            ),
+        ),
     )
 
     next_run_at = resolve_next_run(first_run_override, max_acceptable_delay_hours, cron_expr)
-    await scheduling_db.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
+    await execution_manager.await_jobs_db(
+        "experiment.next.upsert",
+        partial(scheduling_db.upsert_experiment_next, experiment_id=experiment_id, scheduled_at=next_run_at),
+    )
     logger.debug(f"Schedule {experiment_id}: next run at {next_run_at}")
     prod_scheduler()
 
@@ -128,8 +139,18 @@ async def get_schedule(
     Raises ExperimentNotFound if not found, not visible to ``auth_context``, or not a cron schedule.
     """
     results = list(
-        await experiment_db.list_experiment_definitions(
-            auth_context=auth_context, experiment_definition_id=experiment_id, version=version, limit=1
+        cast(
+            Iterable[experiment_db.ExperimentLatest],
+            await execution_manager.await_jobs_db(
+                "experiment.definition.list",
+                partial(
+                    experiment_db.list_experiment_definitions,
+                    auth_context=auth_context,
+                    experiment_definition_id=experiment_id,
+                    version=version,
+                    limit=1,
+                ),
+            ),
         )
     )
     if not results or results[0].experiment.experiment_type != "cron_schedule":
@@ -145,15 +166,31 @@ async def list_schedules(
 
     Raises ValueError if page is out of range.
     """
-    total = await experiment_db.count_experiment_definitions(auth_context=auth_context, experiment_type="cron_schedule")
+    total = cast(
+        int,
+        await execution_manager.await_jobs_db(
+            "experiment.definition.count",
+            partial(experiment_db.count_experiment_definitions, auth_context=auth_context, experiment_type="cron_schedule"),
+        ),
+    )
     start = pagination.start()
 
     if start >= total and total > 0:
         raise ValueError("Page number out of range.")
 
     experiments = list(
-        await experiment_db.list_experiment_definitions(
-            auth_context=auth_context, experiment_type="cron_schedule", offset=start, limit=pagination.page_size
+        cast(
+            Iterable[experiment_db.ExperimentLatest],
+            await execution_manager.await_jobs_db(
+                "experiment.definition.list",
+                partial(
+                    experiment_db.list_experiment_definitions,
+                    auth_context=auth_context,
+                    experiment_type="cron_schedule",
+                    offset=start,
+                    limit=pagination.page_size,
+                ),
+            ),
         )
     )
     return experiments, total, pagination.total_pages(total)
@@ -169,20 +206,26 @@ async def update_schedule(
 ) -> experiment_db.ExperimentLatest:
     """Update a cron schedule experiment. Returns the updated schedule paired with its entity-level created_at.
 
-    Acquires scheduler_lock for the duration.  Raises SchedulerBusy if lock
-    cannot be acquired.  Raises ExperimentNotFound or ExperimentAccessDenied as
-    appropriate.  Raises ValueError for an invalid cron expression or stale
+    Acquires scheduler_lock for the duration. Raises SchedulerBusy if lock
+    cannot be acquired. Raises ExperimentNotFound or ExperimentAccessDenied as
+    appropriate. Raises ValueError for an invalid cron expression or stale
     first_run_override.
     """
     with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
         if not acquired:
             raise SchedulerBusy("Scheduler is busy, please retry.")
 
-        current = await experiment_db.get_experiment_definition(experiment_id)
+        current = cast(
+            experiment_db.ExperimentDefinitionRecord | None,
+            await execution_manager.await_jobs_db(
+                "experiment.definition.get",
+                partial(experiment_db.get_experiment_definition, experiment_id),
+            ),
+        )
         if current is None or current.experiment_type != "cron_schedule":
             raise ExperimentNotFound(f"Schedule {experiment_id} not found")
 
-        current_def = cast(dict, current.experiment_definition) or {}
+        current_def = current.experiment_definition or {}
 
         new_cron_expr = cron_expr if cron_expr is not None else str(current_def.get("cron_expr", ""))
         if cron_expr is not None:
@@ -202,31 +245,49 @@ async def update_schedule(
             "enabled": new_enabled,
         }
 
-        await experiment_db.upsert_experiment_definition(
-            auth_context=auth_context,
-            experiment_definition_id=experiment_id,
-            blueprint_id=BlueprintId(str(current.blueprint_id)),  # ty:ignore[invalid-argument-type]
-            blueprint_version=cast(int, current.blueprint_version),
-            experiment_type="cron_schedule",
-            created_by=cast(str, current.created_by),
-            experiment_definition=new_experiment_definition,
-            display_name=cast(str | None, current.display_name),
-            display_description=cast(str | None, current.display_description),
-            tags=cast(list[str] | None, current.tags),
+        await execution_manager.await_jobs_db(
+            "experiment.definition.upsert",
+            partial(
+                experiment_db.upsert_experiment_definition,
+                auth_context=auth_context,
+                experiment_definition_id=experiment_id,
+                blueprint_id=current.blueprint_id,
+                blueprint_version=current.blueprint_version,
+                experiment_type="cron_schedule",
+                created_by=current.created_by,
+                experiment_definition=new_experiment_definition,
+                display_name=current.display_name,
+                display_description=current.display_description,
+                tags=current.tags,
+            ),
         )
 
         if cron_expr is not None or enabled is not None or first_run_override is not None:
             if new_enabled:
                 next_run_at = resolve_next_run(first_run_override, new_max_delay, new_cron_expr)
-                await scheduling_db.upsert_experiment_next(experiment_id=experiment_id, scheduled_at=next_run_at)
+                await execution_manager.await_jobs_db(
+                    "experiment.next.upsert",
+                    partial(scheduling_db.upsert_experiment_next, experiment_id=experiment_id, scheduled_at=next_run_at),
+                )
                 logger.debug(f"Schedule {experiment_id}: regenerated next run at {next_run_at}")
             else:
-                await scheduling_db.delete_experiment_next(experiment_id)
+                await execution_manager.await_jobs_db(
+                    "experiment.next.delete",
+                    partial(scheduling_db.delete_experiment_next, experiment_id),
+                )
                 logger.debug(f"Schedule {experiment_id}: disabled, next run cleared")
         prod_scheduler()
 
     updated = list(
-        await experiment_db.list_experiment_definitions(auth_context=auth_context, experiment_definition_id=experiment_id, limit=1)
+        cast(
+            Iterable[experiment_db.ExperimentLatest],
+            await execution_manager.await_jobs_db(
+                "experiment.definition.list",
+                partial(
+                    experiment_db.list_experiment_definitions, auth_context=auth_context, experiment_definition_id=experiment_id, limit=1
+                ),
+            ),
+        )
     )
     assert updated
     return updated[0]
@@ -235,14 +296,20 @@ async def update_schedule(
 async def delete_schedule(auth_context: AuthContext, experiment_id: ExperimentDefinitionId) -> None:
     """Soft-delete a cron schedule experiment and clear its next run.
 
-    Acquires scheduler_lock for the duration.  Raises SchedulerBusy if lock
-    cannot be acquired.  Raises ExperimentNotFound or ExperimentAccessDenied.
+    Acquires scheduler_lock for the duration. Raises SchedulerBusy if lock
+    cannot be acquired. Raises ExperimentNotFound or ExperimentAccessDenied.
     """
     with timed_acquire(scheduler_lock, timeout_acquire_request) as acquired:
         if not acquired:
             raise SchedulerBusy("Scheduler is busy, please retry.")
-        await experiment_db.soft_delete_experiment_definition(experiment_id, auth_context=auth_context)
-        await scheduling_db.delete_experiment_next(experiment_id)
+        await execution_manager.await_jobs_db(
+            "experiment.definition.delete",
+            partial(experiment_db.soft_delete_experiment_definition, experiment_id, auth_context=auth_context),
+        )
+        await execution_manager.await_jobs_db(
+            "experiment.next.delete",
+            partial(scheduling_db.delete_experiment_next, experiment_id),
+        )
     prod_scheduler()
 
 
@@ -251,10 +318,22 @@ async def get_next_run(auth_context: AuthContext, experiment_id: ExperimentDefin
 
     Raises ExperimentNotFound if the schedule does not exist.
     """
-    exp_def = await experiment_db.get_experiment_definition(experiment_id)
+    exp_def = cast(
+        experiment_db.ExperimentDefinitionRecord | None,
+        await execution_manager.await_jobs_db(
+            "experiment.definition.get",
+            partial(experiment_db.get_experiment_definition, experiment_id),
+        ),
+    )
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise ExperimentNotFound(f"Schedule {experiment_id} not found")
-    next_entry = await scheduling_db.get_experiment_next(experiment_id)
+    next_entry = cast(
+        scheduling_db.ExperimentNextRecord | None,
+        await execution_manager.await_jobs_db(
+            "experiment.next.get",
+            partial(scheduling_db.get_experiment_next, experiment_id),
+        ),
+    )
     if next_entry is None:
         return "not scheduled currently"
     return str(next_entry.scheduled_at)
@@ -264,22 +343,40 @@ async def get_schedule_runs(
     auth_context: AuthContext,
     experiment_id: ExperimentDefinitionId,
     pagination: PaginationSpec,
-) -> tuple[Iterable[Run], int, int]:
+) -> tuple[Iterable[RunRecord], int, int]:
     """Return (executions, total, total_pages) for runs linked to a cron schedule experiment.
 
     Raises ExperimentNotFound if the schedule does not exist.
     Raises ValueError if page is out of range.
     Will return empty if the user is not authenticated to see the resource.
     """
-    exp_def = await experiment_db.get_experiment_definition(experiment_id)
+    exp_def = cast(
+        experiment_db.ExperimentDefinitionRecord | None,
+        await execution_manager.await_jobs_db(
+            "experiment.definition.get",
+            partial(experiment_db.get_experiment_definition, experiment_id),
+        ),
+    )
     if exp_def is None or exp_def.experiment_type != "cron_schedule":
         raise ExperimentNotFound(f"Schedule {experiment_id} not found")
 
-    total = await run_db.count_runs_by_experiment(experiment_id, auth_context=auth_context)
+    total = cast(
+        int,
+        await execution_manager.await_jobs_db(
+            "run.count-by-experiment",
+            partial(run_db.count_runs_by_experiment, experiment_id, auth_context=auth_context),
+        ),
+    )
     start = pagination.start()
 
     if start >= total and total > 0:
         raise ValueError("Page number out of range.")
 
-    executions = await run_db.list_runs_by_experiment(experiment_id, auth_context=auth_context, offset=start, limit=pagination.page_size)
+    executions = cast(
+        Iterable[RunRecord],
+        await execution_manager.await_jobs_db(
+            "run.list-by-experiment",
+            partial(run_db.list_runs_by_experiment, experiment_id, auth_context=auth_context, offset=start, limit=pagination.page_size),
+        ),
+    )
     return executions, total, pagination.total_pages(total)

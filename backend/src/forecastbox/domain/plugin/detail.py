@@ -22,17 +22,18 @@ these fast operations; long-running work must not be done under it.
 """
 
 import logging
+from functools import partial
 
 from fiab_core.fable import PluginCompositeId
 from fiab_core.plugin import Plugin
 from pydantic import Field
 
-from forecastbox.domain.plugin.db import get_all_plugin_states
+from forecastbox.domain.plugin.db import PluginStateRecord, get_all_plugin_states
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail
-from forecastbox.schemata.jobs import PluginState
+from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -110,7 +111,7 @@ def _build_detail(
     remote_info: PluginRemoteInfo | None,
     plugin_in_memory: Plugin | None,
     in_memory_errors: PluginErrors,
-    db_state: PluginState | None,
+    db_state: PluginStateRecord | None,
 ) -> PluginDetail:
     generic_data = PluginGenericData(store_info=store_entry, remote_info=remote_info)
 
@@ -124,20 +125,20 @@ def _build_detail(
 
     # Separate persisted errors by source: install-phase errors go to install_data,
     # load/template_ingest errors go to load_errors.
-    all_db_errors = PluginErrors([PluginError(**e) for e in (db_state.plugin_errors or [])])  # type: ignore[union-attr]
+    all_db_errors = PluginErrors([PluginError(**e) for e in db_state.plugin_errors])
     install_errors = PluginErrors([e for e in all_db_errors if e.source == "install"])
     db_load_errors = PluginErrors([e for e in all_db_errors if e.source != "install"])
     install_data = PluginInstallData(
-        local_version=db_state.plugin_version,  # type: ignore[attr-defined]
-        update_datetime=value_dt2str(db_state.updated_at),  # type: ignore[attr-defined]
+        local_version=db_state.plugin_version,
+        update_datetime=value_dt2str(db_state.updated_at),
         install_errors=install_errors,
     )
 
     # settings_data -- only if install succeeded
     settings_data = None
     if not _install_failed(install_errors):
-        is_enabled = bool(db_state.enabled)  # type: ignore[attr-defined]
-        excluded: list[str] = list(db_state.excluded_templates) if db_state.excluded_templates else []  # type: ignore[union-attr]
+        is_enabled = db_state.enabled
+        excluded = list(db_state.excluded_templates)
         excluded_set = set(excluded)
         if plugin_in_memory is not None and is_enabled:
             all_names = [t.display_name for t in plugin_in_memory.blueprint_templates]
@@ -148,15 +149,15 @@ def _build_detail(
             isEnabled=is_enabled,
             excluded_templates=excluded,
             included_templates=included,
-            glyph_remapping=dict(db_state.glyph_remapping) if db_state.glyph_remapping else {},  # type: ignore[arg-type]
+            glyph_remapping=dict(db_state.glyph_remapping),
         )
 
     # load_errors -- db non-install errors + in-memory errors + template-ingest errors from DB
     load_error_list: list[PluginError] = list(db_load_errors) + list(in_memory_errors)
-    if db_state.template_errors:  # type: ignore[truthy-bool]
+    if db_state.template_errors:
         load_error_list += [
             PluginError(source="template_ingest", severity="warning", detail=f"template {name!r}: {msg}")
-            for name, msg in db_state.template_errors.items()  # type: ignore[union-attr]
+            for name, msg in db_state.template_errors.items()
         ]
 
     return PluginDetail(
@@ -180,15 +181,15 @@ async def build_plugin_listing() -> PluginListing:
             raise PluginManagerBusy("plugin manager lock could not be acquired; retry later")
         plugins_snapshot: dict[PluginCompositeId, Plugin] = dict(PluginManager.plugins)
         errors_snapshot: dict[PluginCompositeId, PluginErrors] = dict(PluginManager.errors)
-        db_states = await get_all_plugin_states()
+        db_states = await execution_manager.await_jobs_db("plugin.state.list", partial(get_all_plugin_states))
 
     store_detail = get_plugins_detail()
 
     # Index DB states by parsed PluginCompositeId
-    states_by_id: dict[PluginCompositeId, PluginState] = {}
+    states_by_id: dict[PluginCompositeId, PluginStateRecord] = {}
     for state in db_states:
         try:
-            pid = PluginCompositeId.from_str(state.plugin_id)  # type: ignore[arg-type]
+            pid = PluginCompositeId.from_str(state.plugin_id)
         except Exception:
             logger.warning(f"could not parse plugin_id {state.plugin_id!r} from DB; skipping")
             continue

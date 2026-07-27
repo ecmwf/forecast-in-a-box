@@ -9,20 +9,18 @@
 
 """Background execution of a run: compilation, context persistence, and cascade submission.
 
-Runs in a thread-pool executor (not the async event loop) so that the caller can return
-an ExecuteResult immediately without waiting for potentially slow cascade submission.
-Async database calls are dispatched back to the event loop via
-``asyncio.run_coroutine_threadsafe``.
+Runs on a worker thread so the caller can return an ExecuteResult immediately
+without waiting for potentially slow cascade submission. Jobs-database access is
+performed synchronously on the worker thread and serialized by the shared jobs RLock.
 """
 
-import asyncio
 import logging
 from datetime import datetime
 from typing import cast
 
-from cascade.low.core import TaskId
 from fiab_core.fable import BlockInstanceId
 
+from forecastbox.domain.blueprint.db import BlueprintRecord
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.gateway.service import get_current_cascade_proc
 from forecastbox.domain.glyphs import global_db
@@ -40,7 +38,6 @@ from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_gl
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.detail import store_compilation_detail
 from forecastbox.domain.run.types import RunId
-from forecastbox.schemata.jobs import Blueprint
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.memcache import TooLargeEntry
 from forecastbox.utility.time import current_time
@@ -52,26 +49,19 @@ def execute_background(
     run_id: RunId,
     attempt_count: int,
     submit_time: datetime,
-    blueprint: Blueprint,
+    blueprint: BlueprintRecord,
     compiler_runtime_context: CompilerRuntimeContext,
-    loop: asyncio.AbstractEventLoop,
     auth_context: AuthContext,
 ) -> None:
     """Compile a blueprint and submit it to cascade, updating the Run row as we go.
 
-    Intended to run in a thread-pool executor. All async database mutations are
-    dispatched to ``loop`` via ``asyncio.run_coroutine_threadsafe``.
-
-    ``submit_time`` is the ``created_at`` timestamp recorded when the Run row was
-    first inserted; it becomes ``submitDatetime`` in the intrinsic glyphs so that
-    retries preserve the original submission time. ``startDatetime`` is set to the
-    moment this function actually begins executing (i.e. ``current_time()``).
+    Intended to run on a worker thread. ``submit_time`` is the ``created_at`` timestamp
+    recorded when the Run row was first inserted; it becomes ``submitDatetime`` in the
+    intrinsic glyphs so that retries preserve the original submission time.
+    ``startDatetime`` is set to the moment this function actually begins executing
+    (i.e. ``current_time()``).
     """
-
     logger.debug(f"starting background compilation of {run_id=}")
-
-    def run_async(coro: object) -> object:  # type: ignore[type-arg]
-        return asyncio.run_coroutine_threadsafe(coro, loop).result()  # type: ignore[arg-type]
 
     try:
         start_time = current_time("glyph_resolution")
@@ -80,7 +70,7 @@ def execute_background(
             resolve_intrinsic_glyph_values(run_id, submit_time, start_time, attempt_count),
         )
 
-        global_buckets = cast(GlyphResolutionBuckets, run_async(global_db.get_glyphs_for_resolution(auth_context)))
+        global_buckets: GlyphResolutionBuckets = global_db.get_glyphs_for_resolution(auth_context)
 
         builder = BlueprintBuilder.model_validate(blueprint.builder)
         local_values: dict[str, str] = builder.local_glyphs
@@ -108,13 +98,11 @@ def execute_background(
         exec_spec, run_outputs, compilation_detail = compile_builder(builder, relevant_glyphs_and_values)
 
         persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
-        run_async(
-            db.update_run_runtime(
-                run_id,
-                attempt_count,
-                compiler_runtime_context=persisted_context.model_dump(exclude_unset=True),
-                status="preparing",
-            )
+        db.update_run_runtime(
+            run_id,
+            attempt_count,
+            compiler_runtime_context=persisted_context.model_dump(exclude_unset=True),
+            status="preparing",
         )
 
         logger.debug(f"starting background submission of {run_id=}")
@@ -127,19 +115,17 @@ def execute_background(
                 )
             except TooLargeEntry as e:
                 logger.warning(f"failed to cache compilation detail for {run_id=}, {attempt_count=}: {repr(e)}")
-            run_async(
-                db.update_run_runtime(
-                    run_id,
-                    attempt_count,
-                    cascade_job_id=response.job_id,
-                    cascade_proc=get_current_cascade_proc(),
-                    outputs=run_outputs.model_dump(),
-                )
+            db.update_run_runtime(
+                run_id,
+                attempt_count,
+                cascade_job_id=response.job_id,
+                cascade_proc=get_current_cascade_proc(),
+                outputs=run_outputs.model_dump(),
             )
         else:
             error = (response.error or "no error provided by cascade")[:255]
-            run_async(db.update_run_runtime(run_id, attempt_count, status="failed", error=error))
+            db.update_run_runtime(run_id, attempt_count, status="failed", error=error)
     except Exception as e:
         logger.exception(f"execute_background failed for run {run_id!r} attempt {attempt_count}: {repr(e)}")
         logger.debug(f"updating background data of {run_id=}")
-        run_async(db.update_run_runtime(run_id, attempt_count, status="failed", error=repr(e)[:255]))
+        db.update_run_runtime(run_id, attempt_count, status="failed", error=repr(e)[:255])

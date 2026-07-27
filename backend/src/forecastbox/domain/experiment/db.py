@@ -11,14 +11,14 @@
 
 Uses the same session maker as ``forecastbox.schemata.jobs`` so that all tables
 share a single SQLite connection pool and in-process tests can monkeypatch
-a single ``async_session_maker`` attribute to inject an in-memory database.
+a single ``sync_session_maker`` attribute to inject an in-memory database.
 """
 
 import datetime as dt
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy import func, select, update
 
@@ -32,7 +32,48 @@ from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
 from forecastbox.utility.time import current_time
 
 
-async def upsert_experiment_definition(
+@dataclass(frozen=True, eq=True, slots=True)
+class ExperimentDefinitionRecord:
+    experiment_definition_id: ExperimentDefinitionId
+    version: int
+    created_by: str
+    created_at: dt.datetime
+    display_name: str | None
+    display_description: str | None
+    tags: list[str] | None
+    blueprint_id: BlueprintId
+    blueprint_version: int
+    experiment_type: ExperimentType
+    experiment_definition: dict[str, Any] | None
+    is_deleted: bool
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class ExperimentLatest:
+    """An ExperimentDefinition paired with the entity's true creation time."""
+
+    experiment: ExperimentDefinitionRecord
+    created_at: dt.datetime
+
+
+def _to_experiment_record(row: ExperimentDefinition) -> ExperimentDefinitionRecord:
+    return ExperimentDefinitionRecord(
+        experiment_definition_id=ExperimentDefinitionId(str(cast(Any, row.experiment_definition_id))),
+        version=cast(int, row.version),
+        created_by=cast(str, row.created_by),
+        created_at=cast(dt.datetime, row.created_at),
+        display_name=cast(str | None, row.display_name),
+        display_description=cast(str | None, row.display_description),
+        tags=cast(list[str] | None, row.tags),
+        blueprint_id=BlueprintId(str(cast(Any, row.blueprint_id))),
+        blueprint_version=cast(int, row.blueprint_version),
+        experiment_type=cast(ExperimentType, row.experiment_type),
+        experiment_definition=cast(dict[str, Any] | None, row.experiment_definition),
+        is_deleted=cast(bool, row.is_deleted),
+    )
+
+
+def upsert_experiment_definition(
     *,
     auth_context: AuthContext,
     experiment_definition_id: ExperimentDefinitionId | None = None,
@@ -57,9 +98,9 @@ async def upsert_experiment_definition(
     experiment_id = experiment_definition_id if experiment_definition_id is not None else ExperimentDefinitionId(str(uuid.uuid4()))
     ref_time = current_time("dbref")
 
-    async def function(i: int) -> int:
-        async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(
+    def function(i: int) -> int:
+        with _jobs_module.sync_session_maker() as session:
+            result = session.execute(
                 select(func.max(ExperimentDefinition.version)).where(ExperimentDefinition.experiment_definition_id == experiment_id)
             )
             max_version: int | None = result.scalar()
@@ -76,7 +117,7 @@ async def upsert_experiment_definition(
                     .order_by(ExperimentDefinition.version.desc())
                     .limit(1)
                 )
-                owner_result = await session.execute(owner_query)
+                owner_result = session.execute(owner_query)
                 row = owner_result.first()
                 if row is not None:
                     owner: str = row[0]
@@ -102,16 +143,16 @@ async def upsert_experiment_definition(
                     is_deleted=False,
                 )
             )
-            await session.commit()
+            session.commit()
             return new_version
 
-    new_version = await dbRetry(function)
+    new_version = dbRetry(function)
     return experiment_id, new_version
 
 
-async def get_experiment_definition(
+def get_experiment_definition(
     experiment_definition_id: ExperimentDefinitionId, version: int | None = None
-) -> ExperimentDefinition | None:
+) -> ExperimentDefinitionRecord | None:
     """Return a specific or the latest non-deleted version of an ExperimentDefinition.
 
     No authorization is applied; possession of the experiment ID is treated as
@@ -138,18 +179,11 @@ async def get_experiment_definition(
             .order_by(ExperimentDefinition.version.desc())
             .limit(1)
         )
-    return await querySingle(query, _jobs_module.async_session_maker)
+    row = querySingle(query, _jobs_module.sync_session_maker)
+    return None if row is None else _to_experiment_record(row)
 
 
-@dataclass
-class ExperimentLatest:
-    """An ExperimentDefinition (a specific or the latest visible version) paired with the entity's true creation time."""
-
-    experiment: ExperimentDefinition
-    created_at: dt.datetime
-
-
-async def list_experiment_definitions(
+def list_experiment_definitions(
     *,
     auth_context: AuthContext,
     experiment_type: str | None = None,
@@ -176,8 +210,8 @@ async def list_experiment_definitions(
     ``created_at`` which represents that version's ``updated_at``.
     """
 
-    async def function(i: int) -> list[ExperimentLatest]:
-        async with _jobs_module.async_session_maker() as session:
+    def function(i: int) -> list[ExperimentLatest]:
+        with _jobs_module.sync_session_maker() as session:
             subq = select(
                 ExperimentDefinition.experiment_definition_id,
                 func.max(ExperimentDefinition.version).label("max_version"),
@@ -212,13 +246,13 @@ async def list_experiment_definitions(
             query = query.offset(offset)
             if limit is not None:
                 query = query.limit(limit)
-            result = await session.execute(query)
-            return [ExperimentLatest(experiment=r[0], created_at=r[1]) for r in result.all()]
+            result = session.execute(query)
+            return [ExperimentLatest(experiment=_to_experiment_record(r[0]), created_at=r[1]) for r in result.all()]
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def count_experiment_definitions(
+def count_experiment_definitions(
     *,
     auth_context: AuthContext,
     experiment_type: str | None = None,
@@ -229,8 +263,8 @@ async def count_experiment_definitions(
     Authenticated non-admin users count only their own.
     """
 
-    async def function(i: int) -> int:
-        async with _jobs_module.async_session_maker() as session:
+    def function(i: int) -> int:
+        with _jobs_module.sync_session_maker() as session:
             subq = (
                 select(
                     ExperimentDefinition.experiment_definition_id,
@@ -250,22 +284,22 @@ async def count_experiment_definitions(
             if not auth_context.has_admin():
                 inner = inner.where(ExperimentDefinition.created_by == auth_context.user_id)
             query = select(func.count()).select_from(inner.subquery())
-            result = await session.execute(query)
+            result = session.execute(query)
             return result.scalar() or 0
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def soft_delete_experiment_definition(experiment_id: ExperimentDefinitionId, *, auth_context: AuthContext) -> None:
+def soft_delete_experiment_definition(experiment_id: ExperimentDefinitionId, *, auth_context: AuthContext) -> None:
     """Mark all versions of an ExperimentDefinition as deleted.
 
-    Raises ``ExperimentNotFound`` if the blueprint does not exist, and
+    Raises ``ExperimentNotFound`` if the experiment does not exist, and
     ``ExperimentAccessDenied`` if the actor is not the owner or an admin.
     """
-    existing = await get_experiment_definition(experiment_id)
+    existing = get_experiment_definition(experiment_id)
     if existing is None:
         raise ExperimentNotFound(f"No ExperimentDefinition with id={experiment_id!r}.")
-    if not auth_context.allowed(cast(str, existing.created_by)):
+    if not auth_context.allowed(existing.created_by):
         raise ExperimentAccessDenied(f"User {auth_context.user_id!r} is not allowed to delete ExperimentDefinition {experiment_id!r}.")
     stmt = update(ExperimentDefinition).where(ExperimentDefinition.experiment_definition_id == experiment_id).values(is_deleted=True)
-    await executeAndCommit(stmt, _jobs_module.async_session_maker)
+    executeAndCommit(stmt, _jobs_module.sync_session_maker)

@@ -15,22 +15,42 @@ single connection pool and in-process tests can monkeypatch a single attribute.
 
 import datetime as dt
 import uuid
+from dataclasses import dataclass
+from typing import Any, cast
 
 from sqlalchemy import delete, func, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
+from forecastbox.domain.experiment import db as experiment_db
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentNext
 from forecastbox.utility.db import addAndCommit, dbRetry, executeAndCommit, querySingle
 from forecastbox.utility.time import current_time
 
 
-async def upsert_experiment_next(*, experiment_id: ExperimentDefinitionId, scheduled_at: dt.datetime) -> None:
+@dataclass(frozen=True, eq=True, slots=True)
+class ExperimentNextRecord:
+    experiment_next_id: str
+    experiment_id: ExperimentDefinitionId
+    scheduled_at: dt.datetime
+    updated_at: dt.datetime
+
+
+def _to_experiment_next_record(row: ExperimentNext) -> ExperimentNextRecord:
+    return ExperimentNextRecord(
+        experiment_next_id=str(cast(Any, row.experiment_next_id)),
+        experiment_id=ExperimentDefinitionId(str(cast(Any, row.experiment_id))),
+        scheduled_at=cast(dt.datetime, row.scheduled_at),
+        updated_at=cast(dt.datetime, row.updated_at),
+    )
+
+
+def upsert_experiment_next(*, experiment_id: ExperimentDefinitionId, scheduled_at: dt.datetime) -> None:
     """Insert or update the next scheduled run time for an experiment."""
     ref_time = current_time("dbref")
-    existing = await querySingle(
+    existing = querySingle(
         select(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id),
-        _jobs_module.async_session_maker,
+        _jobs_module.sync_session_maker,
     )
     if existing:
         stmt = (
@@ -38,7 +58,7 @@ async def upsert_experiment_next(*, experiment_id: ExperimentDefinitionId, sched
             .where(ExperimentNext.experiment_id == experiment_id)
             .values(scheduled_at=scheduled_at, updated_at=ref_time)
         )
-        await executeAndCommit(stmt, _jobs_module.async_session_maker)
+        executeAndCommit(stmt, _jobs_module.sync_session_maker)
     else:
         entity = ExperimentNext(
             experiment_next_id=str(uuid.uuid4()),
@@ -46,22 +66,23 @@ async def upsert_experiment_next(*, experiment_id: ExperimentDefinitionId, sched
             scheduled_at=scheduled_at,
             updated_at=ref_time,
         )
-        await addAndCommit(entity, _jobs_module.async_session_maker)
+        addAndCommit(entity, _jobs_module.sync_session_maker)
 
 
-async def get_experiment_next(experiment_id: ExperimentDefinitionId) -> ExperimentNext | None:
+def get_experiment_next(experiment_id: ExperimentDefinitionId) -> ExperimentNextRecord | None:
     """Return the next scheduled run entry for an experiment."""
     query = select(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
-    return await querySingle(query, _jobs_module.async_session_maker)
+    row = querySingle(query, _jobs_module.sync_session_maker)
+    return None if row is None else _to_experiment_next_record(row)
 
 
-async def delete_experiment_next(experiment_id: ExperimentDefinitionId) -> None:
+def delete_experiment_next(experiment_id: ExperimentDefinitionId) -> None:
     """Remove the next scheduled run entry for an experiment, clearing the pending tick."""
     stmt = delete(ExperimentNext).where(ExperimentNext.experiment_id == experiment_id)
-    await executeAndCommit(stmt, _jobs_module.async_session_maker)
+    executeAndCommit(stmt, _jobs_module.sync_session_maker)
 
 
-async def get_schedulable_experiments(now: dt.datetime) -> list[tuple[ExperimentNext, ExperimentDefinition]]:
+def get_schedulable_experiments(now: dt.datetime) -> list[tuple[ExperimentNextRecord, experiment_db.ExperimentDefinitionRecord]]:
     """Return (ExperimentNext, ExperimentDefinition) pairs due for execution.
 
     Joins ExperimentNext with the latest non-deleted ExperimentDefinition of type
@@ -70,8 +91,8 @@ async def get_schedulable_experiments(now: dt.datetime) -> list[tuple[Experiment
     scheduler thread by logging error and deleting their ExperimentNext.
     """
 
-    async def function(i: int) -> list[tuple[ExperimentNext, ExperimentDefinition]]:
-        async with _jobs_module.async_session_maker() as session:
+    def function(i: int) -> list[tuple[ExperimentNextRecord, experiment_db.ExperimentDefinitionRecord]]:
+        with _jobs_module.sync_session_maker() as session:
             subq = (
                 select(
                     ExperimentDefinition.experiment_definition_id,
@@ -92,19 +113,19 @@ async def get_schedulable_experiments(now: dt.datetime) -> list[tuple[Experiment
                 )
                 .where(ExperimentDefinition.experiment_type == "cron_schedule")
             )
-            result = await session.execute(query)
-            return [(row[0], row[1]) for row in result.all()]
+            result = session.execute(query)
+            return [(_to_experiment_next_record(row[0]), experiment_db._to_experiment_record(row[1])) for row in result.all()]
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def next_schedulable_experiment() -> dt.datetime | None:
+def next_schedulable_experiment() -> dt.datetime | None:
     """Return the earliest scheduled_at across all ExperimentNext rows."""
 
-    async def function(i: int) -> dt.datetime | None:
-        async with _jobs_module.async_session_maker() as session:
+    def function(i: int) -> dt.datetime | None:
+        with _jobs_module.sync_session_maker() as session:
             query = select(func.min(ExperimentNext.scheduled_at))
-            result = await session.execute(query)
+            result = session.execute(query)
             return result.scalar_one_or_none()
 
-    return await dbRetry(function)
+    return dbRetry(function)

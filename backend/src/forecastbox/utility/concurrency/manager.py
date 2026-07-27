@@ -576,6 +576,14 @@ class ExecutionManager:
         future = self.submit_unmonitored(pool_name, task_name, task)
         return await asyncio.wrap_future(future)
 
+    async def await_jobs_db(self, task_name: str, task: SyncTask[T]) -> T:
+        """Convenience wrapper submitting a single jobs-DB call to ``ConcurrentPools.JobsDb``.
+
+        Async services and routes use this to bridge a synchronous jobs-DB helper
+        call into async code, instead of each module defining its own alias.
+        """
+        return await self.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
+
     def submit_after(
         self,
         dependency: Future[Any],

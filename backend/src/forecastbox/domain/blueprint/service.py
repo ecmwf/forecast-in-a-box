@@ -23,6 +23,7 @@ No HTTP exceptions are raised here; callers are responsible for mapping
 import datetime as dt
 import logging
 from collections import defaultdict
+from functools import partial
 from itertools import groupby
 from typing import Any, cast
 
@@ -53,6 +54,7 @@ from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values, remap_glyph_names
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.graph import topological_order
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -174,10 +176,14 @@ class BlueprintSaveCommand(FiabBaseModel):
 # ---------------------------------------------------------------------------
 
 
-async def validate_expand(
-    blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
+def _validate_expand_with_buckets(
+    blueprint: BlueprintBuilder,
+    auth_context: AuthContext,
+    global_buckets: global_db.GlyphResolutionBuckets,
+    *,
+    validate_only: bool = False,
 ) -> BlueprintValidationExpansion:
-    """Validate and expand a partially-constructed BlueprintBuilder.
+    """Validate and expand a partially-constructed BlueprintBuilder using preloaded global glyphs.
 
     Returns structured validation errors and possible completion options.
     The presence of errors does not affect the return (callers decide how to
@@ -213,7 +219,6 @@ async def validate_expand(
     outputs = {}
 
     intrinsic_values = cast(dict[str, str], get_values_and_examples())
-    global_buckets = await global_db.get_glyphs_for_resolution(auth_context)
     local_glyphs = blueprint.local_glyphs
 
     all_glyphs_raw = merge_glyph_values(
@@ -337,9 +342,9 @@ async def validate_expand(
             continue
         outputs[blockId] = output_or_error.t
 
-        # Serialize the block's output qube for the frontend qube lens. Best
-        # effort only — a malformed/edge-case qube must never fail validation.
         if not validate_only and isinstance(output_or_error.t, QubedOutput):
+            # Serialize the block's output qube for the frontend qube lens. Best
+            # effort only — a malformed/edge-case qube must never fail validation.
             try:
                 block_output_qubes[blockId] = output_or_error.t.dataqube.to_json()
             except Exception as exc:  # viz extra, never fatal
@@ -378,6 +383,28 @@ async def validate_expand(
         missing_glyphs=missing_glyphs_result,
         block_output_qubes=block_output_qubes,
     )
+
+
+def validate_expand_sync(
+    blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
+) -> BlueprintValidationExpansion:
+    """Synchronous variant used by non-async callers such as the plugin updater thread."""
+    global_buckets = global_db.get_glyphs_for_resolution(auth_context)
+    return _validate_expand_with_buckets(blueprint, auth_context, global_buckets, validate_only=validate_only)
+
+
+async def validate_expand(
+    blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
+) -> BlueprintValidationExpansion:
+    """Validate and expand a partially-constructed BlueprintBuilder."""
+    global_buckets = cast(
+        global_db.GlyphResolutionBuckets,
+        await execution_manager.await_jobs_db(
+            "glyph.resolution",
+            partial(global_db.get_glyphs_for_resolution, auth_context),
+        ),
+    )
+    return _validate_expand_with_buckets(blueprint, auth_context, global_buckets, validate_only=validate_only)
 
 
 def template_to_builder(template: BlueprintTemplate, plugin_id: PluginCompositeId) -> BlueprintBuilder:
@@ -508,19 +535,26 @@ async def save_builder(
     Raises ``BlueprintNotFound`` or ``BlueprintAccessDenied`` from the db layer.
     """
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
-    blueprint_id, version = await upsert_blueprint(
-        auth_context=auth_context,
-        blueprint_id=blueprint_id,
-        source=source,
-        created_by=auth_context.user_id,
-        builder=payload.builder.model_dump(mode="json"),
-        display_name=payload.display_name,
-        display_description=payload.display_description,
-        tags=[t.model_dump() for t in payload.tags] if payload.tags else None,
-        parent_id=payload.parent_id,
-        expected_version=expected_version,
+    saved_blueprint_id, version = cast(
+        tuple[BlueprintId, int],
+        await execution_manager.await_jobs_db(
+            "blueprint.upsert",
+            partial(
+                upsert_blueprint,
+                auth_context=auth_context,
+                blueprint_id=blueprint_id,
+                source=source,
+                created_by=auth_context.user_id,
+                builder=payload.builder.model_dump(mode="json"),
+                display_name=payload.display_name,
+                display_description=payload.display_description,
+                tags=[t.model_dump() for t in payload.tags] if payload.tags else None,
+                parent_id=payload.parent_id,
+                expected_version=expected_version,
+            ),
+        ),
     )
-    return BlueprintSaveResult(blueprint_id=blueprint_id, blueprint_version=version)
+    return BlueprintSaveResult(blueprint_id=saved_blueprint_id, blueprint_version=version)
 
 
 async def load_builder(blueprint_id: BlueprintId, version: int | None, auth_context: AuthContext) -> BlueprintRetrieveResult:
@@ -531,7 +565,15 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None, auth_cont
     Raises ``BlueprintNotFound`` if the id does not exist, is not visible to
     ``auth_context``, or has no builder spec.
     """
-    results = list(await db.list_blueprints(auth_context=auth_context, blueprint_id=blueprint_id, version=version, limit=1))
+    results = list(
+        cast(
+            list[db.BlueprintLatest],
+            await execution_manager.await_jobs_db(
+                "blueprint.list",
+                partial(db.list_blueprints, auth_context=auth_context, blueprint_id=blueprint_id, version=version, limit=1),
+            ),
+        )
+    )
     if not results:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} not found.")
     latest = results[0]
@@ -539,18 +581,18 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None, auth_cont
     if blueprint.builder is None:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} has no builder spec.")
     builder = BlueprintBuilder.model_validate(blueprint.builder)
-    raw_tags: list[dict] = blueprint.tags or []  # ty:ignore[invalid-argument-type,invalid-assignment]
+    raw_tags: list[dict] = blueprint.tags or []
     return BlueprintRetrieveResult(
-        blueprint_id=BlueprintId(str(blueprint.blueprint_id)),  # ty:ignore[invalid-argument-type]
-        blueprint_version=cast(int, blueprint.version),
+        blueprint_id=blueprint.blueprint_id,
+        blueprint_version=blueprint.version,
         builder=builder,
-        display_name=blueprint.display_name,  # ty:ignore[invalid-argument-type]
-        display_description=blueprint.display_description,  # ty:ignore[invalid-argument-type]
+        display_name=blueprint.display_name,
+        display_description=blueprint.display_description,
         tags=[Tag.model_validate(t) for t in raw_tags],
-        parent_id=blueprint.parent_id,  # ty:ignore[invalid-argument-type]
+        parent_id=blueprint.parent_id,
         source=cast(str, blueprint.source),
-        fiabcore_major=cast(int, blueprint.fiabcore_major),
+        fiabcore_major=blueprint.fiabcore_major,
         created_at=value_dt2str(latest.created_at),
-        updated_at=value_dt2str(cast(dt.datetime, blueprint.created_at)),
-        user=cast(str, blueprint.created_by),
+        updated_at=value_dt2str(blueprint.created_at),
+        user=blueprint.created_by,
     )
