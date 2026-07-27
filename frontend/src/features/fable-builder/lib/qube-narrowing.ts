@@ -46,8 +46,7 @@ export function computeEdgeNarrowing(
 ): Array<DimensionNarrowing> {
   const outputQube = blockOutputQubes[sourceBlockId] as QubeNode | undefined
   const block = fable.blocks[sourceBlockId] as
-    | FableBuilderV1['blocks'][string]
-    | undefined
+    FableBuilderV1['blocks'][string] | undefined
   if (!outputQube || !block) return []
 
   const inputCounts = new Map<string, number>()
@@ -76,8 +75,7 @@ export function computeEdgeNarrowing(
   // A Select only deliberately narrows its chosen dimension; keep just that one.
   const isSelect = block.factory_id.factory === 'select'
   const selectedDim = block.configuration_values['dimension'] as
-    | string
-    | undefined
+    string | undefined
   const deliberate = isSelect
     ? narrowings.filter((item) => item.dimension === selectedDim)
     : narrowings

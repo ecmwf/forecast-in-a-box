@@ -47,8 +47,7 @@ export function dropModeForConnection(
 ): DropMode {
   if (conn.isInput) {
     const prior = fable.blocks[conn.nodeId].input_ids[conn.handleId] as
-      | string
-      | undefined
+      string | undefined
     return prior ? 'insert' : 'connect'
   }
   const sourceHasConsumers = Object.values(fable.blocks).some((block) =>

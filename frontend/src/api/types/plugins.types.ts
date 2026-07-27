@@ -171,12 +171,7 @@ export function pluginErrorsMaxSeverity(
 
 /** The single visual state a plugin's status badge conveys. */
 export type PluginBadgeKind =
-  | 'loaded'
-  | 'disabled'
-  | 'warning'
-  | 'errored'
-  | 'update'
-  | 'available'
+  'loaded' | 'disabled' | 'warning' | 'errored' | 'update' | 'available'
 
 /**
  * The one badge a plugin shows. Badge and status filter both derive from this,
