@@ -168,9 +168,14 @@ Notes:
 - Keep `expire_on_commit=False` (matches current behavior; needed so returned
   ORM values remain readable after commit).
 - The six helper modules currently reference `_jobs_module.async_session_maker`
-  so tests can monkeypatch one attribute. Preserve that indirection: they will
-  reference `_jobs_module.sync_session_maker` after conversion (single
-  monkeypatch point retained -- see open questions on tests).
+  so tests can monkeypatch one attribute. Preserve that single-attribute
+  indirection: they will reference `_jobs_module.sync_session_maker` after
+  conversion. The tests covering these helpers switch to synchronous style
+  themselves (they should not `await` a converted helper; a unit test that would
+  is a candidate for splitting per one-concern-per-test) and supply an in-memory
+  synchronous maker backed by SQLAlchemy `StaticPool` so the schema stays visible
+  across threads. Test rewrites are tracked with the (separate) test work, but
+  the seam decision (`sync_session_maker`, one monkeypatch point) is fixed here.
 
 ### Step 2.1b -- Synchronous jobs lock and retry helpers (`utility/db.py`)
 
@@ -263,50 +268,56 @@ Rules:
   `upsert_experiment_next` calls `querySingle` then `executeAndCommit`) simply
   become nested synchronous calls under the same re-entrant `RLock`.
 
-### Step 2.2b -- Materialize ORM values returned across the JobsDb bridge
+### Step 2.2b -- Return ORM-free values from public helpers (JobsDb bridge safety)
 
-Some helpers return ORM instances (`Run`, `Blueprint`, `ExperimentDefinition`,
+Some helpers today return ORM instances (`Run`, `Blueprint`, `ExperimentDefinition`,
 `ExperimentNext`, `GlobalGlyph`, `PluginState`) or containers of them
 (`BlueprintLatest`, `ExperimentLatest`, `list[tuple[ExperimentNext,
 ExperimentDefinition]]`). When such a helper is invoked from async code via
 `awaitable_submit`, the ORM object is created on the JobsDb worker thread, its
-session is closed there, and the object is then read on the caller's thread.
+session is closed there, and the object is then read on the caller's thread --
+which risks reading an unloaded/expired attribute off a detached instance.
 
-For each ORM-returning helper, classify it:
+**Firm rule for this phase (chosen for safety over minimality):** no **public**
+helper (a function whose name does **not** start with `_`) in any of the six
+converted modules may return an ORM instance -- or a container/tuple/dataclass
+holding one -- regardless of whether its current callers are async or sync. Each
+such public helper returns a fully materialized, ORM-free value: a plain scalar,
+a frozen dataclass / Pydantic DTO, or a container of those, built and populated
+while the session is still open. This removes the whole class of
+`DetachedInstanceError`/cross-thread lazy-load bugs by convention rather than by
+per-caller audit.
 
-1. **Only ever invoked directly from synchronous code** (same thread creates and
-   reads the object) -> no change needed (design 2.2: "you do not need to change
-   that").
-2. **Ever invoked from async code (JobsDb bridge)** -> ensure the returned value
-   is fully materialized before the session closes, i.e. it does not rely on
-   lazy loading after close.
+`_`-prefixed (private) helpers **may** stay returning an ORM object for now,
+because they are only meant to be used within their defining module (same thread,
+same open session). Enforcing "no private helper is used across module
+boundaries" is left to convention; detecting breaches is out of scope for this
+effort.
 
-Practical guidance:
-- With `expire_on_commit=False` and plain column reads (no `relationship()` is
-  defined on any of these models -- verified in `schemata/jobs.py`), attributes
-  loaded during the query remain accessible after `close()`. The main risk is
-  attributes never loaded (deferred/expired), not lazy relationships.
-- Prefer introducing small frozen dataclasses (or reuse existing DTOs) where an
-  async caller only needs a handful of fields, per the design's "you may need to
-  introduce new dataclasses" allowance. Where a caller (e.g. `poll_and_update`,
-  route serializers) reads many attributes and already treats the ORM row as a
-  read-only snapshot, materialization-before-close is sufficient without a new
-  type.
-- Concretely audit these async-reachable returns and decide dataclass vs.
-  materialize: `run_db.get_run`, `run_db.list_runs`,
+Guidance:
+- Because no model in `schemata/jobs.py` defines a `relationship()`, each ORM row
+  is a flat set of columns; a DTO is a straightforward field-by-field copy taken
+  before the session closes. Reuse an existing DTO where one already fits;
+  otherwise add a small frozen dataclass next to the helper.
+- Public helpers to convert to ORM-free returns (each returns a DTO / container
+  of DTOs / scalar): `run_db.get_run`, `run_db.list_runs`,
   `run_db.list_runs_by_experiment`, `blueprint_db.get_blueprint`,
   `blueprint_db.list_blueprints` (`BlueprintLatest`),
+  `blueprint_db.find_plugin_template_id` (already scalar),
   `experiment_db.get_experiment_definition`,
   `experiment_db.list_experiment_definitions` (`ExperimentLatest`),
-  `scheduling_db.get_experiment_next`, `global_db.*`, `plugin_db.get_plugin_state`,
-  `plugin_db.get_all_plugin_states`.
-- `get_schedulable_experiments` returns ORM tuples but (after Phase 2) is called
-  **directly** from the scheduler thread, so it falls in category 1 -- no change
-  beyond the sync conversion, as long as the scheduler reads the fields on its
-  own thread before any further submission.
-
-This classification is the single most error-prone part of the phase; see open
-questions.
+  `scheduling_db.get_experiment_next`, `scheduling_db.get_schedulable_experiments`,
+  `global_db.upsert_global_glyph`, `global_db.get_global_glyph`,
+  `global_db.list_global_glyphs`, `global_db.get_glyphs_for_resolution` (already
+  a plain-`dict` DTO), `global_db.delete_global_glyph`,
+  `plugin_db.get_plugin_state`, `plugin_db.get_all_plugin_states`.
+- `BlueprintLatest` / `ExperimentLatest` currently wrap an ORM instance plus a
+  timestamp; redefine them (or replace their payload) so they carry plain
+  materialized fields instead of the ORM object.
+- Downstream consumers that today read attributes off the returned ORM row
+  (route serializers, `poll_and_update`, `experiment2runnable`, the scheduler
+  loop) must be updated to read the DTO fields. This is a real but mechanical
+  ripple; account for it in each caller rewrite (Steps 2.2c/2.2d).
 
 ### Step 2.2c -- Rewrite async callers to submit through the JobsDb pool
 
@@ -346,6 +357,17 @@ Guidance:
   internally, so this invariant holds automatically).
 - Do not wrap non-DB async work in `awaitable_submit`; only the DB helper calls
   move.
+- **Do not add handling for `SubmissionRejected` (pool saturation) in this
+  phase.** To keep scope simple, leave it unhandled so it surfaces as a default
+  HTTP 500. Explicit service-busy mapping (e.g. 503) will be addressed later,
+  systematically, across all pools -- not here.
+- Each async service that issues several sequential DB calls (e.g.
+  `experiment/service.py::create_schedule` -> three; `run/service.py::poll_and_update`
+  -> one or more updates) becomes one JobsDb submission **per call**, preserving
+  the existing per-operation lock granularity (design: do not merge into
+  transaction-like operations). This is explicitly **acceptable within this
+  migration effort**; any latency optimization from batching is deferred to later
+  work.
 
 ### Step 2.2d -- Rewrite synchronous callers to call helpers directly
 
@@ -364,14 +386,19 @@ helpers directly -- no loop, no `run_coroutine_threadsafe`:
   `db.next_schedulable_experiment` directly; replace the
   `_run_async(execute(...))` submission with a direct `submit_run_sync(...)` call
   (2.2e). The scheduler stays an unmanaged thread for now (managed-thread
-  migration is Phase 4); Phase 2 only removes its DB loop dependency.
+  migration is Phase 4); Phase 2 only removes its DB loop dependency. The stored
+  loop is assumed to serve DB access only; if implementation uncovers any non-DB
+  dependency on it, that use must itself be removed, or the discovery flagged as
+  a blocker for this phase.
 - **`domain/plugin/manager.py`** (updater thread): replace every
   `_run_async_from_thread(<db coro>)` with a direct synchronous helper call.
   Nested async DB-orchestration helpers reachable only from this thread (e.g.
   `_ingest_plugin_templates`) must be converted to synchronous functions that
   call the converted DB helpers directly. Remove `_run_async_from_thread` and
-  `PluginManager.loop` once no non-DB use of the loop remains (verify: today it
-  is DB-only). The plugin manager's *thread ownership* is Phase 3; Phase 2 only
+  `PluginManager.loop` (and its assignment in `app.py`). `PluginManager.loop` is
+  assumed to serve DB access only; if implementation uncovers any non-DB use of
+  it, that use must itself be removed, or the discovery flagged as a blocker for
+  this phase. The plugin manager's *thread ownership* is Phase 3; Phase 2 only
   removes its DB loop bridge.
 
 ### Step 2.2e -- Async-independent run-submission boundary
@@ -436,9 +463,9 @@ After all callers compile against the sync helpers, remove:
   `utility/db.py` (replaced in 2.1b).
 - The async jobs session usage from runtime operations: once every helper uses
   `sync_session_maker`, remove `async_engine` / `async_session_maker` /
-  async `create_db_and_tables` from `schemata/jobs.py` **unless** a monkeypatch
-  test seam still requires the attribute name (see open questions -- resolve so
-  no runtime code path can open the jobs file under the old async lock).
+  async `create_db_and_tables` from `schemata/jobs.py`. The test seam uses
+  `sync_session_maker` (Step 2.1a), so no runtime code path may open the jobs
+  file under the old async engine or the old `asyncio.Lock`.
 
 Completion criterion (design 2.2): search all jobs-DB helpers and direct
 session-maker imports; the cutover is complete only when **no** code path can
@@ -456,8 +483,9 @@ Verify during implementation (design 2.3):
 - The sync SQLite engine + pool are configured so a connection may be checked out
   by different threads over its lifetime (`check_same_thread=False`); the jobs
   lock prevents simultaneous use.
-- Queue saturation surfaces as an explicit service-busy failure
-  (`SubmissionRejected`), never a direct fallback DB call from async code.
+- Queue saturation surfaces as `SubmissionRejected` and is left **unhandled**
+  in this phase (default HTTP 500); never add a direct fallback DB call from
+  async code. Explicit service-busy mapping is deferred (Step 2.2c).
 - DB tasks are not auto-retried by the manager; only the narrow SQLite
   `OperationalError` retry inside `dbRetry` applies.
 - No helper waits on futures/pool submissions/domain locks while holding the
@@ -476,73 +504,12 @@ across call sites for the same helper.
 
 - `uv run prek` before committing.
 - Targeted type check / lint on the changed backend modules.
-- Run the existing jobs-DB unit tests after adapting their session-maker
-  monkeypatching (see open questions): at minimum
+- Run the existing jobs-DB unit tests after switching them to synchronous style
+  (they call `sync_session_maker` directly; a `StaticPool` in-memory maker keeps
+  the schema visible across threads): at minimum
   `tests/unit/domain/blueprint/test_blueprint_db.py`,
   `tests/unit/domain/plugins/test_plugin_db.py`, and any run/experiment/glyph DB
   and scheduler tests. Broaden to the affected route/service tests.
 - Manual smoke: start the backend, confirm `/api/v1/status` shows JobsDb ready,
   create/list a blueprint, create a run, and (if enabled) let the scheduler tick
   -- confirming no `run_coroutine_threadsafe` / loop-retention paths remain.
-
-## Open questions and concerns
-
-1. **Test seam for the sync session maker.** Helper modules currently indirect
-   through `_jobs_module.async_session_maker` so tests monkeypatch one attribute
-   to an in-memory DB. In-memory SQLite plus a synchronous engine shared across
-   threads needs `StaticPool` (a single shared connection) to keep the schema
-   visible across threads. Should Phase 2 (a) switch helpers to
-   `_jobs_module.sync_session_maker` and have tests build a `StaticPool`
-   in-memory `sync_session_maker`, or (b) provide a small test fixture/factory?
-   Test design is out of scope per the migration doc, but the *seam* is a code
-   decision. Recommendation: keep the single-attribute indirection
-   (`sync_session_maker`) and let the (separate) test work supply a `StaticPool`
-   maker.
-*> review: the tests that cover the db helper modules should switch to sync themselves -- we want to keep the tests close to the code in spirit, with minimum overhead etc. I don't think there is a unit test for a db module that would do some awaits. If there is, it is a candidate for splitting actually; unit tests should cover only concern
-
-2. **ORM-across-thread classification (Step 2.2b).** This requires a
-   helper-by-helper audit of which returning-ORM helpers are reached from async
-   (JobsDb bridge) vs. sync-only. Concern: an object that is lazily/deferred and
-   read after the worker closes its session would raise `DetachedInstanceError`
-   only at runtime. Should we, for safety and clarity, convert **all**
-   async-reachable ORM returns to explicit frozen dataclasses/DTOs even where
-   materialization-before-close would technically suffice? That is more code and
-   touches route/service serializers, but removes a whole class of latent bugs.
-   The models define no relationships today, which lowers the risk.
-*> review: ok lets be safe and convert everything in "public" db modules -- ie, a `_some_helper` methods starting with underscore, if there are such, can stay for now returning an ORM. But no underscore-starting method should return an ORM, regardless of its callers. We would forbid by convention to use private methods outside of the module, but identifying breaches thereof is out of scope for this effort
-
-3. **Scheduler thread status/liveness during the loop removal.** Removing
-   `_loop`/`_run_async` from `SchedulerThread` while leaving it an unmanaged
-   thread (managed-thread migration is Phase 4) is intended, but the thread still
-   owns `scheduler_lock`, liveness fields, and `status_scheduler`. Confirm no
-   remaining scheduler code path needs the loop for non-DB reasons before
-   deleting the field.
-*> review: I'm not aware of any need for the loop beyond the DB access. If any is found during implementation, it should be removed or flagged as a blocker
-
-4. **`PluginManager.loop` non-DB uses.** The plan assumes `PluginManager.loop`
-   is DB-only (verified for `_run_async_from_thread`). Before removing it and its
-   `app.py` assignment, re-confirm no other module reads `PluginManager.loop`.
-*> review: I'm not aware of any need for the loop beyond the DB access. If any is found during implementation, it should be removed or flagged as a blocker
-
-5. **`execute_background` waiting on artifacts vs. pool sizing.** In Phase 2 the
-   artifact manager still uses its own executor, so run-submission waits do not
-   contend with the (Phase 3) `ArtifactIo` pool. When Phase 3 moves artifacts,
-   ensure the waiter (RunSubmission) and the download task (ArtifactIo) stay on
-   different pools. Flagged here as a forward dependency, not a Phase 2 change.
-*> review: indeed, not a concern here, to be solved during Phase 3.
-
-6. **`awaitable_submit` failure semantics for callers.** Async callers must be
-   ready to handle `SubmissionRejected` (service busy) surfacing from
-   `awaitable_submit`. Should routes map it to HTTP 503? The migration doc says
-   to treat saturation as an explicit service-busy failure; the exact HTTP
-   mapping is a route-layer decision worth confirming, though arguably minimal
-   for Phase 2 given the JobsDb `max_pending=128` default.
-*> review: to keep the scope simple, put to the plan to explicitly ignore the possibliity of SubmissionRejection exception, ie, it should end up as a default 500 unhandled. We will deal with it later, systematically
-
-7. **Number of submissions per request.** Some async services issue several
-   sequential DB calls (e.g. `experiment/service.py::create_schedule` does three;
-   `run/service.py::poll_and_update` issues one or more updates). Each becomes a
-   separate JobsDb submission, preserving existing lock granularity per the
-   design ("do not merge into bigger transaction-like operations"). Confirm this
-   is acceptable latency-wise; the design explicitly accepts it.
-*> review: be explicit in the plan that this is acceptable within this migration effort, and that we will address this later
