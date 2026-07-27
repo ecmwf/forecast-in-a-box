@@ -27,7 +27,6 @@ Glyph routes:
 
 import datetime as dt
 import logging
-from collections.abc import Callable
 from functools import partial
 from typing import Annotated, Any, Literal, cast
 
@@ -65,8 +64,7 @@ from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.schemata.jobs import BlueprintSource
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrency.manager import TaskName, execution_manager
-from forecastbox.utility.config import ConcurrentPools
+from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -78,10 +76,6 @@ router = APIRouter(
     tags=["blueprint"],
     responses={404: {"description": "Not found"}},
 )
-
-
-async def _await_jobs_db(task_name: str, task: Callable[[], object]) -> object:
-    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
 
 
 _CORE_VERSION_MISMATCH_KEY = "CoreVersionMismatch"
@@ -348,14 +342,14 @@ async def list_blueprints(
     """
     total = cast(
         int,
-        await _await_jobs_db(
+        await execution_manager.await_jobs_db(
             "blueprint.count", partial(db.count_blueprints, auth_context=auth_context, created_by=filters.created_by, source=filters.source)
         ),
     )
     start = pagination.start()
     page_defs = cast(
         list[db.BlueprintLatest],
-        await _await_jobs_db(
+        await execution_manager.await_jobs_db(
             "blueprint.list",
             partial(
                 db.list_blueprints,
@@ -444,7 +438,7 @@ async def delete_blueprint(
     ``version`` must match the current latest version; returns 409 if it does not.
     """
     try:
-        await _await_jobs_db(
+        await execution_manager.await_jobs_db(
             "blueprint.delete",
             partial(db.soft_delete_blueprint, request.blueprint_id, expected_version=request.version, auth_context=auth_context),
         )
@@ -560,11 +554,13 @@ async def list_available_glyphs(
     global_items: list[GlobalGlyphResponse] = []
     global_total = 0
     if want_global:
-        global_total = cast(int, await _await_jobs_db("glyph.count", partial(global_db.count_global_glyphs, auth_context, key=glyph_key)))
+        global_total = cast(
+            int, await execution_manager.await_jobs_db("glyph.count", partial(global_db.count_global_glyphs, auth_context, key=glyph_key))
+        )
         if remainder.current_page_remaining > 0:
             rows = cast(
                 list[global_db.GlobalGlyphRecord],
-                await _await_jobs_db(
+                await execution_manager.await_jobs_db(
                     "glyph.list",
                     partial(
                         global_db.list_global_glyphs,
@@ -629,7 +625,7 @@ async def post_global_glyph(
         )
     row = cast(
         global_db.GlobalGlyphRecord,
-        await _await_jobs_db(
+        await execution_manager.await_jobs_db(
             "glyph.upsert",
             partial(global_db.upsert_global_glyph, request.key, request.value, request.public, request.overriddable, auth_context),
         ),
@@ -649,7 +645,9 @@ async def delete_global_glyph(
     """
     row = cast(
         global_db.GlobalGlyphRecord | None,
-        await _await_jobs_db("glyph.delete", partial(global_db.delete_global_glyph, request.global_glyph_id, auth_context)),
+        await execution_manager.await_jobs_db(
+            "glyph.delete", partial(global_db.delete_global_glyph, request.global_glyph_id, auth_context)
+        ),
     )
     if row is None:
         raise HTTPException(status_code=404, detail=f"GlobalGlyph {request.global_glyph_id!r} not found or not accessible.")

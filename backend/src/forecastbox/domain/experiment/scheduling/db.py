@@ -83,7 +83,13 @@ def delete_experiment_next(experiment_id: ExperimentDefinitionId) -> None:
 
 
 def get_schedulable_experiments(now: dt.datetime) -> list[tuple[ExperimentNextRecord, experiment_db.ExperimentDefinitionRecord]]:
-    """Return due ``(ExperimentNext, ExperimentDefinition)`` pairs."""
+    """Return due ``(ExperimentNext, ExperimentDefinition)`` pairs.
+
+    Joins ExperimentNext with the latest non-deleted ExperimentDefinition of type
+    'cron_schedule'. Disabled schedules have their ExperimentNext row deleted at
+    update time, so should not appear here -- but if they would, we handle at the
+    scheduler thread by logging error and deleting their ExperimentNext.
+    """
 
     def function(i: int) -> list[tuple[ExperimentNextRecord, experiment_db.ExperimentDefinitionRecord]]:
         with _jobs_module.sync_session_maker() as session:

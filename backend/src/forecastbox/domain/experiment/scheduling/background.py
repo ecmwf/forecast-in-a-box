@@ -24,10 +24,18 @@ from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
 
+# NOTE this lock can be locked externally, eg when updating schedules. For all operations
+# potentially involving the ScheduleNext table etc, as well as scheduler instance itself
+# to guarantee the singleton nature
 scheduler_lock = threading.Lock()
-timeout_acquire_request = 3
-timeout_acquire_lifecycle = 5
-timeout_acquire_background = 60
+timeout_acquire_request = 3  # aggressive timeout, we dont want to block async worker for long
+timeout_acquire_lifecycle = 5  # moderate timeout during scheduler startup/shutdown
+timeout_acquire_background = 60  # leisure timeout for the scheduler background thread
+
+# NOTE this does not really affect how often scheduler checks for new jobs --
+# if anything is scheduled for earlier, we sleep for shorter time in advance,
+# or are `prod`ed explicitly. The actual importance of this interval is to
+# implement liveness checks correctly
 sleep_duration_min: int = 15 * 60
 
 
@@ -71,10 +79,12 @@ class SchedulerThread(threading.Thread):
                         f"older than max_acceptable_delay_hours ({runnable.max_acceptable_delay_hours} hours)."
                     )
                 elif not is_valid:
+                    # NOTE this should not happen -- we have locks etc preventing this
                     logger.error("Skipping {experiment_id} at {scheduled_at}: it is not valid!")
                 else:
                     exec_result = submit_run_sync(
                         runnable.blueprint,
+                        # NOTE the is_admin may be True, but we dont know and its not important for this call
                         AuthContext(
                             user_id=runnable.created_by,
                             is_admin=False,
@@ -160,7 +170,7 @@ def stop_scheduler() -> None:
             raise ValueError("unexpected stop")
         Globals.scheduler.stop()
         Globals.scheduler.prod()
-        if Globals.scheduler.is_alive():
+        if Globals.scheduler.is_alive():  # just in case it wasnt even started
             Globals.scheduler.join(1)
         if Globals.scheduler.is_alive():
             logger.warning(f"scheduler thread {Globals.scheduler.name} / {Globals.scheduler.native_id} is alive despite stop/join!")
@@ -183,7 +193,7 @@ def status_scheduler() -> str:
     if not Globals.scheduler.is_alive():
         logger.warning("scheduler reported down due to thread not being alive")
         return "down"
-    Globals.scheduler.liveness_signal.wait(0)
+    Globals.scheduler.liveness_signal.wait(0)  # we do this just for ensuring a multithread sync
     now = current_time("liveness")
     if (
         Globals.scheduler.liveness_timestamp is None

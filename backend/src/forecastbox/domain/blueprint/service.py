@@ -23,7 +23,6 @@ No HTTP exceptions are raised here; callers are responsible for mapping
 import datetime as dt
 import logging
 from collections import defaultdict
-from collections.abc import Callable
 from functools import partial
 from itertools import groupby
 from typing import Any, cast
@@ -55,8 +54,7 @@ from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values, remap_glyph_names
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrency.manager import TaskName, execution_manager
-from forecastbox.utility.config import ConcurrentPools
+from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.graph import topological_order
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -178,10 +176,6 @@ class BlueprintSaveCommand(FiabBaseModel):
 # ---------------------------------------------------------------------------
 
 
-async def _await_jobs_db(task_name: str, task: Callable[[], object]) -> object:
-    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
-
-
 def _validate_expand_with_buckets(
     blueprint: BlueprintBuilder,
     auth_context: AuthContext,
@@ -189,7 +183,20 @@ def _validate_expand_with_buckets(
     *,
     validate_only: bool = False,
 ) -> BlueprintValidationExpansion:
-    """Validate and expand a partially-constructed BlueprintBuilder using preloaded global glyphs."""
+    """Validate and expand a partially-constructed BlueprintBuilder using preloaded global glyphs.
+
+    Returns structured validation errors and possible completion options.
+    The presence of errors does not affect the return (callers decide how to
+    surface them). Intrinsic and global glyphs visible to the caller, along
+    with local glyphs defined on the builder, are all considered known.
+
+    When ``validate_only`` is True, ``possible_sources`` and
+    ``possible_expansions`` are omitted from the result (saves work when the
+    caller only needs error checking), and the blueprint is deep-copied so
+    that ``resolve_configurations`` mutations do not affect the caller's object.
+    When ``validate_only`` is False (the default, used by the expand endpoint),
+    the passed-in blueprint may be mutated in place and expansion data is computed.
+    """
     plugins = PluginManager.plugins
     if validate_only:
         blueprint = blueprint.model_copy(deep=True)
@@ -230,6 +237,7 @@ def _validate_expand_with_buckets(
     for key in sorted(colliding_keys):
         global_errors.append(f"Local glyph key {key!r} is reserved as an intrinsic glyph and cannot be overridden.")
 
+    # Build lookup and detect duplicate instance ids.
     block_lookup: dict[BlockInstanceId, RoutableBlock] = {}
     for routable in blueprint.blocks:
         if routable.instance_id in block_lookup:
@@ -270,12 +278,15 @@ def _validate_expand_with_buckets(
         extracted = cast(ExtractedGlyphs, extract_result.t)
         unknown_glyphs = extracted.glyphs - available_glyphs
         if unknown_glyphs:
+            # Soft path: omit options referencing unknown glyphs and record them,
+            # rather than failing the whole block.
             option_glyph_map = resolution.extract_glyphs_per_option(routable.instance)
             for opt_id, opt_glyphs in option_glyph_map.items():
                 opt_unknown = opt_glyphs & unknown_glyphs
                 if opt_unknown:
                     missing_glyphs_result.setdefault(blockId, {})[opt_id] = sorted(opt_unknown)
                     del routable.instance.configuration_values[opt_id]
+            # Re-extract after removing affected options to get an accurate extracted state.
             extract_result = resolution.extract_glyphs(routable.instance)
             if extract_result.e is not None:
                 block_errors[blockId] += extract_result.e
@@ -288,9 +299,13 @@ def _validate_expand_with_buckets(
             block_errors[blockId] += [f"Jinja expression error: {exc}"]
             invalidable.add(blockId)
             continue
+        # A glyph value may itself reference an unknown glyph (e.g. myPath="${root}/${missing}").
+        # After substitution those unresolved ${...} patterns survive in the config values;
+        # a second extract_glyphs pass surfaces them.
         extract_after = resolution.extract_glyphs(routable.instance)
         nested_unknowns = cast(ExtractedGlyphs, extract_after.t).glyphs
         if nested_unknowns:
+            # Soft path: omit options with unresolved nested glyph references.
             option_glyph_map_after = resolution.extract_glyphs_per_option(routable.instance)
             for opt_id, opt_glyphs in option_glyph_map_after.items():
                 opt_nested = opt_glyphs & nested_unknowns
@@ -299,6 +314,8 @@ def _validate_expand_with_buckets(
                     existing = set(block_opts.get(opt_id, []))
                     block_opts[opt_id] = sorted(existing | opt_nested)
                     del routable.instance.configuration_values[opt_id]
+        # We dont want to return resolutions of nested glyphs, just the top levels. For this reason
+        # we need to run the extraction twice, not just once after the substitution
         resolved_configuration_options[blockId] = {
             k: routable.instance.configuration_values[k] for k in extracted.glyphed_options if k in routable.instance.configuration_values
         }
@@ -326,9 +343,11 @@ def _validate_expand_with_buckets(
         outputs[blockId] = output_or_error.t
 
         if not validate_only and isinstance(output_or_error.t, QubedOutput):
+            # Serialize the block's output qube for the frontend qube lens. Best
+            # effort only — a malformed/edge-case qube must never fail validation.
             try:
                 block_output_qubes[blockId] = output_or_error.t.dataqube.to_json()
-            except Exception as exc:
+            except Exception as exc:  # viz extra, never fatal
                 logger.error(f"Could not serialize output qube for {blockId=}: {repr(exc)}")
 
         if not validate_only:
@@ -346,6 +365,7 @@ def _validate_expand_with_buckets(
                 else []
             )
 
+    # the topological search *omits* nodes in cycles or with missing ancestors -- thus we need to report and detect them
     for blockId, routable in block_lookup.items():
         if blockId not in visited:
             missing = [source_id for source_id in routable.instance.input_ids.values() if source_id not in block_lookup]
@@ -379,7 +399,7 @@ async def validate_expand(
     """Validate and expand a partially-constructed BlueprintBuilder."""
     global_buckets = cast(
         global_db.GlyphResolutionBuckets,
-        await _await_jobs_db(
+        await execution_manager.await_jobs_db(
             "glyph.resolution",
             partial(global_db.get_glyphs_for_resolution, auth_context),
         ),
@@ -510,7 +530,7 @@ async def save_builder(
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
     saved_blueprint_id, version = cast(
         tuple[BlueprintId, int],
-        await _await_jobs_db(
+        await execution_manager.await_jobs_db(
             "blueprint.upsert",
             partial(
                 upsert_blueprint,
@@ -535,7 +555,7 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None, auth_cont
     results = list(
         cast(
             list[db.BlueprintLatest],
-            await _await_jobs_db(
+            await execution_manager.await_jobs_db(
                 "blueprint.list",
                 partial(db.list_blueprints, auth_context=auth_context, blueprint_id=blueprint_id, version=version, limit=1),
             ),

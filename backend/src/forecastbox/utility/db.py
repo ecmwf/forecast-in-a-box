@@ -40,7 +40,7 @@ def dbRetry(func: Callable[[int], T]) -> T:
             if i == 0:
                 raise
             time.sleep(0.1)
-    raise ValueError
+    raise ValueError  # NOTE in case of retries misconfig, we dont want implicit None
 
 
 def executeAndCommit(stmt: Any, session_maker: Any) -> None:

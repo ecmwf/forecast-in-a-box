@@ -40,7 +40,12 @@ from forecastbox.utility.time import current_time
 
 
 class CompilerRuntimeContext(FiabBaseModel):
-    """Per-execution dynamic values that override compiled ExecutionSpecification fields."""
+    """Per-execution dynamic values that override compiled ExecutionSpecification fields.
+
+    Merged via deep_union into the compiled spec before job submission; only the fields
+    explicitly set here override the compiled values. Persisted as JSON on the Run row
+    so that retries reproduce the same overrides.
+    """
 
     glyphs: dict[str, str] = Field(default_factory=dict)
 
@@ -102,7 +107,13 @@ def upsert_run(
     compiler_runtime_context: CompilerRuntimeContext = CompilerRuntimeContext(),
     experiment_context: str | None = None,
 ) -> tuple[RunId, int, dt.datetime]:
-    """Insert a new attempt of a Run and return (id, attempt_count, created_at)."""
+    """Insert a new attempt of a Run and return (id, attempt_count, created_at).
+
+    If ``run_id`` is omitted a fresh UUID is generated (attempt 1).
+    If ``run_id`` is supplied the next attempt number is derived from the database;
+    raises ``KeyError`` if that id does not exist yet.
+    No actor-level auth is enforced on creation; any caller may create an execution.
+    """
     supplied_run_id = run_id
     effective_run_id = run_id if run_id is not None else RunId(str(uuid.uuid4()))
     ref_time = current_time("dbref")
@@ -144,7 +155,12 @@ def get_run(
     *,
     auth_context: AuthContext,
 ) -> RunRecord:
-    """Return a specific or the latest non-deleted attempt of a Run."""
+    """Return a specific or the latest non-deleted attempt of a Run.
+
+    Raises ``RunNotFound`` if the execution does not exist.
+    Raises ``RunAccessDenied`` if the actor is an authenticated non-admin
+    who does not own the execution.
+    """
     if attempt_count is not None:
         query = select(Run).where(
             Run.run_id == run_id,
@@ -163,14 +179,21 @@ def get_run(
 
 
 def update_run_runtime(run_id: RunId, attempt_count: int, **kwargs: object) -> None:
-    """Update mutable runtime fields on a specific Run attempt."""
+    """Update mutable runtime fields on a specific Run attempt.
+
+    No actor-level auth; this is an internal system operation called during execution.
+    """
     ref_time = current_time("dbref")
     stmt = update(Run).where(Run.run_id == run_id, Run.attempt_count == attempt_count).values(updated_at=ref_time, **kwargs)
     executeAndCommit(stmt, _jobs_module.sync_session_maker)
 
 
 def list_runs(*, auth_context: AuthContext, offset: int = 0, limit: int | None = None) -> Iterable[RunRecord]:
-    """Return the latest non-deleted attempt of every Run, with optional paging."""
+    """Return the latest non-deleted attempt of every Run, with optional paging.
+
+    Admins and anonymous actors see all executions.  Authenticated non-admins see only
+    executions they created.  Orders by creation time, descending.
+    """
 
     def function(i: int) -> list[RunRecord]:
         with _jobs_module.sync_session_maker() as session:
@@ -214,7 +237,12 @@ def count_runs(*, auth_context: AuthContext) -> int:
 
 
 def soft_delete_run(run_id: RunId, *, auth_context: AuthContext) -> None:
-    """Mark all attempts of a Run as deleted."""
+    """Mark all attempts of a Run as deleted.
+
+    Raises ``RunNotFound`` if the execution does not exist.
+    Raises ``RunAccessDenied`` if the actor is an authenticated non-admin
+    who does not own the execution.
+    """
     get_run(run_id, auth_context=auth_context)
     stmt = update(Run).where(Run.run_id == run_id).values(is_deleted=True)
     executeAndCommit(stmt, _jobs_module.sync_session_maker)
@@ -227,7 +255,11 @@ def list_runs_by_experiment(
     offset: int = 0,
     limit: int | None = None,
 ) -> Iterable[RunRecord]:
-    """Return the latest non-deleted attempt of each execution linked to an experiment."""
+    """Return the latest non-deleted attempt of each execution linked to an experiment.
+
+    Admins and anonymous actors see all.  Authenticated non-admins see only their own.
+    Orders by creation time, descending.
+    """
 
     def function(i: int) -> list[RunRecord]:
         with _jobs_module.sync_session_maker() as session:

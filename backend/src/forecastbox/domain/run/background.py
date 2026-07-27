@@ -53,7 +53,14 @@ def execute_background(
     compiler_runtime_context: CompilerRuntimeContext,
     auth_context: AuthContext,
 ) -> None:
-    """Compile a blueprint and submit it to cascade, updating the Run row as we go."""
+    """Compile a blueprint and submit it to cascade, updating the Run row as we go.
+
+    Intended to run on a worker thread. ``submit_time`` is the ``created_at`` timestamp
+    recorded when the Run row was first inserted; it becomes ``submitDatetime`` in the
+    intrinsic glyphs so that retries preserve the original submission time.
+    ``startDatetime`` is set to the moment this function actually begins executing
+    (i.e. ``current_time()``).
+    """
     logger.debug(f"starting background compilation of {run_id=}")
 
     try:
@@ -68,6 +75,12 @@ def execute_background(
         builder = BlueprintBuilder.model_validate(blueprint.builder)
         local_values: dict[str, str] = builder.local_glyphs
 
+        # Persist only the glyphs actually referenced in the builder, keeping the stored context lean.
+        # Use expand_glyph_values with roots to get the full transitive closure of dependencies,
+        # then persist raw (pre-expansion) values for all of them (excluding intrinsics, which are
+        # always freshly computed). This ensures composite glyphs like "${root}/${runId}" can
+        # re-expand correctly on restart even if the intermediate dependency (e.g. "root") is no
+        # longer in the global DB.
         referenced_glyph_names = {
             name for block in builder.blocks for name in cast(ExtractedGlyphs, extract_glyphs(block.instance).t).glyphs
         }

@@ -21,7 +21,6 @@ import logging
 import os
 import pathlib
 import zipfile
-from collections.abc import Callable
 from dataclasses import asdict
 from functools import partial
 from typing import Annotated, Literal, cast
@@ -44,8 +43,7 @@ from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrency.manager import TaskName, execution_manager
-from forecastbox.utility.config import ConcurrentPools
+from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -58,10 +56,6 @@ router = APIRouter(
     tags=["execution"],
     responses={404: {"description": "Not found"}},
 )
-
-
-async def _await_jobs_db(task_name: str, task: Callable[[], object]) -> object:
-    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +209,7 @@ async def _resolve_run_with_cascade(
     try:
         execution = cast(
             db.RunRecord,
-            await _await_jobs_db(
+            await execution_manager.await_jobs_db(
                 "run.get", partial(db.get_run, execution_spec.run_id, execution_spec.attempt_count, auth_context=auth_context)
             ),
         )
@@ -302,7 +296,7 @@ async def list_runs(
 
     Admins see all executions; regular users see only their own.
     """
-    total = cast(int, await _await_jobs_db("run.count", partial(db.count_runs, auth_context=auth_context)))
+    total = cast(int, await execution_manager.await_jobs_db("run.count", partial(db.count_runs, auth_context=auth_context)))
     start = pagination.start()
     total_pages = pagination.total_pages(total)
     if start >= total and total > 0:
@@ -310,7 +304,9 @@ async def list_runs(
     executions = list(
         cast(
             list[db.RunRecord],
-            await _await_jobs_db("run.list", partial(db.list_runs, auth_context=auth_context, offset=start, limit=pagination.page_size)),
+            await execution_manager.await_jobs_db(
+                "run.list", partial(db.list_runs, auth_context=auth_context, offset=start, limit=pagination.page_size)
+            ),
         )
     )
     details = [_to_run_detail(await service.poll_and_update(e)) for e in executions]
@@ -324,7 +320,10 @@ async def get_run(
 ) -> RunDetailResponse:
     try:
         execution = cast(
-            db.RunRecord, await _await_jobs_db("run.get", partial(db.get_run, spec.run_id, spec.attempt_count, auth_context=auth_context))
+            db.RunRecord,
+            await execution_manager.await_jobs_db(
+                "run.get", partial(db.get_run, spec.run_id, spec.attempt_count, auth_context=auth_context)
+            ),
         )
         domain_detail = await service.poll_and_update(execution, detailed_report=True)
     except RunNotFound:
@@ -379,7 +378,9 @@ async def delete_run(
     Returns 409 if it does not match.
     """
     try:
-        current = cast(db.RunRecord, await _await_jobs_db("run.get", partial(db.get_run, request.run_id, auth_context=auth_context)))
+        current = cast(
+            db.RunRecord, await execution_manager.await_jobs_db("run.get", partial(db.get_run, request.run_id, auth_context=auth_context))
+        )
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
     except RunAccessDenied:
@@ -403,7 +404,7 @@ async def delete_run(
         raise HTTPException(500, f"Job deletion failed: {e}")
     finally:
         try:
-            await _await_jobs_db("run.delete", partial(db.soft_delete_run, request.run_id, auth_context=auth_context))
+            await execution_manager.await_jobs_db("run.delete", partial(db.soft_delete_run, request.run_id, auth_context=auth_context))
         except (RunNotFound, RunAccessDenied):
             pass
 
@@ -419,7 +420,9 @@ async def restart_run(
     Returns 409 if it does not match.
     """
     try:
-        current = cast(db.RunRecord, await _await_jobs_db("run.get", partial(db.get_run, request.run_id, auth_context=auth_context)))
+        current = cast(
+            db.RunRecord, await execution_manager.await_jobs_db("run.get", partial(db.get_run, request.run_id, auth_context=auth_context))
+        )
     except RunNotFound:
         raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
     except RunAccessDenied:

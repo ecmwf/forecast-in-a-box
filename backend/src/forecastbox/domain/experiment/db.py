@@ -198,6 +198,14 @@ def list_experiment_definitions(
                 func.min(ExperimentDefinition.created_at).label("first_created_at"),
             ).where(ExperimentDefinition.is_deleted.is_(False))
             if experiment_definition_id is not None:
+                # Safe and cheap to filter here: experiment_definition_id is the GROUP BY key
+                # itself, so restricting rows before grouping cannot change
+                # max_version/first_created_at for the remaining group -- it just avoids
+                # aggregating over every other experiment. NOTE: created_by and
+                # experiment_type are deliberately NOT filtered here -- they are attributes of
+                # individual version rows, and filtering them pre-aggregation would match "any
+                # version satisfies the filter" instead of "the returned version does", and
+                # could even change which version is picked as the latest one.
                 subq = subq.where(ExperimentDefinition.experiment_definition_id == experiment_definition_id)
             subq = subq.group_by(ExperimentDefinition.experiment_definition_id).subquery()
 

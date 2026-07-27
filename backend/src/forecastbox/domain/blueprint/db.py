@@ -111,6 +111,7 @@ def upsert_blueprint(
                     raise BlueprintVersionConflict(
                         f"Version conflict for Blueprint {effective_blueprint_id!r}: expected version {expected_version}, current is {max_version}."
                     )
+                # Ownership check on the latest (non-deleted) version.
                 owner_query = (
                     select(Blueprint.created_by)
                     .where(
@@ -222,6 +223,17 @@ def list_blueprints(
                 func.min(Blueprint.created_at).label("first_created_at"),
             ).where(Blueprint.is_deleted.is_(False))
             if blueprint_id is not None:
+                # Safe and cheap to filter here: blueprint_id is the GROUP BY key itself, so
+                # restricting rows before grouping cannot change max_version/first_created_at
+                # for the remaining group -- it just avoids aggregating over every other
+                # blueprint. NOTE: created_by and source are deliberately NOT filtered here --
+                # unlike blueprint_id, they are attributes of individual version rows and are
+                # not guaranteed constant across a blueprint's versions (``source`` is
+                # recomputed from ``display_name`` on every save; ``created_by`` reflects
+                # whoever authored that particular version, e.g. an admin editing another
+                # user's blueprint). Filtering them pre-aggregation would match "any version
+                # satisfies the filter" instead of "the returned version does", and could even
+                # change which version is picked as the latest one.
                 subq = subq.where(Blueprint.blueprint_id == blueprint_id)
             subq = subq.group_by(Blueprint.blueprint_id).subquery()
 

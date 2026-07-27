@@ -7,7 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Plugin management routes — /plugin/*. Corresponds to `domain.plugin` submodule."""
+"""Plugin management routes — /plugin/*. Corresponds to `domain.plugin` submodule.
+
+Contains:
+ - one operational route for status of the plugin installer module status,
+ - complete CRUD+List routes for the Plugin entity.
+"""
 
 import logging
 from functools import partial
@@ -27,8 +32,8 @@ from forecastbox.domain.plugin.exceptions import PluginManagerBusy, PluginNotFou
 from forecastbox.domain.plugin.manager import PluginManager, submit_update_single, uninstall_plugin, unload_single
 from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
-from forecastbox.utility.concurrency.manager import TaskName, execution_manager
-from forecastbox.utility.config import ConcurrentPools, PluginSettings, config
+from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.config import PluginSettings, config
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -42,8 +47,9 @@ router = APIRouter(
 )
 
 
-async def _await_jobs_db(task_name: str, task: partial[object]) -> object:
-    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
+# ---------------------------------------------------------------------------
+# CRUD routes
+# ---------------------------------------------------------------------------
 
 
 @router.get("/list")
@@ -55,6 +61,9 @@ async def get_plugin_list() -> PluginListing:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugin manager is busy; retry later")
 
 
+# TODO ideally we'd return the redirect here, but that is basically guaranteed to end up with a 503 because
+# the plugins aren't ready yet -- we probably need to await here or smth
+# get_catalogue_redirect = lambda request: RedirectResponse(request.url_for("get_catalogue"), status_code=status.HTTP_303_SEE_OTHER)
 get_catalogue_redirect = lambda request: Response(status_code=202)
 
 
@@ -65,6 +74,13 @@ def update_plugin(
     version: str | None = None,
     admin: UserRead | None = Depends(get_admin_user),
 ) -> Response:
+    """Trigger a pip-install update for a plugin.
+
+    If ``version`` is provided it must be a valid PEP 440 version string; the
+    plugin will be pinned to exactly that version (``==version``).
+    If omitted, the newest available version compatible with the installed
+    ``fiab-core`` is selected.
+    """
     target: Version | None = None
     if version is not None:
         try:
@@ -91,6 +107,7 @@ def update_plugin(
 
 class PluginVersions(FiabBaseModel):
     versions: list[str]
+    """Compatible versions, sorted newest first."""
 
 
 def _pluginId2settingsAndSource(pluginCompositeId: PluginCompositeId) -> tuple[PluginSettings, str] | None:
@@ -114,6 +131,12 @@ def _settings2Versions(pluginSettings: PluginSettings, pipSource: str) -> Plugin
 
 @router.get("/versions")
 def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends()]) -> PluginVersions:
+    """Return available PyPI versions of a plugin that are compatible with the installed ``fiab-core``.
+
+    Compatibility is defined as equal major version. Only versions published
+    on PyPI are considered; locally-installed or git-sourced plugins will
+    receive an empty list.
+    """
     settings_and_source = _pluginId2settingsAndSource(pluginCompositeId)
     if settings_and_source is None:
         raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
@@ -122,6 +145,7 @@ def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends(
 
 @router.post("/install")
 def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
+    # TODO possibly add optional version parameter
     submit_install_plugin(pluginCompositeId)
     return get_catalogue_redirect(request)
 
@@ -137,8 +161,13 @@ async def uninstall_plugin_endpoint(
 class PluginSettingsUpdateRequest(FiabBaseModel):
     pluginCompositeId: PluginCompositeId
     isEnabled: bool | None = None
+    """Enable or disable the plugin. ``None`` leaves the stored value unchanged."""
     excluded_templates: list[str] | None = None
+    """Names of templates to exclude. ``None`` leaves the stored list unchanged;
+    an empty list explicitly clears all exclusions."""
     glyph_remapping: dict[str, str] | None = None
+    """Glyph rename map to persist. ``None`` leaves the stored map unchanged;
+    an empty dict explicitly clears all remappings."""
 
 
 @router.post("/settings")
@@ -150,7 +179,7 @@ async def update_plugin_settings_endpoint(
     """Persist plugin settings (enabled flag, exclusions, remapping) and trigger a re-ingest."""
     plugin_id_str = PluginCompositeId.to_str(body.pluginCompositeId)
     try:
-        await _await_jobs_db(
+        await execution_manager.await_jobs_db(
             "plugin.state.upsert",
             partial(
                 upsert_plugin_state,
@@ -172,7 +201,9 @@ async def update_plugin_settings_endpoint(
 
 class TemplateExampleValuesResponse(FiabBaseModel):
     example_values: dict[BlockInstanceId, dict[ConfigurationOptionId, BlueprintTemplateExampleInput]]
+    """Per-block example configuration values, keyed by block instance id then option id."""
     example_glyphs: dict[str, BlueprintTemplateExampleInput]
+    """Example glyph name-to-value pairs the user is expected to override."""
 
 
 @router.get("/templateExampleValues")
@@ -180,6 +211,14 @@ async def get_template_example_values(
     pluginCompositeId: Annotated[PluginCompositeId, Depends()],
     displayName: str,
 ) -> TemplateExampleValuesResponse:
+    """Return example_values and example_glyphs for a specific blueprint template from a loaded plugin.
+
+    Applies any stored glyph remapping to both the values and keys of the example data,
+    mirroring the remapping applied during template ingestion.
+
+    Returns 404 if the plugin is not loaded or the display name is not found.
+    Returns 403 if the template is excluded by admin settings.
+    """
     plugin = PluginManager.plugins.get(pluginCompositeId)
     if plugin is None:
         raise HTTPException(status_code=404, detail=f"Plugin {PluginCompositeId.to_str(pluginCompositeId)!r} not loaded")
@@ -193,7 +232,7 @@ async def get_template_example_values(
     plugin_id_str = PluginCompositeId.to_str(pluginCompositeId)
     plugin_state = cast(
         PluginStateRecord | None,
-        await _await_jobs_db(
+        await execution_manager.await_jobs_db(
             "plugin.state.get",
             partial(get_plugin_state, plugin_id_str),
         ),

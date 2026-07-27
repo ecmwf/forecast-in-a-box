@@ -7,7 +7,19 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Plugin listing detail -- response classes and handler for the GET /plugin/list route."""
+"""Plugin listing detail -- response classes and handler for the GET /plugin/list route.
+
+These classes are both frontend-exposed (serialised as JSON in HTTP responses) and
+consumed internally by the service layer.  Changes to field names or structure affect
+the frontend contract; coordinate with frontend consumers before making breaking changes.
+
+The public entry-point is ``build_plugin_listing()``.  It acquires the PluginManager
+lock for the duration of the in-memory snapshot capture *and* the database reads, so
+that both are taken from the same logical point in time.  This is not a fully
+transactional read (the SQLite reads are not inside a DB transaction), but it is
+sufficient for a consistent UI snapshot.  The lock is held only for the duration of
+these fast operations; long-running work must not be done under it.
+"""
 
 import logging
 from functools import partial
@@ -21,45 +33,75 @@ from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail
-from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
-from forecastbox.utility.config import ConcurrentPools
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Response model hierarchy
+# ---------------------------------------------------------------------------
+
+
 class PluginGenericData(FiabBaseModel):
     store_info: PluginStoreEntry | None = None
+    """Info about the plugin from the respective store. None if the plugin was configured
+    outside of any store (e.g. direct config edit without going through the install flow)."""
     remote_info: PluginRemoteInfo | None = None
+    """Dynamic remote information such as the most recent published version. None if the
+    plugin is an install from a local path or if no remote data is available."""
 
 
 class PluginInstallSettings(FiabBaseModel):
     isEnabled: bool
+    """Whether the user configured the plugin to be loaded."""
     excluded_templates: list[str]
+    """Templates the user configured to be excluded. Empty list if none configured."""
     included_templates: list[str]
+    """Templates that are available for use. If the plugin is disabled or not loaded, this is an empty list."""
     glyph_remapping: dict[str, str]
+    """Glyph remapping the user applied during installation. Empty map if disabled or not configured."""
 
 
 class PluginInstallData(FiabBaseModel):
     local_version: str
+    """The installed version, as declared by the python package."""
     update_datetime: str
+    """The most recent update datetime -- when was the python package locally modified."""
     install_errors: PluginErrors
+    """Errors that appear exclusively during the install phase. If any entry has a severity
+    higher than warning, the install has failed and the plugin cannot be used."""
 
 
 class PluginDetail(FiabBaseModel):
     generic_data: PluginGenericData
+    """Always available for every configured plugin, regardless of its status."""
     install_data: PluginInstallData | None = None
+    """Available only if the plugin was installed (i.e. a DB record exists).
+    Contains possible error messages from the installation phase."""
     settings_data: PluginInstallSettings | None = None
+    """Available only if the plugin was successfully installed (no install-phase errors
+    of severity error or critical)."""
     load_errors: PluginErrors = Field(default_factory=lambda: PluginErrors([]))
+    """Load and template-ingestion errors accumulated since the last successful install.
+    Always a list; non-empty only when the plugin is installed and enabled. Maximum
+    severity determines whether the plugin can be used."""
 
 
 class PluginListing(FiabBaseModel):
     plugins: dict[PluginCompositeId, PluginDetail]
 
 
+# ---------------------------------------------------------------------------
+# Listing builder
+# ---------------------------------------------------------------------------
+
+
 def _install_failed(install_errors: PluginErrors) -> bool:
+    """Return True if any install error has severity error or critical."""
     return any(e.severity in ("error", "critical") for e in install_errors)
 
 
@@ -81,6 +123,8 @@ def _build_detail(
             )
         return PluginDetail(generic_data=generic_data)
 
+    # Separate persisted errors by source: install-phase errors go to install_data,
+    # load/template_ingest errors go to load_errors.
     all_db_errors = PluginErrors([PluginError(**e) for e in db_state.plugin_errors])
     install_errors = PluginErrors([e for e in all_db_errors if e.source == "install"])
     db_load_errors = PluginErrors([e for e in all_db_errors if e.source != "install"])
@@ -90,6 +134,7 @@ def _build_detail(
         install_errors=install_errors,
     )
 
+    # settings_data -- only if install succeeded
     settings_data = None
     if not _install_failed(install_errors):
         is_enabled = db_state.enabled
@@ -107,6 +152,7 @@ def _build_detail(
             glyph_remapping=dict(db_state.glyph_remapping),
         )
 
+    # load_errors -- db non-install errors + in-memory errors + template-ingest errors from DB
     load_error_list: list[PluginError] = list(db_load_errors) + list(in_memory_errors)
     if db_state.template_errors:
         load_error_list += [
@@ -123,20 +169,23 @@ def _build_detail(
 
 
 async def build_plugin_listing() -> PluginListing:
-    """Build and return the full plugin listing."""
+    """Build and return the full plugin listing.
+
+    Acquires the PluginManager lock, captures in-memory plugin and error snapshots,
+    then performs all DB reads while still holding the lock to ensure a consistent
+    view.  Raises ``PluginManagerBusy`` if the lock cannot be acquired within the
+    timeout, which the route layer translates to a 503 response.
+    """
     with timed_acquire(PluginManager.lock, 0.5) as acquired:
         if not acquired:
             raise PluginManagerBusy("plugin manager lock could not be acquired; retry later")
         plugins_snapshot: dict[PluginCompositeId, Plugin] = dict(PluginManager.plugins)
         errors_snapshot: dict[PluginCompositeId, PluginErrors] = dict(PluginManager.errors)
-        db_states = await execution_manager.awaitable_submit(
-            ConcurrentPools.JobsDb,
-            TaskName("plugin.state.list"),
-            partial(get_all_plugin_states),
-        )
+        db_states = await execution_manager.await_jobs_db("plugin.state.list", partial(get_all_plugin_states))
 
     store_detail = get_plugins_detail()
 
+    # Index DB states by parsed PluginCompositeId
     states_by_id: dict[PluginCompositeId, PluginStateRecord] = {}
     for state in db_states:
         try:

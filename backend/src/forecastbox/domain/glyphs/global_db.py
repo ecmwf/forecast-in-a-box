@@ -85,7 +85,15 @@ def upsert_global_glyph(
     overriddable: bool | None,
     auth_context: AuthContext,
 ) -> GlobalGlyphRecord:
-    """Insert or update a GlobalGlyph by (created_by, key) and return it."""
+    """Insert or update a GlobalGlyph by (created_by, key) and return it.
+
+    Each user owns their own glyph per key; callers can only upsert their own rows.
+    On insert the caller becomes the owner.  On update the existing row for this
+    (caller, key) pair is updated in-place — no cross-user mutation is possible.
+
+    ``overriddable`` must be ``None`` when ``public=False`` and a bool when ``public=True``.
+    This invariant is enforced at the route layer; the domain layer trusts callers.
+    """
     ref_time = current_time("dbref")
 
     def function(i: int) -> GlobalGlyphRecord:
@@ -125,7 +133,7 @@ def upsert_global_glyph(
 
 
 def get_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContext) -> GlobalGlyphRecord | None:
-    """Return a GlobalGlyph visible to the caller by its stable id."""
+    """Return a GlobalGlyph visible to the caller by its stable id, or None if not found or not visible."""
     query = _visibility_filter(
         select(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id),
         auth_context,
@@ -137,7 +145,12 @@ def get_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContext) 
 def list_global_glyphs(
     auth_context: AuthContext, offset: int = 0, limit: int | None = None, key: str | None = None
 ) -> Iterable[GlobalGlyphRecord]:
-    """Return GlobalGlyphs visible to the caller, ordered by key, with optional paging."""
+    """Return GlobalGlyphs visible to the caller, ordered by key, with optional paging.
+
+    Admins see all glyphs.  Non-admins see their own glyphs plus all public glyphs.
+    Multiple rows for the same key (from different owners) may appear.
+    When ``key`` is given, only glyphs whose key matches exactly are returned.
+    """
 
     def function(i: int) -> list[GlobalGlyphRecord]:
         with _jobs_module.sync_session_maker() as session:
@@ -156,7 +169,10 @@ def list_global_glyphs(
 
 
 def count_global_glyphs(auth_context: AuthContext, key: str | None = None) -> int:
-    """Return the total number of GlobalGlyphs visible to the caller."""
+    """Return the total number of GlobalGlyphs visible to the caller.
+
+    When ``key`` is given, only glyphs whose key matches exactly are counted.
+    """
 
     def function(i: int) -> int:
         with _jobs_module.sync_session_maker() as session:
@@ -170,7 +186,16 @@ def count_global_glyphs(auth_context: AuthContext, key: str | None = None) -> in
 
 
 def get_glyphs_for_resolution(auth_context: AuthContext) -> GlyphResolutionBuckets:
-    """Fetch global glyphs split into three resolution tiers for the given caller."""
+    """Fetch global glyphs split into three resolution tiers for the given caller.
+
+    Returns a ``GlyphResolutionBuckets`` with:
+    - ``public_overriddable``: public glyphs with ``overriddable=True`` (lowest priority).
+    - ``user_own``: caller's own private (``public=False``) glyphs.
+    - ``public_nonoverridable``: public glyphs with ``overriddable=False`` (highest priority).
+
+    When multiple public glyphs share the same key (e.g. created by different admins),
+    the most recently updated one wins within each public tier.
+    """
 
     def function(i: int) -> GlyphResolutionBuckets:
         with _jobs_module.sync_session_maker() as session:
@@ -201,10 +226,21 @@ def get_glyphs_for_resolution(auth_context: AuthContext) -> GlyphResolutionBucke
 
 
 def delete_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContext) -> GlobalGlyphRecord | None:
-    """Delete a GlobalGlyph by id if the caller is allowed to do so."""
+    """Delete a GlobalGlyph by id if the caller is allowed to do so.
+
+    Returns the deleted row on success, or ``None`` if the glyph does not exist
+    or is not visible to the caller.  Callers must check the returned value and
+    raise an appropriate HTTP error when it is ``None``.
+
+    The caller must own the glyph (``created_by == auth_context.user_id``) or
+    be an admin; visibility is checked via ``_visibility_filter`` and ownership
+    is enforced via ``auth_context.allowed``.
+    """
 
     def function(i: int) -> GlobalGlyphRecord | None:
         with _jobs_module.sync_session_maker() as session:
+            # Fetch with visibility filter so non-admins cannot see (and thus
+            # cannot attempt to delete) glyphs that are not visible to them.
             query = _visibility_filter(
                 select(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id),
                 auth_context,
@@ -214,6 +250,7 @@ def delete_global_glyph(global_glyph_id: GlobalGlyphId, auth_context: AuthContex
             if row is None:
                 return None
             if not auth_context.allowed(str(row.created_by)):
+                # Visible but not owned — caller is not admin and not the owner.
                 return None
             dto = _to_global_glyph_record(row)
             session.execute(delete(GlobalGlyph).where(GlobalGlyph.global_glyph_id == global_glyph_id))

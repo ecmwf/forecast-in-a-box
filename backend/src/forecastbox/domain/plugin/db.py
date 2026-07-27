@@ -12,6 +12,15 @@
 Uses the same session maker as ``forecastbox.schemata.jobs`` so that all tables
 share a single SQLite connection pool and in-process tests can monkeypatch
 ``sync_session_maker`` to inject an in-memory database.
+
+This table records unversioned app state (install history, per-plugin config).
+Writes are idempotent: insert on first install with empty-default columns for
+excluded_templates / glyph_remapping / template_errors; update plugin_version /
+updated_at / install_error on subsequent installs without clobbering the columns
+owned by other subsystems.
+
+The ``upsert_plugin_state`` helper owns all mutable columns and does a partial
+update that leaves unspecified fields (``None`` arguments) unchanged.
 """
 
 import datetime as dt
@@ -64,7 +73,24 @@ def upsert_plugin_state(
     excluded_templates: list[str] | None = None,
     glyph_remapping: dict[str, str] | None = None,
 ) -> None:
-    """Insert or update the PluginState row for ``plugin_id``."""
+    """Insert or update the PluginState row for ``plugin_id``.
+
+    On first install: creates a row with empty ``excluded_templates`` /
+    ``glyph_remapping`` / ``template_errors`` defaults, ``asset_ingest_needed=True``,
+    and ``enabled=True``.  All ``None`` arguments fall back to their defaults for
+    new rows.
+
+    On subsequent calls: only the explicitly provided (non-``None``) arguments are
+    written; ``None`` means "leave the stored value unchanged".  Pass an empty list
+    to explicitly clear previously stored errors.
+
+    ``asset_ingest_needed`` is set to ``True`` when any of the following is true on
+    an existing row: the flag was already set, the version changed, the plugin is
+    being re-enabled, ``excluded_templates`` changed, or ``glyph_remapping`` changed.
+
+    Raises ``PluginNotFoundError`` if ``version`` is ``None`` and no existing row is found,
+    as that indicates a user error (updating a plugin that was never installed).
+    """
     ref_time = current_time("dbref")
     plugin_errors_raw = [e.model_dump() for e in plugin_errors] if plugin_errors is not None else None
 
@@ -140,7 +166,15 @@ def get_all_plugin_states() -> list[PluginStateRecord]:
 
 
 def update_template_errors(*, plugin_id: str, template_errors: dict[str, str]) -> None:
-    """Persist per-template validation errors for ``plugin_id``."""
+    """Persist per-template validation errors for ``plugin_id``.
+
+    An empty dict clears any recorded errors (all templates passed).  A non-empty
+    dict maps ``display_name`` to the error string for that template.  Call
+    this after each ingestion pass so the status surface reflects the latest result.
+
+    If no PluginState row exists yet the call is silently skipped; the row will
+    be created by ``upsert_plugin_state`` which defaults ``template_errors`` to ``{}``.
+    """
 
     def function(i: int) -> None:
         with _jobs_module.sync_session_maker() as session:
@@ -153,7 +187,12 @@ def update_template_errors(*, plugin_id: str, template_errors: dict[str, str]) -
 
 
 def clear_asset_ingest_needed(*, plugin_id: str) -> None:
-    """Clear the ``asset_ingest_needed`` flag immediately before starting template ingestion."""
+    """Clear the ``asset_ingest_needed`` flag immediately before starting template ingestion.
+
+    Clearing before (not after) ingestion means a partial failure does not leave the
+    flag set and trigger a spurious re-ingest; the per-template errors are already
+    persisted via ``update_template_errors``.  If no row exists the call is a no-op.
+    """
 
     def function(i: int) -> None:
         with _jobs_module.sync_session_maker() as session:
