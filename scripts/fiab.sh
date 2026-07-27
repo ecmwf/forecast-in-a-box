@@ -237,7 +237,11 @@ replaceLauncher() {
 }
 
 maybeReplaceLauncher() {
+    # NOTE since we possibly exec in this script after replacing the launcher,
+    # we need to have all the original $@ from the caller, along with the $1
+    # for the selected release
     selectedRelease=$1
+    shift
     # if we have a *change* of release, download new launcher and exec again
     if [ ! -f "$FIAB_RELEASE_MARKER" ] ; then
         # no idea about previous release => assume launcher up-to-date, just mark it
@@ -269,7 +273,7 @@ ensureEnvironment() {
     maybeInstallPython
     selectedRelease=$(selectRelease)
     >&2 echo "Selected release is $selectedRelease"
-    maybeReplaceLauncher $selectedRelease
+    maybeReplaceLauncher $selectedRelease $@
     maybeDownloadLock $selectedRelease
     maybeGetDefaultConfig $selectedRelease
     maybeCreateVenv
