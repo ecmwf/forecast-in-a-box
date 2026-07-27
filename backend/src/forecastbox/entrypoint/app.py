@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 result = module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
                 if inspect.isawaitable(result):
                     await result
-                else:
+                elif callable(result):
                     result()
         _start_execution_runtime()
     except BaseException:
