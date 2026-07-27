@@ -23,6 +23,8 @@ No HTTP exceptions are raised here; callers are responsible for mapping
 import datetime as dt
 import logging
 from collections import defaultdict
+from collections.abc import Callable
+from functools import partial
 from itertools import groupby
 from typing import Any, cast
 
@@ -53,6 +55,8 @@ from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values, remap_glyph_names
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools
 from forecastbox.utility.graph import topological_order
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -174,23 +178,18 @@ class BlueprintSaveCommand(FiabBaseModel):
 # ---------------------------------------------------------------------------
 
 
-async def validate_expand(
-    blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
+async def _await_jobs_db(task_name: str, task: Callable[[], object]) -> object:
+    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
+
+
+def _validate_expand_with_buckets(
+    blueprint: BlueprintBuilder,
+    auth_context: AuthContext,
+    global_buckets: global_db.GlyphResolutionBuckets,
+    *,
+    validate_only: bool = False,
 ) -> BlueprintValidationExpansion:
-    """Validate and expand a partially-constructed BlueprintBuilder.
-
-    Returns structured validation errors and possible completion options.
-    The presence of errors does not affect the return (callers decide how to
-    surface them). Intrinsic and global glyphs visible to the caller, along
-    with local glyphs defined on the builder, are all considered known.
-
-    When ``validate_only`` is True, ``possible_sources`` and
-    ``possible_expansions`` are omitted from the result (saves work when the
-    caller only needs error checking), and the blueprint is deep-copied so
-    that ``resolve_configurations`` mutations do not affect the caller's object.
-    When ``validate_only`` is False (the default, used by the expand endpoint),
-    the passed-in blueprint may be mutated in place and expansion data is computed.
-    """
+    """Validate and expand a partially-constructed BlueprintBuilder using preloaded global glyphs."""
     plugins = PluginManager.plugins
     if validate_only:
         blueprint = blueprint.model_copy(deep=True)
@@ -213,7 +212,6 @@ async def validate_expand(
     outputs = {}
 
     intrinsic_values = cast(dict[str, str], get_values_and_examples())
-    global_buckets = await global_db.get_glyphs_for_resolution(auth_context)
     local_glyphs = blueprint.local_glyphs
 
     all_glyphs_raw = merge_glyph_values(
@@ -232,7 +230,6 @@ async def validate_expand(
     for key in sorted(colliding_keys):
         global_errors.append(f"Local glyph key {key!r} is reserved as an intrinsic glyph and cannot be overridden.")
 
-    # Build lookup and detect duplicate instance ids.
     block_lookup: dict[BlockInstanceId, RoutableBlock] = {}
     for routable in blueprint.blocks:
         if routable.instance_id in block_lookup:
@@ -273,15 +270,12 @@ async def validate_expand(
         extracted = cast(ExtractedGlyphs, extract_result.t)
         unknown_glyphs = extracted.glyphs - available_glyphs
         if unknown_glyphs:
-            # Soft path: omit options referencing unknown glyphs and record them,
-            # rather than failing the whole block.
             option_glyph_map = resolution.extract_glyphs_per_option(routable.instance)
             for opt_id, opt_glyphs in option_glyph_map.items():
                 opt_unknown = opt_glyphs & unknown_glyphs
                 if opt_unknown:
                     missing_glyphs_result.setdefault(blockId, {})[opt_id] = sorted(opt_unknown)
                     del routable.instance.configuration_values[opt_id]
-            # Re-extract after removing affected options to get an accurate extracted state.
             extract_result = resolution.extract_glyphs(routable.instance)
             if extract_result.e is not None:
                 block_errors[blockId] += extract_result.e
@@ -294,13 +288,9 @@ async def validate_expand(
             block_errors[blockId] += [f"Jinja expression error: {exc}"]
             invalidable.add(blockId)
             continue
-        # A glyph value may itself reference an unknown glyph (e.g. myPath="${root}/${missing}").
-        # After substitution those unresolved ${...} patterns survive in the config values;
-        # a second extract_glyphs pass surfaces them.
         extract_after = resolution.extract_glyphs(routable.instance)
         nested_unknowns = cast(ExtractedGlyphs, extract_after.t).glyphs
         if nested_unknowns:
-            # Soft path: omit options with unresolved nested glyph references.
             option_glyph_map_after = resolution.extract_glyphs_per_option(routable.instance)
             for opt_id, opt_glyphs in option_glyph_map_after.items():
                 opt_nested = opt_glyphs & nested_unknowns
@@ -309,8 +299,6 @@ async def validate_expand(
                     existing = set(block_opts.get(opt_id, []))
                     block_opts[opt_id] = sorted(existing | opt_nested)
                     del routable.instance.configuration_values[opt_id]
-        # We dont want to return resolutions of nested glyphs, just the top levels. For this reason
-        # we need to run the extraction twice, not just once after the substitution
         resolved_configuration_options[blockId] = {
             k: routable.instance.configuration_values[k] for k in extracted.glyphed_options if k in routable.instance.configuration_values
         }
@@ -337,12 +325,10 @@ async def validate_expand(
             continue
         outputs[blockId] = output_or_error.t
 
-        # Serialize the block's output qube for the frontend qube lens. Best
-        # effort only — a malformed/edge-case qube must never fail validation.
         if not validate_only and isinstance(output_or_error.t, QubedOutput):
             try:
                 block_output_qubes[blockId] = output_or_error.t.dataqube.to_json()
-            except Exception as exc:  # viz extra, never fatal
+            except Exception as exc:
                 logger.error(f"Could not serialize output qube for {blockId=}: {repr(exc)}")
 
         if not validate_only:
@@ -360,7 +346,6 @@ async def validate_expand(
                 else []
             )
 
-    # the topological search *omits* nodes in cycles or with missing ancestors -- thus we need to report and detect them
     for blockId, routable in block_lookup.items():
         if blockId not in visited:
             missing = [source_id for source_id in routable.instance.input_ids.values() if source_id not in block_lookup]
@@ -378,6 +363,28 @@ async def validate_expand(
         missing_glyphs=missing_glyphs_result,
         block_output_qubes=block_output_qubes,
     )
+
+
+def validate_expand_sync(
+    blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
+) -> BlueprintValidationExpansion:
+    """Synchronous variant used by non-async callers such as the plugin updater thread."""
+    global_buckets = global_db.get_glyphs_for_resolution(auth_context)
+    return _validate_expand_with_buckets(blueprint, auth_context, global_buckets, validate_only=validate_only)
+
+
+async def validate_expand(
+    blueprint: BlueprintBuilder, auth_context: AuthContext, *, validate_only: bool = False
+) -> BlueprintValidationExpansion:
+    """Validate and expand a partially-constructed BlueprintBuilder."""
+    global_buckets = cast(
+        global_db.GlyphResolutionBuckets,
+        await _await_jobs_db(
+            "glyph.resolution",
+            partial(global_db.get_glyphs_for_resolution, auth_context),
+        ),
+    )
+    return _validate_expand_with_buckets(blueprint, auth_context, global_buckets, validate_only=validate_only)
 
 
 def template_to_builder(template: BlueprintTemplate, plugin_id: PluginCompositeId) -> BlueprintBuilder:
@@ -499,39 +506,41 @@ async def save_builder(
     blueprint_id: BlueprintId | None = None,
     expected_version: int | None = None,
 ) -> BlueprintSaveResult:
-    """Persist a BlueprintBuilder as a Blueprint and return the stable id and version.
-
-    ``source`` is derived from ``display_name``: ``user_defined`` when a name is
-    provided, ``oneoff_execution`` otherwise.
-    When ``expected_version`` is provided it must match the current max version;
-    raises ``BlueprintVersionConflict`` if it does not.
-    Raises ``BlueprintNotFound`` or ``BlueprintAccessDenied`` from the db layer.
-    """
+    """Persist a BlueprintBuilder as a Blueprint and return the stable id and version."""
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
-    blueprint_id, version = await upsert_blueprint(
-        auth_context=auth_context,
-        blueprint_id=blueprint_id,
-        source=source,
-        created_by=auth_context.user_id,
-        builder=payload.builder.model_dump(mode="json"),
-        display_name=payload.display_name,
-        display_description=payload.display_description,
-        tags=[t.model_dump() for t in payload.tags] if payload.tags else None,
-        parent_id=payload.parent_id,
-        expected_version=expected_version,
+    saved_blueprint_id, version = cast(
+        tuple[BlueprintId, int],
+        await _await_jobs_db(
+            "blueprint.upsert",
+            partial(
+                upsert_blueprint,
+                auth_context=auth_context,
+                blueprint_id=blueprint_id,
+                source=source,
+                created_by=auth_context.user_id,
+                builder=payload.builder.model_dump(mode="json"),
+                display_name=payload.display_name,
+                display_description=payload.display_description,
+                tags=[t.model_dump() for t in payload.tags] if payload.tags else None,
+                parent_id=payload.parent_id,
+                expected_version=expected_version,
+            ),
+        ),
     )
-    return BlueprintSaveResult(blueprint_id=blueprint_id, blueprint_version=version)
+    return BlueprintSaveResult(blueprint_id=saved_blueprint_id, blueprint_version=version)
 
 
 async def load_builder(blueprint_id: BlueprintId, version: int | None, auth_context: AuthContext) -> BlueprintRetrieveResult:
-    """Load a Blueprint and return it as a BlueprintRetrieveResult.
-
-    Applies the same ownership scoping as ``list_blueprints`` -- a caller may only
-    load a blueprint they own, a plugin template, or (if admin) any blueprint.
-    Raises ``BlueprintNotFound`` if the id does not exist, is not visible to
-    ``auth_context``, or has no builder spec.
-    """
-    results = list(await db.list_blueprints(auth_context=auth_context, blueprint_id=blueprint_id, version=version, limit=1))
+    """Load a Blueprint and return it as a BlueprintRetrieveResult."""
+    results = list(
+        cast(
+            list[db.BlueprintLatest],
+            await _await_jobs_db(
+                "blueprint.list",
+                partial(db.list_blueprints, auth_context=auth_context, blueprint_id=blueprint_id, version=version, limit=1),
+            ),
+        )
+    )
     if not results:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} not found.")
     latest = results[0]
@@ -539,18 +548,18 @@ async def load_builder(blueprint_id: BlueprintId, version: int | None, auth_cont
     if blueprint.builder is None:
         raise BlueprintNotFound(f"Blueprint {blueprint_id!r} has no builder spec.")
     builder = BlueprintBuilder.model_validate(blueprint.builder)
-    raw_tags: list[dict] = blueprint.tags or []  # ty:ignore[invalid-argument-type,invalid-assignment]
+    raw_tags: list[dict] = blueprint.tags or []
     return BlueprintRetrieveResult(
-        blueprint_id=BlueprintId(str(blueprint.blueprint_id)),  # ty:ignore[invalid-argument-type]
-        blueprint_version=cast(int, blueprint.version),
+        blueprint_id=blueprint.blueprint_id,
+        blueprint_version=blueprint.version,
         builder=builder,
-        display_name=blueprint.display_name,  # ty:ignore[invalid-argument-type]
-        display_description=blueprint.display_description,  # ty:ignore[invalid-argument-type]
+        display_name=blueprint.display_name,
+        display_description=blueprint.display_description,
         tags=[Tag.model_validate(t) for t in raw_tags],
-        parent_id=blueprint.parent_id,  # ty:ignore[invalid-argument-type]
+        parent_id=blueprint.parent_id,
         source=cast(str, blueprint.source),
-        fiabcore_major=cast(int, blueprint.fiabcore_major),
+        fiabcore_major=blueprint.fiabcore_major,
         created_at=value_dt2str(latest.created_at),
-        updated_at=value_dt2str(cast(dt.datetime, blueprint.created_at)),
-        user=cast(str, blueprint.created_by),
+        updated_at=value_dt2str(blueprint.created_at),
+        user=blueprint.created_by,
     )

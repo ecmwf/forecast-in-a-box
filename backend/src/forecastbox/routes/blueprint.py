@@ -27,6 +27,8 @@ Glyph routes:
 
 import datetime as dt
 import logging
+from collections.abc import Callable
+from functools import partial
 from typing import Annotated, Any, Literal, cast
 
 from cascade.low.func import assert_never
@@ -61,8 +63,10 @@ from forecastbox.domain.glyphs.jinja_interpolation import get_custom_functions
 from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
-from forecastbox.schemata.jobs import BlueprintSource, GlobalGlyph
+from forecastbox.schemata.jobs import BlueprintSource
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
@@ -74,6 +78,11 @@ router = APIRouter(
     tags=["blueprint"],
     responses={404: {"description": "Not found"}},
 )
+
+
+async def _await_jobs_db(task_name: str, task: Callable[[], object]) -> object:
+    return await execution_manager.awaitable_submit(ConcurrentPools.JobsDb, TaskName(task_name), task)
+
 
 _CORE_VERSION_MISMATCH_KEY = "CoreVersionMismatch"
 
@@ -337,16 +346,26 @@ async def list_blueprints(
     - ``source``: restrict to blueprints with this source (``plugin_template``,
       ``user_defined``, or ``oneoff_execution``).  Returns 422 for unknown values.
     """
-    total = await db.count_blueprints(auth_context=auth_context, created_by=filters.created_by, source=filters.source)
+    total = cast(
+        int,
+        await _await_jobs_db(
+            "blueprint.count", partial(db.count_blueprints, auth_context=auth_context, created_by=filters.created_by, source=filters.source)
+        ),
+    )
     start = pagination.start()
-    page_defs = list(
-        await db.list_blueprints(
-            auth_context=auth_context,
-            offset=start,
-            limit=pagination.page_size,
-            created_by=filters.created_by,
-            source=filters.source,
-        )
+    page_defs = cast(
+        list[db.BlueprintLatest],
+        await _await_jobs_db(
+            "blueprint.list",
+            partial(
+                db.list_blueprints,
+                auth_context=auth_context,
+                offset=start,
+                limit=pagination.page_size,
+                created_by=filters.created_by,
+                source=filters.source,
+            ),
+        ),
     )
     current_fiabcore_major = get_fiabcore_version().major
     items = []
@@ -354,19 +373,19 @@ async def list_blueprints(
         defn = row.blueprint
         raw_tags: list[dict] = cast(list[dict], defn.tags) or []
         tags = [Tag.model_validate(t) for t in raw_tags]
-        _maybe_append_coreversion_mismatch(tags, cast(int, defn.fiabcore_major), current_fiabcore_major)
+        _maybe_append_coreversion_mismatch(tags, defn.fiabcore_major, current_fiabcore_major)
         items.append(
             BlueprintDetail(
                 blueprint_id=BlueprintId(str(defn.blueprint_id)),  # ty:ignore[invalid-argument-type]
-                version=cast(int, defn.version),
-                display_name=cast(str | None, defn.display_name),
-                display_description=cast(str | None, defn.display_description),
+                version=defn.version,
+                display_name=defn.display_name,
+                display_description=defn.display_description,
                 tags=tags,
-                parent_id=cast(str | None, defn.parent_id),
+                parent_id=defn.parent_id,
                 source=cast(BlueprintSource | None, defn.source),
                 created_at=value_dt2str(row.created_at),
-                updated_at=value_dt2str(cast(dt.datetime, defn.created_at)),
-                user=cast(str, defn.created_by),
+                updated_at=value_dt2str(defn.created_at),
+                user=defn.created_by,
             )
         )
     return BlueprintListResponse(blueprints=items, total=total, page=pagination.page, page_size=pagination.page_size)
@@ -425,10 +444,9 @@ async def delete_blueprint(
     ``version`` must match the current latest version; returns 409 if it does not.
     """
     try:
-        await db.soft_delete_blueprint(
-            request.blueprint_id,
-            expected_version=request.version,
-            auth_context=auth_context,
+        await _await_jobs_db(
+            "blueprint.delete",
+            partial(db.soft_delete_blueprint, request.blueprint_id, expected_version=request.version, auth_context=auth_context),
         )
     except BlueprintVersionConflict as e:
         raise HTTPException(status_code=409, detail=str(e))
@@ -503,7 +521,7 @@ def _build_intrinsic_glyphs(glyph_key: str | None) -> list[IntrinsicGlyphRespons
     return result
 
 
-def _row_to_global_response(row: GlobalGlyph) -> GlobalGlyphResponse:
+def _row_to_global_response(row: global_db.GlobalGlyphRecord) -> GlobalGlyphResponse:
     return GlobalGlyphResponse(
         global_glyph_id=GlobalGlyphId(str(row.global_glyph_id)),  # ty:ignore[invalid-argument-type]
         key=str(row.key),
@@ -542,12 +560,20 @@ async def list_available_glyphs(
     global_items: list[GlobalGlyphResponse] = []
     global_total = 0
     if want_global:
-        global_total = await global_db.count_global_glyphs(auth_context, key=glyph_key)
+        global_total = cast(int, await _await_jobs_db("glyph.count", partial(global_db.count_global_glyphs, auth_context, key=glyph_key)))
         if remainder.current_page_remaining > 0:
-            rows = list(
-                await global_db.list_global_glyphs(
-                    auth_context, offset=remainder.offset_shifted, limit=remainder.current_page_remaining, key=glyph_key
-                )
+            rows = cast(
+                list[global_db.GlobalGlyphRecord],
+                await _await_jobs_db(
+                    "glyph.list",
+                    partial(
+                        global_db.list_global_glyphs,
+                        auth_context,
+                        offset=remainder.offset_shifted,
+                        limit=remainder.current_page_remaining,
+                        key=glyph_key,
+                    ),
+                ),
             )
             global_items = [_row_to_global_response(row) for row in rows]
 
@@ -601,7 +627,13 @@ async def post_global_glyph(
             status_code=403,
             detail="Only admins may create or update public global glyphs.",
         )
-    row = await global_db.upsert_global_glyph(request.key, request.value, request.public, request.overriddable, auth_context)
+    row = cast(
+        global_db.GlobalGlyphRecord,
+        await _await_jobs_db(
+            "glyph.upsert",
+            partial(global_db.upsert_global_glyph, request.key, request.value, request.public, request.overriddable, auth_context),
+        ),
+    )
     return _row_to_global_response(row)
 
 
@@ -615,6 +647,9 @@ async def delete_global_glyph(
     Returns 404 if the glyph does not exist or is not visible to the caller.
     Returns 403 if the caller is not the owner and is not an admin.
     """
-    row = await global_db.delete_global_glyph(request.global_glyph_id, auth_context)
+    row = cast(
+        global_db.GlobalGlyphRecord | None,
+        await _await_jobs_db("glyph.delete", partial(global_db.delete_global_glyph, request.global_glyph_id, auth_context)),
+    )
     if row is None:
         raise HTTPException(status_code=404, detail=f"GlobalGlyph {request.global_glyph_id!r} not found or not accessible.")

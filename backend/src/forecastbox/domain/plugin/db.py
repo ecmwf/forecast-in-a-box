@@ -11,19 +11,12 @@
 
 Uses the same session maker as ``forecastbox.schemata.jobs`` so that all tables
 share a single SQLite connection pool and in-process tests can monkeypatch
-``async_session_maker`` to inject an in-memory database.
-
-This table records unversioned app state (install history, per-plugin config).
-Writes are idempotent: insert on first install with empty-default columns for
-excluded_templates / glyph_remapping / template_errors; update plugin_version /
-updated_at / install_error on subsequent installs without clobbering the columns
-owned by other subsystems.
-
-The ``upsert_plugin_state`` helper owns all mutable columns and does a partial
-update that leaves unspecified fields (``None`` arguments) unchanged.
+``sync_session_maker`` to inject an in-memory database.
 """
 
-import logging
+import datetime as dt
+from dataclasses import dataclass
+from typing import Any, cast
 
 from sqlalchemy import select, update
 
@@ -34,10 +27,35 @@ from forecastbox.schemata.jobs import PluginState
 from forecastbox.utility.db import dbRetry, querySingle
 from forecastbox.utility.time import current_time
 
-logger = logging.getLogger(__name__)
+
+@dataclass(frozen=True, eq=True, slots=True)
+class PluginStateRecord:
+    plugin_id: str
+    plugin_version: str
+    updated_at: dt.datetime
+    plugin_errors: list[dict[str, Any]]
+    excluded_templates: list[str]
+    glyph_remapping: dict[str, str]
+    template_errors: dict[str, str]
+    asset_ingest_needed: bool
+    enabled: bool
 
 
-async def upsert_plugin_state(
+def _to_plugin_state_record(row: PluginState) -> PluginStateRecord:
+    return PluginStateRecord(
+        plugin_id=cast(str, row.plugin_id),
+        plugin_version=cast(str, row.plugin_version),
+        updated_at=cast(dt.datetime, row.updated_at),
+        plugin_errors=cast(list[dict[str, Any]], list(cast(Any, row.plugin_errors) or [])),
+        excluded_templates=cast(list[str], list(cast(Any, row.excluded_templates) or [])),
+        glyph_remapping=cast(dict[str, str], dict(cast(Any, row.glyph_remapping) or {})),
+        template_errors=cast(dict[str, str], dict(cast(Any, row.template_errors) or {})),
+        asset_ingest_needed=cast(bool, row.asset_ingest_needed),
+        enabled=cast(bool, row.enabled),
+    )
+
+
+def upsert_plugin_state(
     *,
     plugin_id: str,
     version: str | None = None,
@@ -46,30 +64,13 @@ async def upsert_plugin_state(
     excluded_templates: list[str] | None = None,
     glyph_remapping: dict[str, str] | None = None,
 ) -> None:
-    """Insert or update the PluginState row for ``plugin_id``.
-
-    On first install: creates a row with empty ``excluded_templates`` /
-    ``glyph_remapping`` / ``template_errors`` defaults, ``asset_ingest_needed=True``,
-    and ``enabled=True``.  All ``None`` arguments fall back to their defaults for
-    new rows.
-
-    On subsequent calls: only the explicitly provided (non-``None``) arguments are
-    written; ``None`` means "leave the stored value unchanged".  Pass an empty list
-    to explicitly clear previously stored errors.
-
-    ``asset_ingest_needed`` is set to ``True`` when any of the following is true on
-    an existing row: the flag was already set, the version changed, the plugin is
-    being re-enabled, ``excluded_templates`` changed, or ``glyph_remapping`` changed.
-
-    Raises ``PluginNotFoundError`` if ``version`` is ``None`` and no existing row is found,
-    as that indicates a user error (updating a plugin that was never installed).
-    """
+    """Insert or update the PluginState row for ``plugin_id``."""
     ref_time = current_time("dbref")
     plugin_errors_raw = [e.model_dump() for e in plugin_errors] if plugin_errors is not None else None
 
-    async def function(i: int) -> None:
-        async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(select(PluginState).where(PluginState.plugin_id == plugin_id))
+    def function(i: int) -> None:
+        with _jobs_module.sync_session_maker() as session:
+            result = session.execute(select(PluginState).where(PluginState.plugin_id == plugin_id))
             existing = result.scalar_one_or_none()
             if existing is None:
                 if version is None:
@@ -93,8 +94,10 @@ async def upsert_plugin_state(
             else:
                 version_changed = version is not None and version != existing.plugin_version
                 enabling = enabled is True and not existing.enabled
-                excluded_changed = excluded_templates is not None and excluded_templates != list(existing.excluded_templates or [])  # ty:ignore[invalid-argument-type]
-                remapping_changed = glyph_remapping is not None and glyph_remapping != dict(existing.glyph_remapping or {})  # ty:ignore[no-matching-overload]
+                excluded_changed = excluded_templates is not None and excluded_templates != list(
+                    cast(Any, existing.excluded_templates) or []
+                )
+                remapping_changed = glyph_remapping is not None and glyph_remapping != dict(cast(Any, existing.glyph_remapping) or {})
                 new_ingest_needed = (
                     bool(existing.asset_ingest_needed) or version_changed or enabling or excluded_changed or remapping_changed
                 )
@@ -112,61 +115,49 @@ async def upsert_plugin_state(
                     values["excluded_templates"] = excluded_templates
                 if glyph_remapping is not None:
                     values["glyph_remapping"] = glyph_remapping
-                await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(**values))
-            await session.commit()
+                session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(**values))
+            session.commit()
 
-    await dbRetry(function)
+    dbRetry(function)
 
 
-async def get_plugin_state(plugin_id: str) -> PluginState | None:
+def get_plugin_state(plugin_id: str) -> PluginStateRecord | None:
     """Return the PluginState row for ``plugin_id``, or ``None`` if not yet installed."""
     query = select(PluginState).where(PluginState.plugin_id == plugin_id)
-    return await querySingle(query, _jobs_module.async_session_maker)
+    row = querySingle(query, _jobs_module.sync_session_maker)
+    return None if row is None else _to_plugin_state_record(row)
 
 
-async def get_all_plugin_states() -> list[PluginState]:
+def get_all_plugin_states() -> list[PluginStateRecord]:
     """Return all PluginState rows."""
 
-    async def function(i: int) -> list[PluginState]:
-        async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(select(PluginState))
-            return [row[0] for row in result.all()]
+    def function(i: int) -> list[PluginStateRecord]:
+        with _jobs_module.sync_session_maker() as session:
+            result = session.execute(select(PluginState))
+            return [_to_plugin_state_record(row[0]) for row in result.all()]
 
-    return await dbRetry(function)
+    return dbRetry(function)
 
 
-async def update_template_errors(*, plugin_id: str, template_errors: dict[str, str]) -> None:
-    """Persist per-template validation errors for ``plugin_id``.
+def update_template_errors(*, plugin_id: str, template_errors: dict[str, str]) -> None:
+    """Persist per-template validation errors for ``plugin_id``."""
 
-    An empty dict clears any recorded errors (all templates passed).  A non-empty
-    dict maps ``display_name`` to the error string for that template.  Call
-    this after each ingestion pass so the status surface reflects the latest result.
-
-    If no PluginState row exists yet the call is silently skipped; the row will
-    be created by ``upsert_plugin_state`` which defaults ``template_errors`` to ``{}``.
-    """
-
-    async def function(i: int) -> None:
-        async with _jobs_module.async_session_maker() as session:
-            result = await session.execute(select(PluginState).where(PluginState.plugin_id == plugin_id))
+    def function(i: int) -> None:
+        with _jobs_module.sync_session_maker() as session:
+            result = session.execute(select(PluginState).where(PluginState.plugin_id == plugin_id))
             if result.scalar_one_or_none() is not None:
-                await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(template_errors=template_errors))
-                await session.commit()
+                session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(template_errors=template_errors))
+                session.commit()
 
-    await dbRetry(function)
+    dbRetry(function)
 
 
-async def clear_asset_ingest_needed(*, plugin_id: str) -> None:
-    """Clear the ``asset_ingest_needed`` flag immediately before starting template ingestion.
+def clear_asset_ingest_needed(*, plugin_id: str) -> None:
+    """Clear the ``asset_ingest_needed`` flag immediately before starting template ingestion."""
 
-    Clearing before (not after) ingestion means a partial failure does not leave the
-    flag set and trigger a spurious re-ingest; the per-template errors are already
-    persisted via ``update_template_errors``.  If no row exists the call is a no-op.
-    """
+    def function(i: int) -> None:
+        with _jobs_module.sync_session_maker() as session:
+            session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(asset_ingest_needed=False))
+            session.commit()
 
-    async def function(i: int) -> None:
-        async with _jobs_module.async_session_maker() as session:
-            await session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(asset_ingest_needed=False))
-            await session.commit()
-
-    await dbRetry(function)
+    dbRetry(function)

@@ -9,8 +9,8 @@
 
 """FastAPI Entrypoint"""
 
-import asyncio
 import importlib
+import inspect
 import logging
 import os
 import pkgutil
@@ -108,7 +108,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
             module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
             if hasattr(module, "create_db_and_tables"):
-                await module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
+                result = module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
+                if inspect.isawaitable(result):
+                    await result
         _start_execution_runtime()
     except BaseException:
         execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
@@ -125,7 +127,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path)
         )
         catalog_ready = submit_refresh_catalog()
-        PluginManager.loop = asyncio.get_running_loop()
         submit_load_plugins(start_after=catalog_ready)
         yield
     finally:
