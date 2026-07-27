@@ -526,7 +526,14 @@ async def save_builder(
     blueprint_id: BlueprintId | None = None,
     expected_version: int | None = None,
 ) -> BlueprintSaveResult:
-    """Persist a BlueprintBuilder as a Blueprint and return the stable id and version."""
+    """Persist a BlueprintBuilder as a Blueprint and return the stable id and version.
+
+    ``source`` is derived from ``display_name``: ``user_defined`` when a name is
+    provided, ``oneoff_execution`` otherwise.
+    When ``expected_version`` is provided it must match the current max version;
+    raises ``BlueprintVersionConflict`` if it does not.
+    Raises ``BlueprintNotFound`` or ``BlueprintAccessDenied`` from the db layer.
+    """
     source: str = "user_defined" if payload.display_name is not None else "oneoff_execution"
     saved_blueprint_id, version = cast(
         tuple[BlueprintId, int],
@@ -551,7 +558,13 @@ async def save_builder(
 
 
 async def load_builder(blueprint_id: BlueprintId, version: int | None, auth_context: AuthContext) -> BlueprintRetrieveResult:
-    """Load a Blueprint and return it as a BlueprintRetrieveResult."""
+    """Load a Blueprint and return it as a BlueprintRetrieveResult.
+
+    Applies the same ownership scoping as ``list_blueprints`` -- a caller may only
+    load a blueprint they own, a plugin template, or (if admin) any blueprint.
+    Raises ``BlueprintNotFound`` if the id does not exist, is not visible to
+    ``auth_context``, or has no builder spec.
+    """
     results = list(
         cast(
             list[db.BlueprintLatest],

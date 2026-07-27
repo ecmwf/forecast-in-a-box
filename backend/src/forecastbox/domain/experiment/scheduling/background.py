@@ -7,7 +7,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""The main loop of the scheduler -- checks the ScheduledRun table and submits jobs."""
+"""The main loop of the scheduler -- checks the ScheduledRun table, submits jobs.
+Runs in its own thread.
+"""
 
 import datetime as dt
 import logging

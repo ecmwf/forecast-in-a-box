@@ -89,7 +89,8 @@ def upsert_experiment_definition(
     """Insert a new version of an ExperimentDefinition and return ``(id, version)``.
 
     If ``experiment_definition_id`` is omitted a fresh UUID is generated (version 1).
-    For updates, checks that the caller is the owner or has admin access.
+    For updates, checks that the caller is the owner or has admin access (via
+    ``auth_context.allowed()``), raising ``ExperimentAccessDenied`` otherwise.
     Raises ``ExperimentNotFound`` if an ``experiment_definition_id`` is given but
     does not exist.
     """
@@ -156,8 +157,11 @@ def get_experiment_definition(
 
     No authorization is applied; possession of the experiment ID is treated as
     sufficient read access. This is intentional and relied upon by internal
-    callers that already possess a validated foreign key or have performed their
-    own ownership check.
+    callers (scheduling, update/delete write paths, ...) that already possess a
+    validated foreign key or have performed their own ownership check. Route
+    handlers exposing an ExperimentDefinition to a caller by id must NOT use this
+    function -- use ``list_experiment_definitions`` (with ``experiment_definition_id``
+    set) instead, which applies the same ownership scoping as the list endpoint.
     """
     if version is not None:
         query = select(ExperimentDefinition).where(
@@ -188,7 +192,23 @@ def list_experiment_definitions(
     experiment_definition_id: ExperimentDefinitionId | None = None,
     version: int | None = None,
 ) -> Iterable[ExperimentLatest]:
-    """Return the latest (or a pinned) non-deleted version of every ExperimentDefinition visible to the caller."""
+    """Return the latest (or a pinned) non-deleted version of every ExperimentDefinition visible to the caller.
+
+    Admins and passthrough callers (``auth_context.has_admin()``) see all experiment definitions.
+    Authenticated non-admin users see only their own experiment definitions.
+
+    ``experiment_definition_id`` narrows the result to a single entity; combined
+    with ``limit=1`` this backs a single "get" lookup while still applying the
+    same ownership scoping as the list endpoint -- there is deliberately no
+    separate, unauthenticated single-row query for route handlers (see
+    ``get_experiment_definition`` for the internal, unauthenticated equivalent).
+    ``version`` optionally pins that entity to a specific version instead of its
+    latest one; it is only meaningful together with ``experiment_definition_id``.
+
+    Each returned row is paired with the entity's true ``created_at``
+    (the first version's creation time), alongside the returned version's own
+    ``created_at`` which represents that version's ``updated_at``.
+    """
 
     def function(i: int) -> list[ExperimentLatest]:
         with _jobs_module.sync_session_maker() as session:
@@ -237,7 +257,11 @@ def count_experiment_definitions(
     auth_context: AuthContext,
     experiment_type: str | None = None,
 ) -> int:
-    """Return the number of distinct non-deleted ExperimentDefinition ids visible to the caller."""
+    """Return the number of distinct non-deleted ExperimentDefinition ids visible to the caller.
+
+    Admins and passthrough callers (``auth_context.has_admin()``) count all experiment definitions.
+    Authenticated non-admin users count only their own.
+    """
 
     def function(i: int) -> int:
         with _jobs_module.sync_session_maker() as session:

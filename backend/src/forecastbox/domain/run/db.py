@@ -243,6 +243,7 @@ def soft_delete_run(run_id: RunId, *, auth_context: AuthContext) -> None:
     Raises ``RunAccessDenied`` if the actor is an authenticated non-admin
     who does not own the execution.
     """
+    # get_run raises if not found or access denied; ownership is already checked.
     get_run(run_id, auth_context=auth_context)
     stmt = update(Run).where(Run.run_id == run_id).values(is_deleted=True)
     executeAndCommit(stmt, _jobs_module.sync_session_maker)

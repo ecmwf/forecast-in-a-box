@@ -83,7 +83,7 @@ def delete_experiment_next(experiment_id: ExperimentDefinitionId) -> None:
 
 
 def get_schedulable_experiments(now: dt.datetime) -> list[tuple[ExperimentNextRecord, experiment_db.ExperimentDefinitionRecord]]:
-    """Return due ``(ExperimentNext, ExperimentDefinition)`` pairs.
+    """Return (ExperimentNext, ExperimentDefinition) pairs due for execution.
 
     Joins ExperimentNext with the latest non-deleted ExperimentDefinition of type
     'cron_schedule'. Disabled schedules have their ExperimentNext row deleted at

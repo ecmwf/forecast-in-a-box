@@ -206,7 +206,9 @@ def list_blueprints(
 
     ``blueprint_id`` narrows the result to a single entity; combined with ``limit=1``
     this backs a single "get" lookup while still applying the same ownership scoping
-    as the list endpoint. ``version`` optionally pins that entity to a specific
+    as the list endpoint -- there is deliberately no separate, unauthenticated
+    single-row query for route handlers (see ``get_blueprint`` for the internal,
+    unauthenticated equivalent). ``version`` optionally pins that entity to a specific
     version instead of its latest one; it is only meaningful together with
     ``blueprint_id``.
 
