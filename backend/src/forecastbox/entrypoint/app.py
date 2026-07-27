@@ -53,6 +53,7 @@ from forecastbox.utility.dispatcher import (
 from forecastbox.utility.dispatcher import (
     stop_request as dispatcher_stop_request,
 )
+from forecastbox.utility.fastapi import register_common_exception_handling
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
 logger = logging.getLogger(__name__)
@@ -152,6 +153,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+register_common_exception_handling(app)
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
