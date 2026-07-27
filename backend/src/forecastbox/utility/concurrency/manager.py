@@ -66,7 +66,7 @@ class RestartPolicy:
 NEVER_RESTART = RestartPolicy()
 
 
-class ExecutionManagerError(RuntimeError):
+class ExecutionManagerError(Exception):
     """Base class for execution manager errors."""
 
 
