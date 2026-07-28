@@ -285,6 +285,7 @@
       "missingVarsTitle": "Missing variables",
       "missingVarsDescription": "This configuration references variables that are not defined on this system. Provide values and choose per variable whether it is stored in the configuration (local) or on this system (global).",
       "usedIn": "Used in {{block}} → {{option}}",
+      "setsOption": "Sets {{option}}",
       "usedInMore": "+{{count}}",
       "prefilled": "Prefilled by the template ({{count}})",
       "apply": "Apply",

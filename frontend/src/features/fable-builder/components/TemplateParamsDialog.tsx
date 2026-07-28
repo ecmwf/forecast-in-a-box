@@ -36,7 +36,9 @@ import type {
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { TemplateExampleValues } from '@/api/types/plugins.types'
+import type { GlyphInfo } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { getFactory } from '@/api/types/fable.types'
+import { GlyphContext } from '@/features/fable-builder/context/GlyphContext'
 import {
   fableKeys,
   useCreateGlobalGlyph,
@@ -84,6 +86,9 @@ interface TemplateParamsDialogProps {
   /** Per-parameter local/global scope; global values are created on Apply. */
   scopeSelectable?: boolean
 }
+
+/** Stable empty array — a new literal each render would remount every field. */
+const NO_GLYPHS: Array<GlyphInfo> = []
 
 export function TemplateParamsDialog({
   open,
@@ -242,21 +247,100 @@ export function TemplateParamsDialog({
     const factory = catalogue
       ? getFactory(catalogue, block.factory_id)
       : undefined
-    let optionTitle = site.optionId
+    let option = site.optionId
     if (factory && site.optionId in factory.configuration_options) {
       const optionMeta = factory.configuration_options[site.optionId]
-      if (optionMeta.title) optionTitle = optionMeta.title
+      if (optionMeta.title) option = optionMeta.title
     }
     return t('template.dialog.usedIn', {
       block: factory?.title ?? block.factory_id.factory,
-      option: optionTitle,
+      option,
     })
   }
 
-  const renderField = (name: string) => {
+  /** Display title of the option a usage site points at. */
+  function optionTitle(site: ParameterUsage): string {
+    if (!(site.blockId in baseFable.blocks)) return site.optionId
+    const block = baseFable.blocks[site.blockId]
+    const factory = catalogue
+      ? getFactory(catalogue, block.factory_id)
+      : undefined
+    if (factory && site.optionId in factory.configuration_options) {
+      return factory.configuration_options[site.optionId].title || site.optionId
+    }
+    return site.optionId
+  }
+
+  /** Display title of a block, for the group heading. */
+  function blockTitle(blockId: string): string {
+    if (!(blockId in baseFable.blocks)) return blockId
+    const block = baseFable.blocks[blockId]
+    const factory = catalogue
+      ? getFactory(catalogue, block.factory_id)
+      : undefined
+    return factory?.title ?? block.factory_id.factory
+  }
+
+  /** Group parameters by the block they configure, in pipeline order. */
+  function groupParameters(
+    names: ReadonlyArray<string>,
+  ): Array<{ blockId: string | null; names: Array<string> }> {
+    const byBlock = new Map<string, Array<string>>()
+    const ungrouped: Array<string> = []
+    for (const name of names) {
+      const sites = name in params.usage ? params.usage[name] : []
+      if (sites.length === 0) {
+        ungrouped.push(name)
+        continue
+      }
+      const { blockId } = sites[0]
+      const bucket = byBlock.get(blockId)
+      if (bucket) bucket.push(name)
+      else byBlock.set(blockId, [name])
+    }
+
+    const groups: Array<{ blockId: string | null; names: Array<string> }> =
+      Object.keys(baseFable.blocks)
+        .filter((blockId) => byBlock.has(blockId))
+        .map((blockId) => {
+          const optionOrder = Object.keys(
+            baseFable.blocks[blockId].configuration_values,
+          )
+          const inBlock = byBlock.get(blockId)!
+          // Within a block, follow the option order the template declares.
+          inBlock.sort(
+            (a, b) =>
+              optionOrder.indexOf(params.usage[a][0].optionId) -
+              optionOrder.indexOf(params.usage[b][0].optionId),
+          )
+          return { blockId, names: inBlock }
+        })
+    if (ungrouped.length > 0) groups.push({ blockId: null, names: ungrouped })
+    return groups
+  }
+
+  /** Render a list of parameters grouped by the block each one configures. */
+  function renderGroups(names: ReadonlyArray<string>) {
+    return groupParameters(names).map(({ blockId, names: groupNames }) => (
+      <div key={blockId ?? '_'} className="flex flex-col gap-3">
+        {blockId !== null && (
+          <p className="border-b pb-1 text-[0.65rem] font-semibold tracking-wide text-muted-foreground uppercase">
+            {blockTitle(blockId)}
+          </p>
+        )}
+        <div className="grid items-start gap-x-6 gap-y-4 sm:grid-cols-2">
+          {groupNames.map((name) => renderField(name, blockId !== null))}
+        </div>
+      </div>
+    ))
+  }
+
+  const renderField = (name: string, grouped = false) => {
     const preview = resolvedPreview(name)
     const missing = isMissing(name)
     const meta = examples?.example_glyphs[name]
+    // Templates declare their own types; nothing is inferred elsewhere.
+    const valueType = meta?.type_hint
     const usageSites = name in params.usage ? params.usage[name] : []
     const scope = scopes[name] === 'global' ? 'global' : 'local'
     return (
@@ -300,7 +384,10 @@ export function TemplateParamsDialog({
           )}
         </div>
         {meta?.display_description && (
-          <p className="text-xs text-muted-foreground">
+          <p
+            className="truncate text-xs text-muted-foreground"
+            title={meta.display_description}
+          >
             {meta.display_description}
           </p>
         )}
@@ -309,39 +396,46 @@ export function TemplateParamsDialog({
             className="truncate text-xs text-muted-foreground"
             title={usageSites.map(usageLabel).join('\n')}
           >
-            {usageLabel(usageSites[0])}
+            {/* Grouped fields already sit under their block's heading. */}
+            {grouped
+              ? t('template.dialog.setsOption', {
+                  option: optionTitle(usageSites[0]),
+                })
+              : usageLabel(usageSites[0])}
             {usageSites.length > 1 &&
               ` ${t('template.dialog.usedInMore', { count: usageSites.length - 1 })}`}
           </p>
         )}
-        {meta?.type_hint ? (
-          <FieldRenderer
-            id={`template-param-${name}`}
-            configKey={name}
-            valueType={meta.type_hint}
-            value={values[name] ?? ''}
-            onChange={(value) => setValue(name, value)}
-            inputClassName={cn(missing && 'border-amber-400')}
-          />
-        ) : (
-          <Input
-            id={`template-param-${name}`}
-            value={values[name] ?? ''}
-            onChange={(e) => setValue(name, e.target.value)}
-            aria-invalid={missing || undefined}
-            className={cn(missing && 'border-amber-400')}
-          />
-        )}
-        {missing ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            {t('template.dialog.missingValue')}
-          </p>
-        ) : (
-          preview !== null &&
-          preview !== (values[name] ?? '') && (
-            <ResolvedPreview preview={preview} />
-          )
-        )}
+        <div className="flex flex-col gap-1.5">
+          {valueType ? (
+            <FieldRenderer
+              id={`template-param-${name}`}
+              configKey={name}
+              valueType={valueType}
+              value={values[name] ?? ''}
+              onChange={(value) => setValue(name, value)}
+              inputClassName={cn(missing && 'border-amber-400')}
+            />
+          ) : (
+            <Input
+              id={`template-param-${name}`}
+              value={values[name] ?? ''}
+              onChange={(e) => setValue(name, e.target.value)}
+              aria-invalid={missing || undefined}
+              className={cn(missing && 'border-amber-400')}
+            />
+          )}
+          {missing ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              {t('template.dialog.missingValue')}
+            </p>
+          ) : (
+            preview !== null &&
+            preview !== (values[name] ?? '') && (
+              <ResolvedPreview preview={preview} />
+            )
+          )}
+        </div>
       </div>
     )
   }
@@ -350,7 +444,7 @@ export function TemplateParamsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onSkip()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{title ?? t('template.dialog.title')}</DialogTitle>
           <DialogDescription>
@@ -358,53 +452,56 @@ export function TemplateParamsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* min-w-0: keeps nowrap preview lines from widening the dialog grid */}
-        <div className="flex min-w-0 flex-col gap-4">
-          {params.required.length > 0 && (
-            <div className="flex flex-col gap-3">
-              {params.required.map(renderField)}
+        {/* Variables are defined here, so no expression toggle. */}
+        <GlyphContext.Provider value={NO_GLYPHS}>
+          {/* min-w-0: keeps nowrap preview lines from widening the dialog grid */}
+          <div className="flex min-w-0 flex-col gap-4">
+            {params.required.length > 0 && (
+              <div className="flex flex-col gap-3">
+                {renderGroups(params.required)}
+              </div>
+            )}
+
+            {prefilledNames.length > 0 && (
+              <Collapsible open={showPrefilled} onOpenChange={setShowPrefilled}>
+                <CollapsibleTrigger className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+                  <ChevronRight
+                    className={cn(
+                      'h-4 w-4 transition-transform',
+                      showPrefilled && 'rotate-90',
+                    )}
+                  />
+                  {t('template.dialog.prefilled', {
+                    count: prefilledNames.length,
+                  })}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3 flex flex-col gap-3">
+                  {renderGroups(prefilledNames)}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Live validation status of the candidate configuration */}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {isValidating ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {t('template.dialog.validating')}
+                </>
+              ) : expansion && errorCount === 0 ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  {t('template.dialog.valid')}
+                </>
+              ) : expansion ? (
+                <>
+                  <TriangleAlert className="h-3.5 w-3.5 text-amber-500" />
+                  {t('template.dialog.issues', { count: errorCount })}
+                </>
+              ) : null}
             </div>
-          )}
-
-          {prefilledNames.length > 0 && (
-            <Collapsible open={showPrefilled} onOpenChange={setShowPrefilled}>
-              <CollapsibleTrigger className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 transition-transform',
-                    showPrefilled && 'rotate-90',
-                  )}
-                />
-                {t('template.dialog.prefilled', {
-                  count: prefilledNames.length,
-                })}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-3 flex flex-col gap-3">
-                {prefilledNames.map(renderField)}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          {/* Live validation status of the candidate configuration */}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {isValidating ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {t('template.dialog.validating')}
-              </>
-            ) : expansion && errorCount === 0 ? (
-              <>
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                {t('template.dialog.valid')}
-              </>
-            ) : expansion ? (
-              <>
-                <TriangleAlert className="h-3.5 w-3.5 text-amber-500" />
-                {t('template.dialog.issues', { count: errorCount })}
-              </>
-            ) : null}
           </div>
-        </div>
+        </GlyphContext.Provider>
 
         {applyError && (
           <p className="text-xs text-destructive" role="alert">
