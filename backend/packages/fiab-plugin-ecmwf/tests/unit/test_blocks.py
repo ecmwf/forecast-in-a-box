@@ -315,7 +315,7 @@ class TestOperationalForecastSource:
     def test_catalogue_value_types_are_canonical(self) -> None:
         assert (
             OperationalForecastSource.configuration_options[ConfigurationOptionId("source")].value_type.serialize()
-            == "enumClosed['mars','ecmwf-open-data']"
+            == "enumClosed[str]('mars','ecmwf-open-data')"
         )
         assert OperationalForecastSource.configuration_options[ConfigurationOptionId("base_time")].value_type.serialize() == "datetime"
         assert PARAM not in OperationalForecastSource.configuration_options
@@ -327,7 +327,7 @@ class TestEnsembleStatistics:
     def test_catalogue_value_type_is_canonical(self) -> None:
         assert (
             EnsembleStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type.serialize()
-            == "enumClosed['mean','std']"
+            == "enumClosed[str]('mean','std')"
         )
 
     def test_from_operational_forecast_source(
@@ -385,7 +385,7 @@ class TestTemporalStatistics:
     def test_catalogue_value_type_is_canonical(self) -> None:
         assert (
             TemporalStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type.serialize()
-            == "enumClosed['mean','std','min','max']"
+            == "enumClosed[str]('mean','std','min','max')"
         )
 
     def test_from_operational_forecast_source(
@@ -597,7 +597,7 @@ class TestSelect:
         restrictions = (
             plugin().validator(BlockFactoryId("select"), config.block, {"dataset": operational_forecast_source_output}).restrictions
         )
-        assert restrictions[VALUES].serialize() == "list[enumClosed['0','6','12']]"
+        assert restrictions[VALUES].serialize() == "list[enumClosed[str]('0','6','12')]"
 
     def test_validator_keeps_restrictions_when_configuration_is_missing(
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
@@ -636,7 +636,7 @@ class TestSelect:
 
 
 def test_anemoi_catalogue_value_types_are_canonical(registered_provider: None) -> None:
-    assert get_checkpoint_enum_type().serialize() == "enumClosed['dummy_store:dummy_ckpt']"
+    assert get_checkpoint_enum_type().serialize() == "enumClosed[str]('dummy_store:dummy_ckpt')"
 
 
 class TestGribSink:
@@ -804,7 +804,7 @@ class TestMapPlotSink:
             .validator(BlockFactoryId("mapPlotSink"), map_plot_sink_configuration.block, {"dataset": operational_forecast_source_output})
             .restrictions
         )
-        assert restrictions[PARAM].serialize() == "list[enumClosed['2t','msl','u']]"
+        assert restrictions[PARAM].serialize() == "list[enumClosed[str]('2t','msl','u')]"
 
     def test_expander_has_no_parameters_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
         expansions = plugin().expander(operational_forecast_source_output)
