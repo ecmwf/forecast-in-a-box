@@ -137,6 +137,17 @@ describe('parseValueType', () => {
         closed: true,
       })
     })
+
+    // anemoiSource.input_source ships exactly this, spaces and all.
+    it('parses enumOpen options as an open enum', () => {
+      expect(
+        parseValueType("enumOpen['mars', 'opendata', 'polytope']"),
+      ).toEqual({
+        type: 'enum',
+        options: ['mars', 'opendata', 'polytope'],
+        closed: false,
+      })
+    })
   })
 
   describe('whitespace and case handling', () => {

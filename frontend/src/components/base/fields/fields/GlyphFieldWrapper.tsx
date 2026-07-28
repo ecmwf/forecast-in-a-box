@@ -70,6 +70,8 @@ export interface GlyphFieldWrapperProps {
    * whose values are constrained to a backend-declared set).
    */
   allowGlyphMode?: boolean
+  /** True when the child draws its own border, e.g. a Select. */
+  selfContainedChild?: boolean
   /**
    * When true, the backend expects a calendar-date-only value
    * (`YYYY-MM-DD`). If a glyph expression resolves to a datetime with a
@@ -114,6 +116,7 @@ export function GlyphFieldWrapper({
   disabled,
   className,
   allowGlyphMode = true,
+  selfContainedChild = false,
   isDateOnly = false,
   children,
 }: GlyphFieldWrapperProps) {
@@ -148,9 +151,16 @@ export function GlyphFieldWrapper({
   const missingGlyphNames = useMissingGlyphs()?.[configKey] ?? null
   const valueHasGlyphs = containsGlyphs(value)
 
-  // No glyphs / glyph mode disabled → children as-is, plus error text and
-  // the resolved preview when a template injected a glyph value.
+  // No glyphs / glyph mode disabled → children, error text and preview only.
   if (!hasGlyphs || !allowGlyphMode) {
+    // InputGroupInput has no border of its own, so it still needs the group.
+    const plain = selfContainedChild ? (
+      <>{children}</>
+    ) : (
+      <InputGroup className={cn(hasFieldError && 'border-destructive')}>
+        {children}
+      </InputGroup>
+    )
     const injectedPreview =
       valueHasGlyphs && !hasFieldError
         ? (resolvedConfig?.[configKey] ?? null)
@@ -158,14 +168,14 @@ export function GlyphFieldWrapper({
     const showInjectedPreview =
       injectedPreview !== null && injectedPreview !== value
     if (!hasFieldError && !showInjectedPreview && !missingGlyphNames?.length) {
-      return <>{children}</>
+      return plain
     }
     return (
       <div>
-        {hasFieldError ? (
+        {hasFieldError && selfContainedChild ? (
           <div className="rounded-md ring-1 ring-destructive">{children}</div>
         ) : (
-          children
+          plain
         )}
         {errorMessage && (
           <p className="mt-1 truncate text-xs text-destructive">
@@ -229,6 +239,9 @@ export function GlyphFieldWrapper({
         className={cn(
           mode === 'glyph' && 'border-primary/30',
           hasFieldError && 'border-destructive',
+          // Strip the child's own border so the group reads as one control.
+          selfContainedChild &&
+            '[&_[data-slot=select-trigger]]:border-0 [&_[data-slot=select-trigger]]:bg-transparent [&_[data-slot=select-trigger]]:shadow-none',
         )}
       >
         {mode === 'glyph' ? (

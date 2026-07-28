@@ -126,8 +126,8 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     return { type: 'unknown', raw: trimmed }
   }
 
-  // Enum type: enum[...] / enumClosed[...] with single or double quotes
-  const enumMatch = trimmed.match(/^(enum|enumClosed)\[(.+)\]$/i)
+  // Backend serializes enumClosed/enumOpen; `enum` kept as an alias.
+  const enumMatch = trimmed.match(/^(enum|enumOpen|enumClosed)\[(.+)\]$/i)
   if (enumMatch) {
     const options = parseEnumOptions(enumMatch[2])
     if (options.length > 0) {

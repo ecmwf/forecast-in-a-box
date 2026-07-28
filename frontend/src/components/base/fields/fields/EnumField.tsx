@@ -51,7 +51,7 @@ export function EnumField({
       placeholder={resolvedPlaceholder}
       disabled={disabled}
       className={className}
-      allowGlyphMode={false}
+      selfContainedChild
     >
       <Select
         value={value || null}
