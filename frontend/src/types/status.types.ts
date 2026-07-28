@@ -58,11 +58,24 @@ export function getPluginStatusError(raw: string): string | null {
  */
 export type TrafficLightStatus = 'unknown' | 'green' | 'orange' | 'red'
 
+/** Execution-runtime health; `healthy` already means running with no dead thread. */
+export function normalizeConcurrencyStatus(
+  concurrency: ConcurrencyStatus,
+): ComponentStatus {
+  return concurrency.healthy ? 'up' : 'down'
+}
+
 /**
  * Zod schema for status values
  * Allows known status values and any other string (for future extensibility)
  */
 export const statusValueSchema = z.string()
+
+/** Pool/thread counters stay unmodelled until requests run through the pools. */
+export const concurrencyStatusSchema = z.object({
+  lifecycle: z.string(),
+  healthy: z.boolean(),
+})
 
 /**
  * Zod schema for status response from the API
@@ -74,6 +87,7 @@ export const statusResponseSchema = z.object({
   ecmwf: statusValueSchema,
   scheduler: statusValueSchema,
   plugins: statusValueSchema,
+  concurrency: concurrencyStatusSchema,
   version: z.string(),
 })
 
@@ -82,6 +96,7 @@ export const statusResponseSchema = z.object({
  */
 export type StatusValue = z.infer<typeof statusValueSchema>
 export type StatusResponse = z.infer<typeof statusResponseSchema>
+export type ConcurrencyStatus = z.infer<typeof concurrencyStatusSchema>
 
 /**
  * Component names in the status response (excluding version)
@@ -92,8 +107,20 @@ export const STATUS_COMPONENTS = [
   'ecmwf',
   'scheduler',
   'plugins',
+  'concurrency',
 ] as const
 export type StatusComponent = (typeof STATUS_COMPONENTS)[number]
+
+/** Plugins and concurrency speak their own dialect; the rest report the vocabulary directly. */
+function resolveComponentStatus(
+  status: StatusResponse,
+  component: StatusComponent,
+): ComponentStatus {
+  if (component === 'plugins') return normalizePluginStatus(status.plugins)
+  if (component === 'concurrency')
+    return normalizeConcurrencyStatus(status.concurrency)
+  return status[component] as ComponentStatus
+}
 
 /**
  * Computes the traffic light status from a status response
@@ -110,11 +137,8 @@ export function computeTrafficLightStatus(
   }
 
   // Get statuses for all components (excluding version)
-  // Plugins use a different vocabulary — normalize before comparison
   const componentStatuses = STATUS_COMPONENTS.map((component) =>
-    component === 'plugins'
-      ? normalizePluginStatus(status[component])
-      : (status[component] as ComponentStatus),
+    resolveComponentStatus(status, component),
   )
 
   // Filter out components that are 'off' - they don't count
@@ -172,10 +196,7 @@ export function getComponentStatusDetails(
   }
 
   return STATUS_COMPONENTS.map((component) => {
-    const componentStatus =
-      component === 'plugins'
-        ? normalizePluginStatus(status[component])
-        : (status[component] as ComponentStatus)
+    const componentStatus = resolveComponentStatus(status, component)
     return {
       component,
       status: componentStatus,

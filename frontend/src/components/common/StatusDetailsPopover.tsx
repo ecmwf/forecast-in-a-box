@@ -14,7 +14,7 @@
  * Shows detailed component status information in a popover
  */
 
-import { Activity, RefreshCw, Server } from 'lucide-react'
+import { Activity, Cpu, RefreshCw, Server } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import type { ComponentStatus, StatusComponent } from '@/types/status.types'
@@ -40,6 +40,7 @@ const componentLabelKeys = {
   ecmwf: 'status.ecmwfData',
   scheduler: 'status.scheduler',
   plugins: 'status.plugins',
+  concurrency: 'status.concurrency',
 } as const satisfies Record<StatusComponent, string>
 
 /**
@@ -51,6 +52,8 @@ function getComponentIcon(component: StatusComponent) {
       return <Server className="h-3.5 w-3.5" />
     case 'scheduler':
       return <Activity className="h-3.5 w-3.5" />
+    case 'concurrency':
+      return <Cpu className="h-3.5 w-3.5" />
     default:
       return <Server className="h-3.5 w-3.5" />
   }

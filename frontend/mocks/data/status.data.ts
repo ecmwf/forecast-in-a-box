@@ -24,6 +24,7 @@ export const mockStatusAllUp: StatusResponse = {
   ecmwf: 'up',
   scheduler: 'off',
   plugins: 'ok',
+  concurrency: { lifecycle: 'running', healthy: true },
   version: '0.0.1@2025-11-10 17:06:53',
 }
 
@@ -36,6 +37,7 @@ export const mockStatusPartialOutage: StatusResponse = {
   ecmwf: 'up',
   scheduler: 'off',
   plugins: 'ok',
+  concurrency: { lifecycle: 'running', healthy: true },
   version: '0.0.1@2025-11-10 17:06:53',
 }
 
@@ -48,6 +50,7 @@ export const mockStatusAllDown: StatusResponse = {
   ecmwf: 'down',
   scheduler: 'off',
   plugins: 'down',
+  concurrency: { lifecycle: 'stopped', healthy: false },
   version: '0.0.1@2025-11-10 17:06:53',
 }
 

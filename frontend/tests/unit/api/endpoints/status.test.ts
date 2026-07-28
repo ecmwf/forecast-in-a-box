@@ -32,6 +32,7 @@ describe('fetchStatus', () => {
       ecmwf: 'up',
       scheduler: 'up',
       plugins: 'ok',
+      concurrency: { lifecycle: 'running', healthy: true },
     }
 
     worker.use(

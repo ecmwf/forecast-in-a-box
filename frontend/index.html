@@ -3,8 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="/favicon.ico" />
-    <meta name="theme-color" content="#000000" />
+    <!-- .ico first for legacy; browsers that understand SVG prefer it. -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <!-- Overwritten before paint by theme-init.js, then by ThemeProvider. -->
+    <meta name="theme-color" content="#ffffff" />
+    <!-- Blocking: the theme class must land before first paint. -->
+    <script src="/theme-init.js"></script>
     <meta name="description" content="Forecast-In-A-Box" />
     <meta
       http-equiv="Content-Security-Policy"
@@ -18,7 +23,7 @@
         font-src 'self' https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://cdn.jsdelivr.net;
       "
     />
-    <link rel="apple-touch-icon" href="/logo192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
     <title>Forecast-In-A-Box</title>
   </head>

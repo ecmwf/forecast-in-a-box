@@ -11,15 +11,19 @@
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
+// Masked rather than <img> so the mark takes currentColor: its native ECMWF
+// blue reads almost black against the dark theme.
 export const Logo = ({ className }: { className?: string }) => {
   const { t } = useTranslation('common')
   return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <img
-        src="/logos/fiab.png"
-        alt={t('logoAlt')}
-        className="-my-8 h-12 w-auto"
-      />
-    </div>
+    <span
+      role="img"
+      aria-label={t('logoAlt')}
+      className={cn(
+        'block aspect-103/121 h-11 w-auto shrink-0 bg-primary dark:bg-primary-foreground',
+        'mask-[url(/logos/fiab-mark.svg)] mask-contain mask-center mask-no-repeat',
+        className,
+      )}
+    />
   )
 }

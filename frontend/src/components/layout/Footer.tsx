@@ -52,8 +52,18 @@ export function Footer() {
   return (
     <footer
       role="contentinfo"
-      className="bg-[#0e1f44] text-white dark:bg-[#0c1730]"
+      className="relative isolate overflow-hidden bg-[#0e1f44] text-white dark:bg-[#0c1730]"
     >
+      {/* Wireframe-globe field from the ECMWF slide template, anchored right as there. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-[url(/logos/ecmwf-globe-mesh.webp)] bg-cover bg-right opacity-60"
+      />
+      {/* Keeps text legible over the brightest part of the mesh. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0e1f44] via-[#0e1f44]/85 to-transparent dark:from-[#0c1730] dark:via-[#0c1730]/85"
+      />
       <div
         className={cn(
           'px-6',
@@ -115,6 +125,15 @@ export function Footer() {
             </StatusDetailsPopover>
           )}
         </div>
+      </div>
+
+      {/* Member and co-operating states, full-bleed as the slide template ends. */}
+      <div className="border-t border-white/10 px-6 py-3">
+        <img
+          src="/logos/ecmwf-member-states.svg"
+          alt={t('footer.memberStates')}
+          className="block h-auto w-full"
+        />
       </div>
     </footer>
   )

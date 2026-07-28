@@ -166,7 +166,8 @@
     "uninstallFailed": "Uninstall failed",
     "updating": "Updating",
     "updated": "Updated",
-    "updateFailed": "Update failed"
+    "updateFailed": "Update failed",
+    "failedWithReason": "{{label}}: {{reason}}"
   },
   "admin": {
     "verifyAccessError": "Could not verify admin access. Please try again."

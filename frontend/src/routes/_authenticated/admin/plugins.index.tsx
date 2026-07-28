@@ -45,6 +45,7 @@ import { PluginsFilters } from '@/features/plugins/components/PluginsFilters'
 import { PluginsList } from '@/features/plugins/components/PluginsList'
 import { UninstalledPluginsSection } from '@/features/plugins/components/UninstalledPluginsSection'
 import { UpdatesAvailableSection } from '@/features/plugins/components/UpdatesAvailableSection'
+import { pluginFailureDescription } from '@/features/plugins/utils/plugin-activity'
 import { useActivityStore } from '@/stores/activityStore'
 import { useUiStore } from '@/stores/uiStore'
 import { getPluginStatusError } from '@/types/status.types'
@@ -207,10 +208,10 @@ function PluginsPage() {
           completedAt: Date.now(),
         })
       },
-      () => {
+      (error: unknown) => {
         useActivityStore.getState().updateTask(id, {
           status: 'failed',
-          description: labels.failure,
+          description: pluginFailureDescription(error, labels.failure),
           completedAt: Date.now(),
         })
       },

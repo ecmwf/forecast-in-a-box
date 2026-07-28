@@ -17,6 +17,7 @@
 
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { applyThemeColor } from '@/lib/theme-color'
 import { useUiStore } from '@/stores/uiStore'
 
 interface ThemeProviderProps {
@@ -28,14 +29,29 @@ interface ThemeProviderProps {
  * Applies theme class to document element based on store state
  */
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const theme = useUiStore((state) => state.resolvedTheme)
+  const theme = useUiStore((state) => state.theme)
+  const resolvedTheme = useUiStore((state) => state.resolvedTheme)
+  const setResolvedTheme = useUiStore((state) => state.setResolvedTheme)
+
+  // The store resolves 'system' once, so without this the app keeps the old
+  // theme when the OS flips while it is open.
+  useEffect(() => {
+    if (theme !== 'system') return
+    const query = window.matchMedia('(prefers-color-scheme: dark)')
+    const sync = () => setResolvedTheme(query.matches ? 'dark' : 'light')
+    sync()
+    query.addEventListener('change', sync)
+    return () => query.removeEventListener('change', sync)
+  }, [theme, setResolvedTheme])
 
   useEffect(() => {
     // Apply theme to document root
     const root = document.documentElement
     root.classList.remove('light', 'dark')
-    root.classList.add(theme)
-  }, [theme])
+    root.classList.add(resolvedTheme)
+    // Tracks the explicit setting; a media attribute would see only the OS.
+    applyThemeColor(resolvedTheme)
+  }, [resolvedTheme])
 
   return <>{children}</>
 }
