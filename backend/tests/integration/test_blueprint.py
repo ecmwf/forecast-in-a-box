@@ -262,6 +262,11 @@ def test_plugin_template_in_blueprint_list(backend_client_user: httpx.Client) ->
     matches = [b for b in blueprints if b.get("source") == "plugin_template" and b.get("display_name") == "testBasic"]
     assert len(matches) == 1, f"Expected exactly one 'testBasic' plugin_template blueprint in the list, got: {blueprints}"
 
+    # Template tags survive ingest onto the blueprint row, as key-only tags.
+    assert [t["key"] for t in matches[0].get("tags") or []] == ["testTag", "second"], (
+        f"Expected testBasic's template tags on the blueprint row, got: {matches[0].get('tags')}"
+    )
+
     # Filtering by source=plugin_template must return testBasic.
     response = backend_client_user.get("/blueprint/list", params={"source": "plugin_template"}, timeout=10)
     assert response.is_success, response.text

@@ -225,6 +225,7 @@ class BlueprintTemplate(FiabCoreBaseModel):
 
     display_name: str
     display_description: str
+    tags: list[str] = Field(default_factory=list)
     blocks: dict[BlockInstanceId, BlueprintTemplateBlock]
     environment: BlueprintTemplateEnvironment | None = None
     local_glyphs: dict[str, str] = Field(default_factory=dict)

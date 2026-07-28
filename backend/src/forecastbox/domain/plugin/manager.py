@@ -167,6 +167,7 @@ def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin) -> No
                 builder=builder.model_dump(mode="json"),
                 display_name=template.display_name,
                 display_description=template.display_description,
+                tags=[{"key": tag} for tag in template.tags] or None,
             )
             logger.debug(f"ingested template {template.display_name!r} from plugin {plugin_id_str!r}")
         except Exception as e:
