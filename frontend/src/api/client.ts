@@ -21,6 +21,7 @@
 import i18n from 'i18next'
 import type { ApiError, RequestConfig } from '@/types/api.types'
 import { getBackendBaseUrl } from '@/utils/env'
+import { API_CONSTANTS } from '@/utils/constants'
 import { parseOrThrow } from '@/utils/zod'
 import { readAnonymousId } from '@/lib/anonymous-id'
 import { createLogger } from '@/lib/logger'
@@ -115,7 +116,14 @@ async function request<T>(
   path: string,
   config: RequestConfig = {},
 ): Promise<T> {
-  const { method = 'GET', headers = {}, body, params, schema } = config
+  const {
+    method = 'GET',
+    headers = {},
+    body,
+    params,
+    schema,
+    timeout = API_CONSTANTS.TIMEOUTS.DEFAULT,
+  } = config
 
   const url = buildUrl(path, params)
 
@@ -139,6 +147,8 @@ async function request<T>(
       credentials: 'include', // Include session cookies
       // Fail closed on 3xx — a cross-origin redirect leaks X-Anonymous-ID.
       redirect: 'error',
+      // Nothing else bounds the wait; a stalled backend hangs the spinner.
+      signal: AbortSignal.timeout(timeout),
     })
 
     // Handle non-200 responses
@@ -183,6 +193,18 @@ async function request<T>(
     // Re-throw ApiClientError
     if (error instanceof ApiClientError) {
       throw error
+    }
+
+    // Only ours: a caller's abort raises AbortError and must pass through.
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new ApiClientError(
+        i18n.t('errors:network.timeout', {
+          seconds: Math.round(timeout / 1000),
+        }),
+        undefined,
+        'TIMEOUT_ERROR',
+        error,
+      )
     }
 
     // Handle network errors

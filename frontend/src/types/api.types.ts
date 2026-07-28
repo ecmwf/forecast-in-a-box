@@ -34,4 +34,6 @@ export interface RequestConfig {
   body?: unknown
   params?: Record<string, string | number | boolean>
   schema?: z.ZodTypeAny // Optional Zod schema for response validation
+  /** Abort after this many ms; defaults to API_CONSTANTS.TIMEOUTS.DEFAULT. */
+  timeout?: number
 }
