@@ -165,7 +165,7 @@ class TestClosedEnumType:
     """Tests for ClosedEnumType"""
 
     def test_serialize_quotes_items(self) -> None:
-        assert ClosedEnumType(["option1", "option2"]).serialize() == "enumClosed['option1','option2']"
+        assert ClosedEnumType(["option1", "option2"]).serialize() == "enumClosed[str]('option1','option2')"
 
     def test_convert_valid_enum_value(self) -> None:
         t = ClosedEnumType(["option1", "option2", "option3"])
@@ -190,12 +190,28 @@ class TestClosedEnumType:
         with pytest.raises(WrongType):
             t.validate_convert("option1")
 
+    def test_int_subtype_converts_and_validates(self) -> None:
+        t = ClosedEnumType(["1", "2", "3"], subtype=IntType())
+        assert t.items == [1, 2, 3]
+        assert t.validate_convert("2") == 2
+        with pytest.raises(WrongType):
+            t.validate_convert("4")
+
+    def test_subtype_as_string_is_parsed(self) -> None:
+        t = ClosedEnumType(["1", "2"], subtype="int")
+        assert isinstance(t.subtype, IntType)
+        assert t.validate_convert("1") == 1
+
+    def test_serialize_with_int_subtype(self) -> None:
+        t = ClosedEnumType(["1", "2"], subtype=IntType())
+        assert t.serialize() == "enumClosed[int](1,2)"
+
 
 class TestOpenEnumType:
     """Tests for OpenEnumType"""
 
     def test_serialize_quotes_items(self) -> None:
-        assert OpenEnumType(["option1", "option2"]).serialize() == "enumOpen['option1','option2']"
+        assert OpenEnumType(["option1", "option2"]).serialize() == "enumOpen[str]('option1','option2')"
 
     def test_convert_any_string(self) -> None:
         t = OpenEnumType(["option1", "option2"])
@@ -209,6 +225,15 @@ class TestOpenEnumType:
             t.validate_convert(123)
         with pytest.raises(NotStringInput):
             t.validate_convert(None)
+
+    def test_int_subtype_converts(self) -> None:
+        t = OpenEnumType(["1", "2"], subtype=IntType())
+        assert t.items == [1, 2]
+        assert t.validate_convert("99") == 99
+
+    def test_serialize_with_int_subtype(self) -> None:
+        t = OpenEnumType(["1", "2"], subtype=IntType())
+        assert t.serialize() == "enumOpen[int](1,2)"
 
 
 class TestListType:
@@ -335,18 +360,38 @@ class TestFableTypeParse:
         assert isinstance(parse(" int "), IntType)
 
     def test_parse_closed_enum(self) -> None:
-        t = parse("enumClosed[option1,option2,option3]")
+        t = parse("enumClosed[str](option1,option2,option3)")
         assert isinstance(t, ClosedEnumType)
-        assert t.serialize() == "enumClosed['option1','option2','option3']"
+        assert t.serialize() == "enumClosed[str]('option1','option2','option3')"
         assert t.validate_convert("option1") == "option1"
         with pytest.raises(WrongType):
             t.validate_convert("invalid")
 
     def test_parse_open_enum(self) -> None:
-        t = parse("enumOpen[option1,option2]")
+        t = parse("enumOpen[str](option1,option2)")
         assert isinstance(t, OpenEnumType)
-        assert t.serialize() == "enumOpen['option1','option2']"
+        assert t.serialize() == "enumOpen[str]('option1','option2')"
         assert t.validate_convert("any_value") == "any_value"
+
+    def test_parse_closed_enum_with_int_subtype(self) -> None:
+        t = parse("enumClosed[int](1,2,3)")
+        assert isinstance(t, ClosedEnumType)
+        assert isinstance(t.subtype, IntType)
+        assert t.items == [1, 2, 3]
+        assert t.serialize() == "enumClosed[int](1,2,3)"
+        assert t.validate_convert("2") == 2
+        with pytest.raises(WrongType):
+            t.validate_convert("4")
+
+    def test_parse_open_enum_with_int_subtype(self) -> None:
+        t = parse("enumOpen[int](1,2)")
+        assert isinstance(t, OpenEnumType)
+        assert t.items == [1, 2]
+        assert t.validate_convert("99") == 99
+
+    def test_parse_enum_missing_parens_raises_error(self) -> None:
+        with pytest.raises(ValueError):
+            parse("enumClosed[int]")
 
     def test_parse_list_of_int(self) -> None:
         t = parse("list[int]")
@@ -359,11 +404,11 @@ class TestFableTypeParse:
         assert t.validate_convert("a,b,c") == ["a", "b", "c"]
 
     def test_parse_list_of_enum(self) -> None:
-        t = parse("list[enumClosed[a,b]]")
+        t = parse("list[enumClosed[str](a,b)]")
         assert isinstance(t, ListType)
         assert isinstance(t.item_type, ClosedEnumType)
         assert t.validate_convert("a,b,a") == ["a", "b", "a"]
-        assert t.serialize() == "list[enumClosed['a','b']]"
+        assert t.serialize() == "list[enumClosed[str]('a','b')]"
 
     def test_parse_nested_list_now_supported(self) -> None:
         t = parse("list[list[int]]")
@@ -380,23 +425,23 @@ class TestFableTypeParse:
 
     def test_parse_empty_enum_raises_error(self) -> None:
         with pytest.raises(ValueError):
-            parse("enumClosed[]")
+            parse("enumClosed[str]()")
         with pytest.raises(ValueError):
-            parse("enumOpen[]")
+            parse("enumOpen[str]()")
 
     def test_parse_list_with_whitespace(self) -> None:
         t = parse("list[ int ]")
         assert isinstance(t, ListType)
 
     def test_parse_enum_with_whitespace(self) -> None:
-        t = parse("enumClosed[ a , b , c ]")
+        t = parse("enumClosed[str]( a , b , c )")
         assert isinstance(t, ClosedEnumType)
         assert t.validate_convert("a") == "a"
 
     def test_parse_enum_with_quoted_items(self) -> None:
-        t = parse("enumClosed['a', 'b', 'c']")
+        t = parse("enumClosed[str]('a', 'b', 'c')")
         assert isinstance(t, ClosedEnumType)
-        assert t.serialize() == "enumClosed['a','b','c']"
+        assert t.serialize() == "enumClosed[str]('a','b','c')"
         assert t.validate_convert("b") == "b"
 
 
@@ -410,8 +455,8 @@ class TestValidateConvertIntegration:
             ("float", "3.14", 3.14),
             ("date", "2026-05-08", date(2026, 5, 8)),
             ("datetime", "2026-05-08T10:30:45", datetime(2026, 5, 8, 10, 30, 45)),
-            ("enumClosed[a,b,c]", "b", "b"),
-            ("enumOpen[x,y]", "any_value", "any_value"),
+            ("enumClosed[str](a,b,c)", "b", "b"),
+            ("enumOpen[str](x,y)", "any_value", "any_value"),
             ("list[int]", "1,2,3", [1, 2, 3]),
             ("list[str]", "a,b,c", ["a", "b", "c"]),
         ]
@@ -601,7 +646,7 @@ class TestUnionType:
         assert t.validate_convert("1.5,2.5") == [1.5, 2.5]
 
     def test_parse_union_with_enum(self) -> None:
-        t = parse("union[enumClosed[a,b],str]")
+        t = parse("union[enumClosed[str](a,b),str]")
         assert isinstance(t, UnionType)
         assert isinstance(t.types[0], ClosedEnumType)
         assert t.validate_convert("a") == "a"
@@ -628,7 +673,7 @@ class TestFableTypeParseRemainder:
         assert remainder == ",more"
 
     def test_enum_type_returns_remainder(self) -> None:
-        t, remainder = _parse("enumClosed[a,b],extra")
+        t, remainder = _parse("enumClosed[str](a,b),extra")
         assert isinstance(t, ClosedEnumType)
         assert remainder == ",extra"
 
@@ -638,7 +683,7 @@ class TestFableTypeParseRemainder:
         assert remainder == ",extra"
 
     def test_nested_brackets_in_list_parsed_correctly(self) -> None:
-        t, remainder = _parse("list[enumClosed[a,b]]suffix")
+        t, remainder = _parse("list[enumClosed[str](a,b)]suffix")
         assert isinstance(t, ListType)
         assert isinstance(t.item_type, ClosedEnumType)
         assert remainder == "suffix"
@@ -656,7 +701,7 @@ class TestFableTypeParseRemainder:
             _parse("enumClosed[a,b")
 
     def test_union_with_enum_member(self) -> None:
-        t, remainder = _parse("union[enumClosed[x,y],int]")
+        t, remainder = _parse("union[enumClosed[str](x,y),int]")
         assert isinstance(t, UnionType)
         assert remainder == ""
         assert isinstance(t.types[0], ClosedEnumType)
