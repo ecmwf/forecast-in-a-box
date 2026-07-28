@@ -40,10 +40,7 @@ const PLACEHOLDER = 'Type a command or search...'
 
 /** Every command label, grouped, for exhaustive presence checks. */
 const ALL_COMMANDS = [
-  'Quick Start',
-  'Standard Forecast',
-  'Custom Model Forecast',
-  'Dataset Forecast',
+  'New Forecast Configuration',
   'Dashboard',
   'Configure',
   'Executions',
@@ -135,7 +132,9 @@ describe('CommandPalette', () => {
       .element(screen.getByRole('option', { name: /Dashboard/ }))
       .toBeVisible()
     await expect
-      .element(screen.getByRole('option', { name: /Quick Start/ }))
+      .element(
+        screen.getByRole('option', { name: /New Forecast Configuration/ }),
+      )
       .not.toBeInTheDocument()
   })
 
@@ -175,16 +174,16 @@ describe('CommandPalette', () => {
     expect(useCommandStore.getState().isOpen).toBe(false)
   })
 
-  it('passes the preset search param through for Getting Started commands', async () => {
+  it('opens a blank builder from the Getting Started command', async () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    await screen.getByRole('option', { name: /Quick Start/ }).click()
+    await screen
+      .getByRole('option', { name: /New Forecast Configuration/ })
+      .click()
 
-    expect(mockNavigate).toHaveBeenCalledWith({
-      to: '/configure',
-      search: { preset: 'quick-start' },
-    })
+    // No search params: ready-made starting points come from plugin templates now.
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/configure' })
   })
 
   it('runs the highlighted command when Enter is pressed', async () => {

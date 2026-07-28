@@ -140,24 +140,12 @@
     "esc": "Esc"
   },
   "commands": {
+    "newConfiguration": {
+      "label": "New Forecast Configuration",
+      "description": "Start from a blank canvas"
+    },
     "categoryGettingStarted": "Getting Started",
     "categoryNavigation": "Navigation",
-    "quickStart": {
-      "label": "Quick Start",
-      "description": "Start with AIFS model preset"
-    },
-    "standard": {
-      "label": "Standard Forecast",
-      "description": "Choose model, 120h forecast"
-    },
-    "customModel": {
-      "label": "Custom Model Forecast",
-      "description": "Blank canvas, full control"
-    },
-    "dataset": {
-      "label": "Dataset Forecast",
-      "description": "Use AIFS data from external source"
-    },
     "dashboard": {
       "label": "Dashboard",
       "description": "Go to dashboard"
