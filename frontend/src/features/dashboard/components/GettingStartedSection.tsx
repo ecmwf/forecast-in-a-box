@@ -11,18 +11,25 @@
 /**
  * GettingStartedSection Component
  *
- * Section showing different ways to start a forecast configuration
+ * A blank canvas plus the starting points the ECMWF plugin ships as templates.
  */
 
-import { Activity, Cloud, Database, Layers } from 'lucide-react'
-import { useMemo } from 'react'
+import { Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { GettingStartedCard } from './GettingStartedCard'
+import {
+  TemplateStarterCard,
+  TemplateStarterCardSkeleton,
+} from './TemplateStarterCard'
+import type { ReactNode } from 'react'
 import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
-import type { PresetId } from '@/features/fable-builder/presets/presets'
-import { getPreset } from '@/features/fable-builder/presets/presets'
+import {
+  STARTER_TEMPLATE_LIMIT,
+  useStarterTemplates,
+} from '@/features/dashboard/hooks/useStarterTemplates'
 import { H2, P } from '@/components/base/typography'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
 interface GettingStartedSectionProps {
@@ -30,25 +37,33 @@ interface GettingStartedSectionProps {
   shadow?: PanelShadow
 }
 
+/** Informational filler for the tracks the template cards would have taken. */
+function StarterPanel({
+  title,
+  description,
+  action,
+}: {
+  title: string
+  description: string
+  action: ReactNode
+}) {
+  return (
+    <div className="flex h-full flex-col items-start justify-center rounded-lg border border-dashed p-5 md:col-span-1 lg:col-span-3">
+      <p className="mb-1 text-base font-bold">{title}</p>
+      <P className="mb-4 text-muted-foreground">{description}</P>
+      {action}
+    </div>
+  )
+}
+
 export function GettingStartedSection({
   variant,
   shadow,
 }: GettingStartedSectionProps) {
-  const { t } = useTranslation('dashboard')
+  const { t } = useTranslation(['dashboard', 'common'])
   const navigate = useNavigate()
-
-  const handlePresetClick = (preset: PresetId) => {
-    navigate({ to: '/configure', search: { preset } })
-  }
-
-  // Builder graphs are evaluated once per render — date defaults are stamped
-  // here so the flow previews always reflect the date the cards will load with.
-  const ecmwfOpenDataFable = useMemo(
-    () => getPreset('ecmwf-open-data').fable,
-    [],
-  )
-  const aifsForecastFable = useMemo(() => getPreset('aifs-forecast').fable, [])
-  const aifsDatasetFable = useMemo(() => getPreset('aifs-dataset').fable, [])
+  const { starters, hasStarters, isLoading, isError, refetch } =
+    useStarterTemplates()
 
   const content = (
     <>
@@ -59,67 +74,73 @@ export function GettingStartedSection({
         </P>
       </div>
 
+      {/* Fixed four tracks: the card count varies, but matching the presets row
+          below matters more than absorbing the gap. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Start from Scratch — blank canvas (replaces old Quick Start + Custom Forecast). */}
+        {/* Always available, and the only card that needs no backend. */}
         <GettingStartedCard
           icon={<Layers className="h-5 w-5" />}
           title={t('gettingStarted.startFromScratch.title')}
+          ariaLabel={t('gettingStarted.startFromScratch.title')}
           description={t('gettingStarted.startFromScratch.description')}
           tags={[
             t('gettingStarted.startFromScratch.tags.canvas'),
             t('gettingStarted.startFromScratch.tags.control'),
           ]}
           isRecommended
-          onClick={() => handlePresetClick('custom-model')}
+          onClick={() => navigate({ to: '/configure' })}
         />
 
-        {/* Card 2: ECMWF Open Data — ensemble-mean 2t global PNG. */}
-        <GettingStartedCard
-          icon={<Cloud className="h-5 w-5" />}
-          title={t('gettingStarted.ecmwfOpenData.title')}
-          description={t('gettingStarted.ecmwfOpenData.description')}
-          tags={[
-            t('gettingStarted.ecmwfOpenData.tags.source'),
-            t('gettingStarted.ecmwfOpenData.tags.statistic'),
-            t('gettingStarted.ecmwfOpenData.tags.format'),
-          ]}
-          iconColor="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-          borderColor="border-border hover:border-blue-400"
-          previewFable={ecmwfOpenDataFable}
-          onClick={() => handlePresetClick('ecmwf-open-data')}
-        />
+        {isLoading && (
+          <>
+            {/* Absolutely positioned, so it announces without taking a grid track. */}
+            <span role="status" className="sr-only">
+              {t('gettingStarted.templates.loading')}
+            </span>
+            {Array.from({ length: STARTER_TEMPLATE_LIMIT }, (_, index) => (
+              <TemplateStarterCardSkeleton key={index} />
+            ))}
+          </>
+        )}
 
-        {/* Card 3: AIFS 72h Forecast — multi-sink map plots. */}
-        <GettingStartedCard
-          icon={<Activity className="h-5 w-5" />}
-          title={t('gettingStarted.aifsForecast.title')}
-          description={t('gettingStarted.aifsForecast.description')}
-          tags={[
-            t('gettingStarted.aifsForecast.tags.source'),
-            t('gettingStarted.aifsForecast.tags.leadTime'),
-            t('gettingStarted.aifsForecast.tags.format'),
-          ]}
-          iconColor="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-          borderColor="border-border hover:border-emerald-400"
-          previewFable={aifsForecastFable}
-          onClick={() => handlePresetClick('aifs-forecast')}
-        />
+        {!isLoading &&
+          hasStarters &&
+          starters.map((template, index) => (
+            <TemplateStarterCard
+              key={template.blueprintId}
+              template={template}
+              position={index}
+            />
+          ))}
 
-        {/* Card 4: AIFS Ensemble Dataset — Zarr export. */}
-        <GettingStartedCard
-          icon={<Database className="h-5 w-5" />}
-          title={t('gettingStarted.aifsDataset.title')}
-          description={t('gettingStarted.aifsDataset.description')}
-          tags={[
-            t('gettingStarted.aifsDataset.tags.source'),
-            t('gettingStarted.aifsDataset.tags.members'),
-            t('gettingStarted.aifsDataset.tags.format'),
-          ]}
-          iconColor="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
-          borderColor="border-border hover:border-purple-400"
-          previewFable={aifsDatasetFable}
-          onClick={() => handlePresetClick('aifs-dataset')}
-        />
+        {!isLoading && isError && (
+          <StarterPanel
+            title={t('gettingStarted.templates.errorTitle')}
+            description={t('gettingStarted.templates.errorDescription')}
+            action={
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                {t('common:retry')}
+              </Button>
+            }
+          />
+        )}
+
+        {!isLoading && !isError && !hasStarters && (
+          <StarterPanel
+            title={t('gettingStarted.templates.emptyTitle')}
+            description={t('gettingStarted.templates.emptyDescription')}
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                render={<Link to="/admin/plugins" />}
+                nativeButton={false}
+              >
+                {t('gettingStarted.templates.managePlugins')}
+              </Button>
+            }
+          />
+        )}
       </div>
     </>
   )

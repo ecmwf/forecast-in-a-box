@@ -104,7 +104,10 @@ const mockTemplates: Array<WireBlueprint> = [
     version: 1,
     display_name: 'Fast Map',
     display_description: 'Ready-made starting point',
-    tags: null,
+    tags: [
+      { key: 'IFS Ensemble', value: '' },
+      { key: 'GRIB', value: '' },
+    ],
     source: 'plugin_template',
     user: 'local:plugin-test',
   },
@@ -315,6 +318,9 @@ describe('PresetsPage — Templates tab', () => {
       .element(screen.getByText('From plugin: plugin-test'))
       .toBeVisible()
     await expect.element(screen.getByText('Use template')).toBeVisible()
+    // Plugin-authored tags render as chips, as they do on the dashboard cards.
+    await expect.element(screen.getByText('IFS Ensemble')).toBeVisible()
+    await expect.element(screen.getByText('GRIB')).toBeVisible()
     // User presets don't render on the Templates tab
     await expect
       .element(screen.getByText('European Forecast'))

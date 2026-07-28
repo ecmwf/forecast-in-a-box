@@ -11,6 +11,7 @@
 import { useMemo } from 'react'
 import { useListBlueprints } from '@/api/hooks/useFable'
 import { parsePluginIdString } from '@/api/types/plugins.types'
+import { stripSystemTags } from '@/lib/system-tags'
 
 /** A plugin-shipped blueprint template, offered as a starting point */
 export interface TemplateEntry {
@@ -18,6 +19,8 @@ export interface TemplateEntry {
   version: number
   displayName: string | null
   displayDescription: string | null
+  /** Plugin-authored labels, shown as chips */
+  tags: Array<string>
   /** Owning plugin as a "store:local" composite string (from created_by) */
   pluginId: string | null
   /** Short plugin label for chips (the local part of the composite id) */
@@ -26,8 +29,18 @@ export interface TemplateEntry {
   coreVersionMismatch: string | null
 }
 
+/** Search params that fork a template into the builder and open its dialog. */
+export function templateConfigureSearch(template: TemplateEntry) {
+  return {
+    fableId: template.blueprintId,
+    template: true,
+    ...(template.pluginId && { templatePlugin: template.pluginId }),
+    ...(template.displayName && { templateName: template.displayName }),
+  }
+}
+
 export function useTemplatePresets() {
-  const { data, isLoading } = useListBlueprints(1, 50, {
+  const { data, isLoading, isError, refetch } = useListBlueprints(1, 50, {
     source: 'plugin_template',
   })
 
@@ -38,6 +51,7 @@ export function useTemplatePresets() {
       version: bp.version,
       displayName: bp.display_name,
       displayDescription: bp.display_description,
+      tags: stripSystemTags(bp.tags),
       pluginId: bp.created_by,
       pluginLabel: bp.created_by
         ? parsePluginIdString(bp.created_by).local || bp.created_by
@@ -50,5 +64,7 @@ export function useTemplatePresets() {
     templates,
     hasTemplates: templates.length > 0,
     isLoading,
+    isError,
+    refetch,
   }
 }
