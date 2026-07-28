@@ -13,6 +13,7 @@ from fiab_core.fable import (
     BlockInstanceId,
     BlueprintTemplate,
     BlueprintTemplateBlock,
+    BlueprintTemplateExampleInput,
     ConfigurationOptionId,
 )
 
@@ -26,9 +27,9 @@ from fiab_plugin_ecmwf.templates.common import (
 )
 
 template = BlueprintTemplate(
-    display_name="IFS Single-Member Snapshot",
-    display_description="One member of the IFS ensemble: 2 m temperature and mean sea-level pressure at +24 h, as map plots over the area you choose and a GRIB file.",
-    tags=["IFS Ensemble", "2t + msl", "Map plot + GRIB"],
+    display_name="IFS Ensemble Statistics",
+    display_description="Mean or standard deviation of 2 m temperature at +72 h, as a map plot over the area you choose and a GRIB file.",
+    tags=["IFS Ensemble", "Mean or Std", "Map plot + GRIB"],
     blocks={
         BlockInstanceId("source"): BlueprintTemplateBlock(
             factory_id=BlockFactoryId("operationalForecastSource"),
@@ -41,27 +42,16 @@ template = BlueprintTemplate(
                 input_ids={},
             ),
         ),
+        # Ensemble Statistics handles one parameter at a time.
         BlockInstanceId("selectParam"): BlueprintTemplateBlock(
             factory_id=BlockFactoryId("select"),
             instance=BlockInstance(
                 configuration_values={
                     ConfigurationOptionId("dimension"): "param",
-                    ConfigurationOptionId("values"): "2t,msl",
+                    ConfigurationOptionId("values"): "2t",
                 },
                 input_ids={
                     "dataset": BlockInstanceId("source"),
-                },
-            ),
-        ),
-        BlockInstanceId("selectNumber"): BlueprintTemplateBlock(
-            factory_id=BlockFactoryId("select"),
-            instance=BlockInstance(
-                configuration_values={
-                    ConfigurationOptionId("dimension"): "number",
-                    ConfigurationOptionId("values"): "0",
-                },
-                input_ids={
-                    "dataset": BlockInstanceId("selectParam"),
                 },
             ),
         ),
@@ -70,10 +60,22 @@ template = BlueprintTemplate(
             instance=BlockInstance(
                 configuration_values={
                     ConfigurationOptionId("dimension"): "step",
-                    ConfigurationOptionId("values"): "24",
+                    ConfigurationOptionId("values"): "72",
                 },
                 input_ids={
-                    "dataset": BlockInstanceId("selectNumber"),
+                    "dataset": BlockInstanceId("selectParam"),
+                },
+            ),
+        ),
+        BlockInstanceId("ensembleStatistic"): BlueprintTemplateBlock(
+            factory_id=BlockFactoryId("ensembleStatistics"),
+            instance=BlockInstance(
+                configuration_values={
+                    ConfigurationOptionId("param"): "2t",
+                    ConfigurationOptionId("statistic"): "${statistic}",
+                },
+                input_ids={
+                    "dataset": BlockInstanceId("selectStep"),
                 },
             ),
         ),
@@ -81,15 +83,15 @@ template = BlueprintTemplate(
             factory_id=BlockFactoryId("mapPlotSink"),
             instance=BlockInstance(
                 configuration_values={
-                    ConfigurationOptionId("param"): "2t,msl",
+                    ConfigurationOptionId("param"): "2t",
                     ConfigurationOptionId("domain"): "${area}",
                     ConfigurationOptionId("format"): "${format}",
                     ConfigurationOptionId("groupby"): "none",
-                    # A single step leaves nothing else to split on.
-                    ConfigurationOptionId("splitby"): "param",
+                    # A single field at a single step leaves nothing to split on.
+                    ConfigurationOptionId("splitby"): "none",
                 },
                 input_ids={
-                    "dataset": BlockInstanceId("selectStep"),
+                    "dataset": BlockInstanceId("ensembleStatistic"),
                 },
             ),
         ),
@@ -100,7 +102,7 @@ template = BlueprintTemplate(
                     ConfigurationOptionId("path"): GRIB_OUTPUT_PATH,
                 },
                 input_ids={
-                    "dataset": BlockInstanceId("selectStep"),
+                    "dataset": BlockInstanceId("ensembleStatistic"),
                 },
             ),
         ),
@@ -112,5 +114,11 @@ template = BlueprintTemplate(
         "forecastSource": FORECAST_SOURCE,
         "area": map_area("global"),
         "format": MAP_FORMAT,
+        "statistic": BlueprintTemplateExampleInput(
+            example_value="mean",
+            display_name="Ensemble Statistic",
+            display_description="Statistic to compute over the ensemble",
+            type_hint="enumClosed['mean', 'std']",
+        ),
     },
 )

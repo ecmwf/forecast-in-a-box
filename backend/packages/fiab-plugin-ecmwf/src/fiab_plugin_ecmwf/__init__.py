@@ -24,7 +24,9 @@ from fiab_plugin_ecmwf.blocks import (
     TemporalStatistics,
     ZarrSink,
 )
-from fiab_plugin_ecmwf.templates.prototype import template as _prototype_template
+from fiab_plugin_ecmwf.templates.aifs_forecast import template as _aifs_forecast_template
+from fiab_plugin_ecmwf.templates.ifs_ensemble_statistics import template as _ensemble_statistics_template
+from fiab_plugin_ecmwf.templates.prototype import template as _snapshot_template
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("operationalForecastSource"): OperationalForecastSource(),
@@ -43,4 +45,8 @@ _base_plugin = QubedPluginBuilder(block_builders=blocks, base_environment=["fiab
 
 
 def plugin() -> Plugin:
-    return dataclasses.replace(_base_plugin(), blueprint_templates=(_prototype_template,))
+    # Declaration order is presentation order.
+    return dataclasses.replace(
+        _base_plugin(),
+        blueprint_templates=(_snapshot_template, _aifs_forecast_template, _ensemble_statistics_template),
+    )
