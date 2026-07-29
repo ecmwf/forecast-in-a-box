@@ -9,11 +9,14 @@
 
 """Definitions of all the types"""
 
+import logging
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Any, Iterable, Literal, get_args
 
 from fiab_core.types.exceptions import NotStringInput, WrongType
+
+logger = logging.getLogger(__name__)
 
 # BASE CLASS FOR ALL REAL TYPES
 
@@ -289,3 +292,47 @@ class GeoDomainType(UnionType):
 
     def serialize(self) -> str:
         return "geodomain"
+
+
+class ArtifactType(StringType):
+    """A string representing an id from the artifact catalog. Utilized by the frontend
+    to perform catalog lookup to build a better UI form, displaying additional info"""
+
+    # NOTE we are being careful here as we dont want to introduce a strict dependency
+    # of types on artifacts. Hence the (exceptional) string annotation, in-body import,
+    # defensive lookup, etc
+    def validate_convert(self, value: Any) -> "fiab_core.artifacts.CompositeArtifactId":
+        raw: str = super().validate_convert(value)
+        from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
+
+        try:
+            artifact_id = CompositeArtifactId.from_str(raw)
+        except Exception as e:
+            raise WrongType(f"{v} is not a CompositeArtifactId: {e!r}") from None
+        try:
+            lookup = ArtifactsProvider.get_artifacts_lookup()
+        except RuntimeError as e:
+            logger.warning(f"no artifacts provider -- will not validate! {e!r}")
+            return
+        if artifact_id not in lookup:
+            raise WrongType(f"{artifact_id=} is not known to the ArtifactsProvider")
+        return artifact_id
+
+    def serialize(self) -> str:
+        return "artifact"
+
+
+class ParameterType(StringType):
+    """A string representing a parameter name, like 2t or u or v. Utilized by the frontend
+    to perform param lookup to build a better UI form, displaying additional info,
+    name conversion, etc"""
+
+    def validate_convert(self, value: Any) -> str:
+        raw: str = super().validate_convert(value)
+        # TODO here we should do some "param lookup into metkit" but:
+        # a/ must be opportunistic -- we dont want a metkit dependency
+        # b/ that code may not yet exist?
+        return raw
+
+    def serialize(self) -> str:
+        return "param"
