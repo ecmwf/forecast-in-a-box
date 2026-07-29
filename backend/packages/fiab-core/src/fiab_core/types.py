@@ -204,7 +204,7 @@ class ClosedEnumType(FableType):
     string (in which case it is parsed first). Defaults to StringType for backwards compatibility.
     """
 
-    def __init__(self, items: Iterable[Any], subtype: "FableType | str" = StringType()) -> None:
+    def __init__(self, items: Iterable[Any], subtype: FableType | str = StringType()) -> None:
         self.subtype = parse(subtype) if isinstance(subtype, str) else subtype
         self.items = [self.subtype.validate_convert(item) for item in items]
         self._item_set = set(self.items)
@@ -229,7 +229,7 @@ class OpenEnumType(FableType):
     See ClosedEnumType for the meaning of ``items`` and ``subtype``.
     """
 
-    def __init__(self, items: Iterable[Any], subtype: "FableType | str" = StringType()) -> None:
+    def __init__(self, items: Iterable[Any], subtype: FableType | str = StringType()) -> None:
         self.subtype = parse(subtype) if isinstance(subtype, str) else subtype
         self.items = [self.subtype.validate_convert(item) for item in items]
 
@@ -399,9 +399,9 @@ def _parse(type_expr: str) -> tuple[FableType, str]:
             if subtype_remainder.strip():
                 raise NotFableType(f"Unexpected content after enum subtype in {prefix}: {subtype_remainder!r}")
             after_subtype = after_subtype.lstrip()
-            if not after_subtype.startswith("("):
-                raise NotFableType(f"{prefix} must be followed by '(' item, item, ... ')' after the subtype")
-            _, items_str, remainder = _split_by_parens(after_subtype)
+            should_be_empty, items_str, remainder = _split_by_parens(after_subtype)
+            if should_be_empty:
+                raise NotFableType(f"{prefix} must be followed by '(' item, item, ... ')' after the subtype, gotten {should_be_empty}")
             items = [_normalize_enum_item(item) for item in items_str.split(",") if item.strip()]
             if not items:
                 raise NotFableType(f"{prefix} must contain at least one item")

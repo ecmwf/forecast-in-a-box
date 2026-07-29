@@ -14,6 +14,7 @@
   * when working with a package with insufficient typing coverage like sqlalchemy, use `ty:ignore` comment
   * when `ty` is not powerful enough, use `ty:ignore `
   * use `typing.cast` when the code logic is implicitly erasing the type information
+  * do not use annotation-as-string unless necessary -- that is, prefer `f: TypeExpression` instead of `f: "TypeExpression"`
 * prioritize using pydantic BaseModel or dataclasses.dataclass object for capturing contracts and interfaces.
   * when using pydantic, use `FiabBaseModel` from `forecastbox.utility.pydantic` (or `FiabCoreBaseModel` from `fiab_core.pydantic_utils` in fiab-core) instead of `pydantic.BaseModel` directly, unless the model requires dynamic field handling (e.g., `extra="allow"` for JSON Schema types). These base models set `extra="forbid"` to catch misconfigured constructors early. If you need the dynamic model handling, mark it clearly with a comment.
   * ideally keep them plain, stateless, frozen, without functions -- we end up serializing those objects often over to other python processes or different languages
