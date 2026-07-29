@@ -85,7 +85,7 @@ template = BlueprintTemplate(
                 configuration_values={
                     ConfigurationOptionId("param"): "2t",
                     ConfigurationOptionId("domain"): "${area}",
-                    ConfigurationOptionId("format"): "${format}",
+                    ConfigurationOptionId("format"): "${plotFormat}",
                     ConfigurationOptionId("groupby"): "none",
                     # A single field at a single step leaves nothing to split on.
                     ConfigurationOptionId("splitby"): "none",
@@ -113,7 +113,7 @@ template = BlueprintTemplate(
         "outputRoot": OUTPUT_ROOT,
         "forecastSource": FORECAST_SOURCE,
         "area": map_area("global"),
-        "format": MAP_FORMAT,
+        "plotFormat": MAP_FORMAT,
         "statistic": BlueprintTemplateExampleInput(
             example_value="mean",
             display_name="Ensemble Statistic",

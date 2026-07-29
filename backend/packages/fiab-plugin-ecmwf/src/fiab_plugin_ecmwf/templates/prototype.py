@@ -83,7 +83,7 @@ template = BlueprintTemplate(
                 configuration_values={
                     ConfigurationOptionId("param"): "2t,msl",
                     ConfigurationOptionId("domain"): "${area}",
-                    ConfigurationOptionId("format"): "${format}",
+                    ConfigurationOptionId("format"): "${plotFormat}",
                     ConfigurationOptionId("groupby"): "none",
                     # A single step leaves nothing else to split on.
                     ConfigurationOptionId("splitby"): "param",
@@ -111,6 +111,6 @@ template = BlueprintTemplate(
         "outputRoot": OUTPUT_ROOT,
         "forecastSource": FORECAST_SOURCE,
         "area": map_area("global"),
-        "format": MAP_FORMAT,
+        "plotFormat": MAP_FORMAT,
     },
 )
