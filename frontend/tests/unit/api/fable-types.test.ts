@@ -145,7 +145,7 @@ describe('toValidationState', () => {
           {
             plugin: { store: 'ecmwf', local: 'base' },
             factory: 'sink',
-            restrictions: { amount: 'enumClosed[1,2,3]' },
+            restrictions: { amount: 'enumClosed[int](1,2,3)' },
           },
         ],
       },
@@ -164,7 +164,7 @@ describe('toValidationState', () => {
       },
     ])
     expect(result.blockStates.b1.possibleExpansionRestrictions).toEqual({
-      'ecmwf/base:sink': { amount: 'enumClosed[1,2,3]' },
+      'ecmwf/base:sink': { amount: 'enumClosed[int](1,2,3)' },
     })
   })
 
@@ -187,7 +187,7 @@ describe('toValidationState', () => {
       possible_sources: [],
       possible_expansions: {},
       configuration_restrictions: {
-        b1: { param: 'list[enumClosed[2t,msl]]' },
+        b1: { param: 'list[enumClosed[str](2t,msl)]' },
       },
       resolved_configuration_options: {},
       block_output_qubes: {},
@@ -197,11 +197,11 @@ describe('toValidationState', () => {
     const validationState = toValidationState(expansion, fable, mockCatalogue)
 
     expect(validationState.blockStates.b1.configurationRestrictions).toEqual({
-      param: 'list[enumClosed[2t,msl]]',
+      param: 'list[enumClosed[str](2t,msl)]',
     })
     expect(
       getBlockConfigurationRestrictions(fable, validationState, 'b1'),
-    ).toEqual({ param: 'list[enumClosed[2t,msl]]' })
+    ).toEqual({ param: 'list[enumClosed[str](2t,msl)]' })
   })
 })
 

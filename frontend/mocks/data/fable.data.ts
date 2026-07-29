@@ -55,12 +55,12 @@ export const mockCatalogue: BlockFactoryCatalogue = {
           source: {
             title: 'Source',
             description: 'Top level source for earthkit data',
-            value_type: "enumClosed['mars', 'ecmwf-open-data']",
+            value_type: "enumClosed[str]('mars', 'ecmwf-open-data')",
           },
           forecast: {
             title: 'Forecast model',
             description: 'Name of forecast',
-            value_type: 'enumClosed[aifs-ens,ifs-ens]',
+            value_type: 'enumClosed[str](aifs-ens,ifs-ens)',
             default_value: 'aifs-ens',
           },
           base_time: {
@@ -102,7 +102,7 @@ export const mockCatalogue: BlockFactoryCatalogue = {
           statistic: {
             title: 'Statistic',
             description: 'Statistic to compute over the ensemble',
-            value_type: "enumClosed['mean', 'std']",
+            value_type: "enumClosed[str]('mean', 'std')",
           },
         },
         inputs: ['dataset'],
@@ -120,7 +120,7 @@ export const mockCatalogue: BlockFactoryCatalogue = {
           statistic: {
             title: 'Statistic',
             description: 'Statistic to compute over steps',
-            value_type: "enumClosed['mean', 'std', 'min', 'max']",
+            value_type: "enumClosed[str]('mean', 'std', 'min', 'max')",
           },
         },
         inputs: ['dataset'],

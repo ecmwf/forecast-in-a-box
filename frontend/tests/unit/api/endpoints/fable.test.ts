@@ -137,7 +137,7 @@ describe('expandFable', () => {
         ],
       },
       configuration_restrictions: {
-        'block-1': { param1: "enumClosed['value1','value2']" },
+        'block-1': { param1: "enumClosed[str]('value1','value2')" },
       },
       missing_glyphs: {},
     }
@@ -152,7 +152,7 @@ describe('expandFable', () => {
     expect(result.global_errors).toEqual([])
     expect(result.block_errors).toEqual({})
     expect(result.configuration_restrictions).toEqual({
-      'block-1': { param1: "enumClosed['value1','value2']" },
+      'block-1': { param1: "enumClosed[str]('value1','value2')" },
     })
   })
 
@@ -171,7 +171,7 @@ describe('expandFable', () => {
               {
                 plugin: { store: 'ecmwf', local: 'core' },
                 factory: 'model',
-                restrictions: { param1: "enumClosed['value1','value2']" },
+                restrictions: { param1: "enumClosed[str]('value1','value2')" },
               },
             ],
           },

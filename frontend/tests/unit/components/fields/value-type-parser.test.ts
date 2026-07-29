@@ -81,7 +81,7 @@ describe('parseValueType', () => {
     })
 
     it('parses list with closed enum item type', () => {
-      expect(parseValueType('list[enumClosed[2t,msl]]')).toEqual({
+      expect(parseValueType('list[enumClosed[str](2t,msl)]')).toEqual({
         type: 'enumList',
         options: ['2t', 'msl'],
         closed: true,
@@ -89,7 +89,7 @@ describe('parseValueType', () => {
     })
 
     it('parses list with open enum item type', () => {
-      expect(parseValueType("list[enum['a','b']]")).toEqual({
+      expect(parseValueType("list[enum[str]('a','b')]")).toEqual({
         type: 'enumList',
         options: ['a', 'b'],
         closed: false,
@@ -99,7 +99,7 @@ describe('parseValueType', () => {
 
   describe('enum types', () => {
     it('parses single-quoted enum options', () => {
-      expect(parseValueType("enum['a','b','c']")).toEqual({
+      expect(parseValueType("enum[str]('a','b','c')")).toEqual({
         type: 'enum',
         options: ['a', 'b', 'c'],
         closed: false,
@@ -107,7 +107,7 @@ describe('parseValueType', () => {
     })
 
     it('parses double-quoted enum options', () => {
-      expect(parseValueType('enum["x","y","z"]')).toEqual({
+      expect(parseValueType('enum[str]("x","y","z")')).toEqual({
         type: 'enum',
         options: ['x', 'y', 'z'],
         closed: false,
@@ -115,7 +115,7 @@ describe('parseValueType', () => {
     })
 
     it('parses enum with single option', () => {
-      expect(parseValueType("enum['only']")).toEqual({
+      expect(parseValueType("enum[str]('only')")).toEqual({
         type: 'enum',
         options: ['only'],
         closed: false,
@@ -123,7 +123,9 @@ describe('parseValueType', () => {
     })
 
     it('parses enumClosed options', () => {
-      expect(parseValueType("enumClosed['mars','ecmwf-open-data']")).toEqual({
+      expect(
+        parseValueType("enumClosed[str]('mars','ecmwf-open-data')"),
+      ).toEqual({
         type: 'enum',
         options: ['mars', 'ecmwf-open-data'],
         closed: true,
@@ -131,7 +133,7 @@ describe('parseValueType', () => {
     })
 
     it('parses unquoted enumClosed options', () => {
-      expect(parseValueType('enumClosed[2t,msl]')).toEqual({
+      expect(parseValueType('enumClosed[str](2t,msl)')).toEqual({
         type: 'enum',
         options: ['2t', 'msl'],
         closed: true,
@@ -141,7 +143,7 @@ describe('parseValueType', () => {
     // anemoiSource.input_source ships exactly this, spaces and all.
     it('parses enumOpen options as an open enum', () => {
       expect(
-        parseValueType("enumOpen['mars', 'opendata', 'polytope']"),
+        parseValueType("enumOpen[str]('mars', 'opendata', 'polytope')"),
       ).toEqual({
         type: 'enum',
         options: ['mars', 'opendata', 'polytope'],
@@ -222,7 +224,7 @@ describe('parseValueType', () => {
     })
 
     it('preserves enum options when wrapped', () => {
-      expect(parseValueType("optional[enum['a','b']]")).toEqual({
+      expect(parseValueType("optional[enum[str]('a','b')]")).toEqual({
         type: 'enum',
         options: ['a', 'b'],
         closed: false,
@@ -231,12 +233,14 @@ describe('parseValueType', () => {
     })
 
     it('preserves enumClosed options when wrapped', () => {
-      expect(parseValueType("optional[enumClosed['mean','std']]")).toEqual({
-        type: 'enum',
-        options: ['mean', 'std'],
-        closed: true,
-        optional: true,
-      })
+      expect(parseValueType("optional[enumClosed[str]('mean','std')]")).toEqual(
+        {
+          type: 'enum',
+          options: ['mean', 'std'],
+          closed: true,
+          optional: true,
+        },
+      )
     })
 
     it('marks unknown inner as optional unknown', () => {

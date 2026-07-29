@@ -311,7 +311,7 @@ export const pluginsHandlers = [
             example_value: 'png',
             display_name: 'Format',
             display_description: 'Output image format.',
-            type_hint: 'enumClosed[png,pdf,svg]',
+            type_hint: 'enumClosed[str](png,pdf,svg)',
           },
           area: {
             example_value: 'Europe',

@@ -21,15 +21,20 @@
  * - date-iso8601 → date input
  * - list[str] → tag input (badges with add/remove)
  * - list[int] → tag input (badges with add/remove)
- * - enum['a','b','c'] → select dropdown (open: suggestions, accept any string)
- * - enumClosed['a','b','c'] → select dropdown (closed: must be one of the listed)
- * - list[enumClosed[a,b,c]] → multi-select restricted to the listed items
- * - list[enum[a,b,c]] → multi-select with suggestions, accept any string
+ * - enum[str]('a','b','c') → select dropdown (open: suggestions, accept any string)
+ * - enumClosed[str]('a','b','c') → select dropdown (closed: must be one of the listed)
+ * - list[enumClosed[str](a,b,c)] → multi-select restricted to the listed items
+ * - list[enum[str](a,b,c)] → multi-select with suggestions, accept any string
  * - geodomain → geographic-area picker (presets / countries / draw a box)
  * - optional[T] → same widget as T, with optional=true flag
  *
  * `enum`/`enumList` carry `closed: boolean` (closed vs open) for forward
  * compat; no first-party factory emits the open form yet.
+ *
+ * Enum expressions carry an explicit subtype in brackets, e.g.
+ * `enumClosed[str]('a','b')` or `enumOpen[int](1,2)`. Only the `str`
+ * subtype is rendered as a first-class field today; other subtypes fall
+ * back to `unknown`.
  */
 
 import { getAppTimeZone, todayInZone } from '@/lib/datetime'
@@ -126,15 +131,21 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     return { type: 'unknown', raw: trimmed }
   }
 
-  // Backend serializes enumClosed/enumOpen; `enum` kept as an alias.
-  const enumMatch = trimmed.match(/^(enum|enumOpen|enumClosed)\[(.+)\]$/i)
+  // Backend serializes enumClosed[subtype](...)/enumOpen[subtype](...); `enum` kept as an alias.
+  // Only the `str` subtype is supported as a first-class field; other subtypes are `unknown`.
+  const enumMatch = trimmed.match(
+    /^(enum|enumOpen|enumClosed)\[(\w+)\]\((.*)\)$/i,
+  )
   if (enumMatch) {
-    const options = parseEnumOptions(enumMatch[2])
-    if (options.length > 0) {
-      return {
-        type: 'enum',
-        options,
-        closed: enumMatch[1].toLowerCase() === 'enumclosed',
+    const subtype = enumMatch[2].toLowerCase()
+    if (subtype === 'str' || subtype === 'string') {
+      const options = parseEnumOptions(enumMatch[3])
+      if (options.length > 0) {
+        return {
+          type: 'enum',
+          options,
+          closed: enumMatch[1].toLowerCase() === 'enumclosed',
+        }
       }
     }
   }
