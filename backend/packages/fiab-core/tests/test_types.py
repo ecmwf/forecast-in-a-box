@@ -13,7 +13,7 @@ from datetime import date, datetime
 
 import pytest
 
-from fiab_core.types import (
+from fiab_core.types.definitions import (
     BoundingBoxWSENType,
     ClosedEnumType,
     DatetimeType,
@@ -24,15 +24,16 @@ from fiab_core.types import (
     GeoDomainType,
     IntType,
     ListType,
-    NotFableType,
-    NotStringInput,
     OpenEnumType,
     StringType,
     UnionType,
-    WrongType,
-    _parse,
-    parse,
 )
+from fiab_core.types.exceptions import (
+    NotFableType,
+    NotStringInput,
+    WrongType,
+)
+from fiab_core.types.parser import _parse, parse
 
 
 class TestStringType:
@@ -196,11 +197,6 @@ class TestClosedEnumType:
         assert t.validate_convert("2") == 2
         with pytest.raises(WrongType):
             t.validate_convert("4")
-
-    def test_subtype_as_string_is_parsed(self) -> None:
-        t = ClosedEnumType(["1", "2"], subtype="int")
-        assert isinstance(t.subtype, IntType)
-        assert t.validate_convert("1") == 1
 
     def test_serialize_with_int_subtype(self) -> None:
         t = ClosedEnumType(["1", "2"], subtype=IntType())

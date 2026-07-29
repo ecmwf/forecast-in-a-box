@@ -21,11 +21,13 @@ Provides parsing, validation, and conversion for a small set of type expressions
 """
 
 from fiab_core.types.definitions import *
+from fiab_core.types.exceptions import *
 from fiab_core.types.parser import *
 
 __all__ = []
 import fiab_core.types.definitions as definitions
+import fiab_core.types.exceptions as exceptions
 import fiab_core.types.parser as parser
 
-for mod in (parser, definitions):
+for mod in (parser, definitions, exceptions):
     __all__.extend((attr for attr in dir(mod) if not attr.startswith("_")))

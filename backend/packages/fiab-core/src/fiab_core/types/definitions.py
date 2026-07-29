@@ -14,6 +14,7 @@ from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Any, Iterable, Literal, get_args
 
+import fiab_core  # to satisfy the type checker for artifacts annotation
 from fiab_core.types.exceptions import NotStringInput, WrongType
 
 logger = logging.getLogger(__name__)
@@ -140,12 +141,12 @@ class ClosedEnumType(FableType):
     """Closed enumeration type. Validates membership in the enum, converting via the given subtype.
 
     ``items`` are the raw (string) representations of the allowed values, converted eagerly at
-    construction time via ``subtype``. ``subtype`` may be a FableType instance or a type expression
-    string (in which case it is parsed first). Defaults to StringType for backwards compatibility.
+    construction time via ``subtype``. ``subtype`` must be a FableType instance. Defaults
+    to StringType for backwards compatibility.
     """
 
-    def __init__(self, items: Iterable[Any], subtype: FableType | str = StringType()) -> None:
-        self.subtype = parse(subtype) if isinstance(subtype, str) else subtype
+    def __init__(self, items: Iterable[Any], subtype: FableType = StringType()) -> None:
+        self.subtype = subtype
         self.items = [self.subtype.validate_convert(item) for item in items]
         self._item_set = set(self.items)
 
@@ -169,8 +170,8 @@ class OpenEnumType(FableType):
     See ClosedEnumType for the meaning of ``items`` and ``subtype``.
     """
 
-    def __init__(self, items: Iterable[Any], subtype: FableType | str = StringType()) -> None:
-        self.subtype = parse(subtype) if isinstance(subtype, str) else subtype
+    def __init__(self, items: Iterable[Any], subtype: FableType = StringType()) -> None:
+        self.subtype = subtype
         self.items = [self.subtype.validate_convert(item) for item in items]
 
     def validate_convert(self, value: Any) -> Any:
@@ -308,7 +309,7 @@ class ArtifactType(StringType):
         try:
             artifact_id = CompositeArtifactId.from_str(raw)
         except Exception as e:
-            raise WrongType(f"{v} is not a CompositeArtifactId: {e!r}") from None
+            raise WrongType(f"{raw} is not a CompositeArtifactId: {e!r}") from None
         try:
             lookup = ArtifactsProvider.get_artifacts_lookup()
         except RuntimeError as e:
