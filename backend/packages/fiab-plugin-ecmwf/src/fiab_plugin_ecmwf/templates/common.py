@@ -10,7 +10,7 @@
 """Values shared by this plugin's blueprint templates."""
 
 from fiab_core.fable import BlueprintTemplateExampleInput
-from fiab_core.types import ClosedEnumType, StringType, GeoDomainType
+from fiab_core.types import ClosedEnumType, GeoDomainType, StringType
 
 # `[shortName]` is the sink's own metadata templating, not a glyph.
 GRIB_OUTPUT_PATH = "${outputRoot}/${runId}__${attemptCount}/[shortName].grib"
