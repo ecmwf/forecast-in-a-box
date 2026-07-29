@@ -109,7 +109,7 @@ def test_option_value_matches_its_type(template: BlueprintTemplate, block_id: Bl
         pytest.skip("intrinsic glyph -- the value only exists at run time")
     resolved = _GLYPH.sub(lambda m: template.example_glyphs[_leading_identifier(m.group(1))].example_value, raw)
 
-    value_type, _ = parse(_factory(template, block_id).configuration_options[option_id].value_type)
+    value_type = parse(_factory(template, block_id).configuration_options[option_id].value_type)
     try:
         value_type.validate_convert(resolved)
     except WrongType as exc:
@@ -145,7 +145,7 @@ def test_example_glyph_values_match_their_own_type_hint(template: BlueprintTempl
             f"{name} must state its own type: templates are self-contained and the client "
             "does not infer types from the catalogue or from validation"
         )
-        value_type, _ = parse(example.type_hint)
+        value_type = parse(example.type_hint)
         try:
             value_type.validate_convert(example.example_value)
         except WrongType as exc:

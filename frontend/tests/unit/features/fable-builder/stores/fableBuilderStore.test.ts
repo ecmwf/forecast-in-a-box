@@ -726,7 +726,7 @@ describe('useFableBuilderStore', () => {
               possibleExpansions: [],
               possibleExpansionRestrictions: {
                 'ecmwf/test:transform': {
-                  param: 'list[enumClosed[2t,msl]]',
+                  param: 'list[enumClosed[str](2t,msl)]',
                 },
               },
               configurationRestrictions: {},
@@ -750,7 +750,7 @@ describe('useFableBuilderStore', () => {
       )
       expect(
         useFableBuilderStore.getState().blockConfigurationRestrictions.target,
-      ).toEqual({ param: 'list[enumClosed[2t,msl]]' })
+      ).toEqual({ param: 'list[enumClosed[str](2t,msl)]' })
 
       act(() =>
         useFableBuilderStore.getState().setValidationState(
@@ -869,7 +869,7 @@ describe('useFableBuilderStore', () => {
         useFableBuilderStore
           .getState()
           .setBlockConfigurationRestrictions('block-2', {
-            param: 'list[enumClosed[2t,msl]]',
+            param: 'list[enumClosed[str](2t,msl)]',
           }),
       )
 

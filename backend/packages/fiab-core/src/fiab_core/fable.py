@@ -12,50 +12,41 @@ Types pertaining to Forecast As BLock Expression (Fable): blocks
 """
 
 import abc
-from typing import Any, Literal, NewType
+from typing import Annotated, Any, Literal, NewType
 
 from earthkit.workflows.fluent import Action
-from pydantic import ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import BeforeValidator, ConfigDict, Field, PlainSerializer, WithJsonSchema
 from qubed import Qube
 from typing_extensions import Self
 
 from fiab_core.pydantic_utils import FiabCoreBaseModel
-from fiab_core.types import FableType, NotFableType, parse
+from fiab_core.types import FableType, parse
 
 Error = str
 """Compiler/validator error message type alias."""
 
 
+FableTypeField = Annotated[
+    FableType,
+    BeforeValidator(parse),
+    PlainSerializer(lambda value: value.serialize(), return_type=str),
+    WithJsonSchema({"type": "string"}),
+]
+
+
 class BlockConfigurationOption(FiabCoreBaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     title: str
     """Brief string to display in the BlockFactory detail"""
     description: str
     """Extended description, possibly with example values and their effect"""
-    value_type: str
-    """Will be used when deserializing the actual value"""
-    # TODO do we want Literal instead of str for values? Probably `str` since this will need to be parsed anyway
-    # TODO do we prefer nesting or flattening for complex config? Ideally we support both, its just about the type system
+    value_type: FableTypeField
+    """Type used when deserializing the actual value; serialized as an expression for clients"""
     default_value: str | None = None
     """Used by the frontend to inject the default value"""
     is_advanced: bool = False
     """Used by the frontend to optionally hide the setting unless advanced. Do not set if no default provided / None not valid"""
-
-    _value_type: FableType = PrivateAttr()
-
-    @model_validator(mode="after")
-    def _validate_and_cache_value_type(self) -> Self:
-        try:
-            parsed, remainder = parse(self.value_type)
-            if remainder.strip():
-                raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
-            self._value_type = parsed
-        except NotFableType as exc:
-            raise ValueError(str(exc)) from exc
-        return self
-
-    @property
-    def parsed_value_type(self) -> FableType:
-        return self._value_type
 
 
 ConfigurationOptionId = NewType("ConfigurationOptionId", str)
@@ -197,21 +188,12 @@ class BlueprintTemplateExampleInput(FiabCoreBaseModel):
     is assumed to take them from the underlying configuration option, or,
     in the glyph case, assume no data."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     example_value: str
     display_name: str | None = None
     display_description: str | None = None
-    type_hint: str | None = None
-
-    @model_validator(mode="after")
-    def _validate_type_hint(self) -> Self:
-        if self.type_hint is not None:
-            try:
-                _, remainder = parse(self.type_hint)
-                if remainder.strip():
-                    raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
-            except NotFableType as exc:
-                raise ValueError(str(exc)) from exc
-        return self
+    type_hint: FableTypeField | None = None
 
 
 class BlueprintTemplate(FiabCoreBaseModel):

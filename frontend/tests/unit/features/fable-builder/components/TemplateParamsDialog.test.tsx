@@ -101,7 +101,7 @@ describe('TemplateParamsDialog — #549 example metadata', () => {
             format: {
               example_value: 'png',
               display_name: 'Format',
-              type_hint: 'enumClosed[png,pdf,svg]',
+              type_hint: 'enumClosed[str](png,pdf,svg)',
             },
             area: {
               example_value: 'Europe',

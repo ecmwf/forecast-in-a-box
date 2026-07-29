@@ -208,7 +208,7 @@ describe('FieldRenderer Integration', () => {
   describe('Enum field', () => {
     it('renders a select trigger for enum type', async () => {
       const screen = await renderWithProviders(
-        <ControlledFieldRenderer valueType="enum['opt1','opt2','opt3']" />,
+        <ControlledFieldRenderer valueType="enum[str]('opt1','opt2','opt3')" />,
       )
       // SelectTrigger renders a button with role="combobox"
       const trigger = screen.getByRole('combobox')
@@ -217,7 +217,7 @@ describe('FieldRenderer Integration', () => {
 
     it('shows placeholder text', async () => {
       const screen = await renderWithProviders(
-        <ControlledFieldRenderer valueType="enum['opt1','opt2','opt3']" />,
+        <ControlledFieldRenderer valueType="enum[str]('opt1','opt2','opt3')" />,
       )
       await expect
         .element(screen.getByText('Select an option...'))

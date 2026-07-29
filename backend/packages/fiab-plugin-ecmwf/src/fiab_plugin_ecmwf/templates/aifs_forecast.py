@@ -16,6 +16,7 @@ from fiab_core.fable import (
     BlueprintTemplateExampleInput,
     ConfigurationOptionId,
 )
+from fiab_core.types import ClosedEnumType
 
 from fiab_plugin_ecmwf.templates.common import (
     GRIB_OUTPUT_PATH,
@@ -80,7 +81,7 @@ template = BlueprintTemplate(
             example_value="opendata",
             display_name="Initial Conditions",
             display_description="Source of the initial conditions",
-            type_hint="enumOpen['mars', 'opendata', 'polytope']",
+            type_hint=ClosedEnumType(["mars", "opendata", "polytope"]),
         ),
         "area": map_area("europe"),
         "plotFormat": MAP_FORMAT,

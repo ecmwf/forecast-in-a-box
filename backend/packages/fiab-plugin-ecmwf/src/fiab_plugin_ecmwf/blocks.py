@@ -27,7 +27,7 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Product, Sink, Source, Transform
-from fiab_core.types import ClosedEnumType, ListType
+from fiab_core.types import ClosedEnumType, DatetimeType, GeoDomainType, ListType, StringType
 from qubed import Qube
 
 from .datasets import load_datasets
@@ -113,18 +113,18 @@ class OperationalForecastSource(Source):
         SOURCE: BlockConfigurationOption(
             title="Source",
             description="Top level source for earthkit data",
-            value_type="enumClosed['mars', 'ecmwf-open-data']",
+            value_type=ClosedEnumType(["mars", "ecmwf-open-data"]),
         ),
         FORECAST: BlockConfigurationOption(
             title="Forecast model",
             description="Name of forecast",
-            value_type=f"enumClosed[{','.join(FORECAST_DATASETS.keys())}]",
+            value_type=ClosedEnumType(list(FORECAST_DATASETS)),
             default_value=list(FORECAST_DATASETS.keys())[0],
         ),
         BASETIME: BlockConfigurationOption(
             title="Base time",
             description="Base time of the forecast",
-            value_type="datetime",
+            value_type=DatetimeType(),
         ),
     }
     inputs: list[str] = []
@@ -208,11 +208,11 @@ class EnsembleStatistics(Product):
     title: str = "Ensemble Statistics"
     description: str = "Computes ensemble mean or standard deviation"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        PARAM: BlockConfigurationOption(title="Parameter", description="Parameter name like '2t'", value_type="str"),
+        PARAM: BlockConfigurationOption(title="Parameter", description="Parameter name like '2t'", value_type=StringType()),
         STATISTIC: BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over the ensemble",
-            value_type="enumClosed['mean', 'std']",
+            value_type=ClosedEnumType(["mean", "std"]),
         ),
     }
     inputs: list[str] = ["dataset"]
@@ -254,11 +254,11 @@ class TemporalStatistics(Product):
     title: str = "Temporal Statistics"
     description: str = "Computes temporal statistics"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        PARAM: BlockConfigurationOption(title=PARAM, description="Param name like '2t'", value_type="str"),
+        PARAM: BlockConfigurationOption(title=PARAM, description="Param name like '2t'", value_type=StringType()),
         STATISTIC: BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over steps",
-            value_type="enumClosed['mean', 'std', 'min', 'max']",
+            value_type=ClosedEnumType(["mean", "std", "min", "max"]),
         ),
     }
     inputs: list[str] = ["dataset"]
@@ -306,7 +306,7 @@ class ZarrSink(Sink):
         PATH: BlockConfigurationOption(
             title="Zarr Path",
             description="Filesystem path where the zarr should be written",
-            value_type="str",
+            value_type=StringType(),
         )
     }
     inputs: list[str] = ["dataset"]
@@ -351,12 +351,12 @@ class Select(Transform):
         DIMENSION: BlockConfigurationOption(
             title="Dimension",
             description="Dimension to select from the dataset",
-            value_type="str",
+            value_type=StringType(),
         ),
         VALUES: BlockConfigurationOption(
             title="Values",
             description="Values to select from the chosen dimension",
-            value_type="list[str]",
+            value_type=ListType(StringType()),
         ),
     }
     inputs: list[str] = ["dataset"]
@@ -424,7 +424,7 @@ class GribSink(Sink):
         PATH: BlockConfigurationOption(
             title="GRIB Path",
             description="Filesystem path where the GRIB file should be written. Filename can contain template values from metadata in [] brackets.",
-            value_type="str",
+            value_type=StringType(),
         )
     }
     inputs: list[str] = ["dataset"]
@@ -484,36 +484,36 @@ class MapPlotSink(Sink):
         PARAM: BlockConfigurationOption(
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
-            value_type="list[str]",
+            value_type=ListType(StringType()),
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
             description="Area to display: auto (fit the data), global, a named region/country (select several to union), or a drawn bounding box",
-            value_type="geodomain",
+            value_type=GeoDomainType(),
             default_value="global",
         ),
         FORMAT: BlockConfigurationOption(
             title="Format",
             description="Output image format",
-            value_type="enumClosed['png', 'pdf', 'svg']",
+            value_type=ClosedEnumType(["png", "pdf", "svg"]),
             default_value="png",
         ),
         GROUPBY: BlockConfigurationOption(
             title="Group By",
             description="Dimension to create subplots over",
-            value_type="enumClosed['valid_datetime', 'step', 'number', 'none']",
+            value_type=ClosedEnumType(["valid_datetime", "step", "number", "none"]),
             default_value="none",
         ),
         SPLITBY: BlockConfigurationOption(
             title="Split By",
             description="Dimensions to separate plots by",
-            value_type="list[str]",
+            value_type=ListType(StringType()),
             default_value="step",
         ),
         # ConfigurationOptionId("style_schema"): BlockConfigurationOption(
         #     title="Style Schema",
         #     description="earthkit-plots schema identifier",
-        #     value_type="str",
+        #     value_type=StringType(),
         # ),
     }
     inputs: list[str] = ["dataset"]

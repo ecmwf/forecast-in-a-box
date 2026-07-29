@@ -16,6 +16,7 @@ from fiab_core.fable import (
     BlueprintTemplateExampleInput,
     ConfigurationOptionId,
 )
+from fiab_core.types import ClosedEnumType
 
 from fiab_plugin_ecmwf.templates.common import (
     FORECAST_SOURCE,
@@ -118,7 +119,7 @@ template = BlueprintTemplate(
             example_value="mean",
             display_name="Ensemble Statistic",
             display_description="Statistic to compute over the ensemble",
-            type_hint="enumClosed['mean', 'std']",
+            type_hint=ClosedEnumType(["mean", "std"]),
         ),
     },
 )
