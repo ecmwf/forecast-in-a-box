@@ -50,7 +50,7 @@ template = BlueprintTemplate(
                 configuration_values={
                     ConfigurationOptionId("param"): "2t,msl",
                     ConfigurationOptionId("domain"): "${area}",
-                    ConfigurationOptionId("format"): "${format}",
+                    ConfigurationOptionId("format"): "${plotFormat}",
                     ConfigurationOptionId("groupby"): "none",
                     # Splitting by param is valid only because two are selected.
                     ConfigurationOptionId("splitby"): "step,param",
@@ -83,6 +83,6 @@ template = BlueprintTemplate(
             type_hint="enumOpen['mars', 'opendata', 'polytope']",
         ),
         "area": map_area("europe"),
-        "format": MAP_FORMAT,
+        "plotFormat": MAP_FORMAT,
     },
 )
