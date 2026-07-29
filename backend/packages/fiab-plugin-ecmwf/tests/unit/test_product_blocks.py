@@ -17,8 +17,6 @@ from fiab_core.fable import (
     BlockFactoryId,
     BlockInstanceId,
     ConfigurationOptionId,
-    PluginBlockFactoryId,
-    PluginCompositeId,
     QubedOutput,
 )
 from fiab_core.fable import (
@@ -60,7 +58,7 @@ def threshold_probability_output() -> QubedOutput:
 def predefined_threshold_prob_configuration() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="predefinedThresholdProbability"),  # type: ignore
+            factory_id=plugin.predefinedThresholdProbability.factory_id,  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 PARAM: _param_id_to_param_key("131073"),
@@ -75,7 +73,7 @@ def predefined_threshold_prob_configuration() -> BlockInstance:
 def custom_threshold_prob_configuration() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="customThresholdProbability"),  # type: ignore
+            factory_id=plugin.customThresholdProbability.factory_id,  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 THRESHOLD: 0.5,

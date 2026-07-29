@@ -185,7 +185,8 @@ class PredefinedThresholdProbability(Product):
         sample_axes = axes(collapse(select(other, {ENSEMBLE: 1}), ENSEMBLE))
         coords = {dim: list(values) for dim, values in sample_axes.items() if (len(values) == 1 and dim not in [ENSEMBLE, PARAM])}
         for _ in PPROC_SCHEMA.outputs_from_inputs(
-            inputs=cubes, output_template={**coords, TYPE: self.stat_type, "selection": "default"},
+            inputs=cubes,
+            output_template={**coords, TYPE: self.stat_type, "selection": "default"},
         ):
             return True
         return False

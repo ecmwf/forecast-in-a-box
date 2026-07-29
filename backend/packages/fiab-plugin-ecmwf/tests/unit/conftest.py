@@ -16,8 +16,6 @@ from earthkit.workflows.fluent import Action
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstanceId,
-    PluginBlockFactoryId,
-    PluginCompositeId,
     QubedOutput,
 )
 from fiab_core.fable import (
@@ -45,7 +43,7 @@ from fiab_plugin_ecmwf.qubed_utils import select
 def dummy_blockinstance() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory=BlockFactoryId("dummy")),
+            factory_id=BlockFactoryId("dummy"),
             input_ids={},
             configuration_values={
                 SOURCE: "ecmwf-open-data",
@@ -78,7 +76,7 @@ def operational_forecast_source_action(dummy_blockinstance: BlockInstance) -> Ac
 def ensemble_statistics_configuration() -> BlockInstance:
     return BlockInstance.from_block(
         BlockInstanceBase(
-            factory_id=PluginBlockFactoryId(plugin=PluginCompositeId.from_str("ecmwf:ecmwf"), factory="EnsembleStatistics"),  # type: ignore
+            factory_id=plugin.ensembleStatistics.factory_id,  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 STATISTIC: ["mean"],
