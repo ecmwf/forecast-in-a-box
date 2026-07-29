@@ -80,6 +80,7 @@ def _parse(type_expr: str) -> tuple[FableType, str]:
         ("float", FloatType),
         ("int", IntType),
         ("str", StringType),
+        ("param", ParameterType),
         ("geodomainSingle", GeoDomainSingleType),
         ("bboxWSEN", BoundingBoxWSENType),
         ("geodomain", GeoDomainType),

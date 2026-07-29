@@ -27,7 +27,7 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Product, Sink, Source, Transform
-from fiab_core.types import ClosedEnumType, DatetimeType, GeoDomainType, ListType, StringType
+from fiab_core.types import ClosedEnumType, DatetimeType, GeoDomainType, ListType, ParameterType, StringType
 from qubed import Qube
 
 from .datasets import load_datasets
@@ -208,7 +208,7 @@ class EnsembleStatistics(Product):
     title: str = "Ensemble Statistics"
     description: str = "Computes ensemble mean or standard deviation"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        PARAM: BlockConfigurationOption(title="Parameter", description="Parameter name like '2t'", value_type=StringType()),
+        PARAM: BlockConfigurationOption(title="Parameter", description="Parameter name like '2t'", value_type=ParameterType()),
         STATISTIC: BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over the ensemble",
@@ -254,7 +254,7 @@ class TemporalStatistics(Product):
     title: str = "Temporal Statistics"
     description: str = "Computes temporal statistics"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        PARAM: BlockConfigurationOption(title=PARAM, description="Param name like '2t'", value_type=StringType()),
+        PARAM: BlockConfigurationOption(title=PARAM, description="Param name like '2t'", value_type=ParameterType()),
         STATISTIC: BlockConfigurationOption(
             title="Statistic",
             description="Statistic to compute over steps",
@@ -484,7 +484,7 @@ class MapPlotSink(Sink):
         PARAM: BlockConfigurationOption(
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
-            value_type=ListType(StringType()),
+            value_type=ListType(ParameterType()),
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
@@ -527,7 +527,7 @@ class MapPlotSink(Sink):
         input_param_values = input_axes.get(PARAM, set())
         param_values = [value for value in input_param_values if isinstance(value, str)]
         if param_values:
-            restrictions[PARAM] = ListType(ClosedEnumType(sorted(param_values)))
+            restrictions[PARAM] = ListType(ClosedEnumType(sorted(param_values), subtype=ParameterType()))
 
         common = common_dimensions(input_dataset).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
         splitby = [x for x in common if len(input_axes[x]) > 1]
