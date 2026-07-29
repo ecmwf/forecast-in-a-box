@@ -55,14 +55,14 @@ function seedSavedFables(): Record<string, SavedFableEntry | undefined> {
       ]),
     )
 
-  // Plugin-shipped blueprint template (created_by = "store:local")
+  // Four ecmwf-base templates, so the dashboard's cap-at-three is exercised.
   const templateBase = Object.values(mockSavedFables)[0]
   seeded['template-basic-map'] = {
     ...templateBase,
     display_name: 'testBasic',
     display_description: 'Ready-made starting point shipped by a plugin',
-    tags: [],
-    user_id: 'local:plugin-test',
+    tags: ['IFS Open Data', 'Ensemble Mean', 'PNG Maps'],
+    user_id: 'ecmwf:ecmwf-base',
     source: 'plugin_template',
   }
 
@@ -85,19 +85,43 @@ function seedSavedFables(): Record<string, SavedFableEntry | undefined> {
     },
     display_name: 'testTyped',
     display_description: 'Template with typed example glyphs',
-    tags: [],
-    user_id: 'local:plugin-test',
+    tags: ['AIFS', '72 h', 'GRIB'],
+    user_id: 'ecmwf:ecmwf-base',
+    source: 'plugin_template',
+  }
+
+  seeded['template-third'] = {
+    ...templateBase,
+    display_name: 'testThird',
+    display_description: 'Third plugin template',
+    tags: ['Open Data', 'GRIB'],
+    user_id: 'ecmwf:ecmwf-base',
+    source: 'plugin_template',
+  }
+
+  seeded['template-fourth'] = {
+    ...templateBase,
+    display_name: 'testFourth',
+    display_description: 'Fourth plugin template, beyond the dashboard cap',
+    tags: ['Open Data'],
+    user_id: 'ecmwf:ecmwf-base',
     source: 'plugin_template',
   }
 
   return seeded
 }
 
+const TEMPLATE_IDS = [
+  'template-basic-map',
+  'template-typed-inputs',
+  'template-third',
+  'template-fourth',
+]
+
 function seedFableVersions(): Record<string, number> {
   return {
     ...Object.fromEntries(Object.keys(mockSavedFables).map((id) => [id, 1])),
-    'template-basic-map': 1,
-    'template-typed-inputs': 1,
+    ...Object.fromEntries(TEMPLATE_IDS.map((id) => [id, 1])),
   }
 }
 

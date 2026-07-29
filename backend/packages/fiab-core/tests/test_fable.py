@@ -82,6 +82,7 @@ def test_blueprint_template_constructs() -> None:
     assert tmpl.display_description == "A template"
     assert _BLOCK_ID in tmpl.blocks
     assert tmpl.environment is None
+    assert tmpl.tags == []
     assert tmpl.local_glyphs == {}
     assert tmpl.example_values == {}
     assert tmpl.example_glyphs == {}
@@ -95,6 +96,7 @@ def test_blueprint_template_rejects_unknown_field() -> None:
 def test_blueprint_template_round_trips_model_dump() -> None:
     tmpl = _make_template(
         environment=BlueprintTemplateEnvironment(environment_variables={"K": "V"}),
+        tags=["Open Data", "GRIB"],
         local_glyphs={"g": "v"},
         example_values={_BLOCK_ID: {_TEXT: BlueprintTemplateExampleInput(example_value="world", display_name="World")}},
         example_glyphs={"g": BlueprintTemplateExampleInput(example_value="world")},
@@ -104,6 +106,7 @@ def test_blueprint_template_round_trips_model_dump() -> None:
     restored = BlueprintTemplate.model_validate(dumped)
 
     assert restored.display_name == tmpl.display_name
+    assert restored.tags == ["Open Data", "GRIB"]
     assert restored.environment is not None
     assert restored.environment.environment_variables == {"K": "V"}
     assert restored.local_glyphs == {"g": "v"}

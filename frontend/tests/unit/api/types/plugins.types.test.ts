@@ -434,3 +434,15 @@ describe('parsePluginIdString', () => {
     })
   })
 })
+
+describe('formatPluginIdString', () => {
+  it('round-trips with parsePluginIdString', async () => {
+    const { ECMWF_BASE_PLUGIN, formatPluginIdString, parsePluginIdString } =
+      await import('@/api/types/plugins.types')
+
+    expect(formatPluginIdString(ECMWF_BASE_PLUGIN)).toBe('ecmwf:ecmwf-base')
+    expect(
+      parsePluginIdString(formatPluginIdString(ECMWF_BASE_PLUGIN)),
+    ).toEqual(ECMWF_BASE_PLUGIN)
+  })
+})

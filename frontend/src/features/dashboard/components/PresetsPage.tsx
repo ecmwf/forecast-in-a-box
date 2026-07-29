@@ -15,7 +15,10 @@ import { Bookmark, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { useConfigPresets } from '../hooks/useConfigPresets'
-import { useTemplatePresets } from '../hooks/useTemplatePresets'
+import {
+  templateConfigureSearch,
+  useTemplatePresets,
+} from '../hooks/useTemplatePresets'
 import type { PresetEntry } from '../hooks/useConfigPresets'
 import type { TemplateEntry } from '../hooks/useTemplatePresets'
 import type {
@@ -226,12 +229,7 @@ const TemplateRow = memo(function ({ template }: { template: TemplateEntry }) {
 
   const builder = blueprint?.builder
   const title = template.displayName || t('journal:item.untitled')
-  const useTemplateSearch = {
-    fableId: template.blueprintId,
-    template: true,
-    ...(template.pluginId && { templatePlugin: template.pluginId }),
-    ...(template.displayName && { templateName: template.displayName }),
-  }
+  const useTemplateSearch = templateConfigureSearch(template)
 
   return (
     <div className="group/row p-6 transition-colors hover:bg-muted/50">
@@ -257,6 +255,13 @@ const TemplateRow = memo(function ({ template }: { template: TemplateEntry }) {
               {t('presets.templates.fromPlugin', {
                 plugin: template.pluginLabel,
               })}
+            </div>
+          )}
+          {template.tags.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {template.tags.map((tag) => (
+                <JournalChip key={tag} label={tag} variant="tag" />
+              ))}
             </div>
           )}
         </div>

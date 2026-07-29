@@ -114,16 +114,114 @@ describe('Dashboard', () => {
   })
 
   describe('GettingStartedSection', () => {
-    it('renders getting started section', async () => {
-      const screen = await renderWithRouter(
+    const renderSection = () =>
+      renderWithRouter(
         <AuthContext.Provider value={anonymousAuth}>
           <GettingStartedSection />
         </AuthContext.Provider>,
       )
 
+    it('renders getting started section', async () => {
+      const screen = await renderSection()
+
       await expect
         .element(screen.getByText('Getting Started Presets'))
         .toBeVisible()
+    })
+
+    it('offers the blank canvas plus three plugin templates', async () => {
+      const screen = await renderSection()
+
+      await expect
+        .element(screen.getByRole('button', { name: 'Start from Scratch' }))
+        .toBeVisible()
+      // MSW seeds four; the fourth must not reach the dashboard.
+      await expect
+        .element(screen.getByRole('button', { name: 'testTyped' }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'testBasic' }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'testThird' }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'testFourth' }))
+        .not.toBeInTheDocument()
+    })
+
+    it('orders the cards by the plugin declaration order', async () => {
+      const screen = await renderSection()
+
+      await expect
+        .element(screen.getByRole('button', { name: 'testThird' }))
+        .toBeVisible()
+
+      // The fixture's declared order differs from the list order.
+      const titles = Array.from(
+        screen.container.querySelectorAll('[role="button"] h3'),
+      ).map((node) => node.textContent)
+      expect(titles).toEqual([
+        'Start from Scratch',
+        'testTyped',
+        'testBasic',
+        'testThird',
+      ])
+    })
+
+    it('renders the plugin-authored tags as chips', async () => {
+      const screen = await renderSection()
+
+      await expect.element(screen.getByText('Ensemble Mean')).toBeVisible()
+      await expect.element(screen.getByText('PNG Maps')).toBeVisible()
+    })
+
+    it('shows a loading status until the templates arrive', async () => {
+      const screen = await renderSection()
+
+      await expect.element(screen.getByRole('status')).toBeInTheDocument()
+      await expect
+        .element(screen.getByRole('button', { name: 'testBasic' }))
+        .toBeVisible()
+      await expect.element(screen.getByRole('status')).not.toBeInTheDocument()
+    })
+
+    it('points at plugin management when no templates exist', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.fable.list, () =>
+          HttpResponse.json({
+            blueprints: [],
+            total: 0,
+            page: 1,
+            page_size: 50,
+          }),
+        ),
+      )
+
+      const screen = await renderSection()
+
+      await expect
+        .element(screen.getByText('No plugin templates available'))
+        .toBeVisible()
+      await expect.element(screen.getByText('Manage plugins')).toBeVisible()
+      // The one card that needs no backend stays.
+      await expect
+        .element(screen.getByRole('button', { name: 'Start from Scratch' }))
+        .toBeVisible()
+    })
+
+    it('offers a retry, not stale presets, when the list fails', async () => {
+      worker.use(http.get(API_ENDPOINTS.fable.list, () => HttpResponse.error()))
+
+      const screen = await renderSection()
+
+      await expect
+        .element(screen.getByText("Couldn't load templates"))
+        .toBeVisible()
+      await expect.element(screen.getByText('Retry')).toBeVisible()
+      await expect
+        .element(screen.getByText('ECMWF Open Data'))
+        .not.toBeInTheDocument()
     })
   })
 

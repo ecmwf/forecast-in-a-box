@@ -36,6 +36,26 @@ async function navigateTo(page: Page, path: string) {
   await page.waitForTimeout(2000)
 }
 
+/** Fork the first plugin template; false when the environment ships none. */
+async function openTemplateConfig(page: Page): Promise<boolean> {
+  await navigateTo(page, '/dashboard')
+  // Generous: opening the dialog costs a real /blueprint/expand.
+  const card = page.getByTestId('starter-template-card').first()
+  if (!(await card.isVisible({ timeout: 30000 }).catch(() => false))) {
+    return false
+  }
+  await card.click()
+  await page.waitForURL(/configure/, { timeout: 30000 })
+  // Take the template's own example values rather than filling the dialog.
+  const skip = page.getByRole('button', { name: /^skip$/i })
+  if (await skip.isVisible({ timeout: 45000 }).catch(() => false)) {
+    await skip.click()
+  }
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(2000)
+  return true
+}
+
 /** Switch fable-builder layout via the graph-options dropdown. Form layout is
  * reachable only from that menu now; no-ops if it isn't present. */
 async function switchLayout(page: Page, to: 'form' | 'graph') {
@@ -562,13 +582,12 @@ test.describe('Fable Builder - Save & Load', () => {
     }
   })
 
-  test('loads a preset configuration via URL param', async ({ page }) => {
-    // Navigate with a preset param
-    await page.goto('/configure?preset=quick-start')
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(3000)
+  test('forking a plugin template loads its blocks', async ({ page }) => {
+    if (!(await openTemplateConfig(page))) {
+      test.skip(true, 'no plugin templates in this environment')
+    }
 
-    // Should load with pre-configured blocks
+    // Should load with the template's blocks
     const blocksBadge = page.getByText(/\d+ blocks?/)
     if (
       await blocksBadge
@@ -596,10 +615,9 @@ test.describe('Fable Builder - Review & Validation', () => {
   test('navigates to review step and shows configuration summary', async ({
     page,
   }) => {
-    // Load a preset to get a complete config
-    await page.goto('/configure?preset=quick-start')
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(3000)
+    if (!(await openTemplateConfig(page))) {
+      test.skip(true, 'no plugin templates in this environment')
+    }
 
     // Click Review & Submit
     const reviewButton = page.getByRole('button', { name: /review/i })
@@ -635,10 +653,9 @@ test.describe('Fable Builder - Review & Validation', () => {
   })
 
   test('back to edit returns from review step', async ({ page }) => {
-    // Load preset and go to review
-    await page.goto('/configure?preset=quick-start')
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(3000)
+    if (!(await openTemplateConfig(page))) {
+      test.skip(true, 'no plugin templates in this environment')
+    }
 
     const reviewButton = page.getByRole('button', { name: /review/i })
     if (await reviewButton.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -668,10 +685,9 @@ test.describe('Fable Builder - Review & Validation', () => {
   })
 
   test('shows validation status on review step', async ({ page }) => {
-    // Load preset
-    await page.goto('/configure?preset=quick-start')
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(3000)
+    if (!(await openTemplateConfig(page))) {
+      test.skip(true, 'no plugin templates in this environment')
+    }
 
     const reviewButton = page.getByRole('button', { name: /review/i })
     if (await reviewButton.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -705,10 +721,9 @@ test.describe('Fable Builder - Review & Validation', () => {
   })
 
   test('submit job button visible on review step', async ({ page }) => {
-    // Load preset
-    await page.goto('/configure?preset=quick-start')
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(3000)
+    if (!(await openTemplateConfig(page))) {
+      test.skip(true, 'no plugin templates in this environment')
+    }
 
     const reviewButton = page.getByRole('button', { name: /review/i })
     if (await reviewButton.isVisible({ timeout: 5000 }).catch(() => false)) {

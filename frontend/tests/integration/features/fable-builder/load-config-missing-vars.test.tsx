@@ -42,11 +42,20 @@ const loadedConfig = {
         factory: 'operationalForecastSource',
       },
       configuration_values: {
-        source: '${myDataRoot}',
+        source: 'ecmwf-open-data',
         forecast: 'aifs-ens',
         base_time: '2026-07-14T00:00:00',
       },
       input_ids: {},
+    },
+    // A path root: one fragment of the value, so it stays free text.
+    sink1: {
+      factory_id: {
+        plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+        factory: 'zarrSink',
+      },
+      configuration_values: { path: '${myDataRoot}/out.zarr' },
+      input_ids: { dataset: 'source1' },
     },
   },
   environment: null,
@@ -82,8 +91,10 @@ describe('Load config — missing variables dialog', () => {
     )
 
     await expect.element(screen.getByText('Missing variables')).toBeVisible()
-    // Usage context: block + option display titles from the catalogue
-    await expect.element(screen.getByText(/Used in .+ → .+/)).toBeVisible()
+    // Scoped to the dialog: the canvas node carries the same block title.
+    const dialog = screen.getByRole('dialog')
+    await expect.element(dialog.getByText('Zarr Sink')).toBeVisible()
+    await expect.element(dialog.getByText('Sets Zarr Path')).toBeVisible()
 
     await screen.getByLabelText('myDataRoot').fill('/data/root')
     await screen.getByRole('button', { name: 'Apply' }).click()

@@ -13,6 +13,7 @@ import { renderWithProviders } from '@tests/utils/render'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { EnumField } from '@/components/base/fields/fields/EnumField'
 import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
+import { GlyphContext } from '@/features/fable-builder/context/GlyphContext'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 
 function renderEnum({
@@ -168,5 +169,58 @@ describe('EnumField — resolved preview for template-injected glyph values', ()
 
     await expect.element(screen.getByText('not a valid option')).toBeVisible()
     expect(screen.getByText(/resolves to/).elements()).toHaveLength(0)
+  })
+})
+
+describe('EnumField — authoring a glyph', () => {
+  // The toggle only appears when variables exist to reference.
+  function renderWithGlyphs(value: string) {
+    return renderWithProviders(
+      <GlyphContext.Provider
+        value={[
+          {
+            name: 'format',
+            displayName: 'Output Format',
+            valueExample: 'png',
+            type: 'local',
+          },
+        ]}
+      >
+        <BlockValidationProvider
+          fieldErrors={null}
+          resolvedConfig={{ source: 'png' }}
+          missingGlyphs={null}
+        >
+          <EnumField
+            id="field-source"
+            configKey="source"
+            value={value}
+            onChange={() => {}}
+            options={['mars', 'ecmwf-open-data']}
+          />
+        </BlockValidationProvider>
+      </GlyphContext.Provider>,
+    )
+  }
+
+  it('offers the variable toggle on a concrete value', async () => {
+    // Previously absent: pickers were literal-only.
+    const screen = await renderWithGlyphs('mars')
+
+    await expect
+      .element(
+        screen.getByRole('button', { name: 'Use a variable expression' }),
+      )
+      .toBeInTheDocument()
+  })
+
+  it('edits a glyph expression as text instead of forcing a literal choice', async () => {
+    const screen = await renderWithGlyphs('${format}')
+
+    // Assert the trigger is gone: Select renders a hidden input of its own.
+    await expect.element(screen.getByRole('combobox')).not.toBeInTheDocument()
+    const editor = screen.container.querySelector('input:not([type=hidden])')
+    expect(editor).not.toBeNull()
+    expect((editor as HTMLInputElement).value).toBe('${format}')
   })
 })

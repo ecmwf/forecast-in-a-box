@@ -51,7 +51,13 @@ export const mockPluginListing: PluginListing = {
       settings_data: {
         isEnabled: true,
         excluded_templates: [],
-        included_templates: [],
+        // Deliberately not the blueprint-list order, so ordering tests bite.
+        included_templates: [
+          'testTyped',
+          'testBasic',
+          'testThird',
+          'testFourth',
+        ],
         glyph_remapping: {},
       },
       load_errors: [],

@@ -308,6 +308,17 @@ export function parsePluginIdString(id: string): PluginCompositeId {
   }
 }
 
+/** Inverse of parsePluginIdString. */
+export function formatPluginIdString(id: PluginCompositeId): string {
+  return `${id.store}:${id.local}`
+}
+
+/** The plugin whose blueprint templates the dashboard offers as starting points. */
+export const ECMWF_BASE_PLUGIN: PluginCompositeId = {
+  store: 'ecmwf',
+  local: 'ecmwf-base',
+}
+
 /**
  * Payload fields for POST /plugin/settings (backend PluginSettingsUpdateRequest).
  * Omitted fields leave the stored value unchanged; an empty list/dict clears it.

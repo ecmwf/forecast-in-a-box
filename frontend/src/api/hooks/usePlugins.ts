@@ -163,9 +163,12 @@ function usePluginMutation<TVariables>(
       await action(variables)
       // Poll until the catalogue is available again (plugins finished reloading)
       await waitForCatalogue()
-      // Refresh caches: catalogue for block availability, list for plugin state.
+      // Blueprints too: plugin templates are ingested as blueprint rows.
       await queryClient.invalidateQueries({ queryKey: fableKeys.catalogue() })
       await queryClient.invalidateQueries({ queryKey: pluginKeys.list() })
+      await queryClient.invalidateQueries({
+        queryKey: fableKeys.blueprintsBase(),
+      })
     },
   })
 }

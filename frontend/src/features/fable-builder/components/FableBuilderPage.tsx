@@ -22,7 +22,6 @@ import { FableFormCanvas } from './form-mode/FableFormCanvas'
 import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
 import { TemplateParamsDialog } from './TemplateParamsDialog'
 import type { TFunction } from 'i18next'
-import type { PresetId } from '@/features/fable-builder/presets/presets'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type { TemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
@@ -34,7 +33,6 @@ import {
   readDraft,
   useDraftPersistence,
 } from '@/features/fable-builder/hooks/useDraftPersistence'
-import { getPreset } from '@/features/fable-builder/presets/presets'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { hasUnterminatedGlyph } from '@/features/fable-builder/utils/glyph-display'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -92,7 +90,6 @@ function getValidationErrorMessage(
 
 interface FableBuilderPageProps {
   fableId?: string
-  preset?: PresetId
   encodedState?: string
   /** Open fableId as a template: fork (create-on-save) and prefill example values */
   templateMode?: boolean
@@ -104,7 +101,6 @@ interface FableBuilderPageProps {
 
 export function FableBuilderPage({
   fableId,
-  preset,
   encodedState,
   templateMode = false,
   templatePlugin,
@@ -259,27 +255,13 @@ export function FableBuilderPage({
       }
       initializedRef.current = true
     } else if (!fableId && !encodedState) {
-      if (preset) {
-        const presetConfig = getPreset(preset)
-        setFable(presetConfig.fable, null)
-        setFableName(presetConfig.name)
-      } else {
-        newFable()
-      }
+      newFable()
       initializedRef.current = true
     } else if (!fableId && encodedState) {
       // URL state sync will handle this case
       initializedRef.current = true
     }
-  }, [
-    fableId,
-    existingFable,
-    fableRetrieveData,
-    preset,
-    encodedState,
-    templateMode,
-    t,
-  ])
+  }, [fableId, existingFable, fableRetrieveData, encodedState, templateMode, t])
 
   // Template mode: collect parameters via a dialog once builder + examples
   // are ready, then overlay values (mirrors the backend's ingest overlay).

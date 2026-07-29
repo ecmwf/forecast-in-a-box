@@ -219,6 +219,7 @@ _BLOCK_EXAMPLE = BlockInstanceId("text_example")
 _testBasic = BlueprintTemplate(
     display_name="testBasic",
     display_description="A minimal test template demonstrating fixed values, glyph substitution, and example values.",
+    tags=["testTag", "second"],
     blocks={
         # Fixed: configuration value is a literal string -- no glyphs, no example override needed.
         _BLOCK_FIXED: _make_source_text_block("fixed text"),

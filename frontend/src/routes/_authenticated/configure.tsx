@@ -13,17 +13,6 @@ import { z } from 'zod'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 
 const searchSchema = z.object({
-  preset: z
-    .enum([
-      'quick-start',
-      'standard',
-      'custom-model',
-      'dataset',
-      'ecmwf-open-data',
-      'aifs-forecast',
-      'aifs-dataset',
-    ])
-    .optional(),
   state: z.string().optional(),
   fableId: z.string().optional(),
   /** Open fableId as a template: fork (create-on-save) and prefill example values */
@@ -42,13 +31,12 @@ export const Route = createFileRoute('/_authenticated/configure')({
 })
 
 function ConfigurePage() {
-  const { preset, state, fableId, template, templatePlugin, templateName } =
+  const { state, fableId, template, templatePlugin, templateName } =
     Route.useSearch()
   return (
     <FableBuilderPage
       key={fableId}
       fableId={fableId}
-      preset={preset}
       encodedState={state}
       templateMode={template}
       templatePlugin={templatePlugin}

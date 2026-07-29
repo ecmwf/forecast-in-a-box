@@ -43,56 +43,41 @@ test.describe('Dashboard Content', () => {
     await expect(welcomeHeading.first()).toBeVisible({ timeout: 10000 })
   })
 
-  test('getting started section visible with preset cards', async ({
+  test('getting started section visible with the scratch card', async ({
     page,
   }) => {
-    const gettingStartedHeading = page.getByText(/getting started/i)
-    if (
-      await gettingStartedHeading
-        .first()
-        .isVisible({ timeout: 5000 })
-        .catch(() => false)
-    ) {
-      await expect(gettingStartedHeading.first()).toBeVisible()
-
-      // Should show preset cards
-      const quickStart = page.getByText('Quick Start')
-      const standardForecast = page.getByText('Standard Forecast')
-
-      if (
-        await quickStart
-          .first()
-          .isVisible({ timeout: 3000 })
-          .catch(() => false)
-      ) {
-        await expect(quickStart.first()).toBeVisible()
-      }
-
-      if (
-        await standardForecast
-          .first()
-          .isVisible({ timeout: 3000 })
-          .catch(() => false)
-      ) {
-        await expect(standardForecast.first()).toBeVisible()
-      }
-    }
+    // Both are hardcoded in the frontend, so they exist in every environment.
+    await expect(page.getByText(/getting started/i).first()).toBeVisible({
+      timeout: 10000,
+    })
+    await expect(
+      page.getByRole('button', { name: 'Start from Scratch' }),
+    ).toBeVisible()
   })
 
-  test('clicking a preset card navigates to configure', async ({ page }) => {
-    const quickStartCard = page.getByText('Quick Start')
-    if (
-      await quickStartCard
-        .first()
-        .isVisible({ timeout: 5000 })
-        .catch(() => false)
-    ) {
-      await quickStartCard.first().click()
-      await page.waitForLoadState('networkidle')
+  test('clicking the scratch card navigates to a blank configure', async ({
+    page,
+  }) => {
+    await page.getByRole('button', { name: 'Start from Scratch' }).click()
 
-      // Should navigate to configure with preset param
-      await expect(page).toHaveURL(/configure/)
+    // A blank builder is the default; starters come from plugin templates.
+    await expect(page).toHaveURL(/\/configure$/)
+  })
+
+  test('clicking a template card forks it into configure', async ({ page }) => {
+    // Guarded: the real-stack backend may ship no ECMWF plugin.
+    const templateCard = page.getByTestId('starter-template-card').first()
+
+    if (
+      !(await templateCard.isVisible({ timeout: 10000 }).catch(() => false))
+    ) {
+      test.skip(true, 'no plugin templates in this environment')
     }
+
+    await templateCard.click()
+
+    await expect(page).toHaveURL(/configure\?.*template=true/)
+    await expect(page).toHaveURL(/templatePlugin=ecmwf%3Aecmwf-base/)
   })
 
   test('stat cards display system information', async ({ page }) => {

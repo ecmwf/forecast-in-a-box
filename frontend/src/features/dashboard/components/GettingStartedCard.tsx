@@ -31,6 +31,9 @@ interface GettingStartedCardProps {
   title: string
   description: string
   tags: Array<string>
+  /** Accessible name; without it the whole subtree is read out on focus. */
+  ariaLabel?: string
+  testId?: string
   isRecommended?: boolean
   disabled?: boolean
   disabledMessage?: string
@@ -46,6 +49,8 @@ export function GettingStartedCard({
   title,
   description,
   tags,
+  ariaLabel,
+  testId,
   isRecommended = false,
   disabled = false,
   disabledMessage,
@@ -58,6 +63,8 @@ export function GettingStartedCard({
   const card = (
     <div
       role="button"
+      aria-label={ariaLabel}
+      data-testid={testId}
       tabIndex={disabled ? -1 : 0}
       onClick={disabled ? undefined : onClick}
       onKeyDown={(e) => {
@@ -94,7 +101,8 @@ export function GettingStartedCard({
       </div>
 
       <H3 className="mb-2 text-base font-bold">{title}</H3>
-      <P className="mb-4 leading-relaxed text-muted-foreground">
+      {/* Clamped so plugin-authored copy of any length keeps the grid aligned. */}
+      <P className="mb-4 line-clamp-2 leading-relaxed text-muted-foreground">
         {description}
       </P>
 
