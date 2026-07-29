@@ -100,16 +100,15 @@
     "viewB": "View only B"
   },
   "modes": {
-    "swipe": "Swipe",
     "side": "Side by side",
+    "swipe": "Swipe",
     "flicker": "Flicker",
-    "spy": "Spy",
     "blend": "Blend",
-    "experimental": "Experimental mode — under evaluation",
+    "spy": "Spy",
     "groupAria": "Comparison mode",
     "swipeHandle": "Comparison divider",
     "flickerHint": "Click the map or press Space to flip between A and B",
-    "showing": "Showing: {{slot}}",
+    "showing": "Showing: <slotBadge>{{slot}}</slotBadge>",
     "blendLabel": "Blend B over A",
     "orientationAria": "Swipe divider orientation",
     "orientation": {
@@ -275,7 +274,7 @@
     "sections": {
       "modes": {
         "title": "Comparison modes",
-        "body": "Swipe splits one map with a draggable divider (vertical or horizontal). Side by side shows two maps with a shared camera and a mirrored crosshair. Flicker swaps A/B in place (Space or click). Spy reveals B through a movable lens — shape and size are in the action row. Blend draws B over A with an adjustable weight."
+        "body": "Side by side shows two maps with a shared camera and a mirrored crosshair. Swipe splits one map with a draggable divider (vertical or horizontal). Flicker swaps A/B in place (Space or click). Blend draws B over A with an adjustable weight. Spy reveals B through a movable lens — shape and size are in the action row."
       },
       "layers": {
         "title": "Layers & opacity",

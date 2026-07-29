@@ -53,7 +53,7 @@ export const COMPARE_MODES: readonly [
   CompareMode,
   CompareMode,
   CompareMode,
-] = ['swipe', 'side', 'flicker', 'spy', 'blend']
+] = ['side', 'swipe', 'flicker', 'blend', 'spy']
 
 export type SwipeOrientation = 'vertical' | 'horizontal'
 export type SpyShape = 'circle' | 'rectangle'

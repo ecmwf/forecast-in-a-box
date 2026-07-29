@@ -169,13 +169,13 @@ export function VisualisePage() {
     })
   }
 
-  const mode: CompareMode = search.mode ?? 'swipe'
+  const mode: CompareMode = search.mode ?? 'side'
   const onModeChange = (next: CompareMode) => {
     void navigate({
       search: (prev) => ({
         ...prev,
         // Omit the default so a bare /compare?a=…&b=… stays clean.
-        mode: next === 'swipe' ? undefined : next,
+        mode: next === 'side' ? undefined : next,
       }),
       replace: true,
     })

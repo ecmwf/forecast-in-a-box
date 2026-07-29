@@ -333,12 +333,12 @@ describe('GeoViewer', () => {
     press('b')
     await expect.element(screen.getByText('Active layers')).toBeVisible()
 
-    // 2 → side-by-side (both slot tags visible as separate panels).
-    press('2')
+    // 1 → side-by-side (both slot tags visible as separate panels).
+    press('1')
     await expect
       .element(screen.getByRole('button', { name: /side by side/i }))
       .toHaveAttribute('aria-pressed', 'true')
-    press('1')
+    press('2')
     await expect
       .element(screen.getByRole('button', { name: /swipe/i }))
       .toHaveAttribute('aria-pressed', 'true')

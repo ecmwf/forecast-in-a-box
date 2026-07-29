@@ -30,7 +30,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { getRenderPixel } from 'ol/render'
 import { useOlMapBase } from '../hooks/useOlMapBase'
 import { useBasemap } from '../hooks/useBasemap'
@@ -70,6 +70,11 @@ const EMPTY_ORDER: ReadonlyArray<string> = []
 const EMPTY_OPACITIES: ReadonlyMap<string, number> = new Map()
 /** Swipe keyboard step as a fraction of the map span. */
 const SWIPE_KEY_STEP = 0.02
+/** Filled A/B chips in the flicker indicator — same hues as every slot surface. */
+const SLOT_BADGE_CLASS: Record<SourceSlot, string> = {
+  a: 'bg-blue-600 text-white dark:bg-blue-500',
+  b: 'bg-orange-600 text-white dark:bg-orange-500',
+}
 
 export function SingleMapView({
   view,
@@ -687,9 +692,23 @@ export function SingleMapView({
             type="button"
             onClick={toggleFlicker}
             aria-pressed={flickerFrame === 'b'}
-            className="rounded-md border border-border bg-background/90 px-3 py-1 font-mono text-xs font-bold shadow-sm backdrop-blur-sm"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/90 px-3 py-1 font-mono text-xs font-bold shadow-sm backdrop-blur-sm"
           >
-            {t('modes.showing', { slot: flickerFrame.toUpperCase() })}
+            <Trans
+              t={t}
+              i18nKey="modes.showing"
+              values={{ slot: flickerFrame.toUpperCase() }}
+              components={{
+                slotBadge: (
+                  <span
+                    className={cn(
+                      'rounded px-1',
+                      SLOT_BADGE_CLASS[flickerFrame],
+                    )}
+                  />
+                ),
+              }}
+            />
           </button>
           <p className="rounded bg-background/75 px-2 py-0.5 text-xs text-muted-foreground">
             {t('modes.flickerHint')}
