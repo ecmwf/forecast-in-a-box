@@ -198,6 +198,38 @@ describe('VisualisePage', () => {
     await expect.element(pickerB).toHaveTextContent('Run A')
   })
 
+  it('swapping hands a healthy source to a slot whose start had failed', async () => {
+    // Every start rejects; B is served by a pre-existing lens, so only
+    // A's auto-start fails.
+    resetLensState({ skinnyWmsInstalled: false })
+    injectMockLens({
+      lens_instance_id: 'lens-b-live',
+      status: 'running',
+      lens_name: 'skinnyWMS',
+      lens_params: { local_path: '/data/output/job-grib-b-008_1' },
+      ports: [54300],
+    })
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderVisualisePage()
+
+    // A failed, B running — lifecycle panels, no viewer.
+    await expect
+      .element(screen.getByRole('button', { name: 'Retry' }), {
+        timeout: 8000,
+      })
+      .toBeVisible()
+    await expect.element(screen.getByText(/Serving/)).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Swap A and B' }).click()
+
+    // Healthy source now in A — the viewer must mount; the old entry's
+    // start failure must not stick.
+    await expect
+      .element(screen.getByText(/display is static/), { timeout: 8000 })
+      .toBeVisible()
+  })
+
   it('runs the viewer solo with a single source', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
     const screen = await renderVisualisePage()

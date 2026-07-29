@@ -131,22 +131,34 @@ export function useComparisonSource(
   const lensListQuery = useLensList()
   const matched = pickMatchedLens(lensListQuery.data, localPath)
 
-  // 3) Auto-start when nothing matches.
+  // 3) Auto-start when nothing matches. Start state is path-scoped so a
+  // slot swap's stale outcome can't fail or shadow the new entry's source.
   const startMutation = useStartSkinnyWms()
-  const [startedLensId, setStartedLensId] = useState<string | null>(null)
-  const [startError, setStartError] = useState<string | null>(null)
+  const [started, setStarted] = useState<{ path: string; id: string } | null>(
+    null,
+  )
+  const [startFailure, setStartFailure] = useState<{
+    path: string
+    error: string
+  } | null>(null)
+  const startedLensId = started?.path === localPath ? started.id : null
+  const startError =
+    startFailure?.path === localPath ? startFailure.error : null
   const attemptedPathsRef = useRef<Set<string>>(new Set())
 
   const startForPath = useCallback(
     (path: string) => {
       attemptedPathsRef.current.add(path)
-      setStartError(null)
+      setStartFailure(null)
       ensureLensStarted(path, (p) =>
         startMutation.mutateAsync({ localPath: p }),
       ).then(
-        (id) => setStartedLensId(id),
+        (id) => setStarted({ path, id }),
         (err: unknown) =>
-          setStartError(err instanceof Error ? err.message : String(err)),
+          setStartFailure({
+            path,
+            error: err instanceof Error ? err.message : String(err),
+          }),
       )
     },
     [startMutation],
@@ -200,7 +212,7 @@ export function useComparisonSource(
   useEffect(() => {
     if (!statusGone || !startedLensId) return
     servedIdsRef.current.delete(startedLensId)
-    setStartedLensId(null)
+    setStarted(null)
     if (localPath) {
       attemptedPathsRef.current.delete(localPath)
       evictLensStart(localPath, startedLensId)
@@ -222,8 +234,8 @@ export function useComparisonSource(
       // in-flight start and spawn a duplicate server.
       if (startedLensId) evictLensStart(localPath, startedLensId)
     }
-    setStartedLensId(null)
-    setStartError(null)
+    setStarted(null)
+    setStartFailure(null)
   }, [localPath, startedLensId])
 
   // -------- Phase derivation --------

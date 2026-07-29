@@ -47,7 +47,7 @@ export function CompareSlotBar({
   entries: ReadonlyArray<ComparisonEntry>
   aRef: string | undefined
   bRef: string | undefined
-  /** Assign `ref` to `slot`; assigning the other slot's source swaps. */
+  /** Plain assignment — picking the other slot's source self-compares, never swaps. */
   onAssign: (slot: 'a' | 'b', ref: string) => void
   onSwap: () => void
   /** Clear B back to a single-source view. */
