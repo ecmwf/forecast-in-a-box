@@ -494,29 +494,46 @@ export function SingleMapView({
     mapRef,
   ])
 
-  // Spy cursor tracking.
+  // Spy cursor tracking. Mouse: lens follows hover. Touch: a tap parks
+  // the lens (drags pan the map; lifting a finger fires pointerleave).
   useEffect(() => {
     if (mode !== 'spy' || solo) return
     const map = mapRef.current
     const container = containerRef.current
     if (!map || !container) return
-    const onMove = (e: PointerEvent) => {
+    const place = (e: { clientX: number; clientY: number }) => {
       const rect = container.getBoundingClientRect()
       spyPixelRef.current = [e.clientX - rect.left, e.clientY - rect.top]
       map.render()
     }
-    const onLeave = () => {
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') place(e)
+    }
+    const onLeave = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return
       spyPixelRef.current = null
       map.render()
     }
+    let lastPointerType = 'mouse'
+    const onDown = (e: PointerEvent) => {
+      lastPointerType = e.pointerType
+    }
+    const onClick = (e: MouseEvent) => {
+      // Tap-to-place; armed annotations own map clicks.
+      if (lastPointerType !== 'mouse' && !annotateArmed) place(e)
+    }
     container.addEventListener('pointermove', onMove)
     container.addEventListener('pointerleave', onLeave)
+    container.addEventListener('pointerdown', onDown)
+    container.addEventListener('click', onClick)
     return () => {
       container.removeEventListener('pointermove', onMove)
       container.removeEventListener('pointerleave', onLeave)
+      container.removeEventListener('pointerdown', onDown)
+      container.removeEventListener('click', onClick)
       spyPixelRef.current = null
     }
-  }, [mode, solo, mapRef])
+  }, [mode, solo, mapRef, annotateArmed])
 
   // Flicker: Space toggles (map click too, via the overlay button below).
   const toggleFlicker = useCallback(
