@@ -45,7 +45,8 @@ import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/geo/types'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
-import { H1 } from '@/components/base/typography'
+import { ErrorBoundary } from '@/components/common/ErrorBoundary'
+import { H1, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -67,11 +68,14 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 
-const GeoViewer = lazy(() =>
-  import('@/features/viewer/geo/GeoViewer').then((m) => ({
-    default: m.GeoViewer,
-  })),
-)
+// A factory, not a module-level lazy: a rejected import stays rejected
+// inside React.lazy, so the boundary's Retry mints a fresh one.
+const makeGeoViewer = () =>
+  lazy(() =>
+    import('@/features/viewer/geo/GeoViewer').then((m) => ({
+      default: m.GeoViewer,
+    })),
+  )
 
 const route = getRouteApi('/_authenticated/visualise')
 
@@ -192,6 +196,7 @@ export function VisualisePage() {
   }
 
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [GeoViewer, setGeoViewer] = useState(() => makeGeoViewer())
   const stateA = useComparisonSource(a, { autoStart: true })
   const stateB = useComparisonSource(b, { autoStart: true })
   const viewerFill = useViewportFill(
@@ -346,27 +351,60 @@ export function VisualisePage() {
           }
           className="h-[75vh] min-h-[480px]"
         >
-          <Suspense
-            fallback={
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
+          {/* Local boundary: a failed viewer chunk (redeploy) or an
+              OL/canvas throw must not take down the page shell. */}
+          <ErrorBoundary
+            onReset={() => setGeoViewer(() => makeGeoViewer())}
+            fallbackRender={({ error, resetErrorBoundary }) => (
+              <div className="flex h-full flex-col items-center justify-center gap-3">
+                <P className="font-medium">{t('viewerError.title')}</P>
+                <P
+                  title={error.message}
+                  className="max-w-lg truncate font-mono text-xs text-muted-foreground"
+                >
+                  {error.message}
+                </P>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={resetErrorBoundary}
+                  >
+                    {t('viewerError.retry')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.location.reload()}
+                  >
+                    {t('viewerError.reload')}
+                  </Button>
+                </div>
               </div>
-            }
+            )}
           >
-            {/* Single JSX position — b flips null↔value without a
-                remount, so camera/selection/time survive the switch. */}
-            <GeoViewer
-              a={{ baseUrl: stateA.baseUrl, label: entryDisplayName(a) }}
-              b={
-                b && stateB.phase === 'running'
-                  ? { baseUrl: stateB.baseUrl, label: entryDisplayName(b) }
-                  : null
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
               }
-              mode={mode}
-              onModeChange={onModeChange}
-              onRemoveB={clearSlotB}
-            />
-          </Suspense>
+            >
+              {/* Single JSX position — b flips null↔value without a
+                  remount, so camera/selection/time survive the switch. */}
+              <GeoViewer
+                a={{ baseUrl: stateA.baseUrl, label: entryDisplayName(a) }}
+                b={
+                  b && stateB.phase === 'running'
+                    ? { baseUrl: stateB.baseUrl, label: entryDisplayName(b) }
+                    : null
+                }
+                mode={mode}
+                onModeChange={onModeChange}
+                onRemoveB={clearSlotB}
+              />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       ) : (
         // A not running yet — lifecycle panels.

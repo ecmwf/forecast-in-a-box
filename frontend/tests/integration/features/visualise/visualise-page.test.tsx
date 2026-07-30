@@ -19,7 +19,7 @@
  *   restart)
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
@@ -51,9 +51,25 @@ import {
   registerMockWmsServer,
   wmsCapabilitiesRequestCount,
 } from '@tests/../mocks/data/wms.data'
+import type * as GeoViewerModule from '@/features/viewer/geo/GeoViewer'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import i18n from '@/lib/i18n'
+
+// While armed the viewer throws on render (error-boundary tests) — a
+// one-shot throw would be absorbed by React's concurrent-recovery
+// re-render and never reach the boundary; tests disarm before Retry.
+const viewerCrash = vi.hoisted(() => ({ armed: false }))
+vi.mock('@/features/viewer/geo/GeoViewer', async (importOriginal) => {
+  const actual = await importOriginal<typeof GeoViewerModule>()
+  return {
+    ...actual,
+    GeoViewer: (props: Parameters<typeof actual.GeoViewer>[0]) => {
+      if (viewerCrash.armed) throw new Error('viewer exploded')
+      return <actual.GeoViewer {...props} />
+    },
+  }
+})
 
 const searchSchema = z.object({
   a: z.string().optional(),
@@ -121,6 +137,7 @@ beforeEach(() => {
   resetJobsState()
   injectMockExecution(secondGribRunExecution)
   resetLensState()
+  viewerCrash.armed = false
   // Mock lenses allocate ports from 54300 — serve WMS on the first few so
   // panels that reach `running` can load capabilities.
   for (let port = 54300; port < 54306; port++) {
@@ -248,6 +265,27 @@ describe('VisualisePage', () => {
     await expect
       .element(screen.getByLabelText('Source for slot B'))
       .toHaveTextContent('Pick a source…')
+  })
+
+  it('a viewer crash keeps the page shell alive; Retry recovers', async () => {
+    viewerCrash.armed = true
+    useComparisonStore.getState().addEntry(RUN_A)
+    const screen = await renderVisualisePage()
+
+    await expect
+      .element(screen.getByText('The map viewer failed'), { timeout: 8000 })
+      .toBeVisible()
+    await expect.element(screen.getByText('viewer exploded')).toBeVisible()
+    // The shell survives: slot bar and source management stay usable.
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toBeVisible()
+
+    viewerCrash.armed = false
+    await screen.getByRole('button', { name: 'Retry' }).click()
+    await expect
+      .element(screen.getByText(/display is static/), { timeout: 8000 })
+      .toBeVisible()
   })
 
   it('surfaces a lens-registry outage with Retry instead of spinning', async () => {

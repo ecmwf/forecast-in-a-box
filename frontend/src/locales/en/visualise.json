@@ -78,6 +78,11 @@
       "timedOut": "{{name}} timed out — the server may be slow, try again"
     }
   },
+  "viewerError": {
+    "title": "The map viewer failed",
+    "retry": "Retry",
+    "reload": "Reload page"
+  },
   "lens": {
     "loadingAria": "Loading map imagery",
     "resolving": "Locating output directory…",
