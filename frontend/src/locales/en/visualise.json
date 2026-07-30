@@ -336,7 +336,13 @@
     "options": "Annotation options",
     "export": "Download annotations (GeoJSON)",
     "import": "Import annotations (GeoJSON)",
-    "importInvalid": "Not a valid annotations GeoJSON file"
+    "importInvalid": "Not a valid annotations GeoJSON file",
+    "leaveTitle": "Leave with unsaved annotations?",
+    "leaveBody_one": "Your annotation is not saved anywhere — it will be lost when you leave.",
+    "leaveBody_other": "Your {{count}} annotations are not saved anywhere — they will be lost when you leave.",
+    "leaveExport": "Export GeoJSON",
+    "leaveStay": "Stay",
+    "leaveDiscard": "Leave"
   },
   "toolbar": {
     "copyOptions": "Copy options",

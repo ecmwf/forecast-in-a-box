@@ -33,6 +33,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import 'ol/ol.css'
 import { Loader2, RefreshCw } from 'lucide-react'
+import { useBlocker } from '@tanstack/react-router'
 import { useLensSource } from '../hooks/useLensSource'
 import { createViewerView } from '../hooks/useOlMapBase'
 import { formatStep } from '../format'
@@ -66,7 +67,7 @@ import { GeoToolbar } from './GeoToolbar'
 import { GeoExportDialog } from './GeoExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
-import { nextAnnotationId } from './annotations'
+import { downloadAnnotationsGeojson, nextAnnotationId } from './annotations'
 import { useGeoShortcuts } from './useGeoShortcuts'
 import { GeoTimeSlider } from './GeoTimeSlider'
 import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
@@ -87,6 +88,16 @@ import type {
 } from './types'
 import type { TimeLinkMode } from './time-link'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -675,6 +686,13 @@ export function GeoViewer({
 
   // -------- Annotations: numbered findings pinned to the map ---------
   const [annotations, setAnnotations] = useState<Array<MapAnnotation>>([])
+  // Annotations are ephemeral — block route-leave and browser unload
+  // while any exist; the dialog offers a GeoJSON export first.
+  const leaveBlocker = useBlocker({
+    shouldBlockFn: () => annotations.length > 0,
+    enableBeforeUnload: () => annotations.length > 0,
+    withResolver: true,
+  })
   const [annotateArmed, setAnnotateArmed] = useState(false)
   const [annotationDraft, setAnnotationDraft] =
     useState<AnnotationDraft | null>(null)
@@ -996,6 +1014,33 @@ export function GeoViewer({
         onHelp={() => setHelpOpen(true)}
       />
       <CompareHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
+      <AlertDialog
+        open={leaveBlocker.status === 'blocked'}
+        onOpenChange={(open) => {
+          if (!open) leaveBlocker.reset?.()
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('annotations.leaveTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('annotations.leaveBody', { count: annotations.length })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => downloadAnnotationsGeojson(annotations)}
+            >
+              {t('annotations.leaveExport')}
+            </Button>
+            <AlertDialogCancel>{t('annotations.leaveStay')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => leaveBlocker.proceed?.()}>
+              {t('annotations.leaveDiscard')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AnnotationEditorDialog
         draft={
           annotationDraft

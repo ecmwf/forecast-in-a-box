@@ -15,12 +15,21 @@
  * swipe divider a11y, flicker toggle, zero-overlap auto-unlink.
  */
 
-import { useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from '@vitest/browser/context'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  Outlet,
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  useRouter,
+} from '@tanstack/react-router'
 import {
   getMapRequests,
   registerMockWmsServer,
@@ -68,7 +77,44 @@ function registerDefaultPair(): { portA: number; portB: number } {
   return { portA, portB }
 }
 
-function Harness({
+/** Router shell — the viewer's route-leave guard (useBlocker) needs a
+ *  RouterProvider; '/away' plus the nav button exercise it. The body
+ *  flows through context so screen.rerender() props reach the route. */
+const HarnessBody = createContext<() => React.ReactNode>(() => null)
+function HomeBody() {
+  return useContext(HarnessBody)()
+}
+function RouterHarness({ children }: { children: () => React.ReactNode }) {
+  const [queryClient] = useState(() => new QueryClient())
+  const [router] = useState(() => {
+    const rootRoute = createRootRoute({ component: () => <Outlet /> })
+    const home = createRoute({
+      getParentRoute: () => rootRoute,
+      path: '/',
+      component: HomeBody,
+    })
+    const away = createRoute({
+      getParentRoute: () => rootRoute,
+      path: '/away',
+      component: () => <div>Away page</div>,
+    })
+    return createRouter({
+      routeTree: rootRoute.addChildren([home, away]),
+      history: createMemoryHistory({ initialEntries: ['/'] }),
+    })
+  })
+  return (
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        <HarnessBody.Provider value={children}>
+          <RouterProvider router={router} />
+        </HarnessBody.Provider>
+      </I18nextProvider>
+    </QueryClientProvider>
+  )
+}
+
+function ViewerRoute({
   portA,
   portB,
   initialMode = 'swipe',
@@ -78,21 +124,26 @@ function Harness({
   initialMode?: CompareMode
 }) {
   const [mode, setMode] = useState<CompareMode>(initialMode)
-  const [queryClient] = useState(() => new QueryClient())
+  const router = useRouter()
   return (
-    <QueryClientProvider client={queryClient}>
-      <I18nextProvider i18n={i18n}>
-        <div style={{ width: 1100, height: 700 }}>
-          <GeoViewer
-            a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
-            b={{ baseUrl: `http://localhost:${portB}`, label: 'Run B' }}
-            mode={mode}
-            onModeChange={setMode}
-          />
-        </div>
-      </I18nextProvider>
-    </QueryClientProvider>
+    <div style={{ width: 1100, height: 700 }}>
+      <button onClick={() => router.history.push('/away')}>go away</button>
+      <GeoViewer
+        a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
+        b={{ baseUrl: `http://localhost:${portB}`, label: 'Run B' }}
+        mode={mode}
+        onModeChange={setMode}
+      />
+    </div>
   )
+}
+
+function Harness(props: {
+  portA: number
+  portB: number
+  initialMode?: CompareMode
+}) {
+  return <RouterHarness>{() => <ViewerRoute {...props} />}</RouterHarness>
 }
 
 /** Unstyled env: the map containers collapse to 0×0 and OL never renders.
@@ -710,7 +761,7 @@ describe('GeoViewer', () => {
 
 /** Same pair, but B mounts only when `withB` flips — the progressive
  *  single→comparison transition. */
-function ProgressiveHarness({
+function ProgressiveViewerRoute({
   portA,
   portB,
   withB,
@@ -720,24 +771,29 @@ function ProgressiveHarness({
   withB: boolean
 }) {
   const [mode, setMode] = useState<CompareMode>('swipe')
-  const [queryClient] = useState(() => new QueryClient())
   return (
-    <QueryClientProvider client={queryClient}>
-      <I18nextProvider i18n={i18n}>
-        <div style={{ width: 1100, height: 700 }}>
-          <GeoViewer
-            a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
-            b={
-              withB
-                ? { baseUrl: `http://localhost:${portB}`, label: 'Run B' }
-                : null
-            }
-            mode={mode}
-            onModeChange={setMode}
-          />
-        </div>
-      </I18nextProvider>
-    </QueryClientProvider>
+    <div style={{ width: 1100, height: 700 }}>
+      <GeoViewer
+        a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
+        b={
+          withB
+            ? { baseUrl: `http://localhost:${portB}`, label: 'Run B' }
+            : null
+        }
+        mode={mode}
+        onModeChange={setMode}
+      />
+    </div>
+  )
+}
+
+function ProgressiveHarness(props: {
+  portA: number
+  portB: number
+  withB: boolean
+}) {
+  return (
+    <RouterHarness>{() => <ProgressiveViewerRoute {...props} />}</RouterHarness>
   )
 }
 
@@ -1029,6 +1085,59 @@ describe('GeoViewer layer browser grouping', () => {
     // Toggle clusters them under the shared prefix.
     await screen.getByRole('button', { name: 'Group similar layers' }).click()
     await expect.element(screen.getByText('3 layers')).toBeVisible()
+  })
+})
+
+describe('GeoViewer route-leave guard', () => {
+  it('blocks leaving with annotations; offers export; Leave discards', async () => {
+    const style = document.createElement('style')
+    style.textContent =
+      '[data-slot="dialog-content"],[data-slot="alert-dialog-content"]{position:fixed;z-index:50}'
+    document.head.appendChild(style)
+
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    await screen.getByRole('button', { name: /Annotate/ }).click()
+    await screen.getByText('2 m temperature').first().click()
+    const map = document.querySelector('.ol-viewport')
+    expect(map).not.toBeNull()
+    const container = (map as HTMLElement).parentElement!
+    container.style.cssText = 'position:relative;width:800px;height:400px'
+    ;(map as HTMLElement).scrollIntoView({ block: 'center' })
+    await page
+      .elementLocator(map as Element)
+      .click({ position: { x: 200, y: 200 } })
+    await screen.getByPlaceholder('Record your finding…').fill('keep me')
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect.element(screen.getByText('keep me')).toBeVisible()
+
+    // Leaving is blocked; Export offers the manual backup.
+    await screen.getByRole('button', { name: 'go away' }).click()
+    await expect
+      .element(screen.getByText('Leave with unsaved annotations?'))
+      .toBeVisible()
+    const urlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:x')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    ;(
+      screen
+        .getByRole('button', { name: 'Export GeoJSON' })
+        .element() as HTMLElement
+    ).click()
+    expect(urlSpy).toHaveBeenCalledOnce()
+
+    // Stay keeps the viewer intact; Leave discards and navigates.
+    ;(
+      screen.getByRole('button', { name: 'Stay' }).element() as HTMLElement
+    ).click()
+    await expect.element(screen.getByText('keep me')).toBeVisible()
+    await screen.getByRole('button', { name: 'go away' }).click()
+    const leave = screen.getByRole('button', { name: 'Leave', exact: true })
+    await expect.element(leave).toBeVisible()
+    ;(leave.element() as HTMLElement).click()
+    await expect.element(screen.getByText('Away page')).toBeVisible()
+
+    style.remove()
   })
 })
 
