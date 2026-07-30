@@ -17,6 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { parseWmsTimestamp } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
 
 /** Matches the capabilities background-refresh cadence (useLensSource). */
@@ -49,7 +50,8 @@ export function useGetMapFailureLog({
   const report = useCallback(
     (slot: SourceSlot, layerName: string, time: string | null, ok: boolean) => {
       if (time === null) return
-      const epoch = Date.parse(time)
+      // Same reading as buildSourceTimeIndex, or marks miss their epochs.
+      const epoch = parseWmsTimestamp(time)
       if (!Number.isFinite(epoch)) return
       const key = `${slot}|${epoch}|${layerName}`
       setMarks((prev) => {

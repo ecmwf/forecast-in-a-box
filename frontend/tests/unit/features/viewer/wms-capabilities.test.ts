@@ -19,6 +19,7 @@ import {
   groupLayers,
   isLoopbackUrl,
   parseCapabilities,
+  parseWmsTimestamp,
   partitionGroups,
   rebaseLensUrl,
   scaleBandState,
@@ -252,6 +253,17 @@ describe('skinnyWmsBasemap', () => {
   })
 })
 
+describe('parseWmsTimestamp', () => {
+  it('assumes UTC only when a date-time lacks a zone', () => {
+    const utc = Date.UTC(2026, 5, 10, 6)
+    expect(parseWmsTimestamp('2026-06-10T06:00:00')).toBe(utc)
+    expect(parseWmsTimestamp('2026-06-10T06:00:00Z')).toBe(utc)
+    expect(parseWmsTimestamp('2026-06-10T08:00:00+02:00')).toBe(utc)
+    expect(parseWmsTimestamp('2026-06-10')).toBe(Date.UTC(2026, 5, 10))
+    expect(Number.isNaN(parseWmsTimestamp('not-a-date'))).toBe(true)
+  })
+})
+
 describe('expandTimeSteps', () => {
   it('returns [] for empty input', () => {
     expect(expandTimeSteps('')).toEqual([])
@@ -273,6 +285,26 @@ describe('expandTimeSteps', () => {
       '2026-06-10T12:00:00.000Z',
       '2026-06-10T18:00:00.000Z',
     ])
+  })
+
+  // Pins the UTC doctrine on a non-UTC host: zone-less values shifted by
+  // the host offset would mint instants the server never advertised.
+  it('reads zone-less date-times as UTC (WMS Annex D)', () => {
+    expect(
+      expandTimeSteps('2026-06-10T06:00:00/2026-06-10T18:00:00/PT6H'),
+    ).toEqual([
+      '2026-06-10T06:00:00.000Z',
+      '2026-06-10T12:00:00.000Z',
+      '2026-06-10T18:00:00.000Z',
+    ])
+  })
+
+  it('normalizes explicit offsets to UTC', () => {
+    expect(
+      expandTimeSteps(
+        '2026-06-10T08:00:00+02:00/2026-06-10T14:00:00+02:00/PT6H',
+      ),
+    ).toEqual(['2026-06-10T06:00:00.000Z', '2026-06-10T12:00:00.000Z'])
   })
 
   it('expands mixed literal + interval segments', () => {

@@ -38,6 +38,15 @@ describe('buildSourceTimeIndex', () => {
     )
   })
 
+  it('keys zone-less steps at UTC while keeping the raw string', () => {
+    const layers = [timedLayer('2t', '2026-07-06T06:00:00')]
+    const index = buildSourceTimeIndex(layers, ['2t'])
+    expect(index.epochs).toEqual([Date.UTC(2026, 6, 6, 6)])
+    expect(index.rawByEpoch.get(Date.UTC(2026, 6, 6, 6))).toBe(
+      '2026-07-06T06:00:00',
+    )
+  })
+
   it('ignores inactive layers and non-parseable steps', () => {
     const layers = [
       timedLayer('2t', '2026-07-06T00:00:00Z'),

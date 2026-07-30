@@ -308,6 +308,17 @@ function numOf(el: Element, tag: string): number {
   return t === null ? Number.NaN : Number(t)
 }
 
+/** ISO zone designator: Z, ±hh, ±hhmm, ±hh:mm. */
+const EXPLICIT_ZONE_RE = /(?:Z|[+-]\d{2}(?::?\d{2})?)$/i
+
+/** Date.parse reading zone-less date-times as UTC (WMS Annex D) — the
+ *  viewer host's timezone must never shift a server's instants. */
+export function parseWmsTimestamp(value: string): number {
+  const v = value.trim()
+  const zoneless = v.includes('T') && !EXPLICIT_ZONE_RE.test(v)
+  return Date.parse(zoneless ? `${v}Z` : v)
+}
+
 /**
  * Expand a WMS time `Dimension` raw value into discrete ISO timestamps.
  * The WMS spec allows mixing literal values and ISO 8601 interval
@@ -331,8 +342,8 @@ function expandSingleTimeSegment(seg: string): Array<string> {
   const parts = seg.split('/')
   if (parts.length !== 3) return [seg]
   const [startStr, endStr, periodStr] = parts
-  const start = Date.parse(startStr)
-  const end = Date.parse(endStr)
+  const start = parseWmsTimestamp(startStr)
+  const end = parseWmsTimestamp(endStr)
   if (Number.isNaN(start) || Number.isNaN(end)) return [seg]
 
   // Whole-month/year periods (satellite archives: P1M across decades)

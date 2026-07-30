@@ -16,7 +16,7 @@
  * advertised, which is what goes back out as the WMS TIME parameter.
  */
 
-import { expandTimeSteps } from '../wms-capabilities'
+import { expandTimeSteps, parseWmsTimestamp } from '../wms-capabilities'
 import type { ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
 
@@ -36,7 +36,7 @@ export function buildSourceTimeIndex(
     const layer = layers.find((l) => l.name === name)
     if (!layer?.time) continue
     for (const step of expandTimeSteps(layer.time.raw)) {
-      const epoch = Date.parse(step)
+      const epoch = parseWmsTimestamp(step)
       if (!Number.isFinite(epoch)) continue
       if (!rawByEpoch.has(epoch)) rawByEpoch.set(epoch, step)
     }

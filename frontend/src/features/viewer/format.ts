@@ -12,6 +12,8 @@
  * Formatting helpers shared by the WMS viewers (single-lens and compare).
  */
 
+import { parseWmsTimestamp } from './wms-capabilities'
+
 /** First entry of a Base-UI slider value, which may be scalar or array. */
 export function firstNumber(
   value: number | ReadonlyArray<number> | undefined,
@@ -37,7 +39,7 @@ export function formatLatLon(lat: number, lon: number): string {
 /** WMS TIME value → compact UTC display (`YYYY-MM-DD HH:mmZ`). */
 export function formatStep(iso: string): string {
   if (!iso) return '—'
-  const ms = Date.parse(iso)
+  const ms = parseWmsTimestamp(iso)
   if (!Number.isFinite(ms)) return iso
   const d = new Date(ms)
   const pad = (n: number) => String(n).padStart(2, '0')
