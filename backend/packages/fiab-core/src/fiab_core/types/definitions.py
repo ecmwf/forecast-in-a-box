@@ -33,6 +33,7 @@ class FableType(ABC):
         - TypeError if value is not a string
         - ValueError for validation failures (e.g., invalid format, enum membership)
         """
+        # NOTE probably change to value: str and get rid of the NoStringInput exception? Or utilize that centrally and have children override internal method only
 
     @abstractmethod
     def serialize(self) -> str:
@@ -311,12 +312,7 @@ class GeoDomainType(UnionType):
 
 class ArtifactType(FableType):
     """A string representing an id from the artifact catalog. Utilized by the frontend
-    to perform catalog lookup to build a better UI form, displaying additional info.
-
-    Deliberately not a StringType subclass: it converts into a richer CompositeArtifactId object
-    (mirroring DateType/DatetimeType), not a string, so callers should read it via a dedicated
-    accessor (e.g. BlockInstanceRich.config_as_artifactid) rather than config_as_str.
-    """
+    to perform catalog lookup to build a better UI form, displaying additional info."""
 
     # NOTE we are being careful here as we dont want to introduce a strict dependency
     # of types on artifacts. Hence the (exceptional) string annotation, in-body import,
