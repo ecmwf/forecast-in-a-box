@@ -396,12 +396,15 @@ function DualMapPanel({
           {t('annotations.armedHint')}
         </div>
       )}
-      <CompareSlotTag
-        slot={source.slot}
-        label={source.label}
-        loading={loadingCount > 0 || source.layersLoading}
-        timeLabel={source.timeLabel}
-      />
+      {/* left-12 clears the OL zoom control (the tag hid its + button). */}
+      <div className="pointer-events-none absolute top-2 right-2 left-12 z-10 flex">
+        <CompareSlotTag
+          slot={source.slot}
+          label={source.label}
+          loading={loadingCount > 0 || source.layersLoading}
+          timeLabel={source.timeLabel}
+        />
+      </div>
       {source.hiddenAtTime && (
         <div className="absolute top-10 left-2 z-10 rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
           {t('timeline.gap', { slot: source.slot.toUpperCase() })}

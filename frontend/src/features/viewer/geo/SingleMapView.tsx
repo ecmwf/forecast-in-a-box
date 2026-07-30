@@ -602,23 +602,28 @@ export function SingleMapView({
             : undefined
         }
       />
-      {showA && (
-        <CompareSlotTag
-          slot="a"
-          label={a.label}
-          side="left"
-          loading={loadingCount.a > 0 || a.layersLoading}
-          timeLabel={a.timeLabel}
-        />
-      )}
-      {showB && (
-        <CompareSlotTag
-          slot="b"
-          label={b.label}
-          side="right"
-          loading={loadingCount.b > 0 || b.layersLoading}
-          timeLabel={b.timeLabel}
-        />
+      {/* left-12 clears the OL zoom control (the tag hid its + button). */}
+      {(showA || showB) && (
+        <div className="pointer-events-none absolute top-2 right-2 left-12 z-10 flex items-start gap-2">
+          {showA && (
+            <CompareSlotTag
+              slot="a"
+              label={a.label}
+              side="left"
+              loading={loadingCount.a > 0 || a.layersLoading}
+              timeLabel={a.timeLabel}
+            />
+          )}
+          {showB && (
+            <CompareSlotTag
+              slot="b"
+              label={b.label}
+              side="right"
+              loading={loadingCount.b > 0 || b.layersLoading}
+              timeLabel={b.timeLabel}
+            />
+          )}
+        </div>
       )}
 
       {showA && a.hiddenAtTime && <GapBadge slot="A" side="left" />}

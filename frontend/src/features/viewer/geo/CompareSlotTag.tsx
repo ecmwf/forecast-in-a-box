@@ -43,8 +43,9 @@ export function CompareSlotTag({
   return (
     <div
       className={cn(
-        'absolute top-2 z-10 flex max-w-[70%] items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur-sm',
-        side === 'left' ? 'left-2' : 'right-2',
+        // Flow flex item: fills free space, truncates only on collision.
+        'pointer-events-auto flex max-w-full min-w-0 items-center gap-1.5 rounded-md border border-border bg-background/90 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur-sm',
+        side === 'right' && 'ml-auto',
       )}
     >
       <span
