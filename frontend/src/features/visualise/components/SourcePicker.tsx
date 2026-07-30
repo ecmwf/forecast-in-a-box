@@ -19,7 +19,7 @@ import { useState } from 'react'
 import { FolderInput, Rows3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { entryRef } from '../entry-ref'
-import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
+import { useRemoveComparisonSource } from '../hooks/useRemoveComparisonSource'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { CompareBasketChip } from './CompareBasketChip'
 import { CuratedWmsList } from './sources/CuratedWmsList'
@@ -98,8 +98,7 @@ function SectionLabel({
 function CollectedSources() {
   const { t } = useTranslation('visualise')
   const entries = useComparisonStore((s) => s.entries)
-  const removeEntry = useComparisonStore((s) => s.removeEntry)
-  const stopOrphanedLenses = useStopOrphanedLenses()
+  const removeSource = useRemoveComparisonSource()
   if (entries.length === 0) return null
   return (
     <section className="space-y-1.5">
@@ -107,23 +106,14 @@ function CollectedSources() {
         {t('picker.collected')}
       </P>
       <div className="flex flex-col gap-1.5">
-        {entries.map((entry) => {
-          const ref = entryRef(entry)
-          return (
-            <CompareBasketChip
-              key={ref}
-              entry={entry}
-              slot={null}
-              onRemove={() => {
-                removeEntry(ref)
-                void stopOrphanedLenses(
-                  [entry],
-                  useComparisonStore.getState().entries,
-                )
-              }}
-            />
-          )
-        })}
+        {entries.map((entry) => (
+          <CompareBasketChip
+            key={entryRef(entry)}
+            entry={entry}
+            slot={null}
+            onRemove={() => removeSource(entry)}
+          />
+        ))}
       </div>
     </section>
   )

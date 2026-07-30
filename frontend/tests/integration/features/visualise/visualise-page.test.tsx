@@ -321,6 +321,65 @@ describe('VisualisePage', () => {
     ).toEqual(['/data/output/job-completed-001_1'])
   })
 
+  it('removing ACTIVE A promotes B into the vacated slot', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderVisualisePage()
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toHaveTextContent('Run A')
+
+    await screen.getByRole('button', { name: 'Manage sources' }).click()
+    const removeA = screen.getByRole('button', { name: /Remove Run A/ })
+    await expect.element(removeA).toBeVisible()
+    ;(removeA.element() as HTMLElement).click()
+    ;(
+      screen.getByRole('button', { name: 'Close' }).element() as HTMLElement
+    ).click()
+
+    await expect
+      .poll(() => useComparisonStore.getState().entries)
+      .toHaveLength(1)
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toHaveTextContent('Run B')
+    // The removed ref left the URL — hydration must not resurrect it.
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(useComparisonStore.getState().entries).toHaveLength(1)
+  })
+
+  it('removing ACTIVE B keeps A; a replacement added later activates', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderVisualisePage()
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toHaveTextContent('Run B')
+
+    await screen.getByRole('button', { name: 'Manage sources' }).click()
+    const removeB = screen.getByRole('button', { name: /Remove Run B/ })
+    await expect.element(removeB).toBeVisible()
+    ;(removeB.element() as HTMLElement).click()
+    ;(
+      screen.getByRole('button', { name: 'Close' }).element() as HTMLElement
+    ).click()
+
+    await expect
+      .poll(() => useComparisonStore.getState().entries)
+      .toHaveLength(1)
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toHaveTextContent('Run A')
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(useComparisonStore.getState().entries).toHaveLength(1)
+
+    // The vacated slot must accept a replacement (no dead ref wedging it).
+    useComparisonStore.getState().addEntry(RUN_B)
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toHaveTextContent('Run B')
+  })
+
   it(
     'recovers when a serving lens is stopped elsewhere',
     { timeout: 40000 },

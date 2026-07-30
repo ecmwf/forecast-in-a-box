@@ -22,7 +22,7 @@ import {
   useComparisonStore,
   useIsInComparison,
 } from '../stores/comparisonStore'
-import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
+import { useRemoveComparisonSource } from '../hooks/useRemoveComparisonSource'
 import type { NewComparisonEntry } from '../entry-ref'
 import { Button } from '@/components/ui/button'
 import { showToast } from '@/lib/toast'
@@ -44,8 +44,7 @@ export function AddToComparisonButton({
   const ref = entryRef(entry)
   const inBasket = useIsInComparison(ref)
   const addEntry = useComparisonStore((s) => s.addEntry)
-  const removeEntry = useComparisonStore((s) => s.removeEntry)
-  const stopOrphanedLenses = useStopOrphanedLenses()
+  const removeSource = useRemoveComparisonSource()
 
   const name = entryDisplayName(entry)
   const label = inBasket ? t('entry.inBasket') : t('entry.add')
@@ -53,8 +52,7 @@ export function AddToComparisonButton({
 
   const onClick = () => {
     if (inBasket) {
-      removeEntry(ref)
-      void stopOrphanedLenses([entry], useComparisonStore.getState().entries)
+      removeSource(entry)
       showToast.info(t('toast.removed', { name }))
       return
     }
