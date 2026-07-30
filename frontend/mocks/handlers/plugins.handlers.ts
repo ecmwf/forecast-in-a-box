@@ -28,6 +28,10 @@ import type {
   PluginSettingsUpdate,
 } from '@/api/types/plugins.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import {
+  closedEnum,
+  serializeValueType,
+} from '@/components/base/fields/fable-type'
 
 // Mutable copy for state changes
 const pluginsState: PluginListing = getMutablePluginListing()
@@ -311,7 +315,7 @@ export const pluginsHandlers = [
             example_value: 'png',
             display_name: 'Format',
             display_description: 'Output image format.',
-            type_hint: 'enumClosed[str](png,pdf,svg)',
+            type_hint: serializeValueType(closedEnum(['png', 'pdf', 'svg'])),
           },
           area: {
             example_value: 'Europe',
