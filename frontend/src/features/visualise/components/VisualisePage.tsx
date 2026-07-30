@@ -94,15 +94,20 @@ function useActivePair(): ActivePair & {
 
   // Materialize missing slots from basket order (route file explains why
   // the pair is always pinned in the URL). `b=off` is a deliberate single
-  // view — never re-fill it. Unknown refs are left in place —
-  // useHydrateComparisonFromUrl owns them (adds or strips). `replace`
-  // keeps history clean while chips are clicked around.
+  // view — never re-fill it. Unresolved refs belong to
+  // useHydrateComparisonFromUrl (add/strip/rewrite) — wait, or filling the
+  // sibling slot races that update. `replace` keeps history clean while
+  // chips are clicked around.
   useEffect(() => {
     if (entries.length === 0) return
     const refs = entries.map((e) => entryRef(e))
     const aMissing = search.a === undefined || search.a === SLOT_B_OFF
     const bMissing = search.b === undefined
     if (!aMissing && !bMissing) return
+    const aUnresolved = !aMissing && !byRef.has(search.a!)
+    const bUnresolved =
+      !bMissing && search.b !== SLOT_B_OFF && !byRef.has(search.b!)
+    if (aUnresolved || bUnresolved) return
     const nextA = aMissing ? refs.find((r) => r !== search.b) : search.a
     const nextB = bMissing ? refs.find((r) => r !== nextA) : search.b
     if (nextA !== search.a || nextB !== search.b) {
@@ -111,7 +116,7 @@ function useActivePair(): ActivePair & {
         replace: true,
       })
     }
-  }, [entries, search.a, search.b, navigate])
+  }, [entries, byRef, search.a, search.b, navigate])
 
   // Plain assignment — the same source in both slots is a real workflow
   // (unlink layers, compare two parameters of one run; or pair with the
@@ -153,7 +158,7 @@ export function VisualisePage() {
   const entries = useComparisonStore((s) => s.entries)
   const clear = useComparisonStore((s) => s.clear)
   const { a, b, assignSlot, swapSlots, clearSlotB } = useActivePair()
-  const { pendingExternal, resolveExternal } = useHydrateComparisonFromUrl()
+  const { pendingUnverified, resolveUnverified } = useHydrateComparisonFromUrl()
 
   // Clearing the basket must clear the URL pair too — hydration would
   // otherwise resurrect the active refs as stub entries.
@@ -285,35 +290,39 @@ export function VisualisePage() {
         </div>
       </div>
 
-      {/* External servers from a link need explicit consent; any close declines. */}
+      {/* Link-borne sources need explicit consent; any close declines. */}
       <AlertDialog
-        open={pendingExternal.length > 0}
+        open={pendingUnverified.length > 0}
         onOpenChange={(open) => {
-          if (!open) resolveExternal('ignore')
+          if (!open) resolveUnverified('ignore')
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('hydrate.externalTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('hydrate.externalBody')}
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('hydrate.title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('hydrate.body')}</AlertDialogDescription>
           </AlertDialogHeader>
           <ul className="space-y-1">
-            {pendingExternal.map((p) => (
-              <li
-                key={p.ref}
-                title={p.url}
-                className="truncate font-mono text-xs"
-              >
-                {p.url}
-              </li>
-            ))}
+            {pendingUnverified.map((p) => {
+              const detail = p.kind === 'wms' ? p.url : p.path
+              return (
+                <li
+                  key={p.ref}
+                  title={detail}
+                  className="flex min-w-0 items-baseline gap-2"
+                >
+                  <span className="rounded border border-border px-1 font-mono text-[10px] tracking-wide text-muted-foreground">
+                    {t(p.kind === 'wms' ? 'basket.kindWms' : 'basket.kindPath')}
+                  </span>
+                  <span className="truncate font-mono text-xs">{detail}</span>
+                </li>
+              )
+            })}
           </ul>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('hydrate.externalIgnore')}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => resolveExternal('add')}>
-              {t('hydrate.externalAdd')}
+            <AlertDialogCancel>{t('hydrate.ignore')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => resolveUnverified('add')}>
+              {t('hydrate.add')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

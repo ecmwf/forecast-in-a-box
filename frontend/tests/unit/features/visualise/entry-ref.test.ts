@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  allowedHostPath,
   decodeEntryRef,
   entryDisplayName,
   entryRef,
@@ -36,11 +37,7 @@ describe('entryRef / decodeEntryRef', () => {
     })
   })
 
-  it('round-trips path and wms refs', () => {
-    const path = '/Users/x/.fiab/jobs_output/4af24cc6_1'
-    expect(
-      decodeEntryRef(entryRef({ kind: 'path', path, label: 'x' })),
-    ).toEqual({ kind: 'path', path })
+  it('round-trips wms refs', () => {
     const url = 'http://localhost:19001'
     expect(decodeEntryRef(entryRef({ kind: 'wms', url, label: 'x' }))).toEqual({
       kind: 'wms',
@@ -48,14 +45,48 @@ describe('entryRef / decodeEntryRef', () => {
     })
   })
 
+  it('serializes path entries as stable opaque digests, never the raw path', () => {
+    const path = '/Users/x/.fiab/jobs_output/4af24cc6_1'
+    const ref = entryRef({ kind: 'path', path, label: 'x' })
+    expect(ref).toMatch(/^dir:[0-9a-f]{8}$/)
+    expect(ref).not.toContain(path)
+    // Stable across sessions and distinct per path.
+    expect(entryRef({ kind: 'path', path, label: 'other' })).toBe(ref)
+    expect(entryRef({ kind: 'path', path: '/elsewhere', label: 'x' })).not.toBe(
+      ref,
+    )
+    expect(decodeEntryRef(ref)).toEqual({
+      kind: 'dir',
+      digest: ref.slice('dir:'.length),
+    })
+  })
+
+  it('still decodes legacy raw path refs (consent-gated inbound links)', () => {
+    expect(decodeEntryRef('path:/data/grib')).toEqual({
+      kind: 'path',
+      path: '/data/grib',
+    })
+  })
+
   it('rejects malformed refs', () => {
     expect(decodeEntryRef('run:no-separator')).toBeNull()
     expect(decodeEntryRef('run:~task-only')).toBeNull()
     expect(decodeEntryRef('run:job-only~')).toBeNull()
+    expect(decodeEntryRef('dir:')).toBeNull()
     expect(decodeEntryRef('path:')).toBeNull()
     expect(decodeEntryRef('wms:')).toBeNull()
     expect(decodeEntryRef('bogus:x')).toBeNull()
     expect(decodeEntryRef('')).toBeNull()
+  })
+
+  it('allows only absolute, traversal-free host paths', () => {
+    expect(allowedHostPath('/data/grib')).toBe('/data/grib')
+    expect(allowedHostPath('  /data/grib ')).toBe('/data/grib')
+    expect(allowedHostPath('/data/..grib/x')).toBe('/data/..grib/x')
+    expect(allowedHostPath('relative/path')).toBeNull()
+    expect(allowedHostPath('../etc')).toBeNull()
+    expect(allowedHostPath('/data/../etc/passwd')).toBeNull()
+    expect(allowedHostPath('')).toBeNull()
   })
 
   it('derives display names per kind', () => {

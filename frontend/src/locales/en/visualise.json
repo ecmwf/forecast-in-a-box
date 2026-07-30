@@ -19,10 +19,10 @@
     "sourceLost": "A shared source is no longer available and was removed from the link: {{reason}}"
   },
   "hydrate": {
-    "externalTitle": "Connect to external WMS server?",
-    "externalBody": "This shared link adds an external map server that your browser will contact directly. Only continue if you trust it.",
-    "externalAdd": "Add and connect",
-    "externalIgnore": "Ignore"
+    "title": "Add sources from this shared link?",
+    "body": "This link adds sources this browser has not seen before. External WMS servers are contacted directly by your browser; a host directory starts a map server on the FIAB host. Only continue if you trust the link.",
+    "add": "Add and connect",
+    "ignore": "Ignore"
   },
   "basket": {
     "clear": "Clear all",

@@ -74,7 +74,10 @@ describe('comparisonStore', () => {
     expect(updated.kind === 'output' && updated.runName).toBe('Enriched')
 
     // Path entries are untouched by output-meta updates.
-    store().updateOutputMeta('path:/p', { runName: 'nope' })
+    store().updateOutputMeta(
+      entryRef({ kind: 'path', path: '/p', label: 'P' }),
+      { runName: 'nope' },
+    )
     const pathEntry = store().entries[1]
     expect(pathEntry.kind).toBe('path')
     expect('runName' in pathEntry).toBe(false)

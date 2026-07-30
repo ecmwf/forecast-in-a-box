@@ -17,10 +17,13 @@
  *  - `wms`    — an external WMS endpoint used directly
  *
  * The ref is the entry's identity in both the basket store and the
- * /compare URL (`?a=…&b=…`), so it must be stable and reversible:
- *   `run:<jobId>~<taskId>` · `path:<path>` · `wms:<url>`
+ * /compare URL (`?a=…&b=…`), so it must be stable:
+ *   `run:<jobId>~<taskId>` · `dir:<digest>` · `wms:<url>`
  * `~` is an RFC 3986 unreserved character and cannot appear in run/task
- * ids; the router URL-encodes path/url payloads.
+ * ids; the router URL-encodes url payloads. Path entries serialize as
+ * opaque digests — a raw host path in a shareable URL would let a crafted
+ * link name the directory the backend serves; `dir:` refs resolve only
+ * against the local basket. Legacy `path:` refs decode, never produced.
  */
 
 /** Stored run output — display metadata is snapshotted at add time and
@@ -65,18 +68,29 @@ export type NewComparisonEntry =
   | Omit<PathComparisonEntry, 'addedAt'>
   | Omit<WmsComparisonEntry, 'addedAt'>
 
-/** Decoded identity of a ref — the union minus display metadata. */
+/** Decoded ref identity — `dir` is the local digest, `path` the legacy raw form. */
 export type DecodedEntryRef =
   | { kind: 'output'; jobId: string; taskId: string }
+  | { kind: 'dir'; digest: string }
   | { kind: 'path'; path: string }
   | { kind: 'wms'; url: string }
+
+/** FNV-1a 32-bit hex — deterministic so persisted URLs keep matching the basket. */
+function pathDigest(path: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < path.length; i++) {
+    hash ^= path.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
 
 export function entryRef(entry: NewComparisonEntry | ComparisonEntry): string {
   switch (entry.kind) {
     case 'output':
       return `run:${entry.jobId}~${entry.taskId}`
     case 'path':
-      return `path:${entry.path}`
+      return `dir:${pathDigest(entry.path)}`
     case 'wms':
       return `wms:${entry.url}`
   }
@@ -94,6 +108,11 @@ export function decodeEntryRef(ref: string): DecodedEntryRef | null {
       taskId: payload.slice(sep + 1),
     }
   }
+  if (ref.startsWith('dir:')) {
+    const digest = ref.slice('dir:'.length)
+    return digest ? { kind: 'dir', digest } : null
+  }
+  // Legacy raw-path refs: decoded for consent-gated hydration, never emitted.
   if (ref.startsWith('path:')) {
     const path = ref.slice('path:'.length)
     return path ? { kind: 'path', path } : null
@@ -103,6 +122,14 @@ export function decodeEntryRef(ref: string): DecodedEntryRef | null {
     return url ? { kind: 'wms', url } : null
   }
   return null
+}
+
+/** Host-path allowlist (cf. allowedWmsUrl): absolute and traversal-free, else null. */
+export function allowedHostPath(raw: string): string | null {
+  const path = raw.trim()
+  if (!path.startsWith('/')) return null
+  if (path.split('/').some((seg) => seg === '..')) return null
+  return path
 }
 
 /**

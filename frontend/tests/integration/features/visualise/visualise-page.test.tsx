@@ -400,6 +400,10 @@ describe('VisualisePage', () => {
     const cancel = dialog.getByRole('button', { name: 'Cancel' })
     ;(cancel.element() as HTMLElement).click()
     expect(useComparisonStore.getState().entries).toHaveLength(2)
+    // Await the close — the mid-unmount dialog's action also matches 'Clear all'.
+    await expect
+      .poll(() => screen.getByRole('alertdialog').elements())
+      .toHaveLength(0)
 
     // Confirm clears.
     await screen.getByRole('button', { name: 'Clear all' }).click()
@@ -536,7 +540,7 @@ describe('VisualisePage', () => {
     )
 
     await expect
-      .element(screen.getByText('Connect to external WMS server?'))
+      .element(screen.getByText('Add sources from this shared link?'))
       .toBeVisible()
     // Held: nothing persisted, the server not contacted — a crafted link
     // must not drive-by-connect a victim's browser.
@@ -563,7 +567,7 @@ describe('VisualisePage', () => {
     )
 
     await expect
-      .element(screen.getByText('Connect to external WMS server?'))
+      .element(screen.getByText('Add sources from this shared link?'))
       .toBeVisible()
     const ignore = screen.getByRole('button', { name: 'Ignore' })
     ;(ignore.element() as HTMLElement).click()
@@ -584,7 +588,83 @@ describe('VisualisePage', () => {
       .toBeVisible()
     expect(useComparisonStore.getState().entries).toHaveLength(0)
     expect(
-      screen.getByText('Connect to external WMS server?').elements(),
+      screen.getByText('Add sources from this shared link?').elements(),
+    ).toHaveLength(0)
+  })
+
+  it('holds host-path links behind a confirm; Add starts the lens', async () => {
+    const screen = await renderVisualisePage(
+      `?a=${encodeURIComponent('path:/data/external-grib')}`,
+    )
+
+    await expect
+      .element(screen.getByText('Add sources from this shared link?'))
+      .toBeVisible()
+    // Held: nothing persisted, no lens spawned — a crafted link must not
+    // make the backend serve an arbitrary host directory.
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+    expect(listMockLenses()).toHaveLength(0)
+
+    const add = screen.getByRole('button', { name: 'Add and connect' })
+    ;(add.element() as HTMLElement).click()
+    await expect
+      .poll(() => useComparisonStore.getState().entries)
+      .toHaveLength(1)
+    expect(useComparisonStore.getState().entries[0]).toMatchObject({
+      kind: 'path',
+      path: '/data/external-grib',
+    })
+    await expect
+      .poll(
+        () =>
+          listMockLenses().some(
+            (l) => l.lens_params.local_path === '/data/external-grib',
+          ),
+        { timeout: 8000 },
+      )
+      .toBe(true)
+  })
+
+  it('Ignore declines the host-path link without starting a lens', async () => {
+    const screen = await renderVisualisePage(
+      `?a=${encodeURIComponent('path:/data/external-grib')}`,
+    )
+
+    await expect
+      .element(screen.getByText('Add sources from this shared link?'))
+      .toBeVisible()
+    const ignore = screen.getByRole('button', { name: 'Ignore' })
+    ;(ignore.element() as HTMLElement).click()
+    // Stripped: back to the empty state, nothing persisted or spawned.
+    await expect
+      .element(screen.getByText('GRIB directory on this host'))
+      .toBeVisible()
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+    expect(listMockLenses()).toHaveLength(0)
+  })
+
+  it('rejects traversal and relative host-path refs outright', async () => {
+    const screen = await renderVisualisePage(
+      `?a=${encodeURIComponent('path:/data/../etc')}`,
+    )
+    await expect
+      .element(screen.getByText('GRIB directory on this host'))
+      .toBeVisible()
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+    expect(listMockLenses()).toHaveLength(0)
+    expect(
+      screen.getByText('Add sources from this shared link?').elements(),
+    ).toHaveLength(0)
+  })
+
+  it('strips unknown dir: refs — digests resolve only locally', async () => {
+    const screen = await renderVisualisePage('?a=dir%3Adeadbeef')
+    await expect
+      .element(screen.getByText('GRIB directory on this host'))
+      .toBeVisible()
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+    expect(
+      screen.getByText('Add sources from this shared link?').elements(),
     ).toHaveLength(0)
   })
 })

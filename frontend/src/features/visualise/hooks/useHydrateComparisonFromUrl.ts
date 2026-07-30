@@ -11,8 +11,10 @@
 /**
  * Hydrate the basket from a shared /compare URL. `a`/`b` refs that are not
  * in the local basket are validated and added as stub entries:
- *  - `path:` refs are self-contained
- *  - `wms:` refs are held in `pendingExternal` until explicitly confirmed
+ *  - `dir:` refs are local-only digests — unknown ones are stripped
+ *  - `wms:` and legacy raw `path:` refs are held in `pendingUnverified`
+ *    until confirmed — a crafted link must not drive-by-connect a server
+ *    or spawn a backend lens on a host directory
  *  - `run:` refs are checked against the run's outputs (must be a GRIB
  *    marker) before adding; unknown runs/tasks are stripped from the URL
  *    with a toast, so a stale link degrades instead of wedging the page.
@@ -23,7 +25,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
-import { SLOT_B_OFF, decodeEntryRef, entryRef } from '../entry-ref'
+import {
+  SLOT_B_OFF,
+  allowedHostPath,
+  decodeEntryRef,
+  entryRef,
+} from '../entry-ref'
 import {
   MAX_COMPARISON_ENTRIES,
   useComparisonStore,
@@ -53,16 +60,15 @@ function urlLabel(url: string): string {
   }
 }
 
-/** External `wms:` ref awaiting the user's explicit go-ahead. */
-export interface PendingExternalSource {
-  ref: string
-  url: string
-}
+/** Link-borne source awaiting the user's explicit go-ahead. */
+export type PendingUnverifiedSource =
+  | { ref: string; kind: 'wms'; url: string }
+  | { ref: string; kind: 'path'; path: string }
 
 export interface HydrateComparisonResult {
-  /** External servers a shared link wants to add — confirm before contact. */
-  pendingExternal: ReadonlyArray<PendingExternalSource>
-  resolveExternal: (action: 'add' | 'ignore') => void
+  /** Sources a shared link wants to add — confirm before any effect. */
+  pendingUnverified: ReadonlyArray<PendingUnverifiedSource>
+  resolveUnverified: (action: 'add' | 'ignore') => void
 }
 
 export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
@@ -74,8 +80,8 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
   const entries = useComparisonStore((s) => s.entries)
   // Refs already handled this mount — failures must not retry in a loop.
   const processedRef = useRef<Set<string>>(new Set())
-  const [pendingExternal, setPendingExternal] = useState<
-    Array<PendingExternalSource>
+  const [pendingUnverified, setPendingUnverified] = useState<
+    Array<PendingUnverifiedSource>
   >([])
 
   const strip = useCallback(
@@ -92,22 +98,61 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
     [navigate],
   )
 
-  const resolveExternal = useCallback(
+  const resolveUnverified = useCallback(
     (action: 'add' | 'ignore') => {
-      for (const { ref, url } of pendingExternal) {
-        if (action === 'add') {
-          const result = addEntry({ kind: 'wms', url, label: urlLabel(url) })
-          if (result === 'full') {
-            showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-            strip(ref)
-          }
-        } else {
-          strip(ref)
+      // ONE navigation for all rewrites — queued updates would race each
+      // other and the slot-materialization effect.
+      const rewrite = new Map<string, string | undefined>()
+      for (const pending of pendingUnverified) {
+        if (action !== 'add') {
+          rewrite.set(pending.ref, undefined)
+          continue
+        }
+        const entry =
+          pending.kind === 'wms'
+            ? {
+                kind: 'wms' as const,
+                url: pending.url,
+                label: urlLabel(pending.url),
+              }
+            : {
+                kind: 'path' as const,
+                path: pending.path,
+                label: pathLabel(pending.path),
+              }
+        const result = addEntry(entry)
+        if (result === 'full') {
+          showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
+          rewrite.set(pending.ref, undefined)
+          continue
+        }
+        // Re-mint legacy `path:` as `dir:` in the URL; pre-mark it
+        // processed so the rewrite isn't treated as fresh inbound.
+        const canonical = entryRef(entry)
+        if (canonical !== pending.ref) {
+          processedRef.current.add(canonical)
+          rewrite.set(pending.ref, canonical)
         }
       }
-      setPendingExternal([])
+      if (rewrite.size > 0) {
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            a:
+              prev.a !== undefined && rewrite.has(prev.a)
+                ? rewrite.get(prev.a)
+                : prev.a,
+            b:
+              prev.b !== undefined && rewrite.has(prev.b)
+                ? rewrite.get(prev.b)
+                : prev.b,
+          }),
+          replace: true,
+        })
+      }
+      setPendingUnverified([])
     },
-    [pendingExternal, addEntry, strip, t],
+    [pendingUnverified, addEntry, navigate, t],
   )
 
   useEffect(() => {
@@ -127,12 +172,25 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
         strip(ref)
         continue
       }
+      if (decoded.kind === 'dir') {
+        // Digests resolve only against THIS browser's basket.
+        showToast.error(t('toast.unknownSource'))
+        strip(ref)
+        continue
+      }
       if (decoded.kind === 'path') {
-        addEntry({
-          kind: 'path',
-          path: decoded.path,
-          label: pathLabel(decoded.path),
-        })
+        // Path-checked, then held for confirmation — a crafted link must
+        // not spawn a backend lens on an arbitrary directory.
+        if (allowedHostPath(decoded.path) === null) {
+          showToast.error(t('toast.invalidLink'))
+          strip(ref)
+          continue
+        }
+        setPendingUnverified((prev) =>
+          prev.some((p) => p.ref === ref)
+            ? prev
+            : [...prev, { ref, kind: 'path', path: decoded.path }],
+        )
         continue
       }
       if (decoded.kind === 'wms') {
@@ -143,10 +201,10 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
           strip(ref)
           continue
         }
-        setPendingExternal((prev) =>
+        setPendingUnverified((prev) =>
           prev.some((p) => p.ref === ref)
             ? prev
-            : [...prev, { ref, url: decoded.url }],
+            : [...prev, { ref, kind: 'wms', url: decoded.url }],
         )
         continue
       }
@@ -193,5 +251,5 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
     }
   }, [search.a, search.b, entries, addEntry, strip, queryClient, t])
 
-  return { pendingExternal, resolveExternal }
+  return { pendingUnverified, resolveUnverified }
 }
