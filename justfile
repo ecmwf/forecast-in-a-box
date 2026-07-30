@@ -54,9 +54,21 @@ val:
 f2:
     echo "f2"
 
-dev:
+dev *args:
     #!/usr/bin/env bash
     set -euo pipefail
+
+    args=({{args}})
+
+    for arg in "${args[@]}" ; do
+        if [ "$arg" == "full-reinstall" ] ; then
+            echo "full reinstall! Will drop the db and sync the venv"
+            pushd backend
+            uv sync --extra runtime --all-packages
+            rm -rf .fiab/*db
+            popd
+        fi
+    done
 
     frontend_build_marker=frontend/dist/.git-commit
     frontend_build_needed=false
