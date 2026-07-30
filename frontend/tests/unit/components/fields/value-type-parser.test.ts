@@ -140,7 +140,8 @@ describe('parseValueType', () => {
       })
     })
 
-    // anemoiSource.input_source ships exactly this, spaces and all.
+    // anemoiSource.input_source ships this (the serializer emits no
+    // spaces after commas; tolerate both).
     it('parses enumOpen options as an open enum', () => {
       expect(
         parseValueType("enumOpen[str]('mars', 'opendata', 'polytope')"),
@@ -150,6 +151,7 @@ describe('parseValueType', () => {
         closed: false,
       })
     })
+
   })
 
   describe('whitespace and case handling', () => {

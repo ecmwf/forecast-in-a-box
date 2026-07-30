@@ -30,8 +30,8 @@
  * - param → string input (param name lookup not yet implemented)
  * - optional[T] → same widget as T, with optional=true flag
  *
- * `enum`/`enumList` carry `closed: boolean` (closed vs open) for forward
- * compat; no first-party factory emits the open form yet.
+ * `enum`/`enumList` carry `closed: boolean` (closed vs open);
+ * anemoiSource's `input_source` ships the open form.
  *
  * Enum expressions carry an explicit subtype in brackets, e.g.
  * `enumClosed[str]('a','b')` or `enumOpen[int](1,2)`. Only the `str`
