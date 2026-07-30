@@ -34,12 +34,27 @@
  * anemoiSource's `input_source` ships the open form.
  *
  * Enum expressions carry an explicit subtype in brackets, e.g.
- * `enumClosed[str]('a','b')` or `enumOpen[int](1,2)`. Only the `str`
- * subtype is rendered as a first-class field today; other subtypes fall
- * back to `unknown`.
+ * `enumClosed[str]('a','b')` or `enumClosed[int](1,2)`. str/int/float
+ * subtypes all render as selects over the wire strings; other subtypes
+ * fall back to `unknown`.
  */
 
 import { getAppTimeZone, todayInZone } from '@/lib/datetime'
+
+/** Enum subtypes rendered as selects — values stay wire strings; the
+ *  backend converts on submit. Aliases mirror the simple-type branches.
+ *  `artifact`/`param` members serialize as quoted strings (backend
+ *  `_serialize_enum_item`), so they parse like a `str` subtype. */
+const SELECT_ENUM_SUBTYPES: ReadonlySet<string> = new Set([
+  'str',
+  'string',
+  'int',
+  'integer',
+  'float',
+  'number',
+  'artifact',
+  'param',
+])
 
 export type ParsedValueType =
   | { type: 'string'; optional?: boolean }
@@ -141,21 +156,13 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
   }
 
   // Backend serializes enumClosed[subtype](...)/enumOpen[subtype](...); `enum` kept as an alias.
-  // Only the `str` subtype is supported as a first-class field; other subtypes are `unknown`.
+  // str/int/float subtypes render as selects; others fall back to `unknown`.
   const enumMatch = trimmed.match(
     /^(enum|enumOpen|enumClosed)\[(\w+)\]\((.*)\)$/i,
   )
   if (enumMatch) {
     const subtype = enumMatch[2].toLowerCase()
-    // `artifact` and `param` enum members are serialized as quoted strings
-    // (see backend's `_serialize_enum_item`), so they parse identically to
-    // a `str` subtype enum.
-    if (
-      subtype === 'str' ||
-      subtype === 'string' ||
-      subtype === 'artifact' ||
-      subtype === 'param'
-    ) {
+    if (SELECT_ENUM_SUBTYPES.has(subtype)) {
       const options = parseEnumOptions(enumMatch[3])
       if (options.length > 0) {
         return {
