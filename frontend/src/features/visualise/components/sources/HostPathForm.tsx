@@ -13,6 +13,7 @@
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isRemoteDeployment } from '@/features/visualise/deployment'
 import {
   MAX_COMPARISON_ENTRIES,
   useComparisonStore,
@@ -46,6 +47,11 @@ export function HostPathForm() {
       <P className="text-xs text-muted-foreground">
         {t('picker.hostPath.description')}
       </P>
+      {isRemoteDeployment() && (
+        <P className="text-xs text-muted-foreground italic">
+          {t('picker.hostPath.restrictedHint')}
+        </P>
+      )}
       <div className="flex gap-2">
         <Input
           value={path}

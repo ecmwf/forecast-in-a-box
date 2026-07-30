@@ -10,10 +10,11 @@
 
 /** Add an external WMS endpoint as a source after a GetCapabilities probe. */
 
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Globe, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { probeWmsEndpoint } from '@/features/visualise/wms-probe'
+import { cspConnectPolicy } from '@/features/visualise/deployment'
 import {
   MAX_COMPARISON_ENTRIES,
   useComparisonStore,
@@ -25,6 +26,7 @@ import { showToast } from '@/lib/toast'
 
 type WmsFormError =
   | { reason: 'invalid-url' | 'unreachable' | 'parse' | 'timeout' }
+  | { reason: 'blocked'; host: string }
   | { reason: 'http'; status: number }
   | null
 
@@ -35,6 +37,7 @@ export function WmsUrlForm() {
   const [probing, setProbing] = useState(false)
   const [error, setError] = useState<WmsFormError>(null)
   const addEntry = useComparisonStore((s) => s.addEntry)
+  const cspRestricted = useMemo(() => cspConnectPolicy().restricted, [])
 
   const submit = async () => {
     if (probing || !url.trim()) return
@@ -46,7 +49,9 @@ export function WmsUrlForm() {
       setError(
         result.reason === 'http'
           ? { reason: 'http', status: result.status }
-          : { reason: result.reason },
+          : result.reason === 'blocked'
+            ? { reason: 'blocked', host: result.host }
+            : { reason: result.reason },
       )
       return
     }
@@ -70,11 +75,13 @@ export function WmsUrlForm() {
         ? t('picker.wmsUrl.errorInvalidUrl')
         : error.reason === 'unreachable'
           ? t('picker.wmsUrl.errorUnreachable')
-          : error.reason === 'http'
-            ? t('picker.wmsUrl.errorHttp', { status: error.status })
-            : error.reason === 'timeout'
-              ? t('picker.wmsUrl.errorTimeout')
-              : t('picker.wmsUrl.errorParse')
+          : error.reason === 'blocked'
+            ? t('picker.wmsUrl.errorBlocked', { host: error.host })
+            : error.reason === 'http'
+              ? t('picker.wmsUrl.errorHttp', { status: error.status })
+              : error.reason === 'timeout'
+                ? t('picker.wmsUrl.errorTimeout')
+                : t('picker.wmsUrl.errorParse')
 
   return (
     <div className="space-y-1.5">
@@ -85,6 +92,11 @@ export function WmsUrlForm() {
       <P className="text-xs text-muted-foreground">
         {t('picker.wmsUrl.description')}
       </P>
+      {cspRestricted && (
+        <P className="text-xs text-muted-foreground italic">
+          {t('picker.wmsUrl.restrictedHint')}
+        </P>
+      )}
       <div className="flex gap-2">
         <Input
           value={url}

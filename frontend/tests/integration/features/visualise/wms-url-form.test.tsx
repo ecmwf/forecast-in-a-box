@@ -14,7 +14,7 @@
  * actionable, distinguishable errors.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
@@ -29,9 +29,26 @@ import {
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import { resetLensState } from '@tests/../mocks/data/lens.data'
 import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
+import type * as Deployment from '@/features/visualise/deployment'
 import { SourcePicker } from '@/features/visualise/components/SourcePicker'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import i18n from '@/lib/i18n'
+
+// Simulate the production CSP posture — a real injected CSP meta tag
+// would be enforced by the browser and block MSW traffic.
+const cspRestricted = { current: false }
+vi.mock('@/features/visualise/deployment', async (importOriginal) => {
+  const actual = await importOriginal<typeof Deployment>()
+  return {
+    ...actual,
+    cspConnectPolicy: () =>
+      actual.cspConnectPolicy(
+        cspRestricted.current
+          ? `connect-src 'self' http://localhost:* http://127.0.0.1:* https://maps.dwd.de;`
+          : null,
+      ),
+  }
+})
 
 let nextPort = 19900
 
@@ -70,6 +87,7 @@ async function renderPicker() {
 beforeEach(() => {
   resetJobsState()
   resetLensState()
+  cspRestricted.current = false
 })
 
 describe('External WMS form', () => {
@@ -138,5 +156,41 @@ describe('External WMS form', () => {
       .element(screen.getByText(/responded with HTTP 503/))
       .toBeVisible()
     expect(useComparisonStore.getState().entries).toHaveLength(0)
+  })
+
+  it('on CSP-restricted builds, hints at the allowlist and names a blocked host honestly', async () => {
+    cspRestricted.current = true
+    const screen = await renderPicker()
+
+    await expect
+      .element(screen.getByText(/only the curated WMS servers/))
+      .toBeVisible()
+
+    // Refused before any fetch, with the real reason (not "unreachable").
+    await screen
+      .getByPlaceholder('https://maps.example.org/wms')
+      .fill('https://evil.example.org/wms')
+    await screen.getByRole('button', { name: 'Connect & add' }).click()
+    await expect
+      .element(screen.getByText(/does not allow evil\.example\.org/))
+      .toBeVisible()
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+  })
+
+  it('on CSP-restricted builds, allowlisted hosts still probe normally', async () => {
+    cspRestricted.current = true
+    const port = nextPort++
+    registerMockWmsServer(port, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    const screen = await renderPicker()
+
+    await screen
+      .getByPlaceholder('https://maps.example.org/wms')
+      .fill(`http://localhost:${port}`)
+    await screen.getByRole('button', { name: 'Connect & add' }).click()
+    await expect
+      .poll(() => useComparisonStore.getState().entries)
+      .toHaveLength(1)
   })
 })

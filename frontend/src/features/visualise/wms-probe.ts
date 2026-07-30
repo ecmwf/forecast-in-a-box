@@ -14,11 +14,14 @@
  * real-world endpoints look like `https://eccharts.ecmwf.int/wms/?token=…`
  * or `…/geoserver/ows`); only a bare origin gets `/wms` appended (the
  * lens convention), via toWmsEndpoint. Errors are distinguishable so the
- * form can be actionable: bad input, an HTTP error status (reachable
- * server rejecting the request — wrong path or token), a non-WMS
- * response, or a network/CORS failure (indistinguishable in a browser).
+ * form can be actionable: a CSP-disallowed host (caught before fetching —
+ * a CSP block rejects exactly like a network error), bad input, an HTTP
+ * error status (reachable server rejecting the request — wrong path or
+ * token), a non-WMS response, or a network/CORS failure (indistinguishable
+ * in a browser).
  */
 
+import { cspConnectPolicy } from './deployment'
 import {
   appendWmsParams,
   parseCapabilities,
@@ -30,6 +33,7 @@ import { queryClient } from '@/lib/queryClient'
 export type WmsProbeResult =
   | { ok: true; baseUrl: string; label: string }
   | { ok: false; reason: 'invalid-url' | 'unreachable' | 'parse' | 'timeout' }
+  | { ok: false; reason: 'blocked'; host: string }
   | { ok: false; reason: 'http'; status: number }
 
 // Generous: real met-service capabilities run to MBs and 20+ seconds.
@@ -54,6 +58,10 @@ export async function probeWmsEndpoint(
   const parsed = allowedWmsUrl(raw)
   if (!parsed) {
     return { ok: false, reason: 'invalid-url' }
+  }
+  const csp = cspConnectPolicy()
+  if (csp.restricted && !csp.allows(parsed)) {
+    return { ok: false, reason: 'blocked', host: parsed.host }
   }
   const baseUrl = parsed.toString()
 
