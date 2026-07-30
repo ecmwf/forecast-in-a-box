@@ -120,6 +120,15 @@ export function LoupeOverlay({
     const draw = () => {
       const ctx = loupe.getContext('2d')
       if (ctx) {
+        // Backing store tracks the live devicePixelRatio (per frame — it
+        // changes when the window moves between monitors) so the loupe is
+        // native-crisp on any display, not just DPR 2.
+        const dpr = window.devicePixelRatio || 1
+        const backing = Math.max(1, Math.round(sizePx * dpr))
+        if (loupe.width !== backing || loupe.height !== backing) {
+          loupe.width = backing
+          loupe.height = backing
+        }
         // The map is several stacked canvases (vector basemap, WMS image
         // group, vector overlays), each with its own CSS transform and
         // DOM-level opacity — composite them all, or the loupe shows the
@@ -132,9 +141,9 @@ export function LoupeOverlay({
           originY: drawY - sourceSize / 2,
           scale: loupe.width / sourceSize,
         })
-        // Crosshair through the magnified centre.
+        // Crosshair through the magnified centre — 0.5 CSS px hairline.
         ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)'
-        ctx.lineWidth = 1
+        ctx.lineWidth = dpr / 2
         ctx.beginPath()
         ctx.moveTo(loupe.width / 2, 0)
         ctx.lineTo(loupe.width / 2, loupe.height)
@@ -146,7 +155,7 @@ export function LoupeOverlay({
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [active, drawX, drawY, sourceSize, containerRef])
+  }, [active, drawX, drawY, sizePx, sourceSize, containerRef])
 
   if (!active) return null
   return (
@@ -185,12 +194,8 @@ export function LoupeOverlay({
               transform: 'translate(-50%, -50%)',
             }}
           >
-            <canvas
-              ref={canvasRef}
-              width={sizePx * 2}
-              height={sizePx * 2}
-              className="h-full w-full"
-            />
+            {/* Backing size is set per frame in the draw loop (DPR-aware). */}
+            <canvas ref={canvasRef} className="h-full w-full" />
           </div>
         </>
       )}
