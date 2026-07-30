@@ -656,12 +656,15 @@ function ActivePairCard({
   return (
     <li
       onDragOver={(e) => {
+        // Only our pair drags — a foreign drop reads as "move index 0".
+        if (!e.dataTransfer.types.includes('text/x-compare-pair')) return
         e.preventDefault()
         e.dataTransfer.dropEffect = 'move'
         setOver(true)
       }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => {
+        if (!e.dataTransfer.types.includes('text/x-compare-pair')) return
         e.preventDefault()
         setOver(false)
         const from = Number(e.dataTransfer.getData('text/x-compare-pair'))
@@ -823,12 +826,15 @@ function ActiveSourceSection({
               <li
                 key={name}
                 onDragOver={(e) => {
+                  // Only THIS slot's drags — an A card must not drop on B.
+                  if (!e.dataTransfer.types.includes(dragMime)) return
                   e.preventDefault()
                   e.dataTransfer.dropEffect = 'move'
                   setOverIndex(index)
                 }}
                 onDragLeave={() => setOverIndex(null)}
                 onDrop={(e) => {
+                  if (!e.dataTransfer.types.includes(dragMime)) return
                   e.preventDefault()
                   setOverIndex(null)
                   const from = Number(e.dataTransfer.getData(dragMime))

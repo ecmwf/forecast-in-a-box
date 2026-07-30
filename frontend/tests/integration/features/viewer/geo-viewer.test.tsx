@@ -877,6 +877,32 @@ describe('GeoViewer reorder', () => {
       .toEqual(['Remove 2 m temperature', 'Remove Mean sea level pressure'])
   })
 
+  it('ignores foreign drags (no phantom "move index 0")', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    await screen.getByText('2 m temperature').first().click()
+    await screen.getByText('Mean sea level pressure').first().click()
+
+    const cardOrder = () =>
+      screen
+        .getByRole('button', { name: /^Remove / })
+        .elements()
+        .map((el) => el.getAttribute('aria-label'))
+    const before = cardOrder()
+
+    // A text/file drag carries no pair mime — Number('') would be 0.
+    const grips = screen.getByTitle('Drag to reorder').elements()
+    const dt = new DataTransfer()
+    dt.setData('text/plain', 'not ours')
+    grips[1]
+      .closest('li')!
+      .dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true }))
+
+    await new Promise((r) => setTimeout(r, 300))
+    expect(cardOrder()).toEqual(before)
+  })
+
   it('reorders via the keyboard-accessible move buttons, disabled at bounds', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
