@@ -257,6 +257,9 @@ export function parseAnnotationsGeojson(
     if (typeof noteText !== 'string' || noteText.trim() === '') return []
     const slot: unknown = feature.get('slot')
     const [x, y] = geometry.getCoordinates()
+    // Imported 1e999/string coords parse to Infinity/NaN — locating such
+    // a pin poisons the shared camera.
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return []
     return [
       {
         coordinate: [x, y] as [number, number],

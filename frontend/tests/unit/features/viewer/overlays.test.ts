@@ -62,4 +62,28 @@ describe('parseGeojsonOverlay', () => {
       ),
     ).toThrow()
   })
+
+  // Raw JSON text: 1e999 parses to Infinity (stringify would null it).
+  it('drops non-finite, empty, and missing geometries', () => {
+    const mixed = `{"type":"FeatureCollection","features":[
+      {"type":"Feature","properties":{},"geometry":
+        {"type":"LineString","coordinates":[[0,0],[1e999,2]]}},
+      {"type":"Feature","properties":{},"geometry":
+        {"type":"Point","coordinates":["x",0]}},
+      {"type":"Feature","properties":{},"geometry":null},
+      {"type":"Feature","properties":{},"geometry":
+        {"type":"LineString","coordinates":[]}},
+      {"type":"Feature","properties":{},"geometry":
+        {"type":"Point","coordinates":[10,20]}}
+    ]}`
+    const overlay = parseGeojsonOverlay('mixed.geojson', mixed)
+    expect(overlay.featureCount).toBe(1)
+    expect(overlay.source.getFeatures()).toHaveLength(1)
+
+    const allBad = `{"type":"FeatureCollection","features":[
+      {"type":"Feature","properties":{},"geometry":
+        {"type":"Point","coordinates":[1e999,0]}}
+    ]}`
+    expect(() => parseGeojsonOverlay('bad.geojson', allBad)).toThrow()
+  })
 })

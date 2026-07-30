@@ -17,11 +17,14 @@
 
 import { useEffect, useState } from 'react'
 import GeoJSON from 'ol/format/GeoJSON'
+import GeometryCollection from 'ol/geom/GeometryCollection'
+import SimpleGeometry from 'ol/geom/SimpleGeometry'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import { Fill, Stroke, Style, Text } from 'ol/style'
 import CircleStyle from 'ol/style/Circle'
 import type { RefObject } from 'react'
+import type Geometry from 'ol/geom/Geometry'
 import type OlMap from 'ol/Map'
 import type { FeatureLike } from 'ol/Feature'
 
@@ -54,17 +57,35 @@ const OVERLAY_STYLE = new Style({
   }),
 })
 
+/** Imported 1e999/string coords parse to Infinity/NaN — anywhere in a
+ *  geometry they poison camera and extent math. Empty counts as bad. */
+function geometryIsFinite(geometry: Geometry): boolean {
+  if (geometry instanceof GeometryCollection) {
+    const parts = geometry.getGeometries()
+    return parts.length > 0 && parts.every(geometryIsFinite)
+  }
+  if (geometry instanceof SimpleGeometry) {
+    const flat = geometry.getFlatCoordinates()
+    return flat.length > 0 && flat.every(Number.isFinite)
+  }
+  return false
+}
+
 /**
  * Parse GeoJSON text into an overlay (features reprojected to the
- * viewer's Web-Mercator). Throws on unparsable input or zero features.
+ * viewer's Web-Mercator). Non-finite geometries are dropped; throws on
+ * unparsable input or zero usable features.
  */
 export function parseGeojsonOverlay(
   name: string,
   text: string,
 ): ContextOverlay {
-  const features = new GeoJSON().readFeatures(JSON.parse(text), {
-    featureProjection: 'EPSG:3857',
-  })
+  const features = new GeoJSON()
+    .readFeatures(JSON.parse(text), { featureProjection: 'EPSG:3857' })
+    .filter((feature) => {
+      const geometry = feature.getGeometry()
+      return geometry !== undefined && geometryIsFinite(geometry)
+    })
   if (features.length === 0) {
     throw new Error('GeoJSON contains no features')
   }

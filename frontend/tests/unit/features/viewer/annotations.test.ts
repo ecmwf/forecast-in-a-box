@@ -123,4 +123,25 @@ describe('annotations GeoJSON round-trip', () => {
       ),
     ).toThrow()
   })
+
+  // Raw JSON text: 1e999 parses to Infinity (stringify would null it).
+  it('drops non-finite coordinates that would brick the camera on locate', () => {
+    const mixed = `{"type":"FeatureCollection","features":[
+      {"type":"Feature","properties":{"text":"inf"},"geometry":
+        {"type":"Point","coordinates":[1e999,0]}},
+      {"type":"Feature","properties":{"text":"nan"},"geometry":
+        {"type":"Point","coordinates":["x","y"]}},
+      {"type":"Feature","properties":{"text":"good"},"geometry":
+        {"type":"Point","coordinates":[10,20]}}
+    ]}`
+    const parsed = parseAnnotationsGeojson(mixed)
+    expect(parsed.map((p) => p.text)).toEqual(['good'])
+    expect(parsed[0].coordinate.every(Number.isFinite)).toBe(true)
+
+    const allBad = `{"type":"FeatureCollection","features":[
+      {"type":"Feature","properties":{"text":"inf"},"geometry":
+        {"type":"Point","coordinates":[1e999,0]}}
+    ]}`
+    expect(() => parseAnnotationsGeojson(allBad)).toThrow()
+  })
 })
