@@ -1031,3 +1031,45 @@ describe('GeoViewer layer browser grouping', () => {
     await expect.element(screen.getByText('3 layers')).toBeVisible()
   })
 })
+
+describe('GeoViewer responsive layout', () => {
+  it('auto-collapses both sidebars below lg; handles reopen them', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await expect
+      .element(screen.getByText('2 m temperature').first())
+      .toBeVisible()
+
+    try {
+      await page.viewport(900, 700)
+      await expect
+        .poll(
+          () =>
+            screen.getByRole('button', { name: 'Expand sidebar' }).elements()
+              .length,
+        )
+        .toBe(2)
+
+      // Manual reopen still works below the breakpoint (right = browser).
+      ;(
+        screen
+          .getByRole('button', { name: 'Expand sidebar' })
+          .elements()[1] as HTMLElement
+      ).click()
+      await expect
+        .element(screen.getByText('2 m temperature').first())
+        .toBeVisible()
+
+      await page.viewport(1280, 800)
+      await expect
+        .poll(
+          () =>
+            screen.getByRole('button', { name: 'Expand sidebar' }).elements()
+              .length,
+        )
+        .toBe(0)
+    } finally {
+      await page.viewport(1280, 800)
+    }
+  })
+})

@@ -22,7 +22,14 @@
  * toolbar. Map mechanics live in SingleMapView / DualMapView.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import 'ol/ol.css'
 import { Loader2, RefreshCw } from 'lucide-react'
@@ -81,6 +88,7 @@ import type {
 import type { TimeLinkMode } from './time-link'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
+import { useMedia } from '@/hooks/useMedia'
 import { copyToClipboard } from '@/lib/clipboard'
 import { showToast } from '@/lib/toast'
 import { createLogger } from '@/lib/logger'
@@ -657,6 +665,12 @@ export function GeoViewer({
   // Sidebar collapse.
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
+  // Below lg the sidebars crush the map — auto-collapse; handles reopen.
+  const wideViewport = useMedia('(min-width: 1024px)')
+  useLayoutEffect(() => {
+    setLeftCollapsed(!wideViewport)
+    setRightCollapsed(!wideViewport)
+  }, [wideViewport])
   const [helpOpen, setHelpOpen] = useState(false)
 
   // -------- Annotations: numbered findings pinned to the map ---------
@@ -1009,17 +1023,21 @@ export function GeoViewer({
         annotations={annotations}
         meta={{ labelA: a.label, labelB: b?.label ?? null }}
       />
-      <div className="flex min-h-0 flex-1 gap-2">
+      <div className="relative flex min-h-0 flex-1 gap-2">
         {/* Collapse hides (not unmounts) the sidebars so working state —
             filter tab, search, level chips, expanded groups — survives
-            reopening. */}
+            reopening. Below sm an open sidebar overlays the map instead
+            of crushing it. */}
         {leftCollapsed && (
           <CollapsedSidebarHandle
             side="left"
             onExpand={() => setLeftCollapsed(false)}
           />
         )}
-        <div style={{ display: leftCollapsed ? 'none' : 'contents' }}>
+        <div
+          style={{ display: leftCollapsed ? 'none' : undefined }}
+          className="max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-20 max-sm:flex max-sm:shadow-xl sm:contents"
+        >
           <GeoActiveLayersPanel
             pairs={pairing.pairs}
             selection={selection}
@@ -1117,7 +1135,10 @@ export function GeoViewer({
             />
           )}
         </div>
-        <div style={{ display: rightCollapsed ? 'none' : 'contents' }}>
+        <div
+          style={{ display: rightCollapsed ? 'none' : undefined }}
+          className="max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-20 max-sm:flex max-sm:shadow-xl sm:contents"
+        >
           <GeoLayerBrowser
             hasB={hasB}
             focusSlot={focusSlot}

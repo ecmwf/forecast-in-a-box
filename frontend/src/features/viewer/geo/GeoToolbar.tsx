@@ -185,12 +185,13 @@ export function GeoToolbar({
           // in the page header is the way in).
           <div />
         ) : (
-          <div className="flex items-center gap-2">
+          // Phones: one scrollable line per cluster beats a wrap tower.
+          <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:w-full max-sm:flex-nowrap max-sm:overflow-x-auto">
             {/* Source focus: view A, both, or B. */}
             <div
               role="group"
               aria-label={t('focus.aria')}
-              className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
+              className="flex shrink-0 items-center gap-0.5 rounded-lg bg-muted p-0.5"
             >
               {FOCUS_CHOICES.map(({ slot, label, title, on }) => (
                 <button
@@ -217,7 +218,7 @@ export function GeoToolbar({
               role="group"
               aria-label={t('modes.groupAria')}
               className={cn(
-                'flex items-center gap-0.5 rounded-lg bg-muted p-0.5 transition-opacity',
+                'flex shrink-0 items-center gap-0.5 rounded-lg bg-muted p-0.5 transition-opacity',
                 focusSlot !== null && 'opacity-40',
               )}
             >
@@ -230,7 +231,7 @@ export function GeoToolbar({
                   aria-pressed={mode === id}
                   title={`(${keyLabel(COMPARE_KEYS.modes[index])})`}
                   className={cn(
-                    'relative inline-flex min-w-16 items-center justify-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium transition-colors disabled:pointer-events-none',
+                    'relative inline-flex min-w-16 items-center justify-center gap-1 rounded-md px-2.5 py-1 text-sm font-medium whitespace-nowrap transition-colors disabled:pointer-events-none',
                     mode === id
                       ? 'bg-background text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground',
@@ -246,9 +247,9 @@ export function GeoToolbar({
             </div>
           </div>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3 max-sm:w-full max-sm:flex-nowrap max-sm:overflow-x-auto">
           {!solo && focusSlot === null && (
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex shrink-0 items-center gap-2 text-sm whitespace-nowrap">
               <Switch
                 size="sm"
                 checked={linkMode === 'linked'}
@@ -272,7 +273,7 @@ export function GeoToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className="relative h-7 w-7"
+            className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
             disabled={!onFit}
             onClick={() => onFit?.()}
             title={`${tExec('lens.fitGlobe')} (${keyLabel(COMPARE_KEYS.fit)})`}
@@ -287,7 +288,7 @@ export function GeoToolbar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
                   title={tExec('lens.basemap')}
                   aria-label={tExec('lens.basemap')}
                 />
@@ -341,7 +342,7 @@ export function GeoToolbar({
           <Button
             variant={measureMode === 'line' ? 'secondary' : 'ghost'}
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
             aria-pressed={measureMode === 'line'}
             onClick={() =>
               onMeasureMode(measureMode === 'line' ? 'none' : 'line')
@@ -354,7 +355,7 @@ export function GeoToolbar({
           <Button
             variant={measureMode === 'area' ? 'secondary' : 'ghost'}
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
             aria-pressed={measureMode === 'area'}
             onClick={() =>
               onMeasureMode(measureMode === 'area' ? 'none' : 'area')
@@ -367,7 +368,7 @@ export function GeoToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
             onClick={onMeasureClear}
             title={t('measure.clear')}
             aria-label={t('measure.clear')}
@@ -378,7 +379,7 @@ export function GeoToolbar({
             <Button
               variant={annotateArmed ? 'secondary' : 'ghost'}
               size="icon"
-              className="relative h-7 w-7"
+              className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
               aria-pressed={annotateArmed}
               onClick={onAnnotateToggle}
               title={`${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`}
@@ -431,7 +432,7 @@ export function GeoToolbar({
             <Button
               variant="ghost"
               size="icon"
-              className="relative h-7 w-7"
+              className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
               onClick={() => onCopy(null)}
               title={`${tExec('lens.copyMap')} (${keyLabel(COMPARE_KEYS.copy)})`}
               aria-label={tExec('lens.copyMap')}
@@ -468,7 +469,7 @@ export function GeoToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className="relative h-7 w-7"
+            className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
             onClick={onExport}
             title={`${t('export.open')} (${keyLabel(COMPARE_KEYS.export)})`}
             aria-label={t('export.open')}
@@ -479,7 +480,7 @@ export function GeoToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className="relative h-7 w-7"
+            className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
             onClick={onHelp}
             title={`${t('help.open')} (${keyLabel(COMPARE_KEYS.help)})`}
             aria-label={t('help.open')}
@@ -514,7 +515,7 @@ function ModeActionRow({
 
   // Fixed-height row, always rendered — keeps the divider/toolbar height steady across modes.
   return (
-    <div className="flex min-h-9 flex-wrap items-center gap-4 border-t border-border/60 pt-2 text-sm">
+    <div className="flex min-h-9 flex-wrap items-center gap-4 border-t border-border/60 pt-2 text-sm max-sm:flex-nowrap max-sm:overflow-x-auto">
       {mode === 'swipe' && (
         <Segmented
           aria={t('modes.orientationAria')}
@@ -541,7 +542,7 @@ function ModeActionRow({
               onChange({ spyShape: id as 'circle' | 'rectangle' })
             }
           />
-          <label className="flex w-48 items-center gap-2 text-xs text-muted-foreground">
+          <label className="flex w-48 shrink-0 items-center gap-2 text-xs whitespace-nowrap text-muted-foreground">
             <span className="shrink-0">{t('modes.spySize')}</span>
             <Slider
               value={[options.spySizePx]}
@@ -554,7 +555,7 @@ function ModeActionRow({
         </>
       )}
       {mode === 'blend' && (
-        <label className="flex w-64 items-center gap-2 text-xs">
+        <label className="flex w-64 shrink-0 items-center gap-2 text-xs whitespace-nowrap">
           <span className="font-mono font-bold">A</span>
           <span className="sr-only">{t('modes.blendLabel')}</span>
           <Slider
@@ -570,7 +571,7 @@ function ModeActionRow({
       {/* Loupe controls grouped on the right: the hint, plus the mirror
           toggle when side-by-side. */}
       <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1">
+        <span className="flex shrink-0 items-center gap-1">
           <ZoomIn className="h-3.5 w-3.5" />
           {t('modes.loupeHint')}
         </span>
@@ -584,7 +585,7 @@ function ModeActionRow({
           ]}
           onChange={(id) => onChange({ loupeZoom: Number(id) })}
         />
-        <label className="flex w-36 items-center gap-2">
+        <label className="flex w-36 shrink-0 items-center gap-2">
           <span className="shrink-0">{t('modes.loupeSize')}</span>
           <Slider
             value={[options.loupeSizePx]}
@@ -595,7 +596,7 @@ function ModeActionRow({
           />
         </label>
         {mode === 'side' && (
-          <label className="flex items-center gap-2">
+          <label className="flex shrink-0 items-center gap-2 whitespace-nowrap">
             <Switch
               size="sm"
               checked={options.loupeMirror}
@@ -624,7 +625,7 @@ function Segmented({
     <div
       role="group"
       aria-label={aria}
-      className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
+      className="flex shrink-0 items-center gap-0.5 rounded-lg bg-muted p-0.5"
     >
       {items.map((item) => (
         <button
@@ -633,7 +634,7 @@ function Segmented({
           onClick={() => onChange(item.id)}
           aria-pressed={value === item.id}
           className={cn(
-            'rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
+            'rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-colors',
             value === item.id
               ? 'bg-background text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground',

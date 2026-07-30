@@ -317,7 +317,7 @@ export function GeoTimeSlider({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
                 disabled={steps.length <= 1}
                 onClick={() =>
                   onChange(safeIndex <= rangeStart ? rangeEnd : safeIndex - 1)
@@ -329,7 +329,7 @@ export function GeoTimeSlider({
               <Button
                 variant={playing ? 'default' : 'outline'}
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
                 disabled={steps.length <= 1}
                 onClick={() => setPlaying((p) => !p)}
                 aria-label={playing ? t('lens.pause') : t('lens.play')}
@@ -343,7 +343,7 @@ export function GeoTimeSlider({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
                 disabled={steps.length <= 1}
                 onClick={() =>
                   onChange(safeIndex >= rangeEnd ? rangeStart : safeIndex + 1)

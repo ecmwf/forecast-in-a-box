@@ -56,6 +56,8 @@ export function CompareSlotBar({
   const { t } = useTranslation('visualise')
 
   return (
+    // Swap+B+X group as one unit so narrow screens wrap into two clean
+    // full-width rows instead of scattering the controls.
     <div className="flex flex-wrap items-center gap-2">
       <SlotPicker
         slot="a"
@@ -63,36 +65,38 @@ export function CompareSlotBar({
         value={aRef}
         onChange={(ref) => onAssign('a', ref)}
       />
-      <Button
-        variant="outline"
-        size="icon"
-        className="h-9 w-9 shrink-0"
-        onClick={onSwap}
-        disabled={!aRef || !bRef}
-        aria-label={t('slots.swap')}
-        title={t('slots.swap')}
-      >
-        <ArrowLeftRight className="h-4 w-4" />
-      </Button>
-      <SlotPicker
-        slot="b"
-        entries={entries}
-        value={bRef}
-        onChange={(ref) => onAssign('b', ref)}
-        markRef={aRef}
-      />
-      {bRef && (
+      <div className="flex max-w-full min-w-0 items-center gap-2">
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
-          className="-ml-1 h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-          onClick={onSingleView}
-          aria-label={t('slots.singleView')}
-          title={t('slots.singleView')}
+          className="h-9 w-9 shrink-0"
+          onClick={onSwap}
+          disabled={!aRef || !bRef}
+          aria-label={t('slots.swap')}
+          title={t('slots.swap')}
         >
-          <X className="h-4 w-4" />
+          <ArrowLeftRight className="h-4 w-4" />
         </Button>
-      )}
+        <SlotPicker
+          slot="b"
+          entries={entries}
+          value={bRef}
+          onChange={(ref) => onAssign('b', ref)}
+          markRef={aRef}
+        />
+        {bRef && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-ml-1 h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={onSingleView}
+            aria-label={t('slots.singleView')}
+            title={t('slots.singleView')}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
@@ -128,7 +132,7 @@ function SlotPicker({
   const current = entries.find((e) => entryRef(e) === value)
   const suffix = current ? triggerSuffix(current, timeZone) : null
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
+    <div className="flex max-w-full min-w-0 items-center gap-1.5">
       <span
         className={cn(
           'flex h-6 w-6 shrink-0 items-center justify-center rounded font-mono text-xs font-bold',
@@ -144,7 +148,7 @@ function SlotPicker({
         }}
       >
         <SelectTrigger
-          className="h-9 w-64 text-sm"
+          className="h-9 w-64 max-w-full min-w-0 text-sm"
           aria-label={t('slots.pickerAria', { slot: slot.toUpperCase() })}
         >
           {/* Base UI shows the raw value for programmatically-set

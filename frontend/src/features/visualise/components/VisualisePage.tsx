@@ -217,7 +217,8 @@ export function VisualisePage() {
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <H1 className="text-xl">{t('page.title')}</H1>
         {entries.length > 0 && (
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+          // Phones: full-width below title+actions, not wedged beside them.
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 max-sm:order-last max-sm:basis-full">
             <CompareSlotBar
               entries={entries}
               aRef={a ? entryRef(a) : undefined}

@@ -144,57 +144,61 @@ export function DualMapView({
   )
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-2">
-      <DualMapPanel
-        source={a}
-        view={view}
-        preload={preload}
-        pinnedLegends={pinnedLegends}
-        onUnpinLegend={onUnpinLegend}
-        cross={cross}
-        onCross={setCross}
-        loupeMirror={loupeMirror}
-        loupeSizePx={loupeSizePx}
-        loupeZoom={loupeZoom}
-        basemapId={basemapId}
-        basemapOpacity={basemapOpacity}
-        measureMode={measureMode}
-        measureClearNonce={measureClearNonce}
-        overlays={overlays}
-        annotations={annotations}
-        annotateArmed={annotateArmed}
-        annotationHighlightId={annotationHighlightId}
-        onAnnotationCreate={onAnnotationCreate}
-        onAnnotationEdit={onAnnotationEdit}
-        onAnnotationMove={onAnnotationMove}
-        onRegisterFit={registerFit}
-        onRegisterCapture={registerCapture}
-      />
-      <DualMapPanel
-        source={b}
-        view={view}
-        preload={preload}
-        pinnedLegends={pinnedLegends}
-        onUnpinLegend={onUnpinLegend}
-        cross={cross}
-        onCross={setCross}
-        loupeMirror={loupeMirror}
-        loupeSizePx={loupeSizePx}
-        loupeZoom={loupeZoom}
-        basemapId={basemapId}
-        basemapOpacity={basemapOpacity}
-        measureMode={measureMode}
-        measureClearNonce={measureClearNonce}
-        overlays={overlays}
-        annotations={annotations}
-        annotateArmed={annotateArmed}
-        annotationHighlightId={annotationHighlightId}
-        onAnnotationCreate={onAnnotationCreate}
-        onAnnotationEdit={onAnnotationEdit}
-        onAnnotationMove={onAnnotationMove}
-        onRegisterFit={registerFit}
-        onRegisterCapture={registerCapture}
-      />
+    // Columns only when EACH map gets ~380px+ — with sidebars open at
+    // ~1024px the pair would otherwise render as two skinny strips.
+    <div className="@container h-full min-h-0">
+      <div className="grid h-full min-h-0 grid-cols-1 gap-2 @3xl:grid-cols-2">
+        <DualMapPanel
+          source={a}
+          view={view}
+          preload={preload}
+          pinnedLegends={pinnedLegends}
+          onUnpinLegend={onUnpinLegend}
+          cross={cross}
+          onCross={setCross}
+          loupeMirror={loupeMirror}
+          loupeSizePx={loupeSizePx}
+          loupeZoom={loupeZoom}
+          basemapId={basemapId}
+          basemapOpacity={basemapOpacity}
+          measureMode={measureMode}
+          measureClearNonce={measureClearNonce}
+          overlays={overlays}
+          annotations={annotations}
+          annotateArmed={annotateArmed}
+          annotationHighlightId={annotationHighlightId}
+          onAnnotationCreate={onAnnotationCreate}
+          onAnnotationEdit={onAnnotationEdit}
+          onAnnotationMove={onAnnotationMove}
+          onRegisterFit={registerFit}
+          onRegisterCapture={registerCapture}
+        />
+        <DualMapPanel
+          source={b}
+          view={view}
+          preload={preload}
+          pinnedLegends={pinnedLegends}
+          onUnpinLegend={onUnpinLegend}
+          cross={cross}
+          onCross={setCross}
+          loupeMirror={loupeMirror}
+          loupeSizePx={loupeSizePx}
+          loupeZoom={loupeZoom}
+          basemapId={basemapId}
+          basemapOpacity={basemapOpacity}
+          measureMode={measureMode}
+          measureClearNonce={measureClearNonce}
+          overlays={overlays}
+          annotations={annotations}
+          annotateArmed={annotateArmed}
+          annotationHighlightId={annotationHighlightId}
+          onAnnotationCreate={onAnnotationCreate}
+          onAnnotationEdit={onAnnotationEdit}
+          onAnnotationMove={onAnnotationMove}
+          onRegisterFit={registerFit}
+          onRegisterCapture={registerCapture}
+        />
+      </div>
     </div>
   )
 }

@@ -30,14 +30,14 @@ export function CollapsedSidebarHandle({
   return (
     <div
       className={cn(
-        'flex w-8 shrink-0 flex-col items-center bg-muted/40 py-2',
+        'flex w-8 shrink-0 flex-col items-center bg-muted/40 py-2 pointer-coarse:w-12',
         side === 'left' ? 'border-r border-border' : 'border-l border-border',
       )}
     >
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7"
+        className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
         onClick={onExpand}
         title={t('lens.expandSidebar')}
         aria-label={t('lens.expandSidebar')}
