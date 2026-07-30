@@ -81,6 +81,7 @@ def _parse(type_expr: str) -> tuple[FableType, str]:
         ("int", IntType),
         ("str", StringType),
         ("param", ParameterType),
+        ("artifact", ArtifactType),
         ("geodomainSingle", GeoDomainSingleType),
         ("bboxWSEN", BoundingBoxWSENType),
         ("geodomain", GeoDomainType),

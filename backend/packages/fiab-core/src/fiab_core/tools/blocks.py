@@ -15,6 +15,7 @@ from typing import Any, Callable, Literal, TypeVar, cast
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
 
+from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -30,7 +31,7 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.tools.convert import GeoDomainWrapper
-from fiab_core.types import ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
+from fiab_core.types import ArtifactType, ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
 
 
 class BlockInstanceConfigurationError(ValueError):
@@ -144,6 +145,21 @@ class BlockInstanceRich:
                 validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected datetime, got {type(raw_value).__name__}")
+
+    def config_as_artifactid(
+        self, key: str | ConfigurationOptionId, *, validator: Callable[[CompositeArtifactId, str], None] | None = None
+    ) -> CompositeArtifactId:
+        option_id, option = self._get_configuration_option(key)
+        if not isinstance(option.value_type, (ArtifactType, ClosedEnumType, OpenEnumType)):
+            raise BlockInstanceConfigurationError(
+                f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not artifact"
+            )
+        raw_value = self._get_raw_value(option_id)
+        if isinstance(raw_value, CompositeArtifactId):
+            if validator is not None:
+                validator(raw_value, option_id)
+            return raw_value
+        raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected artifact, got {type(raw_value).__name__}")
 
     def config_as_list(
         self,

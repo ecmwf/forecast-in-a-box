@@ -11,10 +11,12 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
+from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import BlockFactoryId, ConfigurationOptionId, PluginCompositeId, QubedOutput
 from fiab_core.fable import BlockInstance as BlockInstanceBase
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
+from fiab_core.types import WrongType
 from qubed import Qube
 
 from fiab_plugin_ecmwf import plugin
@@ -65,7 +67,7 @@ def _make_raw_block(
 
 
 @pytest.fixture
-def anemoi_source_configuration(dummy_checkpoint: str) -> BlockInstance:
+def anemoi_source_configuration(dummy_checkpoint: CompositeArtifactId) -> BlockInstance:
     return _make_block(
         AnemoiSource,
         {
@@ -79,7 +81,7 @@ def anemoi_source_configuration(dummy_checkpoint: str) -> BlockInstance:
 
 
 @pytest.fixture
-def anemoi_source_ensemble_configuration(dummy_checkpoint: str) -> BlockInstance:
+def anemoi_source_ensemble_configuration(dummy_checkpoint: CompositeArtifactId) -> BlockInstance:
     return _make_block(
         AnemoiSource,
         {
@@ -93,7 +95,7 @@ def anemoi_source_ensemble_configuration(dummy_checkpoint: str) -> BlockInstance
 
 
 @pytest.fixture
-def anemoi_input_source_configuration(dummy_checkpoint: str) -> BlockInstance:
+def anemoi_input_source_configuration(dummy_checkpoint: CompositeArtifactId) -> BlockInstance:
     return _make_block(
         AnemoiInputSource,
         {
@@ -106,7 +108,7 @@ def anemoi_input_source_configuration(dummy_checkpoint: str) -> BlockInstance:
 
 
 @pytest.fixture
-def anemoi_transform_configuration(dummy_checkpoint: str) -> BlockInstance:
+def anemoi_transform_configuration(dummy_checkpoint: CompositeArtifactId) -> BlockInstance:
     return _make_block(
         AnemoiTransform,
         {"checkpoint": dummy_checkpoint, "lead_time": 24},
@@ -135,7 +137,7 @@ def anemoi_input_source_output(anemoi_input_source_configuration: BlockInstance)
 
 
 class TestCheckpointArtifact:
-    def test_model_output_selects_multiple_steps_with_metadata(self, six_hour_dummy_checkpoint: str) -> None:
+    def test_model_output_selects_multiple_steps_with_metadata(self, six_hour_dummy_checkpoint: CompositeArtifactId) -> None:
         output = CheckpointArtifact(six_hour_dummy_checkpoint).get_model_output(lead_time=48)
 
         assert isinstance(output, Qube)
@@ -173,7 +175,7 @@ class TestAnemoiSourceValidate:
     def test_ensemble_preserves_param_axis(self, anemoi_source_ensemble_output: QubedOutput) -> None:
         assert contains(anemoi_source_ensemble_output, "param")
 
-    def test_invalid_lead_time_not_a_digit(self, dummy_checkpoint: str) -> None:
+    def test_invalid_lead_time_not_a_digit(self, dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_raw_block(
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": "abc", "base_time": "2024-01-01", "number": "1"},
@@ -185,7 +187,7 @@ class TestAnemoiSourceValidate:
                 restrictions={},
             )
 
-    def test_invalid_lead_time_negative(self, dummy_checkpoint: str) -> None:
+    def test_invalid_lead_time_negative(self, dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_block(
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": -1, "base_time": datetime(2024, 1, 1), "number": 1},
@@ -197,7 +199,7 @@ class TestAnemoiSourceValidate:
                 restrictions={},
             )
 
-    def test_invalid_lead_time_equal_to_timestep(self, dummy_checkpoint: str) -> None:
+    def test_invalid_lead_time_equal_to_timestep(self, dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_block(
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": 1, "base_time": datetime(2024, 1, 1), "number": 1},
@@ -205,7 +207,7 @@ class TestAnemoiSourceValidate:
         with pytest.raises(Exception, match="must be greater than checkpoint timestep"):
             AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
-    def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: str) -> None:
+    def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_block(
             AnemoiSource,
             {"checkpoint": six_hour_dummy_checkpoint, "lead_time": 7, "base_time": datetime(2024, 1, 1), "number": 1},
@@ -213,7 +215,7 @@ class TestAnemoiSourceValidate:
         with pytest.raises(Exception, match="must be a multiple of checkpoint timestep"):
             AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
-    def test_invalid_number_zero(self, dummy_checkpoint: str) -> None:
+    def test_invalid_number_zero(self, dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_block(
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 0},
@@ -225,7 +227,7 @@ class TestAnemoiSourceValidate:
                 restrictions={},
             )
 
-    def test_invalid_number_not_a_digit(self, dummy_checkpoint: str) -> None:
+    def test_invalid_number_not_a_digit(self, dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_raw_block(
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": "24", "base_time": "2024-01-01", "number": "two"},
@@ -240,17 +242,14 @@ class TestAnemoiSourceValidate:
     def test_unknown_checkpoint(self, registered_provider: None) -> None:
         block = _make_block(
             AnemoiSource,
-            {"checkpoint": "dummy_store:unknown", "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 1},
+            {
+                "checkpoint": CompositeArtifactId.from_str("dummy_store:unknown"),
+                "lead_time": 24,
+                "base_time": datetime(2024, 1, 1),
+                "number": 1,
+            },
         )
         with pytest.raises(Exception):
-            AnemoiSource().validate(block=block, inputs={}, restrictions={})
-
-    def test_invalid_checkpoint_format(self) -> None:
-        block = _make_block(
-            AnemoiSource,
-            {"checkpoint": "not-a-valid-id", "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 1},
-        )
-        with pytest.raises(ValueError, match="must be of the form"):
             AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
 
@@ -343,7 +342,7 @@ class TestAnemoiTransformValidate:
         )  # type: ignore[assignment]
         assert contains(output, "param")
 
-    def test_invalid_lead_time_not_a_digit(self, dummy_checkpoint: str, dummy_qube: Qube) -> None:
+    def test_invalid_lead_time_not_a_digit(self, dummy_checkpoint: CompositeArtifactId, dummy_qube: Qube) -> None:
         input_dataset = QubedOutput(dataqube=dummy_qube)
         block = _make_raw_block(
             AnemoiTransform,
@@ -357,7 +356,7 @@ class TestAnemoiTransformValidate:
                 restrictions={},
             )
 
-    def test_invalid_lead_time_negative(self, dummy_checkpoint: str, dummy_qube: Qube) -> None:
+    def test_invalid_lead_time_negative(self, dummy_checkpoint: CompositeArtifactId, dummy_qube: Qube) -> None:
         input_dataset = QubedOutput(dataqube=dummy_qube)
         block = _make_block(
             AnemoiTransform,
@@ -371,7 +370,7 @@ class TestAnemoiTransformValidate:
                 restrictions={},
             )
 
-    def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: str, dummy_qube: Qube) -> None:
+    def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: CompositeArtifactId, dummy_qube: Qube) -> None:
         input_dataset = QubedOutput(dataqube=dummy_qube)
         block = _make_block(
             AnemoiTransform,
@@ -385,13 +384,13 @@ class TestAnemoiTransformValidate:
         input_dataset = QubedOutput(dataqube=dummy_qube)
         block = _make_block(
             AnemoiTransform,
-            {"checkpoint": "dummy_store:unknown", "lead_time": 24},
+            {"checkpoint": CompositeArtifactId.from_str("dummy_store:unknown"), "lead_time": 24},
             input_ids={"dataset": "src"},
         )
         with pytest.raises(Exception):
             AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}, restrictions={})
 
-    def test_incompatible_input_dataset(self, dummy_checkpoint: str) -> None:
+    def test_incompatible_input_dataset(self, dummy_checkpoint: CompositeArtifactId) -> None:
         """If the input dataset does not contain the model's required input params, validate should error."""
         incompatible = QubedOutput(dataqube=Qube.from_datacube({"param": ["nonexistent"]}))
         block = _make_block(
@@ -480,7 +479,7 @@ class TestFlowChainedTransforms:
 
     def test_chained_transforms(
         self,
-        dummy_checkpoint: str,
+        dummy_checkpoint: CompositeArtifactId,
         anemoi_input_source_output: QubedOutput,
         anemoi_transform_configuration: BlockInstance,
     ) -> None:
@@ -507,7 +506,7 @@ class TestFlowChainedTransforms:
 
     def test_chained_transforms_propagate_ensemble(
         self,
-        dummy_checkpoint: str,
+        dummy_checkpoint: CompositeArtifactId,
         anemoi_input_source_output: QubedOutput,
         anemoi_transform_configuration: BlockInstance,
     ) -> None:
@@ -544,7 +543,15 @@ class TestAnemoiCatalogueIntegration:
     """Verify catalogue / enum types at the plugin registration level."""
 
     def test_checkpoint_enum_type_matches_registered_provider(self, registered_provider: None) -> None:
-        assert get_checkpoint_enum_type().serialize() == "enumClosed[str]('dummy_store:dummy_ckpt')"
+        assert get_checkpoint_enum_type().serialize() == "enumClosed[artifact]('dummy_store:dummy_ckpt')"
+
+    def test_checkpoint_enum_type_rejects_unknown_checkpoint(self, registered_provider: None) -> None:
+        with pytest.raises(WrongType, match="not known to the ArtifactsProvider"):
+            get_checkpoint_enum_type().validate_convert("dummy_store:unknown")
+
+    def test_checkpoint_enum_type_rejects_malformed_id(self, registered_provider: None) -> None:
+        with pytest.raises(WrongType, match="must be of the form"):
+            get_checkpoint_enum_type().validate_convert("not-a-valid-id")
 
     def test_plugin_expander_includes_anemoi_transform(self, anemoi_source_output: QubedOutput) -> None:
         """AnemoiTransform should appear in expansions for a QubedOutput that has 'param'."""

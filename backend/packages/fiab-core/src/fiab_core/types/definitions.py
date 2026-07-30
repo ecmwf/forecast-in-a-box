@@ -129,11 +129,25 @@ class DatetimeType(FableType):
 # GENERIC TYPES
 
 
-def _serialize_enum_item(item: Any) -> str:
-    if isinstance(item, str):
-        return f"'{item}'"
-    if hasattr(item, "isoformat"):
+def _serialize_enum_item(item: Any, subtype: FableType) -> str:
+    """Serialize a single already-converted enum member for ClosedEnumType/OpenEnumType.serialize().
+
+    Dispatches on the enum's declared ``subtype`` rather than introspecting ``item`` itself, since the
+    same converted Python value can mean different things for different types. Only the subtypes that
+    are actually used as enum members today are covered; extend this as new cases arise.
+    """
+    if isinstance(subtype, ArtifactType):
+        # NOTE we explicitly import in-body to not introduce a high level dependency for now
+        from fiab_core.artifacts import CompositeArtifactId
+
+        return f"'{CompositeArtifactId.to_str(item)}'"
+    if isinstance(subtype, DateType):
         return item.isoformat()
+    if isinstance(subtype, DatetimeType):
+        # NOTE replacing microseconds to get rid of %f, we dont want that in outputs
+        return item.replace(microsecond=0).isoformat()
+    if isinstance(subtype, StringType):
+        return f"'{item}'"
     return str(item)
 
 
@@ -160,7 +174,7 @@ class ClosedEnumType(FableType):
         return converted
 
     def serialize(self) -> str:
-        items_str = ",".join(_serialize_enum_item(item) for item in self.items)
+        items_str = ",".join(_serialize_enum_item(item, self.subtype) for item in self.items)
         return f"enumClosed[{self.subtype.serialize()}]({items_str})"
 
 
@@ -180,7 +194,7 @@ class OpenEnumType(FableType):
         return self.subtype.validate_convert(value)
 
     def serialize(self) -> str:
-        items_str = ",".join(_serialize_enum_item(item) for item in self.items)
+        items_str = ",".join(_serialize_enum_item(item, self.subtype) for item in self.items)
         return f"enumOpen[{self.subtype.serialize()}]({items_str})"
 
 
@@ -295,26 +309,32 @@ class GeoDomainType(UnionType):
         return "geodomain"
 
 
-class ArtifactType(StringType):
+class ArtifactType(FableType):
     """A string representing an id from the artifact catalog. Utilized by the frontend
-    to perform catalog lookup to build a better UI form, displaying additional info"""
+    to perform catalog lookup to build a better UI form, displaying additional info.
+
+    Deliberately not a StringType subclass: it converts into a richer CompositeArtifactId object
+    (mirroring DateType/DatetimeType), not a string, so callers should read it via a dedicated
+    accessor (e.g. BlockInstanceRich.config_as_artifactid) rather than config_as_str.
+    """
 
     # NOTE we are being careful here as we dont want to introduce a strict dependency
     # of types on artifacts. Hence the (exceptional) string annotation, in-body import,
     # defensive lookup, etc
     def validate_convert(self, value: Any) -> "fiab_core.artifacts.CompositeArtifactId":
-        raw: str = super().validate_convert(value)
+        if not isinstance(value, str):
+            raise NotStringInput(f"Expected string, got {type(value).__name__}")
         from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 
         try:
-            artifact_id = CompositeArtifactId.from_str(raw)
+            artifact_id = CompositeArtifactId.from_str(value)
         except Exception as e:
-            raise WrongType(f"{raw} is not a CompositeArtifactId: {e!r}") from None
+            raise WrongType(f"{value} is not a CompositeArtifactId: {e!r}") from None
         try:
             lookup = ArtifactsProvider.get_artifacts_lookup()
         except RuntimeError as e:
             logger.warning(f"no artifacts provider -- will not validate! {e!r}")
-            return
+            return artifact_id
         if artifact_id not in lookup:
             raise WrongType(f"{artifact_id=} is not known to the ArtifactsProvider")
         return artifact_id
