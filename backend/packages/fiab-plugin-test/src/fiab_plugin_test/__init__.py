@@ -23,7 +23,7 @@ from fiab_core.fable import (
     RawOutput,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
-from fiab_core.types import ClosedEnumType, FableType, FloatType, IntType, StringType, parse
+from fiab_core.types import ArtifactType, ClosedEnumType, FableType, FloatType, IntType, StringType, parse
 
 TEXT = ConfigurationOptionId("text")
 DURATION = ConfigurationOptionId("duration")
@@ -35,7 +35,7 @@ FNAME = ConfigurationOptionId("fname")
 def _get_checkpoint_enum_type() -> FableType:
     available = ArtifactsProvider.get_artifacts_lookup()
     values = [CompositeArtifactId.to_str(k) for k in available]
-    return ClosedEnumType(values)
+    return ClosedEnumType(values, subtype=ArtifactType())
 
 
 catalogue = lambda: BlockFactoryCatalogue(
@@ -166,10 +166,9 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
                 return Either.error(f"Invalid type for {DURATION!r}: expected float, got {type(duration).__name__}")
             action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))
         elif factory_id == "source_filesize":
-            checkpoint_str = instance.configuration_values[CHECKPOINT]
-            if not isinstance(checkpoint_str, str):
-                return Either.error(f"Invalid type for {CHECKPOINT!r}: expected str, got {type(checkpoint_str).__name__}")
-            artifact_id = CompositeArtifactId.from_str(checkpoint_str)
+            artifact_id = instance.configuration_values[CHECKPOINT]
+            if not isinstance(artifact_id, CompositeArtifactId):
+                return Either.error(f"Invalid type for {CHECKPOINT!r}: expected artifact id, got {type(artifact_id).__name__}")
             local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
             payload = Payload(
                 "fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]}

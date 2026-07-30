@@ -75,7 +75,7 @@ def test_source_filesize_factory_uses_closed_enum_checkpoint_type() -> None:
     factory = catalogue().factories[BlockFactoryId("source_filesize")]
     assert (
         factory.configuration_options[ConfigurationOptionId("checkpoint")].value_type.serialize()
-        == "enumClosed[str]('mystore:mycheckpoint')"
+        == "enumClosed[artifact]('mystore:mycheckpoint')"
     )
 
 
@@ -114,7 +114,7 @@ def test_compiler_source_filesize_embeds_path_and_artifact_in_payload(tmp_path: 
     fake_id = CompositeArtifactId.from_str("mystore:mycheckpoint")
 
     with patch.object(ArtifactsProvider, "get_artifact_local_path", return_value=artifact_path):
-        factory_id, instance = _make_instance("source_filesize", {"checkpoint": "mystore:mycheckpoint"})
+        factory_id, instance = _make_instance("source_filesize", {"checkpoint": fake_id})
         result = compiler({}, factory_id, instance)
 
     assert result.t is not None, f"compiler returned error: {result.e}"

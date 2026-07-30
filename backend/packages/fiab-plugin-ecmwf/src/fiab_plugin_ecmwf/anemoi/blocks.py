@@ -15,6 +15,7 @@ from typing import Any
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions  # ty: ignore[unresolved-import]
+from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -57,7 +58,7 @@ def strip_timezone(dt: datetime) -> datetime:
 class AnemoiBuilder:
     """Utility to build an Inference from an Anemoi checkpoint, for use in both Source and Transform blocks"""
 
-    def __init__(self, checkpoint: str) -> None:
+    def __init__(self, checkpoint: CompositeArtifactId) -> None:
         self.checkpoint = CheckpointArtifact(checkpoint)
         self.artifact_id = self.checkpoint.artifact
 
@@ -150,7 +151,7 @@ class AnemoiSource(Source):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         ensemble_members = block.config_as_int(ENSEMBLE, validator=positive)
-        checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
+        checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
         lead_time = block.config_as_int(LEAD_TIME, validator=positive)
 
         validation_error = checkpoint.validate_lead_time(lead_time)
@@ -169,7 +170,7 @@ class AnemoiSource(Source):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
 
         input_source = block.config_as_str(INPUT_SOURCE)
-        builder = AnemoiBuilder(block.config_as_str(CHECKPOINT))
+        builder = AnemoiBuilder(block.config_as_artifactid(CHECKPOINT))
 
         action = builder.from_input(
             input_source=input_source,
@@ -213,7 +214,7 @@ class AnemoiInputSource(Source):
     def validate(
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
-        checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
+        checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
         number = block.config_as_int(ENSEMBLE, validator=positive)
         model_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
         model_input = expand(model_input, {ENSEMBLE: [number]})
@@ -225,7 +226,7 @@ class AnemoiInputSource(Source):
         block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
 
-        builder = AnemoiBuilder(block.config_as_str(CHECKPOINT))
+        builder = AnemoiBuilder(block.config_as_artifactid(CHECKPOINT))
 
         action = builder.get_initial_conditions(
             input_source=block.config_as_str(INPUT_SOURCE),
@@ -257,7 +258,7 @@ class AnemoiTransform(Transform):
     def validate(
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
-        checkpoint = CheckpointArtifact(block.config_as_str(CHECKPOINT))
+        checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
         lead_time = block.config_as_int(LEAD_TIME, validator=positive)
         qubed_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
         if not contains(inputs["dataset"], qubed_input):
@@ -281,7 +282,7 @@ class AnemoiTransform(Transform):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["initial conditions"]
 
-        builder = AnemoiBuilder(block.config_as_str(CHECKPOINT))
+        builder = AnemoiBuilder(block.config_as_artifactid(CHECKPOINT))
         action = builder.from_initial_conditions(
             inputs[input_task],
             lead_time=block.config_as_int(LEAD_TIME, validator=positive),

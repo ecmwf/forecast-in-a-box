@@ -26,6 +26,8 @@
  * - list[enumClosed[str](a,b,c)] → multi-select restricted to the listed items
  * - list[enum[str](a,b,c)] → multi-select with suggestions, accept any string
  * - geodomain → geographic-area picker (presets / countries / draw a box)
+ * - artifact → string input (catalog lookup / richer UI not yet implemented)
+ * - param → string input (param name lookup not yet implemented)
  * - optional[T] → same widget as T, with optional=true flag
  *
  * `enum`/`enumList` carry `closed: boolean` (closed vs open) for forward
@@ -109,6 +111,13 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
     return { type: 'geodomain' }
   }
 
+  // `artifact` and `param` are treated as plain strings for now; the backend
+  // reserves them for future catalog/param lookups but the frontend does not
+  // yet implement any such lookup, so they behave exactly like `str`.
+  if (normalized === 'artifact' || normalized === 'param') {
+    return { type: 'string' }
+  }
+
   // List type: list[str], list[int], or list[enumClosed[...]]
   // Match the trimmed string so leading/trailing whitespace does not fall through.
   const listMatch = trimmed.match(/^list\[(.+)\]$/i)
@@ -138,7 +147,15 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
   )
   if (enumMatch) {
     const subtype = enumMatch[2].toLowerCase()
-    if (subtype === 'str' || subtype === 'string') {
+    // `artifact` and `param` enum members are serialized as quoted strings
+    // (see backend's `_serialize_enum_item`), so they parse identically to
+    // a `str` subtype enum.
+    if (
+      subtype === 'str' ||
+      subtype === 'string' ||
+      subtype === 'artifact' ||
+      subtype === 'param'
+    ) {
       const options = parseEnumOptions(enumMatch[3])
       if (options.length > 0) {
         return {

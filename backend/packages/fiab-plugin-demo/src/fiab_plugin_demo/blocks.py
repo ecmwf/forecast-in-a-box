@@ -20,7 +20,7 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Product, Sink, Transform
-from fiab_core.types import ListType, StringType
+from fiab_core.types import ListType, ParameterType, StringType
 
 DIR = ConfigurationOptionId("dir")
 PARAM = ConfigurationOptionId("param")
@@ -125,7 +125,7 @@ class FilterParam(_DemoTransform):
         PARAM: BlockConfigurationOption(
             title="Parameters",
             description="Parameters to select and plot (e.g. '2t', 'msl')",
-            value_type=ListType(StringType()),
+            value_type=ListType(ParameterType()),
         )
     }
 

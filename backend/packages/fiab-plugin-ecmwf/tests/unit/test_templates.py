@@ -19,6 +19,8 @@ checkable without one is checked.
 """
 
 import re
+from collections.abc import Callable, Generator
+from contextlib import AbstractContextManager as ContextManager
 
 import pytest
 from fiab_core.fable import BlockFactory, BlockInstanceId, BlueprintTemplate, ConfigurationOptionId
@@ -35,6 +37,24 @@ _GLYPH = re.compile(r"\$\{([^}]+)\}")
 
 TEMPLATES = plugin().blueprint_templates
 FACTORIES = plugin().catalogue.factories
+
+# Templates may reference real, non-test checkpoint artifacts (e.g. the AIFS template's
+# 'ecmwf:aifs-global-o48'). Register them alongside the shared dummy checkpoint so
+# ArtifactType-typed options (like 'checkpoint') validate against something that knows them.
+_TEMPLATE_CHECKPOINT_IDS = {
+    str(value)
+    for template in TEMPLATES
+    for block in template.blocks.values()
+    for option_id, value in block.instance.configuration_values.items()
+    if option_id == ConfigurationOptionId("checkpoint") and not _GLYPH.search(str(value))
+}
+
+
+@pytest.fixture(scope="module", autouse=True)
+def registered_provider(dummy_provider_factory: Callable[..., ContextManager[None]]) -> Generator[None, None, None]:
+    """Overrides the shared fixture to additionally register the checkpoints these templates reference."""
+    with dummy_provider_factory(extra_checkpoint_ids=_TEMPLATE_CHECKPOINT_IDS):
+        yield
 
 
 def _factory(template: BlueprintTemplate, block_id: BlockInstanceId) -> BlockFactory:

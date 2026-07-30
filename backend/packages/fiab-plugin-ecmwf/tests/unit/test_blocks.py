@@ -636,7 +636,7 @@ class TestSelect:
 
 
 def test_anemoi_catalogue_value_types_are_canonical(registered_provider: None) -> None:
-    assert get_checkpoint_enum_type().serialize() == "enumClosed[str]('dummy_store:dummy_ckpt')"
+    assert get_checkpoint_enum_type().serialize() == "enumClosed[artifact]('dummy_store:dummy_ckpt')"
 
 
 class TestGribSink:
@@ -804,7 +804,7 @@ class TestMapPlotSink:
             .validator(BlockFactoryId("mapPlotSink"), map_plot_sink_configuration.block, {"dataset": operational_forecast_source_output})
             .restrictions
         )
-        assert restrictions[PARAM].serialize() == "list[enumClosed[str]('2t','msl','u')]"
+        assert restrictions[PARAM].serialize() == "list[enumClosed[param]('2t','msl','u')]"
 
     def test_expander_has_no_parameters_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
         expansions = plugin().expander(operational_forecast_source_output)

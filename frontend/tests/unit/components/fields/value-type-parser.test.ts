@@ -252,6 +252,51 @@ describe('parseValueType', () => {
     })
   })
 
+  describe('artifact and param types', () => {
+    // Both are treated as plain strings for now: no catalog/param lookup is
+    // implemented on the frontend yet, so they must behave exactly like `str`.
+    it('parses "artifact" as string', () => {
+      expect(parseValueType('artifact')).toEqual({ type: 'string' })
+    })
+
+    it('parses "param" as string', () => {
+      expect(parseValueType('param')).toEqual({ type: 'string' })
+    })
+
+    it('parses optional[artifact] as string with optional flag', () => {
+      expect(parseValueType('optional[artifact]')).toEqual({
+        type: 'string',
+        optional: true,
+      })
+    })
+
+    it('parses enumClosed[artifact] like enumClosed[str]', () => {
+      expect(
+        parseValueType("enumClosed[artifact]('fc:t:step0','fc:t:step6')"),
+      ).toEqual({
+        type: 'enum',
+        options: ['fc:t:step0', 'fc:t:step6'],
+        closed: true,
+      })
+    })
+
+    it('parses enumOpen[param] like enumOpen[str]', () => {
+      expect(parseValueType("enumOpen[param]('2t','msl')")).toEqual({
+        type: 'enum',
+        options: ['2t', 'msl'],
+        closed: false,
+      })
+    })
+
+    it('parses list[enumClosed[param]] like list[enumClosed[str]]', () => {
+      expect(parseValueType('list[enumClosed[param](2t,msl)]')).toEqual({
+        type: 'enumList',
+        options: ['2t', 'msl'],
+        closed: true,
+      })
+    })
+  })
+
   describe('geodomain type', () => {
     it('parses "geodomain"', () => {
       expect(parseValueType('geodomain')).toEqual({ type: 'geodomain' })

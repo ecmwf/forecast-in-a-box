@@ -19,7 +19,7 @@ from earthkit.data.utils.dates import to_timedelta
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import QubedOutput
 from fiab_core.tools.plugins import _detect_editable_install
-from fiab_core.types import ClosedEnumType, FableType, StringType
+from fiab_core.types import ArtifactType, ClosedEnumType, FableType
 from qubed import Qube
 
 from ..qubed_utils import expand
@@ -50,18 +50,18 @@ def get_checkpoint_enum_type() -> FableType:
         available_checkpoints = get_available_checkpoints()
     except Exception as e:
         logger.error(f"Error fetching available checkpoints: {e}")
-        return StringType()
+        return ArtifactType()
     if not available_checkpoints:
-        return StringType()
+        return ArtifactType()
     values = [CompositeArtifactId.to_str(k) for k in available_checkpoints]
-    return ClosedEnumType(values)
+    return ClosedEnumType(values, subtype=ArtifactType())
 
 
 class CheckpointArtifact:
     """Wrapper around the checkpoint artifact to provide utility methods for accessing the checkpoint data and creating model input configuration."""
 
-    def __init__(self, artifact: CompositeArtifactId | str) -> None:
-        self.artifact = CompositeArtifactId.from_str(artifact) if isinstance(artifact, str) else artifact
+    def __init__(self, artifact: CompositeArtifactId) -> None:
+        self.artifact = artifact
 
     def checkpoint(self) -> AnemoiCheckpoint:
         """Get the AnemoiCheckpoint artifact from the artifact store."""
