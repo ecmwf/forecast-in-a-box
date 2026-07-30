@@ -11,7 +11,7 @@
 /**
  * Hydrate the basket from a shared /compare URL. `a`/`b` refs that are not
  * in the local basket are validated and added as stub entries:
- *  - `dir:` refs are local-only digests — unknown ones are stripped
+ *  - `dir:`/`wmsp:` refs are local-only digests — unknown ones are stripped
  *  - `wms:` and legacy raw `path:` refs are held in `pendingUnverified`
  *    until confirmed — a crafted link must not drive-by-connect a server
  *    or spawn a backend lens on a host directory
@@ -172,7 +172,7 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
         strip(ref)
         continue
       }
-      if (decoded.kind === 'dir') {
+      if (decoded.kind === 'dir' || decoded.kind === 'wmsp') {
         // Digests resolve only against THIS browser's basket.
         showToast.error(t('toast.unknownSource'))
         strip(ref)

@@ -32,22 +32,37 @@ import { queryClient } from '@/lib/queryClient'
 
 export type WmsProbeResult =
   | { ok: true; baseUrl: string; label: string }
-  | { ok: false; reason: 'invalid-url' | 'unreachable' | 'parse' | 'timeout' }
+  | {
+      ok: false
+      reason: 'invalid-url' | 'userinfo' | 'unreachable' | 'parse' | 'timeout'
+    }
   | { ok: false; reason: 'blocked'; host: string }
   | { ok: false; reason: 'http'; status: number }
 
 // Generous: real met-service capabilities run to MBs and 20+ seconds.
 const PROBE_TIMEOUT_MS = 30_000
 
-/** Shared allowlist: WMS endpoints must be http(s). Null = rejected. */
+/** Shared allowlist: WMS endpoints must be http(s), no embedded
+ *  credentials (fetch rejects userinfo URLs anyway). Null = rejected. */
 export function allowedWmsUrl(raw: string): URL | null {
   try {
     const parsed = new URL(raw.trim())
+    if (parsed.username || parsed.password) return null
     return parsed.protocol === 'http:' || parsed.protocol === 'https:'
       ? parsed
       : null
   } catch {
     return null
+  }
+}
+
+/** Parseable http(s) URL that only failed allowedWmsUrl on userinfo. */
+function hasUserinfo(raw: string): boolean {
+  try {
+    const parsed = new URL(raw.trim())
+    return Boolean(parsed.username || parsed.password)
+  } catch {
+    return false
   }
 }
 
@@ -57,7 +72,7 @@ export async function probeWmsEndpoint(
 ): Promise<WmsProbeResult> {
   const parsed = allowedWmsUrl(raw)
   if (!parsed) {
-    return { ok: false, reason: 'invalid-url' }
+    return { ok: false, reason: hasUserinfo(raw) ? 'userinfo' : 'invalid-url' }
   }
   const csp = cspConnectPolicy()
   if (csp.restricted && !csp.allows(parsed)) {

@@ -131,6 +131,19 @@ describe('External WMS form', () => {
       .toHaveLength(1)
   })
 
+  it('rejects URLs with embedded credentials before any fetch', async () => {
+    const screen = await renderPicker()
+    await screen
+      .getByPlaceholder('https://maps.example.org/wms')
+      .fill('https://user:pass@maps.example.org/wms')
+    await screen.getByRole('button', { name: 'Connect & add' }).click()
+
+    await expect
+      .element(screen.getByText(/embedded credentials are not supported/))
+      .toBeVisible()
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+  })
+
   it('rejects unparsable input without touching the basket', async () => {
     const screen = await renderPicker()
     await screen

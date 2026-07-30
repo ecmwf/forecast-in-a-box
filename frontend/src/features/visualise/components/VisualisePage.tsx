@@ -24,7 +24,12 @@ import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { BrushCleaning, Loader2, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
-import { SLOT_B_OFF, entryDisplayName, entryRef } from '../entry-ref'
+import {
+  SLOT_B_OFF,
+  entryDisplayName,
+  entryRef,
+  redactWmsUrl,
+} from '../entry-ref'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
@@ -304,7 +309,7 @@ export function VisualisePage() {
           </AlertDialogHeader>
           <ul className="space-y-1">
             {pendingUnverified.map((p) => {
-              const detail = p.kind === 'wms' ? p.url : p.path
+              const detail = p.kind === 'wms' ? redactWmsUrl(p.url) : p.path
               return (
                 <li
                   key={p.ref}

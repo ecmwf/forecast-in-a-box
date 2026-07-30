@@ -14,6 +14,8 @@ import {
   decodeEntryRef,
   entryDisplayName,
   entryRef,
+  redactWmsUrl,
+  wmsUrlIsPrivate,
 } from '@/features/visualise/entry-ref'
 
 const outputEntry = {
@@ -61,6 +63,39 @@ describe('entryRef / decodeEntryRef', () => {
     })
   })
 
+  it('serializes credential-bearing wms entries as opaque digests', () => {
+    const url = 'https://maps.example.org/wms?dataset=x&token=SECRET'
+    const ref = entryRef({ kind: 'wms', url, label: 'x' })
+    expect(ref).toMatch(/^wmsp:[0-9a-f]{8}$/)
+    expect(ref).not.toContain('SECRET')
+    expect(entryRef({ kind: 'wms', url, label: 'y' })).toBe(ref)
+    expect(decodeEntryRef(ref)).toEqual({
+      kind: 'wmsp',
+      digest: ref.slice('wmsp:'.length),
+    })
+  })
+
+  it('keeps curated endpoints shareable despite their public token', () => {
+    const url = 'https://eccharts.ecmwf.int/wms/?token=public'
+    expect(entryRef({ kind: 'wms', url, label: 'x' })).toBe(`wms:${url}`)
+  })
+
+  it('classifies wms urls by credential params and userinfo', () => {
+    expect(wmsUrlIsPrivate('https://x.org/wms?api_key=k')).toBe(true)
+    expect(wmsUrlIsPrivate('https://x.org/wms?apikey=k')).toBe(true)
+    expect(wmsUrlIsPrivate('https://user:pw@x.org/wms')).toBe(true)
+    expect(wmsUrlIsPrivate('https://x.org/wms?dataset=OBS')).toBe(false)
+    expect(wmsUrlIsPrivate('not a url')).toBe(true)
+  })
+
+  it('redacts secret values for display; public urls pass through', () => {
+    expect(redactWmsUrl('https://x.org/wms?dataset=a&token=SECRET')).toBe(
+      'https://x.org/wms?dataset=a&token=***',
+    )
+    const publicUrl = 'https://x.org/wms?dataset=OBS'
+    expect(redactWmsUrl(publicUrl)).toBe(publicUrl)
+  })
+
   it('still decodes legacy raw path refs (consent-gated inbound links)', () => {
     expect(decodeEntryRef('path:/data/grib')).toEqual({
       kind: 'path',
@@ -73,6 +108,7 @@ describe('entryRef / decodeEntryRef', () => {
     expect(decodeEntryRef('run:~task-only')).toBeNull()
     expect(decodeEntryRef('run:job-only~')).toBeNull()
     expect(decodeEntryRef('dir:')).toBeNull()
+    expect(decodeEntryRef('wmsp:')).toBeNull()
     expect(decodeEntryRef('path:')).toBeNull()
     expect(decodeEntryRef('wms:')).toBeNull()
     expect(decodeEntryRef('bogus:x')).toBeNull()

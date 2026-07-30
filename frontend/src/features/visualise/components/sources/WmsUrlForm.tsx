@@ -25,7 +25,7 @@ import { P } from '@/components/base/typography'
 import { showToast } from '@/lib/toast'
 
 type WmsFormError =
-  | { reason: 'invalid-url' | 'unreachable' | 'parse' | 'timeout' }
+  | { reason: 'invalid-url' | 'userinfo' | 'unreachable' | 'parse' | 'timeout' }
   | { reason: 'blocked'; host: string }
   | { reason: 'http'; status: number }
   | null
@@ -73,15 +73,17 @@ export function WmsUrlForm() {
       ? null
       : error.reason === 'invalid-url'
         ? t('picker.wmsUrl.errorInvalidUrl')
-        : error.reason === 'unreachable'
-          ? t('picker.wmsUrl.errorUnreachable')
-          : error.reason === 'blocked'
-            ? t('picker.wmsUrl.errorBlocked', { host: error.host })
-            : error.reason === 'http'
-              ? t('picker.wmsUrl.errorHttp', { status: error.status })
-              : error.reason === 'timeout'
-                ? t('picker.wmsUrl.errorTimeout')
-                : t('picker.wmsUrl.errorParse')
+        : error.reason === 'userinfo'
+          ? t('picker.wmsUrl.errorUserinfo')
+          : error.reason === 'unreachable'
+            ? t('picker.wmsUrl.errorUnreachable')
+            : error.reason === 'blocked'
+              ? t('picker.wmsUrl.errorBlocked', { host: error.host })
+              : error.reason === 'http'
+                ? t('picker.wmsUrl.errorHttp', { status: error.status })
+                : error.reason === 'timeout'
+                  ? t('picker.wmsUrl.errorTimeout')
+                  : t('picker.wmsUrl.errorParse')
 
   return (
     <div className="space-y-1.5">

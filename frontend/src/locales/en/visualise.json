@@ -55,6 +55,7 @@
       "probing": "Checking server…",
       "restrictedHint": "In cloud mode, only the curated WMS servers are currently allowed — this deployment blocks other endpoints.",
       "errorInvalidUrl": "Enter a valid http(s) URL",
+      "errorUserinfo": "Remove the username/password from the URL — embedded credentials are not supported",
       "errorBlocked": "This deployment does not allow {{host}} — in cloud mode, only the curated WMS servers are currently available",
       "errorUnreachable": "Server not reachable — check the URL, and that it allows cross-origin (CORS) requests from this app",
       "errorHttp": "The server responded with HTTP {{status}} — check the URL path and any token",

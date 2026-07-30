@@ -667,4 +667,42 @@ describe('VisualisePage', () => {
       screen.getByText('Add sources from this shared link?').elements(),
     ).toHaveLength(0)
   })
+
+  it('strips unknown wmsp: refs — credentialed endpoints never travel', async () => {
+    const screen = await renderVisualisePage('?a=wmsp%3Adeadbeef')
+    await expect
+      .element(screen.getByText('GRIB directory on this host'))
+      .toBeVisible()
+    expect(useComparisonStore.getState().entries).toHaveLength(0)
+    expect(
+      screen.getByText('Add sources from this shared link?').elements(),
+    ).toHaveLength(0)
+  })
+
+  it('redacts tokened wms links in the consent dialog; Add keeps the real URL', async () => {
+    const port = 54392
+    registerMockWmsServer(port, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    const url = `http://localhost:${port}/wms?token=supersecret`
+    const screen = await renderVisualisePage(
+      `?a=${encodeURIComponent(`wms:${url}`)}`,
+    )
+
+    await expect
+      .element(screen.getByText('Add sources from this shared link?'))
+      .toBeVisible()
+    await expect.element(screen.getByText(/token=\*\*\*/)).toBeVisible()
+    expect(screen.getByText(/supersecret/).elements()).toHaveLength(0)
+
+    const add = screen.getByRole('button', { name: 'Add and connect' })
+    ;(add.element() as HTMLElement).click()
+    await expect
+      .poll(() => useComparisonStore.getState().entries)
+      .toHaveLength(1)
+    expect(useComparisonStore.getState().entries[0]).toMatchObject({
+      kind: 'wms',
+      url,
+    })
+  })
 })

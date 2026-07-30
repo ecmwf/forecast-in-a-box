@@ -18,13 +18,17 @@
  *
  * The ref is the entry's identity in both the basket store and the
  * /compare URL (`?a=…&b=…`), so it must be stable:
- *   `run:<jobId>~<taskId>` · `dir:<digest>` · `wms:<url>`
+ *   `run:<jobId>~<taskId>` · `dir:<digest>` · `wms:<url>` · `wmsp:<digest>`
  * `~` is an RFC 3986 unreserved character and cannot appear in run/task
- * ids; the router URL-encodes url payloads. Path entries serialize as
- * opaque digests — a raw host path in a shareable URL would let a crafted
- * link name the directory the backend serves; `dir:` refs resolve only
- * against the local basket. Legacy `path:` refs decode, never produced.
+ * ids; the router URL-encodes url payloads. Host paths and
+ * credential-bearing WMS endpoints serialize as opaque digests — a raw
+ * path in a shareable URL would let a crafted link name the directory the
+ * backend serves, a `?token=…` URL would leak the secret; digest refs
+ * resolve only against the local basket. Legacy `path:` refs decode,
+ * never produced.
  */
+
+import { CURATED_WMS_SERVERS } from './curated-wms'
 
 /** Stored run output — display metadata is snapshotted at add time and
  *  enriched lazily (runs can be deleted; the basket stays readable). */
@@ -68,21 +72,61 @@ export type NewComparisonEntry =
   | Omit<PathComparisonEntry, 'addedAt'>
   | Omit<WmsComparisonEntry, 'addedAt'>
 
-/** Decoded ref identity — `dir` is the local digest, `path` the legacy raw form. */
+/** Decoded ref identity — `dir`/`wmsp` are local digests, `path` the legacy raw form. */
 export type DecodedEntryRef =
   | { kind: 'output'; jobId: string; taskId: string }
   | { kind: 'dir'; digest: string }
+  | { kind: 'wmsp'; digest: string }
   | { kind: 'path'; path: string }
   | { kind: 'wms'; url: string }
 
 /** FNV-1a 32-bit hex — deterministic so persisted URLs keep matching the basket. */
-function pathDigest(path: string): string {
+function refDigest(payload: string): string {
   let hash = 0x811c9dc5
-  for (let i = 0; i < path.length; i++) {
-    hash ^= path.charCodeAt(i)
+  for (let i = 0; i < payload.length; i++) {
+    hash ^= payload.charCodeAt(i)
     hash = Math.imul(hash, 0x01000193)
   }
   return (hash >>> 0).toString(16).padStart(8, '0')
+}
+
+/** Query params whose values are likely credentials. */
+const SECRET_QUERY_PARAM =
+  /(?:^|[_-])(token|key|apikey|secret|password|signature|sig|auth)$/i
+
+// Vetted public endpoints — their tokens (e.g. eccharts `token=public`)
+// ship with the app and stay shareable.
+const CURATED_URLS = new Set(
+  CURATED_WMS_SERVERS.map((s) => new URL(s.url).toString()),
+)
+
+/** Secret-bearing endpoint (userinfo or credential query param, curated exempt). */
+export function wmsUrlIsPrivate(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (CURATED_URLS.has(parsed.toString())) return false
+    if (parsed.username || parsed.password) return true
+    return [...parsed.searchParams.keys()].some((name) =>
+      SECRET_QUERY_PARAM.test(name),
+    )
+  } catch {
+    return true
+  }
+}
+
+/** Mask secret values for display ("token=***"); public URLs pass through. */
+export function redactWmsUrl(url: string): string {
+  if (!wmsUrlIsPrivate(url)) return url
+  try {
+    const parsed = new URL(url)
+    if (parsed.password) parsed.password = '***'
+    for (const name of [...parsed.searchParams.keys()]) {
+      if (SECRET_QUERY_PARAM.test(name)) parsed.searchParams.set(name, '***')
+    }
+    return parsed.toString()
+  } catch {
+    return url
+  }
 }
 
 export function entryRef(entry: NewComparisonEntry | ComparisonEntry): string {
@@ -90,9 +134,11 @@ export function entryRef(entry: NewComparisonEntry | ComparisonEntry): string {
     case 'output':
       return `run:${entry.jobId}~${entry.taskId}`
     case 'path':
-      return `dir:${pathDigest(entry.path)}`
+      return `dir:${refDigest(entry.path)}`
     case 'wms':
-      return `wms:${entry.url}`
+      return wmsUrlIsPrivate(entry.url)
+        ? `wmsp:${refDigest(entry.url)}`
+        : `wms:${entry.url}`
   }
 }
 
@@ -111,6 +157,10 @@ export function decodeEntryRef(ref: string): DecodedEntryRef | null {
   if (ref.startsWith('dir:')) {
     const digest = ref.slice('dir:'.length)
     return digest ? { kind: 'dir', digest } : null
+  }
+  if (ref.startsWith('wmsp:')) {
+    const digest = ref.slice('wmsp:'.length)
+    return digest ? { kind: 'wmsp', digest } : null
   }
   // Legacy raw-path refs: decoded for consent-gated hydration, never emitted.
   if (ref.startsWith('path:')) {

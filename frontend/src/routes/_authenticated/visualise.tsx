@@ -15,9 +15,10 @@ import { VisualisePage } from '@/features/visualise/components/VisualisePage'
 /**
  * Visualisation URL state — the shareable projection of a view.
  * `a`/`b` are entry refs (`run:<jobId>~<taskId>` | `dir:<digest>` |
- * `wms:<url>`, see entry-ref.ts — host paths only ever appear as opaque
- * digests); `b` may also be the literal `off` (deliberate single-source
- * view, see SLOT_B_OFF). The basket itself is localStorage, and lens
+ * `wms:<url>` | `wmsp:<digest>`, see entry-ref.ts — host paths and
+ * credentialed endpoints only ever appear as opaque digests); `b` may
+ * also be the literal `off` (deliberate single-source view, see
+ * SLOT_B_OFF). The basket itself is localStorage, and lens
  * ids/ports are runtime-only. Unlike other routes, `a`/`b` are
  * deliberately always materialized once sources are active: the "default
  * pair" depends on client-local basket state, so a shared URL must pin it
