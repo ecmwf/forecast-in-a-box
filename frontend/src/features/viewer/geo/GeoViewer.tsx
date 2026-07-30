@@ -248,6 +248,7 @@ export function GeoViewer({
     blend: 0.6,
     loupeMirror: true,
     loupeSizePx: 180,
+    loupeZoom: 2,
   })
 
   // -------- Time-link policy (exact / nearest / offset / independent) --
@@ -1068,6 +1069,7 @@ export function GeoViewer({
               b={mapSourceB}
               loupeMirror={modeOptions.loupeMirror}
               loupeSizePx={modeOptions.loupeSizePx}
+              loupeZoom={modeOptions.loupeZoom}
               preload={preloadTimeSteps}
               pinnedLegends={pinnedLegendItems}
               onUnpinLegend={unpinLegend}

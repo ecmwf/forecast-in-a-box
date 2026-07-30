@@ -23,7 +23,7 @@ import { drawCompositedViewport } from '../map-export'
 import type { RefObject } from 'react'
 
 const DEFAULT_LOUPE_SIZE_PX = 180
-const LOUPE_ZOOM = 2
+const DEFAULT_LOUPE_ZOOM = 2
 const LOUPE_GAP_PX = 32
 
 const clamp = (v: number, lo: number, hi: number) =>
@@ -33,6 +33,7 @@ export function LoupeOverlay({
   containerRef,
   mirror = null,
   sizePx = DEFAULT_LOUPE_SIZE_PX,
+  zoom = DEFAULT_LOUPE_ZOOM,
 }: {
   containerRef: RefObject<HTMLDivElement | null>
   /** Sibling panel's cursor fraction — mirrors the loupe onto this map
@@ -40,11 +41,13 @@ export function LoupeOverlay({
   mirror?: { x: number; y: number } | null
   /** Loupe diameter in CSS pixels. */
   sizePx?: number
+  /** Magnification factor (screen CSS px → loupe CSS px). */
+  zoom?: number
 }) {
   const [active, setActive] = useState(false)
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const sourceSize = sizePx / LOUPE_ZOOM
+  const sourceSize = sizePx / zoom
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {

@@ -123,7 +123,8 @@
     "spySize": "Spy size",
     "loupeHint": "Hold Z to magnify",
     "loupeMirror": "Magnify both panels",
-    "loupeSize": "Magnifier size"
+    "loupeSize": "Magnifier size",
+    "loupeZoom": "Magnifier zoom"
   },
   "timeline": {
     "label": "Valid time",

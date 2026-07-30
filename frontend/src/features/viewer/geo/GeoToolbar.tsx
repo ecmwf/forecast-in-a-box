@@ -574,6 +574,16 @@ function ModeActionRow({
           <ZoomIn className="h-3.5 w-3.5" />
           {t('modes.loupeHint')}
         </span>
+        <Segmented
+          aria={t('modes.loupeZoom')}
+          value={String(options.loupeZoom)}
+          items={[
+            { id: '2', label: '2×' },
+            { id: '3', label: '3×' },
+            { id: '4', label: '4×' },
+          ]}
+          onChange={(id) => onChange({ loupeZoom: Number(id) })}
+        />
         <label className="flex w-36 items-center gap-2">
           <span className="shrink-0">{t('modes.loupeSize')}</span>
           <Slider

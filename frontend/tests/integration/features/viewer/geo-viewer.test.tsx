@@ -498,6 +498,9 @@ describe('GeoViewer', () => {
     const container = (map as HTMLElement).parentElement!
     container.style.cssText = 'position:relative;width:800px;height:400px'
     const viewport = page.elementLocator(map as Element)
+    // Unstyled flow can push the map below the test window's fold, where
+    // position-clicks silently miss OL — bring it into view first.
+    ;(map as HTMLElement).scrollIntoView({ block: 'center' })
     // x=200 keeps clear of the swipe divider at the 50% mark.
     await viewport.click({ position: { x: 200, y: 200 } })
     await expect.element(screen.getByText('Annotation 1')).toBeVisible()

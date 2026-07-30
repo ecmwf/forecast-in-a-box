@@ -70,6 +70,8 @@ export interface CompareModeOptions {
   loupeMirror: boolean
   /** Hold-Z loupe diameter in CSS pixels. */
   loupeSizePx: number
+  /** Hold-Z loupe magnification factor. */
+  loupeZoom: number
 }
 
 /** One captured map for export: raw composited canvas + metadata. The

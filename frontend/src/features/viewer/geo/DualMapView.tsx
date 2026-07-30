@@ -55,6 +55,7 @@ export function DualMapView({
   b,
   loupeMirror = true,
   loupeSizePx = 180,
+  loupeZoom = 2,
   preload = false,
   pinnedLegends = [],
   onUnpinLegend = noop,
@@ -79,6 +80,8 @@ export function DualMapView({
   loupeMirror?: boolean
   /** Hold-Z loupe diameter in CSS pixels. */
   loupeSizePx?: number
+  /** Hold-Z loupe magnification factor. */
+  loupeZoom?: number
   /** Prefetch every active layer × time step into the HTTP cache. */
   preload?: boolean
   pinnedLegends?: ReadonlyArray<SlotLegendItem>
@@ -152,6 +155,7 @@ export function DualMapView({
         onCross={setCross}
         loupeMirror={loupeMirror}
         loupeSizePx={loupeSizePx}
+        loupeZoom={loupeZoom}
         basemapId={basemapId}
         basemapOpacity={basemapOpacity}
         measureMode={measureMode}
@@ -176,6 +180,7 @@ export function DualMapView({
         onCross={setCross}
         loupeMirror={loupeMirror}
         loupeSizePx={loupeSizePx}
+        loupeZoom={loupeZoom}
         basemapId={basemapId}
         basemapOpacity={basemapOpacity}
         measureMode={measureMode}
@@ -204,6 +209,7 @@ function DualMapPanel({
   onCross,
   loupeMirror,
   loupeSizePx,
+  loupeZoom,
   basemapId,
   basemapOpacity,
   measureMode,
@@ -227,6 +233,7 @@ function DualMapPanel({
   onCross: (pos: CrossPosition) => void
   loupeMirror: boolean
   loupeSizePx: number
+  loupeZoom: number
   basemapId: string
   basemapOpacity: number
   measureMode: MeasureMode
@@ -368,6 +375,7 @@ function DualMapPanel({
         containerRef={containerRef}
         mirror={loupeMirror ? cross : null}
         sizePx={loupeSizePx}
+        zoom={loupeZoom}
       />
       <OverlayHoverCard hover={overlayHover} />
       <PinnedLegendsBar
