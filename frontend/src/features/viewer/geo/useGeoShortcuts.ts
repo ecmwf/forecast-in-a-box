@@ -27,6 +27,7 @@
 import { useEffect } from 'react'
 import {
   formatForDisplay,
+  getKeyStateTracker,
   useHotkey,
   useKeyHold,
 } from '@tanstack/react-hotkeys'
@@ -148,6 +149,8 @@ export function useGeoShortcuts(handlers: {
   })
   // Continuous panning: hold WASD/arrows and a rAF loop moves the shared
   // camera at a constant velocity — OS key-repeat is laggy and choppy.
+  // Held-state truth is TanStack's tracker: it clears keyups the OS
+  // swallows during ⌘-chords (macOS) and clears on blur.
   useEffect(() => {
     const VEC: Record<string, [number, number]> = {
       w: [0, -1],
@@ -159,22 +162,25 @@ export function useGeoShortcuts(handlers: {
       arrowleft: [-1, 0],
       arrowright: [1, 0],
     }
-    const held = new Set<string>()
+    const tracker = getKeyStateTracker()
+    // Armed = passed the gates on keydown; panning needs armed AND held.
+    const armed = new Set<string>()
     let raf = 0
     let last = 0
     const tick = (t: number) => {
+      for (const k of armed) if (!tracker.isKeyHeld(k)) armed.delete(k)
       const dt = last ? Math.min(MAX_FRAME_S, (t - last) / 1000) : 0
       last = t
       let dx = 0
       let dy = 0
-      for (const k of held) {
+      for (const k of armed) {
         dx += VEC[k][0]
         dy += VEC[k][1]
       }
       if (dx || dy) {
         onPan(dx * PAN_SPEED_PX_PER_SEC * dt, dy * PAN_SPEED_PX_PER_SEC * dt)
       }
-      if (held.size) {
+      if (armed.size) {
         raf = requestAnimationFrame(tick)
       } else {
         raf = 0
@@ -182,24 +188,20 @@ export function useGeoShortcuts(handlers: {
       }
     }
     const down = (e: KeyboardEvent) => {
+      // Modifier chords (⌘A, ⌥←, …) belong to the browser, never the pan.
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       const k = e.key.toLowerCase()
       if (!(k in VEC) || panBlocked()) return
       const el = e.target as HTMLElement | null
       if (el?.closest('input, textarea, select, [contenteditable="true"]'))
         return
       e.preventDefault()
-      held.add(k)
+      armed.add(k)
       if (!raf) raf = requestAnimationFrame(tick)
     }
-    const up = (e: KeyboardEvent) => held.delete(e.key.toLowerCase())
-    const blur = () => held.clear()
     window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
-    window.addEventListener('blur', blur)
     return () => {
       window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
-      window.removeEventListener('blur', blur)
       cancelAnimationFrame(raf)
     }
   }, [onPan])
