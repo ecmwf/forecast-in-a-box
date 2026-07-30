@@ -258,9 +258,13 @@ export function useComparisonSource(
   }
   if (!localPath) return { phase: 'resolvingDir' }
 
+  // An error atop last-known-running keeps serving — death is 404/terminal.
   const terminal =
     startError !== null ||
-    (!!lensId && statusQuery.isError && !statusGone) ||
+    (!!lensId &&
+      statusQuery.isError &&
+      !statusGone &&
+      statusQuery.data?.status !== 'running') ||
     ((detail?.status === 'failed' || detail?.status === 'terminated') &&
       !diedAfterServing)
   if (terminal) {
@@ -268,6 +272,15 @@ export function useComparisonSource(
       phase: 'failed',
       error: startError ?? statusQuery.error?.message ?? null,
       retry,
+    }
+  }
+
+  // Registry down, no lens in hand — fail with retry, not endless "Starting…".
+  if (!lensId && lensListQuery.isError) {
+    return {
+      phase: 'failed',
+      error: lensListQuery.error.message,
+      retry: () => void lensListQuery.refetch(),
     }
   }
 

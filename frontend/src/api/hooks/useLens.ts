@@ -13,6 +13,7 @@ import type {
   LensInstanceDetailResponse,
   SupportedLensDetail,
 } from '@/api/types/lens.types'
+import { ApiClientError } from '@/api/client'
 import {
   getLensStatus,
   listLenses,
@@ -84,7 +85,10 @@ export function useLensStatus(lensInstanceId: string | undefined) {
       return status === 'running' ? 15_000 : false
     },
     refetchOnWindowFocus: false,
-    retry: false,
+    // One dropped poll must not read as lens death; 404 (gone) is definitive.
+    retry: (failureCount, error) =>
+      failureCount < 2 &&
+      !(error instanceof ApiClientError && error.status === 404),
   })
 }
 

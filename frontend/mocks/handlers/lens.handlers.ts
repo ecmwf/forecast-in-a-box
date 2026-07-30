@@ -14,7 +14,9 @@
 
 import { HttpResponse, delay, http } from 'msw'
 import {
+  consumeLensStatusFailure,
   isSkinnyWmsInstalled,
+  lensListOutage,
   listMockLenses,
   pollMockLens,
   startMockLens,
@@ -43,6 +45,9 @@ export const lensHandlers = [
 
   http.get(API_ENDPOINTS.lens.status, async ({ request }) => {
     await delay(50)
+    if (consumeLensStatusFailure()) {
+      return HttpResponse.json({ detail: 'registry hiccup' }, { status: 500 })
+    }
     const id = new URL(request.url).searchParams.get('lens_instance_id')
     const detail = id ? pollMockLens(id) : null
     if (!detail) {
@@ -68,6 +73,12 @@ export const lensHandlers = [
 
   http.get(API_ENDPOINTS.lens.list, async () => {
     await delay(50)
+    if (lensListOutage()) {
+      return HttpResponse.json(
+        { detail: 'registry unavailable' },
+        { status: 503 },
+      )
+    }
     return HttpResponse.json(listMockLenses())
   }),
 

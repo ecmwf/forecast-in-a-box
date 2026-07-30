@@ -33,6 +33,10 @@ let pollsUntilRunning = 1
 /** Mirrors deployments without the optional SkinnyWMS package installed. */
 let skinnyWmsInstalled = true
 
+/** Fault injection: transient 5xx on status polls, registry-list outage. */
+let statusFailureBudget = 0
+let listOutage = false
+
 export function resetLensState(options?: {
   pollsUntilRunning?: number
   skinnyWmsInstalled?: boolean
@@ -42,6 +46,30 @@ export function resetLensState(options?: {
   lensState = {}
   pollsUntilRunning = options?.pollsUntilRunning ?? 1
   skinnyWmsInstalled = options?.skinnyWmsInstalled ?? true
+  statusFailureBudget = 0
+  listOutage = false
+}
+
+export function failNextLensStatusPolls(count: number): void {
+  statusFailureBudget = count
+}
+
+export function pendingLensStatusFailures(): number {
+  return statusFailureBudget
+}
+
+export function consumeLensStatusFailure(): boolean {
+  if (statusFailureBudget <= 0) return false
+  statusFailureBudget--
+  return true
+}
+
+export function setLensListOutage(outage: boolean): void {
+  listOutage = outage
+}
+
+export function lensListOutage(): boolean {
+  return listOutage
 }
 
 export function isSkinnyWmsInstalled(): boolean {

@@ -39,9 +39,12 @@ import {
 } from '@tests/../mocks/data/job.data'
 import {
   failMockLens,
+  failNextLensStatusPolls,
   injectMockLens,
   listMockLenses,
+  pendingLensStatusFailures,
   resetLensState,
+  setLensListOutage,
   stopMockLens,
 } from '@tests/../mocks/data/lens.data'
 import {
@@ -246,6 +249,51 @@ describe('VisualisePage', () => {
       .element(screen.getByLabelText('Source for slot B'))
       .toHaveTextContent('Pick a source…')
   })
+
+  it('surfaces a lens-registry outage with Retry instead of spinning', async () => {
+    setLensListOutage(true)
+    useComparisonStore.getState().addEntry(RUN_A)
+    const screen = await renderVisualisePage()
+
+    const retry = screen.getByRole('button', { name: 'Retry' })
+    await expect.element(retry).toBeVisible()
+    expect(listMockLenses()).toHaveLength(0)
+
+    setLensListOutage(false)
+    await retry.click()
+    await expect.poll(() => listMockLenses(), { timeout: 8000 }).toHaveLength(1)
+    await expect
+      .element(screen.getByText(/display is static/), { timeout: 8000 })
+      .toBeVisible()
+  })
+
+  it(
+    'keeps the running viewer through a transient status-poll outage',
+    { timeout: 60000 },
+    async () => {
+      useComparisonStore.getState().addEntry(RUN_A)
+      const screen = await renderVisualisePage()
+      await expect
+        .element(screen.getByText(/display is static/), { timeout: 8000 })
+        .toBeVisible()
+
+      // 3 consecutive 5xx: one fully errored poll cycle (attempt + 2 retries).
+      failNextLensStatusPolls(3)
+      await expect
+        .poll(() => pendingLensStatusFailures(), {
+          timeout: 30000,
+          interval: 500,
+        })
+        .toBe(0)
+      await new Promise((r) => setTimeout(r, 800))
+
+      // Stale-running keeps the viewer mounted; no failure UI, no remount.
+      await expect.element(screen.getByText(/display is static/)).toBeVisible()
+      expect(
+        screen.getByRole('button', { name: 'Retry' }).elements(),
+      ).toHaveLength(0)
+    },
+  )
 
   it('offers Stop only for stray lenses (no basket entry)', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
