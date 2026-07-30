@@ -14,6 +14,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isRemoteDeployment } from '@/features/visualise/deployment'
+import { useSkinnyWmsAvailable } from '@/api/hooks/useLens'
 import {
   MAX_COMPARISON_ENTRIES,
   useComparisonStore,
@@ -27,6 +28,7 @@ export function HostPathForm() {
   const { t } = useTranslation('visualise')
   const [path, setPath] = useState('')
   const addEntry = useComparisonStore((s) => s.addEntry)
+  const lensUnavailable = useSkinnyWmsAvailable() === false
 
   const submit = () => {
     const trimmed = path.trim()
@@ -52,6 +54,11 @@ export function HostPathForm() {
           {t('picker.hostPath.restrictedHint')}
         </P>
       )}
+      {lensUnavailable && (
+        <P className="text-xs text-muted-foreground italic">
+          {t('picker.lensUnavailable')}
+        </P>
+      )}
       <div className="flex gap-2">
         <Input
           value={path}
@@ -61,6 +68,7 @@ export function HostPathForm() {
           }}
           name="host-path"
           spellCheck={false}
+          disabled={lensUnavailable}
           aria-label={t('picker.hostPath.title')}
           placeholder={t('picker.hostPath.placeholder')}
           className="h-8 font-mono text-xs"
@@ -69,7 +77,7 @@ export function HostPathForm() {
           size="sm"
           variant="outline"
           onClick={submit}
-          disabled={!path.trim()}
+          disabled={!path.trim() || lensUnavailable}
           className="h-8 shrink-0"
         >
           {t('picker.add')}

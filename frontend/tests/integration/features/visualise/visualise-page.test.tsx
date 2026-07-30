@@ -267,6 +267,25 @@ describe('VisualisePage', () => {
       .toHaveTextContent('Pick a source…')
   })
 
+  it('gates local sources when SkinnyWMS is missing; external WMS stays', async () => {
+    resetLensState({ skinnyWmsInstalled: false })
+    const screen = await renderVisualisePage()
+
+    const add = screen
+      .getByRole('button', { name: /add to comparison/i })
+      .first()
+    await expect.element(add).toBeDisabled()
+    await expect
+      .element(screen.getByLabelText('GRIB directory on this host'))
+      .toBeDisabled()
+    await expect
+      .element(screen.getByText(/SkinnyWMS is not installed/).first())
+      .toBeVisible()
+    await expect
+      .element(screen.getByLabelText('External WMS server'))
+      .toBeEnabled()
+  })
+
   it('a viewer crash keeps the page shell alive; Retry recovers', async () => {
     viewerCrash.armed = true
     useComparisonStore.getState().addEntry(RUN_A)

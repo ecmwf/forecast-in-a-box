@@ -47,6 +47,7 @@
     "searchEmpty": "Nothing matches the search.",
     "add": "Add",
     "lost": "No longer available",
+    "lensUnavailable": "Not available on this deployment — SkinnyWMS is not installed",
     "wmsUrl": {
       "title": "External WMS server",
       "description": "Any WMS endpoint — another FIAB instance, GeoServer, a met-service WMS. The server must allow cross-origin requests (CORS).",

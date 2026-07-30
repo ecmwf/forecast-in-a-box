@@ -24,6 +24,7 @@ import {
 } from '../stores/comparisonStore'
 import { useRemoveComparisonSource } from '../hooks/useRemoveComparisonSource'
 import type { NewComparisonEntry } from '../entry-ref'
+import { useSkinnyWmsAvailable } from '@/api/hooks/useLens'
 import { Button } from '@/components/ui/button'
 import { showToast } from '@/lib/toast'
 
@@ -45,6 +46,12 @@ export function AddToComparisonButton({
   const inBasket = useIsInComparison(ref)
   const addEntry = useComparisonStore((s) => s.addEntry)
   const removeSource = useRemoveComparisonSource()
+  // Output/path sources need a lens — don't invite adds that can only fail.
+  const skinnyAvailable = useSkinnyWmsAvailable()
+  const lensGated =
+    entry.kind !== 'wms' && !inBasket && skinnyAvailable === false
+  const isDisabled = disabled || lensGated
+  const reason = lensGated ? t('picker.lensUnavailable') : disabledReason
 
   const name = entryDisplayName(entry)
   const label = inBasket ? t('entry.inBasket') : t('entry.add')
@@ -69,10 +76,10 @@ export function AddToComparisonButton({
       variant={inBasket ? 'secondary' : 'outline'}
       size={iconOnly ? 'icon' : 'sm'}
       className={iconOnly ? 'h-8 w-8 shrink-0' : 'h-8 shrink-0 gap-1.5'}
-      disabled={disabled}
+      disabled={isDisabled}
       aria-pressed={inBasket}
       aria-label={aria}
-      title={disabled && disabledReason ? disabledReason : aria}
+      title={isDisabled && reason ? reason : aria}
       onClick={onClick}
     >
       {inBasket ? (
