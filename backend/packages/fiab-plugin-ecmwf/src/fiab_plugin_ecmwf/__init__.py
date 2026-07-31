@@ -25,13 +25,14 @@ from fiab_plugin_ecmwf.blocks import (
 from fiab_plugin_ecmwf.templates.aifs_forecast import template as _aifs_forecast_template
 from fiab_plugin_ecmwf.templates.ifs_ensemble_statistics import template as _ensemble_statistics_template
 from fiab_plugin_ecmwf.templates.prototype import template as _snapshot_template
-from fiab_plugin_ecmwf.products.blocks import CustomThresholdProbability, EnsembleStatistics, PredefinedThresholdProbability
+from fiab_plugin_ecmwf.products.blocks import CustomThresholdProbability, EnsembleStatistics, PredefinedThresholdProbability, ThermalIndices
 
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("operationalForecastSource"): OperationalForecastSource(),
     BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
     BlockFactoryId("predefinedThresholdProbability"): PredefinedThresholdProbability(),
     BlockFactoryId("customThresholdProbability"): CustomThresholdProbability(),
+    BlockFactoryId("thermalIndices"): ThermalIndices(),
     BlockFactoryId("select"): Select(),
     BlockFactoryId("zarrSink"): ZarrSink(),
     BlockFactoryId("gribSink"): GribSink(),

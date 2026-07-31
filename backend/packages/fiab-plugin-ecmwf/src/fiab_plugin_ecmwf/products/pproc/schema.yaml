@@ -8,25 +8,335 @@ config:
   filter:type:
     fc/cf/pf:
       filter:param:
-        "10/207/228249/228005/237207/238207/239207":
+        "10/207":
           preprocessing:
             - operation: norm
-        "121":
-          filter:type:
-            em/es:
-              accumulations:
-                step:
-                  operation: maximum
-                  metadata:
-                    stepType: max
-        "122":
-          filter:type:
-            em/es:
-              accumulations:
-                step:
-                  operation: minimum
-                  metadata:
-                    stepType: min
+        "261016":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_hmdx"
+              params: ["167", "168"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261016
+              join: false
+        "261023":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_rhp"
+              params: ["167", "168"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 260242
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_wbt"
+              params: ["167", "260242"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261023
+              join: false
+        "260242":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_rhp"
+              params: ["167", "168"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 260242
+              join: false
+        "260004":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_heatx"
+              params: ["167", "168"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 260004
+              join: false
+        "260005":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: norm
+              params: ["165", "166"]
+              metadata:
+                paramId: 207
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_wcf"
+              params: ["167", "207"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 260005
+              join: false
+        "214001":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_cossza"
+              params: ["167", "228021"]
+              deaccumulate: ["228021"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 214001
+              join: false
+        "47":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_cossza"
+              params: ["167", "228021"]
+              deaccumulate: ["228021"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 214001
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_dsrp"
+              params: ["228021", "214001"]
+              deaccumulate: ["228021"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 47
+              join: false
+        "261002":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_cossza"
+              params: ["167", "228021"]
+              deaccumulate: ["228021"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 214001
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_mrt"
+              params: ["167", "214001", "47", "169", "228021", "175", "177", "176"]
+              deaccumulate: ["47", "169", "228021", "175", "177", "176"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261002
+              join: false
+        "261001":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: norm
+              params: ["165", "166"]
+              metadata:
+                paramId: 207
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_cossza"
+              params: ["167", "228021"]
+              deaccumulate: ["228021"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 214001
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_mrt"
+              params: ["167", "214001", "47", "169", "228021", "175", "177", "176"]
+              deaccumulate: ["47", "169", "228021", "175", "177", "176"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261002
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_utci"
+              params: ["167", "168", "207", "261002"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261001
+              join: false
+        "261014":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: norm
+              params: ["165", "166"]
+              metadata:
+                paramId: 207
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_cossza"
+              params: ["167", "228021"]
+              deaccumulate: ["228021"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 214001
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_mrt"
+              params: ["167", "214001", "47", "169", "228021", "175", "177", "176"]
+              deaccumulate: ["47", "169", "228021", "175", "177", "176"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261002
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_wbgt"
+              params: ["167", "168", "207", "261002"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261014
+              join: false
+        "261015":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: norm
+              params: ["165", "166"]
+              metadata:
+                paramId: 207
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_cossza"
+              params: ["167", "228021"]
+              deaccumulate: ["228021"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 214001
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_mrt"
+              params: ["167", "214001", "47", "169", "228021", "175", "177", "176"]
+              deaccumulate: ["47", "169", "228021", "175", "177", "176"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261002
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_gt"
+              params: ["167", "207", "261002"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261015
+              join: false
+        "261018":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: norm
+              params: ["165", "166"]
+              metadata:
+                paramId: 207
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_rhp"
+              params: ["167", "168"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 260242
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_nefft"
+              params: ["167", "207", "260242"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 261018
+              join: false
+        "260255":
+          entrypoint: pproc-thermal-indices
+          preprocessing:
+            - operation: thermal_index
+              function: norm
+              params: ["165", "166"]
+              metadata:
+                paramId: 207
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_rhp"
+              params: ["167", "168"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 260242
+              join: true
+            - operation: thermal_index
+              function: "ppruntime.thermal_indices.calc_aptmp"
+              params: ["167", "260242", "207"]
+              metadata:
+                edition: 2
+                bitsPerValue: 16
+                packingType: "grid_ccsds"
+                typeOfGeneratingProcess: 2
+                paramId: 260255
+              join: false
     em/es:
       entrypoint: "pproc-ensms"
       metadata_from_output: ["param", "stream", "date", "type"]
@@ -37,34 +347,32 @@ config:
         es:
           statistics:
             operation: std
-      filter:stream:
-        enfo/waef/eefo/weef:
-          input:
-            dtype: float64
-          filter:param:
-            "*":
+      input:
+        dtype: float64
+      filter:param:
+        "*":
+          statistics:
+            metadata:
+              edition: 2
+              bitsPerValue: 16
+              productDefinitionTemplateNumber: 2
+          filter:type:  
+            em:
               statistics:
                 metadata:
-                  edition: 2
-                  bitsPerValue: 16
-                  productDefinitionTemplateNumber: 2
-              filter:type:  
-                em:
-                  statistics:
-                    metadata:
-                      derivedForecast: 0
-                      typeOfProcessedData: 10
-                es:
-                  statistics:
-                    metadata:
-                      derivedForecast: 4
-                      typeOfProcessedData: 10
-            "121/122":
+                  derivedForecast: 0
+                  typeOfProcessedData: 10
+            es:
               statistics:
                 metadata:
-                  edition: 2
-                  bitsPerValue: 16
-                  productDefinitionTemplateNumber: 12
+                  derivedForecast: 4
+                  typeOfProcessedData: 10
+        "121/122":
+          statistics:
+            metadata:
+              edition: 2
+              bitsPerValue: 16
+              productDefinitionTemplateNumber: 12
     ep:
       metadata_from_output: ["param", "stream", "date", "type"]
       statistics:
@@ -401,12 +709,12 @@ windows:
             - type: instantaneous
               start: 12
               interval: 12
-            - type: range
-              width: 120
-              start: 120
-              interval: 120
-            - "120-168"
-            - "168-240"
+            # - type: range
+            #   width: 120
+            #   start: 120
+            #   interval: 120
+            # - "120-168"
+            # - "168-240"
         "*": {}
     efi/efic/sot:
       filter:stream:
@@ -535,347 +843,155 @@ windows:
             type: range
             width: 168
             interval: 24
+datasets: {}
 inputs:
-  filter:class:
-    ai:
-      filter:stream:
-        enfo:
-          filter:type:
-            "em/es/pb/efi/sot/ep":
-              forecast:
-                inputs:
-                  - request: &enfo_cf
-                      stream: enfo
-                      type: cf
-                  - request: &enfo_pf
-                      stream: enfo
-                      type: "pf"
-                    members: &enfo_members
-                      start: 1
-                      end: 50
-            "cf/efic":
-              forecast:
-                inputs:
-                  request: *enfo_cf
-            "pf":
-              forecast:
-                inputs:
-                  request: *enfo_pf
-                  members: *enfo_members
-            fcmean/fcstdev/fcmin/fcmax:
-              filter:members:
-                only_zero:
-                  forecast:
-                    inputs:
-                      request: *enfo_cf
-                no_zero:
-                  forecast:
-                    inputs:
-                      request: *enfo_pf
-                      members: *enfo_members
-                contains_zero:
-                  from_inputs: false
-                  forecast:
-                    inputs:
-                      - request: *enfo_cf
-                      - request: *enfo_pf
-                        members: *enfo_members
-          climatology:
-            inputs:
-              request:
-                stream: "efhs"
-                time: "0000"
-            scheme: ecmwf-4days
-        waef:
-          filter:type:
-            em/es/pb/efi/sot:
-              forecast:
-                inputs:
-                  - request: &waef_cf
-                      stream: waef
-                      type: "cf"
-                  - request: &waef_pf
-                      stream: waef
-                      type: "pf"
-                    members: *enfo_members
-            "cf/efic":
-              forecast:
-                inputs:
-                  request: *waef_cf
-            "pf/ep":
-              forecast:
-                inputs:
-                  request: *waef_pf
-                  members: *enfo_members
-            fcmean/fcstdev/fcmin/fcmax:
-              filter:members:
-                only_zero:
-                  forecast:
-                    inputs:
-                      request:
-                        <<: *waef_cf
-                no_zero:
-                  forecast:
-                    inputs:
-                      request: *waef_pf
-                      members: *enfo_members
-                contains_zero:
-                  from_inputs: false
-                  forecast:
-                    inputs:
-                      - request:
-                          <<: *waef_cf
-                      - request: *waef_pf
-                        members: *enfo_members
-          climatology:
-            inputs:
-              request:
-                stream: "wehs"
-                time: "0000"
-            scheme: ecmwf-4days
-    od:
-      filter:stream:
-        oper:
-          filter:type:
-            fc/fcmean/fcstdev/fcmin/fcmax:
-              forecast:
-                inputs:
-                  request: &oper_fc
-                    stream: oper
-                    type: fc
-        wave:
-          filter:type:
-            fc/fcmean/fcstdev/fcmin/fcmax:
-              forecast:
-                inputs:
-                  request: &wave_fc
-                    stream: wave
-                    type: fc
-        enfo:
-          filter:type:
-            "em/es/pb/efi/sot/ep":
-              forecast:
-                inputs:
-                  - request: *oper_fc
-                  - request: *enfo_pf
-                    members: *enfo_members
-            "cf/efic":
-              forecast:
-                inputs:
-                  request: *oper_fc
-            "pf":
-              forecast:
-                inputs:
-                  request: *enfo_pf
-                  members: *enfo_members
-            fcmean/fcstdev/fcmin/fcmax:
-              filter:members:
-                only_zero:
-                  forecast:
-                    inputs:
-                      request: *oper_fc
-                no_zero:
-                  forecast:
-                    inputs:
-                      request: *enfo_pf
-                      members: *enfo_members
-                contains_zero:
-                  from_inputs: false
-                  forecast:
-                    inputs:
-                      - request: *oper_fc
-                      - request: *enfo_pf
-                        members: *enfo_members
-          climatology:
-            inputs:
-              request:
-                stream: "efhs"
-                time: "0000"
-            scheme: ecmwf-4days
-        waef:
-          filter:type:
-            em/es/pb/efi/sot:
-              forecast:
-                inputs:
-                  - request: *wave_fc
-                  - request: *waef_pf
-                    members: *enfo_members
-            "cf/efic":
-              forecast:
-                inputs:
-                  request: *wave_fc
-            "pf/ep":
-              forecast:
-                inputs:
-                  request: *waef_pf
-                  members: *enfo_members
-            fcmean/fcstdev/fcmin/fcmax:
-              filter:members:
-                only_zero:
-                  forecast:
-                    inputs:
-                      request: *wave_fc
-                no_zero:
-                  forecast:
-                    inputs:
-                      request: *waef_pf
-                      members: *enfo_members
-                contains_zero:
-                  from_inputs: false
-                  forecast:
-                    inputs:
-                      - request: *wave_fc
-                      - request: *waef_pf
-                        members: *enfo_members
-          climatology:
-            inputs:
-              request:
-                stream: "wehs"
-                time: "0000"
-            scheme: ecmwf-4days
   filter:type:
     fc/cf/pf:
+      filter:type:
+        pf:
+          fc_inputs:
+            select:
+              type: pf
+              number: "{number}"
+        "*":
+          fc_inputs:
+            select:
+              type: "{type}"
       filter:param:
+        "*":
+          fc_inputs:
+            select:
+              param: "{param}"
+              type: "{type}"
         "10":
-          forecast:
-            inputs:
-              request:
-                param: ["131", "132"]
-        "121/122":
-          forecast:
-            inputs:
-              request:
-                param: "167"
-              derive_step:
-                type: deaccumulate
+          fc_inputs:
+            select:
+              param: ["131", "132"]
         "207":
-          forecast:
-            inputs:
-              request:
-                param: ["165", "166"]
+          fc_inputs:
+            select:
+              param: ["165", "166"]
         "228249":
-          forecast:
-            inputs:
-              request:
-                param: ["228246", "228247"]
+          fc_inputs:
+            select:
+              param: ["228246", "228247"]
         "261001":
-          forecast:
-            inputs:
-              - request:
-                  param: ["169", "175", "176", "177", "228021", "47"]
-                derive_step:
-                  type: deaccumulate
-              - request:
-                  param: ["165", "166", "167", "168"]
+          fc_inputs:
+            - select:
+                param: ["169", "175", "176", "177", "228021", "47"]
+              derive:
+                step:
+                  name: step_deaccumulate
+            - select:
+                param: ["165", "166", "167", "168"]
         "261014":
-          forecast:
-            inputs:
-              - request:
-                  param: ["169", "175", "176", "177", "228021", "47"]
-                derive_step:
-                  type: deaccumulate
-              - request:
-                  param: ["165", "166", "167", "168"]
+          fc_inputs:
+            - select:
+                param: ["169", "175", "176", "177", "228021", "47"]
+              derive:
+                step:
+                  name: step_deaccumulate
+            - select:
+                param: ["165", "166", "167", "168"]
         "261015":
-          forecast:
-            inputs:
-              - request:
-                  param: ["169", "175", "176", "177", "228021", "47"]
-                derive_step:
-                  type: deaccumulate
-              - request:
-                  param: ["165", "166", "167", "168"]
+          fc_inputs:
+            - select:
+                param: ["169", "175", "176", "177", "228021", "47"]
+              derive:
+                step:
+                  name: step_deaccumulate
+            - select:
+                param: ["165", "166", "167", "168"]
         "260004":
-          forecast:
-            inputs:
-              request:
-                param: ["167", "168"]
+          fc_inputs:
+            select:
+              param: ["167", "168"]
         "260242":
-          forecast:
-            inputs:
-              request:
-                param: ["167", "168"]
+          fc_inputs:
+            select:
+              param: ["167", "168"]
         "261016":
-          forecast:
-            inputs:
-              request:
-                param: ["167", "168"]
+          fc_inputs:
+            select:
+              param: ["167", "168"]
         "260005":
-          forecast:
-            inputs:
-              request:
-                param:  ["165", "166", "167"]
+          fc_inputs:
+            select:
+              param:  ["165", "166", "167"]
         "260255":
-          forecast:
-            inputs:
-              request:
-                param: ["165", "166", "167", "168"]
+          fc_inputs:
+            select:
+              param: ["165", "166", "167", "168"]
         "261018":
-          forecast:
-            inputs:
-              request:
-                param: ["165", "166", "167", "168"]
+          fc_inputs:
+            select:
+              param: ["165", "166", "167", "168"]
         "261002":
-          forecast:
-            inputs:
-              - request:
-                  param: ["47", "228021", "169", "175", "176", "177"]
-                derive_step:
-                  type: deaccumulate
-              - request:
-                  param: "167" # Required for metadata of cossza
+          fc_inputs:
+            - select:
+                param: ["47", "228021", "169", "175", "176", "177"]
+              derive:
+                step:
+                  name: step_deaccumulate
+            - select:
+                param: "167" # Required for metadata of cossza
         "261023":
-          forecast:
-            inputs:
-              request:
-                param: ["167", "168"]
+          fc_inputs:
+            select:
+              param: ["167", "168"]
     em/es/pb:
-      forecast:
-        inputs:
-          request:
-            param: "{param}"
+      fc_inputs:
+        select:
+          ensemble: True
     ep:
+      fc_inputs:
+        select:
+          ensemble: True
       filter:selection:
-        custom:
-          forecast:
-            inputs:
-              request:
-                param: "{param}"
+        custom: {}
         default:
           filter:param:
             131060/131061/131062/131063/131064/131065/131066/131067/131098/131099/131085:
               filter:class:
                 ai:
-                  forecast:
-                    inputs:
-                      request:
-                        param: "228228"
-                      derive_step:
-                        type: deaccumulate
+                  fc_inputs:
+                    select:
+                      param: "228228"
+                    derive:
+                      step:
+                        name: step_deaccumulate
                 od:
-                  forecast:
-                    inputs:
-                      request:
-                        param: "228"
-                      derive_step:
-                        type: deaccumulate
+                  fc_inputs:
+                    select:
+                      param: "228"
+                    derive:
+                      step:
+                        name: step_deaccumulate
             131068/131069:
-              forecast:
-                inputs:
-                  request:
-                    param: ["165", "166"]
+              fc_inputs:
+                select:
+                  param: ["165", "166"]
+            131070/131071/131072/131100:
+              fc_inputs:
+                select:
+                  param: "123"
+                derive:
+                  step:
+                    name: step_default
+                    by: 6
             "131073":
-              forecast:
-                inputs:
-                  request:
-                    param: "167"
+              fc_inputs:
+                select:
+                  param: "167"
             131074/131075/131076/131077:
-              forecast:
-                inputs:
-                  request:
-                    param: "140229"
+              fc_inputs:
+                select:
+                  param: "140229"
             131078/131079/131080/131081:
-              forecast:
-                inputs:
-                  request:
-                    param: "140232"
+              fc_inputs:
+                select:
+                  param: "140232"
+    pb:
+      fc_inputs:
+        select:
+          ensemble: True
