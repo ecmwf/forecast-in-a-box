@@ -42,8 +42,8 @@ from fiab_plugin_ecmwf.qubed_utils import select
 @pytest.fixture
 def dummy_blockinstance() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("dummy"),
         BlockInstanceBase(
-            factory_id=BlockFactoryId("dummy"),
             input_ids={},
             configuration_values={
                 SOURCE: "ecmwf-open-data",
@@ -75,8 +75,8 @@ def operational_forecast_source_action(dummy_blockinstance: BlockInstance) -> Ac
 @pytest.fixture
 def ensemble_statistics_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("ensembleStatistics"),
         BlockInstanceBase(
-            factory_id=plugin.ensembleStatistics.factory_id,  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 STATISTIC: ["mean"],

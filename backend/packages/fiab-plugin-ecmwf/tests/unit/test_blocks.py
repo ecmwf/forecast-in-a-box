@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from earthkit.workflows.fluent import Action
-from earthkit.workflows.nodetree import nodetree_dimensions
+from earthkit.workflows.nodetree import nodetree_arrays, nodetree_dimensions
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstanceId,
@@ -87,6 +87,7 @@ def select_configuration() -> BlockInstance:
 @pytest.fixture
 def zarr_sink_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("zarrSink"),
         _block_instance(
             "zarrSink",
             {
@@ -163,7 +164,9 @@ class TestOperationalForecastSource:
         assert contains(output, "step")
         assert contains(output, "number")
 
-    def test_compile_builds_action_from_catalogue(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.parametrize("forecast", ["aifs-ens", "ifs-ens"])
+    @pytest.mark.parametrize("time", [0, 6])
+    def test_compile_builds_action_from_catalogue(self, forecast: str, time: int) -> None:
         block = OperationalForecastSource()
         block_instance = BlockInstance.from_block(
             BlockFactoryId("operationalForecastSource"),
@@ -178,7 +181,7 @@ class TestOperationalForecastSource:
             OperationalForecastSource.configuration_options,
         )
         action = block.compile({}, block_instance).get_or_raise()
-        action = action.select({PARAM: ["2t", "u"], STEP: [0, 6], ENSEMBLE: [1]}, expand=True)
+        action = action.select({PARAM: ["167", "131"], STEP: [0, 6], ENSEMBLE: [1]}, expand=True)
         for _, array in nodetree_arrays(action.nodes):
             assert array.sizes[STEP] == 2
             assert array.sizes[ENSEMBLE] > 0
@@ -293,12 +296,8 @@ class TestSelect:
         self, select_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         block = _select()
-        config = select_configuration.model_copy(
-            update={
-                "configuration_values": _config(
-                    {"dimension": "param", "values": [_param_id_to_param_key("167"), _param_id_to_param_key("151")]}
-                )
-            }
+        config = select_configuration.with_configuration_values(
+            _config({"dimension": "param", "values": [_param_id_to_param_key("167"), _param_id_to_param_key("151")]})
         )
         output = block.validate(block=config, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         assert isinstance(output, QubedOutput)
@@ -402,7 +401,7 @@ class TestSelect:
         input_action = MagicMock()
         selected_action = MagicMock()
         input_action.select.return_value = selected_action
-        config = select_configuration.model_copy(update={"configuration_values": _config({"dimension": "type", "values": ["cf"]})})
+        config = select_configuration.with_configuration_values(_config({"dimension": "type", "values": ["cf"]}))
 
         result = block.compile(inputs={BlockInstanceId("source_output"): input_action}, block=config)  # type: ignore[dict-item]
         assert result.t is selected_action
@@ -797,7 +796,7 @@ class TestMapPlotSink:
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
-                        "param": ["2t"],
+                        "param": [_param_id_to_param_key("167")],
                         "domain": [-10, 35, 30, 60],
                         "format": "png",
                         "groupby": "none",
@@ -821,7 +820,7 @@ class TestMapPlotSink:
                 input_ids={"dataset": BlockInstanceId("source_output")},
                 configuration_values=_config(
                     {
-                        "param": ["2t"],
+                        "param": [_param_id_to_param_key("167")],
                         "domain": ["global"],
                         "format": "png",
                         "groupby": "none",
