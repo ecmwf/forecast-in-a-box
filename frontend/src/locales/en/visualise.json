@@ -45,6 +45,7 @@
     "external": "External data",
     "empty": "No runs with stored geographic outputs yet. Run a forecast with a GRIB sink, or add external data below.",
     "searchEmpty": "Nothing matches the search.",
+    "layersError": "Could not load this server's layers — {{error}}",
     "add": "Add",
     "lost": "No longer available",
     "lensUnavailable": "Not available on this deployment — SkinnyWMS is not installed",

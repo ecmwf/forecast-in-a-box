@@ -37,6 +37,7 @@ import type { PairedLayer, SourceSlot } from './layer-pairing'
 import type { ParsedLayer } from '../wms-capabilities'
 import type { CompareSelection } from './useCompareSelection'
 import type { LensSource } from '../hooks/useLensSource'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
@@ -104,11 +105,15 @@ export function GeoLayerBrowser({
   // interleave two unrelated catalogs and "A∩B" is empty by definition,
   // so unlinked mode offers just A | B.
   const unlinked = selection.linkMode !== 'linked'
+  // Solo: the persisted tab choice may say 'b'/'A∩B' — with no B that
+  // filters everything out and reads as an empty search.
   const effectiveFilter: SlotFilter =
     focusSlot ??
-    (unlinked && (slotFilter === 'all' || slotFilter === 'both')
-      ? 'a'
-      : slotFilter)
+    (!hasB
+      ? 'all'
+      : unlinked && (slotFilter === 'all' || slotFilter === 'both')
+        ? 'a'
+        : slotFilter)
 
   const filteredPairs = useMemo(
     () => pairs.filter((pair) => pairMatchesSearch(pair, query)),
@@ -255,6 +260,11 @@ export function GeoLayerBrowser({
             query={query}
             grouped={grouped}
             loading={sourceA.loadingLayers || sourceB.loadingLayers}
+            error={sourceA.error ?? sourceB.error}
+            onRetry={() => {
+              sourceA.retry()
+              sourceB.retry()
+            }}
           />
         ) : (
           <>
@@ -297,6 +307,8 @@ function LinkedSections({
   query,
   grouped,
   loading,
+  error,
+  onRetry,
 }: {
   partitioned: ReturnType<typeof groupPairs>
   selectedLevels: ReadonlySet<number>
@@ -305,6 +317,8 @@ function LinkedSections({
   query: string
   grouped: boolean
   loading: boolean
+  error: string | null
+  onRetry: () => void
 }) {
   const { t } = useTranslation('visualise')
   const { t: tExec } = useTranslation('executions')
@@ -331,6 +345,19 @@ function LinkedSections({
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {tExec('lens.loadingLayers')}
         </P>
+      )
+    }
+    // A failed catalog must never masquerade as an empty search.
+    if (error !== null) {
+      return (
+        <div className="space-y-2 p-2">
+          <P className="text-sm text-destructive">
+            {t('picker.layersError', { error })}
+          </P>
+          <Button size="sm" variant="outline" onClick={onRetry}>
+            {t('lens.retry')}
+          </Button>
+        </div>
       )
     }
     return (
@@ -684,6 +711,16 @@ function UnlinkedSourceSection({
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               {tExec('lens.loadingLayers')}
             </P>
+          ) : source.error !== null ? (
+            // A failed catalog must never masquerade as an empty search.
+            <div className="space-y-2 px-2 py-1">
+              <P className="text-sm text-destructive">
+                {t('picker.layersError', { error: source.error })}
+              </P>
+              <Button size="sm" variant="outline" onClick={source.retry}>
+                {t('lens.retry')}
+              </Button>
+            </div>
           ) : (
             <P className="px-2 py-1 text-sm text-muted-foreground">
               {t('picker.searchEmpty')}
