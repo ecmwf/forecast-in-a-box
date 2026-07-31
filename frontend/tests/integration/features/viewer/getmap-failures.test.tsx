@@ -68,6 +68,25 @@ describe('useGetMapFailureLog', () => {
     expect(log.failedEpochs.b.size).toBe(0)
   })
 
+  it('drops a deactivated layer’s marks via retainLayers', async () => {
+    let log!: GetMapFailureLog
+    await render(<Harness expose={(l) => (log = l)} />)
+
+    await act(() => {
+      log.report('a', 'pressure', T06, false)
+      log.report('a', 'temperature', T12, false)
+      log.report('b', 'pressure', T06, false)
+    })
+    expect([...log.failedEpochs.a].sort()).toEqual([E06, E12])
+
+    // Pressure deactivated on A: its mark goes; B is untouched.
+    await act(() => {
+      log.retainLayers('a', ['temperature'])
+    })
+    expect([...log.failedEpochs.a]).toEqual([E12])
+    expect([...log.failedEpochs.b]).toEqual([E06])
+  })
+
   it('keeps an epoch marked until every failing layer recovered', async () => {
     let log!: GetMapFailureLog
     await render(<Harness expose={(l) => (log = l)} />)

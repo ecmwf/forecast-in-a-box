@@ -36,6 +36,9 @@ export interface GetMapFailureLog {
   ) => void
   /** Drop a slot's marks (source or capabilities changed). */
   clearSlot: (slot: SourceSlot) => void
+  /** Drop marks from layers outside the active set — a deactivated
+   *  layer can never clear its marks by succeeding again. */
+  retainLayers: (slot: SourceSlot, layerNames: ReadonlyArray<string>) => void
 }
 
 export function useGetMapFailureLog({
@@ -82,6 +85,23 @@ export function useGetMapFailureLog({
     })
   }, [])
 
+  const retainLayers = useCallback(
+    (slot: SourceSlot, layerNames: ReadonlyArray<string>) => {
+      const keep = new Set(layerNames)
+      setMarks((prev) => {
+        const next = new Map(
+          [...prev].filter(([key]) => {
+            const parts = key.split('|')
+            // Layer names may contain '|' — everything past slot|epoch.
+            return parts[0] !== slot || keep.has(parts.slice(2).join('|'))
+          }),
+        )
+        return next.size === prev.size ? prev : next
+      })
+    },
+    [],
+  )
+
   // TTL prune — a mark may overstay by at most one interval; revisiting a
   // marked instant re-probes anyway (the layer stack retries on params).
   useEffect(() => {
@@ -104,5 +124,5 @@ export function useGetMapFailureLog({
     return out
   }, [marks])
 
-  return { failedEpochs, report, clearSlot }
+  return { failedEpochs, report, clearSlot, retainLayers }
 }

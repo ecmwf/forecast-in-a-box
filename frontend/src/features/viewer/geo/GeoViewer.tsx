@@ -441,6 +441,17 @@ export function GeoViewer({
     () => clearFailures('b'),
     [clearFailures, b?.baseUrl, sourceB.layers],
   )
+  // A deactivated layer's marks would otherwise linger until the TTL,
+  // painting failures the display no longer contains.
+  const retainFailureLayers = failures.retainLayers
+  useEffect(
+    () => retainFailureLayers('a', activeOrderA),
+    [retainFailureLayers, activeOrderA],
+  )
+  useEffect(
+    () => retainFailureLayers('b', activeOrderB),
+    [retainFailureLayers, activeOrderB],
+  )
   // Marks projected onto the shared axis exactly like availability, so a
   // mark paints where the failing instant is actually displayed.
   const trackFailures = useMemo(() => {
