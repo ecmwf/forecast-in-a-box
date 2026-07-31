@@ -32,6 +32,7 @@ from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsE
 from forecastbox.utility.concurrency.shutdown import shutdown_popen
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.pydantic import FiabBaseModel
+from forecastbox.utility.time import default_tz_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +118,9 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             # SkinnyWMS honours this via flask-cors on all endpoints.
             "SKINNYWMS_CORS_ORIGINS": "*",
             # SkinnyWMS localizes naive UTC GRIB datetimes via astimezone(),
-            # shifting advertised times by the host's UTC offset — pin UTC.
-            "TZ": "UTC",
+            # shifting advertised times by the host's UTC offset — we explicitly
+            # use the backend-wide default tz
+            "TZ": default_tz_fallback(),
         }
         process: subprocess.Popen[bytes] = subprocess.Popen(
             cmd,
