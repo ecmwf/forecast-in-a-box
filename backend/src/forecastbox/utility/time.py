@@ -7,7 +7,11 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Time and Date related utilities"""
+"""Time and Date related utilities. Centralizes all default tz and conversion
+logic as well, to have a consistent behaviour wrt naive timestamps and UTC etc"""
+
+# NOTE this file should be kept consistent with fiab-core's types handling of
+# datetimes and dates! It would be however odd to make this coupling explicit
 
 import sys
 from datetime import UTC, datetime, timedelta
@@ -23,6 +27,12 @@ TimeQueryReason = Literal[
     "dbref",  # for db inserts and created_at/updated_at
     "pylock_save",  # for creating the pylock.toml.timestamp file utilized by the installer
 ]
+
+
+def default_tz_fallback() -> str:
+    """In situations like launching external lenses, we prefer to override host TZ because
+    gribs are often produced with a tacit assumption of UTCness"""
+    return "UTC"
 
 
 def current_time(reason: TimeQueryReason) -> datetime:
