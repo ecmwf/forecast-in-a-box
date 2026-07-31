@@ -15,7 +15,7 @@
  * (OL then syncs pan/zoom/rotation natively).
  */
 
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import OlMap from 'ol/Map'
 import View from 'ol/View'
 import { fromLonLat, transformExtent } from 'ol/proj'
@@ -73,6 +73,8 @@ export interface OlMapBase {
   /** Provide the WMS-advertised bbox used by forced fits; triggers the
    *  initial unforced fit attempt. */
   setFitBbox: (bbox: [number, number, number, number] | null) => void
+  /** Bumps each time the OL map is recreated — dep for layer-mounting hooks. */
+  mapVersion: number
 }
 
 export function useOlMapBase(
@@ -82,6 +84,7 @@ export function useOlMapBase(
   const { view, resetKey, incLoading, decLoading } = options
   const mapRef = useRef<OlMap | null>(null)
   const basemapLayerRef = useRef<BasemapLayer | null>(null)
+  const [mapVersion, setMapVersion] = useState(0)
   const bboxRef = useRef<[number, number, number, number] | null>(null)
   // Keep the external view in a ref so a caller passing an inline-created
   // View doesn't retrigger the map effect (it must stay referentially
@@ -140,6 +143,9 @@ export function useOlMapBase(
       moveTolerance: 6,
     })
     mapRef.current = map
+    // Recreation signal for hooks that mount layers on the map — deps on
+    // the stable mapRef alone strand them on a replaced instance.
+    setMapVersion((v) => v + 1)
     // Sheets animate in from off-screen; the container is 0×0 at mount
     // time. Watch for resize and tell OL to recompute viewport size so
     // tiles render once the drawer settles. Auto-fit kicks in here too —
@@ -159,5 +165,5 @@ export function useOlMapBase(
     }
   }, [containerRef, resetKey, tryFit, incLoading, decLoading])
 
-  return { mapRef, basemapLayerRef, tryFit, setFitBbox }
+  return { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion }
 }
