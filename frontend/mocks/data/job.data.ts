@@ -130,6 +130,33 @@ const seedExecutions: Array<JobExecutionDetail> = [
   },
 ]
 
+/** Test-only fixture: a second completed run with a stored GRIB output —
+ * comparison tests pair it with job-completed-001. Not part of the default
+ * seed (list-driven tests assume a single completed run); inject it via
+ * {@link injectMockExecution}. */
+export const secondGribRunExecution: JobExecutionDetail = {
+  run_id: 'job-grib-b-008',
+  attempt_count: 1,
+  status: 'completed',
+  created_at: twoHoursAgo,
+  updated_at: twoHoursAgo,
+  blueprint_id: 'def-001',
+  blueprint_version: 1,
+  error: null,
+  progress: '100',
+  cascade_job_id: 'cascade-008',
+  lost_task_ids: {},
+  outputs: {
+    'task-out-grib-b': {
+      mime_type: 'text/plain; fiab-format=gribdir',
+      original_block: 'block_sink_1',
+      is_available: true,
+    },
+  },
+  completed_block_ids: null,
+  planned_block_ids: null,
+}
+
 /** Test-only fixture for the mixed-availability filter case. Not added to
  * the default seed — inject it via {@link injectMockExecution} from the test
  * that needs it, so other seed-dependent tests stay deterministic. */
@@ -473,11 +500,12 @@ export function createMockSvgBlob(): Blob {
 }
 
 /** Mock blob for a stored mime. Opaque mimes return PNG bytes so the
- * sniff-promotion path stays exercised; unknown mimes also fall back to PNG. */
-export function mockBlobForMime(mimeType: string): Blob {
+ * sniff-promotion path stays exercised; unknown mimes also fall back to PNG.
+ * GribSink markers resolve to a per-run directory path. */
+export function mockBlobForMime(mimeType: string, runId?: string): Blob {
   switch (mimeType) {
     case 'text/plain; fiab-format=gribdir':
-      return new Blob(['/data/output/job-completed-001_1'], {
+      return new Blob([`/data/output/${runId ?? 'job-completed-001'}_1`], {
         type: 'text/plain',
       })
     case 'application/pdf':

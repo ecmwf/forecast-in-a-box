@@ -69,6 +69,8 @@ interface RunViewModelCore {
   isBookmarked: boolean
   /** Produced-artifact count; 0 falls back to the sink-block count. */
   producedOutputs: number
+  /** Of the produced outputs, how many are no longer retrievable. */
+  lostOutputs: number
 }
 
 /** Build the shared view model — both adapters funnel through here. */
@@ -90,6 +92,7 @@ function buildRunViewModel(core: RunViewModelCore): ForecastRunViewModel {
     createdAt: core.createdAt,
     modelLabel: canDeriveBlocks ? deriveModelLabel(builder, catalogue) : null,
     outputCount: core.producedOutputs || sinkCount,
+    lostOutputCount: core.lostOutputs,
     outputKinds: canDeriveBlocks ? deriveSinkKinds(builder, catalogue) : [],
     tags: stripSystemTags(core.blueprint?.tags),
     blueprintId: core.blueprintId,
@@ -126,6 +129,7 @@ export function runDetailToViewModel({
     catalogue,
     isBookmarked,
     producedOutputs: run.outputs ? Object.keys(run.outputs).length : 0,
+    lostOutputs: Object.keys(run.lost_task_ids).length,
   })
 }
 
@@ -160,5 +164,6 @@ export function scheduleRunToViewModel({
     catalogue,
     isBookmarked,
     producedOutputs: 0,
+    lostOutputs: 0,
   })
 }

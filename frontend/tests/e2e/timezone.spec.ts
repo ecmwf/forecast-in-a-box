@@ -25,7 +25,7 @@ const UI_STORE_KEY = 'fiab.store.ui'
 
 async function gotoDashboard(page: Page): Promise<void> {
   await page.goto('/')
-  await page.waitForURL(/dashboard/, { timeout: 15000 })
+  await page.waitForURL(/overview/, { timeout: 15000 })
   await page.waitForLoadState('networkidle')
 }
 

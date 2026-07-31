@@ -14,7 +14,7 @@
  * Commands for navigating to different pages and starting a new configuration.
  */
 
-import { History, Home, Layers, Settings, Wrench } from 'lucide-react'
+import { Earth, History, Home, Layers, Settings, Wrench } from 'lucide-react'
 import i18n from 'i18next'
 import type { NavigateFn } from '@tanstack/react-router'
 import type { Command } from './registry'
@@ -43,7 +43,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       category: 'Navigation',
       keywords: ['home', 'dashboard', 'main'],
       hotkey: ['G', 'D'],
-      action: () => navigate({ to: '/dashboard' }),
+      action: () => navigate({ to: '/overview' }),
     },
     {
       id: 'nav-configure',
@@ -63,7 +63,17 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       category: 'Navigation',
       keywords: ['executions', 'history', 'past', 'runs', 'journal', 'jobs'],
       hotkey: ['G', 'E'],
-      action: () => navigate({ to: '/executions' }),
+      action: () => navigate({ to: '/execute' }),
+    },
+    {
+      id: 'nav-visualise',
+      label: i18n.t('common:commands.visualise.label'),
+      description: i18n.t('common:commands.visualise.description'),
+      icon: <Earth className="h-4 w-4" />,
+      category: 'Navigation',
+      keywords: ['visualise', 'visualize', 'map', 'compare', 'wms', 'viewer'],
+      hotkey: ['G', 'V'],
+      action: () => navigate({ to: '/visualise' }),
     },
     {
       id: 'nav-admin',

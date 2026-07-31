@@ -11,33 +11,23 @@
 /**
  * Lists sink outputs written to disk, derived from the run's own outputs:
  * GribSink streams its (run-private, glyph-resolved) output directory as a
- * `GRIB_DIR_MIME` payload, which this card fetches and serves to a SkinnyWMS
- * lens. "Open" mounts the in-app WMS viewer, the copy action copies the
+ * `GRIB_DIR_MIME` payload. "Visualise" opens the output on /visualise (a
+ * lens is started there as needed); the copy action copies the
  * GetCapabilities URL for external WMS clients (QGIS, ArcGIS, …). The lens
- * lifecycle is explicit on the row: a running server shows a status badge
- * with its port and a Stop control; closing the viewer sheet does not stop
- * the server.
+ * lifecycle is explicit on the row: a running server shows a Stop control.
  */
 
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import {
-  Copy,
-  Eye,
-  FolderOpen,
-  Loader2,
-  Maximize2,
-  Minimize2,
-  Play,
-  Square,
-  X,
-} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Copy, Earth, FolderOpen, Loader2, Play, Square } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { RunOutputs } from '@/api/types/job.types'
+import type { LostTaskIds } from '@/features/executions/outputs/availability'
+import { classifyOutput } from '@/features/executions/outputs/availability'
 import { getFactory } from '@/api/types/fable.types'
 import {
   useLensStatus,
@@ -45,32 +35,20 @@ import {
   useStartSkinnyWms,
   useStopLens,
 } from '@/api/hooks/useLens'
-import { buildLensBaseUrl, buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
-import { getJobResultHead } from '@/api/endpoints/job'
+import { buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
+import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
 import { showToast } from '@/lib/toast'
 import { cn, copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { P } from '@/components/base/typography'
-
-const WmsViewer = lazy(() => import('./WmsViewer'))
-
-/** The directory payload is a short path — cap the fetch defensively. */
-const DIR_PAYLOAD_BYTES = 1024
 
 const GRIB_CHIP_CLASS =
   'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
@@ -83,27 +61,16 @@ function splitPath(path: string): { dir: string; name: string } {
   return { dir: trimmed.slice(0, idx + 1), name: trimmed.slice(idx + 1) }
 }
 
-/** Resolve the lens directory for a marker output: its payload holds the
- * glyph-resolved output directory as plain text, written by the backend. */
-function useStoredDirPath(jobId: string, taskId: string, enabled: boolean) {
-  return useQuery<string>({
-    queryKey: ['job-result', 'stored-dir', jobId, taskId],
-    queryFn: async () => {
-      const head = await getJobResultHead(jobId, taskId, DIR_PAYLOAD_BYTES)
-      return new TextDecoder().decode(head).trim()
-    },
-    enabled,
-    staleTime: Infinity,
-    retry: 1,
-  })
-}
-
 interface StoredOutputsCardProps {
   jobId: string
   outputs: RunOutputs | null
+  /** Reasons for outputs that are no longer retrievable. */
+  lostTaskIds?: LostTaskIds
   /** Optional: resolve human-readable sink titles from the run's fable. */
   fable?: FableBuilderV1
   catalogue?: BlockFactoryCatalogue
+  /** Blueprint display name — snapshotted into comparison entries. */
+  runName?: string
 }
 
 interface StoredOutputRow {
@@ -112,6 +79,8 @@ interface StoredOutputRow {
   taskId: string
   title: string
   isAvailable: boolean
+  /** Reason the sink's data is no longer retrievable. */
+  lostReason?: string
   /** Number of GRIB marker tasks the sink fanned out to. */
   count: number
 }
@@ -119,14 +88,12 @@ interface StoredOutputRow {
 export function StoredOutputsCard({
   jobId,
   outputs,
+  lostTaskIds = {},
   fable,
   catalogue,
+  runName,
 }: StoredOutputsCardProps) {
   const { t } = useTranslation('executions')
-  const [viewer, setViewer] = useState<{
-    lensId: string
-    title: string
-  } | null>(null)
 
   // One row per sink block — a sink fans out to one marker task per cascade
   // branch (e.g. per ensemble member), all pointing at the same directory.
@@ -135,6 +102,11 @@ export function StoredOutputsCard({
     const byBlock = new Map<string, StoredOutputRow>()
     for (const [taskId, meta] of Object.entries(outputs)) {
       if (meta.mime_type !== GRIB_DIR_MIME) continue
+      const availability = classifyOutput(
+        meta.is_available,
+        taskId,
+        lostTaskIds,
+      )
       const existing = byBlock.get(meta.original_block)
       if (existing) {
         existing.count += 1
@@ -142,6 +114,13 @@ export function StoredOutputsCard({
         if (!existing.isAvailable && meta.is_available) {
           existing.taskId = taskId
           existing.isAvailable = true
+          existing.lostReason = undefined
+        } else if (
+          !existing.isAvailable &&
+          existing.lostReason === undefined &&
+          availability.state === 'lost'
+        ) {
+          existing.lostReason = availability.reason
         }
         continue
       }
@@ -155,53 +134,44 @@ export function StoredOutputsCard({
         taskId,
         title: factory?.title ?? meta.original_block,
         isAvailable: meta.is_available,
+        lostReason:
+          availability.state === 'lost' ? availability.reason : undefined,
         count: 1,
       })
     }
     return Array.from(byBlock.values())
-  }, [outputs, fable, catalogue])
+  }, [outputs, lostTaskIds, fable, catalogue])
 
   if (rows.length === 0) return null
 
   return (
-    <>
-      <Card shadow="none" className="gap-3 p-4">
-        <div className="flex items-center gap-2">
-          <FolderOpen className="h-4 w-4 text-muted-foreground" />
-          <P className="font-medium">{t('storedOutputs.title')}</P>
-        </div>
-        <ul className="divide-y divide-border">
-          {rows.map((row) => (
-            <StoredOutputRowItem
-              key={row.blockId}
-              jobId={jobId}
-              row={row}
-              onOpenViewer={(lensId, title) => setViewer({ lensId, title })}
-            />
-          ))}
-        </ul>
-      </Card>
-      {viewer && (
-        <Suspense fallback={null}>
-          <LensViewerSheet
-            lensInstanceId={viewer.lensId}
-            title={viewer.title}
-            onClose={() => setViewer(null)}
+    <Card shadow="none" className="gap-3 p-4">
+      <div className="flex items-center gap-2">
+        <FolderOpen className="h-4 w-4 text-muted-foreground" />
+        <P className="font-medium">{t('storedOutputs.title')}</P>
+      </div>
+      <ul className="divide-y divide-border">
+        {rows.map((row) => (
+          <StoredOutputRowItem
+            key={row.blockId}
+            jobId={jobId}
+            row={row}
+            runName={runName}
           />
-        </Suspense>
-      )}
-    </>
+        ))}
+      </ul>
+    </Card>
   )
 }
 
 function StoredOutputRowItem({
   jobId,
   row,
-  onOpenViewer,
+  runName,
 }: {
   jobId: string
   row: StoredOutputRow
-  onOpenViewer: (lensId: string, title: string) => void
+  runName?: string
 }) {
   const { t } = useTranslation('executions')
   // false only when the backend reports SkinnyWMS as not installed.
@@ -210,7 +180,7 @@ function StoredOutputRowItem({
   const stopMutation = useStopLens()
   const dirQuery = useStoredDirPath(jobId, row.taskId, row.isAvailable)
   const dirPath = dirQuery.data
-  // The row owns its lens instance; the viewer sheet only displays it.
+  // The row owns its lens instance.
   const [lensId, setLensId] = useState<string | null>(null)
   const statusQuery = useLensStatus(lensId ?? undefined)
 
@@ -255,8 +225,24 @@ function StoredOutputRowItem({
     )
   }
 
-  const view = () => {
-    if (lensId) onOpenViewer(lensId, dirPath ?? row.title)
+  const navigate = useNavigate()
+  const visualise = () => {
+    void navigate({
+      to: '/visualise',
+      search: {
+        a: entryRef({
+          kind: 'output',
+          jobId,
+          taskId: row.taskId,
+          blockId: row.blockId,
+          runName: runName ?? '',
+          blockTitle: row.title,
+          runCreatedAt: null,
+        }),
+        // Deliberate single view of THIS output — no basket auto-pair.
+        b: SLOT_B_OFF,
+      },
+    })
   }
 
   const copy = () => {
@@ -314,8 +300,11 @@ function StoredOutputRowItem({
         ) : row.isAvailable ? (
           <P className="font-mono text-xs text-muted-foreground">…</P>
         ) : (
-          <P className="text-xs text-muted-foreground italic">
-            {t('storedOutputs.fileMissing')}
+          <P
+            className="text-xs text-muted-foreground italic"
+            title={row.lostReason}
+          >
+            {row.lostReason ?? t('storedOutputs.fileMissing')}
           </P>
         )}
         {/* Inline note: disabled buttons can't surface a title/tooltip. */}
@@ -326,6 +315,17 @@ function StoredOutputRowItem({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
+        {row.isAvailable && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={visualise}
+            className="gap-1.5"
+          >
+            <Earth className="h-3.5 w-3.5" />
+            {t('storedOutputs.visualise')}
+          </Button>
+        )}
         {!row.isAvailable ? null : running ? (
           <>
             <Button
@@ -363,15 +363,6 @@ function StoredOutputRowItem({
                 </P>
               </TooltipContent>
             </Tooltip>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={view}
-              className="gap-1.5"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              {t('storedOutputs.view')}
-            </Button>
           </>
         ) : (
           <Button
@@ -394,105 +385,5 @@ function StoredOutputRowItem({
         )}
       </div>
     </li>
-  )
-}
-
-/**
- * Bottom sheet hosting the WMS viewer for a row-owned lens. Closing the
- * sheet only hides the viewer — the server keeps running and remains
- * stoppable from the row badge (and `ActiveLensesCard`).
- */
-function LensViewerSheet({
-  lensInstanceId,
-  title,
-  onClose,
-}: {
-  lensInstanceId: string
-  title: string
-  onClose: () => void
-}) {
-  const { t } = useTranslation('executions')
-  const statusQuery = useLensStatus(lensInstanceId)
-  const [expanded, setExpanded] = useState(false)
-
-  const status = statusQuery.data?.status
-  const port = statusQuery.data?.ports[0]
-  const inFailedState =
-    statusQuery.isError || status === 'failed' || status === 'terminated'
-
-  return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
-      <SheetContent
-        side="bottom"
-        showCloseButton={false}
-        style={{ height: expanded ? '95vh' : '50vh' }}
-        // Full-height slide-up: the panel is much taller than a default sheet.
-        className="flex flex-col gap-0 p-0 duration-300 data-[side=bottom]:data-ending-style:translate-y-full data-[side=bottom]:data-starting-style:translate-y-full"
-      >
-        <SheetHeader className="flex flex-row items-start gap-3 border-b border-border p-4">
-          <div className="min-w-0 flex-1">
-            <SheetTitle>{t('lens.title')}</SheetTitle>
-            {/* Hint + path share a line when wide; the path wraps below when cramped. */}
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <SheetDescription className="shrink-0">
-                {t('lens.subtitle')}
-              </SheetDescription>
-              <span
-                className="min-w-0 grow basis-64 truncate font-mono text-xs text-muted-foreground"
-                title={title}
-              >
-                {title}
-              </span>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setExpanded((e) => !e)}
-            aria-label={expanded ? t('lens.collapse') : t('lens.expand')}
-            title={expanded ? t('lens.collapse') : t('lens.expand')}
-          >
-            {expanded ? (
-              <Minimize2 className="h-3.5 w-3.5" />
-            ) : (
-              <Maximize2 className="h-3.5 w-3.5" />
-            )}
-          </Button>
-          <SheetClose
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                aria-label={t('storedOutputs.close')}
-              />
-            }
-          >
-            <X className="h-3.5 w-3.5" />
-          </SheetClose>
-        </SheetHeader>
-        {inFailedState ? (
-          <div className="m-auto max-w-md space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-6 text-center">
-            <P className="font-semibold text-destructive">
-              {t('storedOutputs.lensFailed')}
-            </P>
-            <P className="text-sm text-destructive/80">
-              {statusQuery.error?.message ?? status ?? 'unknown'}
-            </P>
-            <Button variant="outline" onClick={onClose}>
-              {t('storedOutputs.close')}
-            </Button>
-          </div>
-        ) : status !== 'running' || port === undefined ? (
-          <div className="m-auto flex items-center gap-3 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>{t('storedOutputs.starting')}</span>
-          </div>
-        ) : (
-          <WmsViewer baseUrl={buildLensBaseUrl(port)} />
-        )}
-      </SheetContent>
-    </Sheet>
   )
 }

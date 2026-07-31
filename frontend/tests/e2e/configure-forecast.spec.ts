@@ -29,7 +29,7 @@ import type { Page } from '@playwright/test'
  */
 async function navigateTo(page: Page, path: string) {
   await page.goto('/')
-  await page.waitForURL(/dashboard/, { timeout: 15000 })
+  await page.waitForURL(/overview/, { timeout: 15000 })
   await page.waitForLoadState('networkidle')
   await page.goto(path)
   await page.waitForLoadState('networkidle')
@@ -38,7 +38,7 @@ async function navigateTo(page: Page, path: string) {
 
 /** Fork the first plugin template; false when the environment ships none. */
 async function openTemplateConfig(page: Page): Promise<boolean> {
-  await navigateTo(page, '/dashboard')
+  await navigateTo(page, '/overview')
   // Generous: opening the dialog costs a real /blueprint/expand.
   const card = page.getByTestId('starter-template-card').first()
   if (!(await card.isVisible({ timeout: 30000 }).catch(() => false))) {

@@ -55,7 +55,7 @@ function AuthenticatedLayout() {
     <DashboardLayout
       notificationMessage={t('notification.newModels')}
       notificationLinkText={t('notification.registryLink')}
-      notificationLinkHref="#"
+      notificationLinkHref="/admin/artifacts"
     >
       <Outlet />
     </DashboardLayout>

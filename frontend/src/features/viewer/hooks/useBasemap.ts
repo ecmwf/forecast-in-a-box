@@ -1,0 +1,181 @@
+/*
+ * (C) Copyright 2026- ECMWF and individual contributors.
+ *
+ * This software is licensed under the terms of the Apache Licence Version 2.0
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
+ * granted to it by virtue of its status as an intergovernmental organisation nor
+ * does it submit to any jurisdiction.
+ */
+
+/**
+ * Basemap management for a viewer map: the swap between the external
+ * vector basemap and the lens's SkinnyWMS-native background, plus the
+ * coastline/border reference overlay that rides above the data layers
+ * while the native basemap is active. One instance per (map × lens).
+ */
+
+import { useEffect, useMemo, useRef } from 'react'
+import ImageLayer from 'ol/layer/Image'
+import { skinnyWmsBasemap } from '../wms-capabilities'
+import {
+  BASEMAPS,
+  DEFAULT_BASEMAP_ID,
+  REFERENCE_OVERLAY_Z,
+  SKINNYWMS_BASEMAP,
+  WEB_MERCATOR_EXTENT,
+  makeBasemapLayer,
+  makeDataLayerSource,
+  makeSkinnyWmsBasemap,
+} from '../ol-layers'
+import type { RefObject } from 'react'
+import type OlMap from 'ol/Map'
+import type ImageWMS from 'ol/source/ImageWMS'
+import type { ParsedLayer } from '../wms-capabilities'
+import type { BasemapLayer, BasemapOption } from '../ol-layers'
+
+export function useBasemap(options: {
+  mapRef: RefObject<OlMap | null>
+  basemapLayerRef: RefObject<BasemapLayer | null>
+  baseUrl: string
+  decorationLayers: ReadonlyArray<ParsedLayer>
+  basemapId: string
+  /** Basemap layer opacity (0 hides it entirely). Default 1. */
+  opacity?: number
+  incLoading: () => void
+  decLoading: () => void
+}): void {
+  const {
+    mapRef,
+    basemapLayerRef,
+    baseUrl,
+    decorationLayers,
+    basemapId,
+    opacity = 1,
+    incLoading,
+    decLoading,
+  } = options
+  // What this map actually shows. The skinny basemap is served BY the
+  // lens (key includes baseUrl); a rebuilt map arrives showing the
+  // default — both cases must re-apply.
+  const appliedRef = useRef<{ map: OlMap | null; key: string }>({
+    map: null,
+    key: DEFAULT_BASEMAP_ID,
+  })
+  const referenceLayerRef = useRef<ImageLayer<ImageWMS> | null>(null)
+  const opacityRef = useRef(opacity)
+  opacityRef.current = opacity
+
+  // SkinnyWMS decoration layers, split into base map + reference layers.
+  const skinnyBasemap = useMemo(
+    () => skinnyWmsBasemap(decorationLayers),
+    [decorationLayers],
+  )
+  // Offer the SkinnyWMS basemap only once a `background` layer is advertised.
+  const availableBasemaps = useMemo<ReadonlyArray<BasemapOption>>(
+    () => [
+      ...BASEMAPS,
+      ...(skinnyBasemap.background ? [SKINNYWMS_BASEMAP] : []),
+    ],
+    [skinnyBasemap.background],
+  )
+
+  // -------- Basemap swap --------
+  // Full layer replacement (not setSource) — the basemap types differ.
+  useEffect(() => {
+    const map = mapRef.current
+    const oldLayer = basemapLayerRef.current
+    if (!map || !oldLayer) return
+    if (appliedRef.current.map !== map) {
+      // A (re)built map mounts the default basemap (useOlMapBase).
+      appliedRef.current = { map, key: DEFAULT_BASEMAP_ID }
+    }
+    const opt = availableBasemaps.find((b) => b.id === basemapId) ?? BASEMAPS[0]
+    const key =
+      opt.type === 'skinnywms' && skinnyBasemap.background
+        ? `${opt.id}|${baseUrl}`
+        : opt.id
+    if (appliedRef.current.key === key) return
+    appliedRef.current = { map, key }
+    let newLayer: BasemapLayer
+    if (opt.type === 'skinnywms' && skinnyBasemap.background) {
+      const skinny = makeSkinnyWmsBasemap(
+        baseUrl,
+        skinnyBasemap.background.name,
+      )
+      const source = skinny.getSource()
+      source?.on('imageloadstart', incLoading)
+      source?.on('imageloadend', decLoading)
+      source?.on('imageloaderror', decLoading)
+      newLayer = skinny
+    } else {
+      // Carto basemap — or skinnywms with no background, which falls back.
+      const external = opt.type === 'skinnywms' ? BASEMAPS[0] : opt
+      const tiled = makeBasemapLayer(external)
+      const source = tiled.getSource()
+      source?.on('tileloadstart', incLoading)
+      source?.on('tileloadend', decLoading)
+      source?.on('tileloaderror', decLoading)
+      newLayer = tiled
+    }
+    map.removeLayer(oldLayer)
+    map.getLayers().insertAt(0, newLayer)
+    basemapLayerRef.current = newLayer
+  }, [
+    basemapId,
+    availableBasemaps,
+    skinnyBasemap.background,
+    baseUrl,
+    mapRef,
+    basemapLayerRef,
+    incLoading,
+    decLoading,
+  ])
+
+  // Basemap opacity — applied to whichever layer currently holds the slot
+  // (swaps create fresh layers, so this also covers the initial state).
+  // The SkinnyWMS reference overlay (coastlines/borders above the data)
+  // is part of the same base cartography, so it follows the slider too.
+  useEffect(() => {
+    basemapLayerRef.current?.setOpacity(opacity)
+    referenceLayerRef.current?.setOpacity(opacity)
+  }, [opacity, basemapId, basemapLayerRef])
+
+  // -------- SkinnyWMS reference overlay --------
+  // Coastline/border layers over the data while the SkinnyWMS basemap is
+  // active. Tied to the basemap choice — no separate toggle.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (basemapId !== SKINNYWMS_BASEMAP.id) return
+    if (skinnyBasemap.reference.length === 0) return
+    const source = makeDataLayerSource(baseUrl, {
+      LAYERS: skinnyBasemap.reference.map((l) => l.name).join(','),
+      STYLES: '',
+      FORMAT: 'image/png',
+      TRANSPARENT: 'TRUE',
+    })
+    source.on('imageloadstart', incLoading)
+    source.on('imageloadend', decLoading)
+    source.on('imageloaderror', decLoading)
+    const overlay = new ImageLayer({
+      source,
+      zIndex: REFERENCE_OVERLAY_Z,
+      extent: WEB_MERCATOR_EXTENT,
+    })
+    overlay.setOpacity(opacityRef.current)
+    referenceLayerRef.current = overlay
+    map.addLayer(overlay)
+    return () => {
+      referenceLayerRef.current = null
+      map.removeLayer(overlay)
+    }
+  }, [
+    basemapId,
+    skinnyBasemap.reference,
+    baseUrl,
+    mapRef,
+    incLoading,
+    decLoading,
+  ])
+}

@@ -28,6 +28,7 @@ import {
 } from '@tanstack/react-router'
 import { z } from 'zod'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
+import { resetLensState } from '@tests/../mocks/data/lens.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { RunListPage } from '@/features/executions/components/RunListPage'
@@ -70,10 +71,10 @@ function renderJobList() {
   })
   const executionsRoute = createRoute({
     getParentRoute: () => authenticatedRoute,
-    path: '/executions',
+    path: '/execute',
     component: () => <Outlet />,
   })
-  // Index route id `/_authenticated/executions/` — matches RunListPage's getRouteApi call.
+  // Index route id `/_authenticated/execute/` — matches RunListPage's getRouteApi call.
   const listRoute = createRoute({
     getParentRoute: () => executionsRoute,
     path: '/',
@@ -90,7 +91,7 @@ function renderJobList() {
   ])
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ['/executions'] }),
+    history: createMemoryHistory({ initialEntries: ['/execute'] }),
   })
 
   return render(
@@ -108,6 +109,7 @@ describe('RunListPage Integration', () => {
   beforeEach(() => {
     localStorage.clear()
     resetJobsState()
+    resetLensState()
   })
 
   describe('rendering', () => {

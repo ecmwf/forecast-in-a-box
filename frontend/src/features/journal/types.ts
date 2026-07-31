@@ -11,7 +11,7 @@
 import type { JobStatus } from '@/api/types/job.types'
 
 /**
- * The shape both run surfaces — the dashboard journal and /executions —
+ * The shape both run surfaces — the dashboard journal and /execute —
  * render. Built by the adapters from a raw run plus its blueprint.
  */
 export interface ForecastRunViewModel {
@@ -31,6 +31,8 @@ export interface ForecastRunViewModel {
   modelLabel: string | null
   /** Outputs the run produced, or the planned sink-block count. */
   outputCount: number
+  /** Produced outputs no longer retrievable; subset of {@link outputCount}. */
+  lostOutputCount: number
   /** Sink-block titles — the kinds of output the configuration produces. */
   outputKinds: Array<string>
   /** User tags, system markers stripped. */

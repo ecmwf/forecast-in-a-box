@@ -88,6 +88,8 @@ export const STORAGE_KEYS = {
     fableBuilderUi: 'fiab.store.fable-builder-ui',
     /** Notification center history (completed/failed task records) */
     activity: 'fiab.store.activity',
+    /** Geographic comparison basket (collected sources) */
+    comparison: 'fiab.store.comparison',
   },
 } as const
 
@@ -111,7 +113,8 @@ export const STORE_VERSIONS = {
   ui: 6, // v6: Add application timezone preference
   config: 1,
   fableBuilder: 2, // v2: Removed configDisplayMode, added isMiniMapOpen
-  activity: 1,
+  activity: 2, // v2: navigateTo rewritten for /executions→/execute, /dashboard→/overview
+  comparison: 1,
 } as const
 
 /**

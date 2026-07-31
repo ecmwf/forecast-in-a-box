@@ -23,10 +23,12 @@ import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 import { cleanup } from 'vitest-browser-react'
 import { worker } from '../mocks/browser'
 import { resetJobsState } from '../mocks/data/job.data'
+import { resetWmsState } from '../mocks/data/wms.data'
 import { resetArtifactsHandlerState } from '../mocks/handlers/artifacts.handlers'
 import { resetFableHandlerState } from '../mocks/handlers/fable.handlers'
 import { resetPluginsHandlerState } from '../mocks/handlers/plugins.handlers'
 import { useActivityStore } from '@/stores/activityStore'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import { useCommandStore } from '@/stores/commandStore'
 import { useConfigStore } from '@/stores/configStore'
 import { useUiStore } from '@/stores/uiStore'
@@ -52,6 +54,7 @@ function resetSharedState(): void {
   resetPluginsHandlerState()
   resetArtifactsHandlerState()
   resetJobsState()
+  resetWmsState()
 
   // Zustand stores that tests write to
   useFableBuilderStore.getState().reset()
@@ -60,6 +63,7 @@ function resetSharedState(): void {
   useStatusStore.getState().reset()
   useConfigStore.getState().resetConfig()
   useActivityStore.getState().clearAll()
+  useComparisonStore.setState({ entries: [] })
 
   // localStorage carries both the persisted UI-preferences slice and any
   // fable-builder draft written by `useDraftPersistence`. Test files that

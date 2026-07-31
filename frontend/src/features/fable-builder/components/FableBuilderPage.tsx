@@ -33,6 +33,7 @@ import {
   readDraft,
   useDraftPersistence,
 } from '@/features/fable-builder/hooks/useDraftPersistence'
+import { useViewportFill } from '@/hooks/useViewportFill'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { hasUnterminatedGlyph } from '@/features/fable-builder/utils/glyph-display'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -107,6 +108,7 @@ export function FableBuilderPage({
   templateName,
 }: FableBuilderPageProps) {
   const { t } = useTranslation(['configure', 'common'])
+  const canvasFill = useViewportFill(true, { insetPx: 0 })
   const fable = useFableBuilderStore((state) => state.fable)
   const setFable = useFableBuilderStore((state) => state.setFable)
   const newFable = useFableBuilderStore((state) => state.newFable)
@@ -433,7 +435,7 @@ export function FableBuilderPage({
         <Button
           variant="outline"
           nativeButton={false}
-          render={<Link to="/dashboard" />}
+          render={<Link to="/overview" />}
         >
           {t('page.backToDashboard')}
         </Button>
@@ -454,9 +456,11 @@ export function FableBuilderPage({
 
   return (
     <GlyphProvider>
+      {/* Measured height — survives banner dismissal (no chrome calc). */}
       <div
+        ref={canvasFill.ref}
         className="flex min-w-0 flex-col"
-        style={{ height: 'calc(100vh - 7rem)' }}
+        style={{ height: canvasFill.height ?? 'calc(100vh - 7rem)' }}
       >
         <FableBuilderHeader
           fableId={templateMode ? undefined : fableId}

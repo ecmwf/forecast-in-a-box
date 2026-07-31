@@ -23,7 +23,10 @@ import { MimeFilterChips } from './MimeFilterChips'
 import { OutputCard } from './OutputCard'
 import { resolveAdapter } from './registry'
 import { SkeletonOutputCard } from './SkeletonOutputCard'
+import { LostOutputCard } from './LostOutputCard'
 import { needsSniff, useResolvedMimes } from './useResolvedMimes'
+import { classifyOutput } from './availability'
+import type { LostTaskIds } from './availability'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { OutputAdapter, OutputItem } from './types'
 import { isTerminalStatus } from '@/api/types/job.types'
@@ -59,6 +62,8 @@ interface OutputsViewProps {
   jobId: string
   status: JobStatus
   outputs: RunOutputs | null
+  /** Reasons for outputs that are no longer retrievable. */
+  lostTaskIds?: LostTaskIds
   /** Drives the subtle highlight on currently-processing skeletons. */
   completedBlockIds?: ReadonlyArray<string> | null
   /** Surfaces block-level skeletons before any outputs payload arrives. */
@@ -71,13 +76,14 @@ export function OutputsView({
   jobId,
   status,
   outputs,
+  lostTaskIds = {},
   completedBlockIds,
   plannedBlockIds,
   toolbarSlot,
 }: OutputsViewProps) {
   const { t } = useTranslation('executions')
   const navigate = useNavigate()
-  const search = useSearch({ from: '/_authenticated/executions/$jobId' })
+  const search = useSearch({ from: '/_authenticated/execute/$jobId' })
   const [activeViewer, setActiveViewer] = useState<{
     item: OutputItem
     adapter: OutputAdapter
@@ -92,13 +98,22 @@ export function OutputsView({
     const list = Object.entries(outputs)
       // GRIB markers show in the Stored outputs card, not the grid.
       .filter(([, meta]) => meta.mime_type !== GRIB_DIR_MIME)
-      .map(([taskId, meta]) => ({
-        jobId,
-        taskId,
-        mimeType: meta.mime_type,
-        originalBlock: meta.original_block,
-        isAvailable: meta.is_available,
-      }))
+      .map(([taskId, meta]) => {
+        const availability = classifyOutput(
+          meta.is_available,
+          taskId,
+          lostTaskIds,
+        )
+        return {
+          jobId,
+          taskId,
+          mimeType: meta.mime_type,
+          originalBlock: meta.original_block,
+          isAvailable: meta.is_available,
+          lostReason:
+            availability.state === 'lost' ? availability.reason : undefined,
+        }
+      })
     list.sort((a, b) => {
       if (a.originalBlock !== b.originalBlock) {
         return a.originalBlock < b.originalBlock ? -1 : 1
@@ -107,22 +122,31 @@ export function OutputsView({
       return a.taskId < b.taskId ? -1 : 1
     })
     return list
-  }, [jobId, outputs])
+  }, [jobId, outputs, lostTaskIds])
 
   /** GRIB markers aren't grid cards, but still count toward the header tally
    * and block count. */
   const storedStats = useMemo(() => {
     let available = 0
     let pending = 0
+    let lost = 0
     const blocks = new Set<string>()
-    for (const meta of Object.values(outputs ?? {})) {
+    for (const [taskId, meta] of Object.entries(outputs ?? {})) {
       if (meta.mime_type !== GRIB_DIR_MIME) continue
       blocks.add(meta.original_block)
-      if (meta.is_available) available += 1
-      else pending += 1
+      switch (classifyOutput(meta.is_available, taskId, lostTaskIds).state) {
+        case 'available':
+          available += 1
+          break
+        case 'lost':
+          lost += 1
+          break
+        default:
+          pending += 1
+      }
     }
-    return { available, pending, blocks }
-  }, [outputs])
+    return { available, pending, lost, blocks }
+  }, [outputs, lostTaskIds])
   const hasStoredOutputs = storedStats.blocks.size > 0
 
   /** Sniffer-promoted mimes for the whole list. Resolved here, not per card,
@@ -162,7 +186,7 @@ export function OutputsView({
 
   const setActiveMimes = (next: ReadonlyArray<string>): void => {
     void navigate({
-      to: '/executions/$jobId',
+      to: '/execute/$jobId',
       params: { jobId },
       search: (prev) => ({
         ...prev,
@@ -174,7 +198,7 @@ export function OutputsView({
 
   const setGroupBy = (next: GroupBy): void => {
     void navigate({
-      to: '/executions/$jobId',
+      to: '/execute/$jobId',
       params: { jobId },
       search: (prev) => ({
         ...prev,
@@ -226,29 +250,36 @@ export function OutputsView({
 
   /** Single filter pass over the unified list (or synthesised fallback).
    * Counts shown in the toolbar are derived from this same pass. */
-  const { visibleItems, visibleAvailableCount, visiblePendingCount } =
-    useMemo(() => {
-      const source = items.length > 0 ? items : blockSkeletons
-      const visible: Array<OutputItem> = []
-      let available = 0
-      let pending = 0
-      for (const item of source) {
-        if (
-          activeMimes.length > 0 &&
-          !activeMimes.includes(effectiveMime(item))
-        ) {
-          continue
-        }
-        visible.push(item)
-        if (item.isAvailable) available += 1
-        else pending += 1
+  const {
+    visibleItems,
+    visibleAvailableCount,
+    visiblePendingCount,
+    visibleLostCount,
+  } = useMemo(() => {
+    const source = items.length > 0 ? items : blockSkeletons
+    const visible: Array<OutputItem> = []
+    let available = 0
+    let pending = 0
+    let lost = 0
+    for (const item of source) {
+      if (
+        activeMimes.length > 0 &&
+        !activeMimes.includes(effectiveMime(item))
+      ) {
+        continue
       }
-      return {
-        visibleItems: visible,
-        visibleAvailableCount: available,
-        visiblePendingCount: pending,
-      }
-    }, [items, blockSkeletons, activeMimes, effectiveMime])
+      visible.push(item)
+      if (item.isAvailable) available += 1
+      else if (item.lostReason !== undefined) lost += 1
+      else pending += 1
+    }
+    return {
+      visibleItems: visible,
+      visibleAvailableCount: available,
+      visiblePendingCount: pending,
+      visibleLostCount: lost,
+    }
+  }, [items, blockSkeletons, activeMimes, effectiveMime])
 
   const isRunning = !isTerminalStatus(status)
 
@@ -294,6 +325,7 @@ export function OutputsView({
   const shownAvailable = visibleAvailableCount + storedStats.available
   const totalAvailable = availableCount + storedStats.available
   const shownPending = visiblePendingCount + storedStats.pending
+  const shownLost = visibleLostCount + storedStats.lost
 
   const toolbar = (
     <div className="flex w-full flex-wrap items-center justify-between gap-3">
@@ -303,6 +335,11 @@ export function OutputsView({
         {shownPending > 0 && (
           <span className="ml-2">
             · {t('outputs.pending')}: {shownPending}
+          </span>
+        )}
+        {shownLost > 0 && (
+          <span className="ml-2">
+            · {t('outputs.lost')}: {shownLost}
           </span>
         )}
       </P>
@@ -610,6 +647,11 @@ function FlexGridItem({
           item={item}
           adapter={resolveAdapter(effectiveMime(item))}
           onOpenViewer={onOpenViewer}
+        />
+      ) : item.lostReason !== undefined ? (
+        <LostOutputCard
+          originalBlock={item.originalBlock}
+          reason={item.lostReason}
         />
       ) : (
         <SkeletonOutputCard

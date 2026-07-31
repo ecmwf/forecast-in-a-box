@@ -34,8 +34,10 @@ import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { StoredOutputsCard } from './StoredOutputsCard'
+import type { CSSProperties } from 'react'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
+import { useViewportFill } from '@/hooks/useViewportFill'
 import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
@@ -61,7 +63,7 @@ const WIDE_TAB_CONTENT =
 
 export function RunDetailPage() {
   const { t } = useTranslation('executions')
-  const { jobId } = useParams({ from: '/_authenticated/executions/$jobId' })
+  const { jobId } = useParams({ from: '/_authenticated/execute/$jobId' })
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('outputs')
   const [metadataOpen, setMetadataOpen] = useState(false)
@@ -87,6 +89,7 @@ export function RunDetailPage() {
   }, [jobId, resetExecutionSelection])
 
   const layoutMode = useUiStore((state) => state.layoutMode)
+  const columnsFill = useViewportFill(true, { insetPx: 32 })
   const { data: catalogue } = useBlockCatalogue()
 
   // Sync scroll-to-top before paint — a tall /configure scroll position
@@ -111,7 +114,7 @@ export function RunDetailPage() {
             }),
             status: 'active',
             startedAt: Date.now(),
-            navigateTo: `/executions/${jobId}`,
+            navigateTo: `/execute/${jobId}`,
           })
           showToast.success(t('actions.restartJob'))
         },
@@ -129,7 +132,7 @@ export function RunDetailPage() {
       {
         onSuccess: () => {
           showToast.success(t('actions.deleteJob'))
-          navigate({ to: '/executions' })
+          navigate({ to: '/execute' })
         },
         onError: (error) => {
           log.error('Failed to delete job', { jobId, error })
@@ -178,7 +181,7 @@ export function RunDetailPage() {
         <Button
           variant="outline"
           nativeButton={false}
-          render={<Link to="/executions" />}
+          render={<Link to="/execute" />}
         >
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           {t('errors.backToExecutions')}
@@ -235,11 +238,17 @@ export function RunDetailPage() {
       {/* Wide: side-by-side, pinned to viewport height with independent
           column scroll. Narrow: stacked single-document scroll. */}
       <div
+        ref={columnsFill.ref}
+        style={
+          columnsFill.height !== null
+            ? ({ '--fill-h': `${columnsFill.height}px` } as CSSProperties)
+            : undefined
+        }
         className={cn(
           'flex flex-1 flex-col gap-8',
-          // Wide: pin to viewport minus chrome (~17rem). flex-none cancels
-          // the inherited flex-1 so the explicit height is honoured.
-          'min-[1280px]:h-[calc(100vh_-_17rem)] min-[1280px]:flex-row',
+          // Wide: pin to the measured viewport remainder (calc fallback).
+          // flex-none cancels the inherited flex-1 so the height holds.
+          'min-[1280px]:h-[var(--fill-h,calc(100vh_-_17rem))] min-[1280px]:flex-row',
           'min-[1280px]:flex-none min-[1280px]:gap-6 min-[1280px]:overflow-hidden',
         )}
       >
@@ -309,13 +318,16 @@ export function RunDetailPage() {
               <StoredOutputsCard
                 jobId={jobId}
                 outputs={jobData.outputs}
+                lostTaskIds={jobData.lost_task_ids}
                 fable={fableData?.builder}
                 catalogue={catalogue}
+                runName={fableData?.display_name ?? undefined}
               />
               <OutputsPanel
                 jobId={jobId}
                 status={jobData.status}
                 outputs={jobData.outputs}
+                lostTaskIds={jobData.lost_task_ids}
                 completedBlockIds={jobData.completed_block_ids}
                 plannedBlockIds={jobData.planned_block_ids}
                 toolbarSlot={toolbarSlot}
