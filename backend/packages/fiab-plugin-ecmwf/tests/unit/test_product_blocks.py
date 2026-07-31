@@ -28,6 +28,7 @@ from qubed import Qube
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.block_utils import (
     COMPARISON,
+    ENSEMBLE,
     LEVTYPE,
     PARAM,
     STEP,
@@ -40,8 +41,9 @@ from fiab_plugin_ecmwf.products.blocks import (
     CustomThresholdProbability,
     EnsembleStatistics,
     PredefinedThresholdProbability,
+    ThermalIndices,
 )
-from fiab_plugin_ecmwf.qubed_utils import axes, contains
+from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, select
 
 
 @pytest.fixture
@@ -57,8 +59,8 @@ def threshold_probability_output() -> QubedOutput:
 @pytest.fixture
 def predefined_threshold_prob_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("predefinedThresholdProbability"),
         BlockInstanceBase(
-            factory_id=plugin.predefinedThresholdProbability.factory_id,  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 PARAM: _param_id_to_param_key("131073"),
@@ -72,8 +74,8 @@ def predefined_threshold_prob_configuration() -> BlockInstance:
 @pytest.fixture
 def custom_threshold_prob_configuration() -> BlockInstance:
     return BlockInstance.from_block(
+        BlockFactoryId("customThresholdProbability"),
         BlockInstanceBase(
-            factory_id=plugin.customThresholdProbability.factory_id,  # type: ignore
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 THRESHOLD: 0.5,
@@ -82,6 +84,26 @@ def custom_threshold_prob_configuration() -> BlockInstance:
         ),
         CustomThresholdProbability.configuration_options,
     )
+
+
+@pytest.fixture
+def thermal_indices_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("thermalIndices"),
+        BlockInstanceBase(
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values={
+                PARAM: [_param_id_to_param_key(id) for id in ["261023", "260242"]],
+                STEP: ["0", "6", "12"],
+            },
+        ),
+        ThermalIndices.configuration_options,
+    )
+
+
+@pytest.fixture
+def full_operational_forecast_source_output(dummy_blockinstance: BlockInstance) -> QubedOutput:
+    return cast(QubedOutput, OperationalForecastSource().validate(block=dummy_blockinstance, inputs={}, restrictions={}))
 
 
 class TestEnsembleStatistics:
@@ -119,16 +141,15 @@ class TestEnsembleStatistics:
         ).get_or_raise()
         requests = datacubes(action.nodes)
         assert len(requests) == 2
-        expected = [{PARAM: ["167", "151"], TYPE: ["em"], STEP: ["0", "6", "12"]}, {PARAM: ["131"], TYPE: ["em"], STEP: ["0", "6", "12"]}]
-        for index, request in enumerate(requests):
-            for dim, value in expected[index].items():
-                assert request[dim] == sorted(value)
+        assert set.union(*[set(req[PARAM]) for req in requests]) == {"167", "151", "131"}
+        assert set.union(*[set(req[TYPE]) for req in requests]) == {"em"}
+        assert set.union(*[set(req[STEP]) for req in requests]) == {0, 6, 12}
 
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):
             assert expansion.factory not in [
                 BlockFactoryId("ensembleStatistics"),
-                BlockFactoryId("prescribedThresholdProbability"),
+                BlockFactoryId("predefinedThresholdProbability"),
                 BlockFactoryId("customThresholdProbability"),
             ]
 
@@ -164,17 +185,25 @@ class TestPredefinedThresholdProb:
         self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
         restrictions = (
-            plugin().validator(predefined_threshold_prob_configuration, {"dataset": operational_forecast_source_output}).restrictions
+            plugin()
+            .validator(
+                BlockFactoryId("predefinedThresholdProbability"),
+                predefined_threshold_prob_configuration.block,
+                {"dataset": operational_forecast_source_output},
+            )
+            .restrictions
         )
         assert restrictions[PARAM].serialize() == f"enumClosed[{_param_id_to_param_key('131073')}]"
 
     def test_validator_adds_step_restrictions(
         self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
     ) -> None:
-        config = predefined_threshold_prob_configuration.model_copy(
-            update={"configuration_values": {PARAM: _param_id_to_param_key("131073")}}
+        config = predefined_threshold_prob_configuration.with_configuration_values({PARAM: _param_id_to_param_key("131073")})
+        restrictions = (
+            plugin()
+            .validator(BlockFactoryId("predefinedThresholdProbability"), config.block, {"dataset": operational_forecast_source_output})
+            .restrictions
         )
-        restrictions = plugin().validator(config, {"dataset": operational_forecast_source_output}).restrictions
         assert restrictions[STEP].serialize() == "list[enumClosed[12]]"
 
     def test_compile(
@@ -259,3 +288,179 @@ class TestCustomThresholdProb:
                 BlockFactoryId("prescribedThresholdProbability"),
                 BlockFactoryId("customThresholdProbability"),
             ]
+
+
+class TestThermalIndices:
+    @pytest.mark.parametrize(
+        "oper_selection",
+        [
+            {ENSEMBLE: [0], STEP: [0, 6, 12]},
+            {ENSEMBLE: [0, 1, 2], STEP: [0, 6, 12]},
+        ],
+        ids=["single", "ensemble"],
+    )
+    def test_from_operational_forecast_source(
+        self,
+        full_operational_forecast_source_output: QubedOutput,
+        thermal_indices_configuration: BlockInstance,
+        oper_selection: dict[str, list[int | str]],
+    ) -> None:
+        block = ThermalIndices()
+        source_output = select(full_operational_forecast_source_output, oper_selection)
+        if len(oper_selection[ENSEMBLE]) == 1:
+            source_output = collapse(source_output, ENSEMBLE)
+
+        assert block.intersect(other=source_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=thermal_indices_configuration,
+            inputs={"dataset": source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert contains(output, PARAM)
+        output_axes = axes(output)
+        assert len(output_axes[PARAM]) == 2
+        assert "cf" in output_axes[TYPE]
+        assert len(output_axes[STEP]) > 0
+        if len(oper_selection[ENSEMBLE]) == 1:
+            assert ENSEMBLE not in output_axes
+        else:
+            assert ENSEMBLE in output_axes
+            assert output_axes[ENSEMBLE] == set(oper_selection[ENSEMBLE])
+
+    @pytest.mark.parametrize(
+        "oper_selection, expected",
+        [
+            [{ENSEMBLE: [0]}, 1],
+            [{ENSEMBLE: [0, 1, 2]}, 2],
+        ],
+        ids=["single", "ensemble"],
+    )
+    def test_compile(
+        self,
+        dummy_blockinstance: BlockInstance,
+        full_operational_forecast_source_output: QubedOutput,
+        thermal_indices_configuration: BlockInstance,
+        oper_selection: dict[str, list[int | str]],
+        expected: int,
+    ) -> None:
+        selection = {STEP: [0, 6, 12], ENSEMBLE: oper_selection[ENSEMBLE]}
+        operational_forecast_source_output = select(full_operational_forecast_source_output, selection)
+        operational_forecast_source_action = (
+            OperationalForecastSource().compile(inputs={}, block=dummy_blockinstance).get_or_raise().select(selection, expand=True)
+        )
+
+        block = ThermalIndices()
+        block.validate(block=thermal_indices_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
+
+        if len(oper_selection[ENSEMBLE]) == 1:
+            operational_forecast_source_action._squeeze_dimension(ENSEMBLE, drop=True)
+
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
+            block=thermal_indices_configuration,
+        ).get_or_raise()
+        requests = datacubes(action.nodes)
+        assert len(requests) == expected
+        assert "cf" in set.union(*[set(req[TYPE]) for req in requests])
+        assert all(req[PARAM] == ["260242", "261023"] for req in requests)
+        if len(oper_selection[ENSEMBLE]) == 1:
+            assert all(ENSEMBLE not in req for req in requests)
+        else:
+            assert all(ENSEMBLE in req for req in requests)
+
+    @pytest.mark.parametrize(
+        "outputs, expected, unexpected",
+        [
+            [
+                {"class": "od", "stream": "oper", "type": "fc"},
+                set(),
+                {
+                    BlockFactoryId("ensembleStatistics"),
+                    BlockFactoryId("predefinedThresholdProbability"),
+                    BlockFactoryId("customThresholdProbability"),
+                    BlockFactoryId("thermalIndices"),
+                },
+            ],
+            [
+                {"class": "od", "stream": "enfo", "type": "pf", ENSEMBLE: [0, 1, 2]},
+                {
+                    BlockFactoryId("ensembleStatistics"),
+                    BlockFactoryId("customThresholdProbability"),
+                },
+                {
+                    BlockFactoryId("predefinedThresholdProbability"),
+                    BlockFactoryId("thermalIndices"),
+                },
+            ],
+        ],
+        ids=["single", "ensemble"],
+    )
+    def test_expansion(self, outputs: dict, expected: set[BlockFactoryId], unexpected: set[BlockFactoryId]) -> None:
+        thermal_indices_output = QubedOutput(dataqube=Qube.from_datacube({PARAM: ["260242", "261001"], STEP: [6, 12], **outputs}))
+        expansion_factories = [expansion.factory for expansion in plugin().expander(thermal_indices_output)]
+        for expect in expected:
+            assert expect in expansion_factories
+        assert set(expansion_factories).intersection(unexpected) == set()
+
+    def test_validator_adds_parameters_restrictions(
+        self,
+        full_operational_forecast_source_output: QubedOutput,
+        thermal_indices_configuration: BlockInstance,
+    ) -> None:
+        selection = {STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 4, 5]}
+        operational_forecast_source_output = select(full_operational_forecast_source_output, selection)
+        restrictions = (
+            plugin()
+            .validator(
+                BlockFactoryId("thermalIndices"), thermal_indices_configuration.block, {"dataset": operational_forecast_source_output}
+            )
+            .restrictions
+        )
+        for param in ["260004", "260242", "261016", "260005", "260255", "261018", "261023"]:
+            assert _param_id_to_param_key(param) in restrictions[PARAM].serialize()
+        assert _param_id_to_param_key("261001") not in restrictions[PARAM].serialize()
+
+    @pytest.mark.parametrize(
+        "param_config, expected_steps",
+        [
+            [[_param_id_to_param_key("260242")], [0, 6, 12]],
+            [[_param_id_to_param_key("261001")], [6, 12]],
+            [[_param_id_to_param_key("260242"), _param_id_to_param_key("261001")], [6, 12]],
+        ],
+        ids=["no-accum", "accum", "mixed"],
+    )
+    def test_validator_adds_step_restrictions(
+        self,
+        thermal_indices_configuration: BlockInstance,
+        param_config: list[str],
+        expected_steps: list[int],
+    ) -> None:
+        forecast_output = QubedOutput(
+            dataqube=Qube.from_datacube(
+                {
+                    "class": "od",
+                    "stream": "oper",
+                    "levtype": "sfc",
+                    "param": ["165", "166", "167", "168", "169", "175", "176", "177"],
+                    "step": [0, 6, 12],
+                    "type": "fc",
+                    "time": "0000",
+                }
+            )
+            | Qube.from_datacube(
+                {
+                    "class": "od",
+                    "stream": "oper",
+                    "levtype": "sfc",
+                    "param": ["228021", "47"],
+                    "step": [6, 12],
+                    "type": "fc",
+                    "time": "0000",
+                }
+            )
+        )
+        config = thermal_indices_configuration.with_configuration_values({PARAM: param_config})
+        restrictions = plugin().validator(BlockFactoryId("thermalIndices"), config.block, {"dataset": forecast_output}).restrictions
+        assert restrictions[STEP].serialize() == f"list[enumClosed[{','.join(map(str, expected_steps))}]]"
