@@ -132,6 +132,8 @@
     },
     "spySize": "Spy size",
     "loupeHint": "Hold Z to magnify",
+    "loupeLatch": "Magnifier on",
+    "loupeOptions": "Magnifier options",
     "loupeMirror": "Magnify both panels",
     "loupeSize": "Magnifier size",
     "loupeZoom": "Magnifier zoom"
@@ -140,6 +142,7 @@
     "label": "Valid time",
     "gap": "No data at this time — {{slot}}",
     "trackAria": "Availability for source {{slot}}",
+    "trackValue": "Step {{position}} of {{count}}",
     "linkAria": "Time link mode",
     "link": {
       "exact": "Same time (exact)",

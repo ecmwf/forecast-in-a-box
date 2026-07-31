@@ -259,6 +259,7 @@ export function GeoActiveLayersPanel({
                   render={
                     <button
                       type="button"
+                      aria-label={tExec('lens.preloadHelp')}
                       className="shrink-0 text-muted-foreground/60 hover:text-muted-foreground"
                     />
                   }

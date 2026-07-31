@@ -15,6 +15,7 @@
  * swipe divider a11y, flicker toggle, zero-overlap auto-unlink.
  */
 
+import axe from 'axe-core'
 import { createContext, useContext, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from '@vitest/browser/context'
@@ -359,8 +360,10 @@ describe('GeoViewer', () => {
     await expect
       .element(screen.getByRole('slider', { name: /Blend B over A/ }))
       .toBeInTheDocument()
-    // Loupe hint is visible for single-map modes.
-    await expect.element(screen.getByText('Hold Z to magnify')).toBeVisible()
+    // Loupe lives as a toolbar split-button now, not an always-on row.
+    await expect
+      .element(screen.getByRole('button', { name: 'Magnifier on' }))
+      .toBeVisible()
   })
 
   it('drives sidebars, modes, and help via keyboard shortcuts', async () => {
@@ -813,7 +816,9 @@ describe('GeoViewer solo', () => {
       screen.getByRole('switch', { name: /link layer selection/i }).elements(),
     ).toHaveLength(0)
     expect(
-      screen.getByRole('img', { name: 'Availability for source B' }).elements(),
+      screen
+        .getByRole('slider', { name: 'Availability for source B' })
+        .elements(),
     ).toHaveLength(0)
     // Plain copy button — the per-slot menu is comparison-only.
     expect(
@@ -824,7 +829,9 @@ describe('GeoViewer solo', () => {
     await screen.getByText('2 m temperature').first().click()
     await expect.element(screen.getByText('1 / 2')).toBeVisible()
     await expect
-      .element(screen.getByRole('img', { name: 'Availability for source A' }))
+      .element(
+        screen.getByRole('slider', { name: 'Availability for source A' }),
+      )
       .toBeInTheDocument()
     // Global opacity stays; the per-source tier is comparison-only.
     await expect
@@ -1180,5 +1187,71 @@ describe('GeoViewer responsive layout', () => {
     } finally {
       await page.viewport(1280, 800)
     }
+  })
+})
+
+describe('GeoViewer accessibility', () => {
+  it('axe: no serious violations in the active comparison viewer', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+    await expect.element(screen.getByText('1 / 3')).toBeVisible()
+
+    const results = await axe.run(document.body, {
+      // Unstyled test env — color contrast is meaningless here.
+      rules: { 'color-contrast': { enabled: false } },
+    })
+    const serious = results.violations.filter(
+      (v) => v.impact === 'serious' || v.impact === 'critical',
+    )
+    expect(
+      serious.map(
+        (v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
+      ),
+    ).toEqual([])
+  })
+
+  it("keyboard: track slider steps through one source's instants", async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+    await expect.element(screen.getByText('1 / 3')).toBeVisible()
+
+    // B covers only T06/T12 of the union: End/ArrowLeft skip steps B lacks.
+    const track = screen.getByRole('slider', {
+      name: 'Availability for source B',
+    })
+    const el = track.element() as HTMLElement
+    el.focus()
+    el.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'End',
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    await expect.element(screen.getByText('3 / 3')).toBeVisible()
+    el.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'ArrowLeft',
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    await expect.element(screen.getByText('2 / 3')).toBeVisible()
+  })
+
+  it('latches the loupe from the toolbar (keyboard/touch path)', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await expect
+      .element(screen.getByText('2 m temperature').first())
+      .toBeVisible()
+
+    const latch = screen.getByRole('button', { name: 'Magnifier on' })
+    await latch.click()
+    await expect.element(latch).toHaveAttribute('aria-pressed', 'true')
+    await latch.click()
+    await expect.element(latch).toHaveAttribute('aria-pressed', 'false')
   })
 })

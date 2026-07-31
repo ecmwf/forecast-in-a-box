@@ -703,6 +703,7 @@ export function SingleMapView({
         containerRef={containerRef}
         sizePx={loupeSizePx}
         zoom={loupeZoom}
+        latched={options.loupeLatched}
       />
       <OverlayHoverCard hover={overlayHover} />
       <PinnedLegendsBar items={pinnedLegends} onUnpin={onUnpinLegend} />

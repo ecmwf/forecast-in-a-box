@@ -42,6 +42,8 @@ export const COMPARE_KEYS = {
   export: 'E',
   help: 'H',
   annotate: 'N',
+  /** Hold-to-magnify (handled in LoupeOverlay, not via useHotkey). */
+  loupe: 'Z',
   modes: ['1', '2', '3', '4', '5'],
   pan: ['W', 'A', 'S', 'D'],
 } as const

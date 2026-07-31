@@ -72,6 +72,8 @@ export interface CompareModeOptions {
   loupeSizePx: number
   /** Hold-Z loupe magnification factor. */
   loupeZoom: number
+  /** Latch the loupe on (keyboard/touch path — Z is hold-only). */
+  loupeLatched: boolean
 }
 
 /** One captured map for export: raw composited canvas + metadata. The

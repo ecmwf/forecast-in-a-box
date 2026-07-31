@@ -477,6 +477,92 @@ export function GeoToolbar({
             <KeyBadge label={keyLabel(COMPARE_KEYS.export)} show={reveal} />
             <Download className="h-4 w-4" />
           </Button>
+          {/* Magnifier split-button: click latches, chevron opens settings. */}
+          <span className="flex items-center">
+            <Button
+              variant={options.loupeLatched ? 'secondary' : 'ghost'}
+              size="icon"
+              className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+              aria-pressed={options.loupeLatched}
+              onClick={() =>
+                onOptionsChange({ loupeLatched: !options.loupeLatched })
+              }
+              title={`${t('modes.loupeLatch')} (${keyLabel(COMPARE_KEYS.loupe)})`}
+              aria-label={t('modes.loupeLatch')}
+            >
+              <KeyBadge label={keyLabel(COMPARE_KEYS.loupe)} show={reveal} />
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Popover>
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="-ml-1 h-7 w-4"
+                    title={t('modes.loupeOptions')}
+                    aria-label={t('modes.loupeOptions')}
+                  />
+                }
+              >
+                <ChevronDown className="h-3 w-3" />
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 space-y-3 p-3">
+                <label className="flex items-center gap-2 text-xs whitespace-nowrap">
+                  <Switch
+                    size="sm"
+                    checked={options.loupeLatched}
+                    onCheckedChange={(v) =>
+                      onOptionsChange({ loupeLatched: v })
+                    }
+                  />
+                  {t('modes.loupeLatch')}
+                </label>
+                <P className="text-xs text-muted-foreground">
+                  {t('modes.loupeHint')}
+                </P>
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span>{t('modes.loupeZoom')}</span>
+                  <Segmented
+                    aria={t('modes.loupeZoom')}
+                    value={String(options.loupeZoom)}
+                    items={[
+                      { id: '2', label: '2×' },
+                      { id: '3', label: '3×' },
+                      { id: '4', label: '4×' },
+                    ]}
+                    onChange={(id) =>
+                      onOptionsChange({ loupeZoom: Number(id) })
+                    }
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs">
+                  <span className="shrink-0">{t('modes.loupeSize')}</span>
+                  <Slider
+                    value={[options.loupeSizePx]}
+                    min={120}
+                    max={360}
+                    step={20}
+                    onValueChange={(v) =>
+                      onOptionsChange({ loupeSizePx: firstNumber(v) })
+                    }
+                  />
+                </label>
+                {!solo && mode === 'side' && (
+                  <label className="flex items-center gap-2 text-xs whitespace-nowrap">
+                    <Switch
+                      size="sm"
+                      checked={options.loupeMirror}
+                      onCheckedChange={(v) =>
+                        onOptionsChange({ loupeMirror: v })
+                      }
+                    />
+                    {t('modes.loupeMirror')}
+                  </label>
+                )}
+              </PopoverContent>
+            </Popover>
+          </span>
           <Button
             variant="ghost"
             size="icon"
@@ -501,7 +587,7 @@ export function GeoToolbar({
   )
 }
 
-/** Contextual controls for the active mode (just the loupe hint for side/flicker). */
+/** Contextual controls for the active mode; nothing for side/flicker. */
 function ModeActionRow({
   mode,
   options,
@@ -513,7 +599,7 @@ function ModeActionRow({
 }) {
   const { t } = useTranslation('visualise')
 
-  // Fixed-height row, always rendered — keeps the divider/toolbar height steady across modes.
+  if (mode !== 'swipe' && mode !== 'spy' && mode !== 'blend') return null
   return (
     <div className="flex min-h-9 flex-wrap items-center gap-4 border-t border-border/60 pt-2 text-sm max-sm:flex-nowrap max-sm:overflow-x-auto">
       {mode === 'swipe' && (
@@ -568,44 +654,6 @@ function ModeActionRow({
           <span className="font-mono font-bold">B</span>
         </label>
       )}
-      {/* Loupe controls grouped on the right: the hint, plus the mirror
-          toggle when side-by-side. */}
-      <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="flex shrink-0 items-center gap-1">
-          <ZoomIn className="h-3.5 w-3.5" />
-          {t('modes.loupeHint')}
-        </span>
-        <Segmented
-          aria={t('modes.loupeZoom')}
-          value={String(options.loupeZoom)}
-          items={[
-            { id: '2', label: '2×' },
-            { id: '3', label: '3×' },
-            { id: '4', label: '4×' },
-          ]}
-          onChange={(id) => onChange({ loupeZoom: Number(id) })}
-        />
-        <label className="flex w-36 shrink-0 items-center gap-2">
-          <span className="shrink-0">{t('modes.loupeSize')}</span>
-          <Slider
-            value={[options.loupeSizePx]}
-            min={120}
-            max={360}
-            step={20}
-            onValueChange={(v) => onChange({ loupeSizePx: firstNumber(v) })}
-          />
-        </label>
-        {mode === 'side' && (
-          <label className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-            <Switch
-              size="sm"
-              checked={options.loupeMirror}
-              onCheckedChange={(v) => onChange({ loupeMirror: v })}
-            />
-            {t('modes.loupeMirror')}
-          </label>
-        )}
-      </div>
     </div>
   )
 }

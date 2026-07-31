@@ -587,9 +587,39 @@ function SlotRunTrack({
         {slot.toUpperCase()}
       </span>
       <div
-        role="img"
+        // Arrows step this source's instants only; the main slider walks the union.
+        role="slider"
+        tabIndex={0}
         aria-label={t('timeline.trackAria', { slot: slot.toUpperCase() })}
-        className="relative flex h-2 cursor-pointer items-stretch gap-px py-0"
+        aria-valuemin={0}
+        aria-valuemax={Math.max(0, availability.length - 1)}
+        aria-valuenow={currentIndex}
+        aria-valuetext={t('timeline.trackValue', {
+          position: currentIndex + 1,
+          count: availability.length,
+        })}
+        className="relative flex h-2 cursor-pointer items-stretch gap-px py-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        onKeyDown={(e) => {
+          const jumpAvailable = (dir: 1 | -1) => {
+            for (
+              let i = currentIndex + dir;
+              i >= 0 && i < availability.length;
+              i += dir
+            ) {
+              if (availability[i]) return onJump(i)
+            }
+          }
+          if (e.key === 'ArrowRight') jumpAvailable(1)
+          else if (e.key === 'ArrowLeft') jumpAvailable(-1)
+          else if (e.key === 'Home') {
+            const i = availability.indexOf(true)
+            if (i >= 0) onJump(i)
+          } else if (e.key === 'End') {
+            const i = availability.lastIndexOf(true)
+            if (i >= 0) onJump(i)
+          } else return
+          e.preventDefault()
+        }}
         onPointerMove={(e) => onHover(indexFromPointer(e))}
         onPointerLeave={() => onHover(null)}
         onClick={(e) => onJump(indexFromPointer(e))}

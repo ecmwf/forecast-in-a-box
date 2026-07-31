@@ -34,6 +34,7 @@ export function LoupeOverlay({
   mirror = null,
   sizePx = DEFAULT_LOUPE_SIZE_PX,
   zoom = DEFAULT_LOUPE_ZOOM,
+  latched = false,
 }: {
   containerRef: RefObject<HTMLDivElement | null>
   /** Sibling panel's cursor fraction — mirrors the loupe onto this map
@@ -43,8 +44,11 @@ export function LoupeOverlay({
   sizePx?: number
   /** Magnification factor (screen CSS px → loupe CSS px). */
   zoom?: number
+  /** Keep the loupe on without holding Z (keyboard/touch path). */
+  latched?: boolean
 }) {
-  const [active, setActive] = useState(false)
+  const [zHeld, setZHeld] = useState(false)
+  const active = latched || zHeld
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sourceSize = sizePx / zoom
@@ -60,12 +64,12 @@ export function LoupeOverlay({
         )
       )
         return
-      setActive(true)
+      setZHeld(true)
     }
     const up = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'z') setActive(false)
+      if (e.key.toLowerCase() === 'z') setZHeld(false)
     }
-    const blur = () => setActive(false)
+    const blur = () => setZHeld(false)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', blur)
@@ -169,8 +173,12 @@ export function LoupeOverlay({
       <div
         aria-hidden="true"
         className="absolute inset-0 z-20 cursor-crosshair"
+        // Touch: a tap parks the loupe; only mouse-leave clears it.
+        onPointerDown={onShieldMove}
         onPointerMove={onShieldMove}
-        onPointerLeave={() => setPos(null)}
+        onPointerLeave={(e) => {
+          if (e.pointerType === 'mouse') setPos(null)
+        }}
       />
       {drawPos && (
         <>
