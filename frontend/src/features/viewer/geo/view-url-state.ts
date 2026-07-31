@@ -9,16 +9,13 @@
  */
 
 /**
- * Slim view state carried in /visualise search params so a copied URL
- * (or F5) reproduces the view, not just the source pair: active layer
- * stacks, valid time, time-link policy, camera, basemap. Deliberately
- * excluded: annotations/overlays (unbounded — they have file export
- * flows), per-layer opacities, the time clip, and independent-mode
- * per-side instants.
+ * Slim view state in /visualise search params — a copied URL (or F5)
+ * reproduces the view: layer stacks, valid time, time-link, camera,
+ * basemap. Excluded: annotations/overlays (unbounded — export flows),
+ * opacities, time clip, independent per-side instants.
  */
 
-// Import discipline: VisualisePage uses this module statically while the
-// viewer chunk stays lazy — nothing here may pull in OpenLayers.
+// The page imports this statically — keep OpenLayers out of the main chunk.
 import type { TimeLinkMode } from './time-link'
 
 export interface ViewerCamera {
@@ -41,8 +38,7 @@ export interface ViewerUrlState {
   basemap?: string
 }
 
-/** The search-param projection. Every key is always present (possibly
- *  undefined) so spreading over `prev` strips stale values. */
+/** Search-param projection; every key present so spreads strip stale values. */
 export interface ViewerSearchState {
   la: string | undefined
   lb: string | undefined
@@ -59,8 +55,7 @@ const MAX_URL_LAYERS = 12
 /** Per-param budget keeping the whole URL comfortably under ~2 KB. */
 const MAX_NAMES_CHARS = 1500
 
-/** WMS reserves the comma as the LAYERS separator, so names can't
- *  contain one — a name that somehow does is dropped, not split. */
+/** WMS reserves the comma as separator — a name containing one is dropped. */
 function joinNames(names: ReadonlyArray<string>): string | undefined {
   const kept: Array<string> = []
   let length = 0
@@ -83,8 +78,7 @@ function splitNames(value: string | undefined): Array<string> | undefined {
   return names.length > 0 ? names : undefined
 }
 
-// In-range values pass through untouched — the modulo arithmetic would
-// smear them with float error.
+// In-range values pass through — the modulo smears them with float error.
 const wrapLon = (lon: number): number =>
   lon >= -180 && lon <= 180 ? lon : ((((lon + 180) % 360) + 360) % 360) - 180
 

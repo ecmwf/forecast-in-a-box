@@ -56,6 +56,7 @@ import {
   decodeViewerUrlState,
   encodeViewerUrlState,
 } from '@/features/viewer/geo/view-url-state'
+import { GeoViewerSkeleton } from '@/features/viewer/geo/GeoViewerSkeleton'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
@@ -209,8 +210,7 @@ export function VisualisePage() {
   }
 
   // -------- Viewer state ↔ URL (see view-url-state.ts) --------
-  // Mount snapshot for restore; live partials merge into a ref and flush
-  // debounced as a `replace` so scrubbing/panning never spams history.
+  // Mount snapshot restores; partials flush debounced via `replace`.
   const [initialViewState] = useState(() => decodeViewerUrlState(search))
   const viewStateRef = useRef<ViewerUrlState>({ ...initialViewState })
   const viewStateTimerRef = useRef<number | null>(null)
@@ -435,11 +435,7 @@ export function VisualisePage() {
             )}
           >
             <Suspense
-              fallback={
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                </div>
-              }
+              fallback={<GeoViewerSkeleton label={t('common:loading')} />}
             >
               {/* Single JSX position — b flips null↔value without a
                   remount, so camera/selection/time survive the switch. */}

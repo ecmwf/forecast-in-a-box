@@ -32,7 +32,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import 'ol/ol.css'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useBlocker } from '@tanstack/react-router'
 import { fromLonLat, toLonLat } from 'ol/proj'
 import { unByKey } from 'ol/Observable'
@@ -65,6 +65,7 @@ import {
   resolveSourceTime,
 } from './time-link'
 import { useGetMapFailureLog } from './getmap-failures'
+import { GeoViewerSkeleton } from './GeoViewerSkeleton'
 import { GeoToolbar } from './GeoToolbar'
 import { GeoExportDialog } from './GeoExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
@@ -224,8 +225,7 @@ export function GeoViewer({
       selection.setLinkMode('unlinked')
       return
     }
-    // Both slots can settle in one pass; isPairActive reads this render's
-    // (stale) state, so a re-toggle of the same key must be caught here.
+    // Both slots can settle in one pass — stale isPairActive would re-toggle.
     const toggledNow = new Set<string>()
     for (const [slot, source] of [
       ['a', sourceA],
@@ -233,8 +233,7 @@ export function GeoViewer({
     ] as const) {
       const names = pending[slot]
       if (names.length === 0 || source.loadingLayers) continue
-      // Slot B waits for its source — it may still be starting; if its
-      // lens never runs, the URL simply keeps the restored value.
+      // B may still be starting; if it never runs the URL keeps the value.
       if (slot === 'b' && !hasB) continue
       const available = new Set(source.layers.map((l) => l.name))
       // Reverse: toggles prepend, so the first name ends up on top.
@@ -267,8 +266,7 @@ export function GeoViewer({
       const next = { a: pending.a.length > 0, b: pending.b.length > 0 }
       return prev.a === next.a && prev.b === next.b ? prev : next
     })
-    // Meaningful bits only — the selection/source objects churn every
-    // render; layers arrive exactly when loadingLayers flips.
+    // Meaningful bits only — selection/source identities churn every render.
   }, [
     sourceA.loadingLayers,
     sourceB.loadingLayers,
@@ -323,8 +321,7 @@ export function GeoViewer({
   // Focus window over the union axis (indices into timeline.epochs).
   const [timeClip, setTimeClip] = useState<[number, number] | null>(null)
   // Re-locate the selected instant when the union changes (layer add/
-  // remove) instead of snapping to 0. Seeding it from the URL makes the
-  // existing relocate pass restore `t` once the union materializes.
+  // remove) instead of snapping to 0 — URL-seeded, so it also restores `t`.
   const lastEpochRef = useRef<number | null>(
     initialViewRef.current?.timeMs ?? null,
   )
@@ -713,8 +710,7 @@ export function GeoViewer({
       skinnyWmsBasemap(sourceA.decorationLayers).background !== null
     return [...BASEMAPS, ...(hasSkinny ? [SKINNYWMS_BASEMAP] : [])]
   }, [sourceA.decorationLayers])
-  // Snap back when a source swap drops the selected option — settled
-  // catalogs only, or a restored SkinnyWMS choice dies before A loads.
+  // Snap back when a swap drops the option — after A settles (restored SkinnyWMS).
   useEffect(() => {
     if (sourceA.loadingLayers) return
     if (!availableBasemaps.some((opt) => opt.id === basemapId)) {
@@ -731,8 +727,7 @@ export function GeoViewer({
       offsetMs,
       basemap: basemapId === DEFAULT_BASEMAP_ID ? undefined : basemapId,
     }
-    // Hold restored fields until their slot settles — a debounced write
-    // mid-load must not strip them from the URL.
+    // Hold restored fields until slots settle — mid-load writes would strip them.
     if (!restorePending.a) partial.layersA = activeOrderA
     if (!restorePending.b) partial.layersB = activeOrderB
     if (!restorePending.a && !restorePending.b) {
@@ -1117,12 +1112,7 @@ export function GeoViewer({
     )
   }
   if (sourceA.loadingLayers) {
-    return (
-      <div className="flex h-full items-center justify-center gap-2 rounded-md border border-border bg-card text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {tExec('lens.loadingLayers')}
-      </div>
-    )
+    return <GeoViewerSkeleton label={tExec('lens.loadingLayers')} />
   }
 
   return (
