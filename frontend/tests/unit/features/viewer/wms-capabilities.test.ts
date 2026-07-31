@@ -136,6 +136,74 @@ describe('parseCapabilities', () => {
   })
 })
 
+// External-server shapes the lens never produces (WMS 1.3.0 §7.2.4.8).
+describe('parseCapabilities — inheritance & interop', () => {
+  const doc = (inner: string) => `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <Capability>
+    <Request><GetMap/></Request>
+    <Layer>
+      <Title>root</Title>
+      ${inner}
+    </Layer>
+  </Capability>
+</WMS_Capabilities>`
+
+  it('children inherit parent TIME (case-insensitive) and styles; own declarations win', () => {
+    const caps = parseCapabilities(
+      doc(`<Layer>
+        <Title>Forecast group</Title>
+        <Dimension name="TIME" units="ISO8601">2026-07-06T00:00:00Z/2026-07-07T00:00:00Z/PT6H</Dimension>
+        <Style>
+          <Name>default</Name>
+          <LegendURL><OnlineResource xlink:href="http://x/legend.png"/></LegendURL>
+        </Style>
+        <Layer><Name>t2m</Name><Title>2 m temperature</Title></Layer>
+        <Layer>
+          <Name>msl</Name><Title>MSL</Title>
+          <Dimension name="time">2026-07-06T00:00:00Z</Dimension>
+          <Style><Name>contours</Name></Style>
+        </Layer>
+      </Layer>`),
+    )
+    const t2m = caps.layers.find((l) => l.name === 't2m')
+    expect(t2m?.time?.raw).toBe(
+      '2026-07-06T00:00:00Z/2026-07-07T00:00:00Z/PT6H',
+    )
+    expect(t2m?.styles).toEqual([
+      { name: 'default', legendUrl: 'http://x/legend.png' },
+    ])
+    // Own dimension replaces; own style precedes the inherited one.
+    const msl = caps.layers.find((l) => l.name === 'msl')
+    expect(msl?.time?.raw).toBe('2026-07-06T00:00:00Z')
+    expect(msl?.styles.map((s) => s.name)).toEqual(['contours', 'default'])
+  })
+
+  it('reads 1.1.1-style Extent values behind an empty Dimension', () => {
+    const caps = parseCapabilities(
+      doc(`<Layer>
+        <Name>radar</Name><Title>Radar</Title>
+        <Dimension name="time" units="ISO8601"/>
+        <Extent name="time" default="2026-07-06T06:00:00Z">2026-07-06T00:00:00Z/2026-07-06T06:00:00Z/PT1H</Extent>
+      </Layer>`),
+    )
+    expect(caps.layers.find((l) => l.name === 'radar')?.time?.raw).toBe(
+      '2026-07-06T00:00:00Z/2026-07-06T06:00:00Z/PT1H',
+    )
+  })
+
+  it('keeps named composite parents as requestable layers', () => {
+    const caps = parseCapabilities(
+      doc(`<Layer>
+        <Name>wind</Name><Title>Wind group</Title>
+        <Layer><Name>u10</Name><Title>U</Title></Layer>
+        <Layer><Name>v10</Name><Title>V</Title></Layer>
+      </Layer>`),
+    )
+    expect(caps.layers.map((l) => l.name)).toEqual(['wind', 'u10', 'v10'])
+  })
+})
+
 describe('parseCapabilities — scale bands', () => {
   const withLayer = (inner: string) => `<?xml version="1.0"?>
 <WMS_Capabilities version="1.3.0">

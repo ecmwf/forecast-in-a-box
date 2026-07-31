@@ -164,7 +164,7 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
   const bbox = parseBbox(root) ?? DEFAULT_BBOX
 
   const collected: Array<ParsedLayer> = []
-  if (root) collectLeafLayers(root, collected)
+  if (root) collectLayers(root, { styles: [] }, collected)
   const layers: Array<ParsedLayer> = []
   const decorationLayers: Array<ParsedLayer> = []
   for (const layer of collected) {
@@ -174,21 +174,49 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
   return { layers, decorationLayers, bbox }
 }
 
-function collectLeafLayers(el: Element, out: Array<ParsedLayer>): void {
-  const children = directChildren(el, 'Layer')
-  if (children.length === 0) {
-    const layer = parseLayer(el)
-    if (layer) out.push(layer)
-    return
-  }
-  for (const child of children) collectLeafLayers(child, out)
+/** Properties child layers inherit from ancestors (WMS 1.3.0 §7.2.4.8). */
+interface LayerInheritance {
+  time?: ParsedTime
+  styles: ReadonlyArray<ParsedStyle>
+  scale?: ScaleBand
 }
 
-function parseLayer(el: Element): ParsedLayer | null {
-  const name = textOf(el, 'Name')
-  if (!name) return null
-  const title = textOf(el, 'Title') ?? name
+/** Every NAMED layer is requestable — including composite parents; real
+ *  catalogs declare TIME/Style once on a group and inherit downward. */
+function collectLayers(
+  el: Element,
+  inherited: LayerInheritance,
+  out: Array<ParsedLayer>,
+): void {
+  const ownStyles = parseStyles(el)
+  const merged: LayerInheritance = {
+    // A redeclared dimension replaces the ancestor's; styles are additive.
+    time: parseTime(el) ?? inherited.time,
+    styles: [
+      ...ownStyles,
+      ...inherited.styles.filter(
+        (s) => !ownStyles.some((o) => o.name === s.name),
+      ),
+    ],
+    scale: parseScaleBand(el) ?? inherited.scale,
+  }
 
+  const name = textOf(el, 'Name')
+  if (name) {
+    out.push({
+      name,
+      title: textOf(el, 'Title') ?? name,
+      styles: [...merged.styles],
+      time: merged.time,
+      scale: merged.scale,
+    })
+  }
+  for (const child of directChildren(el, 'Layer')) {
+    collectLayers(child, merged, out)
+  }
+}
+
+function parseStyles(el: Element): Array<ParsedStyle> {
   const styles: Array<ParsedStyle> = []
   for (const st of directChildren(el, 'Style')) {
     const styleName = textOf(st, 'Name')
@@ -200,17 +228,20 @@ function parseLayer(el: Element): ParsedLayer | null {
       undefined
     styles.push({ name: styleName, legendUrl: legendUrl || undefined })
   }
+  return styles
+}
 
-  let time: ParsedTime | undefined
-  for (const dim of directChildren(el, 'Dimension')) {
-    if (dim.getAttribute('name') === 'time') {
-      const raw = dim.textContent.trim()
-      if (raw) time = { raw }
-      break
-    }
-  }
-
-  return { name, title, styles, time, scale: parseScaleBand(el) }
+/** Time values: 1.3.0 Dimension text, else 1.1.1's separate Extent.
+ *  Dimension names are case-insensitive per spec (`TIME` is legal). */
+function parseTime(el: Element): ParsedTime | undefined {
+  const timeChild = (tag: string) =>
+    directChildren(el, tag).find(
+      (d) => d.getAttribute('name')?.toLowerCase() === 'time',
+    )
+  const raw =
+    timeChild('Dimension')?.textContent.trim() ||
+    timeChild('Extent')?.textContent.trim()
+  return raw ? { raw } : undefined
 }
 
 /** OGC rendering pixel size (0.28 mm): scaleDenominator = resolution / 0.00028. */
