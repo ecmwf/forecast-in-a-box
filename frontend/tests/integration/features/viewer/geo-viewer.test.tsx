@@ -129,6 +129,9 @@ function ViewerRoute({
   return (
     <div style={{ width: 1100, height: 700 }}>
       <button onClick={() => router.history.push('/away')}>go away</button>
+      <button onClick={() => router.history.push('/?probe=1')}>
+        tweak search
+      </button>
       <GeoViewer
         a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
         b={{ baseUrl: `http://localhost:${portB}`, label: 'Run B' }}
@@ -1117,6 +1120,14 @@ describe('GeoViewer route-leave guard', () => {
       .click({ position: { x: 200, y: 200 } })
     await screen.getByPlaceholder('Record your finding…').fill('keep me')
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect.element(screen.getByText('keep me')).toBeVisible()
+
+    // Same-route search changes (slot/mode) must pass without the guard.
+    await screen.getByRole('button', { name: 'tweak search' }).click()
+    await new Promise((r) => setTimeout(r, 300))
+    expect(
+      screen.getByText('Leave with unsaved annotations?').elements(),
+    ).toHaveLength(0)
     await expect.element(screen.getByText('keep me')).toBeVisible()
 
     // Leaving is blocked; Export offers the manual backup.

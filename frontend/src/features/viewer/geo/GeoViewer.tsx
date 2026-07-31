@@ -700,8 +700,11 @@ export function GeoViewer({
   const [annotations, setAnnotations] = useState<Array<MapAnnotation>>([])
   // Annotations are ephemeral — block route-leave and browser unload
   // while any exist; the dialog offers a GeoJSON export first.
+  // Search-only navigations (slot/mode changes) keep the viewer mounted
+  // and must pass freely.
   const leaveBlocker = useBlocker({
-    shouldBlockFn: () => annotations.length > 0,
+    shouldBlockFn: ({ current, next }) =>
+      annotations.length > 0 && current.pathname !== next.pathname,
     enableBeforeUnload: () => annotations.length > 0,
     withResolver: true,
   })
