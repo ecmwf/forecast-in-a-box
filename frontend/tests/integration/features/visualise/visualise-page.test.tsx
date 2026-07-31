@@ -31,7 +31,6 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { z } from 'zod'
 import {
   injectMockExecution,
   resetJobsState,
@@ -52,6 +51,7 @@ import {
   wmsCapabilitiesRequestCount,
 } from '@tests/../mocks/data/wms.data'
 import type * as GeoViewerModule from '@/features/viewer/geo/GeoViewer'
+import { Route as VisualiseRoute } from '@/routes/_authenticated/visualise'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import i18n from '@/lib/i18n'
@@ -71,11 +71,9 @@ vi.mock('@/features/viewer/geo/GeoViewer', async (importOriginal) => {
   }
 })
 
-const searchSchema = z.object({
-  a: z.string().optional(),
-  b: z.string().optional(),
-  mode: z.enum(['swipe', 'side', 'flicker', 'spy', 'blend']).optional(),
-})
+// The real route's schema — the harness must not drift from production
+// search validation (view-state params, `.catch` resilience).
+const searchSchema = VisualiseRoute.options.validateSearch
 
 function renderVisualisePage(search = '') {
   const queryClient = new QueryClient({
@@ -164,6 +162,16 @@ describe('VisualisePage', () => {
       )
       .toBeVisible()
     await expect.element(screen.getByText(/job-comp/).first()).toBeVisible()
+  })
+
+  it('degrades malformed view-state params instead of failing the route', async () => {
+    const screen = await renderVisualisePage(
+      '?mode=bogus&t=notanumber&cam=1,2&ul=nope&tl=weird',
+    )
+    // Page shell alive, empty state rendered — every bad param dropped.
+    await expect
+      .element(screen.getByPlaceholder('Search runs and blocks…'))
+      .toBeVisible()
   })
 
   it('activates two sources as A/B and auto-starts one lens per directory', async () => {

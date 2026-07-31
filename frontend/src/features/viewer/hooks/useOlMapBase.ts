@@ -29,7 +29,8 @@ import type { RefObject } from 'react'
 import type { BasemapLayer } from '../ol-layers'
 
 // "Auto-fit done" flag on the shared View, so it survives a map remount (mode switch).
-const AUTOFIT_KEY = 'fiab:autoFitted'
+// Exported: a URL-restored camera pre-marks the View as framed.
+export const AUTOFIT_KEY = 'fiab:autoFitted'
 
 /** The default viewer View: Web-Mercator, world-constrained, Europe-framed. */
 export function createViewerView(): View {

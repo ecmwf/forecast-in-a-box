@@ -34,8 +34,10 @@ import { useTranslation } from 'react-i18next'
 import 'ol/ol.css'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useBlocker } from '@tanstack/react-router'
+import { fromLonLat, toLonLat } from 'ol/proj'
+import { unByKey } from 'ol/Observable'
 import { useLensSource } from '../hooks/useLensSource'
-import { createViewerView } from '../hooks/useOlMapBase'
+import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { formatStep } from '../format'
 import { BASEMAPS, DEFAULT_BASEMAP_ID, SKINNYWMS_BASEMAP } from '../ol-layers'
 import {
@@ -88,6 +90,7 @@ import type {
 } from './types'
 import type { TimeLinkMode } from './time-link'
 import type { MeasureMode } from '../hooks/useMeasure'
+import type { ViewerUrlState } from './view-url-state'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -118,6 +121,8 @@ export function GeoViewer({
   mode,
   onModeChange,
   onRemoveB,
+  initialViewState,
+  onViewStateChange,
 }: {
   a: GeoViewerSource
   /** Second source; null runs the viewer solo. */
@@ -126,6 +131,10 @@ export function GeoViewer({
   onModeChange: (mode: CompareMode) => void
   /** Clear slot B (offered when B fails). */
   onRemoveB?: () => void
+  /** URL-restored view state, read once at mount (later changes ignored). */
+  initialViewState?: ViewerUrlState
+  /** Live view-state partials; the page debounces them into the URL. */
+  onViewStateChange?: (partial: Partial<ViewerUrlState>) => void
 }) {
   const { t } = useTranslation('visualise')
   const { t: tExec } = useTranslation('executions')
@@ -134,10 +143,22 @@ export function GeoViewer({
   const sourceA = useLensSource(a.baseUrl)
   const sourceB = useLensSource(b?.baseUrl ?? null)
 
+  // Mount snapshot — restoration must not react to later URL rewrites.
+  const initialViewRef = useRef(initialViewState ?? null)
+
   // One View for the lifetime of the comparison: camera state survives
   // mode switches and source swaps.
   const viewRef = useRef<View | null>(null)
-  viewRef.current ??= createViewerView()
+  if (viewRef.current === null) {
+    viewRef.current = createViewerView()
+    const cam = initialViewRef.current?.camera
+    if (cam) {
+      viewRef.current.setCenter(fromLonLat([cam.lon, cam.lat]))
+      viewRef.current.setZoom(cam.zoom)
+      // A restored camera outranks the initial auto-fit.
+      viewRef.current.set(AUTOFIT_KEY, true, true)
+    }
+  }
 
   // -------- Pairing + selection --------
   const pairing = useMemo(
@@ -174,6 +195,87 @@ export function GeoViewer({
 
   const activeOrderA = selection.activeOrderFor('a')
   const activeOrderB = selection.activeOrderFor('b')
+
+  // -------- URL view-state restore (one-shot per slot) --------
+  const pendingLayersRef = useRef<{
+    a: ReadonlyArray<string>
+    b: ReadonlyArray<string>
+    unlinked: boolean
+  } | null>(
+    initialViewRef.current?.layersA?.length ||
+      initialViewRef.current?.layersB?.length
+      ? {
+          a: initialViewRef.current.layersA ?? [],
+          b: initialViewRef.current.layersB ?? [],
+          unlinked: initialViewRef.current.unlinkedLayers === true,
+        }
+      : null,
+  )
+  // Mirrors the ref as state so the report effect re-runs on completion.
+  const [restorePending, setRestorePending] = useState({
+    a: (pendingLayersRef.current?.a.length ?? 0) > 0,
+    b: (pendingLayersRef.current?.b.length ?? 0) > 0,
+  })
+  useEffect(() => {
+    const pending = pendingLayersRef.current
+    if (!pending) return
+    // Switch the selection model first — toggles must land per-side.
+    if (pending.unlinked && selection.linkMode === 'linked') {
+      selection.setLinkMode('unlinked')
+      return
+    }
+    // Both slots can settle in one pass; isPairActive reads this render's
+    // (stale) state, so a re-toggle of the same key must be caught here.
+    const toggledNow = new Set<string>()
+    for (const [slot, source] of [
+      ['a', sourceA],
+      ['b', sourceB],
+    ] as const) {
+      const names = pending[slot]
+      if (names.length === 0 || source.loadingLayers) continue
+      // Slot B waits for its source — it may still be starting; if its
+      // lens never runs, the URL simply keeps the restored value.
+      if (slot === 'b' && !hasB) continue
+      const available = new Set(source.layers.map((l) => l.name))
+      // Reverse: toggles prepend, so the first name ends up on top.
+      for (const name of [...names].reverse()) {
+        if (!available.has(name)) continue
+        if (pending.unlinked) {
+          if (!selection.isLayerActive(slot, name)) {
+            selection.toggleLayer(slot, name)
+          }
+        } else {
+          const pair = pairing.pairs.find(
+            (p) => p.perSource[slot]?.name === name,
+          )
+          if (
+            pair &&
+            !toggledNow.has(pair.key) &&
+            !selection.isPairActive(pair.key)
+          ) {
+            toggledNow.add(pair.key)
+            selection.togglePair(pair.key)
+          }
+        }
+      }
+      pending[slot] = []
+    }
+    if (pending.a.length === 0 && pending.b.length === 0) {
+      pendingLayersRef.current = null
+    }
+    setRestorePending((prev) => {
+      const next = { a: pending.a.length > 0, b: pending.b.length > 0 }
+      return prev.a === next.a && prev.b === next.b ? prev : next
+    })
+    // Meaningful bits only — the selection/source objects churn every
+    // render; layers arrive exactly when loadingLayers flips.
+  }, [
+    sourceA.loadingLayers,
+    sourceB.loadingLayers,
+    hasB,
+    pairing.pairs,
+    selection.linkMode,
+  ])
 
   // Opacity hierarchy: global × per-source × per-layer (per-layer lives in
   // the selection; the product of the first two feeds the map stacks).
@@ -221,8 +323,11 @@ export function GeoViewer({
   // Focus window over the union axis (indices into timeline.epochs).
   const [timeClip, setTimeClip] = useState<[number, number] | null>(null)
   // Re-locate the selected instant when the union changes (layer add/
-  // remove) instead of snapping to 0.
-  const lastEpochRef = useRef<number | null>(null)
+  // remove) instead of snapping to 0. Seeding it from the URL makes the
+  // existing relocate pass restore `t` once the union materializes.
+  const lastEpochRef = useRef<number | null>(
+    initialViewRef.current?.timeMs ?? null,
+  )
   useEffect(() => {
     const located = locateEpoch(timeline.epochs, lastEpochRef.current)
     // Functional update: `timeStep` stays out of the deps on purpose —
@@ -271,8 +376,12 @@ export function GeoViewer({
   })
 
   // -------- Time-link policy (exact / nearest / offset / independent) --
-  const [timeLinkMode, setTimeLinkMode] = useState<TimeLinkMode>('exact')
-  const [offsetMs, setOffsetMs] = useState(0)
+  const [timeLinkMode, setTimeLinkMode] = useState<TimeLinkMode>(
+    () => initialViewRef.current?.timeLink ?? 'exact',
+  )
+  const [offsetMs, setOffsetMs] = useState(
+    () => initialViewRef.current?.offsetMs ?? 0,
+  )
   // From the RAW indexes — displayTimeline already shifts B by Δ, so
   // deriving bounds from it would feed back on itself.
   const offsetMeta = useMemo(() => {
@@ -593,7 +702,9 @@ export function GeoViewer({
   }, [sourceA, sourceB, a.baseUrl, bBaseUrl, activeOrderA, activeOrderB])
 
   // Basemap — one choice driving every panel.
-  const [basemapId, setBasemapId] = useState<string>(DEFAULT_BASEMAP_ID)
+  const [basemapId, setBasemapId] = useState<string>(
+    () => initialViewRef.current?.basemap ?? DEFAULT_BASEMAP_ID,
+  )
   const [basemapOpacity, setBasemapOpacity] = useState(1)
   const availableBasemaps = useMemo(() => {
     // SkinnyWMS native background comes from A's lens (the canvas host in
@@ -602,12 +713,60 @@ export function GeoViewer({
       skinnyWmsBasemap(sourceA.decorationLayers).background !== null
     return [...BASEMAPS, ...(hasSkinny ? [SKINNYWMS_BASEMAP] : [])]
   }, [sourceA.decorationLayers])
-  // Snap back when a source swap drops the selected option.
+  // Snap back when a source swap drops the selected option — settled
+  // catalogs only, or a restored SkinnyWMS choice dies before A loads.
   useEffect(() => {
+    if (sourceA.loadingLayers) return
     if (!availableBasemaps.some((opt) => opt.id === basemapId)) {
       setBasemapId(DEFAULT_BASEMAP_ID)
     }
-  }, [availableBasemaps, basemapId])
+  }, [availableBasemaps, basemapId, sourceA.loadingLayers])
+
+  // -------- URL view-state report (page debounces into the URL) --------
+  useEffect(() => {
+    if (!onViewStateChange) return
+    const partial: Partial<ViewerUrlState> = {
+      unlinkedLayers: selection.linkMode === 'unlinked',
+      timeLink: timeLinkMode,
+      offsetMs,
+      basemap: basemapId === DEFAULT_BASEMAP_ID ? undefined : basemapId,
+    }
+    // Hold restored fields until their slot settles — a debounced write
+    // mid-load must not strip them from the URL.
+    if (!restorePending.a) partial.layersA = activeOrderA
+    if (!restorePending.b) partial.layersB = activeOrderB
+    if (!restorePending.a && !restorePending.b) {
+      partial.timeMs = currentEpoch ?? undefined
+    }
+    onViewStateChange(partial)
+  }, [
+    onViewStateChange,
+    activeOrderA,
+    activeOrderB,
+    selection.linkMode,
+    restorePending,
+    currentEpoch,
+    timeLinkMode,
+    offsetMs,
+    basemapId,
+  ])
+  useEffect(() => {
+    const view = viewRef.current
+    if (!onViewStateChange || !view) return
+    const report = () => {
+      const center = view.getCenter()
+      const zoom = view.getZoom()
+      if (!center || zoom === undefined) return
+      const [lon, lat] = toLonLat(center)
+      if (![lon, lat, zoom].every(Number.isFinite)) return
+      onViewStateChange({ camera: { lon, lat, zoom } })
+    }
+    const keys = [
+      view.on('change:center', report),
+      view.on('change:resolution', report),
+    ]
+    return () => unByKey(keys)
+  }, [onViewStateChange])
 
   // Time-step prefetch (default off — bandwidth-heavy).
   const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)

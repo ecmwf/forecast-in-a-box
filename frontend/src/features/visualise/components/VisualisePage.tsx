@@ -20,7 +20,15 @@
  * also pauses auto-start.
  */
 
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { BrushCleaning, Loader2, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
@@ -43,6 +51,11 @@ import { VisualiseHub } from './VisualiseHub'
 import type { ComparisonEntry } from '../entry-ref'
 import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/geo/types'
+import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
+import {
+  decodeViewerUrlState,
+  encodeViewerUrlState,
+} from '@/features/viewer/geo/view-url-state'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
@@ -194,6 +207,43 @@ export function VisualisePage() {
       replace: true,
     })
   }
+
+  // -------- Viewer state ↔ URL (see view-url-state.ts) --------
+  // Mount snapshot for restore; live partials merge into a ref and flush
+  // debounced as a `replace` so scrubbing/panning never spams history.
+  const [initialViewState] = useState(() => decodeViewerUrlState(search))
+  const viewStateRef = useRef<ViewerUrlState>({ ...initialViewState })
+  const viewStateTimerRef = useRef<number | null>(null)
+  const lastViewSearchRef = useRef<string | null>(null)
+  const onViewStateChange = useCallback(
+    (partial: Partial<ViewerUrlState>) => {
+      Object.assign(viewStateRef.current, partial)
+      if (viewStateTimerRef.current !== null) {
+        window.clearTimeout(viewStateTimerRef.current)
+      }
+      viewStateTimerRef.current = window.setTimeout(() => {
+        viewStateTimerRef.current = null
+        const encoded = encodeViewerUrlState(viewStateRef.current)
+        const key = JSON.stringify(encoded)
+        if (key === lastViewSearchRef.current) return
+        lastViewSearchRef.current = key
+        void navigate({
+          search: (prev) => ({ ...prev, ...encoded }),
+          replace: true,
+        })
+      }, 400)
+    },
+    [navigate],
+  )
+  // A pending flush must not navigate after leaving the route.
+  useEffect(
+    () => () => {
+      if (viewStateTimerRef.current !== null) {
+        window.clearTimeout(viewStateTimerRef.current)
+      }
+    },
+    [],
+  )
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [GeoViewer, setGeoViewer] = useState(() => makeGeoViewer())
@@ -403,6 +453,8 @@ export function VisualisePage() {
                 mode={mode}
                 onModeChange={onModeChange}
                 onRemoveB={clearSlotB}
+                initialViewState={initialViewState}
+                onViewStateChange={onViewStateChange}
               />
             </Suspense>
           </ErrorBoundary>

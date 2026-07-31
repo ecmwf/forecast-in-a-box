@@ -36,6 +36,7 @@ import {
   registerMockWmsServer,
 } from '@tests/../mocks/data/wms.data'
 import type { CompareMode } from '@/features/viewer/geo/types'
+import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
 import i18n from '@/lib/i18n'
 
@@ -119,10 +120,14 @@ function ViewerRoute({
   portA,
   portB,
   initialMode = 'swipe',
+  initialViewState,
+  onViewStateChange,
 }: {
   portA: number
   portB: number
   initialMode?: CompareMode
+  initialViewState?: ViewerUrlState
+  onViewStateChange?: (partial: Partial<ViewerUrlState>) => void
 }) {
   const [mode, setMode] = useState<CompareMode>(initialMode)
   const router = useRouter()
@@ -137,6 +142,8 @@ function ViewerRoute({
         b={{ baseUrl: `http://localhost:${portB}`, label: 'Run B' }}
         mode={mode}
         onModeChange={setMode}
+        initialViewState={initialViewState}
+        onViewStateChange={onViewStateChange}
       />
     </div>
   )
@@ -146,6 +153,8 @@ function Harness(props: {
   portA: number
   portB: number
   initialMode?: CompareMode
+  initialViewState?: ViewerUrlState
+  onViewStateChange?: (partial: Partial<ViewerUrlState>) => void
 }) {
   return <RouterHarness>{() => <ViewerRoute {...props} />}</RouterHarness>
 }
@@ -1327,5 +1336,71 @@ describe('GeoViewer accessibility', () => {
     await expect.element(latch).toHaveAttribute('aria-pressed', 'true')
     await latch.click()
     await expect.element(latch).toHaveAttribute('aria-pressed', 'false')
+  })
+})
+
+describe('GeoViewer URL view state', () => {
+  it('restores layers and the valid-time instant from the URL', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(
+      <Harness
+        portA={portA}
+        portB={portB}
+        initialViewState={{
+          layersA: ['2t'],
+          layersB: ['2t'],
+          timeMs: Date.parse('2026-07-06T06:00:00Z'),
+        }}
+      />,
+    )
+
+    // The 2t pair activates without a click; T06 = step 2 of the union.
+    await expect.element(screen.getByText('2 / 3')).toBeVisible()
+    expect(screen.getByText(/No data at this time/).elements()).toHaveLength(0)
+  })
+
+  it('restores an unlinked per-side selection', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(
+      <Harness
+        portA={portA}
+        portB={portB}
+        initialViewState={{ unlinkedLayers: true, layersA: ['tp'] }}
+      />,
+    )
+
+    await expect
+      .element(screen.getByRole('switch', { name: /link layer selection/i }))
+      .not.toBeChecked()
+    // tp (A-only) is active: its stack shows the static badge, B's empty.
+    await expect
+      .element(screen.getByText('Total precipitation').first())
+      .toBeVisible()
+  })
+
+  it('reports layer and time changes for the URL write-back', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const reports: Array<Partial<ViewerUrlState>> = []
+    const screen = await render(
+      <Harness
+        portA={portA}
+        portB={portB}
+        onViewStateChange={(partial) => reports.push(partial)}
+      />,
+    )
+
+    await screen.getByText('2 m temperature').first().click()
+    await expect.element(screen.getByText('1 / 3')).toBeVisible()
+    await vi.waitFor(() => {
+      const last = [...reports].reverse().find((r) => r.layersA !== undefined)
+      expect(last?.layersA).toEqual(['2t'])
+      expect(last?.timeMs).toBe(Date.parse('2026-07-06T00:00:00Z'))
+    })
+
+    await screen.getByRole('button', { name: 'Next time step' }).click()
+    await vi.waitFor(() => {
+      const last = [...reports].reverse().find((r) => r.timeMs !== undefined)
+      expect(last?.timeMs).toBe(Date.parse('2026-07-06T06:00:00Z'))
+    })
   })
 })
