@@ -153,10 +153,13 @@ export function SingleMapView({
     loupeZoom,
   } = options
 
-  const { mapRef, basemapLayerRef, tryFit, setFitBbox } = useOlMapBase(
-    containerRef,
-    { view, resetKey: 'compare-single', incLoading: noop, decLoading: noop },
-  )
+  const { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion } =
+    useOlMapBase(containerRef, {
+      view,
+      resetKey: 'compare-single',
+      incLoading: noop,
+      decLoading: noop,
+    })
   useBasemap({
     mapRef,
     basemapLayerRef,
@@ -243,7 +246,13 @@ export function SingleMapView({
     },
   )
 
-  useMeasure(mapRef, measureMode, measureClearNonce)
+  useMeasure(
+    mapRef,
+    measureMode,
+    measureClearNonce,
+    t('measure.remove'),
+    mapVersion,
+  )
   useTimeStepPrefetch(mapRef, {
     enabled: preload,
     baseUrl: a.baseUrl,
@@ -717,6 +726,15 @@ export function SingleMapView({
       {annotateArmed && (
         <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
           {t('annotations.armedHint')}
+        </div>
+      )}
+      {measureMode !== 'none' && (
+        <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
+          {t(
+            measureMode === 'box'
+              ? 'measure.armedHintBox'
+              : 'measure.armedHint',
+          )}
         </div>
       )}
 

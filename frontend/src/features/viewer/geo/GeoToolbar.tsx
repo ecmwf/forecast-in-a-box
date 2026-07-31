@@ -41,6 +41,7 @@ import { COMPARE_MODES } from './types'
 import type { LinkMode } from './useCompareSelection'
 import type { SourceSlot } from './layer-pairing'
 import type { CompareMode, CompareModeOptions } from './types'
+import type { MeasureMode } from '../hooks/useMeasure'
 import type { MapAnnotation } from './annotations'
 import type { BasemapOption } from '../ol-layers'
 import { Button } from '@/components/ui/button'
@@ -139,8 +140,8 @@ export function GeoToolbar({
   onFit: (() => void) | null
   options: CompareModeOptions
   onOptionsChange: (patch: Partial<CompareModeOptions>) => void
-  measureMode: 'none' | 'line' | 'area'
-  onMeasureMode: (mode: 'none' | 'line' | 'area') => void
+  measureMode: MeasureMode
+  onMeasureMode: (mode: MeasureMode) => void
   onMeasureClear: () => void
   annotateArmed: boolean
   onAnnotateToggle: () => void
@@ -352,19 +353,53 @@ export function GeoToolbar({
           >
             <Ruler className="h-4 w-4" />
           </Button>
-          <Button
-            variant={measureMode === 'area' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-            aria-pressed={measureMode === 'area'}
-            onClick={() =>
-              onMeasureMode(measureMode === 'area' ? 'none' : 'area')
-            }
-            title={t('measure.area')}
-            aria-label={t('measure.area')}
-          >
-            <SquareDashed className="h-4 w-4" />
-          </Button>
+          {/* Area split-button: click = freeform, chevron picks the shape. */}
+          <span className="flex items-center">
+            <Button
+              variant={
+                measureMode === 'area' || measureMode === 'box'
+                  ? 'secondary'
+                  : 'ghost'
+              }
+              size="icon"
+              className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+              aria-pressed={measureMode === 'area' || measureMode === 'box'}
+              onClick={() =>
+                onMeasureMode(
+                  measureMode === 'area' || measureMode === 'box'
+                    ? 'none'
+                    : 'area',
+                )
+              }
+              title={t('measure.area')}
+              aria-label={t('measure.area')}
+            >
+              <SquareDashed className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="-ml-1 h-7 w-4"
+                    title={t('measure.shapeMenu')}
+                    aria-label={t('measure.shapeMenu')}
+                  />
+                }
+              >
+                <ChevronDown className="h-3 w-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-44">
+                <DropdownMenuItem onClick={() => onMeasureMode('area')}>
+                  {t('measure.freeform')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMeasureMode('box')}>
+                  {t('measure.rectangle')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </span>
           <Button
             variant="ghost"
             size="icon"

@@ -273,15 +273,13 @@ function DualMapPanel({
     () => setLoadingCount((c) => Math.max(0, c - 1)),
     [],
   )
-  const { mapRef, basemapLayerRef, tryFit, setFitBbox } = useOlMapBase(
-    containerRef,
-    {
+  const { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion } =
+    useOlMapBase(containerRef, {
       view,
       resetKey: `${source.slot}:${source.baseUrl}`,
       incLoading: noop,
       decLoading: noop,
-    },
-  )
+    })
   useBasemap({
     mapRef,
     basemapLayerRef,
@@ -303,7 +301,13 @@ function DualMapPanel({
     onLoadResult: source.onLoadResult,
   })
 
-  useMeasure(mapRef, measureMode, measureClearNonce)
+  useMeasure(
+    mapRef,
+    measureMode,
+    measureClearNonce,
+    t('measure.remove'),
+    mapVersion,
+  )
   useTimeStepPrefetch(mapRef, {
     enabled: preload,
     baseUrl: source.baseUrl,
@@ -402,6 +406,15 @@ function DualMapPanel({
       {annotateArmed && (
         <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
           {t('annotations.armedHint')}
+        </div>
+      )}
+      {measureMode !== 'none' && (
+        <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
+          {t(
+            measureMode === 'box'
+              ? 'measure.armedHintBox'
+              : 'measure.armedHint',
+          )}
         </div>
       )}
       {/* left-12 clears the OL zoom control (the tag hid its + button). */}

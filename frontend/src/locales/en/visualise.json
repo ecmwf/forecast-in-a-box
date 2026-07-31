@@ -253,7 +253,13 @@
   "measure": {
     "line": "Measure distance",
     "area": "Measure area",
-    "clear": "Clear measurements"
+    "clear": "Clear measurements",
+    "armedHint": "Click to add points · double-click to finish · Esc exits",
+    "armedHintBox": "Click two opposite corners · Esc exits",
+    "remove": "Remove this measurement",
+    "shapeMenu": "Area shape options",
+    "freeform": "Freeform area",
+    "rectangle": "Rectangle area"
   },
   "export": {
     "title": "Export comparison",

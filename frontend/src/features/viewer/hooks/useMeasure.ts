@@ -17,7 +17,8 @@
  */
 
 import { useEffect, useRef } from 'react'
-import Draw from 'ol/interaction/Draw'
+import Draw, { createBox } from 'ol/interaction/Draw'
+import DoubleClickZoom from 'ol/interaction/DoubleClickZoom'
 import Overlay from 'ol/Overlay'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
@@ -27,11 +28,12 @@ import Point from 'ol/geom/Point'
 import { getArea, getLength } from 'ol/sphere'
 import { unByKey } from 'ol/Observable'
 import type { RefObject } from 'react'
+import type Feature from 'ol/Feature'
 import type OlMap from 'ol/Map'
 import type Geometry from 'ol/geom/Geometry'
 import type { EventsKey } from 'ol/events'
 
-export type MeasureMode = 'none' | 'line' | 'area'
+export type MeasureMode = 'none' | 'line' | 'area' | 'box'
 
 /** Geodesic length → "12.3 km" / "845 m". */
 export function formatLength(meters: number): string {
@@ -104,6 +106,17 @@ function measureStyleWithLabel(
 const TOOLTIP_CLASS =
   'rounded border border-border bg-background/95 px-1.5 py-0.5 font-mono text-xs shadow-sm whitespace-nowrap'
 
+const REMOVE_CLASS =
+  'flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-border bg-background/95 text-[10px] leading-none text-muted-foreground shadow-sm hover:text-foreground'
+
+/** Canvas width of the frozen label — places the × just past its edge. */
+function labelWidthPx(label: string): number {
+  const ctx = document.createElement('canvas').getContext('2d')
+  if (!ctx) return 60
+  ctx.font = '12px system-ui, sans-serif'
+  return ctx.measureText(label).width + 10
+}
+
 function measureText(geometry: Geometry, projection: string): string {
   if (geometry.getType() === 'Polygon') {
     return formatArea(getArea(geometry, { projection }))
@@ -115,6 +128,11 @@ export function useMeasure(
   mapRef: RefObject<OlMap | null>,
   mode: MeasureMode,
   clearNonce: number,
+  /** Accessible name for each measurement's remove button. */
+  removeLabel: string,
+  /** useOlMapBase's recreation counter — re-attaches layer/draw after a
+   *  map rebuild (finished features vanished onto the dead map before). */
+  mapVersion: number,
 ): void {
   const sourceRef = useRef<VectorSource | null>(null)
   const overlaysRef = useRef<Array<Overlay>>([])
@@ -137,10 +155,49 @@ export function useMeasure(
       zIndex: 1500,
     })
     map.addLayer(layer)
-    return () => {
-      map.removeLayer(layer)
+    // × per finished measurement — attached on INSERTION: drawend fires
+    // before Draw adds the feature, so work there can lose it.
+    const source = sourceRef.current
+    const attachRemove = (feature: Feature) => {
+      const label = feature.get('measureLabel') as string | undefined
+      const geometry = feature.getGeometry()
+      if (!label || !geometry) return
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = REMOVE_CLASS
+      button.textContent = '×'
+      button.title = removeLabel
+      button.setAttribute('aria-label', removeLabel)
+      const remove = new Overlay({
+        element: button,
+        positioning: 'center-left',
+        offset: [labelWidthPx(label) / 2 + 6, -19],
+      })
+      const extent = geometry.getExtent()
+      remove.setPosition([
+        (extent[0] + extent[2]) / 2,
+        Math.max(extent[1], extent[3]),
+      ])
+      button.addEventListener('click', () => {
+        source.removeFeature(feature)
+        map.removeOverlay(remove)
+        overlaysRef.current = overlaysRef.current.filter((o) => o !== remove)
+      })
+      map.addOverlay(remove)
+      overlaysRef.current.push(remove)
     }
-  }, [mapRef])
+    // Features survive a map rebuild in the source — their ×s don't.
+    for (const feature of source.getFeatures()) attachRemove(feature)
+    const addKey = source.on('addfeature', (evt) => {
+      if (evt.feature) attachRemove(evt.feature)
+    })
+    return () => {
+      unByKey(addKey)
+      map.removeLayer(layer)
+      for (const overlay of overlaysRef.current) map.removeOverlay(overlay)
+      overlaysRef.current = []
+    }
+  }, [mapRef, removeLabel, mapVersion])
 
   // Draw interaction per mode, with a live tooltip that freezes on finish.
   useEffect(() => {
@@ -150,12 +207,21 @@ export function useMeasure(
 
     const draw = new Draw({
       source,
-      type: mode === 'line' ? 'LineString' : 'Polygon',
+      type:
+        mode === 'line' ? 'LineString' : mode === 'box' ? 'Circle' : 'Polygon',
+      // Box: two opposite corners; the geometry lands as a Polygon.
+      geometryFunction: mode === 'box' ? createBox() : undefined,
       style: MEASURE_STYLE,
       // Vertex clicks must not leak into singleclick listeners (annotation edit/create).
       stopClick: true,
     })
     map.addInteraction(draw)
+    // The finishing double-click must not also zoom the view away.
+    const dblZoom = map
+      .getInteractions()
+      .getArray()
+      .find((i) => i instanceof DoubleClickZoom)
+    dblZoom?.setActive(false)
 
     let tooltip: Overlay | null = null
     let geometryKey: EventsKey | null = null
@@ -204,13 +270,14 @@ export function useMeasure(
       unByKey(endKey)
       if (geometryKey) unByKey(geometryKey)
       map.removeInteraction(draw)
+      dblZoom?.setActive(true)
       // An unfinished sketch's tooltip would otherwise dangle.
       if (tooltip) {
         map.removeOverlay(tooltip)
         overlaysRef.current = overlaysRef.current.filter((o) => o !== tooltip)
       }
     }
-  }, [mapRef, mode])
+  }, [mapRef, mode, mapVersion])
 
   // Clear results.
   useEffect(() => {

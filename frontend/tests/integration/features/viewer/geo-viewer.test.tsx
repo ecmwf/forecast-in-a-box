@@ -1098,6 +1098,69 @@ describe('GeoViewer layer browser grouping', () => {
   })
 })
 
+describe('GeoViewer measure tool', () => {
+  it('shows a hint while armed; × removes one measurement; Esc exits', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    await screen.getByRole('button', { name: 'Measure distance' }).click()
+    await expect
+      .element(screen.getByText(/double-click to finish/).first())
+      .toBeVisible()
+
+    const map = document.querySelector('.ol-viewport')
+    expect(map).not.toBeNull()
+    const container = (map as HTMLElement).parentElement!
+    container.style.cssText = 'position:relative;width:800px;height:400px'
+    ;(map as HTMLElement).scrollIntoView({ block: 'center' })
+    const viewport = page.elementLocator(map as Element)
+    await viewport.click({ position: { x: 150, y: 200 } })
+    await viewport.dblClick({ position: { x: 300, y: 200 } })
+
+    const remove = screen.getByRole('button', {
+      name: 'Remove this measurement',
+    })
+    await expect.element(remove).toBeVisible()
+    ;(remove.element() as HTMLElement).click()
+    await expect.poll(() => remove.elements().length).toBe(0)
+
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    await expect
+      .poll(() => screen.getByText(/double-click to finish/).elements().length)
+      .toBe(0)
+  })
+
+  it('rectangle shape: two opposite corners make a measured box', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    await screen.getByRole('button', { name: 'Area shape options' }).click()
+    await screen.getByRole('menuitem', { name: 'Rectangle area' }).click()
+    await expect
+      .element(screen.getByText(/two opposite corners/).first())
+      .toBeVisible()
+
+    const map = document.querySelector('.ol-viewport')
+    expect(map).not.toBeNull()
+    const container = (map as HTMLElement).parentElement!
+    container.style.cssText = 'position:relative;width:800px;height:400px'
+    ;(map as HTMLElement).scrollIntoView({ block: 'center' })
+    const viewport = page.elementLocator(map as Element)
+    await viewport.click({ position: { x: 150, y: 150 } })
+    await viewport.click({ position: { x: 300, y: 250 } })
+
+    await expect
+      .element(screen.getByRole('button', { name: 'Remove this measurement' }))
+      .toBeVisible()
+  })
+})
+
 describe('GeoViewer route-leave guard', () => {
   it('blocks leaving with annotations; offers export; Leave discards', async () => {
     const style = document.createElement('style')

@@ -87,6 +87,7 @@ import type {
   CompareModeOptions,
 } from './types'
 import type { TimeLinkMode } from './time-link'
+import type { MeasureMode } from '../hooks/useMeasure'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -254,9 +255,7 @@ export function GeoViewer({
     timeline.epochs.length > 0 ? timeline.epochs[safeStep] : null
 
   // Measure tools (mode-independent): current tool + clear signal.
-  const [measureMode, setMeasureMode] = useState<'none' | 'line' | 'area'>(
-    'none',
-  )
+  const [measureMode, setMeasureMode] = useState<MeasureMode>('none')
   const [measureClearNonce, setMeasureClearNonce] = useState(0)
 
   // Per-mode tuning surfaced in the toolbar's action row.
@@ -802,13 +801,10 @@ export function GeoViewer({
     setAnnotateArmed((armed) => !armed)
     setMeasureMode('none')
   }, [])
-  const setMeasureModeExclusive = useCallback(
-    (measure: 'none' | 'line' | 'area') => {
-      if (measure !== 'none') setAnnotateArmed(false)
-      setMeasureMode(measure)
-    },
-    [],
-  )
+  const setMeasureModeExclusive = useCallback((measure: MeasureMode) => {
+    if (measure !== 'none') setAnnotateArmed(false)
+    setMeasureMode(measure)
+  }, [])
 
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
@@ -855,8 +851,12 @@ export function GeoViewer({
     onHelp: () => setHelpOpen((v) => !v),
     onAnnotate: toggleAnnotate,
     onAnnotateDisarm: {
-      enabled: annotateArmed && annotationDraft === null,
-      disarm: () => setAnnotateArmed(false),
+      enabled:
+        (annotateArmed && annotationDraft === null) || measureMode !== 'none',
+      disarm: () => {
+        setAnnotateArmed(false)
+        setMeasureMode('none')
+      },
     },
     onPan,
   })
