@@ -725,6 +725,51 @@ describe('GeoViewer', () => {
     style.remove()
   })
 
+  it('negates the time offset on swap so the alignment is preserved', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    await screen.getByLabelText('Time link mode').click()
+    await screen
+      .getByRole('option', { name: 'Time offset (B = A + Δ)' })
+      .click()
+    await screen.getByRole('button', { name: 'Align starts' }).click()
+    await expect.element(screen.getByText('B +6 h')).toBeVisible()
+
+    // Post-swap Δ must be −6 h — same physical pairing, sides exchanged.
+    await screen.getByRole('button', { name: 'swap slots' }).click()
+    await expect.element(screen.getByText('B −6 h')).toBeVisible()
+    await expect.element(screen.getByRole('textbox').first()).toHaveValue('-6')
+    expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
+  })
+
+  it('pinned legends and focus follow their source through a swap', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    // Pin A's legend, focus B.
+    await screen
+      .getByRole('button', { name: 'Pin legend open' })
+      .first()
+      .click()
+    await expect
+      .element(screen.getByTitle('A · 2 m temperature'))
+      .toBeInTheDocument()
+    await screen.getByRole('button', { name: 'View only B' }).click()
+
+    // Swap: both stay with their sources, now in the other slots.
+    await screen.getByRole('button', { name: 'swap slots' }).click()
+    await expect
+      .element(screen.getByRole('button', { name: 'View only A' }))
+      .toHaveAttribute('aria-pressed', 'true')
+    await expect
+      .element(screen.getByTitle('B · 2 m temperature'))
+      .toBeInTheDocument()
+    expect(screen.getByTitle('A · 2 m temperature').elements()).toHaveLength(0)
+  })
+
   it('clips the timeline to a source range via presets', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)

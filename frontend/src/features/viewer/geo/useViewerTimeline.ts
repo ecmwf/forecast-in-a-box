@@ -145,6 +145,19 @@ export function useViewerTimeline({
     a: 0,
     b: 0,
   })
+  // Swap keeps what's on screen: instants exchange; in offset mode the
+  // axis moves to the old B target and Δ flips (same pairing, sides swapped).
+  const onSlotsSwapped = useCallback(() => {
+    setIndepIndex((prev) => ({ a: prev.b, b: prev.a }))
+    if (timeLinkMode === 'offset' && currentEpoch !== null) {
+      const located = locateEpoch(timeline.epochs, currentEpoch + offsetMs)
+      if (located >= 0) {
+        setTimeStep(located)
+        lastEpochRef.current = timeline.epochs[located]
+      }
+    }
+    setOffsetMs((v) => -v)
+  }, [timeLinkMode, currentEpoch, offsetMs, timeline.epochs])
 
   const resolvedA = useMemo(() => {
     if (timeLinkMode === 'independent') {
@@ -344,6 +357,7 @@ export function useViewerTimeline({
     offsetMeta,
     indepIndex,
     setIndepIndex,
+    onSlotsSwapped,
     resolvedA,
     resolvedB,
     resolvedFor,

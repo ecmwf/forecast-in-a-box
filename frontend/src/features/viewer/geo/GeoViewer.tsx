@@ -259,6 +259,7 @@ export function GeoViewer({
     offsetMeta,
     indepIndex,
     setIndepIndex,
+    onSlotsSwapped,
     resolvedA,
     resolvedB,
     resolveTimeA,
@@ -380,6 +381,29 @@ export function GeoViewer({
 
   // Source focus: a slot views only that source (UI collapses to it); null compares both.
   const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
+
+  // A swap exchanges the slots' content — slot-keyed working state follows it.
+  const prevIdsRef = useRef<{ a: string; b: string | null }>({
+    a: a.id,
+    b: bId,
+  })
+  useEffect(() => {
+    const prev = prevIdsRef.current
+    prevIdsRef.current = { a: a.id, b: bId }
+    if (!(prev.a === bId && prev.b === a.id && a.id !== bId)) return
+    setSourceOpacity((p) => ({ a: p.b, b: p.a }))
+    setPinnedLegends(
+      (p) =>
+        new Set(
+          Array.from(p).map((k) =>
+            k.startsWith('a:') ? `b:${k.slice(2)}` : `a:${k.slice(2)}`,
+          ),
+        ),
+    )
+    setFocusSlot((f) => (f === 'a' ? 'b' : f === 'b' ? 'a' : null))
+    onSlotsSwapped()
+  }, [a.id, bId, onSlotsSwapped])
+
   useEffect(() => {
     if (!hasB && focusSlot !== null) setFocusSlot(null)
   }, [hasB, focusSlot])
