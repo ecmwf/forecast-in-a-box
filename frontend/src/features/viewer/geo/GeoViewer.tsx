@@ -33,12 +33,11 @@ import {
 import { useTranslation } from 'react-i18next'
 import 'ol/ol.css'
 import { RefreshCw } from 'lucide-react'
-import { useBlocker } from '@tanstack/react-router'
 import { fromLonLat, toLonLat } from 'ol/proj'
 import { unByKey } from 'ol/Observable'
 import { useLensSource } from '../hooks/useLensSource'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
-import { formatLatLon, formatStep } from '../format'
+import { formatStep } from '../format'
 import { BASEMAPS, DEFAULT_BASEMAP_ID, SKINNYWMS_BASEMAP } from '../ol-layers'
 import {
   isLoopbackUrl,
@@ -70,20 +69,14 @@ import { GeoToolbar } from './GeoToolbar'
 import { GeoExportDialog } from './GeoExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
-import {
-  defaultAnnotationColor,
-  downloadAnnotationsGeojson,
-  nextAnnotationId,
-  nextAnnotationLabel,
-} from './annotations'
+import { useViewerAnnotations } from './useViewerAnnotations'
+import { downloadAnnotationsGeojson } from './annotations'
 import { useGeoShortcuts } from './useGeoShortcuts'
 import { GeoTimeSlider } from './GeoTimeSlider'
 import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
-import type { MapAnnotation } from './annotations'
-import type { AnnotationDraft, AnnotationPatch } from './AnnotationEditorDialog'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
 import type { ParsedLayer } from '../wms-capabilities'
@@ -888,130 +881,38 @@ export function GeoViewer({
   }
   const [helpOpen, setHelpOpen] = useState(false)
 
-  // -------- Annotations: numbered findings pinned to the map ---------
-  const [annotations, setAnnotations] = useState<Array<MapAnnotation>>([])
-  // Annotations are ephemeral — block route-leave and browser unload
-  // while any exist; the dialog offers a GeoJSON export first.
-  // Search-only navigations (slot/mode changes) keep the viewer mounted
-  // and must pass freely.
-  const leaveBlocker = useBlocker({
-    shouldBlockFn: ({ current, next }) =>
-      annotations.length > 0 && current.pathname !== next.pathname,
-    enableBeforeUnload: () => annotations.length > 0,
-    withResolver: true,
-  })
-  const [annotateArmed, setAnnotateArmed] = useState(false)
-  const [annotationDraft, setAnnotationDraft] =
-    useState<AnnotationDraft | null>(null)
-  // Where a new annotation will land, captured at map-click time.
-  const pendingRef = useRef<{
-    coordinate: [number, number]
-    slot: SourceSlot | null
-  } | null>(null)
-
-  const onAnnotationCreate = useCallback(
-    (coordinate: [number, number], slot: SourceSlot | null) => {
-      pendingRef.current = { coordinate, slot }
-      setAnnotationDraft({
-        id: null,
-        text: '',
-        label: nextAnnotationLabel(annotations),
-        color: defaultAnnotationColor(slot),
-      })
-    },
-    [annotations],
-  )
-  const onAnnotationEdit = useCallback(
-    (id: string) => {
-      const annotation = annotations.find((ann) => ann.id === id)
-      if (!annotation) return
-      setAnnotationDraft({
-        id,
-        text: annotation.text,
-        label: annotation.label,
-        color: annotation.color,
-      })
-    },
-    [annotations],
-  )
-  const saveAnnotation = (patch: AnnotationPatch) => {
-    if (annotationDraft?.id) {
-      setAnnotations((prev) =>
-        prev.map((ann) =>
-          ann.id === annotationDraft.id ? { ...ann, ...patch } : ann,
-        ),
-      )
-    } else if (pendingRef.current) {
-      const { coordinate, slot } = pendingRef.current
-      setAnnotations((prev) => [
-        ...prev,
-        { id: nextAnnotationId(), coordinate, slot, ...patch },
-      ])
-      pendingRef.current = null
-    }
-    setAnnotationDraft(null)
-  }
-  const deleteAnnotation = () => {
-    if (annotationDraft?.id) {
-      setAnnotations((prev) =>
-        prev.filter((ann) => ann.id !== annotationDraft.id),
-      )
-    }
-    setAnnotationDraft(null)
-  }
-  const removeAnnotationById = useCallback(
-    (id: string) =>
-      setAnnotations((prev) => prev.filter((ann) => ann.id !== id)),
-    [],
-  )
-  const moveAnnotation = useCallback(
-    (id: string, coordinate: [number, number]) =>
-      setAnnotations((prev) =>
-        prev.map((ann) => (ann.id === id ? { ...ann, coordinate } : ann)),
-      ),
-    [],
-  )
-  const importAnnotations = useCallback(
-    (items: ReadonlyArray<Omit<MapAnnotation, 'id'>>) =>
-      setAnnotations((prev) => {
-        // Label-less pins (v1 files) get the next free numbers here.
-        const next = [...prev]
-        for (const item of items) {
-          next.push({
-            ...item,
-            label: item.label || nextAnnotationLabel(next),
-            id: nextAnnotationId(),
-          })
-        }
-        return next
-      }),
-    [],
-  )
-  // Sidebar-row hover echoes onto the map; row click pans to the pin.
-  const [annotationHighlightId, setAnnotationHighlightId] = useState<
-    string | null
-  >(null)
-  const locateAnnotation = useCallback(
-    (id: string) => {
-      const annotation = annotations.find((ann) => ann.id === id)
-      if (!annotation) return
-      viewRef.current?.animate({
-        center: annotation.coordinate,
-        duration: 350,
-      })
-    },
-    [annotations],
-  )
-
+  // -------- Annotations: labeled findings pinned to the map ---------
   // Measure and annotate both consume map clicks — arming one disarms the other.
-  const toggleAnnotate = useCallback(() => {
-    setAnnotateArmed((armed) => !armed)
-    setMeasureMode('none')
-  }, [])
-  const setMeasureModeExclusive = useCallback((measure: MeasureMode) => {
-    if (measure !== 'none') setAnnotateArmed(false)
-    setMeasureMode(measure)
-  }, [])
+  const {
+    annotations,
+    leaveBlocker,
+    annotateArmed,
+    toggleAnnotate,
+    disarmAnnotate,
+    annotationDraft,
+    annotationDraftLocation,
+    onAnnotationCreate,
+    onAnnotationEdit,
+    saveAnnotation,
+    deleteAnnotation,
+    closeAnnotationEditor,
+    removeAnnotationById,
+    moveAnnotation,
+    importAnnotations,
+    locateAnnotation,
+    annotationHighlightId,
+    setAnnotationHighlightId,
+  } = useViewerAnnotations({
+    viewRef,
+    onToggle: () => setMeasureMode('none'),
+  })
+  const setMeasureModeExclusive = useCallback(
+    (measure: MeasureMode) => {
+      if (measure !== 'none') disarmAnnotate()
+      setMeasureMode(measure)
+    },
+    [disarmAnnotate],
+  )
 
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
@@ -1065,7 +966,7 @@ export function GeoViewer({
       disarm: () => {
         // An open sheet owns Escape first — it covers the map.
         if (sheetOpen) return closeSheets()
-        setAnnotateArmed(false)
+        disarmAnnotate()
         setMeasureMode('none')
       },
     },
@@ -1264,21 +1165,10 @@ export function GeoViewer({
       </AlertDialog>
       <AnnotationEditorDialog
         draft={annotationDraft}
-        location={(() => {
-          const coordinate = annotationDraft?.id
-            ? annotations.find((ann) => ann.id === annotationDraft.id)
-                ?.coordinate
-            : pendingRef.current?.coordinate
-          if (!coordinate) return null
-          const [lon, lat] = toLonLat(coordinate)
-          return formatLatLon(lat, lon)
-        })()}
+        location={annotationDraftLocation}
         onSave={saveAnnotation}
         onDelete={deleteAnnotation}
-        onClose={() => {
-          pendingRef.current = null
-          setAnnotationDraft(null)
-        }}
+        onClose={closeAnnotationEditor}
       />
       <GeoExportDialog
         open={exportOpen}
