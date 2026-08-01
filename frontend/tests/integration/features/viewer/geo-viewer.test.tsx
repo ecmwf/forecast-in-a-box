@@ -787,6 +787,55 @@ describe('GeoViewer', () => {
     expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
   })
 
+  it('drops unlinked names a replaced source cannot serve', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: 'tp', title: 'Total precipitation' }],
+    })
+    const reports: Array<Partial<ViewerUrlState>> = []
+    const screen = await render(
+      <Harness
+        portA={portA}
+        portB={portB}
+        onViewStateChange={(p) => reports.push(p)}
+      />,
+    )
+
+    // Zero overlap auto-unlinks; select one layer per side.
+    await screen.getByText('2 m temperature').first().click()
+    await screen.getByRole('button', { name: 'B', exact: true }).click()
+    await screen.getByText('Total precipitation').first().click()
+    await vi.waitFor(() => {
+      const last = [...reports].reverse().find((r) => r.layersA !== undefined)
+      expect(last?.layersA).toEqual(['2t'])
+      expect(last?.layersB).toEqual(['tp'])
+    })
+
+    // A source without 2t replaces A: state and URL drop it, B survives.
+    const portA2 = nextPort++
+    registerMockWmsServer(portA2, {
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    await screen.rerender(
+      <Harness
+        portA={portA2}
+        portB={portB}
+        onViewStateChange={(p) => reports.push(p)}
+      />,
+    )
+    await vi.waitFor(() => {
+      const last = [...reports].reverse().find((r) => r.layersA !== undefined)
+      expect(last?.layersA).toEqual([])
+      expect(last?.layersB).toEqual(['tp'])
+    })
+    // No raw-name row lingers in the sidebar for the vanished layer.
+    expect(screen.getByText('2t', { exact: true }).elements()).toHaveLength(0)
+  })
+
   it('keeps the clip window on the same instants when the axis grows', async () => {
     const portA = nextPort++
     const portB = nextPort++

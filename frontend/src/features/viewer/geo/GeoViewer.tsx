@@ -415,6 +415,32 @@ export function GeoViewer({
     if (bId !== null && lastB !== null && bId !== lastB) onSourceReplaced('b')
   }, [a.id, bId, swapSelectionSlots, onSlotsSwapped, onSourceReplaced])
 
+  // Prune unserved unlinked names once a catalog settles healthy (absent B
+  // keeps its list). Declared after the swap detector — remap lands first.
+  const retainServable = selection.retainServable
+  useEffect(() => {
+    if (sourceA.loadingLayers || sourceA.retrying || sourceA.error) return
+    retainServable('a', new Set(sourceA.layers.map((l) => l.name)))
+  }, [
+    retainServable,
+    sourceA.loadingLayers,
+    sourceA.retrying,
+    sourceA.error,
+    sourceA.layers,
+  ])
+  useEffect(() => {
+    if (!hasB || sourceB.loadingLayers || sourceB.retrying || sourceB.error)
+      return
+    retainServable('b', new Set(sourceB.layers.map((l) => l.name)))
+  }, [
+    retainServable,
+    hasB,
+    sourceB.loadingLayers,
+    sourceB.retrying,
+    sourceB.error,
+    sourceB.layers,
+  ])
+
   useEffect(() => {
     if (!hasB && focusSlot !== null) setFocusSlot(null)
   }, [hasB, focusSlot])

@@ -24,8 +24,19 @@ import type View from 'ol/View'
 import type { LensSource } from '../hooks/useLensSource'
 import type { PairedLayer } from './layer-pairing'
 import type { CompareSelection } from './useCompareSelection'
+import type { ParsedLayer } from '../wms-capabilities'
 import type { TimeLinkMode } from './time-link'
 import type { ViewerUrlState } from './view-url-state'
+
+// Unlinked lists can outlive their source — the URL carries served names only.
+function servedNames(
+  order: ReadonlyArray<string>,
+  layers: ReadonlyArray<ParsedLayer>,
+  catalogUnknown: boolean,
+): ReadonlyArray<string> {
+  if (catalogUnknown) return order
+  return order.filter((name) => layers.some((l) => l.name === name))
+}
 
 export function useViewerUrlState({
   initial,
@@ -148,8 +159,20 @@ export function useViewerUrlState({
       basemap: basemapId === DEFAULT_BASEMAP_ID ? undefined : basemapId,
     }
     // Hold restored fields until slots settle — mid-load writes would strip them.
-    if (!restorePending.a) partial.layersA = activeOrderA
-    if (!restorePending.b) partial.layersB = activeOrderB
+    if (!restorePending.a) {
+      partial.layersA = servedNames(
+        activeOrderA,
+        sourceA.layers,
+        sourceA.loadingLayers || sourceA.error !== null,
+      )
+    }
+    if (!restorePending.b) {
+      partial.layersB = servedNames(
+        activeOrderB,
+        sourceB.layers,
+        sourceB.loadingLayers || sourceB.error !== null,
+      )
+    }
     if (!restorePending.a && !restorePending.b) {
       partial.timeMs = currentEpoch ?? undefined
     }
@@ -158,6 +181,12 @@ export function useViewerUrlState({
     onViewStateChange,
     activeOrderA,
     activeOrderB,
+    sourceA.layers,
+    sourceA.loadingLayers,
+    sourceA.error,
+    sourceB.layers,
+    sourceB.loadingLayers,
+    sourceB.error,
     selection.linkMode,
     selection.autoUnlinked,
     restorePending,
