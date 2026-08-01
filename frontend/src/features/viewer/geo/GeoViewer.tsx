@@ -48,21 +48,7 @@ import { canvasToPngBlob, joinCanvasesHorizontally } from '../map-export'
 import { CollapsedSidebarHandle } from '../components/CollapsedSidebarHandle'
 import { composeCaptures } from './export-pipeline'
 import { buildPairs } from './layer-pairing'
-import {
-  buildCompareTimeline,
-  buildSourceTimeIndex,
-  locateEpoch,
-} from './compare-timeline'
 import { useCompareSelection } from './useCompareSelection'
-import {
-  defaultToleranceMs,
-  effectiveAvailability,
-  effectiveFailureLayers,
-  formatOffset,
-  medianStepMs,
-  offsetBounds,
-  resolveSourceTime,
-} from './time-link'
 import { useGetMapFailureLog } from './getmap-failures'
 import { GeoViewerSkeleton } from './GeoViewerSkeleton'
 import { GeoToolbar } from './GeoToolbar'
@@ -70,6 +56,7 @@ import { GeoExportDialog } from './GeoExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
 import { useViewerAnnotations } from './useViewerAnnotations'
+import { useViewerTimeline } from './useViewerTimeline'
 import { downloadAnnotationsGeojson } from './annotations'
 import { useGeoShortcuts } from './useGeoShortcuts'
 import { GeoTimeSlider } from './GeoTimeSlider'
@@ -79,7 +66,6 @@ import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
-import type { ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
 import type {
   CaptureResult,
@@ -87,7 +73,6 @@ import type {
   CompareMode,
   CompareModeOptions,
 } from './types'
-import type { TimeLinkMode } from './time-link'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { ViewerUrlState } from './view-url-state'
 import { Button } from '@/components/ui/button'
@@ -285,75 +270,6 @@ export function GeoViewer({
     [],
   )
 
-  // -------- Valid-time alignment (epoch-keyed union) --------
-  const timeIndexA = useMemo(
-    () => buildSourceTimeIndex(sourceA.layers, activeOrderA),
-    [sourceA.layers, activeOrderA],
-  )
-  const timeIndexB = useMemo(
-    () => buildSourceTimeIndex(sourceB.layers, activeOrderB),
-    [sourceB.layers, activeOrderB],
-  )
-  const timeline = useMemo(
-    () => buildCompareTimeline(timeIndexA, timeIndexB),
-    [timeIndexA, timeIndexB],
-  )
-  // Raw per-source step strings, epoch-ordered (prefetch warmup).
-  const rawStepsA = useMemo(
-    () =>
-      timeIndexA.epochs.flatMap((e) => {
-        const raw = timeIndexA.rawByEpoch.get(e)
-        return raw !== undefined ? [raw] : []
-      }),
-    [timeIndexA],
-  )
-  const rawStepsB = useMemo(
-    () =>
-      timeIndexB.epochs.flatMap((e) => {
-        const raw = timeIndexB.rawByEpoch.get(e)
-        return raw !== undefined ? [raw] : []
-      }),
-    [timeIndexB],
-  )
-  const [timeStep, setTimeStep] = useState(0)
-  // Focus window over the union axis (indices into timeline.epochs).
-  const [timeClip, setTimeClip] = useState<[number, number] | null>(null)
-  // Re-locate the selected instant when the union changes (layer add/
-  // remove) instead of snapping to 0 — URL-seeded, so it also restores `t`.
-  const lastEpochRef = useRef<number | null>(
-    initialViewRef.current?.timeMs ?? null,
-  )
-  useEffect(() => {
-    const located = locateEpoch(timeline.epochs, lastEpochRef.current)
-    // Functional update: `timeStep` stays out of the deps on purpose —
-    // this must run only when the union changes, not on every scrub.
-    if (located >= 0) setTimeStep((step) => (step === located ? step : located))
-  }, [timeline.epochs])
-  const onTimeChange = useCallback(
-    (index: number) => {
-      setTimeStep(index)
-      lastEpochRef.current =
-        index >= 0 && index < timeline.epochs.length
-          ? timeline.epochs[index]
-          : null
-    },
-    [timeline.epochs],
-  )
-
-  // Drop a stale clip when the union changes shape under it.
-  useEffect(() => {
-    if (timeClip && timeClip[1] > timeline.epochs.length - 1) setTimeClip(null)
-  }, [timeClip, timeline.epochs.length])
-
-  const clipStart = timeClip ? timeClip[0] : 0
-  const clipEnd = timeClip ? timeClip[1] : timeline.epochs.length - 1
-  const safeStep = Math.max(
-    Math.max(0, clipStart),
-    Math.min(timeStep, Math.min(timeline.epochs.length - 1, clipEnd)),
-  )
-  const currentEpoch: number | null =
-    timeline.epochs.length > 0 ? timeline.epochs[safeStep] : null
-
   // Measure tools (mode-independent): current tool + clear signal.
   const [measureMode, setMeasureMode] = useState<MeasureMode>('none')
   const [measureClearNonce, setMeasureClearNonce] = useState(0)
@@ -369,155 +285,6 @@ export function GeoViewer({
     loupeZoom: 2,
     loupeLatched: false,
   })
-
-  // -------- Time-link policy (exact / nearest / offset / independent) --
-  const [timeLinkMode, setTimeLinkMode] = useState<TimeLinkMode>(
-    () => initialViewRef.current?.timeLink ?? 'exact',
-  )
-  const [offsetMs, setOffsetMs] = useState(
-    () => initialViewRef.current?.offsetMs ?? 0,
-  )
-  // From the RAW indexes — displayTimeline already shifts B by Δ, so
-  // deriving bounds from it would feed back on itself.
-  const offsetMeta = useMemo(() => {
-    const [minMs, maxMs] = offsetBounds(timeIndexA, timeIndexB)
-    const epochsA = timeIndexA.epochs
-    const epochsB = timeIndexB.epochs
-    const empty = epochsA.length === 0 || epochsB.length === 0
-    return {
-      minMs,
-      maxMs,
-      stepMs: Math.min(medianStepMs(timeIndexA), medianStepMs(timeIndexB)),
-      alignStartsMs: empty ? null : epochsB[0] - epochsA[0],
-      alignEndsMs: empty
-        ? null
-        : epochsB[epochsB.length - 1] - epochsA[epochsA.length - 1],
-    }
-  }, [timeIndexA, timeIndexB])
-  const [indepIndex, setIndepIndex] = useState<Record<SourceSlot, number>>({
-    a: 0,
-    b: 0,
-  })
-
-  const resolvedA = useMemo(() => {
-    if (timeLinkMode === 'independent') {
-      const i = Math.max(
-        0,
-        Math.min(indepIndex.a, timeIndexA.epochs.length - 1),
-      )
-      const epoch = timeIndexA.epochs.length > 0 ? timeIndexA.epochs[i] : null
-      return {
-        raw: epoch !== null ? (timeIndexA.rawByEpoch.get(epoch) ?? null) : null,
-        epoch,
-        offsetMs: null,
-        hidden: false,
-      }
-    }
-    return resolveSourceTime(
-      timeIndexA,
-      currentEpoch,
-      timeLinkMode === 'exact' ? 'exact' : 'nearest',
-      defaultToleranceMs(timeIndexA),
-    )
-  }, [timeLinkMode, indepIndex.a, timeIndexA, currentEpoch])
-
-  const resolvedB = useMemo(() => {
-    if (timeLinkMode === 'independent') {
-      const i = Math.max(
-        0,
-        Math.min(indepIndex.b, timeIndexB.epochs.length - 1),
-      )
-      const epoch = timeIndexB.epochs.length > 0 ? timeIndexB.epochs[i] : null
-      return {
-        raw: epoch !== null ? (timeIndexB.rawByEpoch.get(epoch) ?? null) : null,
-        epoch,
-        offsetMs: null,
-        hidden: false,
-      }
-    }
-    const target =
-      timeLinkMode === 'offset' && currentEpoch !== null
-        ? currentEpoch + offsetMs
-        : currentEpoch
-    return resolveSourceTime(
-      timeIndexB,
-      target,
-      timeLinkMode === 'exact' ? 'exact' : 'nearest',
-      defaultToleranceMs(timeIndexB),
-    )
-  }, [timeLinkMode, indepIndex.b, timeIndexB, currentEpoch, offsetMs])
-
-  const resolvedFor = (slot: SourceSlot) =>
-    slot === 'a' ? resolvedA : resolvedB
-
-  // Per-side hover instants for the timeline tooltip: what each side
-  // would display if the slider stood at the hovered epoch.
-  const hoverTimes = useCallback(
-    (epoch: number) => {
-      if (timeLinkMode === 'exact' || timeLinkMode === 'independent') {
-        return null
-      }
-      const ra = resolveSourceTime(
-        timeIndexA,
-        epoch,
-        'nearest',
-        defaultToleranceMs(timeIndexA),
-      )
-      const rb = resolveSourceTime(
-        timeIndexB,
-        timeLinkMode === 'offset' ? epoch + offsetMs : epoch,
-        'nearest',
-        defaultToleranceMs(timeIndexB),
-      )
-      const label = (e: number | null) =>
-        e !== null ? formatStep(new Date(e).toISOString()) : null
-      return { a: label(ra.epoch), b: label(rb.epoch) }
-    },
-    [timeLinkMode, timeIndexA, timeIndexB, offsetMs],
-  )
-
-  // Tracks (and the A/B/A∩B window presets) show what each side WOULD
-  // render at every axis position under the current time-link policy —
-  // under a +48h offset, B's usable window visibly shifts off the tail.
-  const displayTimeline = useMemo(() => {
-    if (timeLinkMode === 'exact' || timeLinkMode === 'independent') {
-      return timeline
-    }
-    return {
-      ...timeline,
-      availability: {
-        a: effectiveAvailability(
-          timeline.epochs,
-          timeIndexA,
-          'nearest',
-          0,
-          defaultToleranceMs(timeIndexA),
-        ),
-        b: effectiveAvailability(
-          timeline.epochs,
-          timeIndexB,
-          'nearest',
-          timeLinkMode === 'offset' ? offsetMs : 0,
-          defaultToleranceMs(timeIndexB),
-        ),
-      },
-    }
-  }, [timeline, timeIndexA, timeIndexB, timeLinkMode, offsetMs])
-
-  // Stable per-slot identities: these feed effect deps in the layer
-  // stacks, where a fresh closure per render would reconcile every render.
-  const resolveTimeA = useMemo(
-    () =>
-      (layer: ParsedLayer): string | null =>
-        layer.time ? resolvedA.raw : null,
-    [resolvedA],
-  )
-  const resolveTimeB = useMemo(
-    () =>
-      (layer: ParsedLayer): string | null =>
-        layer.time ? resolvedB.raw : null,
-    [resolvedB],
-  )
 
   // -------- GetMap failure cache (advertised-but-not-served instants) --
   const failures = useGetMapFailureLog()
@@ -555,65 +322,41 @@ export function GeoViewer({
     () => retainFailureLayers('b', activeOrderB),
     [retainFailureLayers, activeOrderB],
   )
-  // Marks projected onto the shared axis exactly like availability, so a
-  // mark paints where the failing instant is actually displayed. Names
-  // resolve to display titles here — the slider shows words, not ids.
-  const trackFailures = useMemo(() => {
-    const resolveMode =
-      timeLinkMode === 'nearest' || timeLinkMode === 'offset'
-        ? ('nearest' as const)
-        : ('exact' as const)
-    const titled = (
-      cells: Array<ReadonlyArray<string>>,
-      layers: ReadonlyArray<ParsedLayer>,
-    ) =>
-      cells.map((names) =>
-        names.map((n) => layers.find((l) => l.name === n)?.title ?? n),
-      )
-    return {
-      a: titled(
-        effectiveFailureLayers(
-          timeline.epochs,
-          timeIndexA,
-          failures.failedLayers.a,
-          resolveMode,
-          0,
-          defaultToleranceMs(timeIndexA),
-        ),
-        sourceA.layers,
-      ),
-      b: titled(
-        effectiveFailureLayers(
-          timeline.epochs,
-          timeIndexB,
-          failures.failedLayers.b,
-          resolveMode,
-          timeLinkMode === 'offset' ? offsetMs : 0,
-          defaultToleranceMs(timeIndexB),
-        ),
-        sourceB.layers,
-      ),
-    }
-  }, [
-    timeline.epochs,
+  // -------- Valid-time alignment + link policy --------
+  const {
     timeIndexA,
     timeIndexB,
-    failures.failedLayers,
+    timeline,
+    displayTimeline,
+    rawStepsA,
+    rawStepsB,
+    safeStep,
+    currentEpoch,
+    onTimeChange,
+    timeClip,
+    setTimeClip,
     timeLinkMode,
+    setTimeLinkMode,
     offsetMs,
-    sourceA.layers,
-    sourceB.layers,
-  ])
-
-  // Offset tag relative to the SHARED axis (A's requested instant), so a
-  // fixed-Δ B honestly reads e.g. "B +6 h".
-  const timeTagFor = (slot: SourceSlot): string | null => {
-    if (timeLinkMode === 'independent') return null
-    const resolved = resolvedFor(slot)
-    if (resolved.epoch === null || currentEpoch === null) return null
-    const delta = resolved.epoch - currentEpoch
-    return delta === 0 ? null : formatOffset(delta)
-  }
+    setOffsetMs,
+    offsetMeta,
+    indepIndex,
+    setIndepIndex,
+    resolvedA,
+    resolvedB,
+    resolveTimeA,
+    resolveTimeB,
+    hoverTimes,
+    trackFailures,
+    timeTagFor,
+  } = useViewerTimeline({
+    sourceA,
+    sourceB,
+    activeOrderA,
+    activeOrderB,
+    initial: initialViewRef.current,
+    failedLayers: failures.failedLayers,
+  })
 
   // -------- Fit plumbing (map components register their fit action) ----
   const [fitAction, setFitAction] = useState<(() => void) | null>(null)
