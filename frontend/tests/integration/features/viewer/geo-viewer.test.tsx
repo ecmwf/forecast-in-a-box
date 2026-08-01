@@ -548,7 +548,7 @@ describe('GeoViewer', () => {
     // tests for the same workaround).
     const style = document.createElement('style')
     style.textContent =
-      '[data-slot="dialog-content"]{position:fixed;z-index:50}'
+      '[data-slot="dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
     document.head.appendChild(style)
 
     const { portA, portB } = registerDefaultPair()
@@ -569,7 +569,7 @@ describe('GeoViewer', () => {
     ;(map as HTMLElement).scrollIntoView({ block: 'center' })
     // x=200 keeps clear of the swipe divider at the 50% mark.
     await viewport.click({ position: { x: 200, y: 200 } })
-    await expect.element(screen.getByText('Annotation 1')).toBeVisible()
+    await expect.element(screen.getByText('New annotation')).toBeVisible()
     await screen
       .getByPlaceholder('Record your finding…')
       .fill('Deep low over the gulf')
@@ -582,17 +582,70 @@ describe('GeoViewer', () => {
 
     // Edit via the row's pencil (row click pans instead), then delete.
     await screen.getByRole('button', { name: 'Edit annotation 1' }).click()
-    await expect.element(screen.getByText('Annotation 1')).toBeVisible()
+    await expect.element(screen.getByText('Edit annotation')).toBeVisible()
     await screen.getByRole('button', { name: 'Delete' }).click()
     await expect
       .element(screen.getByText('Deep low over the gulf'))
       .not.toBeInTheDocument()
   })
 
+  it('labels are sticky through deletes, editable, and colorable', async () => {
+    const style = document.createElement('style')
+    style.textContent =
+      '[data-slot="dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
+    document.head.appendChild(style)
+
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByRole('button', { name: /Annotate/ }).click()
+    await screen.getByText('2 m temperature').first().click()
+    const map = document.querySelector('.ol-viewport')
+    const container = (map as HTMLElement).parentElement!
+    container.style.cssText = 'position:relative;width:800px;height:400px'
+    ;(map as HTMLElement).scrollIntoView({ block: 'center' })
+    const viewport = page.elementLocator(map as Element)
+
+    // Pin 1: label auto-suggested as "1".
+    await viewport.click({ position: { x: 200, y: 200 } })
+    await expect.element(screen.getByLabelText('Label')).toHaveValue('1')
+    await screen.getByPlaceholder('Record your finding…').fill('first')
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+    // Pin 2 (clear of pin 1's hit radius): suggested "2".
+    await viewport.click({ position: { x: 320, y: 260 } })
+    await expect.element(screen.getByLabelText('Label')).toHaveValue('2')
+    await screen.getByPlaceholder('Record your finding…').fill('second')
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+
+    // Deleting 1 must NOT renumber 2 — labels are sticky.
+    await screen.getByRole('button', { name: 'Remove annotation 1' }).click()
+    await expect
+      .poll(
+        () =>
+          screen.getByRole('button', { name: 'Remove annotation 1' }).elements()
+            .length,
+      )
+      .toBe(0)
+    expect(
+      screen.getByRole('button', { name: 'Remove annotation 2' }).elements(),
+    ).toHaveLength(1)
+
+    // Relabel + recolor via the editor.
+    await screen.getByRole('button', { name: 'Edit annotation 2' }).click()
+    await screen.getByLabelText('Label').fill('X9')
+    // Palette is collapsed to the current swatch — expand, then pick.
+    await screen.getByRole('button', { name: 'Pin color' }).click()
+    await screen.getByRole('radio', { name: 'Red' }).click()
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect
+      .element(screen.getByRole('button', { name: 'Remove annotation X9' }))
+      .toBeInTheDocument()
+    style.remove()
+  })
+
   it('annotates per panel in side-by-side mode', async () => {
     const style = document.createElement('style')
     style.textContent =
-      '[data-slot="dialog-content"]{position:fixed;z-index:50}'
+      '[data-slot="dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
     document.head.appendChild(style)
 
     const { portA, portB } = registerDefaultPair()
@@ -611,7 +664,7 @@ describe('GeoViewer', () => {
     await page
       .elementLocator(viewports[1])
       .click({ position: { x: 250, y: 200 } })
-    await expect.element(screen.getByText('Annotation 1')).toBeVisible()
+    await expect.element(screen.getByText('New annotation')).toBeVisible()
     await screen.getByPlaceholder('Record your finding…').fill('B-side eddy')
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
 
@@ -1174,7 +1227,7 @@ describe('GeoViewer route-leave guard', () => {
   it('blocks leaving with annotations; offers export; Leave discards', async () => {
     const style = document.createElement('style')
     style.textContent =
-      '[data-slot="dialog-content"],[data-slot="alert-dialog-content"]{position:fixed;z-index:50}'
+      '[data-slot="dialog-content"],[data-slot="alert-dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
     document.head.appendChild(style)
 
     const { portA, portB } = registerDefaultPair()

@@ -157,7 +157,9 @@ export interface LegendExportItem {
  * map. Shared by PNG export and the compare captures.
  */
 export interface ExportNote {
-  number: number
+  label: string
+  /** CSS color of the pin — the strip's badge column matches it. */
+  color: string
   text: string
 }
 
@@ -273,9 +275,9 @@ function drawNotesStrip(
   let y = yOffset + pad
   notes.forEach((note, i) => {
     if (i > 0) y += lineHeight * 0.35
-    ctx.fillStyle = '#111'
+    ctx.fillStyle = note.color
     ctx.textAlign = 'right'
-    ctx.fillText(`${note.number}.`, pad + numberCol - 8 * dpr, y)
+    ctx.fillText(`${note.label}.`, pad + numberCol - 8 * dpr, y)
     ctx.textAlign = 'left'
     ctx.fillStyle = '#333'
     for (const line of wrapNoteLines(ctx, note.text, innerWidth)) {

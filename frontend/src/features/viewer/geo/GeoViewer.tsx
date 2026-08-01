@@ -38,7 +38,7 @@ import { fromLonLat, toLonLat } from 'ol/proj'
 import { unByKey } from 'ol/Observable'
 import { useLensSource } from '../hooks/useLensSource'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
-import { formatStep } from '../format'
+import { formatLatLon, formatStep } from '../format'
 import { BASEMAPS, DEFAULT_BASEMAP_ID, SKINNYWMS_BASEMAP } from '../ol-layers'
 import {
   isLoopbackUrl,
@@ -70,7 +70,12 @@ import { GeoToolbar } from './GeoToolbar'
 import { GeoExportDialog } from './GeoExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
-import { downloadAnnotationsGeojson, nextAnnotationId } from './annotations'
+import {
+  defaultAnnotationColor,
+  downloadAnnotationsGeojson,
+  nextAnnotationId,
+  nextAnnotationLabel,
+} from './annotations'
 import { useGeoShortcuts } from './useGeoShortcuts'
 import { GeoTimeSlider } from './GeoTimeSlider'
 import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
@@ -78,7 +83,7 @@ import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
 import type { MapAnnotation } from './annotations'
-import type { AnnotationDraft } from './AnnotationEditorDialog'
+import type { AnnotationDraft, AnnotationPatch } from './AnnotationEditorDialog'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
 import type { ParsedLayer } from '../wms-capabilities'
@@ -907,34 +912,40 @@ export function GeoViewer({
   const onAnnotationCreate = useCallback(
     (coordinate: [number, number], slot: SourceSlot | null) => {
       pendingRef.current = { coordinate, slot }
-      setAnnotationDraft({ id: null, text: '', number: -1 })
-    },
-    [],
-  )
-  const onAnnotationEdit = useCallback(
-    (id: string) => {
-      const index = annotations.findIndex((ann) => ann.id === id)
-      if (index === -1) return
       setAnnotationDraft({
-        id,
-        text: annotations[index].text,
-        number: index + 1,
+        id: null,
+        text: '',
+        label: nextAnnotationLabel(annotations),
+        color: defaultAnnotationColor(slot),
       })
     },
     [annotations],
   )
-  const saveAnnotation = (text: string) => {
+  const onAnnotationEdit = useCallback(
+    (id: string) => {
+      const annotation = annotations.find((ann) => ann.id === id)
+      if (!annotation) return
+      setAnnotationDraft({
+        id,
+        text: annotation.text,
+        label: annotation.label,
+        color: annotation.color,
+      })
+    },
+    [annotations],
+  )
+  const saveAnnotation = (patch: AnnotationPatch) => {
     if (annotationDraft?.id) {
       setAnnotations((prev) =>
         prev.map((ann) =>
-          ann.id === annotationDraft.id ? { ...ann, text } : ann,
+          ann.id === annotationDraft.id ? { ...ann, ...patch } : ann,
         ),
       )
     } else if (pendingRef.current) {
       const { coordinate, slot } = pendingRef.current
       setAnnotations((prev) => [
         ...prev,
-        { id: nextAnnotationId(), coordinate, text, slot },
+        { id: nextAnnotationId(), coordinate, slot, ...patch },
       ])
       pendingRef.current = null
     }
@@ -962,10 +973,18 @@ export function GeoViewer({
   )
   const importAnnotations = useCallback(
     (items: ReadonlyArray<Omit<MapAnnotation, 'id'>>) =>
-      setAnnotations((prev) => [
-        ...prev,
-        ...items.map((item) => ({ ...item, id: nextAnnotationId() })),
-      ]),
+      setAnnotations((prev) => {
+        // Label-less pins (v1 files) get the next free numbers here.
+        const next = [...prev]
+        for (const item of items) {
+          next.push({
+            ...item,
+            label: item.label || nextAnnotationLabel(next),
+            id: nextAnnotationId(),
+          })
+        }
+        return next
+      }),
     [],
   )
   // Sidebar-row hover echoes onto the map; row click pans to the pin.
@@ -1244,17 +1263,16 @@ export function GeoViewer({
         </AlertDialogContent>
       </AlertDialog>
       <AnnotationEditorDialog
-        draft={
-          annotationDraft
-            ? {
-                ...annotationDraft,
-                number:
-                  annotationDraft.number === -1
-                    ? annotations.length + 1
-                    : annotationDraft.number,
-              }
-            : null
-        }
+        draft={annotationDraft}
+        location={(() => {
+          const coordinate = annotationDraft?.id
+            ? annotations.find((ann) => ann.id === annotationDraft.id)
+                ?.coordinate
+            : pendingRef.current?.coordinate
+          if (!coordinate) return null
+          const [lon, lat] = toLonLat(coordinate)
+          return formatLatLon(lat, lon)
+        })()}
         onSave={saveAnnotation}
         onDelete={deleteAnnotation}
         onClose={() => {

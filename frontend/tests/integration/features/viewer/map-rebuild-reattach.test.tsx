@@ -41,7 +41,9 @@ const handlers = { onCreate: noop, onEdit: noop, onMove: noop }
 const ANNOTATION: MapAnnotation = {
   id: 'a1',
   coordinate: [0, 0],
+  label: '1',
   text: 'pin',
+  color: 'slate',
   slot: null,
 }
 

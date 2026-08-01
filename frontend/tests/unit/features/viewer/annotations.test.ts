@@ -14,6 +14,7 @@ import type { MapAnnotation } from '@/features/viewer/geo/annotations'
 import {
   annotationVisibleOn,
   annotationsToGeojson,
+  nextAnnotationLabel,
   parseAnnotationsGeojson,
 } from '@/features/viewer/geo/annotations'
 
@@ -39,12 +40,14 @@ const pin = (
 ): MapAnnotation => ({
   id,
   coordinate: fromLonLat(lonLat) as [number, number],
+  label: id,
   text: `note ${id}`,
+  color: 'red',
   slot,
 })
 
 describe('annotations GeoJSON round-trip', () => {
-  it('preserves text, slot, and coordinates (via WGS84 wire format)', () => {
+  it('preserves label, color, text, slot, and coordinates (WGS84 wire)', () => {
     const pins = [
       pin('1', 'a'),
       pin('2', 'b', [-70.66, -33.45]),
@@ -55,29 +58,32 @@ describe('annotations GeoJSON round-trip', () => {
     parsed.forEach((restored, i) => {
       expect(restored.text).toBe(pins[i].text)
       expect(restored.slot).toBe(pins[i].slot)
+      expect(restored.label).toBe(pins[i].label)
+      expect(restored.color).toBe('red')
       expect(restored.coordinate[0]).toBeCloseTo(pins[i].coordinate[0], 0)
       expect(restored.coordinate[1]).toBeCloseTo(pins[i].coordinate[1], 0)
     })
   })
 
-  it('writes RFC 7946 lon/lat with numbering properties and a version stamp', () => {
+  it('writes RFC 7946 lon/lat with label/color properties and a version stamp', () => {
     const collection = JSON.parse(annotationsToGeojson([pin('1', 'a')])) as {
       type: string
       'fiab:annotations': { version: number }
       features: Array<{
         geometry: { type: string; coordinates: [number, number] }
-        properties: { number: number; text: string; slot: string }
+        properties: { label: string; color: string; text: string; slot: string }
       }>
     }
     expect(collection.type).toBe('FeatureCollection')
     // Foreign member (RFC 7946 §6.1) — future importers branch on this.
-    expect(collection['fiab:annotations']).toEqual({ version: 1 })
+    expect(collection['fiab:annotations']).toEqual({ version: 2 })
     const feature = collection.features[0]
     expect(feature.geometry.type).toBe('Point')
     expect(feature.geometry.coordinates[0]).toBeCloseTo(8.55, 4)
     expect(feature.geometry.coordinates[1]).toBeCloseTo(47.37, 4)
     expect(feature.properties).toMatchObject({
-      number: 1,
+      label: '1',
+      color: 'red',
       text: 'note 1',
       slot: 'a',
     })
@@ -112,7 +118,13 @@ describe('annotations GeoJSON round-trip', () => {
     }
     const parsed = parseAnnotationsGeojson(JSON.stringify(mixed))
     expect(parsed).toHaveLength(1)
-    expect(parsed[0]).toMatchObject({ text: 'kept', slot: null })
+    // v1 file: no label (importer assigns) and slot-default color.
+    expect(parsed[0]).toMatchObject({
+      text: 'kept',
+      slot: null,
+      label: '',
+      color: 'slate',
+    })
   })
 
   it('throws on unparsable input and on collections without usable pins', () => {
@@ -143,5 +155,15 @@ describe('annotations GeoJSON round-trip', () => {
         {"type":"Point","coordinates":[1e999,0]}}
     ]}`
     expect(() => parseAnnotationsGeojson(allBad)).toThrow()
+  })
+})
+
+describe('nextAnnotationLabel', () => {
+  it('fills gaps left by deletes and ignores non-numeric labels', () => {
+    expect(nextAnnotationLabel([])).toBe('1')
+    expect(
+      nextAnnotationLabel([{ label: '1' }, { label: '3' }, { label: 'X' }]),
+    ).toBe('2')
+    expect(nextAnnotationLabel([{ label: '1' }, { label: '2' }])).toBe('3')
   })
 })

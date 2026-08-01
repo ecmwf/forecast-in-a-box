@@ -14,7 +14,7 @@
  */
 
 import { composeExportCanvas, loadLegendImage } from '../map-export'
-import { annotationVisibleOn } from './annotations'
+import { ANNOTATION_COLORS, annotationVisibleOn } from './annotations'
 import type { MapAnnotation } from './annotations'
 import type { ExportNote, LegendExportItem } from '../map-export'
 import type { SourceSlot } from './layer-pairing'
@@ -39,14 +39,14 @@ function legendsFor(
 }
 
 /** Notes for one capture — the annotations its panel actually shows,
- *  keeping their global numbering. */
+ *  with their sticky labels and pin colors. */
 function notesFor(
   capture: CaptureResult,
   annotations: ReadonlyArray<MapAnnotation>,
 ): Array<ExportNote> {
-  return annotations.flatMap((a, i) =>
+  return annotations.flatMap((a) =>
     annotationVisibleOn(a, capture.slot)
-      ? [{ number: i + 1, text: a.text }]
+      ? [{ label: a.label, color: ANNOTATION_COLORS[a.color], text: a.text }]
       : [],
   )
 }
