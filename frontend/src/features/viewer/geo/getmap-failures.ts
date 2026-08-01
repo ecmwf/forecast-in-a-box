@@ -27,6 +27,8 @@ const PRUNE_INTERVAL_MS = 30_000
 export interface GetMapFailureLog {
   /** Epochs with at least one currently-failing layer, per slot. */
   failedEpochs: Record<SourceSlot, ReadonlySet<number>>
+  /** Failing layer NAMES per epoch, per slot — feeds attribution UI. */
+  failedLayers: Record<SourceSlot, ReadonlyMap<number, ReadonlyArray<string>>>
   /** Record a load outcome; `time` is the raw WMS TIME that was sent. */
   report: (
     slot: SourceSlot,
@@ -115,14 +117,31 @@ export function useGetMapFailureLog({
     return () => window.clearInterval(id)
   }, [ttlMs, pruneIntervalMs])
 
-  const failedEpochs = useMemo(() => {
-    const out: Record<SourceSlot, Set<number>> = { a: new Set(), b: new Set() }
+  const failedLayers = useMemo(() => {
+    const out: Record<SourceSlot, Map<number, Array<string>>> = {
+      a: new Map(),
+      b: new Map(),
+    }
     for (const key of marks.keys()) {
-      const [slot, epoch] = key.split('|')
-      out[slot as SourceSlot].add(Number(epoch))
+      const parts = key.split('|')
+      const epoch = Number(parts[1])
+      // Layer names may contain '|' — everything past slot|epoch.
+      const layer = parts.slice(2).join('|')
+      const perEpoch = out[parts[0] as SourceSlot]
+      const list = perEpoch.get(epoch)
+      if (list) list.push(layer)
+      else perEpoch.set(epoch, [layer])
     }
     return out
   }, [marks])
 
-  return { failedEpochs, report, clearSlot, retainLayers }
+  const failedEpochs = useMemo(
+    () => ({
+      a: new Set(failedLayers.a.keys()),
+      b: new Set(failedLayers.b.keys()),
+    }),
+    [failedLayers],
+  )
+
+  return { failedEpochs, failedLayers, report, clearSlot, retainLayers }
 }

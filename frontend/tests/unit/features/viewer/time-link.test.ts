@@ -14,7 +14,7 @@ import { buildSourceTimeIndex } from '@/features/viewer/geo/compare-timeline'
 import {
   defaultToleranceMs,
   effectiveAvailability,
-  effectiveFailures,
+  effectiveFailureLayers,
   formatOffset,
   medianStepMs,
   offsetBounds,
@@ -127,28 +127,35 @@ describe('effectiveAvailability', () => {
   })
 })
 
-describe('effectiveFailures', () => {
+describe('effectiveFailureLayers', () => {
   const axis = [0, 1, 2, 3, 4].map((i) => T00 + i * 6 * HOUR)
 
-  it('exact mode marks the failing epoch at its own axis position', () => {
-    const failed = new Set([T00 + 6 * HOUR])
+  it('exact mode places the failing layers at their own axis position', () => {
+    const failed = new Map([[T00 + 6 * HOUR, ['2t', 'msl']]])
     expect(
-      effectiveFailures(axis, sixHourly, failed, 'exact', 0, HOUR),
-    ).toEqual([false, true, false, false, false])
+      effectiveFailureLayers(axis, sixHourly, failed, 'exact', 0, HOUR),
+    ).toEqual([[], ['2t', 'msl'], [], [], []])
   })
 
-  it('a shift moves the mark with the displayed window', () => {
+  it('a shift moves the names with the displayed window', () => {
     // Sampling at t + 6h: axis position 0 displays the T06 step.
-    const failed = new Set([T00 + 6 * HOUR])
+    const failed = new Map([[T00 + 6 * HOUR, ['2t']]])
     expect(
-      effectiveFailures(axis, sixHourly, failed, 'nearest', 6 * HOUR, HOUR),
-    ).toEqual([true, false, false, false, false])
+      effectiveFailureLayers(
+        axis,
+        sixHourly,
+        failed,
+        'nearest',
+        6 * HOUR,
+        HOUR,
+      ),
+    ).toEqual([['2t'], [], [], [], []])
   })
 
   it('no failures → all clear without resolving', () => {
     expect(
-      effectiveFailures(axis, sixHourly, new Set(), 'exact', 0, HOUR),
-    ).toEqual([false, false, false, false, false])
+      effectiveFailureLayers(axis, sixHourly, new Map(), 'exact', 0, HOUR),
+    ).toEqual([[], [], [], [], []])
   })
 })
 

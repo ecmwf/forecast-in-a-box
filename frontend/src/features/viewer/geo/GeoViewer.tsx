@@ -58,7 +58,7 @@ import { useCompareSelection } from './useCompareSelection'
 import {
   defaultToleranceMs,
   effectiveAvailability,
-  effectiveFailures,
+  effectiveFailureLayers,
   formatOffset,
   medianStepMs,
   offsetBounds,
@@ -558,37 +558,53 @@ export function GeoViewer({
     [retainFailureLayers, activeOrderB],
   )
   // Marks projected onto the shared axis exactly like availability, so a
-  // mark paints where the failing instant is actually displayed.
+  // mark paints where the failing instant is actually displayed. Names
+  // resolve to display titles here — the slider shows words, not ids.
   const trackFailures = useMemo(() => {
     const resolveMode =
       timeLinkMode === 'nearest' || timeLinkMode === 'offset'
         ? ('nearest' as const)
         : ('exact' as const)
+    const titled = (
+      cells: Array<ReadonlyArray<string>>,
+      layers: ReadonlyArray<ParsedLayer>,
+    ) =>
+      cells.map((names) =>
+        names.map((n) => layers.find((l) => l.name === n)?.title ?? n),
+      )
     return {
-      a: effectiveFailures(
-        timeline.epochs,
-        timeIndexA,
-        failures.failedEpochs.a,
-        resolveMode,
-        0,
-        defaultToleranceMs(timeIndexA),
+      a: titled(
+        effectiveFailureLayers(
+          timeline.epochs,
+          timeIndexA,
+          failures.failedLayers.a,
+          resolveMode,
+          0,
+          defaultToleranceMs(timeIndexA),
+        ),
+        sourceA.layers,
       ),
-      b: effectiveFailures(
-        timeline.epochs,
-        timeIndexB,
-        failures.failedEpochs.b,
-        resolveMode,
-        timeLinkMode === 'offset' ? offsetMs : 0,
-        defaultToleranceMs(timeIndexB),
+      b: titled(
+        effectiveFailureLayers(
+          timeline.epochs,
+          timeIndexB,
+          failures.failedLayers.b,
+          resolveMode,
+          timeLinkMode === 'offset' ? offsetMs : 0,
+          defaultToleranceMs(timeIndexB),
+        ),
+        sourceB.layers,
       ),
     }
   }, [
     timeline.epochs,
     timeIndexA,
     timeIndexB,
-    failures.failedEpochs,
+    failures.failedLayers,
     timeLinkMode,
     offsetMs,
+    sourceA.layers,
+    sourceB.layers,
   ])
 
   // Offset tag relative to the SHARED axis (A's requested instant), so a

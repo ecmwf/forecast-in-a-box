@@ -26,18 +26,24 @@ const T0 = Date.parse('2026-07-06T00:00:00Z')
 
 const noop = () => {}
 
-function renderSlider(stepCount: number, failedAt: ReadonlyArray<number>) {
+function renderSlider(
+  stepCount: number,
+  failedAt: ReadonlyArray<number>,
+  failedTitles: ReadonlyArray<string> = ['2 m temperature'],
+) {
   const epochs = Array.from({ length: stepCount }, (_, i) => T0 + i * HOUR)
   const available = epochs.map(() => true)
-  const failed = epochs.map((_, i) => failedAt.includes(i))
+  const failed = epochs.map((_, i) =>
+    failedAt.includes(i) ? failedTitles : [],
+  )
   const timeline = {
     epochs,
     availability: { a: available, b: available },
     intersectionCount: stepCount,
   }
-  const failures: Record<SourceSlot, ReadonlyArray<boolean>> = {
+  const failures: Record<SourceSlot, ReadonlyArray<ReadonlyArray<string>>> = {
     a: failed,
-    b: epochs.map(() => false),
+    b: epochs.map(() => []),
   }
   const axis = { epochs, index: 0, onChange: noop }
   return render(
@@ -68,14 +74,17 @@ function renderSlider(stepCount: number, failedAt: ReadonlyArray<number>) {
   )
 }
 
-const MARK_SELECTOR = '[title="Advertised but not served"]'
+const MARK_SELECTOR = '[title^="Advertised but not served"]'
 
 describe('GeoTimeSlider failure marks', () => {
-  it('paints failed instants as light slot-tinted cells with a tooltip', async () => {
+  it('paints failed instants as light slot-tinted cells naming the layers', async () => {
     const { container } = await renderSlider(6, [2])
     const marks = container.querySelectorAll(MARK_SELECTOR)
     expect(marks).toHaveLength(1)
     expect(marks[0].className).toContain('bg-blue-300')
+    expect(marks[0].getAttribute('title')).toBe(
+      'Advertised but not served: 2 m temperature',
+    )
   })
 
   it('groups failed instants into their own runs beyond the cell limit', async () => {
@@ -84,6 +93,7 @@ describe('GeoTimeSlider failure marks', () => {
     const marks = container.querySelectorAll(MARK_SELECTOR)
     expect(marks).toHaveLength(1)
     expect(marks[0].className).toContain('bg-blue-300')
+    expect(marks[0].getAttribute('title')).toContain('2 m temperature')
   })
 
   it('explains the light tint in the panel header only when marks exist', async () => {
@@ -94,5 +104,21 @@ describe('GeoTimeSlider failure marks', () => {
 
     const clean = await renderSlider(6, [])
     expect(clean.container.textContent).not.toContain(hint)
+  })
+
+  it('names the failing layers when the selected instant is affected', async () => {
+    // index 0 is the selected instant in this harness.
+    const atCurrent = await renderSlider(6, [0], ['2 m temperature', 'MSL'])
+    expect(
+      atCurrent
+        .getByText('Not served at this time: 2 m temperature, MSL')
+        .element(),
+    ).toBeTruthy()
+
+    // Failure elsewhere in the window keeps the generic wording.
+    const elsewhere = await renderSlider(6, [2])
+    expect(elsewhere.container.textContent).not.toContain(
+      'Not served at this time',
+    )
   })
 })
