@@ -62,7 +62,8 @@
       "errorUnreachable": "Server not reachable — check the URL, and that it allows cross-origin (CORS) requests from this app",
       "errorHttp": "The server responded with HTTP {{status}} — check the URL path and any token",
       "errorParse": "The server responded, but not with a readable WMS capabilities document",
-      "errorTimeout": "Timed out — the server may be slow, try again"
+      "errorTimeout": "Timed out — the server may be slow, try again",
+      "errorInterrupted": "The server dropped the connection while sending its catalog — try again, or later"
     },
     "hostPath": {
       "title": "GRIB directory on this host",
@@ -77,7 +78,8 @@
       "added": "Added",
       "failed": "Could not reach {{name}}",
       "checking": "Checking WMS capabilities…",
-      "timedOut": "{{name}} timed out — the server may be slow, try again"
+      "timedOut": "{{name}} timed out — the server may be slow, try again",
+      "interrupted": "{{name}} dropped the connection while sending its catalog — try again, or later"
     }
   },
   "viewerError": {

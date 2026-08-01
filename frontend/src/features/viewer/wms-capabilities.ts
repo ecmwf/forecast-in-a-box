@@ -148,6 +148,122 @@ export function skinnyWmsBasemap(
   return { background, reference }
 }
 
+// No total deadline: slow multi-MB catalogs are legit — response+stall guards.
+export const CAPABILITIES_RESPONSE_TIMEOUT_MS = 60_000
+export const CAPABILITIES_STALL_TIMEOUT_MS = 30_000
+
+export type CapabilitiesErrorKind = 'timeout' | 'interrupted' | 'http' | 'parse'
+
+/** Typed capability-fetch failure; `kind` drives retry and message mapping. */
+export class CapabilitiesError extends Error {
+  constructor(
+    readonly kind: CapabilitiesErrorKind,
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message)
+    this.name = 'CapabilitiesError'
+  }
+}
+
+export interface CapabilitiesLimits {
+  responseMs?: number
+  stallMs?: number
+}
+
+/** Fetch + parse GetCapabilities with stall-aware timeouts. */
+export async function fetchCapabilities(
+  baseUrl: string,
+  signal?: AbortSignal,
+  limits: CapabilitiesLimits = {},
+): Promise<ParsedCapabilities> {
+  const responseMs = limits.responseMs ?? CAPABILITIES_RESPONSE_TIMEOUT_MS
+  const stallMs = limits.stallMs ?? CAPABILITIES_STALL_TIMEOUT_MS
+  const controller = new AbortController()
+  signal?.addEventListener('abort', () => controller.abort(signal.reason), {
+    once: true,
+  })
+  let timedOut: string | null = null
+  let timer = 0
+  const arm = (message: string, ms: number) => {
+    window.clearTimeout(timer)
+    timer = window.setTimeout(() => {
+      timedOut = message
+      controller.abort()
+    }, ms)
+  }
+  // Deadline abort ≠ caller cancellation (query unmount aborts too).
+  const asTimeout = (err: unknown): unknown =>
+    timedOut !== null && !signal?.aborted
+      ? new CapabilitiesError('timeout', timedOut)
+      : err
+  // Detached bodies don't observe the fetch signal — race reads so aborts win.
+  const aborted = new Promise<never>((_, reject) => {
+    const fail = () =>
+      reject(controller.signal.reason ?? new DOMException('', 'AbortError'))
+    if (controller.signal.aborted) fail()
+    else controller.signal.addEventListener('abort', fail, { once: true })
+  })
+  aborted.catch(() => {}) // not always awaited — silence unhandled rejection
+
+  let xml = ''
+  try {
+    arm(`GetCapabilities: no response after ${responseMs / 1000}s`, responseMs)
+    let res: Response
+    try {
+      res = await fetch(
+        appendWmsParams(
+          toWmsEndpoint(baseUrl),
+          'service=WMS&version=1.3.0&request=GetCapabilities',
+        ),
+        { signal: controller.signal },
+      )
+    } catch (err) {
+      throw asTimeout(err)
+    }
+    if (!res.ok) {
+      throw new CapabilitiesError(
+        'http',
+        `GetCapabilities ${res.status}`,
+        res.status,
+      )
+    }
+    const reader = res.body?.getReader()
+    if (!reader) {
+      xml = await res.text()
+    } else {
+      const stallMessage = `GetCapabilities: download stalled for ${stallMs / 1000}s`
+      const decoder = new TextDecoder()
+      arm(stallMessage, stallMs)
+      try {
+        for (;;) {
+          const { done, value } = await Promise.race([reader.read(), aborted])
+          if (done) break
+          arm(stallMessage, stallMs)
+          xml += decoder.decode(value, { stream: true })
+        }
+      } catch (err) {
+        void reader.cancel().catch(() => {})
+        const mapped = asTimeout(err)
+        if (mapped !== err || signal?.aborted) throw mapped
+        // The response began, then the transport died under us.
+        throw new CapabilitiesError(
+          'interrupted',
+          'GetCapabilities connection interrupted mid-download',
+        )
+      }
+      xml += decoder.decode()
+    }
+  } finally {
+    window.clearTimeout(timer)
+  }
+  try {
+    return parseCapabilities(xml)
+  } catch {
+    throw new CapabilitiesError('parse', 'GetCapabilities XML parse failed')
+  }
+}
+
 /**
  * Parse a WMS 1.3.0 capabilities XML document. Recursively descends
  * nested `<Layer>` elements and emits only leaves (those with a `<Name>`).
@@ -460,7 +576,7 @@ export interface LayerGroup {
 
 const TITLE_LEVEL_RE =
   /^(.+?)\s+(?:at\s+)?([0-9]+(?:\.[0-9]+)?)\s*(hPa|mb|millibars?)\s*$/i
-// Require the `@pl` scope, else DWD `name_<n>` suffixes read as hPa levels.
+// Require the `@pl` scope, else external `name_<n>` suffixes read as hPa levels.
 const NAME_LEVEL_RE = /^(.+?@pl)_(\d+)$/
 
 /**

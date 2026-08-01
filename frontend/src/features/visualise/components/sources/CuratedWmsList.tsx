@@ -51,7 +51,9 @@ export function CuratedWmsList() {
         t(
           result.reason === 'timeout'
             ? 'picker.curated.timedOut'
-            : 'picker.curated.failed',
+            : result.reason === 'interrupted'
+              ? 'picker.curated.interrupted'
+              : 'picker.curated.failed',
           { name: server.name },
         ),
       )
