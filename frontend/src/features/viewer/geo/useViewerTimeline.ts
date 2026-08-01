@@ -83,8 +83,27 @@ export function useViewerTimeline({
     [timeIndexB],
   )
   const [timeStep, setTimeStep] = useState(0)
-  // Focus window over the union axis (indices into timeline.epochs).
-  const [timeClip, setTimeClip] = useState<[number, number] | null>(null)
+  // Clip bounds are epochs; derived indices can't slide on an axis reshape.
+  const [clipEpochs, setClipEpochs] = useState<[number, number] | null>(null)
+  const timeClip = useMemo<[number, number] | null>(() => {
+    if (!clipEpochs) return null
+    const start = timeline.epochs.findIndex((e) => e >= clipEpochs[0])
+    if (start === -1) return null
+    let end = timeline.epochs.length - 1
+    while (end > start && timeline.epochs[end] > clipEpochs[1]) end -= 1
+    if (timeline.epochs[end] > clipEpochs[1]) return null
+    return [start, end]
+  }, [clipEpochs, timeline.epochs])
+  const setTimeClip = useCallback(
+    (clip: [number, number] | null) => {
+      setClipEpochs(
+        clip === null || clip[0] < 0 || clip[1] >= timeline.epochs.length
+          ? null
+          : [timeline.epochs[clip[0]], timeline.epochs[clip[1]]],
+      )
+    },
+    [timeline.epochs],
+  )
   // Re-locate the selected instant when the union changes (layer add/
   // remove) instead of snapping to 0 — URL-seeded, so it also restores `t`.
   const lastEpochRef = useRef<number | null>(initial?.timeMs ?? null)
@@ -104,11 +123,6 @@ export function useViewerTimeline({
     },
     [timeline.epochs],
   )
-
-  // Drop a stale clip when the union changes shape under it.
-  useEffect(() => {
-    if (timeClip && timeClip[1] > timeline.epochs.length - 1) setTimeClip(null)
-  }, [timeClip, timeline.epochs.length])
 
   const clipStart = timeClip ? timeClip[0] : 0
   const clipEnd = timeClip ? timeClip[1] : timeline.epochs.length - 1
@@ -145,9 +159,8 @@ export function useViewerTimeline({
     a: 0,
     b: 0,
   })
-  // A different source in a slot invalidates pair-tuned state: Δ resets
-  // (offset drops to exact), its independent instant restarts; generic
-  // modes (exact/nearest) persist.
+  // Replacement invalidates pair-tuned state: Δ→0 (offset drops to exact),
+  // the slot's independent instant restarts; exact/nearest persist.
   const onSourceReplaced = useCallback((slot: SourceSlot) => {
     setIndepIndex((prev) => ({ ...prev, [slot]: 0 }))
     setOffsetMs(0)

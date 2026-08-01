@@ -383,9 +383,8 @@ export function GeoViewer({
   // Source focus: a slot views only that source (UI collapses to it); null compares both.
   const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
 
-  // A swap exchanges the slots' content — slot-keyed working state follows it.
-  // A replacement instead resets pair-tuned time linking; re-adding the SAME
-  // B after a removal keeps its settings (tracked via the last non-null id).
+  // Swap: slot-keyed state follows the content. Replacement: pair-tuned
+  // time linking resets (re-adding the SAME B keeps its settings).
   const prevIdsRef = useRef<{ a: string; b: string | null }>({
     a: a.id,
     b: bId,

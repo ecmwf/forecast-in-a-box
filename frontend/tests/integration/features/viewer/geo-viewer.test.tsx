@@ -787,6 +787,48 @@ describe('GeoViewer', () => {
     expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
   })
 
+  it('keeps the clip window on the same instants when the axis grows', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    const early = '2026-07-05T18:00:00Z'
+    registerMockWmsServer(portA, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          time: '2026-07-06T00:00:00Z,2026-07-06T06:00:00Z',
+        },
+        { name: 'msl', title: 'Mean sea level pressure', time: early },
+      ],
+    })
+    registerMockWmsServer(portB, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          time: '2026-07-06T06:00:00Z,2026-07-06T12:00:00Z',
+        },
+        { name: 'msl', title: 'Mean sea level pressure', time: early },
+      ],
+    })
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+    await expect.element(screen.getByText('1 / 3')).toBeVisible()
+
+    // Window T00–T06 (A's current range).
+    await screen.getByTitle('Clip to A’s time range').click()
+    await expect.element(screen.getByText(/1 \/ 2/)).toBeVisible()
+
+    // A layer at T−6 h prepends an axis step. Index-kept bounds would
+    // slide the window to T−6–T00; epoch-kept bounds stay on T00–T06.
+    await screen.getByText('Mean sea level pressure').first().click()
+    await expect
+      .element(screen.getByText('2026-07-06 00:00Z – 2026-07-06 06:00Z'))
+      .toBeVisible()
+    await expect.element(screen.getByText(/1 \/ 2/)).toBeVisible()
+    await expect.element(screen.getByText('(4)')).toBeVisible()
+  })
+
   it('resets pair-tuned time linking when a slot gets a different source', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
