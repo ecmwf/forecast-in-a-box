@@ -15,11 +15,13 @@
  * are source-independent, and the camera survives because the `ol/View`
  * is persistent.
  *
- * Owns: per-source capabilities (useLensSource ×2), the pairing/selection
- * model (linked by default, auto-unlinks on zero overlap), the shared
- * epoch-keyed valid-time timeline, one persistent `ol/View` (camera
- * survives mode switches — maps remount, the View doesn't), and the mode
- * toolbar. Map mechanics live in SingleMapView / DualMapView.
+ * Composition root. Owns: per-source capabilities (useLensSource ×2),
+ * the pairing/selection model, one persistent `ol/View` (camera survives
+ * mode switches — maps remount, the View doesn't), mode/focus state, the
+ * GetMap failure log, and the sidebar/sheet layout. Subsystems live in
+ * hooks — useViewerTimeline (axis + link policy), useViewerAnnotations,
+ * useViewerUrlState (restore/report), useViewerExport (capture/copy) —
+ * and map mechanics in SingleMapView / DualMapView.
  */
 
 import {
@@ -43,9 +45,7 @@ import {
   rebaseLensUrl,
   skinnyWmsBasemap,
 } from '../wms-capabilities'
-import { canvasToPngBlob, joinCanvasesHorizontally } from '../map-export'
 import { CollapsedSidebarHandle } from '../components/CollapsedSidebarHandle'
-import { composeCaptures } from './export-pipeline'
 import { buildPairs } from './layer-pairing'
 import { useCompareSelection } from './useCompareSelection'
 import { useGetMapFailureLog } from './getmap-failures'
@@ -56,6 +56,7 @@ import { CompareHelpDialog } from './CompareHelpDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
 import { useViewerAnnotations } from './useViewerAnnotations'
 import { useViewerUrlState } from './useViewerUrlState'
+import { useViewerExport } from './useViewerExport'
 import { useViewerTimeline } from './useViewerTimeline'
 import { downloadAnnotationsGeojson } from './annotations'
 import { useGeoShortcuts } from './useGeoShortcuts'
@@ -67,12 +68,7 @@ import { SingleMapView } from './SingleMapView'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
 import type { SourceSlot } from './layer-pairing'
-import type {
-  CaptureResult,
-  CompareMapSource,
-  CompareMode,
-  CompareModeOptions,
-} from './types'
+import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { ViewerUrlState } from './view-url-state'
 import { Button } from '@/components/ui/button'
@@ -88,11 +84,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
-import { copyToClipboard } from '@/lib/clipboard'
-import { showToast } from '@/lib/toast'
-import { createLogger } from '@/lib/logger'
-
-const log = createLogger('GeoViewer')
 
 export interface GeoViewerSource {
   baseUrl: string
@@ -287,95 +278,7 @@ export function GeoViewer({
     [],
   )
 
-  // -------- Export (map components register their capture action) ------
-  const [captureAction, setCaptureAction] = useState<
-    (() => Promise<Array<CaptureResult>>) | null
-  >(null)
-  // Mirrored in a ref: captureFor invokes the action AFTER waiting out a
-  // captureOnly re-render, so it must read the registration made for that
-  // render — its own state binding still closes over captureOnly = null.
-  const captureActionRef = useRef<(() => Promise<Array<CaptureResult>>) | null>(
-    null,
-  )
-  const onRegisterCapture = useCallback(
-    (capture: (() => Promise<Array<CaptureResult>>) | null) => {
-      captureActionRef.current = capture
-      setCaptureAction(() => capture)
-    },
-    [],
-  )
-  const [exportOpen, setExportOpen] = useState(false)
-
-  // Per-slot copy re-renders the single map with only that slot showing;
-  // side-by-side just filters its per-map captures.
-  const [captureOnly, setCaptureOnly] = useState<SourceSlot | null>(null)
-  const captureFor = async (
-    only: SourceSlot | null,
-  ): Promise<Array<CaptureResult>> => {
-    const capture = captureActionRef.current
-    if (!capture) throw new Error('Capture unavailable')
-    if (only === null) return capture()
-    setCaptureOnly(only)
-    try {
-      // Two frames: React commit, then OL applies the opacity change.
-      await new Promise((r) =>
-        requestAnimationFrame(() => requestAnimationFrame(r)),
-      )
-      const results = await (captureActionRef.current ?? capture)()
-      return results.filter((c) => c.slot === only)
-    } finally {
-      setCaptureOnly(null)
-    }
-  }
-
-  // Unawaited promise: the item must be built inside the gesture (Safari).
-  // Combined view joins side-by-side maps into one image — the clipboard
-  // holds a single item.
-  const copyView = (only: SourceSlot | null) => {
-    if (!captureAction) return
-    copyToClipboard(
-      'image/png',
-      composeCaptures({
-        capture: () => captureFor(only),
-        legends: exportLegends,
-        annotations,
-      }).then((canvases) => {
-        const joined = joinCanvasesHorizontally(canvases)
-        return joined ? canvasToPngBlob(joined) : null
-      }),
-    )
-      .then(() => showToast.success(tExec('lens.mapCopied')))
-      .catch((err: unknown) => {
-        log.error('View copy failed', { error: err })
-        showToast.error(tExec('lens.mapCopyFailed'))
-      })
-  }
-
-  // Active layers' legends for the export (per slot, lens URLs rebased,
-  // external URLs verbatim — rebaseLensUrl handles both).
   const bBaseUrl = b?.baseUrl ?? null
-  const exportLegends = useMemo(() => {
-    const specs: Array<{ slot: SourceSlot; title: string; url: string }> = []
-    const slots: Array<
-      readonly [SourceSlot, typeof sourceA, string, ReadonlyArray<string>]
-    > = [['a', sourceA, a.baseUrl, activeOrderA]]
-    if (bBaseUrl !== null) {
-      slots.push(['b', sourceB, bBaseUrl, activeOrderB])
-    }
-    for (const [slot, source, baseUrl, order] of slots) {
-      for (const name of order) {
-        const layer = source.layers.find((l) => l.name === name)
-        const legendUrl = layer?.styles[0]?.legendUrl
-        if (!layer || !legendUrl) continue
-        specs.push({
-          slot,
-          title: layer.title,
-          url: rebaseLensUrl(legendUrl, baseUrl),
-        })
-      }
-    }
-    return specs
-  }, [sourceA, sourceB, a.baseUrl, bBaseUrl, activeOrderA, activeOrderB])
 
   // Basemap — one choice driving every panel.
   const [basemapId, setBasemapId] = useState<string>(
@@ -576,6 +479,25 @@ export function GeoViewer({
   const onZoomToResolution = useCallback((res: number) => {
     viewRef.current?.animate({ resolution: res, duration: 350 })
   }, [])
+
+  // -------- Export (map components register their capture action) ------
+  const {
+    onRegisterCapture,
+    captureAction,
+    captureOnly,
+    exportOpen,
+    setExportOpen,
+    copyView,
+    exportLegends,
+  } = useViewerExport({
+    aBaseUrl: a.baseUrl,
+    bBaseUrl,
+    sourceA,
+    sourceB,
+    activeOrderA,
+    activeOrderB,
+    annotations,
+  })
 
   useGeoShortcuts({
     // Any open → collapse both; else restore (one sheet only on phones).
