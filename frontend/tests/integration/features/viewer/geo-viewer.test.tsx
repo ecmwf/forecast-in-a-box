@@ -725,6 +725,49 @@ describe('GeoViewer', () => {
     style.remove()
   })
 
+  it('unlinked per-side selections follow their source through a swap', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: 'tp', title: 'Total precipitation' }],
+    })
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    // Zero overlap auto-unlinks; activate one layer per side.
+    await screen.getByText('2 m temperature').first().click()
+    await screen.getByRole('button', { name: 'B', exact: true }).click()
+    await screen.getByText('Total precipitation').first().click()
+
+    await screen.getByRole('button', { name: 'swap slots' }).click()
+
+    // Each active-layer section now lists its source's own selection.
+    // (The label also appears in the map's slot tag — scope to <section>.)
+    const sectionWith = (label: string) =>
+      page.elementLocator(
+        screen
+          .getByText(label)
+          .elements()
+          .map((e) => e.closest('section'))
+          .find((s) => s !== null)!,
+      )
+    await expect
+      .element(
+        sectionWith('Run B').getByText('Total precipitation', { exact: true }),
+      )
+      .toBeVisible()
+    await expect
+      .element(
+        sectionWith('Run A').getByText('2 m temperature', { exact: true }),
+      )
+      .toBeVisible()
+    // The raw layer names never leak (an unmapped list would show '2t').
+    expect(screen.getByText('2t', { exact: true }).elements()).toHaveLength(0)
+    expect(screen.getByText('tp', { exact: true }).elements()).toHaveLength(0)
+  })
+
   it('negates the time offset on swap so the alignment is preserved', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)

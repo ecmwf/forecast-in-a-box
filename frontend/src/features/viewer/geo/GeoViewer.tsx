@@ -387,6 +387,7 @@ export function GeoViewer({
     a: a.id,
     b: bId,
   })
+  const swapSelectionSlots = selection.onSlotsSwapped
   useEffect(() => {
     const prev = prevIdsRef.current
     prevIdsRef.current = { a: a.id, b: bId }
@@ -401,8 +402,9 @@ export function GeoViewer({
         ),
     )
     setFocusSlot((f) => (f === 'a' ? 'b' : f === 'b' ? 'a' : null))
+    swapSelectionSlots()
     onSlotsSwapped()
-  }, [a.id, bId, onSlotsSwapped])
+  }, [a.id, bId, swapSelectionSlots, onSlotsSwapped])
 
   useEffect(() => {
     if (!hasB && focusSlot !== null) setFocusSlot(null)
