@@ -19,23 +19,24 @@ import {
 } from '@/features/viewer/geo/annotations'
 
 describe('annotationVisibleOn', () => {
-  it('single map shows everything', () => {
-    expect(annotationVisibleOn({ slot: 'a' }, null)).toBe(true)
-    expect(annotationVisibleOn({ slot: 'b' }, null)).toBe(true)
-    expect(annotationVisibleOn({ slot: null }, null)).toBe(true)
+  it('shared pins show on every surface', () => {
+    expect(annotationVisibleOn({ sourceId: null }, ['run:x'])).toBe(true)
+    expect(annotationVisibleOn({ sourceId: null }, [])).toBe(true)
   })
 
-  it('side-by-side panels show own + shared pins only', () => {
-    expect(annotationVisibleOn({ slot: 'a' }, 'a')).toBe(true)
-    expect(annotationVisibleOn({ slot: null }, 'a')).toBe(true)
-    expect(annotationVisibleOn({ slot: 'b' }, 'a')).toBe(false)
-    expect(annotationVisibleOn({ slot: 'a' }, 'b')).toBe(false)
+  it('bound pins show only where their source is on screen', () => {
+    expect(annotationVisibleOn({ sourceId: 'run:x' }, ['run:x'])).toBe(true)
+    expect(annotationVisibleOn({ sourceId: 'run:x' }, ['wms:y', 'run:x'])).toBe(
+      true,
+    )
+    expect(annotationVisibleOn({ sourceId: 'run:x' }, ['wms:y'])).toBe(false)
+    expect(annotationVisibleOn({ sourceId: 'run:x' }, [])).toBe(false)
   })
 })
 
 const pin = (
   id: string,
-  slot: 'a' | 'b' | null,
+  sourceId: string | null,
   lonLat: [number, number] = [8.55, 47.37],
 ): MapAnnotation => ({
   id,
@@ -43,21 +44,21 @@ const pin = (
   label: id,
   text: `note ${id}`,
   color: 'red',
-  slot,
+  sourceId,
 })
 
 describe('annotations GeoJSON round-trip', () => {
-  it('preserves label, color, text, slot, and coordinates (WGS84 wire)', () => {
+  it('preserves label, color, text, source, and coordinates (WGS84 wire)', () => {
     const pins = [
-      pin('1', 'a'),
-      pin('2', 'b', [-70.66, -33.45]),
+      pin('1', 'run:model-x'),
+      pin('2', 'wms:external', [-70.66, -33.45]),
       pin('3', null),
     ]
     const parsed = parseAnnotationsGeojson(annotationsToGeojson(pins))
     expect(parsed).toHaveLength(3)
     parsed.forEach((restored, i) => {
       expect(restored.text).toBe(pins[i].text)
-      expect(restored.slot).toBe(pins[i].slot)
+      expect(restored.sourceId).toBe(pins[i].sourceId)
       expect(restored.label).toBe(pins[i].label)
       expect(restored.color).toBe('red')
       expect(restored.coordinate[0]).toBeCloseTo(pins[i].coordinate[0], 0)
@@ -65,18 +66,25 @@ describe('annotations GeoJSON round-trip', () => {
     })
   })
 
-  it('writes RFC 7946 lon/lat with label/color properties and a version stamp', () => {
-    const collection = JSON.parse(annotationsToGeojson([pin('1', 'a')])) as {
+  it('writes RFC 7946 lon/lat with label/color/source properties and a version stamp', () => {
+    const collection = JSON.parse(
+      annotationsToGeojson([pin('1', 'run:model-x')]),
+    ) as {
       type: string
       'fiab:annotations': { version: number }
       features: Array<{
         geometry: { type: string; coordinates: [number, number] }
-        properties: { label: string; color: string; text: string; slot: string }
+        properties: {
+          label: string
+          color: string
+          text: string
+          source: string
+        }
       }>
     }
     expect(collection.type).toBe('FeatureCollection')
     // Foreign member (RFC 7946 §6.1) — future importers branch on this.
-    expect(collection['fiab:annotations']).toEqual({ version: 2 })
+    expect(collection['fiab:annotations']).toEqual({ version: 3 })
     const feature = collection.features[0]
     expect(feature.geometry.type).toBe('Point')
     expect(feature.geometry.coordinates[0]).toBeCloseTo(8.55, 4)
@@ -85,8 +93,36 @@ describe('annotations GeoJSON round-trip', () => {
       label: '1',
       color: 'red',
       text: 'note 1',
-      slot: 'a',
+      source: 'run:model-x',
     })
+  })
+
+  it('maps legacy v2 slot files onto the current assignment', () => {
+    const v2 = {
+      type: 'FeatureCollection',
+      features: (
+        [
+          ['on A', 'a'],
+          ['on B', 'b'],
+          ['shared', null],
+        ] as const
+      ).map(([text, slot], i) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [i, i] },
+        properties: { text, slot },
+      })),
+    }
+    const parsed = parseAnnotationsGeojson(JSON.stringify(v2), {
+      a: 'run:1',
+      b: 'wms:2',
+    })
+    expect(parsed.map((p) => p.sourceId)).toEqual(['run:1', 'wms:2', null])
+    // A slot without a current source degrades to shared.
+    const soloParsed = parseAnnotationsGeojson(JSON.stringify(v2), {
+      a: 'run:1',
+      b: null,
+    })
+    expect(soloParsed.map((p) => p.sourceId)).toEqual(['run:1', null, null])
   })
 
   it('skips non-point and textless features, tolerates foreign slots', () => {
@@ -121,7 +157,7 @@ describe('annotations GeoJSON round-trip', () => {
     // v1 file: no label (importer assigns) and slot-default color.
     expect(parsed[0]).toMatchObject({
       text: 'kept',
-      slot: null,
+      sourceId: null,
       label: '',
       color: 'slate',
     })

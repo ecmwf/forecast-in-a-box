@@ -44,8 +44,9 @@ const ANNOTATION: MapAnnotation = {
   label: '1',
   text: 'pin',
   color: 'slate',
-  slot: null,
+  sourceId: null,
 }
+const NO_SOURCES: ReadonlyArray<string> = []
 
 function makeOverlay(): ContextOverlay {
   return {
@@ -84,7 +85,7 @@ function Harness({
   useAnnotationLayer(
     mapRef,
     [ANNOTATION],
-    null,
+    NO_SOURCES,
     false,
     handlers,
     null,

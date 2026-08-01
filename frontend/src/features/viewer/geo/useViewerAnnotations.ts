@@ -55,12 +55,17 @@ export function useViewerAnnotations({
   // Where a new annotation will land, captured at map-click time.
   const pendingRef = useRef<{
     coordinate: [number, number]
-    slot: SourceSlot | null
+    sourceId: string | null
   } | null>(null)
 
   const onAnnotationCreate = useCallback(
-    (coordinate: [number, number], slot: SourceSlot | null) => {
-      pendingRef.current = { coordinate, slot }
+    (
+      coordinate: [number, number],
+      // The binding is the source id; the slot only picks the color default.
+      sourceId: string | null,
+      slot: SourceSlot | null,
+    ) => {
+      pendingRef.current = { coordinate, sourceId }
       setAnnotationDraft({
         id: null,
         text: '',
@@ -91,10 +96,10 @@ export function useViewerAnnotations({
         ),
       )
     } else if (pendingRef.current) {
-      const { coordinate, slot } = pendingRef.current
+      const { coordinate, sourceId } = pendingRef.current
       setAnnotations((prev) => [
         ...prev,
-        { id: nextAnnotationId(), coordinate, slot, ...patch },
+        { id: nextAnnotationId(), coordinate, sourceId, ...patch },
       ])
       pendingRef.current = null
     }

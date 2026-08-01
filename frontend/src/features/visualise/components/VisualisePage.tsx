@@ -455,10 +455,18 @@ export function VisualisePage() {
               {/* Single JSX position — b flips null↔value without a
                   remount, so camera/selection/time survive the switch. */}
               <GeoViewer
-                a={{ baseUrl: stateA.baseUrl, label: entryDisplayName(a) }}
+                a={{
+                  id: entryRef(a),
+                  baseUrl: stateA.baseUrl,
+                  label: entryDisplayName(a),
+                }}
                 b={
                   b && stateB.phase === 'running'
-                    ? { baseUrl: stateB.baseUrl, label: entryDisplayName(b) }
+                    ? {
+                        id: entryRef(b),
+                        baseUrl: stateB.baseUrl,
+                        label: entryDisplayName(b),
+                      }
                     : null
                 }
                 mode={mode}

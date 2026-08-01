@@ -130,16 +130,29 @@ function ViewerRoute({
   onViewStateChange?: (partial: Partial<ViewerUrlState>) => void
 }) {
   const [mode, setMode] = useState<CompareMode>(initialMode)
+  // Slot swap mirrors VisualisePage: a pure a↔b prop exchange.
+  const [swapped, setSwapped] = useState(false)
   const router = useRouter()
+  const srcA = {
+    id: `run:test-${portA}`,
+    baseUrl: `http://localhost:${portA}`,
+    label: 'Run A',
+  }
+  const srcB = {
+    id: `run:test-${portB}`,
+    baseUrl: `http://localhost:${portB}`,
+    label: 'Run B',
+  }
   return (
     <div style={{ width: 1100, height: 700 }}>
       <button onClick={() => router.history.push('/away')}>go away</button>
       <button onClick={() => router.history.push('/?probe=1')}>
         tweak search
       </button>
+      <button onClick={() => setSwapped((v) => !v)}>swap slots</button>
       <GeoViewer
-        a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
-        b={{ baseUrl: `http://localhost:${portB}`, label: 'Run B' }}
+        a={swapped ? srcB : srcA}
+        b={swapped ? srcA : srcB}
         mode={mode}
         onModeChange={setMode}
         initialViewState={initialViewState}
@@ -675,6 +688,43 @@ describe('GeoViewer', () => {
       .toBeInTheDocument()
   })
 
+  it('annotations follow their source through a slot swap', async () => {
+    const style = document.createElement('style')
+    style.textContent =
+      '[data-slot="dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
+    document.head.appendChild(style)
+
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(
+      <Harness portA={portA} portB={portB} initialMode="side" />,
+    )
+    await screen.getByRole('button', { name: /Annotate/ }).click()
+
+    const viewports = document.querySelectorAll('.ol-viewport')
+    expect(viewports.length).toBe(2)
+    for (const v of viewports) {
+      const container = (v as HTMLElement).parentElement!
+      container.style.cssText = 'position:relative;width:500px;height:400px'
+    }
+    await page
+      .elementLocator(viewports[1])
+      .click({ position: { x: 250, y: 200 } })
+    await expect.element(screen.getByText('New annotation')).toBeVisible()
+    await screen.getByPlaceholder('Record your finding…').fill('B-side eddy')
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect
+      .element(screen.getByTitle('B', { exact: true }))
+      .toBeInTheDocument()
+
+    // Swap: the pin's source now sits in slot A — attribution follows it.
+    await screen.getByRole('button', { name: 'swap slots' }).click()
+    await expect
+      .element(screen.getByTitle('A', { exact: true }))
+      .toBeInTheDocument()
+    expect(screen.getByTitle('B', { exact: true }).elements()).toHaveLength(0)
+    style.remove()
+  })
+
   it('clips the timeline to a source range via presets', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
@@ -842,10 +892,18 @@ function ProgressiveViewerRoute({
   return (
     <div style={{ width: 1100, height: 700 }}>
       <GeoViewer
-        a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
+        a={{
+          id: `run:test-${portA}`,
+          baseUrl: `http://localhost:${portA}`,
+          label: 'Run A',
+        }}
         b={
           withB
-            ? { baseUrl: `http://localhost:${portB}`, label: 'Run B' }
+            ? {
+                id: `run:test-${portB}`,
+                baseUrl: `http://localhost:${portB}`,
+                label: 'Run B',
+              }
             : null
         }
         mode={mode}

@@ -65,6 +65,7 @@ import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
+import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
 import type { SourceSlot } from './layer-pairing'
@@ -86,6 +87,8 @@ import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
 
 export interface GeoViewerSource {
+  /** Stable source identity (basket entry ref) — annotations bind to it. */
+  id: string
   baseUrl: string
   label: string
 }
@@ -115,6 +118,7 @@ export function GeoViewer({
   const { t: tExec } = useTranslation('executions')
 
   const hasB = b !== null
+  const bId = b?.id ?? null
   const sourceA = useLensSource(a.baseUrl)
   const sourceB = useLensSource(b?.baseUrl ?? null)
 
@@ -451,6 +455,19 @@ export function GeoViewer({
     },
     [disarmAnnotate],
   )
+  // Sidebar attribution is derived, so a swap flips the shown letters.
+  const annotationAttribution = useCallback(
+    (ann: MapAnnotation) => {
+      if (ann.sourceId === null) return t('annotations.slotShared')
+      const slots = (['a', 'b'] as const).filter(
+        (s) => (s === 'a' ? a.id : bId) === ann.sourceId,
+      )
+      return slots.length > 0
+        ? slots.map((s) => s.toUpperCase()).join(' · ')
+        : t('annotations.notShown')
+    },
+    [a.id, bId, t],
+  )
 
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
@@ -497,6 +514,7 @@ export function GeoViewer({
     activeOrderA,
     activeOrderB,
     annotations,
+    slotIds: { a: a.id, b: bId },
   })
 
   useGeoShortcuts({
@@ -558,6 +576,7 @@ export function GeoViewer({
   // -------- Source view-model for the map components --------
   const mapSourceA: CompareMapSource = {
     slot: 'a',
+    id: a.id,
     baseUrl: a.baseUrl,
     label: a.label,
     layers: sourceA.layers,
@@ -580,6 +599,7 @@ export function GeoViewer({
   const mapSourceB: CompareMapSource | null = b
     ? {
         slot: 'b',
+        id: b.id,
         baseUrl: b.baseUrl,
         label: b.label,
         layers: sourceB.layers,
@@ -682,6 +702,7 @@ export function GeoViewer({
         onAnnotateToggle={toggleAnnotate}
         annotations={annotations}
         onAnnotationsImport={importAnnotations}
+        annotationSlotIds={{ a: a.id, b: bId }}
         onExport={() => setExportOpen(true)}
         onCopy={copyView}
         copySlots={hasB}
@@ -733,6 +754,7 @@ export function GeoViewer({
         capture={captureAction}
         legends={exportLegends}
         annotations={annotations}
+        slotIds={{ a: a.id, b: bId }}
         meta={{ labelA: a.label, labelB: b?.label ?? null }}
       />
       <div className="relative flex min-h-0 flex-1 gap-2">
@@ -772,6 +794,7 @@ export function GeoViewer({
               remove: removeAnnotationById,
               locate: locateAnnotation,
               setHighlight: setAnnotationHighlightId,
+              attribution: annotationAttribution,
             }}
             opacity={{
               global: globalOpacity,

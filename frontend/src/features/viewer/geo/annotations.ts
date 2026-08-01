@@ -9,12 +9,10 @@
  */
 
 /**
- * Map annotations: labeled, colored pins recorded per comparison slot.
- * A pin placed on side-by-side panel A — or while
- * focused on A — belongs to A and renders only on A surfaces; combined-
- * view pins (slot null) render everywhere. Pins are canvas-native (vector features
- * with Text styles), so the loupe and PNG exports include them for free;
- * the full texts are baked into exports as a numbered notes strip.
+ * Map annotations: labeled, colored pins bound to a source identity, so
+ * they follow their source through slot swaps (sourceId null = shared).
+ * Canvas-native vector features — the loupe and PNG exports include them
+ * for free; full texts are baked into exports as a numbered notes strip.
  */
 
 import { useEffect, useRef } from 'react'
@@ -59,8 +57,8 @@ export interface MapAnnotation {
   label: string
   text: string
   color: AnnotationColor
-  /** Panel the pin was placed on; null = single-map (shows everywhere). */
-  slot: SourceSlot | null
+  /** Source the pin belongs to; null = shared (shows on every surface). */
+  sourceId: string | null
 }
 
 let annotationCounter = 0
@@ -90,15 +88,13 @@ export function isAnnotationFeature(feature: FeatureLike): boolean {
   return String(feature.getId() ?? '').startsWith('annotation-')
 }
 
-/** Should `annotation` render on a panel showing `panelSlot`?
- *  Single map (panelSlot null) shows everything; a side-by-side panel
- *  shows its own pins plus the shared (null-slot) ones. */
+/** Should `annotation` render on a surface showing the `shownIds` sources?
+ *  Shared pins always do; bound pins only where their source is on screen. */
 export function annotationVisibleOn(
-  annotation: Pick<MapAnnotation, 'slot'>,
-  panelSlot: SourceSlot | null,
+  annotation: Pick<MapAnnotation, 'sourceId'>,
+  shownIds: ReadonlyArray<string>,
 ): boolean {
-  if (panelSlot === null) return true
-  return annotation.slot === null || annotation.slot === panelSlot
+  return annotation.sourceId === null || shownIds.includes(annotation.sourceId)
 }
 
 function pinStyles(
@@ -154,10 +150,12 @@ function pinStyles(
 export function useAnnotationLayer(
   mapRef: RefObject<OlMap | null>,
   annotations: ReadonlyArray<MapAnnotation>,
-  panelSlot: SourceSlot | null,
+  /** Source ids this surface shows — memoize; it is an effect dependency. */
+  shownIds: ReadonlyArray<string>,
   armed: boolean,
   handlers: {
-    onCreate: (coordinate: [number, number], slot: SourceSlot | null) => void
+    /** Creation context (source binding) lives in the caller's closure. */
+    onCreate: (coordinate: [number, number]) => void
     onEdit: (id: string) => void
     onMove: (id: string, coordinate: [number, number]) => void
   },
@@ -173,7 +171,7 @@ export function useAnnotationLayer(
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    const visible = annotations.filter((a) => annotationVisibleOn(a, panelSlot))
+    const visible = annotations.filter((a) => annotationVisibleOn(a, shownIds))
     const source = new VectorSource({
       features: visible.map((a) => {
         const feature = new Feature({ geometry: new Point(a.coordinate) })
@@ -201,10 +199,7 @@ export function useAnnotationLayer(
         return
       }
       if (armedRef.current) {
-        handlersRef.current.onCreate(
-          [evt.coordinate[0], evt.coordinate[1]],
-          panelSlot,
-        )
+        handlersRef.current.onCreate([evt.coordinate[0], evt.coordinate[1]])
       }
     }
     map.on('singleclick', onClick)
@@ -230,15 +225,15 @@ export function useAnnotationLayer(
       map.un('singleclick', onClick)
       map.removeLayer(layer)
     }
-  }, [mapRef, annotations, panelSlot, highlightId, mapVersion])
+  }, [mapRef, annotations, shownIds, highlightId, mapVersion])
 }
 
 // -------- GeoJSON round-trip (RFC 7946: WGS84 lon/lat on the wire) --------
 
 /** Bump when the export shape changes; readers branch on the foreign member. */
-const ANNOTATIONS_FORMAT_VERSION = 2
+const ANNOTATIONS_FORMAT_VERSION = 3
 
-/** Point FeatureCollection (label/text/color/slot props) — plain GeoJSON,
+/** Point FeatureCollection (label/text/color/source props) — plain GeoJSON,
  *  so exports open in any GIS tool; versioned via an RFC 7946 foreign member. */
 export function annotationsToGeojson(
   annotations: ReadonlyArray<MapAnnotation>,
@@ -249,7 +244,7 @@ export function annotationsToGeojson(
       label: a.label,
       text: a.text,
       color: a.color,
-      slot: a.slot,
+      source: a.sourceId,
     })
     return feature
   })
@@ -278,12 +273,13 @@ export function downloadAnnotationsGeojson(
   URL.revokeObjectURL(url)
 }
 
-/** Pin data from annotations GeoJSON: Points with non-empty `text` only,
- *  foreign `slot`/`color` values fall back to shared/slot-default and a
- *  missing `label` (v1 files) stays '' for the importer to assign.
+/** Pin data from annotations GeoJSON: Points with non-empty `text` only.
+ *  v3 binds by `source` id; legacy `slot` maps through `slotIds` (foreign
+ *  → shared); a missing `label` (v1) stays '' for the importer to assign.
  *  Throws when nothing usable. */
 export function parseAnnotationsGeojson(
   text: string,
+  slotIds: { a?: string | null; b?: string | null } = {},
 ): Array<Omit<MapAnnotation, 'id'>> {
   const features = new GeoJSON().readFeatures(JSON.parse(text), {
     featureProjection: 'EPSG:3857',
@@ -293,8 +289,15 @@ export function parseAnnotationsGeojson(
     const noteText: unknown = feature.get('text')
     if (!(geometry instanceof Point)) return []
     if (typeof noteText !== 'string' || noteText.trim() === '') return []
+    const sourceRaw: unknown = feature.get('source')
     const slotRaw: unknown = feature.get('slot')
     const slot = slotRaw === 'a' ? 'a' : slotRaw === 'b' ? 'b' : null
+    const sourceId =
+      typeof sourceRaw === 'string' && sourceRaw !== ''
+        ? sourceRaw
+        : slot !== null
+          ? (slotIds[slot] ?? null)
+          : null
     const labelRaw: unknown = feature.get('label')
     const colorRaw: unknown = feature.get('color')
     const [x, y] = geometry.getCoordinates()
@@ -313,7 +316,7 @@ export function parseAnnotationsGeojson(
           typeof colorRaw === 'string' && colorRaw in ANNOTATION_COLORS
             ? (colorRaw as AnnotationColor)
             : defaultAnnotationColor(slot),
-        slot,
+        sourceId,
       },
     ]
   })

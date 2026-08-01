@@ -355,6 +355,7 @@
     "delete": "Delete",
     "remove": "Remove annotation {{label}}",
     "slotShared": "Both",
+    "notShown": "Source not shown",
     "armedHint": "Click the map to add a note · Esc exits",
     "locate": "Show annotation {{label}} on the map",
     "edit": "Edit annotation {{label}}",

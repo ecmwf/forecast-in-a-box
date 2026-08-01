@@ -17,6 +17,8 @@ const LEGEND_OK =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 const LEGEND_BROKEN = 'data:image/png;base64,not-an-image'
 
+const SLOT_IDS = { a: 'run:model-a', b: 'wms:model-b' }
+
 function capture(slot: CaptureResult['slot']): CaptureResult {
   const canvas = document.createElement('canvas')
   canvas.width = 120
@@ -37,6 +39,7 @@ describe('composeCaptures', () => {
         capture: () => Promise.resolve([]),
         legends: [],
         annotations: [],
+        slotIds: SLOT_IDS,
       }),
     ).rejects.toThrow('Nothing to capture')
   })
@@ -47,6 +50,7 @@ describe('composeCaptures', () => {
       capture: () => Promise.resolve([a, capture('b')]),
       legends: [],
       annotations: [],
+      slotIds: SLOT_IDS,
     })
     expect(result).toHaveLength(2)
     // The title bar overlays the map; without legends/notes the composed
@@ -65,16 +69,19 @@ describe('composeCaptures', () => {
       capture: () => Promise.resolve([capture('a')]),
       legends: [legends[1]], // only B's legend — filtered out for slot a
       annotations: [],
+      slotIds: SLOT_IDS,
     })
     const [aWithLegend] = await composeCaptures({
       capture: () => Promise.resolve([capture('a')]),
       legends: [legends[0]],
       annotations: [],
+      slotIds: SLOT_IDS,
     })
     const [combined] = await composeCaptures({
       capture: () => Promise.resolve([capture(null)]),
       legends,
       annotations: [],
+      slotIds: SLOT_IDS,
     })
     // A foreign-slot legend adds nothing; an own-slot legend adds a strip;
     // the combined view carries a strip too (its multi-column layout may
@@ -84,16 +91,45 @@ describe('composeCaptures', () => {
     expect(combined.height).toBeGreaterThan(80)
   })
 
+  it('bakes notes only into captures that show the pin’s source', async () => {
+    const bPin = {
+      id: 'p1',
+      coordinate: [0, 0] as [number, number],
+      label: '1',
+      text: 'B-side eddy',
+      color: 'orange' as const,
+      sourceId: SLOT_IDS.b,
+    }
+    const compose = (
+      slot: CaptureResult['slot'],
+      annotations: [typeof bPin] | [],
+    ) =>
+      composeCaptures({
+        capture: () => Promise.resolve([capture(slot)]),
+        legends: [],
+        annotations,
+        slotIds: SLOT_IDS,
+      }).then(([c]) => c.height)
+    expect(await compose('a', [bPin])).toBe(await compose('a', []))
+    expect(await compose('b', [bPin])).toBeGreaterThan(await compose('b', []))
+    expect(await compose(null, [bPin])).toBeGreaterThan(await compose(null, []))
+    // A pin whose source left both slots stays out of every capture.
+    const orphan = { ...bPin, sourceId: 'run:gone' }
+    expect(await compose(null, [orphan])).toBe(await compose(null, []))
+  })
+
   it('drops legends that fail to load and still exports the map', async () => {
     const [withBroken] = await composeCaptures({
       capture: () => Promise.resolve([capture('a')]),
       legends: [{ slot: 'a', title: 'Broken', url: LEGEND_BROKEN }],
       annotations: [],
+      slotIds: SLOT_IDS,
     })
     const [without] = await composeCaptures({
       capture: () => Promise.resolve([capture('a')]),
       legends: [],
       annotations: [],
+      slotIds: SLOT_IDS,
     })
     expect(withBroken.height).toBe(without.height)
   })

@@ -84,6 +84,8 @@ export interface AnnotationControls {
   locate: (id: string) => void
   /** Echo sidebar-row hover as an enlarged pin; null clears. */
   setHighlight: (id: string | null) => void
+  /** Where the pin's source is shown now ("A", "A · B", shared, hidden). */
+  attribution: (annotation: MapAnnotation) => string
 }
 
 export interface OpacityTiers {
@@ -382,11 +384,7 @@ function AnnotationsSection({
             <span
               className="mt-0.5 flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-0.5 font-mono text-[10px] font-bold text-white"
               style={{ backgroundColor: ANNOTATION_COLORS[annotation.color] }}
-              title={
-                annotation.slot
-                  ? annotation.slot.toUpperCase()
-                  : t('annotations.slotShared')
-              }
+              title={annotations.attribution(annotation)}
             >
               {annotation.label}
             </span>

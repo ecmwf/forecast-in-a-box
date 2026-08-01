@@ -15,7 +15,7 @@
  * DOM crosshair mirrors the cursor position across both panels.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useOlMapBase } from '../hooks/useOlMapBase'
 import { useBasemap } from '../hooks/useBasemap'
@@ -99,6 +99,7 @@ export function DualMapView({
   annotationHighlightId: string | null
   onAnnotationCreate: (
     coordinate: [number, number],
+    sourceId: string | null,
     slot: SourceSlot | null,
   ) => void
   onAnnotationEdit: (id: string) => void
@@ -255,6 +256,7 @@ function DualMapPanel({
   annotationHighlightId: string | null
   onAnnotationCreate: (
     coordinate: [number, number],
+    sourceId: string | null,
     slot: SourceSlot | null,
   ) => void
   onAnnotationEdit: (id: string) => void
@@ -321,13 +323,16 @@ function DualMapPanel({
   const pointer = usePointerReadout(mapRef, mapVersion)
   useContextOverlays(mapRef, overlays, mapVersion)
   const overlayHover = useOverlayHover(mapRef, overlays, mapVersion)
+  // A panel shows exactly its source's pins; creations bind to it.
+  const pinScope = useMemo(() => [source.id], [source.id])
   useAnnotationLayer(
     mapRef,
     annotations,
-    source.slot,
+    pinScope,
     annotateArmed,
     {
-      onCreate: onAnnotationCreate,
+      onCreate: (coordinate) =>
+        onAnnotationCreate(coordinate, source.id, source.slot),
       onEdit: onAnnotationEdit,
       onMove: onAnnotationMove,
     },

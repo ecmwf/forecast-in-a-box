@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next'
 import { canvasToPngBlob, joinCanvasesHorizontally } from '../map-export'
 import { rebaseLensUrl } from '../wms-capabilities'
 import { composeCaptures } from './export-pipeline'
+import type { ExportSlotIds } from './export-pipeline'
 import type { LensSource } from '../hooks/useLensSource'
 import type { MapAnnotation } from './annotations'
 import type { SourceSlot } from './layer-pairing'
@@ -37,6 +38,7 @@ export function useViewerExport({
   activeOrderA,
   activeOrderB,
   annotations,
+  slotIds,
 }: {
   aBaseUrl: string
   bBaseUrl: string | null
@@ -45,6 +47,7 @@ export function useViewerExport({
   activeOrderA: ReadonlyArray<string>
   activeOrderB: ReadonlyArray<string>
   annotations: ReadonlyArray<MapAnnotation>
+  slotIds: ExportSlotIds
 }) {
   const { t: tExec } = useTranslation('executions')
 
@@ -124,6 +127,7 @@ export function useViewerExport({
         capture: () => captureFor(only),
         legends: exportLegends,
         annotations,
+        slotIds,
       }).then((canvases) => {
         const joined = joinCanvasesHorizontally(canvases)
         return joined ? canvasToPngBlob(joined) : null

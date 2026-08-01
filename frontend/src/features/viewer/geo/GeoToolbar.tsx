@@ -116,6 +116,7 @@ export function GeoToolbar({
   onAnnotateToggle,
   annotations,
   onAnnotationsImport,
+  annotationSlotIds,
   onExport,
   onCopy,
   copySlots,
@@ -147,6 +148,8 @@ export function GeoToolbar({
   onAnnotateToggle: () => void
   annotations: ReadonlyArray<MapAnnotation>
   onAnnotationsImport: (items: ReadonlyArray<Omit<MapAnnotation, 'id'>>) => void
+  /** Current slot→source assignment — maps legacy slot-keyed import files. */
+  annotationSlotIds: { a: string; b: string | null }
   onExport: () => void
   /** Copy the view (null) or one slot's clean image. */
   onCopy: (only: SourceSlot | null) => void
@@ -167,7 +170,7 @@ export function GeoToolbar({
     if (!file) return
     try {
       const text = await file.text()
-      onAnnotationsImport(parseAnnotationsGeojson(text))
+      onAnnotationsImport(parseAnnotationsGeojson(text, annotationSlotIds))
     } catch (err) {
       log.error('Annotations GeoJSON parse failed', { error: err })
       showToast.error(t('annotations.importInvalid'))

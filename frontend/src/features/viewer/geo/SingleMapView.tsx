@@ -29,7 +29,7 @@
  * would corrupt other modes' rendering.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { getRenderPixel } from 'ol/render'
 import { useOlMapBase } from '../hooks/useOlMapBase'
@@ -123,6 +123,7 @@ export function SingleMapView({
   annotationHighlightId: string | null
   onAnnotationCreate: (
     coordinate: [number, number],
+    sourceId: string | null,
     slot: SourceSlot | null,
   ) => void
   onAnnotationEdit: (id: string) => void
@@ -276,14 +277,39 @@ export function SingleMapView({
   const pointer = usePointerReadout(mapRef, mapVersion)
   useContextOverlays(mapRef, overlays, mapVersion)
   const overlayHover = useOverlayHover(mapRef, overlays, mapVersion)
-  // Pins follow the focus/per-slot mask; creations are attributed to it.
+  // Pins and creations follow the focus mask (solo → A, combined → shared).
+  const bId = b?.id ?? null
+  const pinScope = useMemo(
+    () =>
+      captureOnly === 'a'
+        ? [a.id]
+        : captureOnly === 'b'
+          ? bId !== null
+            ? [bId]
+            : []
+          : bId !== null
+            ? [a.id, bId]
+            : [a.id],
+    [captureOnly, a.id, bId],
+  )
   useAnnotationLayer(
     mapRef,
     annotations,
-    captureOnly,
+    pinScope,
     annotateArmed,
     {
-      onCreate: onAnnotationCreate,
+      onCreate: (coordinate) =>
+        onAnnotationCreate(
+          coordinate,
+          captureOnly === null
+            ? solo
+              ? a.id
+              : null
+            : captureOnly === 'a'
+              ? a.id
+              : bId,
+          captureOnly,
+        ),
       onEdit: onAnnotationEdit,
       onMove: onAnnotationMove,
     },
