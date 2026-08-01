@@ -738,7 +738,9 @@ export function GeoViewer({
   useEffect(() => {
     if (!onViewStateChange) return
     const partial: Partial<ViewerUrlState> = {
-      unlinkedLayers: selection.linkMode === 'unlinked',
+      // Auto-unlink is situational — persisting it would block the relink.
+      unlinkedLayers:
+        selection.linkMode === 'unlinked' && !selection.autoUnlinked,
       timeLink: timeLinkMode,
       offsetMs,
       basemap: basemapId === DEFAULT_BASEMAP_ID ? undefined : basemapId,
@@ -755,6 +757,7 @@ export function GeoViewer({
     activeOrderA,
     activeOrderB,
     selection.linkMode,
+    selection.autoUnlinked,
     restorePending,
     currentEpoch,
     timeLinkMode,

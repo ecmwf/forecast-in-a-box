@@ -133,8 +133,9 @@ export function GeoLayerBrowser({
     })
   }
 
+  // lg:w-60 — the in-flow lg–xl band is where the map is most squeezed.
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
+    <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background lg:w-60 xl:w-72">
       <div className="space-y-2 border-b border-border bg-muted/40 px-3 pt-2.5 pb-2.5">
         <div className="flex items-center gap-1.5">
           <button

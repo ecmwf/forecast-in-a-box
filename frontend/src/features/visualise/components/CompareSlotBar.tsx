@@ -56,8 +56,8 @@ export function CompareSlotBar({
   const { t } = useTranslation('visualise')
 
   return (
-    // Swap+B+X group as one unit so narrow screens wrap into two clean
-    // full-width rows instead of scattering the controls.
+    // Below lg the B group takes its own row and the swap trails it, so
+    // both rows lead with their slot badge (A over B, aligned).
     <div className="flex flex-wrap items-center gap-2">
       <SlotPicker
         slot="a"
@@ -65,11 +65,11 @@ export function CompareSlotBar({
         value={aRef}
         onChange={(ref) => onAssign('a', ref)}
       />
-      <div className="flex max-w-full min-w-0 items-center gap-2">
+      <div className="flex max-w-full min-w-0 items-center gap-2 max-lg:w-full">
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9 shrink-0"
+          className="h-9 w-9 shrink-0 max-lg:order-last"
           onClick={onSwap}
           disabled={!aRef || !bRef}
           aria-label={t('slots.swap')}

@@ -26,7 +26,11 @@ import type OlMap from 'ol/Map'
 import type { RefObject } from 'react'
 import type { MapAnnotation } from '@/features/viewer/geo/annotations'
 import type { ContextOverlay } from '@/features/viewer/geo/overlays'
-import { useOlMapBase } from '@/features/viewer/hooks/useOlMapBase'
+import type View from 'ol/View'
+import {
+  createViewerView,
+  useOlMapBase,
+} from '@/features/viewer/hooks/useOlMapBase'
 import { usePointerReadout } from '@/features/viewer/hooks/usePointerReadout'
 import { useAnnotationLayer } from '@/features/viewer/geo/annotations'
 import { useContextOverlays } from '@/features/viewer/geo/overlays'
@@ -61,12 +65,15 @@ const probe: { mapRef: RefObject<OlMap | null> | null } = { mapRef: null }
 function Harness({
   resetKey,
   overlays,
+  view,
 }: {
   resetKey: string
   overlays: ReadonlyArray<ContextOverlay>
+  view?: View
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const { mapRef, mapVersion } = useOlMapBase(containerRef, {
+    view,
     resetKey,
     incLoading: noop,
     decLoading: noop,
@@ -113,5 +120,21 @@ describe('map rebuild re-attachment', () => {
     // The layers must be on the NEW instance, not stranded on the dead one.
     await expect.poll(vectorLayerCount).toBe(2)
     expect(probe.mapRef?.current?.hasListener('pointermove')).toBe(true)
+  })
+})
+
+describe('restored-camera floor', () => {
+  it('a camera below the basemap floor clamps to minZoom', async () => {
+    // A URL-restored camera from another viewport size: below z1 the
+    // basemap style paints nothing and the extent can become
+    // unsatisfiable — the view floor rejects it outright.
+    const view = createViewerView()
+    view.setCenter([0, 0])
+    view.setZoom(0.2)
+    expect(view.getZoom()).toBeGreaterThanOrEqual(1)
+
+    await render(<Harness resetKey="floor" overlays={[]} view={view} />)
+    await expect.poll(() => view.isDef()).toBe(true)
+    expect(view.getZoom()).toBeGreaterThanOrEqual(1)
   })
 })

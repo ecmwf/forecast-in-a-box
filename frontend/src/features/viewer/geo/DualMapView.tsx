@@ -31,7 +31,7 @@ import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
 import { useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
-import { LoadErrorBadge } from './SingleMapView'
+import { LoadErrorBadge, erroredTitles } from './SingleMapView'
 import { LoupeOverlay } from './LoupeOverlay'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
@@ -436,7 +436,11 @@ function DualMapPanel({
         </div>
       )}
       {stack.errorCount > 0 && !source.hiddenAtTime && (
-        <LoadErrorBadge slot={source.slot.toUpperCase()} side="left" />
+        <LoadErrorBadge
+          slot={source.slot.toUpperCase()}
+          side="left"
+          layers={erroredTitles(stack.erroredNames, source.layers)}
+        />
       )}
       {source.timeTag && (
         <div className="absolute top-10 left-2 z-10 rounded-md border border-border bg-background/90 px-2 py-1 font-mono text-xs font-medium shadow-sm backdrop-blur-sm">

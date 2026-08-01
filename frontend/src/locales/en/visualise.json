@@ -167,7 +167,7 @@
     "alignStartsHint": "Shift B so both series start together",
     "alignEnds": "Align ends",
     "alignEndsHint": "Shift B so both series end together",
-    "loadError": "Server returned no data for this time — {{slot}}",
+    "loadErrorLayers": "No data at this time — {{slot}}: {{layers}}",
     "notServed": "Advertised but not served",
     "notServedNow": "Not served at this time: {{layers}}",
     "static": "No time-enabled layers active — the display is static.",

@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 function SidebarSkeleton() {
   return (
-    <aside className="flex w-72 shrink-0 flex-col gap-3 overflow-hidden rounded-md border border-border bg-background p-3 max-lg:hidden">
+    <aside className="flex w-72 shrink-0 flex-col gap-3 overflow-hidden rounded-md border border-border bg-background p-3 max-lg:hidden lg:w-60 xl:w-72">
       <Skeleton className="h-4 w-28" />
       {Array.from({ length: 5 }, (_, i) => (
         <div key={i} className="flex items-center gap-2">

@@ -30,8 +30,11 @@ export function CollapsedSidebarHandle({
   return (
     <div
       className={cn(
-        'flex w-8 shrink-0 flex-col items-center bg-muted/40 py-2 pointer-coarse:w-12',
+        'flex w-8 shrink-0 flex-col items-center bg-muted/40 py-2 sm:pointer-coarse:w-12',
         side === 'left' ? 'border-r border-border' : 'border-l border-border',
+        // Phones: float over the map edge — two in-flow rails cost ~25% width.
+        'max-sm:absolute max-sm:top-1/2 max-sm:z-10 max-sm:w-auto max-sm:-translate-y-1/2 max-sm:rounded-md max-sm:border max-sm:border-border max-sm:bg-background/90 max-sm:py-0 max-sm:shadow-sm',
+        side === 'left' ? 'max-sm:left-1' : 'max-sm:right-1',
       )}
     >
       <Button

@@ -100,6 +100,8 @@ export interface WmsLayerStack {
   revision: number
   /** Layers whose latest load failed (hidden until a load succeeds). */
   errorCount: number
+  /** NAMES of the currently-errored layers (badge attribution). */
+  erroredNames: ReadonlyArray<string>
 }
 
 export function useWmsLayerStack(
@@ -133,10 +135,15 @@ export function useWmsLayerStack(
   const attachedMapRef = useRef<OlMap | null>(null)
   const stackRef = useRef<ReadonlyArray<ImageLayer<ImageWMS>>>([])
   const [revision, setRevision] = useState(0)
-  const [errorCount, setErrorCount] = useState(0)
+  const [erroredNames, setErroredNames] = useState<ReadonlyArray<string>>([])
   const syncErrorCount = useCallback(() => {
-    setErrorCount(
-      [...managedRef.current.values()].filter((m) => m.errored).length,
+    const names = [...managedRef.current.entries()]
+      .filter(([, m]) => m.errored)
+      .map(([name]) => name)
+    setErroredNames((prev) =>
+      prev.length === names.length && prev.every((n, i) => n === names[i])
+        ? prev
+        : names,
     )
   }, [])
 
@@ -290,5 +297,5 @@ export function useWmsLayerStack(
     [],
   )
 
-  return { stackRef, revision, errorCount }
+  return { stackRef, revision, errorCount: erroredNames.length, erroredNames }
 }

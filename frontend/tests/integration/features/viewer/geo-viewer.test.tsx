@@ -1378,6 +1378,36 @@ describe('GeoViewer URL view state', () => {
       .toBeVisible()
   })
 
+  it('never reports an auto-unlink as a manual choice', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: 'tp', title: 'Total precipitation' }],
+    })
+    const reports: Array<Partial<ViewerUrlState>> = []
+    const screen = await render(
+      <Harness
+        portA={portA}
+        portB={portB}
+        onViewStateChange={(partial) => reports.push(partial)}
+      />,
+    )
+
+    // Zero overlap → auto-unlink kicks in…
+    await expect
+      .element(
+        screen.getByText(
+          'The two sources share no common layers — selection is per panel.',
+        ),
+      )
+      .toBeVisible()
+    // …but the URL must not pin it (restoring manual unlink blocks relink).
+    expect(reports.some((r) => r.unlinkedLayers === true)).toBe(false)
+  })
+
   it('reports layer and time changes for the URL write-back', async () => {
     const { portA, portB } = registerDefaultPair()
     const reports: Array<Partial<ViewerUrlState>> = []

@@ -113,8 +113,8 @@ export function AuthenticatedHeader() {
           </Link>
         </div>
 
-        {/* Section nav — in flow so it can't overlap; shown at lg+. */}
-        <div className="hidden shrink-0 lg:flex">
+        {/* Section nav, lg+ — shrinkable; the breadcrumb yields before clipping. */}
+        <div className="hidden min-w-0 lg:flex">
           <NavToggle />
         </div>
 
