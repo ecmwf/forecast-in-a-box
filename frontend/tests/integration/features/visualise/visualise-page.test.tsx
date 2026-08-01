@@ -597,8 +597,9 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     await screen.getByLabelText('Source for slot B').click()
+    // Both pickers' mounted lists chip A now — assert presence, not unicity.
     await expect
-      .element(screen.getByTitle('Currently source A'))
+      .element(screen.getByTitle('Currently source A').first())
       .toBeInTheDocument()
     await screen.getByRole('option', { name: /Run A/ }).click()
     await expect

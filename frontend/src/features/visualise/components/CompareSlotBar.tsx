@@ -12,8 +12,8 @@
  * First-class A/B slot assignment: two labelled pickers over the basket
  * entries with a swap button between them. B is cleared via a dedicated
  * X (never a fake Select item — a controlled Select re-commits its old
- * value on animated close, resurrecting B); A's entry is badged in the
- * B list, so picking it is the discoverable self-compare path.
+ * value on animated close, resurrecting B); each list chips the slots a
+ * row occupies, so picking the other slot's row self-compares.
  */
 
 import { ArrowLeftRight, X } from 'lucide-react'
@@ -64,6 +64,7 @@ export function CompareSlotBar({
         entries={entries}
         value={aRef}
         onChange={(ref) => onAssign('a', ref)}
+        markRef={bRef}
       />
       <div className="flex max-w-full min-w-0 items-center gap-2 max-lg:w-full">
         <Button
@@ -101,12 +102,13 @@ export function CompareSlotBar({
   )
 }
 
-/** Trigger-suffix that distinguishes same-named sources at a glance. */
+/** Date suffix for same-named sources — skipped when the name embeds one. */
 function triggerSuffix(
   entry: ComparisonEntry,
   timeZone: string,
 ): string | null {
   if (entry.kind === 'output' && entry.runCreatedAt) {
+    if (/\d{4}-\d{2}-\d{2}/.test(entryDisplayName(entry))) return null
     return formatInZone(new Date(entry.runCreatedAt), timeZone, 'dd MMM HH:mm')
   }
   // wms/path labels already carry their host / directory name.
@@ -124,7 +126,7 @@ function SlotPicker({
   entries: ReadonlyArray<ComparisonEntry>
   value: string | undefined
   onChange: (ref: string) => void
-  /** Badge this entry as the other slot's current source (self-compare hint). */
+  /** The other slot's current ref — rows chip every slot they occupy. */
   markRef?: string
 }) {
   const { t } = useTranslation('visualise')
@@ -168,40 +170,51 @@ function SlotPicker({
             ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="min-w-[360px]">
+        <SelectContent className="max-w-md min-w-[360px]">
           {entries.map((entry) => {
             const ref = entryRef(entry)
             const { kind, detail } = entryDetail(entry)
             const date = triggerSuffix(entry, timeZone)
+            // One chip per slot the row occupies (both on self-compare).
+            const chipSlots = (['a', 'b'] as const).filter((s) =>
+              s === slot ? ref === value : ref === markRef,
+            )
             return (
-              <SelectItem key={ref} value={ref}>
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="min-w-0 truncate">
+              <SelectItem
+                key={ref}
+                value={ref}
+                className="py-2 pr-2 [&_svg]:hidden"
+              >
+                {/* divs: the item styles its last SPAN child as a flex row. */}
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {/* flex-1 keeps the slot chips in a right-hand column. */}
+                    <span className="min-w-0 flex-1 truncate">
                       {entryDisplayName(entry)}
                     </span>
-                    {markRef === ref && (
+                    {chipSlots.map((s) => (
                       <span
-                        title={t('slots.isA')}
+                        key={s}
+                        title={t('slots.inSlot', { slot: s.toUpperCase() })}
                         className={cn(
-                          'rounded px-1 font-mono text-[10px] font-bold',
-                          SLOT_BADGE.a,
+                          'shrink-0 rounded px-1 font-mono text-[10px] font-bold',
+                          SLOT_BADGE[s],
                         )}
                       >
-                        A
+                        {s.toUpperCase()}
                       </span>
-                    )}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="rounded bg-muted px-1 font-mono text-[10px] uppercase">
+                    ))}
+                  </div>
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="shrink-0 rounded bg-muted px-1 font-mono text-[10px] uppercase">
                       {t(`slots.kind.${kind}`)}
                     </span>
-                    <span className="truncate font-mono">{detail}</span>
+                    <span className="min-w-0 truncate font-mono">{detail}</span>
                     {date && (
                       <span className="shrink-0 tabular-nums">{date}</span>
                     )}
-                  </span>
-                </span>
+                  </div>
+                </div>
               </SelectItem>
             )
           })}

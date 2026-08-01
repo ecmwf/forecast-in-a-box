@@ -246,7 +246,7 @@
     "placeholder": "Pick a source…",
     "pickerAria": "Source for slot {{slot}}",
     "singleView": "Single view",
-    "isA": "Currently source A",
+    "inSlot": "Currently source {{slot}}",
     "kind": {
       "run": "Run",
       "wms": "WMS",
