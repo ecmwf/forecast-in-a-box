@@ -1271,6 +1271,40 @@ describe('GeoViewer responsive layout', () => {
       await page.viewport(1280, 800)
     }
   })
+
+  it('below lg: one modal sheet at a time; the scrim closes it', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await expect
+      .element(screen.getByText('2 m temperature').first())
+      .toBeVisible()
+
+    const handles = () =>
+      screen
+        .getByRole('button', { name: 'Expand sidebar' })
+        .elements() as Array<HTMLElement>
+    try {
+      // Phone and tablet share the sheet behavior.
+      for (const width of [500, 900]) {
+        await page.viewport(width, 800)
+        await expect.poll(() => handles().length).toBe(2)
+
+        // Open left, then right — the sheets swap, never coexist.
+        handles()[0].click()
+        await expect.poll(() => handles().length).toBe(1)
+        handles()[0].click()
+        await expect.poll(() => handles().length).toBe(1)
+
+        // Scrim tap closes the open sheet — both handles return.
+        ;(
+          document.querySelector('[data-testid="sidebar-scrim"]') as HTMLElement
+        ).click()
+        await expect.poll(() => handles().length).toBe(2)
+      }
+    } finally {
+      await page.viewport(1280, 900)
+    }
+  })
 })
 
 describe('GeoViewer accessibility', () => {

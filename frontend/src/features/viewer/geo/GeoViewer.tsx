@@ -862,10 +862,25 @@ export function GeoViewer({
   const [rightCollapsed, setRightCollapsed] = useState(false)
   // Below lg the sidebars crush the map — auto-collapse; handles reopen.
   const wideViewport = useMedia('(min-width: 1024px)')
+  // Below lg an open sidebar is a modal sheet: one at a time, scrim closes.
+  const sheetViewport = useMedia('(max-width: 1023px)')
   useLayoutEffect(() => {
     setLeftCollapsed(!wideViewport)
     setRightCollapsed(!wideViewport)
   }, [wideViewport])
+  const sheetOpen = sheetViewport && (!leftCollapsed || !rightCollapsed)
+  const closeSheets = () => {
+    setLeftCollapsed(true)
+    setRightCollapsed(true)
+  }
+  const expandLeft = () => {
+    setLeftCollapsed(false)
+    if (sheetViewport) setRightCollapsed(true)
+  }
+  const expandRight = () => {
+    setRightCollapsed(false)
+    if (sheetViewport) setLeftCollapsed(true)
+  }
   const [helpOpen, setHelpOpen] = useState(false)
 
   // -------- Annotations: numbered findings pinned to the map ---------
@@ -1008,11 +1023,11 @@ export function GeoViewer({
   }, [])
 
   useGeoShortcuts({
-    // Any sidebar open → collapse both; both collapsed → restore both.
+    // Any open → collapse both; else restore (one sheet only on phones).
     onToggleSidebars: () => {
-      const collapse = !(leftCollapsed && rightCollapsed)
-      setLeftCollapsed(collapse)
-      setRightCollapsed(collapse)
+      if (!(leftCollapsed && rightCollapsed)) return closeSheets()
+      setRightCollapsed(false)
+      if (!sheetViewport) setLeftCollapsed(false)
     },
     // Mode keys are comparison-only and inert while focused on one source.
     onMode: (next) => {
@@ -1025,8 +1040,12 @@ export function GeoViewer({
     onAnnotate: toggleAnnotate,
     onAnnotateDisarm: {
       enabled:
-        (annotateArmed && annotationDraft === null) || measureMode !== 'none',
+        sheetOpen ||
+        (annotateArmed && annotationDraft === null) ||
+        measureMode !== 'none',
       disarm: () => {
+        // An open sheet owns Escape first — it covers the map.
+        if (sheetOpen) return closeSheets()
         setAnnotateArmed(false)
         setMeasureMode('none')
       },
@@ -1256,15 +1275,21 @@ export function GeoViewer({
             filter tab, search, level chips, expanded groups — survives
             reopening. Below sm an open sidebar overlays the map instead
             of crushing it. */}
-        {leftCollapsed && (
-          <CollapsedSidebarHandle
-            side="left"
-            onExpand={() => setLeftCollapsed(false)}
+        {sheetOpen && (
+          // Modal-sheet scrim: tap closes; also blocks map input beneath.
+          <div
+            aria-hidden="true"
+            data-testid="sidebar-scrim"
+            className="absolute inset-0 z-10 bg-black/30 lg:hidden"
+            onClick={closeSheets}
           />
+        )}
+        {leftCollapsed && (
+          <CollapsedSidebarHandle side="left" onExpand={expandLeft} />
         )}
         <div
           style={{ display: leftCollapsed ? 'none' : undefined }}
-          className="max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-20 max-sm:flex max-sm:shadow-xl sm:contents"
+          className="max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:z-20 max-lg:flex max-lg:shadow-xl lg:contents"
         >
           <GeoActiveLayersPanel
             pairs={pairing.pairs}
@@ -1366,7 +1391,7 @@ export function GeoViewer({
         </div>
         <div
           style={{ display: rightCollapsed ? 'none' : undefined }}
-          className="max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-20 max-sm:flex max-sm:shadow-xl sm:contents"
+          className="max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-20 max-lg:flex max-lg:shadow-xl lg:contents"
         >
           <GeoLayerBrowser
             hasB={hasB}
@@ -1379,10 +1404,7 @@ export function GeoViewer({
           />
         </div>
         {rightCollapsed && (
-          <CollapsedSidebarHandle
-            side="right"
-            onExpand={() => setRightCollapsed(false)}
-          />
+          <CollapsedSidebarHandle side="right" onExpand={expandRight} />
         )}
       </div>
       <GeoTimeSlider
