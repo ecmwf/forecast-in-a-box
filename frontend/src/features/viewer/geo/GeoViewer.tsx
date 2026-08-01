@@ -260,6 +260,7 @@ export function GeoViewer({
     indepIndex,
     setIndepIndex,
     onSlotsSwapped,
+    onSourceReplaced,
     resolvedA,
     resolvedB,
     resolveTimeA,
@@ -383,28 +384,37 @@ export function GeoViewer({
   const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
 
   // A swap exchanges the slots' content — slot-keyed working state follows it.
+  // A replacement instead resets pair-tuned time linking; re-adding the SAME
+  // B after a removal keeps its settings (tracked via the last non-null id).
   const prevIdsRef = useRef<{ a: string; b: string | null }>({
     a: a.id,
     b: bId,
   })
+  const lastBIdRef = useRef<string | null>(bId)
   const swapSelectionSlots = selection.onSlotsSwapped
   useEffect(() => {
     const prev = prevIdsRef.current
     prevIdsRef.current = { a: a.id, b: bId }
-    if (!(prev.a === bId && prev.b === a.id && a.id !== bId)) return
-    setSourceOpacity((p) => ({ a: p.b, b: p.a }))
-    setPinnedLegends(
-      (p) =>
-        new Set(
-          Array.from(p).map((k) =>
-            k.startsWith('a:') ? `b:${k.slice(2)}` : `a:${k.slice(2)}`,
+    const lastB = lastBIdRef.current
+    if (bId !== null) lastBIdRef.current = bId
+    if (prev.a === bId && prev.b === a.id && a.id !== bId) {
+      setSourceOpacity((p) => ({ a: p.b, b: p.a }))
+      setPinnedLegends(
+        (p) =>
+          new Set(
+            Array.from(p).map((k) =>
+              k.startsWith('a:') ? `b:${k.slice(2)}` : `a:${k.slice(2)}`,
+            ),
           ),
-        ),
-    )
-    setFocusSlot((f) => (f === 'a' ? 'b' : f === 'b' ? 'a' : null))
-    swapSelectionSlots()
-    onSlotsSwapped()
-  }, [a.id, bId, swapSelectionSlots, onSlotsSwapped])
+      )
+      setFocusSlot((f) => (f === 'a' ? 'b' : f === 'b' ? 'a' : null))
+      swapSelectionSlots()
+      onSlotsSwapped()
+      return
+    }
+    if (prev.a !== a.id) onSourceReplaced('a')
+    if (bId !== null && lastB !== null && bId !== lastB) onSourceReplaced('b')
+  }, [a.id, bId, swapSelectionSlots, onSlotsSwapped, onSourceReplaced])
 
   useEffect(() => {
     if (!hasB && focusSlot !== null) setFocusSlot(null)

@@ -787,6 +787,61 @@ describe('GeoViewer', () => {
     expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
   })
 
+  it('resets pair-tuned time linking when a slot gets a different source', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    await screen.getByLabelText('Time link mode').click()
+    await screen
+      .getByRole('option', { name: 'Time offset (B = A + Δ)' })
+      .click()
+    await screen.getByRole('button', { name: 'Align starts' }).click()
+    await expect.element(screen.getByText('B +6 h')).toBeVisible()
+
+    // A different B: Δ was tuned for the old pair — back to exact.
+    const portB2 = nextPort++
+    registerMockWmsServer(portB2, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          time: '2026-07-06T06:00:00Z,2026-07-06T12:00:00Z',
+        },
+      ],
+    })
+    await screen.rerender(<Harness portA={portA} portB={portB2} />)
+    await expect
+      .element(screen.getByLabelText('Time link mode'))
+      .toHaveTextContent('Same time (exact)')
+    expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
+  })
+
+  it('keeps the offset when the SAME B is removed and re-added', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(
+      <ProgressiveHarness portA={portA} portB={portB} withB={true} />,
+    )
+    await screen.getByText('2 m temperature').first().click()
+
+    await screen.getByLabelText('Time link mode').click()
+    await screen
+      .getByRole('option', { name: 'Time offset (B = A + Δ)' })
+      .click()
+    await screen.getByRole('button', { name: 'Align starts' }).click()
+    await expect.element(screen.getByText('B +6 h')).toBeVisible()
+
+    // Remove B (solo renders as exact), then bring the same source back.
+    await screen.rerender(
+      <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
+    )
+    expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
+    await screen.rerender(
+      <ProgressiveHarness portA={portA} portB={portB} withB={true} />,
+    )
+    await expect.element(screen.getByText('B +6 h')).toBeVisible()
+  })
+
   it('pinned legends and focus follow their source through a swap', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)

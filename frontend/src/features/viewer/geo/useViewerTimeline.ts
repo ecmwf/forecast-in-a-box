@@ -145,6 +145,15 @@ export function useViewerTimeline({
     a: 0,
     b: 0,
   })
+  // A different source in a slot invalidates pair-tuned state: Δ resets
+  // (offset drops to exact), its independent instant restarts; generic
+  // modes (exact/nearest) persist.
+  const onSourceReplaced = useCallback((slot: SourceSlot) => {
+    setIndepIndex((prev) => ({ ...prev, [slot]: 0 }))
+    setOffsetMs(0)
+    setTimeLinkMode((mode) => (mode === 'offset' ? 'exact' : mode))
+  }, [])
+
   // Swap keeps what's on screen: instants exchange; in offset mode the
   // axis moves to the old B target and Δ flips (same pairing, sides swapped).
   const onSlotsSwapped = useCallback(() => {
@@ -358,6 +367,7 @@ export function useViewerTimeline({
     indepIndex,
     setIndepIndex,
     onSlotsSwapped,
+    onSourceReplaced,
     resolvedA,
     resolvedB,
     resolvedFor,
