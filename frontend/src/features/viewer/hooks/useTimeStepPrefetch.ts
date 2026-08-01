@@ -33,6 +33,7 @@ export function useTimeStepPrefetch(
     layers,
     activeOrder,
     timeSteps,
+    mapVersion,
   }: {
     enabled: boolean
     baseUrl: string
@@ -40,6 +41,8 @@ export function useTimeStepPrefetch(
     activeOrder: ReadonlyArray<string>
     /** Raw TIME strings this server advertises. */
     timeSteps: ReadonlyArray<string>
+    /** useOlMapBase recreation counter — restart after a map rebuild. */
+    mapVersion: number
   },
 ): void {
   useEffect(() => {
@@ -104,5 +107,5 @@ export function useTimeStepPrefetch(
       // Best-effort cleanup of any still-attached hidden layers.
       for (const h of hiddenLayers) map.removeLayer(h)
     }
-  }, [enabled, baseUrl, activeOrder, layers, timeSteps, mapRef])
+  }, [enabled, baseUrl, activeOrder, layers, timeSteps, mapRef, mapVersion])
 }

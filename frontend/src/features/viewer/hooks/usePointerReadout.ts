@@ -9,8 +9,8 @@
  */
 
 /**
- * Lat/lon hover read-out for a viewer map. Attaches once on mount — call
- * after the map-constructing hook so `mapRef.current` is populated.
+ * Lat/lon hover read-out for a viewer map. Call after the map-constructing
+ * hook so `mapRef.current` is populated; re-attaches on map rebuilds.
  */
 
 import { useEffect, useState } from 'react'
@@ -26,6 +26,8 @@ export interface PointerReadout {
 
 export function usePointerReadout(
   mapRef: RefObject<OlMap | null>,
+  /** useOlMapBase recreation counter — re-attach after a map rebuild. */
+  mapVersion: number,
 ): PointerReadout | null {
   const [pointer, setPointer] = useState<PointerReadout | null>(null)
 
@@ -45,7 +47,7 @@ export function usePointerReadout(
       map.un('pointermove', onMove)
       target.removeEventListener('mouseleave', onLeave)
     }
-  }, [mapRef])
+  }, [mapRef, mapVersion])
 
   return pointer
 }

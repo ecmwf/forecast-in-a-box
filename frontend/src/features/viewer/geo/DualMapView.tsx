@@ -289,6 +289,7 @@ function DualMapPanel({
     opacity: basemapOpacity,
     incLoading,
     decLoading,
+    mapVersion,
   })
   const stack = useWmsLayerStack(mapRef, source.baseUrl, source.layers, {
     zBase: 100,
@@ -299,6 +300,7 @@ function DualMapPanel({
     incLoading,
     decLoading,
     onLoadResult: source.onLoadResult,
+    mapVersion,
   })
 
   useMeasure(
@@ -314,10 +316,11 @@ function DualMapPanel({
     layers: source.layers,
     activeOrder: source.activeOrder,
     timeSteps: source.timeSteps,
+    mapVersion,
   })
-  const pointer = usePointerReadout(mapRef)
-  useContextOverlays(mapRef, overlays)
-  const overlayHover = useOverlayHover(mapRef, overlays)
+  const pointer = usePointerReadout(mapRef, mapVersion)
+  useContextOverlays(mapRef, overlays, mapVersion)
+  const overlayHover = useOverlayHover(mapRef, overlays, mapVersion)
   useAnnotationLayer(
     mapRef,
     annotations,
@@ -329,6 +332,7 @@ function DualMapPanel({
       onMove: onAnnotationMove,
     },
     annotationHighlightId,
+    mapVersion,
   )
 
   useEffect(() => {

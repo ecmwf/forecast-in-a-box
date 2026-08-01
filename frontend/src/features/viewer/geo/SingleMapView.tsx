@@ -170,6 +170,7 @@ export function SingleMapView({
     opacity: basemapOpacity,
     incLoading: noop,
     decLoading: noop,
+    mapVersion,
   })
 
   // Stack opacity = base tier (global × source) × mode factor; a time gap
@@ -225,6 +226,7 @@ export function SingleMapView({
     incLoading: incA,
     decLoading: decA,
     onLoadResult: a.onLoadResult,
+    mapVersion,
     trackRevision: true,
   })
   // Unconditional hook; solo passes an inert config (empty order → the
@@ -242,6 +244,7 @@ export function SingleMapView({
       incLoading: incB,
       decLoading: decB,
       onLoadResult: b?.onLoadResult,
+      mapVersion,
       trackRevision: true,
     },
   )
@@ -259,6 +262,7 @@ export function SingleMapView({
     layers: a.layers,
     activeOrder: a.activeOrder,
     timeSteps: a.timeSteps,
+    mapVersion,
   })
   useTimeStepPrefetch(mapRef, {
     enabled: preload && b !== null,
@@ -266,10 +270,11 @@ export function SingleMapView({
     layers: b?.layers ?? EMPTY_LAYERS,
     activeOrder: b?.activeOrder ?? EMPTY_ORDER,
     timeSteps: b?.timeSteps ?? EMPTY_ORDER,
+    mapVersion,
   })
-  const pointer = usePointerReadout(mapRef)
-  useContextOverlays(mapRef, overlays)
-  const overlayHover = useOverlayHover(mapRef, overlays)
+  const pointer = usePointerReadout(mapRef, mapVersion)
+  useContextOverlays(mapRef, overlays, mapVersion)
+  const overlayHover = useOverlayHover(mapRef, overlays, mapVersion)
   // Pins follow the focus/per-slot mask; creations are attributed to it.
   useAnnotationLayer(
     mapRef,
@@ -282,6 +287,7 @@ export function SingleMapView({
       onMove: onAnnotationMove,
     },
     annotationHighlightId,
+    mapVersion,
   )
 
   // Fit plumbing (union bbox of both sources).

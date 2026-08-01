@@ -83,6 +83,8 @@ export interface WmsLayerStackConfig {
   decLoading: () => void
   /** Per-request load outcome (feeds the GetMap failure cache). */
   onLoadResult?: (layerName: string, time: string | null, ok: boolean) => void
+  /** useOlMapBase recreation counter — re-attach after a map rebuild. */
+  mapVersion: number
   /**
    * Bump `revision` state after each reconciliation. Costs one extra
    * consumer render per change — enable only when something must re-attach
@@ -115,6 +117,7 @@ export function useWmsLayerStack(
     incLoading,
     decLoading,
     onLoadResult,
+    mapVersion,
     trackRevision = false,
   } = config
 
@@ -269,6 +272,7 @@ export function useWmsLayerStack(
     incLoading,
     decLoading,
     syncErrorCount,
+    mapVersion,
   ])
 
   // Unmount: detach this stack's layers (the map may outlive the stack —

@@ -129,7 +129,9 @@ export function useAnnotationLayer(
     onEdit: (id: string) => void
     onMove: (id: string, coordinate: [number, number]) => void
   },
-  highlightId: string | null = null,
+  highlightId: string | null,
+  /** useOlMapBase recreation counter — re-attach after a map rebuild. */
+  mapVersion: number,
 ): void {
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
@@ -199,7 +201,7 @@ export function useAnnotationLayer(
       map.un('singleclick', onClick)
       map.removeLayer(layer)
     }
-  }, [mapRef, annotations, panelSlot, highlightId])
+  }, [mapRef, annotations, panelSlot, highlightId, mapVersion])
 }
 
 // -------- GeoJSON round-trip (RFC 7946: WGS84 lon/lat on the wire) --------

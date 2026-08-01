@@ -142,6 +142,8 @@ const HOVER_MAX_ROWS = 8
 export function useOverlayHover(
   mapRef: RefObject<OlMap | null>,
   overlays: ReadonlyArray<ContextOverlay>,
+  /** useOlMapBase recreation counter — re-attach after a map rebuild. */
+  mapVersion: number,
 ): OverlayHover | null {
   const [hover, setHover] = useState<OverlayHover | null>(null)
   useEffect(() => {
@@ -176,7 +178,7 @@ export function useOverlayHover(
       map.un('pointermove', onMove)
       setHover(null)
     }
-  }, [mapRef, overlays])
+  }, [mapRef, overlays, mapVersion])
   return hover
 }
 
@@ -184,6 +186,8 @@ export function useOverlayHover(
 export function useContextOverlays(
   mapRef: RefObject<OlMap | null>,
   overlays: ReadonlyArray<ContextOverlay>,
+  /** useOlMapBase recreation counter — re-attach after a map rebuild. */
+  mapVersion: number,
 ): void {
   useEffect(() => {
     const map = mapRef.current
@@ -207,7 +211,7 @@ export function useContextOverlays(
     return () => {
       for (const layer of layers) map.removeLayer(layer)
     }
-  }, [mapRef, overlays])
+  }, [mapRef, overlays, mapVersion])
 }
 
 /** Property keys present in the overlay, most frequent first — offered

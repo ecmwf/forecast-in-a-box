@@ -46,12 +46,15 @@ function Harness({
   port,
   time,
   nonce = 0,
+  mapEpoch = 0,
   onLoadResult,
 }: {
   port: number
   time: string
   /** Bumping forces a re-render without changing any request input. */
   nonce?: number
+  /** Bumping rebuilds the OL map (mirrors a useOlMapBase recreation). */
+  mapEpoch?: number
   onLoadResult?: (layer: string, time: string | null, ok: boolean) => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -68,7 +71,7 @@ function Harness({
     mapRef.current = map
     setReady(true)
     return () => map.setTarget(undefined)
-  }, [])
+  }, [mapEpoch])
 
   const stack = useWmsLayerStack(mapRef, `http://localhost:${port}`, [LAYER], {
     masterOpacity: 1,
@@ -80,6 +83,7 @@ function Harness({
     incLoading: () => setLoading((n) => n + 1),
     decLoading: () => setLoading((n) => n - 1),
     onLoadResult,
+    mapVersion: mapEpoch,
   })
 
   return (
@@ -183,6 +187,28 @@ describe('useWmsLayerStack load failures', () => {
         timeout: 8000,
       })
       .toBe('0')
+  })
+
+  it('re-attaches to a rebuilt map when mapVersion bumps', async () => {
+    const port = nextPort++
+    registerMockWmsServer(port, {
+      layers: [{ name: '2t', title: '2 m temperature', time: `${T00},${T06}` }],
+    })
+
+    const screen = await render(<Harness port={port} time={T00} />)
+    await expect
+      .poll(() => getMapRequests(port).length, { timeout: 8000 })
+      .toBeGreaterThan(0)
+    const before = getMapRequests(port).length
+
+    // Rebuild with UNCHANGED request inputs — only the counter moves.
+    // Without the mapVersion dep the stack stays on the dead map: no
+    // reconcile, no new request, blank new map.
+    await screen.rerender(<Harness port={port} time={T00} mapEpoch={1} />)
+    await expect
+      .poll(() => getMapRequests(port).length, { timeout: 8000 })
+      .toBeGreaterThan(before)
+    expect(screen.getByTestId('visible').element().textContent).toBe('true')
   })
 
   it('follows a baseUrl change (slot swap) despite identical layer names', async () => {
