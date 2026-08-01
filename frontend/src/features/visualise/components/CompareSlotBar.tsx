@@ -42,7 +42,7 @@ export function CompareSlotBar({
   bRef,
   onAssign,
   onSwap,
-  onSingleView,
+  onClearSlot,
 }: {
   entries: ReadonlyArray<ComparisonEntry>
   aRef: string | undefined
@@ -50,8 +50,8 @@ export function CompareSlotBar({
   /** Plain assignment — picking the other slot's source self-compares, never swaps. */
   onAssign: (slot: 'a' | 'b', ref: string) => void
   onSwap: () => void
-  /** Clear B back to a single-source view. */
-  onSingleView: () => void
+  /** Remove one slot from the view; the other continues solo. */
+  onClearSlot: (slot: 'a' | 'b') => void
 }) {
   const { t } = useTranslation('visualise')
 
@@ -59,13 +59,16 @@ export function CompareSlotBar({
     // Below lg the B group takes its own row and the swap trails it, so
     // both rows lead with their slot badge (A over B, aligned).
     <div className="flex flex-wrap items-center gap-2">
-      <SlotPicker
-        slot="a"
-        entries={entries}
-        value={aRef}
-        onChange={(ref) => onAssign('a', ref)}
-        markRef={bRef}
-      />
+      <div className="flex max-w-full min-w-0 items-center gap-2">
+        <SlotPicker
+          slot="a"
+          entries={entries}
+          value={aRef}
+          onChange={(ref) => onAssign('a', ref)}
+          markRef={bRef}
+        />
+        {bRef && <ClearSlotButton slot="a" onClear={() => onClearSlot('a')} />}
+      </div>
       <div className="flex max-w-full min-w-0 items-center gap-2 max-lg:w-full">
         <Button
           variant="outline"
@@ -85,20 +88,36 @@ export function CompareSlotBar({
           onChange={(ref) => onAssign('b', ref)}
           markRef={aRef}
         />
-        {bRef && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="-ml-1 h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={onSingleView}
-            aria-label={t('slots.singleView')}
-            title={t('slots.singleView')}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+        {bRef && <ClearSlotButton slot="b" onClear={() => onClearSlot('b')} />}
       </div>
     </div>
+  )
+}
+
+/** X while comparing: removes the slot from view, not from the basket. */
+function ClearSlotButton({
+  slot,
+  onClear,
+}: {
+  slot: 'a' | 'b'
+  onClear: () => void
+}) {
+  const { t } = useTranslation('visualise')
+  const label = t('slots.clearSlot', {
+    slot: slot.toUpperCase(),
+    other: slot === 'a' ? 'B' : 'A',
+  })
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="-ml-1 h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+      onClick={onClear}
+      aria-label={label}
+      title={label}
+    >
+      <X className="h-4 w-4" />
+    </Button>
   )
 }
 

@@ -30,6 +30,7 @@ function renderSlider(
   stepCount: number,
   failedAt: ReadonlyArray<number>,
   failedTitles: ReadonlyArray<string> = ['2 m temperature'],
+  linkMode: 'exact' | 'offset' | 'independent' = 'exact',
 ) {
   const epochs = Array.from({ length: stepCount }, (_, i) => T0 + i * HOUR)
   const available = epochs.map(() => true)
@@ -54,7 +55,7 @@ function renderSlider(
         failures={failures}
         index={0}
         onChange={noop}
-        linkMode="exact"
+        linkMode={linkMode}
         onLinkModeChange={noop}
         offsetMs={0}
         onOffsetChange={noop}
@@ -120,5 +121,18 @@ describe('GeoTimeSlider failure marks', () => {
     expect(elsewhere.container.textContent).not.toContain(
       'Not served at this time',
     )
+  })
+})
+
+describe('GeoTimeSlider solo link-mode leftovers', () => {
+  it('renders leftover offset/independent modes as exact while solo', async () => {
+    // B was removed while in offset mode — its controls must not linger.
+    const offset = await renderSlider(6, [], [], 'offset')
+    expect(offset.container.textContent).not.toContain('B offset')
+
+    // Independent leftover must not split the solo axis into two sliders.
+    const independent = await renderSlider(6, [], [], 'independent')
+    expect(independent.getByRole('slider').elements().length).toBeGreaterThan(0)
+    expect(independent.container.textContent).not.toContain('B offset')
   })
 })

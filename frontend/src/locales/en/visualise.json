@@ -245,7 +245,7 @@
     "swap": "Swap A and B",
     "placeholder": "Pick a source…",
     "pickerAria": "Source for slot {{slot}}",
-    "singleView": "Single view",
+    "clearSlot": "Remove {{slot}} from view — continue with {{other}}",
     "inSlot": "Currently source {{slot}}",
     "kind": {
       "run": "Run",

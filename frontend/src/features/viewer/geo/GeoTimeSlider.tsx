@@ -83,7 +83,7 @@ export function GeoTimeSlider({
   failures,
   index,
   onChange,
-  linkMode,
+  linkMode: linkModeProp,
   onLinkModeChange,
   offsetMs,
   onOffsetChange,
@@ -121,6 +121,8 @@ export function GeoTimeSlider({
   const { t } = useTranslation('executions')
   const { t: tCompare } = useTranslation('visualise')
   const steps = timeline.epochs
+  // Comparison-only link modes are inert while solo — render as exact.
+  const linkMode = hasB ? linkModeProp : 'exact'
   // Focus collapses the timeline to one shared-axis track (no link modes).
   const focused = soloSlot !== null
   const slots: ReadonlyArray<SourceSlot> = soloSlot
