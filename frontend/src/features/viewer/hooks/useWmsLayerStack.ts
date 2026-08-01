@@ -157,7 +157,7 @@ export function useWmsLayerStack(
 
       const params: Record<string, string> = {
         LAYERS: layerName,
-        // No advertised <Style> (NASA GIBS et al.) → empty = server default.
+        // Some public servers advertise no <Style> → empty = server default.
         STYLES: layer.styles[0]?.name ?? '',
         FORMAT: 'image/png',
         TRANSPARENT: 'TRUE',
