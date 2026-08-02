@@ -89,8 +89,9 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const prevLayoutDirectionRef = useRef(layoutDirection)
   const hasInitializedViewportRef = useRef<boolean>(false)
   const lastBlockCountRef = useRef<number>(0)
-  // A full-graph replacement first lays out at estimated sizes — kept
-  // invisible until the measured layout lands, then faded in.
+  // New nodes lay out at estimated sizes first — relaid out once measured.
+  const [measurePending, setMeasurePending] = useState(false)
+  // Full-graph replacement: additionally hidden until the measured layout.
   const [settling, setSettling] = useState(false)
 
   // Real node sizes, read from the DOM — neither xyflow's dimension events
@@ -108,10 +109,9 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     return dims
   }, [])
 
-  // Reveal: poll the DOM until every replaced node has a size, then lay out
-  // with the real dimensions and fade in (frame-capped so it can't stick).
+  // Relayout with real DOM sizes once all nodes measure (frame-capped poll).
   useEffect(() => {
-    if (!settling) return
+    if (!measurePending) return
     let cancelled = false
     let attempts = 0
     let frame = 0
@@ -129,6 +129,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           layoutNodes(current, edges, { direction: layoutDirection }, dims),
         )
       }
+      setMeasurePending(false)
       setSettling(false)
     }
     frame = requestAnimationFrame(measure)
@@ -136,7 +137,14 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
       cancelled = true
       cancelAnimationFrame(frame)
     }
-  }, [settling, nodes, edges, layoutDirection, measuredDimensions, setNodes])
+  }, [
+    measurePending,
+    nodes,
+    edges,
+    layoutDirection,
+    measuredDimensions,
+    setNodes,
+  ])
 
   useEffect(() => {
     // Use reference equality instead of JSON.stringify for change detection.
@@ -175,12 +183,11 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     }
     lastBlockCountRef.current = currentBlockCount
 
-    // Every node unmeasured = a replacement (preset load): hide until measured.
-    setSettling(
-      shouldLayout &&
-        layouted.length > 0 &&
-        layouted.every((node) => !(node.id in dimensions)),
-    )
+    // Unmeasured nodes → post-mount relayout; full replacements also hide.
+    const unmeasured = layouted.filter((node) => !(node.id in dimensions))
+    const anyNew = shouldLayout && unmeasured.length > 0
+    setMeasurePending(anyNew)
+    setSettling(anyNew && unmeasured.length === layouted.length)
 
     // Preserve the current selection — `fableToGraph` builds nodes without a
     // `selected` flag, so re-apply it here for the same-commit rebuild.
