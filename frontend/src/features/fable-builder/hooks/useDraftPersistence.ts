@@ -28,46 +28,104 @@ import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuild
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { readStorageJson, removeStorage, writeStorageJson } from '@/lib/storage'
 
-const DRAFT_KEY = STORAGE_KEYS.fable.draft
+const DRAFTS_KEY = STORAGE_KEYS.fable.drafts
+const LEGACY_DRAFT_KEY = STORAGE_KEYS.fable.draft
 const DEBOUNCE_MS = 2000
+const MAX_DRAFTS = 5
+const MAX_DRAFT_AGE_MS = 7 * 24 * 60 * 60 * 1000 // a week
 
 export interface FableDraft {
   fable: FableBuilderV1
   fableId: string | null
+  /** Template lineage — a restored fork keeps create-on-save semantics. */
+  forkParentId: string | null
   fableName: string
   fableVersion: number | null
   savedAt: number // Date.now() when the draft was written
 }
 
+type DraftMap = Record<string, FableDraft>
+
 // ---------------------------------------------------------------------------
 // localStorage helpers
 // ---------------------------------------------------------------------------
 
-function writeDraft(draft: FableDraft): void {
-  writeStorageJson(DRAFT_KEY, draft)
+/** One draft slot per editing target, so sessions never overwrite each other. */
+export function draftTargetFor({
+  fableId,
+  forkParentId,
+}: {
+  fableId?: string | null
+  forkParentId?: string | null
+}): string {
+  if (fableId) return `id:${fableId}`
+  if (forkParentId) return `template:${forkParentId}`
+  return 'new'
 }
 
-export function readDraft(): FableDraft | null {
-  return readStorageJson<FableDraft>(DRAFT_KEY)
+function readDraftMap(): DraftMap {
+  const map = readStorageJson<DraftMap>(DRAFTS_KEY)
+  if (map) return map
+  // One-shot migration of the pre-slot single-draft format.
+  const legacy = readStorageJson<FableDraft>(LEGACY_DRAFT_KEY)
+  if (!legacy) return {}
+  removeStorage(LEGACY_DRAFT_KEY)
+  const migrated = {
+    [draftTargetFor(legacy)]: {
+      ...legacy,
+      forkParentId: legacy.forkParentId ?? null,
+    },
+  }
+  writeStorageJson(DRAFTS_KEY, migrated)
+  return migrated
 }
 
-export function clearDraft(): void {
-  removeStorage(DRAFT_KEY)
+/** Stale slots die; beyond the count cap the oldest go first. */
+function prune(map: DraftMap): DraftMap {
+  const now = Date.now()
+  return Object.fromEntries(
+    Object.entries(map)
+      .filter(([, draft]) => now - draft.savedAt <= MAX_DRAFT_AGE_MS)
+      .sort(([, a], [, b]) => b.savedAt - a.savedAt)
+      .slice(0, MAX_DRAFTS),
+  )
 }
 
-/** Write the store's unsaved work as a draft now (no-op when clean). */
+export function readDraft(target: string): FableDraft | null {
+  const draft = readDraftMap()[target] as FableDraft | undefined
+  if (!draft || Date.now() - draft.savedAt > MAX_DRAFT_AGE_MS) return null
+  return draft
+}
+
+export function clearDraft(target: string): void {
+  const map = readDraftMap()
+  if (!(target in map)) return
+  delete map[target]
+  writeStorageJson(DRAFTS_KEY, map)
+}
+
+// Save-time clearing must hit the slot the session was written under —
+// markSaved changes the store identity before the subscriber runs.
+let lastWrittenTarget: string | null = null
+
+/** Write the store's unsaved work into its target slot now (no-op when clean). */
 export function flushDraft(): void {
-  const { fable, fableId, fableName, fableVersion, isDirty } =
+  const { fable, fableId, forkParentId, fableName, fableVersion, isDirty } =
     useFableBuilderStore.getState()
   try {
     if (isDirty) {
-      writeDraft({
+      const target = draftTargetFor({ fableId, forkParentId })
+      lastWrittenTarget = target
+      const map = readDraftMap()
+      map[target] = {
         fable,
         fableId,
+        forkParentId,
         fableName,
         fableVersion,
         savedAt: Date.now(),
-      })
+      }
+      writeStorageJson(DRAFTS_KEY, prune(map))
     }
   } finally {
     useFableBuilderStore.setState({ draftWritePending: false })
@@ -92,9 +150,14 @@ export function useDraftPersistence(): void {
         lastSavedAt: state.lastSavedAt,
       }),
       (selected, prevSelected) => {
-        // Clear draft immediately on save
+        // A save supersedes the session's slot — clear it immediately.
         if (selected.lastSavedAt !== prevSelected.lastSavedAt) {
-          clearDraft()
+          const { fableId, forkParentId } = useFableBuilderStore.getState()
+          clearDraft(draftTargetFor({ fableId, forkParentId }))
+          if (lastWrittenTarget) {
+            clearDraft(lastWrittenTarget)
+            lastWrittenTarget = null
+          }
           if (timerRef.current) {
             clearTimeout(timerRef.current)
             timerRef.current = null

@@ -52,8 +52,10 @@ export const STORAGE_KEYS = {
   fable: {
     /** Favourite flags for blueprints (keyed by blueprint_id) */
     favourites: 'fiab.fable.favourites',
-    /** Auto-saved fable builder draft (debounced writes) */
+    /** Legacy single-slot draft — read once for migration into `drafts` */
     draft: 'fiab.fable.draft',
+    /** Auto-saved builder drafts, one slot per editing target */
+    drafts: 'fiab.fable.drafts',
     /** Pipeline (form-mode) sidebar open/closed flag */
     pipelineSidebarOpen: 'fiab.fable.pipeline-sidebar-open',
   },

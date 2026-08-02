@@ -36,7 +36,7 @@ vi.mock('@/hooks/useUser', () => ({
   useUser: () => ({ data: { is_superuser: true } }),
 }))
 
-function seedDraft(): FableDraft {
+function seedDraft(overrides: Partial<FableDraft> = {}): FableDraft {
   return {
     fable: {
       blocks: {
@@ -51,9 +51,11 @@ function seedDraft(): FableDraft {
       },
     },
     fableId: null,
+    forkParentId: null,
     fableName: 'Drafted work',
     fableVersion: null,
     savedAt: Date.now(),
+    ...overrides,
   }
 }
 
@@ -76,7 +78,10 @@ describe('Fable Builder fresh intent', () => {
   })
 
   it('renders a blank canvas and keeps the stored draft', async () => {
-    localStorage.setItem(STORAGE_KEYS.fable.draft, JSON.stringify(seedDraft()))
+    localStorage.setItem(
+      STORAGE_KEYS.fable.drafts,
+      JSON.stringify({ new: seedDraft() }),
+    )
 
     const screen = await renderWithRouter(<FableBuilderPage fresh />)
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
@@ -85,11 +90,14 @@ describe('Fable Builder fresh intent', () => {
       Object.keys(useFableBuilderStore.getState().fable.blocks),
     ).toHaveLength(0)
     // The bypassed draft must survive for a later normal visit.
-    expect(readDraft()?.fableName).toBe('Drafted work')
+    expect(readDraft('new')?.fableName).toBe('Drafted work')
   })
 
   it('with an encoded URL payload, the draft is neither restored nor cleared', async () => {
-    localStorage.setItem(STORAGE_KEYS.fable.draft, JSON.stringify(seedDraft()))
+    localStorage.setItem(
+      STORAGE_KEYS.fable.drafts,
+      JSON.stringify({ new: seedDraft() }),
+    )
 
     const screen = await renderWithRouter(
       <FableBuilderPage encodedState="some-shared-state" />,
@@ -100,7 +108,7 @@ describe('Fable Builder fresh intent', () => {
     expect(
       Object.keys(useFableBuilderStore.getState().fable.blocks),
     ).toHaveLength(0)
-    expect(readDraft()?.fableName).toBe('Drafted work')
+    expect(readDraft('new')?.fableName).toBe('Drafted work')
   })
 
   it('resumes a live session on a plain visit instead of blanking the canvas', async () => {
@@ -117,7 +125,10 @@ describe('Fable Builder fresh intent', () => {
   })
 
   it('without fresh, a matching draft is restored and consumed', async () => {
-    localStorage.setItem(STORAGE_KEYS.fable.draft, JSON.stringify(seedDraft()))
+    localStorage.setItem(
+      STORAGE_KEYS.fable.drafts,
+      JSON.stringify({ new: seedDraft() }),
+    )
 
     const screen = await renderWithRouter(<FableBuilderPage />)
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
@@ -126,7 +137,45 @@ describe('Fable Builder fresh intent', () => {
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
       .toContain('draft_block')
     expect(useFableBuilderStore.getState().isDirty).toBe(true)
-    expect(readDraft()).toBeNull()
+    expect(readDraft('new')).toBeNull()
+  })
+
+  it('opening a blueprint leaves an unrelated draft slot untouched', async () => {
+    localStorage.setItem(
+      STORAGE_KEYS.fable.drafts,
+      JSON.stringify({ new: seedDraft() }),
+    )
+
+    const screen = await renderWithRouter(
+      <FableBuilderPage fableId="fable-001" />,
+    )
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toContain('block_source_1')
+    expect(readDraft('new')?.fableName).toBe('Drafted work')
+  })
+
+  it('template mode resumes an in-progress fork from its own slot', async () => {
+    localStorage.setItem(
+      STORAGE_KEYS.fable.drafts,
+      JSON.stringify({
+        'template:fable-001': seedDraft({ forkParentId: 'fable-001' }),
+      }),
+    )
+
+    const screen = await renderWithRouter(
+      <FableBuilderPage fableId="fable-001" templateMode />,
+    )
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toContain('draft_block')
+    expect(useFableBuilderStore.getState().forkParentId).toBe('fable-001')
+    expect(useFableBuilderStore.getState().fableId).toBeNull()
+    expect(readDraft('template:fable-001')).toBeNull()
   })
 
   it('mid-session fresh resets the canvas after flushing work to the draft', async () => {
@@ -143,7 +192,7 @@ describe('Fable Builder fresh intent', () => {
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
       .toHaveLength(0)
     // Unsaved work was flushed, not destroyed.
-    const draft = readDraft()
+    const draft = readDraft('new')
     expect(draft?.fable.blocks).toHaveProperty('draft_block')
     expect(draft?.fableName).toBe('Working title')
   })

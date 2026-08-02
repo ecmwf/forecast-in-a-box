@@ -24,12 +24,14 @@ import { TemplateParamsDialog } from './TemplateParamsDialog'
 import type { TFunction } from 'i18next'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type { TemplateParameters } from '@/features/fable-builder/utils/template-parameters'
+import type { FableDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { deriveTemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import {
   clearDraft,
+  draftTargetFor,
   flushDraft,
   readDraft,
   useDraftPersistence,
@@ -204,14 +206,39 @@ export function FableBuilderPage({
   }, [fresh, newFable])
 
   // Initialize fable state - only runs once per mount.
-  // Checks for a stale draft in localStorage before loading from backend.
+  // Checks for the target's draft slot before loading from backend.
   useEffect(() => {
     if (initializedRef.current) return
+
+    function notifyDraftRestored(draft: FableDraft): void {
+      const ago = Math.round((Date.now() - draft.savedAt) / 60_000)
+      const timeLabel =
+        ago < 1
+          ? t('draftRestored.justNow')
+          : t('draftRestored.minutesAgo', { count: ago })
+      showToast.info(t('draftRestored.toast', { timeLabel }), draft.fableName)
+    }
 
     // Template mode: fork — load the template's builder without adopting its
     // identity, so saving creates a new blueprint (parent_id = the template).
     if (templateMode && fableId) {
       if (!existingFable) return
+      // An in-progress fork resumes; its parameters were already handled.
+      const forkTarget = draftTargetFor({ forkParentId: fableId })
+      const forkDraft = readDraft(forkTarget)
+      if (forkDraft && Object.keys(forkDraft.fable.blocks).length > 0) {
+        notifyDraftRestored(forkDraft)
+        setFable(forkDraft.fable, null)
+        useFableBuilderStore.setState({
+          forkParentId: forkDraft.forkParentId ?? fableId,
+          isDirty: true,
+          ...(forkDraft.fableName && { fableName: forkDraft.fableName }),
+        })
+        clearDraft(forkTarget)
+        initializedRef.current = true
+        setTemplateParamsDone(true)
+        return
+      }
       setFable(existingFable, null)
       useFableBuilderStore.setState({
         forkParentId: fableId,
@@ -234,37 +261,25 @@ export function FableBuilderPage({
       return
     }
 
-    // Recover the draft — unless a URL payload wins (draft stays stored).
-    const draft = encodedState ? null : readDraft()
+    // Recover the target's slot — unless a URL payload wins (slot stays stored).
+    const target = draftTargetFor({ fableId })
+    const draft = encodedState ? null : readDraft(target)
     if (draft) {
-      const draftMatchesRoute =
-        (fableId && draft.fableId === fableId) || (!fableId && !draft.fableId)
-
-      if (draftMatchesRoute && Object.keys(draft.fable.blocks).length > 0) {
-        const ago = Math.round((Date.now() - draft.savedAt) / 60_000)
-        const timeLabel =
-          ago < 1
-            ? t('draftRestored.justNow')
-            : t('draftRestored.minutesAgo', { count: ago })
-
-        showToast.info(t('draftRestored.toast', { timeLabel }), draft.fableName)
+      if (Object.keys(draft.fable.blocks).length > 0) {
+        notifyDraftRestored(draft)
         setFable(draft.fable, draft.fableId)
         if (draft.fableName) setFableName(draft.fableName)
-        if (draft.fableVersion) {
-          useFableBuilderStore.setState({
-            fableVersion: draft.fableVersion,
-            isDirty: true,
-          })
-        } else {
-          useFableBuilderStore.setState({ isDirty: true })
-        }
-        clearDraft()
+        useFableBuilderStore.setState({
+          isDirty: true,
+          ...(draft.fableVersion && { fableVersion: draft.fableVersion }),
+          ...(draft.forkParentId && { forkParentId: draft.forkParentId }),
+        })
+        clearDraft(target)
         initializedRef.current = true
         return
       }
-
-      // Draft doesn't match current route — discard silently
-      clearDraft()
+      // An empty shell in this slot is noise; other targets stay untouched.
+      clearDraft(target)
     }
 
     if (fableId && existingFable) {
