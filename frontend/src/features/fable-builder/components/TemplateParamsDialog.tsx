@@ -164,6 +164,8 @@ export function TemplateParamsDialog({
     candidateFable,
     open && !valuesTyping,
   )
+  // The expansion lags the inputs (debounce + fetch) — verdicts wait for it.
+  const settled = !isValidating && debouncedValues === values
 
   const errorCount = expansion
     ? expansion.global_errors.length +
@@ -337,7 +339,7 @@ export function TemplateParamsDialog({
 
   const renderField = (name: string, grouped = false) => {
     const preview = resolvedPreview(name)
-    const missing = isMissing(name)
+    const missing = settled && isMissing(name)
     const meta = examples?.example_glyphs[name]
     // Templates declare their own types; nothing is inferred elsewhere.
     const valueType = meta?.type_hint
@@ -483,7 +485,7 @@ export function TemplateParamsDialog({
 
             {/* Live validation status of the candidate configuration */}
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {isValidating ? (
+              {!settled ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   {t('template.dialog.validating')}
