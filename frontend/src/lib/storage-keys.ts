@@ -77,6 +77,14 @@ export const STORAGE_KEYS = {
   },
 
   /**
+   * Persisted split-pane layouts (direct localStorage)
+   */
+  layout: {
+    /** Run detail: pipeline canvas vs details tabs */
+    runDetailSplit: 'fiab.layout.run-detail-split',
+  },
+
+  /**
    * Zustand store persistence keys
    */
   stores: {
