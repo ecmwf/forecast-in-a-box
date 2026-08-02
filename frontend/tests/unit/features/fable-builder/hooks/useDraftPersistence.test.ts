@@ -202,6 +202,20 @@ describe('useDraftPersistence hook', () => {
     expect(readDraft()).not.toBeNull()
   })
 
+  it('writes the draft on unmount even without a pending debounce', () => {
+    const { unmount } = renderHook(() => useDraftPersistence())
+
+    // Mimic a restore: fable set clean, dirty flagged after — no debounce runs.
+    act(() => useFableBuilderStore.setState({ fable: makeDraft().fable }))
+    act(() => useFableBuilderStore.setState({ isDirty: true }))
+    expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
+    expect(readDraft()).toBeNull()
+
+    act(() => unmount())
+
+    expect(readDraft()).not.toBeNull()
+  })
+
   it('flushes the draft and clears the saving flag when unmounted mid-debounce', () => {
     const { unmount } = renderHook(() => useDraftPersistence())
 

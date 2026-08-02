@@ -129,14 +129,12 @@ export function useDraftPersistence(): void {
 
     return () => {
       unsub()
-      // Flush a pending write on unmount (navigating away mid-debounce): the
-      // store outlives the route, so otherwise the draft is lost and "Saving…"
-      // sticks.
       if (timerRef.current) {
         clearTimeout(timerRef.current)
         timerRef.current = null
-        flushDraft()
       }
+      // A restored-but-unedited session has no timer yet must survive cold boot.
+      flushDraft()
     }
   }, [])
 }

@@ -88,6 +88,34 @@ describe('Fable Builder fresh intent', () => {
     expect(readDraft()?.fableName).toBe('Drafted work')
   })
 
+  it('with an encoded URL payload, the draft is neither restored nor cleared', async () => {
+    localStorage.setItem(STORAGE_KEYS.fable.draft, JSON.stringify(seedDraft()))
+
+    const screen = await renderWithRouter(
+      <FableBuilderPage encodedState="some-shared-state" />,
+    )
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    // The (mocked) URL sync owns the canvas; the draft must stay stored.
+    expect(
+      Object.keys(useFableBuilderStore.getState().fable.blocks),
+    ).toHaveLength(0)
+    expect(readDraft()?.fableName).toBe('Drafted work')
+  })
+
+  it('resumes a live session on a plain visit instead of blanking the canvas', async () => {
+    // As after returning from a template session: content only in the store.
+    useFableBuilderStore.getState().setFable(seedDraft().fable)
+    useFableBuilderStore.setState({ isDirty: true })
+
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    expect(Object.keys(useFableBuilderStore.getState().fable.blocks)).toContain(
+      'draft_block',
+    )
+  })
+
   it('without fresh, a matching draft is restored and consumed', async () => {
     localStorage.setItem(STORAGE_KEYS.fable.draft, JSON.stringify(seedDraft()))
 

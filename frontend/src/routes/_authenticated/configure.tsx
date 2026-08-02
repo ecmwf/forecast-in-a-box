@@ -11,6 +11,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
+import { builderSessionKey } from '@/features/fable-builder/utils/builder-session-key'
 
 const searchSchema = z.object({
   state: z.string().optional(),
@@ -37,7 +38,7 @@ function ConfigurePage() {
     Route.useSearch()
   return (
     <FableBuilderPage
-      key={fableId}
+      key={builderSessionKey({ fableId, template })}
       fableId={fableId}
       encodedState={state}
       templateMode={template}

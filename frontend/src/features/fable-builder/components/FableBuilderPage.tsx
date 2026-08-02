@@ -224,8 +224,18 @@ export function FableBuilderPage({
       return
     }
 
-    // Check for a recoverable draft before normal initialization
-    const draft = readDraft()
+    // A plain visit resumes a live session; the draft is cold-boot recovery.
+    if (
+      !fableId &&
+      !encodedState &&
+      Object.keys(useFableBuilderStore.getState().fable.blocks).length > 0
+    ) {
+      initializedRef.current = true
+      return
+    }
+
+    // Recover the draft — unless a URL payload wins (draft stays stored).
+    const draft = encodedState ? null : readDraft()
     if (draft) {
       const draftMatchesRoute =
         (fableId && draft.fableId === fableId) || (!fableId && !draft.fableId)
