@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -25,13 +25,7 @@ import { FableEdgeComponent } from './FableEdge'
 import { BlockNode } from './nodes/BlockNode'
 import { BlockDragPreview } from './BlockDragPreview'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
-import type {
-  Connection,
-  Edge,
-  EdgeTypes,
-  NodeChange,
-  NodeTypes,
-} from '@xyflow/react'
+import type { Connection, Edge, EdgeTypes, NodeTypes } from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
 import type { FableNode } from './nodes/BlockNode'
 import { getFactory } from '@/api/types/fable.types'
@@ -42,9 +36,9 @@ import {
 import { fableToGraph } from '@/features/fable-builder/utils/fable-to-graph'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useSidebarBlockDrop } from '@/features/fable-builder/hooks/useSidebarBlockDrop'
-import { useDebouncedCallback } from '@/hooks/useDebounce'
 import { useMedia } from '@/hooks/useMedia'
 import { useUiStore } from '@/stores/uiStore'
+import { cn } from '@/lib/utils'
 
 interface FableGraphCanvasProps {
   catalogue: BlockFactoryCatalogue
@@ -81,7 +75,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const { fitView, setViewport, getNodesBounds } = useReactFlow()
   const { onDragOver, onDrop, dropMode } = useSidebarBlockDrop(catalogue)
 
-  const [nodes, setNodes, onNodesChangeInternal] = useNodesState<FableNode>([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<FableNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -95,74 +89,54 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const prevLayoutDirectionRef = useRef(layoutDirection)
   const hasInitializedViewportRef = useRef<boolean>(false)
   const lastBlockCountRef = useRef<number>(0)
-  // Nodes whose dimensions have been measured at least once. Used to skip
-  // auto-relayout on subsequent content-driven resizes (e.g. config badges
-  // growing/shrinking while the user types), which would otherwise jostle
-  // the whole graph.
-  const measuredNodesRef = useRef<Set<string>>(new Set())
+  // A full-graph replacement first lays out at estimated sizes — kept
+  // invisible until the measured layout lands, then faded in.
+  const [settling, setSettling] = useState(false)
 
-  // Measured node sizes in a ref, so the layout effect lays out with real
-  // heights (→ aligned handles, straight edges) without depending on `nodes`.
-  const nodeDimensionsRef = useRef<NodeDimensions>({})
-  nodeDimensionsRef.current = nodes.reduce<NodeDimensions>((acc, node) => {
-    if (node.measured?.width && node.measured.height) {
-      acc[node.id] = {
-        width: node.measured.width,
-        height: node.measured.height,
+  // Real node sizes, read from the DOM — neither xyflow's dimension events
+  // nor its internal store deliver measurements in this controlled setup.
+  const measuredDimensions = useCallback((): NodeDimensions => {
+    const dims: NodeDimensions = {}
+    const els =
+      containerRef.current?.querySelectorAll<HTMLElement>('.react-flow__node')
+    for (const el of els ?? []) {
+      const id = el.getAttribute('data-id')
+      if (id && el.offsetHeight > 0) {
+        dims[id] = { width: el.offsetWidth, height: el.offsetHeight }
       }
     }
-    return acc
-  }, {})
+    return dims
+  }, [])
 
-  // Debounced re-layout function that uses measured node dimensions
-  const debouncedRelayout = useDebouncedCallback(() => {
-    if (!autoLayout) return
-
-    const dimensions = nodes.reduce<NodeDimensions>((acc, node) => {
-      if (node.measured?.width && node.measured.height) {
-        acc[node.id] = {
-          width: node.measured.width,
-          height: node.measured.height,
-        }
+  // Reveal: poll the DOM until every replaced node has a size, then lay out
+  // with the real dimensions and fade in (frame-capped so it can't stick).
+  useEffect(() => {
+    if (!settling) return
+    let cancelled = false
+    let attempts = 0
+    let frame = 0
+    const measure = () => {
+      if (cancelled) return
+      const dims = measuredDimensions()
+      const ready = nodes.length > 0 && nodes.every((node) => node.id in dims)
+      if (!ready && attempts < 60) {
+        attempts += 1
+        frame = requestAnimationFrame(measure)
+        return
       }
-      return acc
-    }, {})
-
-    const layouted = layoutNodes(
-      nodes,
-      edges,
-      { direction: layoutDirection },
-      dimensions,
-    )
-    setNodes(layouted)
-  }, 300)
-
-  // Trigger re-layout only on a node's FIRST measured dimension (freshly
-  // inserted or after layout direction change). Later resizes — e.g. a
-  // config badge wrap changing rows while the user types — are ignored
-  // so the graph doesn't jostle with every keystroke.
-  const onNodesChange = useCallback(
-    (changes: Array<NodeChange<FableNode>>) => {
-      onNodesChangeInternal(changes)
-
-      let hasFirstMeasurement = false
-      for (const change of changes) {
-        if (change.type === 'remove') {
-          measuredNodesRef.current.delete(change.id)
-          continue
-        }
-        if (change.type !== 'dimensions' || !change.dimensions) continue
-        if (measuredNodesRef.current.has(change.id)) continue
-        measuredNodesRef.current.add(change.id)
-        hasFirstMeasurement = true
+      if (ready) {
+        setNodes((current) =>
+          layoutNodes(current, edges, { direction: layoutDirection }, dims),
+        )
       }
-
-      if (hasFirstMeasurement && autoLayout) {
-        debouncedRelayout()
-      }
-    },
-    [onNodesChangeInternal, autoLayout, debouncedRelayout],
-  )
+      setSettling(false)
+    }
+    frame = requestAnimationFrame(measure)
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frame)
+    }
+  }, [settling, nodes, edges, layoutDirection, measuredDimensions, setNodes])
 
   useEffect(() => {
     // Use reference equality instead of JSON.stringify for change detection.
@@ -181,13 +155,14 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
     const { nodes: newNodes, edges: newEdges } = fableToGraph(fable, catalogue)
 
+    const dimensions = measuredDimensions()
     const shouldLayout = autoLayout || needsLayout(newNodes)
     const layouted = shouldLayout
       ? layoutNodes(
           newNodes,
           newEdges,
           { direction: layoutDirection },
-          nodeDimensionsRef.current,
+          dimensions,
         )
       : newNodes
 
@@ -200,6 +175,13 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     }
     lastBlockCountRef.current = currentBlockCount
 
+    // Every node unmeasured = a replacement (preset load): hide until measured.
+    setSettling(
+      shouldLayout &&
+        layouted.length > 0 &&
+        layouted.every((node) => !(node.id in dimensions)),
+    )
+
     // Preserve the current selection — `fableToGraph` builds nodes without a
     // `selected` flag, so re-apply it here for the same-commit rebuild.
     setNodes(
@@ -210,7 +192,15 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
       ),
     )
     setEdges(newEdges)
-  }, [fable, catalogue, autoLayout, layoutDirection, setNodes, setEdges])
+  }, [
+    fable,
+    catalogue,
+    autoLayout,
+    layoutDirection,
+    measuredDimensions,
+    setNodes,
+    setEdges,
+  ])
 
   // Position viewport once on initial load based on layout direction
   // TB: center X on desktop, left-align on mobile, near top Y
@@ -218,6 +208,8 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   useEffect(() => {
     if (hasInitializedViewportRef.current) return
     if (nodes.length === 0) return
+    // Bounds shift when the measured layout lands — position after it.
+    if (settling) return
 
     const container = containerRef.current
     if (!container) return
@@ -261,7 +253,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
     setViewport({ x, y, zoom: 1 })
     hasInitializedViewportRef.current = true
-  }, [nodes, layoutDirection, setViewport])
+  }, [nodes, layoutDirection, setViewport, settling])
 
   // Respond to fit view trigger from the header
   useEffect(() => {
@@ -353,7 +345,11 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         nodesDraggable={!nodesLocked}
-        className="bg-slate-50 dark:bg-slate-950"
+        className={cn(
+          'bg-slate-50 dark:bg-slate-950',
+          // Instant hide while settling; fade in once the layout is final.
+          settling ? 'opacity-0' : 'transition-opacity duration-150',
+        )}
         proOptions={{ hideAttribution: true }}
       >
         <Background
