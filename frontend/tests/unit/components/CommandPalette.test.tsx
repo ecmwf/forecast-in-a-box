@@ -183,8 +183,11 @@ describe('CommandPalette', () => {
       .getByRole('option', { name: /New Forecast Configuration/ })
       .click()
 
-    // No search params: ready-made starting points come from plugin templates now.
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/configure' })
+    // Explicit fresh intent — a bench holding unsaved work asks first.
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: '/configure',
+      search: { fresh: true },
+    })
   })
 
   it('runs the highlighted command when Enter is pressed', async () => {

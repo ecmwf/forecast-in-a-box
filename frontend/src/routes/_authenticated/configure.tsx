@@ -22,7 +22,7 @@ const searchSchema = z.object({
   templatePlugin: z.string().optional(),
   /** Template display name for the example-values lookup */
   templateName: z.string().optional(),
-  /** Explicit blank-canvas intent — skips draft restore (draft is kept). */
+  /** Explicit blank-canvas intent; a bench holding unsaved work asks first. */
   fresh: z.boolean().optional(),
 })
 

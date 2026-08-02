@@ -136,6 +136,7 @@ tests/                   # Unit, integration, E2E tests
 - **Never swallow errors** — always propagate to users via `showToast` from `@/lib/toast` and log with `createLogger()`. Silent `catch {}` blocks are forbidden.
 - **No barrel files (`index.ts`)** — always import directly from the source file (e.g. `@/components/common/LoadingSpinner`, not `@/components/common`)
 - **Path aliases:** `@/*` → `./src/*`, `@tests/*` → `./tests/*`
+- **Unsaved-work policy:** navigation never silently loses work and never prompts on leave. The builder is a single auto-persisted workbench (`useDraftPersistence`); the only interruption is the replace picker when an explicitly opened configuration would replace a non-empty canvas — one rule, no dirty/clean exemptions. Pages whose state cannot be auto-persisted (e.g. viewer annotations) may block route-leave instead.
 
 ## Dates & timezones
 

@@ -9,10 +9,11 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Package } from 'lucide-react'
 import { FableBuilderHeader } from './FableBuilderHeader'
+import { ReplaceWorkbenchDialog } from './ReplaceWorkbenchDialog'
 import { BlockPalette } from './layout/BlockPalette'
 import { ConfigPanel } from './layout/ConfigPanel'
 import { MobileLayout } from './layout/MobileLayout'
@@ -24,21 +25,23 @@ import { TemplateParamsDialog } from './TemplateParamsDialog'
 import type { TFunction } from 'i18next'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type { TemplateParameters } from '@/features/fable-builder/utils/template-parameters'
-import type { FableDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
+import type {
+  WorkbenchIncoming,
+  WorkbenchReplaceTarget,
+} from './ReplaceWorkbenchDialog'
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { deriveTemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import {
   clearDraft,
-  draftTargetFor,
-  flushDraft,
   readDraft,
   useDraftPersistence,
 } from '@/features/fable-builder/hooks/useDraftPersistence'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { hasUnterminatedGlyph } from '@/features/fable-builder/utils/glyph-display'
+import { decodeFableFromURL } from '@/features/fable-builder/utils/url-state'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useMedia } from '@/hooks/useMedia'
 import { GlyphProvider } from '@/features/fable-builder/context/GlyphContext'
@@ -92,6 +95,23 @@ function getValidationErrorMessage(
   return error.message || t('page.validationErrorGeneric')
 }
 
+/** The bench occupant — any non-empty canvas asks before replacement; null = blank. */
+function benchAtRisk(): WorkbenchReplaceTarget | null {
+  const state = useFableBuilderStore.getState()
+  if (Object.keys(state.fable.blocks).length > 0) {
+    return {
+      fable: state.fable,
+      fableName: state.fableName,
+      unsaved: state.isDirty,
+    }
+  }
+  const draft = readDraft()
+  if (draft && Object.keys(draft.fable.blocks).length > 0) {
+    return { fable: draft.fable, fableName: draft.fableName, unsaved: true }
+  }
+  return null
+}
+
 interface FableBuilderPageProps {
   fableId?: string
   encodedState?: string
@@ -101,7 +121,7 @@ interface FableBuilderPageProps {
   templatePlugin?: string
   /** Template display name for the example-values lookup */
   templateName?: string
-  /** Explicit blank-canvas intent — skips draft restore (draft is kept). */
+  /** Explicit blank-canvas intent; a bench holding unsaved work asks first. */
   fresh?: boolean
 }
 
@@ -140,7 +160,13 @@ export function FableBuilderPage({
   )
   const setIsValidating = useFableBuilderStore((state) => state.setIsValidating)
 
+  const navigate = useNavigate()
   const initializedRef = useRef(false)
+  // Decided synchronously at mount, before any payload can touch the store.
+  const [replaceTarget, setReplaceTarget] =
+    useState<WorkbenchReplaceTarget | null>(() =>
+      fableId || encodedState || templateMode || fresh ? benchAtRisk() : null,
+    )
   const [templateInitialized, setTemplateInitialized] = useState(false)
   const [templateParamsDone, setTemplateParamsDone] = useState(false)
   // Set after "Load config"; resolved into loadedParams once glyphs are known
@@ -149,12 +175,13 @@ export function FableBuilderPage({
     null,
   )
 
-  // Auto-persist drafts to localStorage + beforeunload guard
+  // Auto-persist the workbench to localStorage
   useDraftPersistence()
 
+  // Held back while the dialog is open — the payload must not land early.
   useURLStateSync({
     encodedState: fableId ? undefined : encodedState,
-    enabled: !fableId,
+    enabled: !fableId && replaceTarget === null,
   })
 
   const isDesktop = useMedia('(min-width: 768px)')
@@ -196,49 +223,28 @@ export function FableBuilderPage({
     error: validationError,
   } = useFableValidation(debouncedFable, !fableHasOpenGlyph)
 
-  // Fresh intent ("New configuration"): reset now — also mid-session, when
-  // only the search changed. Unsaved work is flushed to the draft first.
+  // Fresh intent: reset now — also mid-session; an occupied bench asks first.
   useEffect(() => {
     if (!fresh) return
-    flushDraft()
+    const risk = benchAtRisk()
+    if (risk) {
+      setReplaceTarget(risk)
+      return
+    }
     newFable()
     initializedRef.current = true
   }, [fresh, newFable])
 
   // Initialize fable state - only runs once per mount.
-  // Checks for the target's draft slot before loading from backend.
   useEffect(() => {
     if (initializedRef.current) return
-
-    function notifyDraftRestored(draft: FableDraft): void {
-      const ago = Math.round((Date.now() - draft.savedAt) / 60_000)
-      const timeLabel =
-        ago < 1
-          ? t('draftRestored.justNow')
-          : t('draftRestored.minutesAgo', { count: ago })
-      showToast.info(t('draftRestored.toast', { timeLabel }), draft.fableName)
-    }
+    // Awaiting the user's replace decision — nothing may load yet.
+    if (replaceTarget) return
 
     // Template mode: fork — load the template's builder without adopting its
     // identity, so saving creates a new blueprint (parent_id = the template).
     if (templateMode && fableId) {
       if (!existingFable) return
-      // An in-progress fork resumes; its parameters were already handled.
-      const forkTarget = draftTargetFor({ forkParentId: fableId })
-      const forkDraft = readDraft(forkTarget)
-      if (forkDraft && Object.keys(forkDraft.fable.blocks).length > 0) {
-        notifyDraftRestored(forkDraft)
-        setFable(forkDraft.fable, null)
-        useFableBuilderStore.setState({
-          forkParentId: forkDraft.forkParentId ?? fableId,
-          isDirty: true,
-          ...(forkDraft.fableName && { fableName: forkDraft.fableName }),
-        })
-        clearDraft(forkTarget)
-        initializedRef.current = true
-        setTemplateParamsDone(true)
-        return
-      }
       setFable(existingFable, null)
       useFableBuilderStore.setState({
         forkParentId: fableId,
@@ -251,22 +257,16 @@ export function FableBuilderPage({
       return
     }
 
-    // A plain visit resumes a live session; the draft is cold-boot recovery.
-    if (
-      !fableId &&
-      !encodedState &&
-      Object.keys(useFableBuilderStore.getState().fable.blocks).length > 0
-    ) {
-      initializedRef.current = true
-      return
-    }
-
-    // Recover the target's slot — unless a URL payload wins (slot stays stored).
-    const target = draftTargetFor({ fableId })
-    const draft = encodedState ? null : readDraft(target)
-    if (draft) {
-      if (Object.keys(draft.fable.blocks).length > 0) {
-        notifyDraftRestored(draft)
+    // Plain visit: resume the live session, or silently cold-boot restore it.
+    if (!fableId && !encodedState) {
+      if (
+        Object.keys(useFableBuilderStore.getState().fable.blocks).length > 0
+      ) {
+        initializedRef.current = true
+        return
+      }
+      const draft = readDraft()
+      if (draft && Object.keys(draft.fable.blocks).length > 0) {
         setFable(draft.fable, draft.fableId)
         if (draft.fableName) setFableName(draft.fableName)
         useFableBuilderStore.setState({
@@ -274,12 +274,12 @@ export function FableBuilderPage({
           ...(draft.fableVersion && { fableVersion: draft.fableVersion }),
           ...(draft.forkParentId && { forkParentId: draft.forkParentId }),
         })
-        clearDraft(target)
         initializedRef.current = true
         return
       }
-      // An empty shell in this slot is noise; other targets stay untouched.
-      clearDraft(target)
+      newFable()
+      initializedRef.current = true
+      return
     }
 
     if (fableId && existingFable) {
@@ -294,14 +294,41 @@ export function FableBuilderPage({
         })
       }
       initializedRef.current = true
-    } else if (!fableId && !encodedState) {
-      newFable()
-      initializedRef.current = true
     } else if (!fableId && encodedState) {
       // URL state sync will handle this case
       initializedRef.current = true
     }
-  }, [fableId, existingFable, fableRetrieveData, encodedState, templateMode, t])
+  }, [
+    fableId,
+    existingFable,
+    fableRetrieveData,
+    encodedState,
+    templateMode,
+    replaceTarget,
+  ])
+
+  function handleReplaceConfirm(): void {
+    clearDraft()
+    // A pending flush must not re-bank the work the user just discarded.
+    useFableBuilderStore.setState({ isDirty: false })
+    if (fresh) {
+      newFable()
+      initializedRef.current = true
+    }
+    setReplaceTarget(null)
+  }
+
+  function handleReplaceCancel(): void {
+    // Navigate only — clearing the target here would un-gate init for one render.
+    navigate({ to: '/configure', replace: true })
+  }
+
+  // The ask is moot once no payload is pending (cancel landed).
+  useEffect(() => {
+    if (!fableId && !encodedState && !templateMode && !fresh) {
+      setReplaceTarget(null)
+    }
+  }, [fableId, encodedState, templateMode, fresh])
 
   // Template mode: collect parameters via a dialog once builder + examples
   // are ready, then overlay values (mirrors the backend's ingest overlay).
@@ -451,10 +478,38 @@ export function FableBuilderPage({
     }
   }, [catalogue, debouncedFable, validationResult, setValidationState])
 
+  // Picker preview of the incoming side; names and builders arrive reactively.
+  const incomingFromState = useMemo(
+    () => (encodedState ? decodeFableFromURL(encodedState) : null),
+    [encodedState],
+  )
+  const incoming: WorkbenchIncoming = fresh
+    ? { label: null, fable: null, isNew: true }
+    : {
+        label:
+          (templateMode ? templateName : undefined) ??
+          fableRetrieveData?.display_name ??
+          null,
+        fable: fableId ? (existingFable ?? null) : incomingFromState,
+        isNew: false,
+      }
+
+  // Rendered in every page state; conditionally mounted — an effect-driven
+  // open=false flip can strand the portal, so closing means unmounting.
+  const replaceDialog = replaceTarget ? (
+    <ReplaceWorkbenchDialog
+      target={replaceTarget}
+      incoming={incoming}
+      onCancel={handleReplaceCancel}
+      onReplace={handleReplaceConfirm}
+    />
+  ) : null
+
   if (catalogueLoading || (fableId && fableLoading)) {
     return (
       <div className="flex min-h-100 items-center justify-center">
         <LoadingSpinner size="lg" />
+        {replaceDialog}
       </div>
     )
   }
@@ -528,6 +583,8 @@ export function FableBuilderPage({
           )}
         </div>
       </div>
+
+      {replaceDialog}
 
       {/* Lives here, not inside ReviewStep, so "Run Once" can open it straight
           from the edit canvas without first routing through the review page. */}

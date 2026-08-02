@@ -188,7 +188,7 @@ describe('useURLStateSync', () => {
       await expect
         .poll(() => useFableBuilderStore.getState().fable)
         .toEqual(fableB)
-      const draft = readDraft('new')
+      const draft = readDraft()
       expect(draft?.fable.blocks).toHaveProperty('work_block')
       expect(draft?.fableName).toBe('In progress')
     })

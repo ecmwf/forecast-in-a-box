@@ -13,15 +13,14 @@ import { act, renderHook } from '@testing-library/react'
 import type { FableDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
 import {
   clearDraft,
-  draftTargetFor,
   flushDraft,
   readDraft,
   useDraftPersistence,
 } from '@/features/fable-builder/hooks/useDraftPersistence'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 
-const DRAFTS_KEY = 'fiab.fable.drafts'
-const LEGACY_KEY = 'fiab.fable.draft'
+const DRAFT_KEY = 'fiab.fable.draft'
+const LEGACY_MAP_KEY = 'fiab.fable.drafts'
 
 function makeDraft(overrides: Partial<FableDraft> = {}): FableDraft {
   return {
@@ -46,10 +45,6 @@ function makeDraft(overrides: Partial<FableDraft> = {}): FableDraft {
   }
 }
 
-function seedDrafts(map: Record<string, FableDraft>): void {
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify(map))
-}
-
 describe('useDraftPersistence helpers', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -60,84 +55,67 @@ describe('useDraftPersistence helpers', () => {
     localStorage.clear()
   })
 
-  describe('draftTargetFor', () => {
-    it('derives one slot per editing target', () => {
-      expect(draftTargetFor({ fableId: 'bp-1' })).toBe('id:bp-1')
-      expect(draftTargetFor({ forkParentId: 'tpl-1' })).toBe('template:tpl-1')
-      expect(draftTargetFor({})).toBe('new')
-    })
-
-    it('an own identity wins over template lineage', () => {
-      expect(draftTargetFor({ fableId: 'bp-1', forkParentId: 'tpl-1' })).toBe(
-        'id:bp-1',
-      )
-    })
-  })
-
   describe('readDraft', () => {
     it('returns null when no draft exists', () => {
-      expect(readDraft('new')).toBeNull()
+      expect(readDraft()).toBeNull()
     })
 
-    it('reads only its own slot', () => {
-      const mine = makeDraft({ fableId: 'bp-1', fableName: 'Mine' })
-      seedDrafts({ new: makeDraft(), 'id:bp-1': mine })
-
-      expect(readDraft('id:bp-1')).toEqual(mine)
-      expect(readDraft('new')?.fableName).toBe('Test Config')
+    it('reads the workbench slot', () => {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(makeDraft()))
+      expect(readDraft()?.fableName).toBe('Test Config')
     })
 
     it('returns null for malformed JSON', () => {
-      localStorage.setItem(DRAFTS_KEY, 'not-json')
-      expect(readDraft('new')).toBeNull()
+      localStorage.setItem(DRAFT_KEY, 'not-json')
+      expect(readDraft()).toBeNull()
     })
 
-    it('returns null for a slot past the age cap', () => {
-      seedDrafts({
-        new: makeDraft({ savedAt: Date.now() - 8 * 24 * 60 * 60 * 1000 }),
-      })
-      expect(readDraft('new')).toBeNull()
+    it('normalises a pre-fork draft without forkParentId', () => {
+      const { forkParentId: _omit, ...legacy } = makeDraft()
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(legacy))
+      expect(readDraft()?.forkParentId).toBeNull()
     })
 
-    it('migrates the legacy single-slot draft', () => {
-      const { forkParentId: _omit, ...legacy } = makeDraft({
-        fableId: 'bp-9',
-        fableName: 'Old format',
-      })
-      localStorage.setItem(LEGACY_KEY, JSON.stringify(legacy))
+    it('migrates the interim per-target map, newest content first', () => {
+      localStorage.setItem(
+        LEGACY_MAP_KEY,
+        JSON.stringify({
+          new: makeDraft({ fableName: 'Older', savedAt: 1000 }),
+          'template:tpl-1': makeDraft({
+            fableName: 'Newest',
+            forkParentId: 'tpl-1',
+            savedAt: 2000,
+          }),
+        }),
+      )
 
-      const migrated = readDraft('id:bp-9')
-      expect(migrated?.fableName).toBe('Old format')
-      expect(migrated?.forkParentId).toBeNull()
-      expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
+      const migrated = readDraft()
+      expect(migrated?.fableName).toBe('Newest')
+      expect(migrated?.forkParentId).toBe('tpl-1')
+      expect(localStorage.getItem(LEGACY_MAP_KEY)).toBeNull()
+      expect(localStorage.getItem(DRAFT_KEY)).not.toBeNull()
     })
   })
 
   describe('clearDraft', () => {
-    it('removes only the given slot', () => {
-      seedDrafts({
-        new: makeDraft(),
-        'id:bp-1': makeDraft({ fableId: 'bp-1' }),
-      })
-
-      clearDraft('new')
-
-      expect(readDraft('new')).toBeNull()
-      expect(readDraft('id:bp-1')).not.toBeNull()
+    it('removes the draft from localStorage', () => {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(makeDraft()))
+      clearDraft()
+      expect(localStorage.getItem(DRAFT_KEY)).toBeNull()
     })
 
     it('does not throw when no draft exists', () => {
-      expect(() => clearDraft('new')).not.toThrow()
+      expect(() => clearDraft()).not.toThrow()
     })
   })
 
   describe('flushDraft', () => {
-    it('writes the dirty store into its target slot', () => {
+    it('writes the dirty store state immediately and clears the pending flag', () => {
       act(() =>
         useFableBuilderStore.setState({
           fable: makeDraft().fable,
-          fableId: 'bp-1',
           fableName: 'Flushed',
+          forkParentId: 'tpl-9',
           isDirty: true,
           draftWritePending: true,
         }),
@@ -146,67 +124,14 @@ describe('useDraftPersistence helpers', () => {
       flushDraft()
 
       expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
-      expect(readDraft('id:bp-1')?.fableName).toBe('Flushed')
-      expect(readDraft('new')).toBeNull()
-    })
-
-    it('a template fork writes into its template slot with lineage', () => {
-      act(() =>
-        useFableBuilderStore.setState({
-          fable: makeDraft().fable,
-          forkParentId: 'tpl-1',
-          isDirty: true,
-        }),
-      )
-
-      flushDraft()
-
-      expect(readDraft('template:tpl-1')?.forkParentId).toBe('tpl-1')
+      const draft = readDraft()
+      expect(draft?.fableName).toBe('Flushed')
+      expect(draft?.forkParentId).toBe('tpl-9')
     })
 
     it('does not write when the store is clean', () => {
       flushDraft()
-      expect(readDraft('new')).toBeNull()
-    })
-
-    it('leaves other slots untouched', () => {
-      seedDrafts({ 'id:other': makeDraft({ fableId: 'other' }) })
-      act(() =>
-        useFableBuilderStore.setState({
-          fable: makeDraft().fable,
-          isDirty: true,
-        }),
-      )
-
-      flushDraft()
-
-      expect(readDraft('new')).not.toBeNull()
-      expect(readDraft('id:other')).not.toBeNull()
-    })
-
-    it('prunes the oldest slots beyond the count cap', () => {
-      const base = Date.now()
-      seedDrafts(
-        Object.fromEntries(
-          ['a', 'b', 'c', 'd', 'e'].map((id, index) => [
-            `id:${id}`,
-            makeDraft({ fableId: id, savedAt: base - (index + 1) * 1000 }),
-          ]),
-        ),
-      )
-      act(() =>
-        useFableBuilderStore.setState({
-          fable: makeDraft().fable,
-          isDirty: true,
-        }),
-      )
-
-      flushDraft()
-
-      const stored = JSON.parse(localStorage.getItem(DRAFTS_KEY)!) as object
-      expect(Object.keys(stored)).toHaveLength(5)
-      expect(readDraft('new')).not.toBeNull()
-      expect(readDraft('id:e')).toBeNull()
+      expect(readDraft()).toBeNull()
     })
   })
 })
@@ -237,10 +162,10 @@ describe('useDraftPersistence hook', () => {
     act(() => vi.advanceTimersByTime(2000))
 
     expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
-    expect(readDraft('new')).not.toBeNull()
+    expect(readDraft()).not.toBeNull()
   })
 
-  it('clears the written slot on save even though the identity changed', () => {
+  it('clears the workbench slot on save', () => {
     renderHook(() => useDraftPersistence())
 
     act(() =>
@@ -250,12 +175,11 @@ describe('useDraftPersistence hook', () => {
       }),
     )
     act(() => vi.advanceTimersByTime(2000))
-    expect(readDraft('new')).not.toBeNull()
+    expect(readDraft()).not.toBeNull()
 
-    // markSaved re-points fableId before the subscriber runs.
     act(() => useFableBuilderStore.getState().markSaved('bp-9', 1))
 
-    expect(readDraft('new')).toBeNull()
+    expect(readDraft()).toBeNull()
   })
 
   it('flushes the draft on pagehide (tab close never unmounts)', () => {
@@ -267,14 +191,14 @@ describe('useDraftPersistence hook', () => {
         isDirty: true,
       }),
     )
-    expect(readDraft('new')).toBeNull()
+    expect(readDraft()).toBeNull()
 
     act(() => {
       window.dispatchEvent(new Event('pagehide'))
     })
 
     expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
-    expect(readDraft('new')).not.toBeNull()
+    expect(readDraft()).not.toBeNull()
   })
 
   it('flushes the draft when the document becomes hidden', () => {
@@ -286,7 +210,7 @@ describe('useDraftPersistence hook', () => {
         isDirty: true,
       }),
     )
-    expect(readDraft('new')).toBeNull()
+    expect(readDraft()).toBeNull()
 
     Object.defineProperty(document, 'visibilityState', {
       value: 'hidden',
@@ -300,7 +224,7 @@ describe('useDraftPersistence hook', () => {
       Reflect.deleteProperty(document, 'visibilityState')
     }
 
-    expect(readDraft('new')).not.toBeNull()
+    expect(readDraft()).not.toBeNull()
   })
 
   it('writes the draft on unmount even without a pending debounce', () => {
@@ -310,11 +234,11 @@ describe('useDraftPersistence hook', () => {
     act(() => useFableBuilderStore.setState({ fable: makeDraft().fable }))
     act(() => useFableBuilderStore.setState({ isDirty: true }))
     expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
-    expect(readDraft('new')).toBeNull()
+    expect(readDraft()).toBeNull()
 
     act(() => unmount())
 
-    expect(readDraft('new')).not.toBeNull()
+    expect(readDraft()).not.toBeNull()
   })
 
   it('flushes the draft and clears the saving flag when unmounted mid-debounce', () => {
@@ -328,12 +252,12 @@ describe('useDraftPersistence hook', () => {
       }),
     )
     expect(useFableBuilderStore.getState().draftWritePending).toBe(true)
-    expect(readDraft('new')).toBeNull()
+    expect(readDraft()).toBeNull()
 
     // Navigating away mid-debounce must not strand the flag or lose the draft.
     act(() => unmount())
 
     expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
-    expect(readDraft('new')).not.toBeNull()
+    expect(readDraft()).not.toBeNull()
   })
 })

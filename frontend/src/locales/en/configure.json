@@ -79,6 +79,22 @@
     "saving": "Saving draft…",
     "saved": "Draft saved"
   },
+  "replaceDialog": {
+    "title": "Which configuration do you want to work on?",
+    "subtitle": "There is unsaved work on the canvas — choose what to continue with.",
+    "subtitleSaved": "A configuration is open on the canvas — choose what to continue with.",
+    "benchLabel": "Your unsaved work",
+    "benchLabelSaved": "Your current configuration",
+    "discardHintSaved": "Replaces your current configuration",
+    "incomingLabel": "Your selection",
+    "blockCount_one": "{{count}} block",
+    "blockCount_other": "{{count}} blocks",
+    "newConfiguration": "New, empty configuration",
+    "unknownIncoming": "Selected configuration",
+    "blankCanvas": "Blank canvas",
+    "keepHint": "Keep working on this",
+    "discardHint": "Discards your unsaved work"
+  },
   "validationStatus": {
     "validating": "Validating",
     "valid": "Valid",
@@ -251,11 +267,6 @@
   "configSummary": {
     "unknownSource": "Unknown",
     "defaultConfiguration": "Default configuration"
-  },
-  "draftRestored": {
-    "justNow": "just now",
-    "minutesAgo": "{{count}} min ago",
-    "toast": "Unsaved draft restored ({{timeLabel}})"
   },
   "blockKind": {
     "source": {

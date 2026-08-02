@@ -9,17 +9,15 @@
  */
 
 /**
- * Auto-persists fable drafts to localStorage so users don't lose unsaved
- * work on accidental navigation or tab close.
+ * Persists the workbench — the single work-in-progress — to localStorage so
+ * it survives navigation, tab close, and reload.
  *
  * - Writes debounced (2 s) after every store change that sets isDirty.
- * - Clears the draft on successful save (markSaved).
- * - On mount, restoration is handled by FableBuilderPage via readDraft().
+ * - Clears the slot on successful save (markSaved).
+ * - On mount, FableBuilderPage restores it silently via readDraft().
  *
- * No `beforeunload` guard — the localStorage draft is the safety net, and
- * the header already shows an "Unsaved" badge when the state is dirty. The
- * native "Leave site?" prompt is intrusive and inconsistent with modern
- * autosave UX (Figma / Google Docs / Airtable).
+ * No `beforeunload` prompt — the slot is the safety net; prompts belong to
+ * the moment work would be replaced, not to leaving the page.
  */
 
 import { useEffect, useRef } from 'react'
@@ -28,11 +26,9 @@ import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuild
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { readStorageJson, removeStorage, writeStorageJson } from '@/lib/storage'
 
-const DRAFTS_KEY = STORAGE_KEYS.fable.drafts
-const LEGACY_DRAFT_KEY = STORAGE_KEYS.fable.draft
+const DRAFT_KEY = STORAGE_KEYS.fable.draft
+const LEGACY_MAP_KEY = STORAGE_KEYS.fable.drafts
 const DEBOUNCE_MS = 2000
-const MAX_DRAFTS = 5
-const MAX_DRAFT_AGE_MS = 7 * 24 * 60 * 60 * 1000 // a week
 
 export interface FableDraft {
   fable: FableBuilderV1
@@ -44,88 +40,46 @@ export interface FableDraft {
   savedAt: number // Date.now() when the draft was written
 }
 
-type DraftMap = Record<string, FableDraft>
-
 // ---------------------------------------------------------------------------
 // localStorage helpers
 // ---------------------------------------------------------------------------
 
-/** One draft slot per editing target, so sessions never overwrite each other. */
-export function draftTargetFor({
-  fableId,
-  forkParentId,
-}: {
-  fableId?: string | null
-  forkParentId?: string | null
-}): string {
-  if (fableId) return `id:${fableId}`
-  if (forkParentId) return `template:${forkParentId}`
-  return 'new'
-}
-
-function readDraftMap(): DraftMap {
-  const map = readStorageJson<DraftMap>(DRAFTS_KEY)
-  if (map) return map
-  // One-shot migration of the pre-slot single-draft format.
-  const legacy = readStorageJson<FableDraft>(LEGACY_DRAFT_KEY)
-  if (!legacy) return {}
-  removeStorage(LEGACY_DRAFT_KEY)
-  const migrated = {
-    [draftTargetFor(legacy)]: {
-      ...legacy,
-      forkParentId: legacy.forkParentId ?? null,
-    },
-  }
-  writeStorageJson(DRAFTS_KEY, migrated)
+/** The workbench slot — the one work-in-progress, nothing else. */
+export function readDraft(): FableDraft | null {
+  const draft = readStorageJson<FableDraft>(DRAFT_KEY)
+  if (draft) return { ...draft, forkParentId: draft.forkParentId ?? null }
+  // One-shot migration of the interim per-target map: newest content wins.
+  const map = readStorageJson<Record<string, FableDraft>>(LEGACY_MAP_KEY)
+  if (!map) return null
+  removeStorage(LEGACY_MAP_KEY)
+  const newest = Object.values(map)
+    .filter((entry) => Object.keys(entry.fable.blocks).length > 0)
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .at(0)
+  if (!newest) return null
+  const migrated = { ...newest, forkParentId: newest.forkParentId ?? null }
+  writeStorageJson(DRAFT_KEY, migrated)
   return migrated
 }
 
-/** Stale slots die; beyond the count cap the oldest go first. */
-function prune(map: DraftMap): DraftMap {
-  const now = Date.now()
-  return Object.fromEntries(
-    Object.entries(map)
-      .filter(([, draft]) => now - draft.savedAt <= MAX_DRAFT_AGE_MS)
-      .sort(([, a], [, b]) => b.savedAt - a.savedAt)
-      .slice(0, MAX_DRAFTS),
-  )
+export function clearDraft(): void {
+  removeStorage(DRAFT_KEY)
 }
 
-export function readDraft(target: string): FableDraft | null {
-  const draft = readDraftMap()[target] as FableDraft | undefined
-  if (!draft || Date.now() - draft.savedAt > MAX_DRAFT_AGE_MS) return null
-  return draft
-}
-
-export function clearDraft(target: string): void {
-  const map = readDraftMap()
-  if (!(target in map)) return
-  delete map[target]
-  writeStorageJson(DRAFTS_KEY, map)
-}
-
-// Save-time clearing must hit the slot the session was written under —
-// markSaved changes the store identity before the subscriber runs.
-let lastWrittenTarget: string | null = null
-
-/** Write the store's unsaved work into its target slot now (no-op when clean). */
+/** Write the store's unsaved work as the workbench now (no-op when clean). */
 export function flushDraft(): void {
   const { fable, fableId, forkParentId, fableName, fableVersion, isDirty } =
     useFableBuilderStore.getState()
   try {
     if (isDirty) {
-      const target = draftTargetFor({ fableId, forkParentId })
-      lastWrittenTarget = target
-      const map = readDraftMap()
-      map[target] = {
+      writeStorageJson(DRAFT_KEY, {
         fable,
         fableId,
         forkParentId,
         fableName,
         fableVersion,
         savedAt: Date.now(),
-      }
-      writeStorageJson(DRAFTS_KEY, prune(map))
+      })
     }
   } finally {
     useFableBuilderStore.setState({ draftWritePending: false })
@@ -150,14 +104,9 @@ export function useDraftPersistence(): void {
         lastSavedAt: state.lastSavedAt,
       }),
       (selected, prevSelected) => {
-        // A save supersedes the session's slot — clear it immediately.
+        // A save supersedes the workbench slot — clear it immediately.
         if (selected.lastSavedAt !== prevSelected.lastSavedAt) {
-          const { fableId, forkParentId } = useFableBuilderStore.getState()
-          clearDraft(draftTargetFor({ fableId, forkParentId }))
-          if (lastWrittenTarget) {
-            clearDraft(lastWrittenTarget)
-            lastWrittenTarget = null
-          }
+          clearDraft()
           if (timerRef.current) {
             clearTimeout(timerRef.current)
             timerRef.current = null
