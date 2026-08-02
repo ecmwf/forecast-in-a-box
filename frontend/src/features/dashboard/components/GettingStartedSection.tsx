@@ -88,7 +88,9 @@ export function GettingStartedSection({
             t('gettingStarted.startFromScratch.tags.control'),
           ]}
           isRecommended
-          onClick={() => navigate({ to: '/configure' })}
+          onClick={() =>
+            navigate({ to: '/configure', search: { fresh: true } })
+          }
         />
 
         {isLoading && (

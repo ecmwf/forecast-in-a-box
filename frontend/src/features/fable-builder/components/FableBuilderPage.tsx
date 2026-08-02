@@ -30,6 +30,7 @@ import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import {
   clearDraft,
+  flushDraft,
   readDraft,
   useDraftPersistence,
 } from '@/features/fable-builder/hooks/useDraftPersistence'
@@ -98,6 +99,8 @@ interface FableBuilderPageProps {
   templatePlugin?: string
   /** Template display name for the example-values lookup */
   templateName?: string
+  /** Explicit blank-canvas intent — skips draft restore (draft is kept). */
+  fresh?: boolean
 }
 
 export function FableBuilderPage({
@@ -106,6 +109,7 @@ export function FableBuilderPage({
   templateMode = false,
   templatePlugin,
   templateName,
+  fresh = false,
 }: FableBuilderPageProps) {
   const { t } = useTranslation(['configure', 'common'])
   const canvasFill = useViewportFill(true, { insetPx: 0 })
@@ -189,6 +193,15 @@ export function FableBuilderPage({
     isFetching: isRevalidating,
     error: validationError,
   } = useFableValidation(debouncedFable, !fableHasOpenGlyph)
+
+  // Fresh intent ("New configuration"): reset now — also mid-session, when
+  // only the search changed. Unsaved work is flushed to the draft first.
+  useEffect(() => {
+    if (!fresh) return
+    flushDraft()
+    newFable()
+    initializedRef.current = true
+  }, [fresh, newFable])
 
   // Initialize fable state - only runs once per mount.
   // Checks for a stale draft in localStorage before loading from backend.

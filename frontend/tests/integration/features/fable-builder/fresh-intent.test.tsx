@@ -1,0 +1,122 @@
+/*
+ * (C) Copyright 2026- ECMWF and individual contributors.
+ *
+ * This software is licensed under the terms of the Apache Licence Version 2.0
+ * which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+ * In applying this licence, ECMWF does not waive the privileges and immunities
+ * granted to it by virtue of its status as an intergovernmental organisation nor
+ * does it submit to any jurisdiction.
+ */
+
+import { useState } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderWithRouter } from '@tests/utils/render'
+import type { FableDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
+import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
+import { readDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
+import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
+
+// Mock useMedia to simulate desktop layout (three-column with sidebars)
+vi.mock('@/hooks/useMedia', () => ({
+  useMedia: () => true,
+}))
+
+// Mock useURLStateSync to prevent navigation to /configure
+vi.mock('@/features/fable-builder/hooks/useURLStateSync', () => ({
+  useURLStateSync: () => ({ loadedFromURL: false }),
+}))
+
+// Mock auth hooks used by EditStep
+vi.mock('@/features/auth/AuthContext', () => ({
+  useAuth: () => ({ authType: 'anonymous', isAuthenticated: true }),
+}))
+
+vi.mock('@/hooks/useUser', () => ({
+  useUser: () => ({ data: { is_superuser: true } }),
+}))
+
+function seedDraft(): FableDraft {
+  return {
+    fable: {
+      blocks: {
+        draft_block: {
+          factory_id: {
+            plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+            factory: 'operationalForecastSource',
+          },
+          configuration_values: { source: 'mars' },
+          input_ids: {},
+        },
+      },
+    },
+    fableId: null,
+    fableName: 'Drafted work',
+    fableVersion: null,
+    savedAt: Date.now(),
+  }
+}
+
+/** Mirrors ConfigurePage: the route stays mounted while the search turns fresh. */
+function FreshToggleHarness() {
+  const [fresh, setFresh] = useState(false)
+  return (
+    <>
+      <button onClick={() => setFresh(true)}>go fresh</button>
+      <FableBuilderPage fresh={fresh} />
+    </>
+  )
+}
+
+describe('Fable Builder fresh intent', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    useFableBuilderStore.getState().reset()
+    vi.clearAllMocks()
+  })
+
+  it('renders a blank canvas and keeps the stored draft', async () => {
+    localStorage.setItem(STORAGE_KEYS.fable.draft, JSON.stringify(seedDraft()))
+
+    const screen = await renderWithRouter(<FableBuilderPage fresh />)
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    expect(
+      Object.keys(useFableBuilderStore.getState().fable.blocks),
+    ).toHaveLength(0)
+    // The bypassed draft must survive for a later normal visit.
+    expect(readDraft()?.fableName).toBe('Drafted work')
+  })
+
+  it('without fresh, a matching draft is restored and consumed', async () => {
+    localStorage.setItem(STORAGE_KEYS.fable.draft, JSON.stringify(seedDraft()))
+
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toContain('draft_block')
+    expect(useFableBuilderStore.getState().isDirty).toBe(true)
+    expect(readDraft()).toBeNull()
+  })
+
+  it('mid-session fresh resets the canvas after flushing work to the draft', async () => {
+    const screen = await renderWithRouter(<FreshToggleHarness />)
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    const store = useFableBuilderStore.getState()
+    store.setFable(seedDraft().fable)
+    useFableBuilderStore.setState({ fableName: 'Working title', isDirty: true })
+
+    await screen.getByRole('button', { name: 'go fresh' }).click()
+
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toHaveLength(0)
+    // Unsaved work was flushed, not destroyed.
+    const draft = readDraft()
+    expect(draft?.fable.blocks).toHaveProperty('draft_block')
+    expect(draft?.fableName).toBe('Working title')
+  })
+})

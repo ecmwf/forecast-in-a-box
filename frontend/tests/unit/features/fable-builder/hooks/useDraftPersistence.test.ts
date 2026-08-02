@@ -13,6 +13,7 @@ import { act, renderHook } from '@testing-library/react'
 import type { FableDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
 import {
   clearDraft,
+  flushDraft,
   readDraft,
   useDraftPersistence,
 } from '@/features/fable-builder/hooks/useDraftPersistence'
@@ -81,6 +82,31 @@ describe('useDraftPersistence helpers', () => {
 
     it('does not throw when no draft exists', () => {
       expect(() => clearDraft()).not.toThrow()
+    })
+  })
+
+  describe('flushDraft', () => {
+    it('writes the dirty store state immediately and clears the pending flag', () => {
+      act(() => useFableBuilderStore.getState().newFable())
+      act(() =>
+        useFableBuilderStore.setState({
+          fable: makeDraft().fable,
+          fableName: 'Flushed',
+          isDirty: true,
+          draftWritePending: true,
+        }),
+      )
+
+      flushDraft()
+
+      expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
+      expect(readDraft()?.fableName).toBe('Flushed')
+    })
+
+    it('does not write when the store is clean', () => {
+      act(() => useFableBuilderStore.getState().newFable())
+      flushDraft()
+      expect(readDraft()).toBeNull()
     })
   })
 })

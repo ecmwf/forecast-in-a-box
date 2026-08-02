@@ -55,6 +55,25 @@ export function clearDraft(): void {
   removeStorage(DRAFT_KEY)
 }
 
+/** Write the store's unsaved work as a draft now (no-op when clean). */
+export function flushDraft(): void {
+  const { fable, fableId, fableName, fableVersion, isDirty } =
+    useFableBuilderStore.getState()
+  try {
+    if (isDirty) {
+      writeDraft({
+        fable,
+        fableId,
+        fableName,
+        fableVersion,
+        savedAt: Date.now(),
+      })
+    }
+  } finally {
+    useFableBuilderStore.setState({ draftWritePending: false })
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -65,26 +84,6 @@ export function useDraftPersistence(): void {
   // Debounced write: subscribe only to the draft-relevant slices so the
   // listener doesn't run on every unrelated UI state change (panels, mode, …).
   useEffect(() => {
-    // Write the unsaved draft and clear the "saving" flag — shared by the
-    // debounce timer and the unmount flush. `finally` keeps it from sticking.
-    function flush(): void {
-      const { fable, fableId, fableName, fableVersion, isDirty } =
-        useFableBuilderStore.getState()
-      try {
-        if (isDirty) {
-          writeDraft({
-            fable,
-            fableId,
-            fableName,
-            fableVersion,
-            savedAt: Date.now(),
-          })
-        }
-      } finally {
-        useFableBuilderStore.setState({ draftWritePending: false })
-      }
-    }
-
     const unsub = useFableBuilderStore.subscribe(
       (state) => ({
         fable: state.fable,
@@ -116,7 +115,7 @@ export function useDraftPersistence(): void {
         useFableBuilderStore.setState({ draftWritePending: true })
         timerRef.current = setTimeout(() => {
           timerRef.current = null
-          flush()
+          flushDraft()
         }, DEBOUNCE_MS)
       },
       {
@@ -136,7 +135,7 @@ export function useDraftPersistence(): void {
       if (timerRef.current) {
         clearTimeout(timerRef.current)
         timerRef.current = null
-        flush()
+        flushDraft()
       }
     }
   }, [])

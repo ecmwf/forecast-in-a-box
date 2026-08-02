@@ -21,6 +21,8 @@ const searchSchema = z.object({
   templatePlugin: z.string().optional(),
   /** Template display name for the example-values lookup */
   templateName: z.string().optional(),
+  /** Explicit blank-canvas intent — skips draft restore (draft is kept). */
+  fresh: z.boolean().optional(),
 })
 
 export type ConfigureSearch = z.infer<typeof searchSchema>
@@ -31,7 +33,7 @@ export const Route = createFileRoute('/_authenticated/configure')({
 })
 
 function ConfigurePage() {
-  const { state, fableId, template, templatePlugin, templateName } =
+  const { state, fableId, template, templatePlugin, templateName, fresh } =
     Route.useSearch()
   return (
     <FableBuilderPage
@@ -41,6 +43,7 @@ function ConfigurePage() {
       templateMode={template}
       templatePlugin={templatePlugin}
       templateName={templateName}
+      fresh={fresh}
     />
   )
 }
