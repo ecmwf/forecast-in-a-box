@@ -127,14 +127,26 @@ export function useDraftPersistence(): void {
       },
     )
 
-    return () => {
-      unsub()
+    // Tab close/hide never unmounts — flush there too, mid-debounce included.
+    const flushNow = () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current)
         timerRef.current = null
       }
-      // A restored-but-unedited session has no timer yet must survive cold boot.
       flushDraft()
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushNow()
+    }
+    window.addEventListener('pagehide', flushNow)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      unsub()
+      window.removeEventListener('pagehide', flushNow)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      // A restored-but-unedited session has no timer yet must survive cold boot.
+      flushNow()
     }
   }, [])
 }

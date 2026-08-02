@@ -202,6 +202,51 @@ describe('useDraftPersistence hook', () => {
     expect(readDraft()).not.toBeNull()
   })
 
+  it('flushes the draft on pagehide (tab close never unmounts)', () => {
+    renderHook(() => useDraftPersistence())
+
+    act(() =>
+      useFableBuilderStore.setState({
+        fable: makeDraft().fable,
+        isDirty: true,
+      }),
+    )
+    expect(readDraft()).toBeNull()
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    expect(useFableBuilderStore.getState().draftWritePending).toBe(false)
+    expect(readDraft()).not.toBeNull()
+  })
+
+  it('flushes the draft when the document becomes hidden', () => {
+    renderHook(() => useDraftPersistence())
+
+    act(() =>
+      useFableBuilderStore.setState({
+        fable: makeDraft().fable,
+        isDirty: true,
+      }),
+    )
+    expect(readDraft()).toBeNull()
+
+    Object.defineProperty(document, 'visibilityState', {
+      value: 'hidden',
+      configurable: true,
+    })
+    try {
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+    } finally {
+      Reflect.deleteProperty(document, 'visibilityState')
+    }
+
+    expect(readDraft()).not.toBeNull()
+  })
+
   it('writes the draft on unmount even without a pending debounce', () => {
     const { unmount } = renderHook(() => useDraftPersistence())
 
