@@ -26,7 +26,7 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Loader2, Settings2 } from 'lucide-react'
+import { Settings2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
   BlockFactoryCatalogue,
@@ -160,11 +160,12 @@ function RunCanvasInner({
   const { layoutedNodes, edges, canvasHeight } = useMemo(() => {
     const nodes = fableToNodes(fable, catalogue)
     const edgeList = fableToEdges(fable, catalogue)
-    // 130/48 reserves enough vertical room that stacked sinks don't touch,
-    // without leaving the canvas feeling sparse.
+    // 200/130 = RunNode's real size (the 280 default padded gaps); 48s apart.
     const laid = layoutNodes(nodes, edgeList, {
       direction: 'LR',
+      nodeWidth: 200,
       nodeHeight: 130,
+      nodeSpacingX: 48,
       nodeSpacingY: 48,
     })
     const hasPlanInfo = blockProgress.plannedSet.size > 0
@@ -202,19 +203,10 @@ function RunCanvasInner({
             // definite height, not just `min-height`). Wide: `!h-full`
             // overrides it so the canvas fills the bounded column.
             'min-[1280px]:!h-full min-[1280px]:min-h-0 min-[1280px]:flex-1',
-            // No border — the dotted background already provides framing.
-            // Status feedback comes from a soft glow halo only.
-            status === 'running' && 'shadow-[0_0_12px_rgba(251,191,36,0.3)]',
-            status === 'failed' && 'shadow-[0_0_12px_rgba(239,68,68,0.3)]',
-            status === 'completed' && 'shadow-[0_0_12px_rgba(34,197,94,0.25)]',
+            // Terminal states stay neutral; only live work gets ambient motion.
+            status === 'running' && 'run-canvas-breathing',
           )}
         >
-          {status === 'running' && (
-            <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-medium text-amber-700">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {t('detail.running')}
-            </div>
-          )}
           <ReactFlow
             nodes={layoutedNodes}
             edges={edges}

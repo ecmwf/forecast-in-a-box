@@ -8,7 +8,6 @@
     "untitledJob": "Untitled Job",
     "showParameters": "Show parameters",
     "hideParameters": "Hide parameters",
-    "running": "Running...",
     "graphUnavailable": "Graph visualisation unavailable",
     "graphUnavailableDescription": "The pipeline graph is not available for this job.",
     "specUnavailable": "Specification not available",
