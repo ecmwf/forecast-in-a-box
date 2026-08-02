@@ -112,11 +112,11 @@
     "comingSoonPreset": "Coming soon: Saving configurations as presets will be available soon."
   },
   "layout": {
-    "resetSidebarWidth": "Reset sidebar width",
     "hideBlockPalette": "Hide block palette",
     "showBlockPalette": "Show block palette",
     "hideConfigPanel": "Hide config panel",
-    "showConfigPanel": "Show config panel"
+    "showConfigPanel": "Show config panel",
+    "resizeSidebar": "Resize sidebar"
   },
   "mobile": {
     "addBlock": "Add Block",

@@ -9,17 +9,12 @@
  */
 
 import { useCallback, useRef } from 'react'
-import { RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { PanelToggleHandle } from './PanelToggleHandle'
 import type { ReactNode } from 'react'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useUiPreferencesStore } from '@/features/fable-builder/stores/uiPreferencesStore'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { SplitHandleChrome } from '@/components/common/SplitResizeHandle'
 import { cn } from '@/lib/utils'
 
 interface ThreeColumnLayoutProps {
@@ -118,28 +113,23 @@ export function ThreeColumnLayout({
       <div className="relative shrink-0">
         {isPaletteOpen && (
           <div
-            className="group/resize absolute inset-y-0 -left-1 z-20 w-3 cursor-col-resize hover:bg-primary/10 active:bg-primary/20"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t('layout.resizeSidebar')}
+            tabIndex={0}
             onPointerDown={onLeftResize}
+            onDoubleClick={resetLeftWidth}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault()
+                setLeftWidth(leftWidth + (e.key === 'ArrowRight' ? 16 : -16))
+              }
+            }}
+            className="group/split absolute inset-y-0 -left-1 z-20 w-3 cursor-col-resize outline-none hover:bg-primary/10 focus-visible:bg-primary/10 active:bg-primary/20"
           >
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    className="absolute top-2 left-1/2 z-30 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card opacity-0 shadow-sm transition-opacity group-hover/resize:opacity-100 hover:bg-muted"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      resetLeftWidth()
-                    }}
-                    aria-label={t('layout.resetSidebarWidth')}
-                  />
-                }
-              >
-                <RotateCcw className="h-2.5 w-2.5 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {t('layout.resetSidebarWidth')}
-              </TooltipContent>
-            </Tooltip>
+            <SplitHandleChrome
+              onNudge={(direction) => setLeftWidth(leftWidth + direction * 48)}
+            />
           </div>
         )}
         <PanelToggleHandle
@@ -161,28 +151,25 @@ export function ThreeColumnLayout({
       <div className="relative shrink-0">
         {isConfigPanelOpen && (
           <div
-            className="group/resize absolute inset-y-0 -right-1 z-20 w-3 cursor-col-resize hover:bg-primary/10 active:bg-primary/20"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t('layout.resizeSidebar')}
+            tabIndex={0}
             onPointerDown={onRightResize}
+            onDoubleClick={resetRightWidth}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault()
+                setRightWidth(rightWidth + (e.key === 'ArrowLeft' ? 16 : -16))
+              }
+            }}
+            className="group/split absolute inset-y-0 -right-1 z-20 w-3 cursor-col-resize outline-none hover:bg-primary/10 focus-visible:bg-primary/10 active:bg-primary/20"
           >
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    className="absolute top-2 left-1/2 z-30 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card opacity-0 shadow-sm transition-opacity group-hover/resize:opacity-100 hover:bg-muted"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      resetRightWidth()
-                    }}
-                    aria-label={t('layout.resetSidebarWidth')}
-                  />
-                }
-              >
-                <RotateCcw className="h-2.5 w-2.5 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                {t('layout.resetSidebarWidth')}
-              </TooltipContent>
-            </Tooltip>
+            <SplitHandleChrome
+              onNudge={(direction) =>
+                setRightWidth(rightWidth - direction * 48)
+              }
+            />
           </div>
         )}
         <PanelToggleHandle
