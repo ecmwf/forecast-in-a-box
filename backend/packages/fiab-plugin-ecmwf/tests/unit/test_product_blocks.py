@@ -23,6 +23,7 @@ from fiab_core.fable import (
     BlockInstance as BlockInstanceBase,
 )
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
+from fiab_core.types import ClosedEnumType, ListType
 from qubed import Qube
 
 from fiab_plugin_ecmwf import plugin
@@ -108,7 +109,10 @@ def full_operational_forecast_source_output(dummy_blockinstance: BlockInstance) 
 
 class TestEnsembleStatistics:
     def test_catalogue_value_type_is_canonical(self) -> None:
-        assert EnsembleStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type == "list[enumClosed['mean', 'std']]"
+        assert (
+            EnsembleStatistics.configuration_options[ConfigurationOptionId("statistic")].value_type.serialize()
+            == "list[enumClosed[str]('mean','std')]"
+        )
 
     def test_from_operational_forecast_source(
         self, ensemble_statistics_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
@@ -193,7 +197,7 @@ class TestPredefinedThresholdProb:
             )
             .restrictions
         )
-        assert restrictions[PARAM].serialize() == f"enumClosed[{_param_id_to_param_key('131073')}]"
+        assert restrictions[PARAM].serialize() == f"enumClosed[str]('{_param_id_to_param_key('131073')}')"
 
     def test_validator_adds_step_restrictions(
         self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
@@ -204,7 +208,7 @@ class TestPredefinedThresholdProb:
             .validator(BlockFactoryId("predefinedThresholdProbability"), config.block, {"dataset": operational_forecast_source_output})
             .restrictions
         )
-        assert restrictions[STEP].serialize() == "list[enumClosed[12]]"
+        assert restrictions[STEP].serialize() == "list[enumClosed[str]('12')]"
 
     def test_compile(
         self,
@@ -237,10 +241,7 @@ class TestPredefinedThresholdProb:
 
 class TestCustomThresholdProb:
     def test_catalogue_value_type_is_canonical(self) -> None:
-        assert (
-            CustomThresholdProbability.configuration_options[ConfigurationOptionId("comparison")].value_type
-            == "enumClosed['>=', '<=', '>', '<']"
-        )
+        assert CustomThresholdProbability.configuration_options[COMPARISON].value_type.serialize() == "enumClosed[str]('>=','<=','>','<')"
 
     def test_from_operational_forecast_source(
         self, custom_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
@@ -463,4 +464,5 @@ class TestThermalIndices:
         )
         config = thermal_indices_configuration.with_configuration_values({PARAM: param_config})
         restrictions = plugin().validator(BlockFactoryId("thermalIndices"), config.block, {"dataset": forecast_output}).restrictions
-        assert restrictions[STEP].serialize() == f"list[enumClosed[{','.join(map(str, expected_steps))}]]"
+        step_list = ",".join(["'{step}'".format(step=step) for step in expected_steps])
+        assert restrictions[STEP].serialize() == f"list[enumClosed[str]({step_list})]"

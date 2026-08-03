@@ -583,7 +583,8 @@ class TestMapPlotSink:
             .validator(BlockFactoryId("mapPlotSink"), map_plot_sink_configuration.block, {"dataset": operational_forecast_source_output})
             .restrictions
         )
-        assert restrictions[PARAM].serialize() == f"list[enumClosed[[param]{_param_id_to_param_key('167')},{_param_id_to_param_key('151')},{_param_id_to_param_key('131')}]]"
+        param_list = ",".join(["'{param_key}'".format(param_key=_param_id_to_param_key(param)) for param in ["167", "151", "131"]])
+        assert restrictions[PARAM].serialize() == f"list[enumClosed[param]({param_list})]"
 
     def test_expander_has_no_parameters_restrictions(self, operational_forecast_source_output: QubedOutput) -> None:
         expansions = plugin().expander(operational_forecast_source_output)
