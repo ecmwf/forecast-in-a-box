@@ -321,6 +321,7 @@ class ThermalIndices(Product):
         "261002",
         "261023",
     ]
+    stat_type: list[str] = ["cf", "pf", "fc"]
 
     def validate(
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
@@ -331,11 +332,11 @@ class ThermalIndices(Product):
         thermo_qube = Qube.empty()
         for output, _ in PPROC_SCHEMA.outputs_from_inputs(
             forecast=ForecastDefinition(datacubes=list(datacubes(surface_cubes))),
-            output_template={**coords, PARAM: self.thermo_params},
+            output_template={**coords, PARAM: self.thermo_params, TYPE: list(axes(surface_cubes)[TYPE])},
         ):
             thermo_qube = thermo_qube | Qube.from_datacube(output)
 
-        restrictions[PARAM] = ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(thermo_qube)[PARAM]])
+        restrictions[PARAM] = ListType(ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(thermo_qube)[PARAM]]))
         selected_param_ids = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
         param_qube = thermo_qube.select({PARAM: selected_param_ids})
 
@@ -371,7 +372,7 @@ class ThermalIndices(Product):
             output
             for output, _ in PPROC_SCHEMA.outputs_from_inputs(
                 forecast=ForecastDefinition(datacubes=nodetree_datacubes(input_task_action.nodes)),
-                output_template={**coords, PARAM: selected_param_ids, STEP: steps},
+                output_template={**coords, PARAM: selected_param_ids, STEP: steps, TYPE: [cube[TYPE] for cube in surface_cubes]},
             )
         ]
         action = action_from_outputs(
@@ -383,11 +384,16 @@ class ThermalIndices(Product):
 
     def intersect(self, other: QubedOutput) -> bool:
         surface_cubes = select(other, {"levtype": "sfc"})
+        # Thermal indices can only be computed from forecast outputs
+        fc_types = set.intersection(axes(surface_cubes).get(TYPE, set()), self.stat_type)
+        if len(fc_types) == 0:
+            return False
+
         coords = {dim: list(values) for dim, values in axes(surface_cubes).items() if len(values) == 1}
         try:
             for _ in PPROC_SCHEMA.outputs_from_inputs(
                 forecast=ForecastDefinition(datacubes=list(datacubes(surface_cubes))),
-                output_template={**coords, PARAM: self.thermo_params},
+                output_template={**coords, PARAM: self.thermo_params, TYPE: list(fc_types)},
                 method="dfs",
             ):
                 return True

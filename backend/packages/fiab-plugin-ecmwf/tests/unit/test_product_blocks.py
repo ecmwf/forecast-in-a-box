@@ -374,7 +374,7 @@ class TestThermalIndices:
         "outputs, expected, unexpected",
         [
             [
-                {"class": "od", "stream": "oper", "type": "fc"},
+                {"class": "od", "stream": "oper", "type": "fc", "levtype": "sfc"},
                 set(),
                 {
                     BlockFactoryId("ensembleStatistics"),
@@ -384,7 +384,7 @@ class TestThermalIndices:
                 },
             ],
             [
-                {"class": "od", "stream": "enfo", "type": "pf", ENSEMBLE: [0, 1, 2]},
+                {"class": "od", "stream": "enfo", "type": "pf", "levtype": "sfc", ENSEMBLE: [0, 1, 2]},
                 {
                     BlockFactoryId("ensembleStatistics"),
                     BlockFactoryId("customThresholdProbability"),
