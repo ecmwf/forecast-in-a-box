@@ -48,7 +48,7 @@ from forecastbox.domain.run.db import CompilerRuntimeContext, RunRecord
 from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunNotFound
 from forecastbox.domain.run.types import RunId
-from forecastbox.schemata.jobs import RunStatus
+from forecastbox.schemata.run import RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.config import ConcurrentPools

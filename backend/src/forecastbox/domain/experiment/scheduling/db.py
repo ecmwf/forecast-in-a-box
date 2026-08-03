@@ -23,7 +23,7 @@ from sqlalchemy import delete, func, select, update
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.experiment import db as experiment_db
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
-from forecastbox.schemata.jobs import ExperimentDefinition, ExperimentNext
+from forecastbox.schemata.experiment import ExperimentDefinition, ExperimentNext
 from forecastbox.utility.db import addAndCommit, dbRetry, executeAndCommit, querySingle
 from forecastbox.utility.time import current_time
 
