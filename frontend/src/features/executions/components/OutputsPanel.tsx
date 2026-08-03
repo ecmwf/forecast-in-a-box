@@ -24,6 +24,8 @@ interface OutputsPanelProps {
   plannedBlockIds?: ReadonlyArray<string> | null
   /** Portal target so the filter row can sit alongside the parent's tabs. */
   toolbarSlot?: HTMLElement | null
+  /** Switches to the Logs tab from the failed-run notice. */
+  onViewLogs?: () => void
 }
 
 export function OutputsPanel({
@@ -34,6 +36,7 @@ export function OutputsPanel({
   completedBlockIds,
   plannedBlockIds,
   toolbarSlot,
+  onViewLogs,
 }: OutputsPanelProps) {
   return (
     // Remount per job so sniffed-mime and open-viewer state never leak across
@@ -47,6 +50,7 @@ export function OutputsPanel({
       completedBlockIds={completedBlockIds}
       plannedBlockIds={plannedBlockIds}
       toolbarSlot={toolbarSlot}
+      onViewLogs={onViewLogs}
     />
   )
 }

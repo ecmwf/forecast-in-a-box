@@ -116,6 +116,7 @@ export function GeoToolbar({
   onAnnotateToggle,
   annotations,
   onAnnotationsImport,
+  annotationSlotIds,
   onExport,
   onCopy,
   copySlots,
@@ -147,6 +148,8 @@ export function GeoToolbar({
   onAnnotateToggle: () => void
   annotations: ReadonlyArray<MapAnnotation>
   onAnnotationsImport: (items: ReadonlyArray<Omit<MapAnnotation, 'id'>>) => void
+  /** Current slot→source assignment — maps legacy slot-keyed import files. */
+  annotationSlotIds: { a: string; b: string | null }
   onExport: () => void
   /** Copy the view (null) or one slot's clean image. */
   onCopy: (only: SourceSlot | null) => void
@@ -167,7 +170,7 @@ export function GeoToolbar({
     if (!file) return
     try {
       const text = await file.text()
-      onAnnotationsImport(parseAnnotationsGeojson(text))
+      onAnnotationsImport(parseAnnotationsGeojson(text, annotationSlotIds))
     } catch (err) {
       log.error('Annotations GeoJSON parse failed', { error: err })
       showToast.error(t('annotations.importInvalid'))
@@ -186,8 +189,8 @@ export function GeoToolbar({
           // in the page header is the way in).
           <div />
         ) : (
-          // Phones: one scrollable line per cluster beats a wrap tower.
-          <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:w-full max-sm:flex-nowrap max-sm:overflow-x-auto">
+          // Below lg: one scrollable line per cluster beats a wrap tower.
+          <div className="flex min-w-0 items-center gap-2 max-lg:w-full max-lg:flex-nowrap max-lg:overflow-x-auto lg:flex-wrap">
             {/* Source focus: view A, both, or B. */}
             <div
               role="group"
@@ -248,9 +251,14 @@ export function GeoToolbar({
             </div>
           </div>
         )}
-        <div className="flex min-w-0 flex-wrap items-center gap-3 max-sm:w-full max-sm:flex-nowrap max-sm:overflow-x-auto">
+        <div className="flex min-w-0 items-center gap-3 max-lg:w-full max-lg:flex-nowrap max-lg:overflow-x-auto lg:flex-wrap">
           {!solo && focusSlot === null && (
-            <label className="flex shrink-0 items-center gap-2 text-sm whitespace-nowrap">
+            <label
+              className="flex shrink-0 items-center gap-2 text-sm whitespace-nowrap"
+              title={
+                linkMode === 'linked' ? t('link.linked') : t('link.unlinked')
+              }
+            >
               <Switch
                 size="sm"
                 checked={linkMode === 'linked'}
@@ -260,8 +268,10 @@ export function GeoToolbar({
                 }
                 aria-label={t('link.toggleAria')}
               />
+              {/* lg–xl in-flow band: label yields so the toolbar stays one line. */}
               <span
                 className={cn(
+                  'lg:max-xl:hidden',
                   linkMode === 'linked'
                     ? 'font-medium'
                     : 'text-muted-foreground',

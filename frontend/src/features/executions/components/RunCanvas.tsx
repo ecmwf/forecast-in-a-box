@@ -26,7 +26,7 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Loader2, Settings2 } from 'lucide-react'
+import { Maximize2, Minimize2, Settings2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
   BlockFactoryCatalogue,
@@ -79,6 +79,9 @@ interface RunCanvasProps {
   plannedBlockIds?: ReadonlyArray<BlockInstanceId> | null
 }
 
+/** Fit never zooms past 1:1 — a tiny graph stays natural-sized, not blown up. */
+const FIT_MAX_ZOOM = 1
+
 const nodeTypes: Record<string, typeof RunNode> = {
   sourceBlock: RunNode,
   transformBlock: RunNode,
@@ -107,9 +110,19 @@ function RunCanvasInner({
   )
   const { t } = useTranslation('executions')
   const [showConfig, setShowConfig] = useState(true)
+  const [maximized, setMaximized] = useState(false)
   const { fitView } = useReactFlow()
   const containerRef = useRef<HTMLDivElement>(null)
   const isInitialRender = useRef(true)
+
+  useEffect(() => {
+    if (!maximized) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMaximized(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [maximized])
 
   useEffect(() => {
     if (isInitialRender.current) {
@@ -118,7 +131,7 @@ function RunCanvasInner({
     }
     // Wait a frame for nodes to re-render at their new size
     requestAnimationFrame(() => {
-      fitView({ duration: 300, padding: 0.1 })
+      fitView({ duration: 300, padding: 0.1, maxZoom: FIT_MAX_ZOOM })
     })
   }, [showConfig, fitView])
 
@@ -133,7 +146,7 @@ function RunCanvasInner({
       if (width === 0 || height === 0) return // skip transient 0×0 during reflow
       window.clearTimeout(timer)
       timer = window.setTimeout(() => {
-        fitView({ padding: 0.15, duration: 200 })
+        fitView({ padding: 0.15, duration: 200, maxZoom: FIT_MAX_ZOOM })
       }, 80)
     })
     observer.observe(element)
@@ -160,11 +173,12 @@ function RunCanvasInner({
   const { layoutedNodes, edges, canvasHeight } = useMemo(() => {
     const nodes = fableToNodes(fable, catalogue)
     const edgeList = fableToEdges(fable, catalogue)
-    // 130/48 reserves enough vertical room that stacked sinks don't touch,
-    // without leaving the canvas feeling sparse.
+    // 200/130 = RunNode's real size (the 280 default padded gaps); 48s apart.
     const laid = layoutNodes(nodes, edgeList, {
       direction: 'LR',
+      nodeWidth: 200,
       nodeHeight: 130,
+      nodeSpacingX: 48,
       nodeSpacingY: 48,
     })
     const hasPlanInfo = blockProgress.plannedSet.size > 0
@@ -195,26 +209,22 @@ function RunCanvasInner({
       <BlockProgressContext value={blockProgress}>
         <div
           ref={containerRef}
-          style={{ height: `${canvasHeight}px` }}
+          style={maximized ? undefined : { height: `${canvasHeight}px` }}
           className={cn(
-            'relative overflow-hidden rounded-lg',
-            // Narrow: inline `height` is the authority (React Flow needs a
-            // definite height, not just `min-height`). Wide: `!h-full`
-            // overrides it so the canvas fills the bounded column.
-            'min-[1280px]:!h-full min-[1280px]:min-h-0 min-[1280px]:flex-1',
-            // No border — the dotted background already provides framing.
-            // Status feedback comes from a soft glow halo only.
-            status === 'running' && 'shadow-[0_0_12px_rgba(251,191,36,0.3)]',
-            status === 'failed' && 'shadow-[0_0_12px_rgba(239,68,68,0.3)]',
-            status === 'completed' && 'shadow-[0_0_12px_rgba(34,197,94,0.25)]',
+            'relative overflow-hidden',
+            maximized
+              ? 'fixed inset-0 z-50 bg-background'
+              : [
+                  'rounded-lg',
+                  // Narrow: inline `height` is the authority (React Flow needs a
+                  // definite height, not just `min-height`). Wide: `!h-full`
+                  // overrides it so the canvas fills the bounded column.
+                  'min-[1280px]:!h-full min-[1280px]:min-h-0 min-[1280px]:flex-1',
+                  // Terminal states stay neutral; only live work gets ambient motion.
+                  status === 'running' && 'run-canvas-breathing',
+                ],
           )}
         >
-          {status === 'running' && (
-            <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-medium text-amber-700">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              {t('detail.running')}
-            </div>
-          )}
           <ReactFlow
             nodes={layoutedNodes}
             edges={edges}
@@ -226,7 +236,9 @@ function RunCanvasInner({
             panOnDrag={true}
             zoomOnScroll={true}
             fitView={true}
-            fitViewOptions={{ padding: 0.15 }}
+            fitViewOptions={{ padding: 0.15, maxZoom: FIT_MAX_ZOOM }}
+            // Default 0.5 floor can't fit a wide pipeline into a phone container.
+            minZoom={0.1}
             proOptions={{ hideAttribution: true }}
             onNodeClick={(_event, node) => {
               // Toggle: click the already-selected block to clear.
@@ -259,6 +271,26 @@ function RunCanvasInner({
                 {showConfig
                   ? t('detail.hideParameters')
                   : t('detail.showParameters')}
+              </Button>
+            </Panel>
+            <Panel position="top-right" className="top-2! right-2!">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-7 w-7 bg-background/80 backdrop-blur-sm"
+                onClick={() => setMaximized((prev) => !prev)}
+                aria-label={t(
+                  maximized ? 'detail.restoreCanvas' : 'detail.maximizeCanvas',
+                )}
+                title={t(
+                  maximized ? 'detail.restoreCanvas' : 'detail.maximizeCanvas',
+                )}
+              >
+                {maximized ? (
+                  <Minimize2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Maximize2 className="h-3.5 w-3.5" />
+                )}
               </Button>
             </Panel>
           </ReactFlow>

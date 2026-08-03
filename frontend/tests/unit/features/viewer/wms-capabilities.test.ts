@@ -8,14 +8,16 @@
  * does it submit to any jurisdiction.
  */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 // Init side-effect: humanizeParam resolves display names through i18next.
 import '@/lib/i18n'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
+  CapabilitiesError,
   appendWmsParams,
   combineScaleBands,
   expandTimeSteps,
+  fetchCapabilities,
   groupLayers,
   isLoopbackUrl,
   parseCapabilities,
@@ -554,5 +556,134 @@ describe('isLoopbackUrl', () => {
     expect(isLoopbackUrl('https://maps.dwd.de/geoserver/ows?')).toBe(false)
     expect(isLoopbackUrl('https://localhost.evil.example')).toBe(false)
     expect(isLoopbackUrl('not a url')).toBe(false)
+  })
+})
+
+describe('fetchCapabilities', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  /** fetch stub that never responds but honours abort, like a hung server. */
+  const stubHungFetch = () =>
+    vi.stubGlobal(
+      'fetch',
+      (_url: string, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(init.signal!.reason),
+          )
+        }),
+    )
+
+  it('parses a served document', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(new Response(capabilitiesXml(), { status: 200 })),
+    )
+    const parsed = await fetchCapabilities('http://localhost:9999')
+    expect(parsed.layers.length).toBeGreaterThan(0)
+  })
+
+  it('surfaces HTTP errors with the status', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(new Response('nope', { status: 503 })),
+    )
+    await expect(fetchCapabilities('http://localhost:9999')).rejects.toThrow(
+      'GetCapabilities 503',
+    )
+  })
+
+  it('times out when the server never responds', async () => {
+    stubHungFetch()
+    await expect(
+      fetchCapabilities('http://localhost:9999', undefined, { responseMs: 50 }),
+    ).rejects.toSatisfy(
+      (err) => err instanceof CapabilitiesError && err.kind === 'timeout',
+    )
+  })
+
+  it('caller cancellation stays an abort, never a timeout', async () => {
+    stubHungFetch()
+    const controller = new AbortController()
+    const pending = fetchCapabilities(
+      'http://localhost:9999',
+      controller.signal,
+      {
+        responseMs: 5000,
+      },
+    )
+    controller.abort()
+    await expect(pending).rejects.toSatisfy(
+      (err) =>
+        !(err instanceof CapabilitiesError) &&
+        (err as DOMException).name === 'AbortError',
+    )
+  })
+
+  /** Response whose body streams under test control. */
+  const streamedResponse = (
+    feed: (
+      push: (text: string) => void,
+      fail: (err: unknown) => void,
+      close: () => void,
+    ) => void,
+  ) => {
+    const encoder = new TextEncoder()
+    return new Response(
+      new ReadableStream({
+        start(ctrl) {
+          feed(
+            (text) => ctrl.enqueue(encoder.encode(text)),
+            (err) => ctrl.error(err),
+            () => ctrl.close(),
+          )
+        },
+      }),
+      { status: 200 },
+    )
+  }
+
+  it('times out when the download stalls mid-stream', async () => {
+    vi.stubGlobal('fetch', () =>
+      // One chunk, then silence — never closed.
+      Promise.resolve(streamedResponse((push) => push('<WMS_Capabilities>'))),
+    )
+    await expect(
+      fetchCapabilities('http://localhost:9999', undefined, { stallMs: 50 }),
+    ).rejects.toSatisfy(
+      (err) =>
+        err instanceof CapabilitiesError &&
+        err.kind === 'timeout' &&
+        err.message.includes('stalled'),
+    )
+  })
+
+  it('a slow but flowing download outlives every fixed deadline', async () => {
+    const parts = capabilitiesXml().match(/[\s\S]{1,500}/g)!
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(
+        streamedResponse((push, _fail, close) => {
+          // Trickle: total time far exceeds stallMs, gaps never do.
+          parts.forEach((part, i) => setTimeout(() => push(part), i * 30))
+          setTimeout(close, parts.length * 30)
+        }),
+      ),
+    )
+    const parsed = await fetchCapabilities('http://localhost:9999', undefined, {
+      stallMs: 120,
+    })
+    expect(parsed.layers.length).toBeGreaterThan(0)
+  })
+
+  it('maps a transport death mid-download to `interrupted`', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(
+        streamedResponse((push, fail) => {
+          push('<WMS_Capabilities>')
+          setTimeout(() => fail(new TypeError('network error')), 10)
+        }),
+      ),
+    )
+    await expect(fetchCapabilities('http://localhost:9999')).rejects.toSatisfy(
+      (err) => err instanceof CapabilitiesError && err.kind === 'interrupted',
+    )
   })
 })

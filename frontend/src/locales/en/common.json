@@ -1,5 +1,11 @@
 {
   "loading": "Loading...",
+  "split": {
+    "hint": "Drag or select to resize",
+    "resize": "Resize panels",
+    "moveLeft": "Move divider left",
+    "moveRight": "Move divider right"
+  },
   "error": "Error",
   "retry": "Retry",
   "cancel": "Cancel",

@@ -83,6 +83,8 @@ export interface WmsLayerStackConfig {
   decLoading: () => void
   /** Per-request load outcome (feeds the GetMap failure cache). */
   onLoadResult?: (layerName: string, time: string | null, ok: boolean) => void
+  /** useOlMapBase recreation counter — re-attach after a map rebuild. */
+  mapVersion: number
   /**
    * Bump `revision` state after each reconciliation. Costs one extra
    * consumer render per change — enable only when something must re-attach
@@ -98,6 +100,8 @@ export interface WmsLayerStack {
   revision: number
   /** Layers whose latest load failed (hidden until a load succeeds). */
   errorCount: number
+  /** NAMES of the currently-errored layers (badge attribution). */
+  erroredNames: ReadonlyArray<string>
 }
 
 export function useWmsLayerStack(
@@ -115,6 +119,7 @@ export function useWmsLayerStack(
     incLoading,
     decLoading,
     onLoadResult,
+    mapVersion,
     trackRevision = false,
   } = config
 
@@ -130,10 +135,15 @@ export function useWmsLayerStack(
   const attachedMapRef = useRef<OlMap | null>(null)
   const stackRef = useRef<ReadonlyArray<ImageLayer<ImageWMS>>>([])
   const [revision, setRevision] = useState(0)
-  const [errorCount, setErrorCount] = useState(0)
+  const [erroredNames, setErroredNames] = useState<ReadonlyArray<string>>([])
   const syncErrorCount = useCallback(() => {
-    setErrorCount(
-      [...managedRef.current.values()].filter((m) => m.errored).length,
+    const names = [...managedRef.current.entries()]
+      .filter(([, m]) => m.errored)
+      .map(([name]) => name)
+    setErroredNames((prev) =>
+      prev.length === names.length && prev.every((n, i) => n === names[i])
+        ? prev
+        : names,
     )
   }, [])
 
@@ -154,7 +164,7 @@ export function useWmsLayerStack(
 
       const params: Record<string, string> = {
         LAYERS: layerName,
-        // No advertised <Style> (NASA GIBS et al.) → empty = server default.
+        // Some public servers advertise no <Style> → empty = server default.
         STYLES: layer.styles[0]?.name ?? '',
         FORMAT: 'image/png',
         TRANSPARENT: 'TRUE',
@@ -269,6 +279,7 @@ export function useWmsLayerStack(
     incLoading,
     decLoading,
     syncErrorCount,
+    mapVersion,
   ])
 
   // Unmount: detach this stack's layers (the map may outlive the stack —
@@ -286,5 +297,5 @@ export function useWmsLayerStack(
     [],
   )
 
-  return { stackRef, revision, errorCount }
+  return { stackRef, revision, errorCount: erroredNames.length, erroredNames }
 }

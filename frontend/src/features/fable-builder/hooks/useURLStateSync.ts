@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
+import { flushDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
   decodeFableFromURL,
@@ -35,25 +36,24 @@ export function useURLStateSync({
   const setFable = useFableBuilderStore((state) => state.setFable)
 
   const initializedRef = useRef(false)
-  const lastEncodedRef = useRef<string | null>(encodedState ?? null)
+  const lastEncodedRef = useRef<string | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isUpdatingURLRef = useRef(false)
 
+  // Apply URL payloads the hook didn't write itself (share links, back/forward).
   useEffect(() => {
-    if (!enabled || initializedRef.current) return
-    if (!encodedState) {
-      initializedRef.current = true
-      return
-    }
-
-    const decoded = decodeFableFromURL(encodedState)
-    if (decoded) {
-      setFable(decoded, null)
-      lastEncodedRef.current = encodedState
+    if (!enabled) return
+    if (encodedState && encodedState !== lastEncodedRef.current) {
+      const decoded = decodeFableFromURL(encodedState)
+      if (decoded) {
+        // An explicit payload replaces unsaved work — bank it first.
+        flushDraft()
+        setFable(decoded, null)
+        lastEncodedRef.current = encodedState
+      }
     }
     initializedRef.current = true
-    // Intentionally only run on mount to sync initial URL state
-  }, [])
+  }, [encodedState, enabled, setFable])
 
   const updateURL = useCallback(
     (newFable: FableBuilderV1) => {

@@ -9,17 +9,12 @@
  */
 
 import { useCallback, useRef } from 'react'
-import { RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { PanelToggleHandle } from './PanelToggleHandle'
 import type { ReactNode } from 'react'
+import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useUiPreferencesStore } from '@/features/fable-builder/stores/uiPreferencesStore'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { SplitHandleChrome } from '@/components/common/SplitResizeHandle'
 import { cn } from '@/lib/utils'
 
 interface ThreeColumnLayoutProps {
@@ -43,11 +38,15 @@ function useResizeHandle(
   return useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault()
+      const strip = e.currentTarget as HTMLElement
+      strip.setAttribute('data-dragging', '')
       startXRef.current = e.clientX
       startWidthRef.current = getCurrentWidth()
+      let moved = false
 
       const onMove = (ev: PointerEvent) => {
         const delta = ev.clientX - startXRef.current
+        if (Math.abs(delta) > 3) moved = true
         // Left sidebar: drag right = wider. Right sidebar: drag left = wider.
         const newWidth =
           direction === 'left'
@@ -57,6 +56,9 @@ function useResizeHandle(
       }
 
       const onUp = () => {
+        strip.removeAttribute('data-dragging')
+        // Only a clean click selects (shows the steppers); a drag never pins them.
+        if (!moved) strip.focus()
         document.removeEventListener('pointermove', onMove)
         document.removeEventListener('pointerup', onUp)
       }
@@ -94,13 +96,13 @@ export function ThreeColumnLayout({
 
   return (
     <div className="relative flex h-full min-h-0 w-full">
-      {/* Left margin zone when sidebar closed */}
-      <div
-        className={cn(
-          'relative shrink-0 transition-all duration-200',
-          isPaletteOpen ? 'w-0' : 'w-4 sm:w-6',
-        )}
-      />
+      {!isPaletteOpen && (
+        <CollapsedSidebarHandle
+          side="left"
+          onExpand={togglePalette}
+          label={t('layout.showBlockPalette')}
+        />
+      )}
 
       {/* Left Panel */}
       <aside
@@ -118,40 +120,26 @@ export function ThreeColumnLayout({
       <div className="relative shrink-0">
         {isPaletteOpen && (
           <div
-            className="group/resize absolute inset-y-0 -left-1 z-20 w-3 cursor-col-resize hover:bg-primary/10 active:bg-primary/20"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t('layout.resizeSidebar')}
+            aria-valuenow={Math.round(leftWidth)}
+            tabIndex={0}
             onPointerDown={onLeftResize}
+            onDoubleClick={resetLeftWidth}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault()
+                setLeftWidth(leftWidth + (e.key === 'ArrowRight' ? 16 : -16))
+              }
+            }}
+            className="group/split absolute inset-y-0 -left-1 z-20 w-3 cursor-col-resize outline-none hover:bg-primary/10 focus-visible:bg-primary/10 active:bg-primary/20"
           >
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    className="absolute top-2 left-1/2 z-30 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card opacity-0 shadow-sm transition-opacity group-hover/resize:opacity-100 hover:bg-muted"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      resetLeftWidth()
-                    }}
-                    aria-label={t('layout.resetSidebarWidth')}
-                  />
-                }
-              >
-                <RotateCcw className="h-2.5 w-2.5 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {t('layout.resetSidebarWidth')}
-              </TooltipContent>
-            </Tooltip>
+            <SplitHandleChrome
+              onNudge={(direction) => setLeftWidth(leftWidth + direction * 48)}
+            />
           </div>
         )}
-        <PanelToggleHandle
-          isOpen={isPaletteOpen}
-          onToggle={togglePalette}
-          position="left"
-          label={
-            isPaletteOpen
-              ? t('layout.hideBlockPalette')
-              : t('layout.showBlockPalette')
-          }
-        />
       </div>
 
       {/* Canvas */}
@@ -161,40 +149,28 @@ export function ThreeColumnLayout({
       <div className="relative shrink-0">
         {isConfigPanelOpen && (
           <div
-            className="group/resize absolute inset-y-0 -right-1 z-20 w-3 cursor-col-resize hover:bg-primary/10 active:bg-primary/20"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t('layout.resizeSidebar')}
+            aria-valuenow={Math.round(rightWidth)}
+            tabIndex={0}
             onPointerDown={onRightResize}
+            onDoubleClick={resetRightWidth}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault()
+                setRightWidth(rightWidth + (e.key === 'ArrowLeft' ? 16 : -16))
+              }
+            }}
+            className="group/split absolute inset-y-0 -right-1 z-20 w-3 cursor-col-resize outline-none hover:bg-primary/10 focus-visible:bg-primary/10 active:bg-primary/20"
           >
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    className="absolute top-2 left-1/2 z-30 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-card opacity-0 shadow-sm transition-opacity group-hover/resize:opacity-100 hover:bg-muted"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      resetRightWidth()
-                    }}
-                    aria-label={t('layout.resetSidebarWidth')}
-                  />
-                }
-              >
-                <RotateCcw className="h-2.5 w-2.5 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                {t('layout.resetSidebarWidth')}
-              </TooltipContent>
-            </Tooltip>
+            <SplitHandleChrome
+              onNudge={(direction) =>
+                setRightWidth(rightWidth - direction * 48)
+              }
+            />
           </div>
         )}
-        <PanelToggleHandle
-          isOpen={isConfigPanelOpen}
-          onToggle={toggleConfigPanel}
-          position="right"
-          label={
-            isConfigPanelOpen
-              ? t('layout.hideConfigPanel')
-              : t('layout.showConfigPanel')
-          }
-        />
       </div>
 
       {/* Right Panel */}
@@ -209,13 +185,13 @@ export function ThreeColumnLayout({
         </div>
       </aside>
 
-      {/* Right margin zone when sidebar closed */}
-      <div
-        className={cn(
-          'relative shrink-0 transition-all duration-200',
-          isConfigPanelOpen ? 'w-0' : 'w-4 sm:w-6',
-        )}
-      />
+      {!isConfigPanelOpen && (
+        <CollapsedSidebarHandle
+          side="right"
+          onExpand={toggleConfigPanel}
+          label={t('layout.showConfigPanel')}
+        />
+      )}
     </div>
   )
 }

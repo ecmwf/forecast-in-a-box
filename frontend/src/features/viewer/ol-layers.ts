@@ -54,8 +54,8 @@ export interface SkinnyWmsBasemapOption {
 
 export type BasemapOption = ExternalBasemapOption | SkinnyWmsBasemapOption
 
-// Imagery basemaps (EOX cloudless, NASA GIBS) removed pending licensing
-// review — the wms-image machinery lives in git history.
+// Satellite-imagery basemaps removed pending licensing review — the
+// wms-image machinery lives in git history.
 export const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
   {
     type: 'vector',

@@ -50,6 +50,7 @@
     "form": "Form",
     "exportConfig": "Export Config",
     "loadConfig": "Load Config",
+    "newConfiguration": "New configuration",
     "exportFailed": "Failed to export config",
     "configLoaded": "Configuration loaded",
     "fileTooLargeTitle": "File too large",
@@ -79,6 +80,22 @@
     "saving": "Saving draft…",
     "saved": "Draft saved"
   },
+  "replaceDialog": {
+    "title": "Which configuration do you want to work on?",
+    "subtitle": "There is unsaved work on the canvas — choose what to continue with.",
+    "subtitleSaved": "A configuration is open on the canvas — choose what to continue with.",
+    "benchLabel": "Previous configuration (unsaved)",
+    "benchLabelSaved": "Previous configuration",
+    "discardHintSaved": "Replaces your current configuration",
+    "incomingLabel": "New configuration",
+    "blockCount_one": "{{count}} block",
+    "blockCount_other": "{{count}} blocks",
+    "newConfiguration": "New, empty configuration",
+    "unknownIncoming": "Selected configuration",
+    "blankCanvas": "Blank canvas",
+    "keepHint": "Keep working on this",
+    "discardHint": "Discards your unsaved work"
+  },
   "validationStatus": {
     "validating": "Validating",
     "valid": "Valid",
@@ -96,11 +113,11 @@
     "comingSoonPreset": "Coming soon: Saving configurations as presets will be available soon."
   },
   "layout": {
-    "resetSidebarWidth": "Reset sidebar width",
     "hideBlockPalette": "Hide block palette",
     "showBlockPalette": "Show block palette",
     "hideConfigPanel": "Hide config panel",
-    "showConfigPanel": "Show config panel"
+    "showConfigPanel": "Show config panel",
+    "resizeSidebar": "Resize sidebar"
   },
   "mobile": {
     "addBlock": "Add Block",
@@ -251,11 +268,6 @@
   "configSummary": {
     "unknownSource": "Unknown",
     "defaultConfiguration": "Default configuration"
-  },
-  "draftRestored": {
-    "justNow": "just now",
-    "minutesAgo": "{{count}} min ago",
-    "toast": "Unsaved draft restored ({{timeLabel}})"
   },
   "blockKind": {
     "source": {

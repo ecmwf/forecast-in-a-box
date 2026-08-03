@@ -168,16 +168,20 @@ export function effectiveAvailability(
  * Mirrors effectiveAvailability so a mark lands where the failing instant
  * is actually shown (offset mode shifts B's marks with its window).
  */
-export function effectiveFailures(
+const NO_LAYERS: ReadonlyArray<string> = []
+
+/** Failing layer names per axis position — [] where the displayed
+ *  instant has none. Same projection as availability. */
+export function effectiveFailureLayers(
   epochs: ReadonlyArray<number>,
   index: SourceTimeIndex,
-  failedEpochs: ReadonlySet<number>,
+  failedLayers: ReadonlyMap<number, ReadonlyArray<string>>,
   mode: 'exact' | 'nearest',
   shiftMs: number,
   toleranceMs: number,
-): Array<boolean> {
-  if (failedEpochs.size === 0 || index.epochs.length === 0) {
-    return epochs.map(() => false)
+): Array<ReadonlyArray<string>> {
+  if (failedLayers.size === 0 || index.epochs.length === 0) {
+    return epochs.map(() => NO_LAYERS)
   }
   return epochs.map((epoch) => {
     const resolved = resolveSourceTime(
@@ -186,6 +190,8 @@ export function effectiveFailures(
       mode,
       toleranceMs,
     )
-    return resolved.epoch !== null && failedEpochs.has(resolved.epoch)
+    return resolved.epoch !== null
+      ? (failedLayers.get(resolved.epoch) ?? NO_LAYERS)
+      : NO_LAYERS
   })
 }

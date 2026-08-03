@@ -9,8 +9,8 @@
  */
 
 /** Force-directed counterpart to the dagre/swimlane Compilation tab.
- * Same task DAG, but laid out live by d3-force with halos
- * behind each block's cluster. */
+ * Same task DAG, laid out live by d3-force; one color per block,
+ * lineage lights up in color against a neutral-gray dimmed field. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
@@ -31,7 +31,6 @@ import {
 } from '@/features/executions/utils/taskLineage'
 import { humaniseTaskName } from '@/features/executions/utils/taskName'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
-import { ExperimentalNotice } from '@/features/executions/components/ExperimentalNotice'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { P } from '@/components/base/typography'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -49,7 +48,6 @@ interface GraphNode {
   id: string
   task: CompilationDetailTask
   blockLabel: string
-  fill: string
   /** Tasks with no parents — the entry points the user is looking for. */
   isEntry: boolean
   x?: number
@@ -61,10 +59,8 @@ interface GraphLink {
   target: string | GraphNode
 }
 
-/** Task-kind fills mirror the Tailwind 500 hues used by BLOCK_KIND_METADATA
- * (source=blue, transform=amber, product=purple, sink=emerald). Hard-coded
- * because canvas paint doesn't resolve CSS variables, and these are the
- * canonical values the same classes elsewhere in the app render to. */
+/** Task-kind dot in the focused-task card only — the canvas encodes block,
+ * not kind. Hues mirror BLOCK_KIND_METADATA's Tailwind 500 values. */
 const TASK_KIND_FILL: Record<string, string> = {
   select: '#f59e0b',
   inference: '#a855f7',
@@ -74,28 +70,85 @@ const TASK_KIND_FILL: Record<string, string> = {
   unknown: '#64748b',
 }
 
-/** Fallback used during SSR / tests where document is unavailable. */
-const FALLBACK_BLOCK_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#a855f7']
-
-/** Read the app's chart tokens (--chart-1..5 in styles.css) into concrete
- * rgb() strings canvas can paint. A temp element lets the browser do the
- * oklch→rgb resolution and tracks theme changes via inheritance. */
-function readChartPalette(): Array<string> {
-  if (typeof document === 'undefined') return FALLBACK_BLOCK_PALETTE
-  const probe = document.createElement('div')
-  document.body.appendChild(probe)
-  const colors: Array<string> = []
-  for (let i = 1; i <= 5; i++) {
-    probe.style.backgroundColor = `var(--chart-${i})`
-    const resolved = getComputedStyle(probe).backgroundColor
-    if (resolved && resolved !== 'rgba(0, 0, 0, 0)') colors.push(resolved)
-  }
-  probe.remove()
-  return colors.length > 0 ? colors : FALLBACK_BLOCK_PALETTE
+interface GraphTheme {
+  palette: Array<string>
+  /** Text + lit-edge color (`--foreground`). */
+  foreground: string
+  /** Flat fill for nodes outside the lineage/selection (`--border`). */
+  dim: string
+  /** Disc separation stroke — the canvas background (`--card`). */
+  surface: string
 }
 
-/** Mix a CSS colour with transparency in oklch space. Used for halo gradient
- * stops; `colour-mix` is supported in all browsers we target. */
+/** Fallback used during SSR / tests where document is unavailable. */
+const FALLBACK_THEME: GraphTheme = {
+  palette: ['#3b82f6', '#10b981', '#f59e0b', '#a855f7'],
+  foreground: '#0f172a',
+  dim: '#cbd5e1',
+  surface: '#ffffff',
+}
+
+/** Resolve the app's CSS tokens into concrete rgb() strings canvas can
+ * paint — a temp element lets the browser do the oklch→rgb resolution. */
+function readGraphTheme(): GraphTheme {
+  if (typeof document === 'undefined') return FALLBACK_THEME
+  const probe = document.createElement('div')
+  document.body.appendChild(probe)
+  const resolve = (variable: string): string | null => {
+    probe.style.backgroundColor = `var(${variable})`
+    const resolved = getComputedStyle(probe).backgroundColor
+    return resolved && resolved !== 'rgba(0, 0, 0, 0)' ? resolved : null
+  }
+  const palette: Array<string> = []
+  for (let i = 1; i <= 5; i++) {
+    const color = resolve(`--chart-${i}`)
+    if (color) palette.push(color)
+  }
+  const theme: GraphTheme = {
+    palette: palette.length > 0 ? palette : FALLBACK_THEME.palette,
+    foreground: resolve('--foreground') ?? FALLBACK_THEME.foreground,
+    dim: resolve('--border') ?? FALLBACK_THEME.dim,
+    surface: resolve('--card') ?? FALLBACK_THEME.surface,
+  }
+  probe.remove()
+  return theme
+}
+
+interface ClusterGeometry {
+  cx: number
+  cy: number
+  /** Farthest node distance from the centroid. */
+  maxR: number
+  count: number
+}
+
+/** Per-block centroid + extent, recomputed per frame from live node positions. */
+function clusterGeometry(
+  nodes: ReadonlyArray<GraphNode>,
+): Map<string, ClusterGeometry> {
+  const byBlock = new Map<string, Array<[number, number]>>()
+  for (const node of nodes) {
+    if (node.x === undefined || node.y === undefined) continue
+    const list = byBlock.get(node.task.block) ?? []
+    list.push([node.x, node.y])
+    byBlock.set(node.task.block, list)
+  }
+  const result = new Map<string, ClusterGeometry>()
+  for (const [blockId, points] of byBlock) {
+    const cx = points.reduce((sum, p) => sum + p[0], 0) / points.length
+    const cy = points.reduce((sum, p) => sum + p[1], 0) / points.length
+    let maxR = 0
+    for (const [x, y] of points) {
+      const r = Math.hypot(x - cx, y - cy)
+      if (r > maxR) maxR = r
+    }
+    result.set(blockId, { cx, cy, maxR, count: points.length })
+  }
+  return result
+}
+
+/** Mix a CSS colour with transparency in oklch space; `color-mix` is
+ * supported in all browsers we target, including as a canvas paint. */
 function withAlpha(color: string, alpha: number): string {
   const pct = Math.round(alpha * 100)
   return `color-mix(in oklch, ${color} ${pct}%, transparent)`
@@ -165,27 +218,27 @@ export function CompilationForceGraph({
     return order
   }, [tasks])
 
-  const blockPalette = useMemo(() => readChartPalette(), [])
+  const theme = useMemo(() => readGraphTheme(), [])
   const blockColorById = useMemo(() => {
     const map = new Map<string, string>()
     orderedBlocks.forEach((blockId, index) => {
-      map.set(blockId, blockPalette[index % blockPalette.length] ?? '#94a3b8')
+      const base = theme.palette[index % theme.palette.length] ?? '#94a3b8'
+      // Soften toward the surface — full-chroma discs read harsh at scale.
+      map.set(blockId, `color-mix(in oklch, ${base} 72%, ${theme.surface})`)
     })
     return map
-  }, [orderedBlocks, blockPalette])
+  }, [orderedBlocks, theme])
 
   const graphData = useMemo(() => {
     const taskIds = new Set(tasks.map((task) => task.task_id))
     // Entry point: every parent reference lies outside the visible slice
     // (or parents is empty). Pinned to the left edge under dagMode='lr'.
     const nodes: Array<GraphNode> = tasks.map((task) => {
-      const kind = classifyTask(task.task_id)
       const isEntry = task.parents.every((p) => !taskIds.has(p))
       return {
         id: task.task_id,
         task,
         blockLabel: blockLabelFor(task.block),
-        fill: TASK_KIND_FILL[kind] ?? TASK_KIND_FILL.unknown,
         isEntry,
       }
     })
@@ -308,7 +361,6 @@ export function CompilationForceGraph({
 
   return (
     <div className="flex h-[min(640px,calc(100vh-22rem))] min-h-[420px] flex-col gap-2 min-[1280px]:!h-full min-[1280px]:min-h-0">
-      <ExperimentalNotice />
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <span>{t('compilation.forceDescription')}</span>
         <div className="flex items-center gap-3">
@@ -394,49 +446,55 @@ export function CompilationForceGraph({
               (selectionAncestorSet.has(String(sourceId)) &&
                 selectionAncestorSet.has(String(targetId)))
             const lit = lineageLit && blockLit
-            // Punchier defaults so long cross-cluster edges read against
-            // the halo gradient.
-            return lit ? 'rgba(71, 85, 105, 0.78)' : 'rgba(100, 116, 139, 0.08)'
+            // 0.35 keeps dense fan-in bundles from congealing into wedges.
+            return lit
+              ? withAlpha(theme.foreground, 0.35)
+              : withAlpha(theme.foreground, 0.06)
           }}
           nodeCanvasObject={(node: GraphNode, ctx, globalScale) => {
             if (node.x === undefined || node.y === undefined) return
-            const lineageDim = !!lineageSet && !lineageSet.has(node.id)
-            const blockDim =
-              !!selectionAncestorSet && !selectionAncestorSet.has(node.id)
-            ctx.globalAlpha = lineageDim || blockDim ? 0.25 : 1
+            const dimmed =
+              (!!lineageSet && !lineageSet.has(node.id)) ||
+              (!!selectionAncestorSet && !selectionAncestorSet.has(node.id))
             const blockColor =
               blockColorById.get(node.task.block) ?? 'rgba(148,163,184,0.6)'
-            // Entry points (no in-set parents) get a wider accent ring +
-            // bigger fill so "where does this start?" reads at a glance.
-            const outerR = node.isEntry ? 11 : 7
-            const innerR = node.isEntry ? 7 : 5
+            // Dimmed = flat neutral at full opacity — alpha-dimming colored
+            // discs blends into mush at cluster density.
+            const fill = dimmed ? theme.dim : blockColor
+            const r = node.isEntry ? 8.5 : 6.5
+            // Entry points (no in-set parents) get a wider accent ring so
+            // "where does this start?" reads at a glance.
             if (node.isEntry) {
               ctx.beginPath()
-              ctx.arc(node.x, node.y, 13, 0, 2 * Math.PI)
-              ctx.strokeStyle = blockColor
+              ctx.arc(node.x, node.y, r + 3.5, 0, 2 * Math.PI)
+              ctx.strokeStyle = fill
               ctx.lineWidth = 1.5 / globalScale
               ctx.stroke()
             }
             ctx.beginPath()
-            ctx.arc(node.x, node.y, outerR, 0, 2 * Math.PI)
-            ctx.fillStyle = blockColor
+            ctx.arc(node.x, node.y, r, 0, 2 * Math.PI)
+            ctx.fillStyle = fill
             ctx.fill()
-            ctx.beginPath()
-            ctx.arc(node.x, node.y, innerR, 0, 2 * Math.PI)
-            ctx.fillStyle = node.fill
-            ctx.fill()
-            if (globalScale > 1.4 || node.isEntry) {
+            // Separation stroke in graph units — a screen-constant width
+            // fattens when zoomed out and bleaches the fill.
+            ctx.strokeStyle = theme.surface
+            ctx.lineWidth = 0.75
+            ctx.stroke()
+            if (node.isEntry || node.id === selectedId) {
               const humanised = humaniseTaskName(node.task.task_id)
               const label = node.isEntry
                 ? `▶ ${humanised.headline}`
                 : humanised.headline
               ctx.font = `${(node.isEntry ? 13 : 12) / globalScale}px sans-serif`
-              ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'
               ctx.textAlign = 'left'
               ctx.textBaseline = 'middle'
-              ctx.fillText(label, node.x + outerR + 3, node.y)
+              // Surface outline lifts the label off edge bundles beneath it.
+              ctx.lineWidth = 3 / globalScale
+              ctx.strokeStyle = withAlpha(theme.surface, 0.9)
+              ctx.strokeText(label, node.x + r + 5, node.y)
+              ctx.fillStyle = withAlpha(theme.foreground, dimmed ? 0.35 : 0.85)
+              ctx.fillText(label, node.x + r + 5, node.y)
             }
-            ctx.globalAlpha = 1
           }}
           nodePointerAreaPaint={(node: GraphNode, color, ctx) => {
             if (node.x === undefined || node.y === undefined) return
@@ -460,65 +518,30 @@ export function CompilationForceGraph({
             setSelectedId(null)
             if (selectedBlockId !== null) setSelectedBlockId(null)
           }}
-          onRenderFramePre={(ctx) => {
-            // Bloom-style cluster halos: radial gradient per block centred
-            // on the cluster centroid. Drawn pre-frame so nodes paint on top.
-            const byBlock = new Map<string, Array<[number, number]>>()
-            for (const node of graphData.nodes) {
-              if (node.x === undefined || node.y === undefined) continue
-              const list = byBlock.get(node.task.block) ?? []
-              list.push([node.x, node.y])
-              byBlock.set(node.task.block, list)
-            }
-            const HALO_PAD = 40
-            const SINGLE_RADIUS = 32
-            for (const [blockId, points] of byBlock) {
-              if (points.length === 0) continue
-              const color = blockColorById.get(blockId) ?? '#94a3b8'
-              const cx =
-                points.reduce((sum, p) => sum + p[0], 0) / points.length
-              const cy =
-                points.reduce((sum, p) => sum + p[1], 0) / points.length
-              let maxR = 0
-              for (const [x, y] of points) {
-                const r = Math.hypot(x - cx, y - cy)
-                if (r > maxR) maxR = r
-              }
-              const radius =
-                points.length === 1 ? SINGLE_RADIUS : maxR + HALO_PAD
-              const gradient = ctx.createRadialGradient(
-                cx,
-                cy,
-                0,
-                cx,
-                cy,
-                radius,
-              )
-              // Contributing blocks brighten, others fade. Alphas kept
-              // soft so the halo never washes out the underlying edges.
-              const isFocused =
-                !contributingBlockIds || contributingBlockIds.has(blockId)
-              const otherSelected =
+          onRenderFramePost={(ctx, globalScale) => {
+            // One label per cluster while zoomed out — per-node names at
+            // this density are pure repetition.
+            if (globalScale >= 2) return
+            for (const [blockId, cluster] of clusterGeometry(graphData.nodes)) {
+              const dimmedBlock =
                 !!contributingBlockIds && !contributingBlockIds.has(blockId)
-              const inner = otherSelected
-                ? 0.09
-                : isFocused && selectedBlockId
-                  ? 0.32
-                  : 0.18
-              const mid = otherSelected
-                ? 0.04
-                : isFocused && selectedBlockId
-                  ? 0.13
-                  : 0.07
-              gradient.addColorStop(0, withAlpha(color, inner))
-              gradient.addColorStop(0.55, withAlpha(color, mid))
-              gradient.addColorStop(1, withAlpha(color, 0))
-              ctx.save()
-              ctx.fillStyle = gradient
-              ctx.beginPath()
-              ctx.arc(cx, cy, radius, 0, 2 * Math.PI)
-              ctx.fill()
-              ctx.restore()
+              const label = `${blockLabelFor(blockId)} · ${t(
+                'compilation.taskCount',
+                { count: cluster.count },
+              )}`
+              const labelY = cluster.cy + cluster.maxR + 14 / globalScale
+              ctx.font = `${12 / globalScale}px sans-serif`
+              ctx.textAlign = 'center'
+              ctx.textBaseline = 'top'
+              // Surface outline lifts the label off edge bundles beneath it.
+              ctx.lineWidth = 3 / globalScale
+              ctx.strokeStyle = withAlpha(theme.surface, 0.9)
+              ctx.strokeText(label, cluster.cx, labelY)
+              ctx.fillStyle = withAlpha(
+                theme.foreground,
+                dimmedBlock ? 0.25 : 0.7,
+              )
+              ctx.fillText(label, cluster.cx, labelY)
             }
           }}
           cooldownTicks={120}

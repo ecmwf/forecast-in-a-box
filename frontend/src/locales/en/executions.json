@@ -8,14 +8,16 @@
     "untitledJob": "Untitled Job",
     "showParameters": "Show parameters",
     "hideParameters": "Hide parameters",
-    "running": "Running...",
+    "maximizeCanvas": "Maximize canvas",
+    "restoreCanvas": "Exit full screen (Esc)",
     "graphUnavailable": "Graph visualisation unavailable",
     "graphUnavailableDescription": "The pipeline graph is not available for this job.",
     "specUnavailable": "Specification not available",
     "specUnavailableDescription": "The original configuration was not stored for this job.",
     "copySpec": "Copy",
     "copied": "Copied",
-    "specCopyFailed": "Couldn't copy specification"
+    "specCopyFailed": "Couldn't copy specification",
+    "startedAt": "Started {{date}}"
   },
   "status": {
     "submitted": "Submitted",
@@ -32,7 +34,7 @@
     "outputs": "Outputs",
     "logs": "Logs",
     "compilation": "Compilation",
-    "graph": "Graph",
+    "graph": "Task graph",
     "specification": "Specification"
   },
   "actions": {
@@ -124,6 +126,13 @@
   "outputs": {
     "generated": "Generated",
     "pending": "Pending",
+    "notProduced": "Not produced",
+    "failedNoOutputs": "No outputs — the run failed",
+    "failedExpected_one": "{{count}} output was expected.",
+    "failedExpected_other": "{{count}} outputs were expected.",
+    "failedNotProduced_one": "{{count}} expected output was not produced — the run failed.",
+    "failedNotProduced_other": "{{count}} expected outputs were not produced — the run failed.",
+    "viewLogs": "View logs",
     "lost": "Not retained",
     "lostTitle": "No longer available",
     "noOutputs": "No outputs available yet",
@@ -189,7 +198,6 @@
     }
   },
   "compilation": {
-    "experimental": "Experimental view — subject to change or complete removal.",
     "fullDescription": "Task-level graph compiled from this run. Click a block on the left to focus its cluster; click a task to focus its block.",
     "forceDescription": "Drag a task to rearrange, click a block on the left to focus its cluster, hover to highlight lineage.",
     "entryHint": "▶ marks entry points (no upstream tasks)",
@@ -275,6 +283,11 @@
   },
   "errors": {
     "executionFailed": "Execution Failed",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy the error message",
+    "showFull": "Show full error",
+    "showLess": "Show less",
     "jobNotFound": "Job not found",
     "jobNotFoundDescription": "The requested job could not be found.",
     "backToExecutions": "Back to Executions"

@@ -133,8 +133,12 @@ export function GeoLayerBrowser({
     })
   }
 
+  // 15rem at lg (map most squeezed); --geo-right-w user resize overrides both bands.
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
+    <aside
+      data-geo-panel="right"
+      className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background lg:w-[var(--geo-right-w,15rem)] xl:w-[var(--geo-right-w,18rem)]"
+    >
       <div className="space-y-2 border-b border-border bg-muted/40 px-3 pt-2.5 pb-2.5">
         <div className="flex items-center gap-1.5">
           <button

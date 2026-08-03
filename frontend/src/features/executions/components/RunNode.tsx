@@ -69,7 +69,7 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
         'relative cursor-pointer rounded-lg border bg-card shadow-sm transition-colors',
         showConfig && configEntries.length > 0 ? 'w-[200px]' : 'w-[140px]',
         isCompleted && 'border-l-2 border-l-emerald-500',
-        isRunning && 'animate-pulse border-amber-500',
+        isRunning && 'run-node-ringing border-amber-500',
         isPlannedIdle && 'opacity-60',
         isHovered && !isSelected && 'bg-primary/10',
         isSelected &&

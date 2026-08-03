@@ -52,8 +52,10 @@ export const STORAGE_KEYS = {
   fable: {
     /** Favourite flags for blueprints (keyed by blueprint_id) */
     favourites: 'fiab.fable.favourites',
-    /** Auto-saved fable builder draft (debounced writes) */
+    /** The workbench draft — the single auto-saved work-in-progress */
     draft: 'fiab.fable.draft',
+    /** Legacy per-target draft map — read once for migration into `draft` */
+    drafts: 'fiab.fable.drafts',
     /** Pipeline (form-mode) sidebar open/closed flag */
     pipelineSidebarOpen: 'fiab.fable.pipeline-sidebar-open',
   },
@@ -72,6 +74,16 @@ export const STORAGE_KEYS = {
   artifacts: {
     /** Composite IDs of downloads in progress, so polling can resume after refresh */
     pendingDownloads: 'fiab.artifacts.pending-downloads',
+  },
+
+  /**
+   * Persisted split-pane layouts (direct localStorage)
+   */
+  layout: {
+    /** Run detail: pipeline canvas vs details tabs */
+    runDetailSplit: 'fiab.layout.run-detail-split',
+    /** Geo viewer: docked sidebar widths (left/right, px) */
+    geoViewerPanels: 'fiab.layout.geo-viewer-panels',
   },
 
   /**

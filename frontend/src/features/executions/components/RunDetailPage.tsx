@@ -34,10 +34,14 @@ import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { StoredOutputsCard } from './StoredOutputsCard'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { useViewportFill } from '@/hooks/useViewportFill'
+import { useSplitLayout } from '@/hooks/useSplitLayout'
+import { useMedia } from '@/hooks/useMedia'
+import { SplitPane } from '@/components/common/SplitResizeHandle'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
@@ -54,12 +58,47 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('RunDetailPage')
 
-// Wide-screen layout: each column claims half the row and scrolls
-// independently via its TabsContent.
+// Wide-screen layout: each column fills its pane and scrolls via its TabsContent.
 const WIDE_COLUMN =
   'min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-w-0 min-[1280px]:flex-1 min-[1280px]:flex-col'
 const WIDE_TAB_CONTENT =
   'min-[1280px]:min-h-0 min-[1280px]:flex-1 min-[1280px]:overflow-y-auto'
+
+/** Wide: resizable two-pane split (persisted); narrow: plain stacked flow. */
+function SplitOrStack({
+  isWide,
+  initialStartPct,
+  onStartPctChange,
+  canvas,
+  details,
+}: {
+  isWide: boolean
+  initialStartPct: number | undefined
+  onStartPctChange: (startPct: number) => void
+  canvas: ReactNode
+  details: ReactNode
+}) {
+  if (!isWide) {
+    return (
+      <div className="flex flex-col gap-8">
+        {canvas}
+        {details}
+      </div>
+    )
+  }
+  return (
+    <SplitPane
+      className="min-h-0 flex-1"
+      initialStartPct={initialStartPct}
+      defaultStartPct={42}
+      onChange={onStartPctChange}
+      minStartPx={320}
+      minEndPx={460}
+      start={canvas}
+      end={details}
+    />
+  )
+}
 
 export function RunDetailPage() {
   const { t } = useTranslation('executions')
@@ -90,6 +129,19 @@ export function RunDetailPage() {
 
   const layoutMode = useUiStore((state) => state.layoutMode)
   const columnsFill = useViewportFill(true, { insetPx: 32 })
+  const isWide = useMedia('(min-width: 1280px)')
+  const { defaultLayout: splitLayout, onLayoutChanged: onSplitLayoutChanged } =
+    useSplitLayout(STORAGE_KEYS.layout.runDetailSplit)
+  // Stored shape predates SplitPane ({canvas, details} shares) — keep it.
+  const initialStartPct =
+    splitLayout && 'canvas' in splitLayout && 'details' in splitLayout
+      ? (splitLayout.canvas / (splitLayout.canvas + splitLayout.details)) * 100
+      : undefined
+  const onStartPctChange = useCallback(
+    (startPct: number) =>
+      onSplitLayoutChanged({ canvas: startPct, details: 100 - startPct }),
+    [onSplitLayoutChanged],
+  )
   const { data: catalogue } = useBlockCatalogue()
 
   // Sync scroll-to-top before paint — a tall /configure scroll position
@@ -235,8 +287,7 @@ export function RunDetailPage() {
         />
       )}
 
-      {/* Wide: side-by-side, pinned to viewport height with independent
-          column scroll. Narrow: stacked single-document scroll. */}
+      {/* Wide: viewport-pinned resizable split; narrow: stacked document scroll. */}
       <div
         ref={columnsFill.ref}
         style={
@@ -248,116 +299,127 @@ export function RunDetailPage() {
           'flex flex-1 flex-col gap-8',
           // Wide: pin to the measured viewport remainder (calc fallback).
           // flex-none cancels the inherited flex-1 so the height holds.
-          'min-[1280px]:h-[var(--fill-h,calc(100vh_-_17rem))] min-[1280px]:flex-row',
-          'min-[1280px]:flex-none min-[1280px]:gap-6 min-[1280px]:overflow-hidden',
+          'min-[1280px]:h-[var(--fill-h,calc(100vh_-_17rem))]',
+          'min-[1280px]:flex-none min-[1280px]:overflow-hidden',
         )}
       >
-        <div className={WIDE_COLUMN}>
-          {fableData?.builder && catalogue ? (
-            <RunCanvas
-              fable={fableData.builder}
-              catalogue={catalogue}
-              status={jobData.status}
-              completedBlockIds={jobData.completed_block_ids}
-              plannedBlockIds={jobData.planned_block_ids}
-            />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-12 text-center">
-              <P className="font-medium text-muted-foreground">
-                {t('detail.graphUnavailable')}
-              </P>
-              <P className="text-muted-foreground">
-                {t('detail.graphUnavailableDescription')}
-              </P>
-            </div>
-          )}
-        </div>
-
-        <div className={WIDE_COLUMN}>
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-h-0 min-[1280px]:flex-col"
-          >
-            {/* Sticky for the mobile single-scroll layout; no-op at wide.
-                Default `bg-muted` is the sticky background — don't override. */}
-            <TabsList className="sticky top-0 z-10 grid w-full shrink-0 grid-cols-5">
-              <TabsTrigger value="outputs">
-                <Package className="h-4 w-4" />
-                {t('tabs.outputs')}
-              </TabsTrigger>
-              <TabsTrigger value="logs">
-                <ScrollText className="h-4 w-4" />
-                {t('tabs.logs')}
-              </TabsTrigger>
-              <TabsTrigger value="compilation">
-                <Network className="h-4 w-4" />
-                {t('tabs.compilation')}
-              </TabsTrigger>
-              <TabsTrigger value="graph">
-                <Share2 className="h-4 w-4" />
-                {t('tabs.graph')}
-              </TabsTrigger>
-              <TabsTrigger value="specification">
-                <FileJson className="h-4 w-4" />
-                {t('tabs.specification')}
-              </TabsTrigger>
-            </TabsList>
-            <div
-              ref={handleToolbarRef}
-              className={cn(
-                'sticky top-12 z-10 my-2 flex shrink-0 items-center gap-3 bg-background',
-                activeTab !== 'outputs' && 'hidden',
+        <SplitOrStack
+          isWide={isWide}
+          initialStartPct={initialStartPct}
+          onStartPctChange={onStartPctChange}
+          canvas={
+            <div className={WIDE_COLUMN}>
+              {fableData?.builder && catalogue ? (
+                <RunCanvas
+                  fable={fableData.builder}
+                  catalogue={catalogue}
+                  status={jobData.status}
+                  completedBlockIds={jobData.completed_block_ids}
+                  plannedBlockIds={jobData.planned_block_ids}
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-12 text-center">
+                  <P className="font-medium text-muted-foreground">
+                    {t('detail.graphUnavailable')}
+                  </P>
+                  <P className="text-muted-foreground">
+                    {t('detail.graphUnavailableDescription')}
+                  </P>
+                </div>
               )}
-            />
-            <TabsContent
-              value="outputs"
-              // pr at wide layout keeps the grid off the column scrollbar.
-              className={cn(WIDE_TAB_CONTENT, 'space-y-4 min-[1280px]:pr-2')}
-            >
-              <StoredOutputsCard
-                jobId={jobId}
-                outputs={jobData.outputs}
-                lostTaskIds={jobData.lost_task_ids}
-                fable={fableData?.builder}
-                catalogue={catalogue}
-                runName={fableData?.display_name ?? undefined}
-              />
-              <OutputsPanel
-                jobId={jobId}
-                status={jobData.status}
-                outputs={jobData.outputs}
-                lostTaskIds={jobData.lost_task_ids}
-                completedBlockIds={jobData.completed_block_ids}
-                plannedBlockIds={jobData.planned_block_ids}
-                toolbarSlot={toolbarSlot}
-              />
-            </TabsContent>
-            <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
-              <LogsPanel jobId={jobId} status={jobData.status} />
-            </TabsContent>
-            <TabsContent value="compilation" className={WIDE_TAB_CONTENT}>
-              <CompilationPanel
-                jobId={jobId}
-                status={jobData.status}
-                fable={fableData?.builder}
-                catalogue={catalogue}
-                onSwitchTab={setActiveTab}
-              />
-            </TabsContent>
-            <TabsContent value="graph" className={WIDE_TAB_CONTENT}>
-              <CompilationForceGraph
-                jobId={jobId}
-                status={jobData.status}
-                fable={fableData?.builder}
-                catalogue={catalogue}
-              />
-            </TabsContent>
-            <TabsContent value="specification" className={WIDE_TAB_CONTENT}>
-              <SpecificationPanel fableSnapshot={fableData?.builder} />
-            </TabsContent>
-          </Tabs>
-        </div>
+            </div>
+          }
+          details={
+            <div className={WIDE_COLUMN}>
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-h-0 min-[1280px]:flex-col"
+              >
+                {/* Sticky for mobile scroll (no-op wide); keep `bg-muted` as its backdrop. */}
+                <TabsList className="sticky top-0 z-10 grid w-full shrink-0 grid-cols-5">
+                  <TabsTrigger value="outputs">
+                    <Package className="h-4 w-4" />
+                    {t('tabs.outputs')}
+                  </TabsTrigger>
+                  <TabsTrigger value="logs">
+                    <ScrollText className="h-4 w-4" />
+                    {t('tabs.logs')}
+                  </TabsTrigger>
+                  <TabsTrigger value="compilation">
+                    <Network className="h-4 w-4" />
+                    {t('tabs.compilation')}
+                  </TabsTrigger>
+                  <TabsTrigger value="graph">
+                    <Share2 className="h-4 w-4" />
+                    {t('tabs.graph')}
+                  </TabsTrigger>
+                  <TabsTrigger value="specification">
+                    <FileJson className="h-4 w-4" />
+                    {t('tabs.specification')}
+                  </TabsTrigger>
+                </TabsList>
+                <div
+                  ref={handleToolbarRef}
+                  className={cn(
+                    'sticky top-12 z-10 my-2 flex shrink-0 items-center gap-3 bg-background',
+                    activeTab !== 'outputs' && 'hidden',
+                  )}
+                />
+                <TabsContent
+                  value="outputs"
+                  // pr at wide layout keeps the grid off the column scrollbar.
+                  className={cn(
+                    WIDE_TAB_CONTENT,
+                    'space-y-4 min-[1280px]:pr-2',
+                  )}
+                >
+                  <StoredOutputsCard
+                    jobId={jobId}
+                    outputs={jobData.outputs}
+                    lostTaskIds={jobData.lost_task_ids}
+                    fable={fableData?.builder}
+                    catalogue={catalogue}
+                    runName={fableData?.display_name ?? undefined}
+                  />
+                  <OutputsPanel
+                    jobId={jobId}
+                    status={jobData.status}
+                    outputs={jobData.outputs}
+                    lostTaskIds={jobData.lost_task_ids}
+                    completedBlockIds={jobData.completed_block_ids}
+                    plannedBlockIds={jobData.planned_block_ids}
+                    toolbarSlot={toolbarSlot}
+                    onViewLogs={() => setActiveTab('logs')}
+                  />
+                </TabsContent>
+                <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
+                  <LogsPanel jobId={jobId} status={jobData.status} />
+                </TabsContent>
+                <TabsContent value="compilation" className={WIDE_TAB_CONTENT}>
+                  <CompilationPanel
+                    jobId={jobId}
+                    status={jobData.status}
+                    fable={fableData?.builder}
+                    catalogue={catalogue}
+                    onSwitchTab={setActiveTab}
+                  />
+                </TabsContent>
+                <TabsContent value="graph" className={WIDE_TAB_CONTENT}>
+                  <CompilationForceGraph
+                    jobId={jobId}
+                    status={jobData.status}
+                    fable={fableData?.builder}
+                    catalogue={catalogue}
+                  />
+                </TabsContent>
+                <TabsContent value="specification" className={WIDE_TAB_CONTENT}>
+                  <SpecificationPanel fableSnapshot={fableData?.builder} />
+                </TabsContent>
+              </Tabs>
+            </div>
+          }
+        />
       </div>
 
       <RunMetadataDialog

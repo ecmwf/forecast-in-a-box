@@ -9,17 +9,15 @@
  */
 
 /**
- * Auto-persists fable drafts to localStorage so users don't lose unsaved
- * work on accidental navigation or tab close.
+ * Persists the workbench — the single work-in-progress — to localStorage so
+ * it survives navigation, tab close, and reload.
  *
  * - Writes debounced (2 s) after every store change that sets isDirty.
- * - Clears the draft on successful save (markSaved).
- * - On mount, restoration is handled by FableBuilderPage via readDraft().
+ * - Clears the slot on successful save (markSaved).
+ * - On mount, FableBuilderPage restores it silently via readDraft().
  *
- * No `beforeunload` guard — the localStorage draft is the safety net, and
- * the header already shows an "Unsaved" badge when the state is dirty. The
- * native "Leave site?" prompt is intrusive and inconsistent with modern
- * autosave UX (Figma / Google Docs / Airtable).
+ * No `beforeunload` prompt — the slot is the safety net; prompts belong to
+ * the moment work would be replaced, not to leaving the page.
  */
 
 import { useEffect, useRef } from 'react'
@@ -29,11 +27,14 @@ import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { readStorageJson, removeStorage, writeStorageJson } from '@/lib/storage'
 
 const DRAFT_KEY = STORAGE_KEYS.fable.draft
+const LEGACY_MAP_KEY = STORAGE_KEYS.fable.drafts
 const DEBOUNCE_MS = 2000
 
 export interface FableDraft {
   fable: FableBuilderV1
   fableId: string | null
+  /** Template lineage — a restored fork keeps create-on-save semantics. */
+  forkParentId: string | null
   fableName: string
   fableVersion: number | null
   savedAt: number // Date.now() when the draft was written
@@ -43,16 +44,46 @@ export interface FableDraft {
 // localStorage helpers
 // ---------------------------------------------------------------------------
 
-function writeDraft(draft: FableDraft): void {
-  writeStorageJson(DRAFT_KEY, draft)
-}
-
+/** The workbench slot — the one work-in-progress, nothing else. */
 export function readDraft(): FableDraft | null {
-  return readStorageJson<FableDraft>(DRAFT_KEY)
+  const draft = readStorageJson<FableDraft>(DRAFT_KEY)
+  if (draft) return { ...draft, forkParentId: draft.forkParentId ?? null }
+  // One-shot migration of the interim per-target map: newest content wins.
+  const map = readStorageJson<Record<string, FableDraft>>(LEGACY_MAP_KEY)
+  if (!map) return null
+  removeStorage(LEGACY_MAP_KEY)
+  const newest = Object.values(map)
+    .filter((entry) => Object.keys(entry.fable.blocks).length > 0)
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .at(0)
+  if (!newest) return null
+  const migrated = { ...newest, forkParentId: newest.forkParentId ?? null }
+  writeStorageJson(DRAFT_KEY, migrated)
+  return migrated
 }
 
 export function clearDraft(): void {
   removeStorage(DRAFT_KEY)
+}
+
+/** Write the store's unsaved work as the workbench now (no-op when clean). */
+export function flushDraft(): void {
+  const { fable, fableId, forkParentId, fableName, fableVersion, isDirty } =
+    useFableBuilderStore.getState()
+  try {
+    if (isDirty) {
+      writeStorageJson(DRAFT_KEY, {
+        fable,
+        fableId,
+        forkParentId,
+        fableName,
+        fableVersion,
+        savedAt: Date.now(),
+      })
+    }
+  } finally {
+    useFableBuilderStore.setState({ draftWritePending: false })
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -65,26 +96,6 @@ export function useDraftPersistence(): void {
   // Debounced write: subscribe only to the draft-relevant slices so the
   // listener doesn't run on every unrelated UI state change (panels, mode, …).
   useEffect(() => {
-    // Write the unsaved draft and clear the "saving" flag — shared by the
-    // debounce timer and the unmount flush. `finally` keeps it from sticking.
-    function flush(): void {
-      const { fable, fableId, fableName, fableVersion, isDirty } =
-        useFableBuilderStore.getState()
-      try {
-        if (isDirty) {
-          writeDraft({
-            fable,
-            fableId,
-            fableName,
-            fableVersion,
-            savedAt: Date.now(),
-          })
-        }
-      } finally {
-        useFableBuilderStore.setState({ draftWritePending: false })
-      }
-    }
-
     const unsub = useFableBuilderStore.subscribe(
       (state) => ({
         fable: state.fable,
@@ -93,7 +104,7 @@ export function useDraftPersistence(): void {
         lastSavedAt: state.lastSavedAt,
       }),
       (selected, prevSelected) => {
-        // Clear draft immediately on save
+        // A save supersedes the workbench slot — clear it immediately.
         if (selected.lastSavedAt !== prevSelected.lastSavedAt) {
           clearDraft()
           if (timerRef.current) {
@@ -116,7 +127,7 @@ export function useDraftPersistence(): void {
         useFableBuilderStore.setState({ draftWritePending: true })
         timerRef.current = setTimeout(() => {
           timerRef.current = null
-          flush()
+          flushDraft()
         }, DEBOUNCE_MS)
       },
       {
@@ -128,16 +139,26 @@ export function useDraftPersistence(): void {
       },
     )
 
-    return () => {
-      unsub()
-      // Flush a pending write on unmount (navigating away mid-debounce): the
-      // store outlives the route, so otherwise the draft is lost and "Saving…"
-      // sticks.
+    // Tab close/hide never unmounts — flush there too, mid-debounce included.
+    const flushNow = () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current)
         timerRef.current = null
-        flush()
       }
+      flushDraft()
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushNow()
+    }
+    window.addEventListener('pagehide', flushNow)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      unsub()
+      window.removeEventListener('pagehide', flushNow)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      // A restored-but-unedited session has no timer yet must survive cold boot.
+      flushNow()
     }
   }, [])
 }

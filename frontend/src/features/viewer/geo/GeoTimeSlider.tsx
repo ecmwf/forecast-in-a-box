@@ -83,7 +83,7 @@ export function GeoTimeSlider({
   failures,
   index,
   onChange,
-  linkMode,
+  linkMode: linkModeProp,
   onLinkModeChange,
   offsetMs,
   onOffsetChange,
@@ -98,8 +98,9 @@ export function GeoTimeSlider({
   /** View only one source: single shared-axis track for that slot. */
   soloSlot?: SourceSlot | null
   timeline: CompareTimeline
-  /** Axis-aligned "advertised but not served" marks (GetMap failures). */
-  failures: Record<SourceSlot, ReadonlyArray<boolean>>
+  /** Axis-aligned "advertised but not served" marks: the failing layer
+   *  TITLES per position ([] = clean). */
+  failures: Record<SourceSlot, ReadonlyArray<ReadonlyArray<string>>>
   index: number
   onChange: (index: number) => void
   linkMode: TimeLinkMode
@@ -120,6 +121,8 @@ export function GeoTimeSlider({
   const { t } = useTranslation('executions')
   const { t: tCompare } = useTranslation('visualise')
   const steps = timeline.epochs
+  // Comparison-only link modes are inert while solo — render as exact.
+  const linkMode = hasB ? linkModeProp : 'exact'
   // Focus collapses the timeline to one shared-axis track (no link modes).
   const focused = soloSlot !== null
   const slots: ReadonlyArray<SourceSlot> = soloSlot
@@ -171,8 +174,25 @@ export function GeoTimeSlider({
   const hasVisibleFailures =
     linkMode !== 'independent' &&
     slots.some((slot) =>
-      failures[slot].slice(rangeStart, rangeEnd + 1).some(Boolean),
+      failures[slot]
+        .slice(rangeStart, rangeEnd + 1)
+        .some((cell) => cell.length > 0),
     )
+  // The selected instant's failures get named — capped, slot-tagged.
+  const currentFailureText = (() => {
+    if (linkMode === 'independent') return null
+    const parts = slots.flatMap((slot) =>
+      (failures[slot][safeIndex] ?? []).map((title) =>
+        hasB && !focused ? `${title} (${slot.toUpperCase()})` : title,
+      ),
+    )
+    if (parts.length === 0) return null
+    const shown = parts.slice(0, 3).join(', ')
+    const more = parts.length - 3
+    return tCompare('timeline.notServedNow', {
+      layers: more > 0 ? `${shown} +${more}` : shown,
+    })
+  })()
 
   return (
     <div className="space-y-2 rounded-md border border-border bg-card px-4 py-3">
@@ -180,10 +200,10 @@ export function GeoTimeSlider({
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {tCompare('timeline.label')}
         </span>
-        {hasVisibleFailures && (
+        {(currentFailureText !== null || hasVisibleFailures) && (
           <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
             <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
-            {tCompare('timeline.notServedHint')}
+            {currentFailureText ?? tCompare('timeline.notServedHint')}
           </span>
         )}
         <div className="flex items-center gap-2">
@@ -542,8 +562,8 @@ function SlotRunTrack({
 }: {
   slot: SourceSlot
   availability: ReadonlyArray<boolean>
-  /** Per-position "advertised but not served" marks (⊆ availability). */
-  failed: ReadonlyArray<boolean>
+  /** Per-position failing layer titles ([] = served; ⊆ availability). */
+  failed: ReadonlyArray<ReadonlyArray<string>>
   currentIndex: number
   hoverIndex: number | null
   /** This side's resolved instant at the hovered position, when the
@@ -554,15 +574,26 @@ function SlotRunTrack({
 }) {
   const { t } = useTranslation('visualise')
   const notServed = t('timeline.notServed')
+  // Native tooltip names the failing layers of the pointed-at position.
+  const failedTitle = (titles: ReadonlyArray<string>) =>
+    titles.length > 0 ? `${notServed}: ${titles.join(', ')}` : undefined
   const cells = availability.length <= TRACK_CELL_LIMIT
   const runs = useMemo(() => {
     if (cells) return null
-    const out: Array<{ state: 'on' | 'off' | 'failed'; length: number }> = []
+    const out: Array<{
+      state: 'on' | 'off' | 'failed'
+      length: number
+      titles: Set<string>
+    }> = []
     availability.forEach((available, i) => {
-      const state = failed[i] ? 'failed' : available ? 'on' : 'off'
+      const state = failed[i].length > 0 ? 'failed' : available ? 'on' : 'off'
       const last = out.at(-1)
-      if (last && last.state === state) last.length++
-      else out.push({ state, length: 1 })
+      if (last && last.state === state) {
+        last.length++
+        for (const title of failed[i]) last.titles.add(title)
+      } else {
+        out.push({ state, length: 1, titles: new Set(failed[i]) })
+      }
     })
     return out
   }, [availability, failed, cells])
@@ -628,12 +659,12 @@ function SlotRunTrack({
           ? availability.map((available, i) => (
               <span
                 key={i}
-                title={failed[i] ? notServed : undefined}
+                title={failedTitle(failed[i])}
                 className={cn(
                   'min-w-0 flex-1 rounded-[1px]',
                   // Selected step stands taller than the rest.
                   i === currentIndex && 'h-3 self-center rounded-sm',
-                  failed[i]
+                  failed[i].length > 0
                     ? TRACK_FAILED_CLASS[slot]
                     : available
                       ? TRACK_ON_CLASS[slot]
@@ -645,7 +676,11 @@ function SlotRunTrack({
               <span
                 key={i}
                 style={{ flexGrow: run.length }}
-                title={run.state === 'failed' ? notServed : undefined}
+                title={
+                  run.state === 'failed'
+                    ? failedTitle([...run.titles])
+                    : undefined
+                }
                 className={cn(
                   'min-w-0 basis-0 rounded-sm',
                   run.state === 'failed'

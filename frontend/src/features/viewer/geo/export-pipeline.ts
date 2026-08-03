@@ -14,7 +14,7 @@
  */
 
 import { composeExportCanvas, loadLegendImage } from '../map-export'
-import { annotationVisibleOn } from './annotations'
+import { ANNOTATION_COLORS, annotationVisibleOn } from './annotations'
 import type { MapAnnotation } from './annotations'
 import type { ExportNote, LegendExportItem } from '../map-export'
 import type { SourceSlot } from './layer-pairing'
@@ -24,6 +24,12 @@ export interface ExportLegendSpec {
   slot: SourceSlot
   title: string
   url: string
+}
+
+/** Current slot→source-id assignment — resolves capture slots to pins. */
+export interface ExportSlotIds {
+  a: string
+  b: string | null
 }
 
 interface LoadedLegend extends LegendExportItem {
@@ -39,14 +45,18 @@ function legendsFor(
 }
 
 /** Notes for one capture — the annotations its panel actually shows,
- *  keeping their global numbering. */
+ *  with their sticky labels and pin colors. */
 function notesFor(
   capture: CaptureResult,
   annotations: ReadonlyArray<MapAnnotation>,
+  slotIds: ExportSlotIds,
 ): Array<ExportNote> {
-  return annotations.flatMap((a, i) =>
-    annotationVisibleOn(a, capture.slot)
-      ? [{ number: i + 1, text: a.text }]
+  const shown = (
+    capture.slot === null ? [slotIds.a, slotIds.b] : [slotIds[capture.slot]]
+  ).filter((id): id is string => id !== null)
+  return annotations.flatMap((a) =>
+    annotationVisibleOn(a, shown)
+      ? [{ label: a.label, color: ANNOTATION_COLORS[a.color], text: a.text }]
       : [],
   )
 }
@@ -60,11 +70,13 @@ export async function composeCaptures({
   capture,
   legends,
   annotations,
+  slotIds,
   title,
 }: {
   capture: () => Promise<Array<CaptureResult>>
   legends: ReadonlyArray<ExportLegendSpec>
   annotations: ReadonlyArray<MapAnnotation>
+  slotIds: ExportSlotIds
   /** Overrides each capture's own label when non-empty. */
   title?: string
 }): Promise<Array<HTMLCanvasElement>> {
@@ -91,7 +103,7 @@ export async function composeCaptures({
       timeText: c.timeLabel,
       titleBarEnabled: true,
       legendItems: legendsFor(c, loaded),
-      notes: notesFor(c, annotations),
+      notes: notesFor(c, annotations, slotIds),
     })
     return composed ? [composed] : []
   })

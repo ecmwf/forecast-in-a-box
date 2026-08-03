@@ -44,6 +44,8 @@ export function useBasemap(options: {
   opacity?: number
   incLoading: () => void
   decLoading: () => void
+  /** useOlMapBase recreation counter — re-apply after a map rebuild. */
+  mapVersion: number
 }): void {
   const {
     mapRef,
@@ -54,6 +56,7 @@ export function useBasemap(options: {
     opacity = 1,
     incLoading,
     decLoading,
+    mapVersion,
   } = options
   // What this map actually shows. The skinny basemap is served BY the
   // lens (key includes baseUrl); a rebuilt map arrives showing the
@@ -130,6 +133,7 @@ export function useBasemap(options: {
     basemapLayerRef,
     incLoading,
     decLoading,
+    mapVersion,
   ])
 
   // Basemap opacity — applied to whichever layer currently holds the slot
@@ -139,7 +143,7 @@ export function useBasemap(options: {
   useEffect(() => {
     basemapLayerRef.current?.setOpacity(opacity)
     referenceLayerRef.current?.setOpacity(opacity)
-  }, [opacity, basemapId, basemapLayerRef])
+  }, [opacity, basemapId, basemapLayerRef, mapVersion])
 
   // -------- SkinnyWMS reference overlay --------
   // Coastline/border layers over the data while the SkinnyWMS basemap is
@@ -177,5 +181,6 @@ export function useBasemap(options: {
     mapRef,
     incLoading,
     decLoading,
+    mapVersion,
   ])
 }

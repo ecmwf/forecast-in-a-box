@@ -29,7 +29,7 @@
  * would corrupt other modes' rendering.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { getRenderPixel } from 'ol/render'
 import { useOlMapBase } from '../hooks/useOlMapBase'
@@ -50,6 +50,7 @@ import { LoupeOverlay } from './LoupeOverlay'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
+import type { ParsedLayer } from '../wms-capabilities'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { SourceSlot } from './layer-pairing'
 import type RenderEvent from 'ol/render/Event'
@@ -122,6 +123,7 @@ export function SingleMapView({
   annotationHighlightId: string | null
   onAnnotationCreate: (
     coordinate: [number, number],
+    sourceId: string | null,
     slot: SourceSlot | null,
   ) => void
   onAnnotationEdit: (id: string) => void
@@ -170,6 +172,7 @@ export function SingleMapView({
     opacity: basemapOpacity,
     incLoading: noop,
     decLoading: noop,
+    mapVersion,
   })
 
   // Stack opacity = base tier (global × source) × mode factor; a time gap
@@ -225,6 +228,7 @@ export function SingleMapView({
     incLoading: incA,
     decLoading: decA,
     onLoadResult: a.onLoadResult,
+    mapVersion,
     trackRevision: true,
   })
   // Unconditional hook; solo passes an inert config (empty order → the
@@ -242,6 +246,7 @@ export function SingleMapView({
       incLoading: incB,
       decLoading: decB,
       onLoadResult: b?.onLoadResult,
+      mapVersion,
       trackRevision: true,
     },
   )
@@ -259,6 +264,7 @@ export function SingleMapView({
     layers: a.layers,
     activeOrder: a.activeOrder,
     timeSteps: a.timeSteps,
+    mapVersion,
   })
   useTimeStepPrefetch(mapRef, {
     enabled: preload && b !== null,
@@ -266,22 +272,49 @@ export function SingleMapView({
     layers: b?.layers ?? EMPTY_LAYERS,
     activeOrder: b?.activeOrder ?? EMPTY_ORDER,
     timeSteps: b?.timeSteps ?? EMPTY_ORDER,
+    mapVersion,
   })
-  const pointer = usePointerReadout(mapRef)
-  useContextOverlays(mapRef, overlays)
-  const overlayHover = useOverlayHover(mapRef, overlays)
-  // Pins follow the focus/per-slot mask; creations are attributed to it.
+  const pointer = usePointerReadout(mapRef, mapVersion)
+  useContextOverlays(mapRef, overlays, mapVersion)
+  const overlayHover = useOverlayHover(mapRef, overlays, mapVersion)
+  // Pins and creations follow the focus mask (solo → A, combined → shared).
+  const bId = b?.id ?? null
+  const pinScope = useMemo(
+    () =>
+      captureOnly === 'a'
+        ? [a.id]
+        : captureOnly === 'b'
+          ? bId !== null
+            ? [bId]
+            : []
+          : bId !== null
+            ? [a.id, bId]
+            : [a.id],
+    [captureOnly, a.id, bId],
+  )
   useAnnotationLayer(
     mapRef,
     annotations,
-    captureOnly,
+    pinScope,
     annotateArmed,
     {
-      onCreate: onAnnotationCreate,
+      onCreate: (coordinate) =>
+        onAnnotationCreate(
+          coordinate,
+          captureOnly === null
+            ? solo
+              ? a.id
+              : null
+            : captureOnly === 'a'
+              ? a.id
+              : bId,
+          captureOnly,
+        ),
       onEdit: onAnnotationEdit,
       onMove: onAnnotationMove,
     },
     annotationHighlightId,
+    mapVersion,
   )
 
   // Fit plumbing (union bbox of both sources).
@@ -638,10 +671,18 @@ export function SingleMapView({
       {showA && a.hiddenAtTime && <GapBadge slot="A" side="left" />}
       {showB && b.hiddenAtTime && <GapBadge slot="B" side="right" />}
       {showA && stackA.errorCount > 0 && !a.hiddenAtTime && (
-        <LoadErrorBadge slot="A" side="left" />
+        <LoadErrorBadge
+          slot="A"
+          side="left"
+          layers={erroredTitles(stackA.erroredNames, a.layers)}
+        />
       )}
       {showB && stackB.errorCount > 0 && !b.hiddenAtTime && (
-        <LoadErrorBadge slot="B" side="right" />
+        <LoadErrorBadge
+          slot="B"
+          side="right"
+          layers={erroredTitles(stackB.erroredNames, b.layers)}
+        />
       )}
       {showA && a.timeTag && (
         <TimeTagBadge slot="A" tag={a.timeTag} side="left" />
@@ -814,16 +855,29 @@ function GapBadge({ slot, side }: { slot: string; side: 'left' | 'right' }) {
   )
 }
 
+/** Failing layer names → display titles for the badge. */
+export function erroredTitles(
+  names: ReadonlyArray<string>,
+  layers: ReadonlyArray<ParsedLayer>,
+): Array<string> {
+  return names.map((n) => layers.find((l) => l.name === n)?.title ?? n)
+}
+
 /** The server returned no image for the requested instant (the layer is
  *  hidden — an older image must never pose as this time). */
 export function LoadErrorBadge({
   slot,
   side,
+  layers,
 }: {
   slot: string
   side: 'left' | 'right'
+  /** Titles of the affected layers — named so intact layers aren't accused. */
+  layers: ReadonlyArray<string>
 }) {
   const { t } = useTranslation('visualise')
+  const shown = layers.slice(0, 2).join(', ')
+  const more = layers.length - 2
   return (
     <div
       className={
@@ -832,8 +886,11 @@ export function LoadErrorBadge({
           : 'absolute top-10 right-2 z-10'
       }
     >
-      <div className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
-        {t('timeline.loadError', { slot })}
+      <div className="max-w-64 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
+        {t('timeline.loadErrorLayers', {
+          slot,
+          layers: more > 0 ? `${shown} +${more}` : shown,
+        })}
       </div>
     </div>
   )

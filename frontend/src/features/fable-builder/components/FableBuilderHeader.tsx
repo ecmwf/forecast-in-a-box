@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  BrushCleaning,
   CalendarClock,
   Check,
   ChevronDown,
@@ -23,7 +24,7 @@ import {
   Undo2,
   Upload,
 } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { ValidationStatusBadge } from './shared/ValidationStatus'
 import { DraftStatus } from './DraftStatus'
@@ -110,6 +111,12 @@ export function FableBuilderHeader({
       : !isValid
         ? t('header.reviewTooltipInvalid')
         : undefined
+
+  const navigate = useNavigate()
+  // Routes through the fresh intent — the workbench picker guards an occupied bench.
+  function handleNewConfiguration(): void {
+    void navigate({ to: '/configure', search: { fresh: true } })
+  }
 
   async function handleShare(): Promise<void> {
     const ok = await copyToClipboard(window.location.href)
@@ -300,6 +307,23 @@ export function FableBuilderHeader({
                     </Tooltip>
                   </div>
 
+                  <Tooltip>
+                    <TooltipTrigger render={<span className="inline-flex" />}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={handleNewConfiguration}
+                        aria-label={t('header.newConfiguration')}
+                      >
+                        <BrushCleaning className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t('header.newConfiguration')}
+                    </TooltipContent>
+                  </Tooltip>
+
                   {/* Save Config with dropdown for more actions */}
                   <ButtonGroup>
                     <SaveConfigPopover
@@ -414,6 +438,18 @@ export function FableBuilderHeader({
                     <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-40">
+                    <DropdownMenuItem onClick={undo} disabled={!canUndo}>
+                      <Undo2 className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="whitespace-nowrap">
+                        {t('header.undo')}
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={redo} disabled={!canRedo}>
+                      <Redo2 className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="whitespace-nowrap">
+                        {t('header.redo')}
+                      </span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleShare}
                       disabled={!hasBlocks}
@@ -436,6 +472,12 @@ export function FableBuilderHeader({
                       <Upload className="mr-2 h-4 w-4 shrink-0" />
                       <span className="whitespace-nowrap">
                         {t('header.loadConfig')}
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleNewConfiguration}>
+                      <BrushCleaning className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="whitespace-nowrap">
+                        {t('header.newConfiguration')}
                       </span>
                     </DropdownMenuItem>
                     <DropdownMenuItem

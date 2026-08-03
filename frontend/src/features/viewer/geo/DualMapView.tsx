@@ -15,7 +15,7 @@
  * DOM crosshair mirrors the cursor position across both panels.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useOlMapBase } from '../hooks/useOlMapBase'
 import { useBasemap } from '../hooks/useBasemap'
@@ -31,7 +31,7 @@ import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
 import { useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
-import { LoadErrorBadge } from './SingleMapView'
+import { LoadErrorBadge, erroredTitles } from './SingleMapView'
 import { LoupeOverlay } from './LoupeOverlay'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
@@ -99,6 +99,7 @@ export function DualMapView({
   annotationHighlightId: string | null
   onAnnotationCreate: (
     coordinate: [number, number],
+    sourceId: string | null,
     slot: SourceSlot | null,
   ) => void
   onAnnotationEdit: (id: string) => void
@@ -255,6 +256,7 @@ function DualMapPanel({
   annotationHighlightId: string | null
   onAnnotationCreate: (
     coordinate: [number, number],
+    sourceId: string | null,
     slot: SourceSlot | null,
   ) => void
   onAnnotationEdit: (id: string) => void
@@ -289,6 +291,7 @@ function DualMapPanel({
     opacity: basemapOpacity,
     incLoading,
     decLoading,
+    mapVersion,
   })
   const stack = useWmsLayerStack(mapRef, source.baseUrl, source.layers, {
     zBase: 100,
@@ -299,6 +302,7 @@ function DualMapPanel({
     incLoading,
     decLoading,
     onLoadResult: source.onLoadResult,
+    mapVersion,
   })
 
   useMeasure(
@@ -314,21 +318,26 @@ function DualMapPanel({
     layers: source.layers,
     activeOrder: source.activeOrder,
     timeSteps: source.timeSteps,
+    mapVersion,
   })
-  const pointer = usePointerReadout(mapRef)
-  useContextOverlays(mapRef, overlays)
-  const overlayHover = useOverlayHover(mapRef, overlays)
+  const pointer = usePointerReadout(mapRef, mapVersion)
+  useContextOverlays(mapRef, overlays, mapVersion)
+  const overlayHover = useOverlayHover(mapRef, overlays, mapVersion)
+  // A panel shows exactly its source's pins; creations bind to it.
+  const pinScope = useMemo(() => [source.id], [source.id])
   useAnnotationLayer(
     mapRef,
     annotations,
-    source.slot,
+    pinScope,
     annotateArmed,
     {
-      onCreate: onAnnotationCreate,
+      onCreate: (coordinate) =>
+        onAnnotationCreate(coordinate, source.id, source.slot),
       onEdit: onAnnotationEdit,
       onMove: onAnnotationMove,
     },
     annotationHighlightId,
+    mapVersion,
   )
 
   useEffect(() => {
@@ -432,7 +441,11 @@ function DualMapPanel({
         </div>
       )}
       {stack.errorCount > 0 && !source.hiddenAtTime && (
-        <LoadErrorBadge slot={source.slot.toUpperCase()} side="left" />
+        <LoadErrorBadge
+          slot={source.slot.toUpperCase()}
+          side="left"
+          layers={erroredTitles(stack.erroredNames, source.layers)}
+        />
       )}
       {source.timeTag && (
         <div className="absolute top-10 left-2 z-10 rounded-md border border-border bg-background/90 px-2 py-1 font-mono text-xs font-medium shadow-sm backdrop-blur-sm">

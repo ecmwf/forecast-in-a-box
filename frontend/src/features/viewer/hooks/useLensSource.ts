@@ -18,13 +18,16 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  appendWmsParams,
+  CapabilitiesError,
+  fetchCapabilities,
   groupLayers,
   isLoopbackUrl,
-  parseCapabilities,
-  toWmsEndpoint,
 } from '../wms-capabilities'
-import type { LayerGroup, ParsedLayer } from '../wms-capabilities'
+import type {
+  LayerGroup,
+  ParsedCapabilities,
+  ParsedLayer,
+} from '../wms-capabilities'
 
 // GetCapabilities retry — lens `running` precedes WMS-port readiness.
 // Loopback = our own lens: a cold SkinnyWMS boot can take tens of
@@ -39,8 +42,6 @@ const LOOPBACK_RETRY_DELAYS_MS = [
 export function wmsCapabilitiesKey(baseUrl: string): ReadonlyArray<string> {
   return ['wms-capabilities', baseUrl]
 }
-
-export type ParsedCapabilities = ReturnType<typeof parseCapabilities>
 
 const NO_LAYERS: ReadonlyArray<ParsedLayer> = []
 
@@ -66,18 +67,14 @@ export function useLensSource(baseUrl: string | null): LensSource {
   const query = useQuery({
     queryKey: wmsCapabilitiesKey(baseUrl ?? ''),
     enabled: baseUrl !== null,
-    queryFn: async ({ signal }): Promise<ParsedCapabilities> => {
-      const res = await fetch(
-        appendWmsParams(
-          toWmsEndpoint(baseUrl!),
-          'service=WMS&version=1.3.0&request=GetCapabilities',
-        ),
-        { signal },
-      )
-      if (!res.ok) throw new Error(`GetCapabilities ${res.status}`)
-      return parseCapabilities(await res.text())
-    },
-    retry: (failureCount) => failureCount <= retryDelays.length,
+    queryFn: ({ signal }): Promise<ParsedCapabilities> =>
+      fetchCapabilities(baseUrl!, signal),
+    // Timeout/interruption burned a long attempt — surface it; Retry stays.
+    retry: (failureCount, error) =>
+      !(
+        error instanceof CapabilitiesError &&
+        (error.kind === 'timeout' || error.kind === 'interrupted')
+      ) && failureCount <= retryDelays.length,
     retryDelay: (failureCount) =>
       retryDelays[Math.min(failureCount, retryDelays.length) - 1],
     // Stale-while-revalidate: cached instantly, silently refreshed every

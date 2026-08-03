@@ -45,7 +45,7 @@ import {
 import { LegendImage } from '../components/LegendImage'
 import { SLOT_CHIP_CLASS } from './GeoLayerBrowser'
 import { parseGeojsonOverlay } from './overlays'
-import { downloadAnnotationsGeojson } from './annotations'
+import { ANNOTATION_COLORS, downloadAnnotationsGeojson } from './annotations'
 import { layerIsTimeAware, pairIsStatic } from './layer-pairing'
 import type { ScaleBand } from '../wms-capabilities'
 import type { ContextOverlay } from './overlays'
@@ -84,6 +84,8 @@ export interface AnnotationControls {
   locate: (id: string) => void
   /** Echo sidebar-row hover as an enlarged pin; null clears. */
   setHighlight: (id: string | null) => void
+  /** Where the pin's source is shown now ("A", "A · B", shared, hidden). */
+  attribution: (annotation: MapAnnotation) => string
 }
 
 export interface OpacityTiers {
@@ -217,8 +219,12 @@ export function GeoActiveLayersPanel({
   const focusedSource =
     focusSlot === 'a' ? sources.a : focusSlot === 'b' ? sources.b : null
 
+  // Width steps mirror GeoLayerBrowser — the sidebars stay symmetric.
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background">
+    <aside
+      data-geo-panel="left"
+      className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background lg:w-[var(--geo-left-w,15rem)] xl:w-[var(--geo-left-w,18rem)]"
+    >
       <div className="space-y-2.5 border-b border-border bg-muted/40 px-3 pt-2.5 pb-3">
         <div className="flex items-center justify-between">
           <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -371,7 +377,7 @@ function AnnotationsSection({
         </Button>
       </div>
       <ul className="space-y-1">
-        {annotations.items.map((annotation, index) => (
+        {annotations.items.map((annotation) => (
           <li
             key={annotation.id}
             className="group flex items-start gap-1.5"
@@ -379,35 +385,25 @@ function AnnotationsSection({
             onMouseLeave={() => annotations.setHighlight(null)}
           >
             <span
-              className={cn(
-                'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold text-white',
-                annotation.slot === 'a'
-                  ? 'bg-blue-600 dark:bg-blue-500'
-                  : annotation.slot === 'b'
-                    ? 'bg-orange-600 dark:bg-orange-500'
-                    : 'bg-slate-700 dark:bg-slate-500',
-              )}
-              title={
-                annotation.slot
-                  ? annotation.slot.toUpperCase()
-                  : t('annotations.slotShared')
-              }
+              className="mt-0.5 flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-0.5 font-mono text-[10px] font-bold text-white"
+              style={{ backgroundColor: ANNOTATION_COLORS[annotation.color] }}
+              title={annotations.attribution(annotation)}
             >
-              {index + 1}
+              {annotation.label}
             </span>
             <button
               type="button"
               onClick={() => annotations.locate(annotation.id)}
               className="min-w-0 flex-1 rounded text-left text-xs leading-snug hover:bg-accent"
-              title={t('annotations.locate', { number: index + 1 })}
+              title={t('annotations.locate', { label: annotation.label })}
             >
               <span className="line-clamp-2">{annotation.text}</span>
             </button>
             <button
               type="button"
               onClick={() => annotations.edit(annotation.id)}
-              aria-label={t('annotations.edit', { number: index + 1 })}
-              title={t('annotations.edit', { number: index + 1 })}
+              aria-label={t('annotations.edit', { label: annotation.label })}
+              title={t('annotations.edit', { label: annotation.label })}
               className="rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100"
             >
               <Pencil className="h-3 w-3" />
@@ -415,7 +411,7 @@ function AnnotationsSection({
             <button
               type="button"
               onClick={() => annotations.remove(annotation.id)}
-              aria-label={t('annotations.remove', { number: index + 1 })}
+              aria-label={t('annotations.remove', { label: annotation.label })}
               className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <X className="h-3 w-3" />

@@ -53,7 +53,6 @@ import {
 } from '@/features/executions/utils/taskLineage'
 import { humaniseTaskName } from '@/features/executions/utils/taskName'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
-import { ExperimentalNotice } from '@/features/executions/components/ExperimentalNotice'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { P } from '@/components/base/typography'
 
@@ -293,7 +292,6 @@ export function CompilationPanel({
 
   return (
     <div className="flex h-[min(640px,calc(100vh-22rem))] min-h-[420px] flex-col gap-2 min-[1280px]:!h-full min-[1280px]:min-h-0">
-      <ExperimentalNotice />
       <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
         <span>{t('compilation.fullDescription')}</span>
         <span>{t('compilation.taskCount', { count: tasks.length })}</span>

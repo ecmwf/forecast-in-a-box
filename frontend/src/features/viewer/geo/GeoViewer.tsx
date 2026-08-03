@@ -15,11 +15,13 @@
  * are source-independent, and the camera survives because the `ol/View`
  * is persistent.
  *
- * Owns: per-source capabilities (useLensSource ×2), the pairing/selection
- * model (linked by default, auto-unlinks on zero overlap), the shared
- * epoch-keyed valid-time timeline, one persistent `ol/View` (camera
- * survives mode switches — maps remount, the View doesn't), and the mode
- * toolbar. Map mechanics live in SingleMapView / DualMapView.
+ * Composition root. Owns: per-source capabilities (useLensSource ×2),
+ * the pairing/selection model, one persistent `ol/View` (camera survives
+ * mode switches — maps remount, the View doesn't), mode/focus state, the
+ * GetMap failure log, and the sidebar/sheet layout. Subsystems live in
+ * hooks — useViewerTimeline (axis + link policy), useViewerAnnotations,
+ * useViewerUrlState (restore/report), useViewerExport (capture/copy) —
+ * and map mechanics in SingleMapView / DualMapView.
  */
 
 import {
@@ -33,9 +35,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import 'ol/ol.css'
 import { RefreshCw } from 'lucide-react'
-import { useBlocker } from '@tanstack/react-router'
-import { fromLonLat, toLonLat } from 'ol/proj'
-import { unByKey } from 'ol/Observable'
+import { fromLonLat } from 'ol/proj'
 import { useLensSource } from '../hooks/useLensSource'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { formatStep } from '../format'
@@ -45,53 +45,36 @@ import {
   rebaseLensUrl,
   skinnyWmsBasemap,
 } from '../wms-capabilities'
-import { canvasToPngBlob, joinCanvasesHorizontally } from '../map-export'
-import { CollapsedSidebarHandle } from '../components/CollapsedSidebarHandle'
-import { composeCaptures } from './export-pipeline'
+import { GeoPanelResizeStrip } from './GeoPanelResizeStrip'
+import { useGeoPanelWidths } from './useGeoPanelWidths'
 import { buildPairs } from './layer-pairing'
-import {
-  buildCompareTimeline,
-  buildSourceTimeIndex,
-  locateEpoch,
-} from './compare-timeline'
 import { useCompareSelection } from './useCompareSelection'
-import {
-  defaultToleranceMs,
-  effectiveAvailability,
-  effectiveFailures,
-  formatOffset,
-  medianStepMs,
-  offsetBounds,
-  resolveSourceTime,
-} from './time-link'
 import { useGetMapFailureLog } from './getmap-failures'
 import { GeoViewerSkeleton } from './GeoViewerSkeleton'
 import { GeoToolbar } from './GeoToolbar'
 import { GeoExportDialog } from './GeoExportDialog'
 import { CompareHelpDialog } from './CompareHelpDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
-import { downloadAnnotationsGeojson, nextAnnotationId } from './annotations'
+import { useViewerAnnotations } from './useViewerAnnotations'
+import { useViewerUrlState } from './useViewerUrlState'
+import { useViewerExport } from './useViewerExport'
+import { useViewerTimeline } from './useViewerTimeline'
+import { downloadAnnotationsGeojson } from './annotations'
 import { useGeoShortcuts } from './useGeoShortcuts'
 import { GeoTimeSlider } from './GeoTimeSlider'
 import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
+import type { GeoPanelSide } from './useGeoPanelWidths'
 import type { MapAnnotation } from './annotations'
-import type { AnnotationDraft } from './AnnotationEditorDialog'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
-import type { ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
-import type {
-  CaptureResult,
-  CompareMapSource,
-  CompareMode,
-  CompareModeOptions,
-} from './types'
-import type { TimeLinkMode } from './time-link'
+import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { ViewerUrlState } from './view-url-state'
+import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -105,13 +88,10 @@ import {
 } from '@/components/ui/alert-dialog'
 import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
-import { copyToClipboard } from '@/lib/clipboard'
-import { showToast } from '@/lib/toast'
-import { createLogger } from '@/lib/logger'
-
-const log = createLogger('GeoViewer')
 
 export interface GeoViewerSource {
+  /** Stable source identity (basket entry ref) — annotations bind to it. */
+  id: string
   baseUrl: string
   label: string
 }
@@ -141,6 +121,7 @@ export function GeoViewer({
   const { t: tExec } = useTranslation('executions')
 
   const hasB = b !== null
+  const bId = b?.id ?? null
   const sourceA = useLensSource(a.baseUrl)
   const sourceB = useLensSource(b?.baseUrl ?? null)
 
@@ -197,84 +178,6 @@ export function GeoViewer({
   const activeOrderA = selection.activeOrderFor('a')
   const activeOrderB = selection.activeOrderFor('b')
 
-  // -------- URL view-state restore (one-shot per slot) --------
-  const pendingLayersRef = useRef<{
-    a: ReadonlyArray<string>
-    b: ReadonlyArray<string>
-    unlinked: boolean
-  } | null>(
-    initialViewRef.current?.layersA?.length ||
-      initialViewRef.current?.layersB?.length
-      ? {
-          a: initialViewRef.current.layersA ?? [],
-          b: initialViewRef.current.layersB ?? [],
-          unlinked: initialViewRef.current.unlinkedLayers === true,
-        }
-      : null,
-  )
-  // Mirrors the ref as state so the report effect re-runs on completion.
-  const [restorePending, setRestorePending] = useState({
-    a: (pendingLayersRef.current?.a.length ?? 0) > 0,
-    b: (pendingLayersRef.current?.b.length ?? 0) > 0,
-  })
-  useEffect(() => {
-    const pending = pendingLayersRef.current
-    if (!pending) return
-    // Switch the selection model first — toggles must land per-side.
-    if (pending.unlinked && selection.linkMode === 'linked') {
-      selection.setLinkMode('unlinked')
-      return
-    }
-    // Both slots can settle in one pass — stale isPairActive would re-toggle.
-    const toggledNow = new Set<string>()
-    for (const [slot, source] of [
-      ['a', sourceA],
-      ['b', sourceB],
-    ] as const) {
-      const names = pending[slot]
-      if (names.length === 0 || source.loadingLayers) continue
-      // B may still be starting; if it never runs the URL keeps the value.
-      if (slot === 'b' && !hasB) continue
-      const available = new Set(source.layers.map((l) => l.name))
-      // Reverse: toggles prepend, so the first name ends up on top.
-      for (const name of [...names].reverse()) {
-        if (!available.has(name)) continue
-        if (pending.unlinked) {
-          if (!selection.isLayerActive(slot, name)) {
-            selection.toggleLayer(slot, name)
-          }
-        } else {
-          const pair = pairing.pairs.find(
-            (p) => p.perSource[slot]?.name === name,
-          )
-          if (
-            pair &&
-            !toggledNow.has(pair.key) &&
-            !selection.isPairActive(pair.key)
-          ) {
-            toggledNow.add(pair.key)
-            selection.togglePair(pair.key)
-          }
-        }
-      }
-      pending[slot] = []
-    }
-    if (pending.a.length === 0 && pending.b.length === 0) {
-      pendingLayersRef.current = null
-    }
-    setRestorePending((prev) => {
-      const next = { a: pending.a.length > 0, b: pending.b.length > 0 }
-      return prev.a === next.a && prev.b === next.b ? prev : next
-    })
-    // Meaningful bits only — selection/source identities churn every render.
-  }, [
-    sourceA.loadingLayers,
-    sourceB.loadingLayers,
-    hasB,
-    pairing.pairs,
-    selection.linkMode,
-  ])
-
   // Opacity hierarchy: global × per-source × per-layer (per-layer lives in
   // the selection; the product of the first two feeds the map stacks).
   const [globalOpacity, setGlobalOpacity] = useState(1)
@@ -286,75 +189,6 @@ export function GeoViewer({
       setSourceOpacity((prev) => ({ ...prev, [slot]: value })),
     [],
   )
-
-  // -------- Valid-time alignment (epoch-keyed union) --------
-  const timeIndexA = useMemo(
-    () => buildSourceTimeIndex(sourceA.layers, activeOrderA),
-    [sourceA.layers, activeOrderA],
-  )
-  const timeIndexB = useMemo(
-    () => buildSourceTimeIndex(sourceB.layers, activeOrderB),
-    [sourceB.layers, activeOrderB],
-  )
-  const timeline = useMemo(
-    () => buildCompareTimeline(timeIndexA, timeIndexB),
-    [timeIndexA, timeIndexB],
-  )
-  // Raw per-source step strings, epoch-ordered (prefetch warmup).
-  const rawStepsA = useMemo(
-    () =>
-      timeIndexA.epochs.flatMap((e) => {
-        const raw = timeIndexA.rawByEpoch.get(e)
-        return raw !== undefined ? [raw] : []
-      }),
-    [timeIndexA],
-  )
-  const rawStepsB = useMemo(
-    () =>
-      timeIndexB.epochs.flatMap((e) => {
-        const raw = timeIndexB.rawByEpoch.get(e)
-        return raw !== undefined ? [raw] : []
-      }),
-    [timeIndexB],
-  )
-  const [timeStep, setTimeStep] = useState(0)
-  // Focus window over the union axis (indices into timeline.epochs).
-  const [timeClip, setTimeClip] = useState<[number, number] | null>(null)
-  // Re-locate the selected instant when the union changes (layer add/
-  // remove) instead of snapping to 0 — URL-seeded, so it also restores `t`.
-  const lastEpochRef = useRef<number | null>(
-    initialViewRef.current?.timeMs ?? null,
-  )
-  useEffect(() => {
-    const located = locateEpoch(timeline.epochs, lastEpochRef.current)
-    // Functional update: `timeStep` stays out of the deps on purpose —
-    // this must run only when the union changes, not on every scrub.
-    if (located >= 0) setTimeStep((step) => (step === located ? step : located))
-  }, [timeline.epochs])
-  const onTimeChange = useCallback(
-    (index: number) => {
-      setTimeStep(index)
-      lastEpochRef.current =
-        index >= 0 && index < timeline.epochs.length
-          ? timeline.epochs[index]
-          : null
-    },
-    [timeline.epochs],
-  )
-
-  // Drop a stale clip when the union changes shape under it.
-  useEffect(() => {
-    if (timeClip && timeClip[1] > timeline.epochs.length - 1) setTimeClip(null)
-  }, [timeClip, timeline.epochs.length])
-
-  const clipStart = timeClip ? timeClip[0] : 0
-  const clipEnd = timeClip ? timeClip[1] : timeline.epochs.length - 1
-  const safeStep = Math.max(
-    Math.max(0, clipStart),
-    Math.min(timeStep, Math.min(timeline.epochs.length - 1, clipEnd)),
-  )
-  const currentEpoch: number | null =
-    timeline.epochs.length > 0 ? timeline.epochs[safeStep] : null
 
   // Measure tools (mode-independent): current tool + clear signal.
   const [measureMode, setMeasureMode] = useState<MeasureMode>('none')
@@ -371,155 +205,6 @@ export function GeoViewer({
     loupeZoom: 2,
     loupeLatched: false,
   })
-
-  // -------- Time-link policy (exact / nearest / offset / independent) --
-  const [timeLinkMode, setTimeLinkMode] = useState<TimeLinkMode>(
-    () => initialViewRef.current?.timeLink ?? 'exact',
-  )
-  const [offsetMs, setOffsetMs] = useState(
-    () => initialViewRef.current?.offsetMs ?? 0,
-  )
-  // From the RAW indexes — displayTimeline already shifts B by Δ, so
-  // deriving bounds from it would feed back on itself.
-  const offsetMeta = useMemo(() => {
-    const [minMs, maxMs] = offsetBounds(timeIndexA, timeIndexB)
-    const epochsA = timeIndexA.epochs
-    const epochsB = timeIndexB.epochs
-    const empty = epochsA.length === 0 || epochsB.length === 0
-    return {
-      minMs,
-      maxMs,
-      stepMs: Math.min(medianStepMs(timeIndexA), medianStepMs(timeIndexB)),
-      alignStartsMs: empty ? null : epochsB[0] - epochsA[0],
-      alignEndsMs: empty
-        ? null
-        : epochsB[epochsB.length - 1] - epochsA[epochsA.length - 1],
-    }
-  }, [timeIndexA, timeIndexB])
-  const [indepIndex, setIndepIndex] = useState<Record<SourceSlot, number>>({
-    a: 0,
-    b: 0,
-  })
-
-  const resolvedA = useMemo(() => {
-    if (timeLinkMode === 'independent') {
-      const i = Math.max(
-        0,
-        Math.min(indepIndex.a, timeIndexA.epochs.length - 1),
-      )
-      const epoch = timeIndexA.epochs.length > 0 ? timeIndexA.epochs[i] : null
-      return {
-        raw: epoch !== null ? (timeIndexA.rawByEpoch.get(epoch) ?? null) : null,
-        epoch,
-        offsetMs: null,
-        hidden: false,
-      }
-    }
-    return resolveSourceTime(
-      timeIndexA,
-      currentEpoch,
-      timeLinkMode === 'exact' ? 'exact' : 'nearest',
-      defaultToleranceMs(timeIndexA),
-    )
-  }, [timeLinkMode, indepIndex.a, timeIndexA, currentEpoch])
-
-  const resolvedB = useMemo(() => {
-    if (timeLinkMode === 'independent') {
-      const i = Math.max(
-        0,
-        Math.min(indepIndex.b, timeIndexB.epochs.length - 1),
-      )
-      const epoch = timeIndexB.epochs.length > 0 ? timeIndexB.epochs[i] : null
-      return {
-        raw: epoch !== null ? (timeIndexB.rawByEpoch.get(epoch) ?? null) : null,
-        epoch,
-        offsetMs: null,
-        hidden: false,
-      }
-    }
-    const target =
-      timeLinkMode === 'offset' && currentEpoch !== null
-        ? currentEpoch + offsetMs
-        : currentEpoch
-    return resolveSourceTime(
-      timeIndexB,
-      target,
-      timeLinkMode === 'exact' ? 'exact' : 'nearest',
-      defaultToleranceMs(timeIndexB),
-    )
-  }, [timeLinkMode, indepIndex.b, timeIndexB, currentEpoch, offsetMs])
-
-  const resolvedFor = (slot: SourceSlot) =>
-    slot === 'a' ? resolvedA : resolvedB
-
-  // Per-side hover instants for the timeline tooltip: what each side
-  // would display if the slider stood at the hovered epoch.
-  const hoverTimes = useCallback(
-    (epoch: number) => {
-      if (timeLinkMode === 'exact' || timeLinkMode === 'independent') {
-        return null
-      }
-      const ra = resolveSourceTime(
-        timeIndexA,
-        epoch,
-        'nearest',
-        defaultToleranceMs(timeIndexA),
-      )
-      const rb = resolveSourceTime(
-        timeIndexB,
-        timeLinkMode === 'offset' ? epoch + offsetMs : epoch,
-        'nearest',
-        defaultToleranceMs(timeIndexB),
-      )
-      const label = (e: number | null) =>
-        e !== null ? formatStep(new Date(e).toISOString()) : null
-      return { a: label(ra.epoch), b: label(rb.epoch) }
-    },
-    [timeLinkMode, timeIndexA, timeIndexB, offsetMs],
-  )
-
-  // Tracks (and the A/B/A∩B window presets) show what each side WOULD
-  // render at every axis position under the current time-link policy —
-  // under a +48h offset, B's usable window visibly shifts off the tail.
-  const displayTimeline = useMemo(() => {
-    if (timeLinkMode === 'exact' || timeLinkMode === 'independent') {
-      return timeline
-    }
-    return {
-      ...timeline,
-      availability: {
-        a: effectiveAvailability(
-          timeline.epochs,
-          timeIndexA,
-          'nearest',
-          0,
-          defaultToleranceMs(timeIndexA),
-        ),
-        b: effectiveAvailability(
-          timeline.epochs,
-          timeIndexB,
-          'nearest',
-          timeLinkMode === 'offset' ? offsetMs : 0,
-          defaultToleranceMs(timeIndexB),
-        ),
-      },
-    }
-  }, [timeline, timeIndexA, timeIndexB, timeLinkMode, offsetMs])
-
-  // Stable per-slot identities: these feed effect deps in the layer
-  // stacks, where a fresh closure per render would reconcile every render.
-  const resolveTimeA = useMemo(
-    () =>
-      (layer: ParsedLayer): string | null =>
-        layer.time ? resolvedA.raw : null,
-    [resolvedA],
-  )
-  const resolveTimeB = useMemo(
-    () =>
-      (layer: ParsedLayer): string | null =>
-        layer.time ? resolvedB.raw : null,
-    [resolvedB],
-  )
 
   // -------- GetMap failure cache (advertised-but-not-served instants) --
   const failures = useGetMapFailureLog()
@@ -557,49 +242,43 @@ export function GeoViewer({
     () => retainFailureLayers('b', activeOrderB),
     [retainFailureLayers, activeOrderB],
   )
-  // Marks projected onto the shared axis exactly like availability, so a
-  // mark paints where the failing instant is actually displayed.
-  const trackFailures = useMemo(() => {
-    const resolveMode =
-      timeLinkMode === 'nearest' || timeLinkMode === 'offset'
-        ? ('nearest' as const)
-        : ('exact' as const)
-    return {
-      a: effectiveFailures(
-        timeline.epochs,
-        timeIndexA,
-        failures.failedEpochs.a,
-        resolveMode,
-        0,
-        defaultToleranceMs(timeIndexA),
-      ),
-      b: effectiveFailures(
-        timeline.epochs,
-        timeIndexB,
-        failures.failedEpochs.b,
-        resolveMode,
-        timeLinkMode === 'offset' ? offsetMs : 0,
-        defaultToleranceMs(timeIndexB),
-      ),
-    }
-  }, [
-    timeline.epochs,
+  // -------- Valid-time alignment + link policy --------
+  const {
     timeIndexA,
     timeIndexB,
-    failures.failedEpochs,
+    timeline,
+    displayTimeline,
+    rawStepsA,
+    rawStepsB,
+    safeStep,
+    currentEpoch,
+    onTimeChange,
+    timeClip,
+    setTimeClip,
     timeLinkMode,
+    setTimeLinkMode,
     offsetMs,
-  ])
-
-  // Offset tag relative to the SHARED axis (A's requested instant), so a
-  // fixed-Δ B honestly reads e.g. "B +6 h".
-  const timeTagFor = (slot: SourceSlot): string | null => {
-    if (timeLinkMode === 'independent') return null
-    const resolved = resolvedFor(slot)
-    if (resolved.epoch === null || currentEpoch === null) return null
-    const delta = resolved.epoch - currentEpoch
-    return delta === 0 ? null : formatOffset(delta)
-  }
+    setOffsetMs,
+    offsetMeta,
+    indepIndex,
+    setIndepIndex,
+    onSlotsSwapped,
+    onSourceReplaced,
+    resolvedA,
+    resolvedB,
+    resolveTimeA,
+    resolveTimeB,
+    hoverTimes,
+    trackFailures,
+    timeTagFor,
+  } = useViewerTimeline({
+    sourceA,
+    sourceB,
+    activeOrderA,
+    activeOrderB,
+    initial: initialViewRef.current,
+    failedLayers: failures.failedLayers,
+  })
 
   // -------- Fit plumbing (map components register their fit action) ----
   const [fitAction, setFitAction] = useState<(() => void) | null>(null)
@@ -608,95 +287,7 @@ export function GeoViewer({
     [],
   )
 
-  // -------- Export (map components register their capture action) ------
-  const [captureAction, setCaptureAction] = useState<
-    (() => Promise<Array<CaptureResult>>) | null
-  >(null)
-  // Mirrored in a ref: captureFor invokes the action AFTER waiting out a
-  // captureOnly re-render, so it must read the registration made for that
-  // render — its own state binding still closes over captureOnly = null.
-  const captureActionRef = useRef<(() => Promise<Array<CaptureResult>>) | null>(
-    null,
-  )
-  const onRegisterCapture = useCallback(
-    (capture: (() => Promise<Array<CaptureResult>>) | null) => {
-      captureActionRef.current = capture
-      setCaptureAction(() => capture)
-    },
-    [],
-  )
-  const [exportOpen, setExportOpen] = useState(false)
-
-  // Per-slot copy re-renders the single map with only that slot showing;
-  // side-by-side just filters its per-map captures.
-  const [captureOnly, setCaptureOnly] = useState<SourceSlot | null>(null)
-  const captureFor = async (
-    only: SourceSlot | null,
-  ): Promise<Array<CaptureResult>> => {
-    const capture = captureActionRef.current
-    if (!capture) throw new Error('Capture unavailable')
-    if (only === null) return capture()
-    setCaptureOnly(only)
-    try {
-      // Two frames: React commit, then OL applies the opacity change.
-      await new Promise((r) =>
-        requestAnimationFrame(() => requestAnimationFrame(r)),
-      )
-      const results = await (captureActionRef.current ?? capture)()
-      return results.filter((c) => c.slot === only)
-    } finally {
-      setCaptureOnly(null)
-    }
-  }
-
-  // Unawaited promise: the item must be built inside the gesture (Safari).
-  // Combined view joins side-by-side maps into one image — the clipboard
-  // holds a single item.
-  const copyView = (only: SourceSlot | null) => {
-    if (!captureAction) return
-    copyToClipboard(
-      'image/png',
-      composeCaptures({
-        capture: () => captureFor(only),
-        legends: exportLegends,
-        annotations,
-      }).then((canvases) => {
-        const joined = joinCanvasesHorizontally(canvases)
-        return joined ? canvasToPngBlob(joined) : null
-      }),
-    )
-      .then(() => showToast.success(tExec('lens.mapCopied')))
-      .catch((err: unknown) => {
-        log.error('View copy failed', { error: err })
-        showToast.error(tExec('lens.mapCopyFailed'))
-      })
-  }
-
-  // Active layers' legends for the export (per slot, lens URLs rebased,
-  // external URLs verbatim — rebaseLensUrl handles both).
   const bBaseUrl = b?.baseUrl ?? null
-  const exportLegends = useMemo(() => {
-    const specs: Array<{ slot: SourceSlot; title: string; url: string }> = []
-    const slots: Array<
-      readonly [SourceSlot, typeof sourceA, string, ReadonlyArray<string>]
-    > = [['a', sourceA, a.baseUrl, activeOrderA]]
-    if (bBaseUrl !== null) {
-      slots.push(['b', sourceB, bBaseUrl, activeOrderB])
-    }
-    for (const [slot, source, baseUrl, order] of slots) {
-      for (const name of order) {
-        const layer = source.layers.find((l) => l.name === name)
-        const legendUrl = layer?.styles[0]?.legendUrl
-        if (!layer || !legendUrl) continue
-        specs.push({
-          slot,
-          title: layer.title,
-          url: rebaseLensUrl(legendUrl, baseUrl),
-        })
-      }
-    }
-    return specs
-  }, [sourceA, sourceB, a.baseUrl, bBaseUrl, activeOrderA, activeOrderB])
 
   // Basemap — one choice driving every panel.
   const [basemapId, setBasemapId] = useState<string>(
@@ -718,50 +309,23 @@ export function GeoViewer({
     }
   }, [availableBasemaps, basemapId, sourceA.loadingLayers])
 
-  // -------- URL view-state report (page debounces into the URL) --------
-  useEffect(() => {
-    if (!onViewStateChange) return
-    const partial: Partial<ViewerUrlState> = {
-      unlinkedLayers: selection.linkMode === 'unlinked',
-      timeLink: timeLinkMode,
-      offsetMs,
-      basemap: basemapId === DEFAULT_BASEMAP_ID ? undefined : basemapId,
-    }
-    // Hold restored fields until slots settle — mid-load writes would strip them.
-    if (!restorePending.a) partial.layersA = activeOrderA
-    if (!restorePending.b) partial.layersB = activeOrderB
-    if (!restorePending.a && !restorePending.b) {
-      partial.timeMs = currentEpoch ?? undefined
-    }
-    onViewStateChange(partial)
-  }, [
+  // -------- URL view-state restore + report --------
+  useViewerUrlState({
+    initial: initialViewRef.current,
     onViewStateChange,
+    viewRef,
+    selection,
+    pairing,
+    sourceA,
+    sourceB,
+    hasB,
     activeOrderA,
     activeOrderB,
-    selection.linkMode,
-    restorePending,
     currentEpoch,
     timeLinkMode,
     offsetMs,
     basemapId,
-  ])
-  useEffect(() => {
-    const view = viewRef.current
-    if (!onViewStateChange || !view) return
-    const report = () => {
-      const center = view.getCenter()
-      const zoom = view.getZoom()
-      if (!center || zoom === undefined) return
-      const [lon, lat] = toLonLat(center)
-      if (![lon, lat, zoom].every(Number.isFinite)) return
-      onViewStateChange({ camera: { lon, lat, zoom } })
-    }
-    const keys = [
-      view.on('change:center', report),
-      view.on('change:resolution', report),
-    ]
-    return () => unByKey(keys)
-  }, [onViewStateChange])
+  })
 
   // Time-step prefetch (default off — bandwidth-heavy).
   const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)
@@ -821,6 +385,65 @@ export function GeoViewer({
 
   // Source focus: a slot views only that source (UI collapses to it); null compares both.
   const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
+
+  // Swap: slot-keyed state follows the content. Replacement: pair-tuned
+  // time linking resets (re-adding the SAME B keeps its settings).
+  const prevIdsRef = useRef<{ a: string; b: string | null }>({
+    a: a.id,
+    b: bId,
+  })
+  const lastBIdRef = useRef<string | null>(bId)
+  const swapSelectionSlots = selection.onSlotsSwapped
+  useEffect(() => {
+    const prev = prevIdsRef.current
+    prevIdsRef.current = { a: a.id, b: bId }
+    const lastB = lastBIdRef.current
+    if (bId !== null) lastBIdRef.current = bId
+    if (prev.a === bId && prev.b === a.id && a.id !== bId) {
+      setSourceOpacity((p) => ({ a: p.b, b: p.a }))
+      setPinnedLegends(
+        (p) =>
+          new Set(
+            Array.from(p).map((k) =>
+              k.startsWith('a:') ? `b:${k.slice(2)}` : `a:${k.slice(2)}`,
+            ),
+          ),
+      )
+      setFocusSlot((f) => (f === 'a' ? 'b' : f === 'b' ? 'a' : null))
+      swapSelectionSlots()
+      onSlotsSwapped()
+      return
+    }
+    if (prev.a !== a.id) onSourceReplaced('a')
+    if (bId !== null && lastB !== null && bId !== lastB) onSourceReplaced('b')
+  }, [a.id, bId, swapSelectionSlots, onSlotsSwapped, onSourceReplaced])
+
+  // Prune unserved unlinked names once a catalog settles healthy (absent B
+  // keeps its list). Declared after the swap detector — remap lands first.
+  const retainServable = selection.retainServable
+  useEffect(() => {
+    if (sourceA.loadingLayers || sourceA.retrying || sourceA.error) return
+    retainServable('a', new Set(sourceA.layers.map((l) => l.name)))
+  }, [
+    retainServable,
+    sourceA.loadingLayers,
+    sourceA.retrying,
+    sourceA.error,
+    sourceA.layers,
+  ])
+  useEffect(() => {
+    if (!hasB || sourceB.loadingLayers || sourceB.retrying || sourceB.error)
+      return
+    retainServable('b', new Set(sourceB.layers.map((l) => l.name)))
+  }, [
+    retainServable,
+    hasB,
+    sourceB.loadingLayers,
+    sourceB.retrying,
+    sourceB.error,
+    sourceB.layers,
+  ])
+
   useEffect(() => {
     if (!hasB && focusSlot !== null) setFocusSlot(null)
   }, [hasB, focusSlot])
@@ -843,122 +466,86 @@ export function GeoViewer({
   const [rightCollapsed, setRightCollapsed] = useState(false)
   // Below lg the sidebars crush the map — auto-collapse; handles reopen.
   const wideViewport = useMedia('(min-width: 1024px)')
+  // Below lg an open sidebar is a modal sheet: one at a time, scrim closes.
+  const sheetViewport = useMedia('(max-width: 1023px)')
   useLayoutEffect(() => {
     setLeftCollapsed(!wideViewport)
     setRightCollapsed(!wideViewport)
   }, [wideViewport])
+  const sheetOpen = sheetViewport && (!leftCollapsed || !rightCollapsed)
+  const closeSheets = () => {
+    setLeftCollapsed(true)
+    setRightCollapsed(true)
+  }
+
+  // lg+ sidebar widths (persisted); the strips drag against live DOM width.
+  const {
+    widths: panelWidths,
+    styleVars: panelStyleVars,
+    setSide: setPanelWidth,
+  } = useGeoPanelWidths()
+  const panelsRef = useRef<HTMLDivElement>(null)
+  const measurePanel = useCallback((side: GeoPanelSide) => {
+    const el = panelsRef.current?.querySelector<HTMLElement>(
+      `[data-geo-panel="${side}"]`,
+    )
+    return el?.offsetWidth ?? 288
+  }, [])
+  const expandLeft = () => {
+    setLeftCollapsed(false)
+    if (sheetViewport) setRightCollapsed(true)
+  }
+  const expandRight = () => {
+    setRightCollapsed(false)
+    if (sheetViewport) setLeftCollapsed(true)
+  }
   const [helpOpen, setHelpOpen] = useState(false)
 
-  // -------- Annotations: numbered findings pinned to the map ---------
-  const [annotations, setAnnotations] = useState<Array<MapAnnotation>>([])
-  // Annotations are ephemeral — block route-leave and browser unload
-  // while any exist; the dialog offers a GeoJSON export first.
-  // Search-only navigations (slot/mode changes) keep the viewer mounted
-  // and must pass freely.
-  const leaveBlocker = useBlocker({
-    shouldBlockFn: ({ current, next }) =>
-      annotations.length > 0 && current.pathname !== next.pathname,
-    enableBeforeUnload: () => annotations.length > 0,
-    withResolver: true,
-  })
-  const [annotateArmed, setAnnotateArmed] = useState(false)
-  const [annotationDraft, setAnnotationDraft] =
-    useState<AnnotationDraft | null>(null)
-  // Where a new annotation will land, captured at map-click time.
-  const pendingRef = useRef<{
-    coordinate: [number, number]
-    slot: SourceSlot | null
-  } | null>(null)
-
-  const onAnnotationCreate = useCallback(
-    (coordinate: [number, number], slot: SourceSlot | null) => {
-      pendingRef.current = { coordinate, slot }
-      setAnnotationDraft({ id: null, text: '', number: -1 })
-    },
-    [],
-  )
-  const onAnnotationEdit = useCallback(
-    (id: string) => {
-      const index = annotations.findIndex((ann) => ann.id === id)
-      if (index === -1) return
-      setAnnotationDraft({
-        id,
-        text: annotations[index].text,
-        number: index + 1,
-      })
-    },
-    [annotations],
-  )
-  const saveAnnotation = (text: string) => {
-    if (annotationDraft?.id) {
-      setAnnotations((prev) =>
-        prev.map((ann) =>
-          ann.id === annotationDraft.id ? { ...ann, text } : ann,
-        ),
-      )
-    } else if (pendingRef.current) {
-      const { coordinate, slot } = pendingRef.current
-      setAnnotations((prev) => [
-        ...prev,
-        { id: nextAnnotationId(), coordinate, text, slot },
-      ])
-      pendingRef.current = null
-    }
-    setAnnotationDraft(null)
-  }
-  const deleteAnnotation = () => {
-    if (annotationDraft?.id) {
-      setAnnotations((prev) =>
-        prev.filter((ann) => ann.id !== annotationDraft.id),
-      )
-    }
-    setAnnotationDraft(null)
-  }
-  const removeAnnotationById = useCallback(
-    (id: string) =>
-      setAnnotations((prev) => prev.filter((ann) => ann.id !== id)),
-    [],
-  )
-  const moveAnnotation = useCallback(
-    (id: string, coordinate: [number, number]) =>
-      setAnnotations((prev) =>
-        prev.map((ann) => (ann.id === id ? { ...ann, coordinate } : ann)),
-      ),
-    [],
-  )
-  const importAnnotations = useCallback(
-    (items: ReadonlyArray<Omit<MapAnnotation, 'id'>>) =>
-      setAnnotations((prev) => [
-        ...prev,
-        ...items.map((item) => ({ ...item, id: nextAnnotationId() })),
-      ]),
-    [],
-  )
-  // Sidebar-row hover echoes onto the map; row click pans to the pin.
-  const [annotationHighlightId, setAnnotationHighlightId] = useState<
-    string | null
-  >(null)
-  const locateAnnotation = useCallback(
-    (id: string) => {
-      const annotation = annotations.find((ann) => ann.id === id)
-      if (!annotation) return
-      viewRef.current?.animate({
-        center: annotation.coordinate,
-        duration: 350,
-      })
-    },
-    [annotations],
-  )
-
+  // -------- Annotations: labeled findings pinned to the map ---------
   // Measure and annotate both consume map clicks — arming one disarms the other.
-  const toggleAnnotate = useCallback(() => {
-    setAnnotateArmed((armed) => !armed)
-    setMeasureMode('none')
-  }, [])
-  const setMeasureModeExclusive = useCallback((measure: MeasureMode) => {
-    if (measure !== 'none') setAnnotateArmed(false)
-    setMeasureMode(measure)
-  }, [])
+  const {
+    annotations,
+    leaveBlocker,
+    annotateArmed,
+    toggleAnnotate,
+    disarmAnnotate,
+    annotationDraft,
+    annotationDraftLocation,
+    onAnnotationCreate,
+    onAnnotationEdit,
+    saveAnnotation,
+    deleteAnnotation,
+    closeAnnotationEditor,
+    removeAnnotationById,
+    moveAnnotation,
+    importAnnotations,
+    locateAnnotation,
+    annotationHighlightId,
+    setAnnotationHighlightId,
+  } = useViewerAnnotations({
+    viewRef,
+    onToggle: () => setMeasureMode('none'),
+  })
+  const setMeasureModeExclusive = useCallback(
+    (measure: MeasureMode) => {
+      if (measure !== 'none') disarmAnnotate()
+      setMeasureMode(measure)
+    },
+    [disarmAnnotate],
+  )
+  // Sidebar attribution is derived, so a swap flips the shown letters.
+  const annotationAttribution = useCallback(
+    (ann: MapAnnotation) => {
+      if (ann.sourceId === null) return t('annotations.slotShared')
+      const slots = (['a', 'b'] as const).filter(
+        (s) => (s === 'a' ? a.id : bId) === ann.sourceId,
+      )
+      return slots.length > 0
+        ? slots.map((s) => s.toUpperCase()).join(' · ')
+        : t('annotations.notShown')
+    },
+    [a.id, bId, t],
+  )
 
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
@@ -988,12 +575,32 @@ export function GeoViewer({
     viewRef.current?.animate({ resolution: res, duration: 350 })
   }, [])
 
+  // -------- Export (map components register their capture action) ------
+  const {
+    onRegisterCapture,
+    captureAction,
+    captureOnly,
+    exportOpen,
+    setExportOpen,
+    copyView,
+    exportLegends,
+  } = useViewerExport({
+    aBaseUrl: a.baseUrl,
+    bBaseUrl,
+    sourceA,
+    sourceB,
+    activeOrderA,
+    activeOrderB,
+    annotations,
+    slotIds: { a: a.id, b: bId },
+  })
+
   useGeoShortcuts({
-    // Any sidebar open → collapse both; both collapsed → restore both.
+    // Any open → collapse both; else restore (one sheet only on phones).
     onToggleSidebars: () => {
-      const collapse = !(leftCollapsed && rightCollapsed)
-      setLeftCollapsed(collapse)
-      setRightCollapsed(collapse)
+      if (!(leftCollapsed && rightCollapsed)) return closeSheets()
+      setRightCollapsed(false)
+      if (!sheetViewport) setLeftCollapsed(false)
     },
     // Mode keys are comparison-only and inert while focused on one source.
     onMode: (next) => {
@@ -1006,9 +613,13 @@ export function GeoViewer({
     onAnnotate: toggleAnnotate,
     onAnnotateDisarm: {
       enabled:
-        (annotateArmed && annotationDraft === null) || measureMode !== 'none',
+        sheetOpen ||
+        (annotateArmed && annotationDraft === null) ||
+        measureMode !== 'none',
       disarm: () => {
-        setAnnotateArmed(false)
+        // An open sheet owns Escape first — it covers the map.
+        if (sheetOpen) return closeSheets()
+        disarmAnnotate()
         setMeasureMode('none')
       },
     },
@@ -1043,6 +654,7 @@ export function GeoViewer({
   // -------- Source view-model for the map components --------
   const mapSourceA: CompareMapSource = {
     slot: 'a',
+    id: a.id,
     baseUrl: a.baseUrl,
     label: a.label,
     layers: sourceA.layers,
@@ -1065,6 +677,7 @@ export function GeoViewer({
   const mapSourceB: CompareMapSource | null = b
     ? {
         slot: 'b',
+        id: b.id,
         baseUrl: b.baseUrl,
         label: b.label,
         layers: sourceB.layers,
@@ -1167,6 +780,7 @@ export function GeoViewer({
         onAnnotateToggle={toggleAnnotate}
         annotations={annotations}
         onAnnotationsImport={importAnnotations}
+        annotationSlotIds={{ a: a.id, b: bId }}
         onExport={() => setExportOpen(true)}
         onCopy={copyView}
         copySlots={hasB}
@@ -1206,23 +820,11 @@ export function GeoViewer({
         </AlertDialogContent>
       </AlertDialog>
       <AnnotationEditorDialog
-        draft={
-          annotationDraft
-            ? {
-                ...annotationDraft,
-                number:
-                  annotationDraft.number === -1
-                    ? annotations.length + 1
-                    : annotationDraft.number,
-              }
-            : null
-        }
+        draft={annotationDraft}
+        location={annotationDraftLocation}
         onSave={saveAnnotation}
         onDelete={deleteAnnotation}
-        onClose={() => {
-          pendingRef.current = null
-          setAnnotationDraft(null)
-        }}
+        onClose={closeAnnotationEditor}
       />
       <GeoExportDialog
         open={exportOpen}
@@ -1230,22 +832,33 @@ export function GeoViewer({
         capture={captureAction}
         legends={exportLegends}
         annotations={annotations}
+        slotIds={{ a: a.id, b: bId }}
         meta={{ labelA: a.label, labelB: b?.label ?? null }}
       />
-      <div className="relative flex min-h-0 flex-1 gap-2">
+      <div
+        ref={panelsRef}
+        style={panelStyleVars}
+        className="relative flex min-h-0 flex-1 gap-2"
+      >
         {/* Collapse hides (not unmounts) the sidebars so working state —
             filter tab, search, level chips, expanded groups — survives
             reopening. Below sm an open sidebar overlays the map instead
             of crushing it. */}
-        {leftCollapsed && (
-          <CollapsedSidebarHandle
-            side="left"
-            onExpand={() => setLeftCollapsed(false)}
+        {sheetOpen && (
+          // Modal-sheet scrim: tap closes; also blocks map input beneath.
+          <div
+            aria-hidden="true"
+            data-testid="sidebar-scrim"
+            className="absolute inset-0 z-10 bg-black/30 lg:hidden"
+            onClick={closeSheets}
           />
+        )}
+        {leftCollapsed && (
+          <CollapsedSidebarHandle side="left" onExpand={expandLeft} />
         )}
         <div
           style={{ display: leftCollapsed ? 'none' : undefined }}
-          className="max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-20 max-sm:flex max-sm:shadow-xl sm:contents"
+          className="max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:z-20 max-lg:flex max-lg:shadow-xl lg:contents"
         >
           <GeoActiveLayersPanel
             pairs={pairing.pairs}
@@ -1263,6 +876,7 @@ export function GeoViewer({
               remove: removeAnnotationById,
               locate: locateAnnotation,
               setHighlight: setAnnotationHighlightId,
+              attribution: annotationAttribution,
             }}
             opacity={{
               global: globalOpacity,
@@ -1288,6 +902,15 @@ export function GeoViewer({
             onCollapse={() => setLeftCollapsed(true)}
           />
         </div>
+        {!leftCollapsed && (
+          <GeoPanelResizeStrip
+            side="left"
+            valueNow={panelWidths.left ?? 288}
+            getWidth={() => measurePanel('left')}
+            onWidth={(px) => setPanelWidth('left', px)}
+            onReset={() => setPanelWidth('left', null)}
+          />
+        )}
         <div className="min-h-0 min-w-0 flex-1">
           {focusSlot === null && mode === 'side' && mapSourceB ? (
             <DualMapView
@@ -1345,9 +968,18 @@ export function GeoViewer({
             />
           )}
         </div>
+        {!rightCollapsed && (
+          <GeoPanelResizeStrip
+            side="right"
+            valueNow={panelWidths.right ?? 288}
+            getWidth={() => measurePanel('right')}
+            onWidth={(px) => setPanelWidth('right', px)}
+            onReset={() => setPanelWidth('right', null)}
+          />
+        )}
         <div
           style={{ display: rightCollapsed ? 'none' : undefined }}
-          className="max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-20 max-sm:flex max-sm:shadow-xl sm:contents"
+          className="max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-20 max-lg:flex max-lg:shadow-xl lg:contents"
         >
           <GeoLayerBrowser
             hasB={hasB}
@@ -1360,10 +992,7 @@ export function GeoViewer({
           />
         </div>
         {rightCollapsed && (
-          <CollapsedSidebarHandle
-            side="right"
-            onExpand={() => setRightCollapsed(false)}
-          />
+          <CollapsedSidebarHandle side="right" onExpand={expandRight} />
         )}
       </div>
       <GeoTimeSlider

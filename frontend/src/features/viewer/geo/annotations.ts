@@ -9,12 +9,10 @@
  */
 
 /**
- * Map annotations: numbered pins with a short on-map label, recorded per
- * comparison slot. A pin placed on side-by-side panel A — or while
- * focused on A — belongs to A and renders only on A surfaces; combined-
- * view pins (slot null) render everywhere. Pins are canvas-native (vector features
- * with Text styles), so the loupe and PNG exports include them for free;
- * the full texts are baked into exports as a numbered notes strip.
+ * Map annotations: labeled, colored pins bound to a source identity, so
+ * they follow their source through slot swaps (sourceId null = shared).
+ * Canvas-native vector features — the loupe and PNG exports include them
+ * for free; full texts are baked into exports as a numbered notes strip.
  */
 
 import { useEffect, useRef } from 'react'
@@ -36,13 +34,31 @@ const ANNOTATION_Z = 1600
 /** On-map label truncation — full text lives in the sidebar and export. */
 const LABEL_MAX_CHARS = 36
 
+/** Curated pin palette — legible on both basemaps, themes, and exports. */
+export const ANNOTATION_COLORS = {
+  blue: 'rgba(37, 99, 235, 0.95)',
+  orange: 'rgba(234, 88, 12, 0.95)',
+  red: 'rgba(220, 38, 38, 0.95)',
+  amber: 'rgba(217, 119, 6, 0.95)',
+  green: 'rgba(22, 163, 74, 0.95)',
+  purple: 'rgba(147, 51, 234, 0.95)',
+  slate: 'rgba(30, 41, 59, 0.95)',
+} as const
+export type AnnotationColor = keyof typeof ANNOTATION_COLORS
+
+/** Badge stays legible up to this many characters. */
+export const ANNOTATION_LABEL_MAX = 4
+
 export interface MapAnnotation {
   id: string
   /** Web-Mercator coordinate the pin anchors to. */
   coordinate: [number, number]
+  /** Badge text — sticky (never renumbered), editable, duplicates OK. */
+  label: string
   text: string
-  /** Panel the pin was placed on; null = single-map (shows everywhere). */
-  slot: SourceSlot | null
+  color: AnnotationColor
+  /** Source the pin belongs to; null = shared (shows on every surface). */
+  sourceId: string | null
 }
 
 let annotationCounter = 0
@@ -51,45 +67,56 @@ export function nextAnnotationId(): string {
   return `annotation-${annotationCounter}`
 }
 
+/** Slot's pin color — the attribution default until the user overrides. */
+export function defaultAnnotationColor(
+  slot: SourceSlot | null,
+): AnnotationColor {
+  return slot === 'a' ? 'blue' : slot === 'b' ? 'orange' : 'slate'
+}
+
+/** Next free integer label — skips taken ones, never reuses on delete. */
+export function nextAnnotationLabel(
+  annotations: ReadonlyArray<Pick<MapAnnotation, 'label'>>,
+): string {
+  const used = new Set(annotations.map((a) => a.label))
+  let n = 1
+  while (used.has(String(n))) n += 1
+  return String(n)
+}
+
 export function isAnnotationFeature(feature: FeatureLike): boolean {
   return String(feature.getId() ?? '').startsWith('annotation-')
 }
 
-/** Should `annotation` render on a panel showing `panelSlot`?
- *  Single map (panelSlot null) shows everything; a side-by-side panel
- *  shows its own pins plus the shared (null-slot) ones. */
+/** Should `annotation` render on a surface showing the `shownIds` sources?
+ *  Shared pins always do; bound pins only where their source is on screen. */
 export function annotationVisibleOn(
-  annotation: Pick<MapAnnotation, 'slot'>,
-  panelSlot: SourceSlot | null,
+  annotation: Pick<MapAnnotation, 'sourceId'>,
+  shownIds: ReadonlyArray<string>,
 ): boolean {
-  if (panelSlot === null) return true
-  return annotation.slot === null || annotation.slot === panelSlot
-}
-
-const SLOT_PIN_COLOR: Record<'a' | 'b' | 'shared', string> = {
-  a: 'rgba(37, 99, 235, 0.95)', // blue-600 — matches every A surface
-  b: 'rgba(234, 88, 12, 0.95)', // orange-600 — matches every B surface
-  shared: 'rgba(30, 41, 59, 0.95)', // slate-800
+  return annotation.sourceId === null || shownIds.includes(annotation.sourceId)
 }
 
 function pinStyles(
-  number: number,
+  badge: string,
   text: string,
-  slot: SourceSlot | null,
+  color: AnnotationColor,
   highlighted: boolean,
 ) {
-  const color = SLOT_PIN_COLOR[slot ?? 'shared']
+  const fill = ANNOTATION_COLORS[color]
   const label =
     text.length > LABEL_MAX_CHARS ? `${text.slice(0, LABEL_MAX_CHARS)}…` : text
+  // Wider badges ("L1", "ABCD") grow the disc so the text stays inside.
+  const radius = (highlighted ? 13 : 10) + Math.max(0, badge.length - 2) * 3.5
   const styles = [
     new Style({
       image: new CircleStyle({
-        radius: highlighted ? 13 : 10,
-        fill: new Fill({ color }),
+        radius,
+        fill: new Fill({ color: fill }),
         stroke: new Stroke({ color: 'white', width: highlighted ? 3 : 2 }),
       }),
       text: new Text({
-        text: String(number),
+        text: badge,
         font: 'bold 11px system-ui, sans-serif',
         fill: new Fill({ color: 'white' }),
       }),
@@ -102,7 +129,8 @@ function pinStyles(
           text: label,
           font: '12px system-ui, sans-serif',
           textAlign: 'left',
-          offsetX: 14,
+          // Clear the (possibly grown) disc.
+          offsetX: radius + 4,
           fill: new Fill({ color: 'rgba(15, 23, 42, 0.95)' }),
           backgroundFill: new Fill({ color: 'rgba(255, 255, 255, 0.92)' }),
           backgroundStroke: new Stroke({ color: 'rgba(0, 0, 0, 0.15)' }),
@@ -122,14 +150,18 @@ function pinStyles(
 export function useAnnotationLayer(
   mapRef: RefObject<OlMap | null>,
   annotations: ReadonlyArray<MapAnnotation>,
-  panelSlot: SourceSlot | null,
+  /** Source ids this surface shows — memoize; it is an effect dependency. */
+  shownIds: ReadonlyArray<string>,
   armed: boolean,
   handlers: {
-    onCreate: (coordinate: [number, number], slot: SourceSlot | null) => void
+    /** Creation context (source binding) lives in the caller's closure. */
+    onCreate: (coordinate: [number, number]) => void
     onEdit: (id: string) => void
     onMove: (id: string, coordinate: [number, number]) => void
   },
-  highlightId: string | null = null,
+  highlightId: string | null,
+  /** useOlMapBase recreation counter — re-attach after a map rebuild. */
+  mapVersion: number,
 ): void {
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
@@ -139,16 +171,13 @@ export function useAnnotationLayer(
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    const visible = annotations.filter((a) => annotationVisibleOn(a, panelSlot))
+    const visible = annotations.filter((a) => annotationVisibleOn(a, shownIds))
     const source = new VectorSource({
       features: visible.map((a) => {
         const feature = new Feature({ geometry: new Point(a.coordinate) })
         feature.setId(a.id)
-        // Numbering follows the full list, so a pin keeps its number on
-        // every panel and in the sidebar/export.
-        const number = annotations.findIndex((x) => x.id === a.id) + 1
         feature.setStyle(
-          pinStyles(number, a.text, a.slot, a.id === highlightId),
+          pinStyles(a.label, a.text, a.color, a.id === highlightId),
         )
         return feature
       }),
@@ -170,10 +199,7 @@ export function useAnnotationLayer(
         return
       }
       if (armedRef.current) {
-        handlersRef.current.onCreate(
-          [evt.coordinate[0], evt.coordinate[1]],
-          panelSlot,
-        )
+        handlersRef.current.onCreate([evt.coordinate[0], evt.coordinate[1]])
       }
     }
     map.on('singleclick', onClick)
@@ -199,22 +225,27 @@ export function useAnnotationLayer(
       map.un('singleclick', onClick)
       map.removeLayer(layer)
     }
-  }, [mapRef, annotations, panelSlot, highlightId])
+  }, [mapRef, annotations, shownIds, highlightId, mapVersion])
 }
 
 // -------- GeoJSON round-trip (RFC 7946: WGS84 lon/lat on the wire) --------
 
 /** Bump when the export shape changes; readers branch on the foreign member. */
-const ANNOTATIONS_FORMAT_VERSION = 1
+const ANNOTATIONS_FORMAT_VERSION = 3
 
-/** Point FeatureCollection (number/text/slot props) — plain GeoJSON, so
- *  exports open in any GIS tool; versioned via an RFC 7946 foreign member. */
+/** Point FeatureCollection (label/text/color/source props) — plain GeoJSON,
+ *  so exports open in any GIS tool; versioned via an RFC 7946 foreign member. */
 export function annotationsToGeojson(
   annotations: ReadonlyArray<MapAnnotation>,
 ): string {
-  const features = annotations.map((a, i) => {
+  const features = annotations.map((a) => {
     const feature = new Feature({ geometry: new Point(a.coordinate) })
-    feature.setProperties({ number: i + 1, text: a.text, slot: a.slot })
+    feature.setProperties({
+      label: a.label,
+      text: a.text,
+      color: a.color,
+      source: a.sourceId,
+    })
     return feature
   })
   const collection = new GeoJSON().writeFeaturesObject(features, {
@@ -242,10 +273,13 @@ export function downloadAnnotationsGeojson(
   URL.revokeObjectURL(url)
 }
 
-/** Pin data from annotations GeoJSON: Points with non-empty `text` only,
- *  foreign `slot` values become shared. Throws when nothing usable. */
+/** Pin data from annotations GeoJSON: Points with non-empty `text` only.
+ *  v3 binds by `source` id; legacy `slot` maps through `slotIds` (foreign
+ *  → shared); a missing `label` (v1) stays '' for the importer to assign.
+ *  Throws when nothing usable. */
 export function parseAnnotationsGeojson(
   text: string,
+  slotIds: { a?: string | null; b?: string | null } = {},
 ): Array<Omit<MapAnnotation, 'id'>> {
   const features = new GeoJSON().readFeatures(JSON.parse(text), {
     featureProjection: 'EPSG:3857',
@@ -255,7 +289,17 @@ export function parseAnnotationsGeojson(
     const noteText: unknown = feature.get('text')
     if (!(geometry instanceof Point)) return []
     if (typeof noteText !== 'string' || noteText.trim() === '') return []
-    const slot: unknown = feature.get('slot')
+    const sourceRaw: unknown = feature.get('source')
+    const slotRaw: unknown = feature.get('slot')
+    const slot = slotRaw === 'a' ? 'a' : slotRaw === 'b' ? 'b' : null
+    const sourceId =
+      typeof sourceRaw === 'string' && sourceRaw !== ''
+        ? sourceRaw
+        : slot !== null
+          ? (slotIds[slot] ?? null)
+          : null
+    const labelRaw: unknown = feature.get('label')
+    const colorRaw: unknown = feature.get('color')
     const [x, y] = geometry.getCoordinates()
     // Imported 1e999/string coords parse to Infinity/NaN — locating such
     // a pin poisons the shared camera.
@@ -263,8 +307,16 @@ export function parseAnnotationsGeojson(
     return [
       {
         coordinate: [x, y] as [number, number],
+        label:
+          typeof labelRaw === 'string'
+            ? labelRaw.trim().slice(0, ANNOTATION_LABEL_MAX)
+            : '',
         text: noteText.trim(),
-        slot: slot === 'a' ? 'a' : slot === 'b' ? 'b' : null,
+        color:
+          typeof colorRaw === 'string' && colorRaw in ANNOTATION_COLORS
+            ? (colorRaw as AnnotationColor)
+            : defaultAnnotationColor(slot),
+        sourceId,
       },
     ]
   })

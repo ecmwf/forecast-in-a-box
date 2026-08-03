@@ -102,6 +102,7 @@ export interface ActivePair {
 function useActivePair(): ActivePair & {
   assignSlot: (slot: 'a' | 'b', ref: string) => void
   swapSlots: () => void
+  clearSlotA: () => void
   clearSlotB: () => void
 } {
   const search = route.useSearch()
@@ -164,12 +165,23 @@ function useActivePair(): ActivePair & {
       replace: true,
     })
   }
+  // Removing A promotes B — A is never empty while a comparison exists.
+  const clearSlotA = () => {
+    void navigate({
+      search: (prev) =>
+        prev.b === undefined || prev.b === SLOT_B_OFF
+          ? prev
+          : { ...prev, a: prev.b, b: SLOT_B_OFF },
+      replace: true,
+    })
+  }
 
   return {
     a: aValid ? (byRef.get(search.a!) ?? null) : null,
     b: bValid ? (byRef.get(search.b!) ?? null) : null,
     assignSlot,
     swapSlots,
+    clearSlotA,
     clearSlotB,
   }
 }
@@ -180,7 +192,8 @@ export function VisualisePage() {
   const navigate = route.useNavigate()
   const entries = useComparisonStore((s) => s.entries)
   const clear = useComparisonStore((s) => s.clear)
-  const { a, b, assignSlot, swapSlots, clearSlotB } = useActivePair()
+  const { a, b, assignSlot, swapSlots, clearSlotA, clearSlotB } =
+    useActivePair()
   const { pendingUnverified, resolveUnverified } = useHydrateComparisonFromUrl()
 
   // Clearing the basket must clear the URL pair too — hydration would
@@ -275,7 +288,9 @@ export function VisualisePage() {
               bRef={b ? entryRef(b) : undefined}
               onAssign={assignSlot}
               onSwap={swapSlots}
-              onSingleView={clearSlotB}
+              onClearSlot={(slot) =>
+                slot === 'a' ? clearSlotA() : clearSlotB()
+              }
             />
             {/* B lifecycle while the solo viewer keeps working. */}
             {b !== null && a !== null && stateA.phase === 'running' && (
@@ -440,10 +455,18 @@ export function VisualisePage() {
               {/* Single JSX position — b flips null↔value without a
                   remount, so camera/selection/time survive the switch. */}
               <GeoViewer
-                a={{ baseUrl: stateA.baseUrl, label: entryDisplayName(a) }}
+                a={{
+                  id: entryRef(a),
+                  baseUrl: stateA.baseUrl,
+                  label: entryDisplayName(a),
+                }}
                 b={
                   b && stateB.phase === 'running'
-                    ? { baseUrl: stateB.baseUrl, label: entryDisplayName(b) }
+                    ? {
+                        id: entryRef(b),
+                        baseUrl: stateB.baseUrl,
+                        label: entryDisplayName(b),
+                      }
                     : null
                 }
                 mode={mode}

@@ -19,7 +19,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { composeCaptures } from './export-pipeline'
-import type { ExportLegendSpec } from './export-pipeline'
+import type { ExportLegendSpec, ExportSlotIds } from './export-pipeline'
 import type { MapAnnotation } from './annotations'
 import type { CaptureResult } from './types'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,7 @@ export function GeoExportDialog({
   capture,
   legends,
   annotations,
+  slotIds,
   meta,
 }: {
   open: boolean
@@ -59,6 +60,7 @@ export function GeoExportDialog({
   legends: ReadonlyArray<ExportLegendSpec>
   /** Findings pinned to the map — texts baked as a numbered strip. */
   annotations: ReadonlyArray<MapAnnotation>
+  slotIds: ExportSlotIds
   meta: GeoExportMeta
 }) {
   const { t } = useTranslation('visualise')
@@ -71,6 +73,7 @@ export function GeoExportDialog({
         capture,
         legends,
         annotations,
+        slotIds,
         title,
       })
       const stamp = new Date().toISOString().replace(/[:.]/g, '-')

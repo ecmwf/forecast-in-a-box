@@ -62,7 +62,8 @@
       "errorUnreachable": "Server not reachable — check the URL, and that it allows cross-origin (CORS) requests from this app",
       "errorHttp": "The server responded with HTTP {{status}} — check the URL path and any token",
       "errorParse": "The server responded, but not with a readable WMS capabilities document",
-      "errorTimeout": "Timed out — the server may be slow, try again"
+      "errorTimeout": "Timed out — the server may be slow, try again",
+      "errorInterrupted": "The server dropped the connection while sending its catalog — try again, or later"
     },
     "hostPath": {
       "title": "GRIB directory on this host",
@@ -77,7 +78,8 @@
       "added": "Added",
       "failed": "Could not reach {{name}}",
       "checking": "Checking WMS capabilities…",
-      "timedOut": "{{name}} timed out — the server may be slow, try again"
+      "timedOut": "{{name}} timed out — the server may be slow, try again",
+      "interrupted": "{{name}} dropped the connection while sending its catalog — try again, or later"
     }
   },
   "viewerError": {
@@ -102,7 +104,8 @@
     "pickPrompt": "Click a source chip above, or add a new source",
     "corsHint": "If this is an external server, it must send CORS headers",
     "bError": "Second source failed:",
-    "removeB": "Remove B"
+    "removeB": "Remove B",
+    "resize": "Resize panel"
   },
   "focus": {
     "aria": "Source focus",
@@ -165,8 +168,9 @@
     "alignStartsHint": "Shift B so both series start together",
     "alignEnds": "Align ends",
     "alignEndsHint": "Shift B so both series end together",
-    "loadError": "Server returned no data for this time — {{slot}}",
+    "loadErrorLayers": "No data at this time — {{slot}}: {{layers}}",
     "notServed": "Advertised but not served",
+    "notServedNow": "Not served at this time: {{layers}}",
     "static": "No time-enabled layers active — the display is static.",
     "staticBadge": "Static",
     "staticLayerHint": "No time dimension — renders unchanged at every time step",
@@ -242,8 +246,8 @@
     "swap": "Swap A and B",
     "placeholder": "Pick a source…",
     "pickerAria": "Source for slot {{slot}}",
-    "singleView": "Single view",
-    "isA": "Currently source A",
+    "clearSlot": "Remove {{slot}} from view — continue with {{other}}",
+    "inSlot": "Currently source {{slot}}",
     "kind": {
       "run": "Run",
       "wms": "WMS",
@@ -333,16 +337,29 @@
   "annotations": {
     "title": "Annotations",
     "tool": "Annotate — click the map to add a note",
-    "editorTitle": "Annotation {{number}}",
+    "editorNew": "New annotation",
+    "editorEdit": "Edit annotation",
+    "labelField": "Label",
+    "colorField": "Pin color",
+    "colors": {
+      "blue": "Blue",
+      "orange": "Orange",
+      "red": "Red",
+      "amber": "Amber",
+      "green": "Green",
+      "purple": "Purple",
+      "slate": "Slate"
+    },
     "placeholder": "Record your finding…",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
-    "remove": "Remove annotation {{number}}",
+    "remove": "Remove annotation {{label}}",
     "slotShared": "Both",
+    "notShown": "Source not shown",
     "armedHint": "Click the map to add a note · Esc exits",
-    "locate": "Show annotation {{number}} on the map",
-    "edit": "Edit annotation {{number}}",
+    "locate": "Show annotation {{label}} on the map",
+    "edit": "Edit annotation {{label}}",
     "options": "Annotation options",
     "export": "Download annotations (GeoJSON)",
     "import": "Import annotations (GeoJSON)",

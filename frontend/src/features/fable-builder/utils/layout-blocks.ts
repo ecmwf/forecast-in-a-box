@@ -40,8 +40,8 @@ const DEFAULT_OPTIONS: LayoutOptions & {
   direction: 'TB',
   nodeWidth: 280,
   nodeHeight: 200,
-  nodeSpacingX: 80, // Horizontal spacing between sibling nodes
-  nodeSpacingY: 100, // Vertical spacing between ranks (more room for edges)
+  nodeSpacingX: 56, // Horizontal spacing between sibling nodes
+  nodeSpacingY: 80, // Vertical spacing between ranks (room for edge labels)
   align: undefined, // Center alignment for symmetrical layout
 }
 

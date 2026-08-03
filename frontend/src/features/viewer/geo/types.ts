@@ -14,6 +14,8 @@ import type { SourceSlot } from './layer-pairing'
 /** Everything a compare map needs to render one source's stack. */
 export interface CompareMapSource {
   slot: SourceSlot
+  /** Stable source identity (basket entry ref) — annotations bind to it. */
+  id: string
   baseUrl: string
   label: string
   layers: ReadonlyArray<ParsedLayer>

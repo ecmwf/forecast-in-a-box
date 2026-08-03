@@ -40,6 +40,8 @@ export function createViewerView(): View {
     center: fromLonLat([12, 50]),
     zoom: 3,
     projection: 'EPSG:3857',
+    // Vector basemap paints nothing below z1; sub-z1 can break the extent.
+    minZoom: 1,
     // smoothExtentConstraint: false keeps pans strictly within the
     // world; without it, slight overshoot makes SkinnyWMS return
     // stretched-stripe images for out-of-bounds BBOXes.
@@ -99,8 +101,9 @@ export function useOlMapBase(
     const olView = map.getView()
     // Skip re-fitting once the shared View is framed — keep the camera across mode switches.
     if (!force && olView.get(AUTOFIT_KEY)) return
+    // Skip while smaller than the fit padding — the fit would go negative.
     const size = map.getSize()
-    if (!size || size[0] < 1 || size[1] < 1) return
+    if (!size || size[0] <= 96 || size[1] <= 96) return
     // Forced = "Fit to globe" button → full WMS bbox; unforced (initial
     // auto-fit) → Europe-centric default. Falls back to the default if
     // the WMS bbox isn't known yet.

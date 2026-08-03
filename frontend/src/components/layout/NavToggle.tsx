@@ -21,7 +21,8 @@ import {
   Play,
   SlidersHorizontal,
 } from 'lucide-react'
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, useParams, useRouterState } from '@tanstack/react-router'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useFableRetrieve } from '@/api/hooks/useFable'
 import { useJobStatus } from '@/api/hooks/useJobs'
@@ -46,7 +47,7 @@ const navItems = [
 ] as const
 
 const itemClass = cn(
-  'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors',
+  'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors',
   'hover:bg-background/50',
   'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
 )
@@ -103,7 +104,7 @@ function VisualiseNavItem() {
       <Earth className="h-4 w-4" />
       {t('nav.visualise')}
       {count > 0 && (
-        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums">
+        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-muted-foreground/20 px-1 text-[10px] font-semibold text-muted-foreground tabular-nums">
           {count}
         </span>
       )}
@@ -115,11 +116,20 @@ export function NavToggle() {
   const { t } = useTranslation('common')
   // `jobId` is only present on the /runs/$jobId route.
   const { jobId } = useParams({ strict: false })
+  const navRef = useRef<HTMLElement>(null)
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  // Keep the active tab visible inside the below-lg scroll strip.
+  useEffect(() => {
+    navRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [pathname])
 
   return (
     <nav
+      ref={navRef}
       aria-label={t('nav.label')}
-      className="inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1"
+      className="inline-flex h-9 min-w-0 items-center gap-1 rounded-lg bg-muted p-1"
     >
       {navItems.map(({ to, labelKey, Icon, exact }) => (
         <Link

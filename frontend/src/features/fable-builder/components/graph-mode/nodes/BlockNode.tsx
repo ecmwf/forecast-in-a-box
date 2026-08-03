@@ -131,9 +131,9 @@ export const BlockNode = memo(function ({
         !isSelected &&
           !hasErrors &&
           'hover:shadow-md hover:ring-1 hover:ring-primary/20',
-        // Selected: prominent blue ring + lifted scale
+        // Selected: blue ring only — a scale would shift handles, kinking edges.
         isSelected &&
-          'scale-[1.02] shadow-[0_0_0_2.5px_rgba(18,69,222,1),0_20px_40px_-5px_rgba(18,69,222,0.2)]',
+          'shadow-[0_0_0_2.5px_rgba(18,69,222,1),0_20px_40px_-5px_rgba(18,69,222,0.2)]',
         // Error (unselected): red ring
         hasErrors &&
           !isSelected &&
@@ -160,7 +160,7 @@ export const BlockNode = memo(function ({
             <Button
               variant="ghost"
               size="icon"
-              className="nodrag h-7 w-7 text-muted-foreground hover:text-primary md:hidden"
+              className="nodrag h-7 w-7 text-muted-foreground hover:text-primary lg:hidden"
               onClick={handleOpenConfig}
               aria-label={t('blockNode.configureBlock')}
             >

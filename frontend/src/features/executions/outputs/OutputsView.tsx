@@ -11,7 +11,7 @@
 /** Outputs grid with MIME filter, group-by toggle, skeletons for pending
  * items, and a lazy viewer for the active selection. */
 
-import { Package } from 'lucide-react'
+import { AlertTriangle, Package } from 'lucide-react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
@@ -35,6 +35,7 @@ import {
   useIsBlockHovered,
 } from '@/features/executions/stores/executionHoverStore'
 import { P } from '@/components/base/typography'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { groupByKey } from '@/lib/group-by'
 import { cn } from '@/lib/utils'
@@ -70,6 +71,8 @@ interface OutputsViewProps {
   plannedBlockIds?: ReadonlyArray<string> | null
   /** Portal target for the toolbar; falls back to inline. */
   toolbarSlot?: HTMLElement | null
+  /** Switches to the Logs tab from the failed-run notice. */
+  onViewLogs?: () => void
 }
 
 export function OutputsView({
@@ -80,6 +83,7 @@ export function OutputsView({
   completedBlockIds,
   plannedBlockIds,
   toolbarSlot,
+  onViewLogs,
 }: OutputsViewProps) {
   const { t } = useTranslation('executions')
   const navigate = useNavigate()
@@ -262,6 +266,13 @@ export function OutputsView({
     let pending = 0
     let lost = 0
     for (const item of source) {
+      const isPending = !item.isAvailable && item.lostReason === undefined
+      // Failed run: never-arriving items are tallied for the notice, not shown
+      // as skeletons (and the mime filter can't hide what was expected).
+      if (status === 'failed' && isPending) {
+        pending += 1
+        continue
+      }
       if (
         activeMimes.length > 0 &&
         !activeMimes.includes(effectiveMime(item))
@@ -279,9 +290,10 @@ export function OutputsView({
       visiblePendingCount: pending,
       visibleLostCount: lost,
     }
-  }, [items, blockSkeletons, activeMimes, effectiveMime])
+  }, [items, blockSkeletons, activeMimes, effectiveMime, status])
 
   const isRunning = !isTerminalStatus(status)
+  const failed = status === 'failed'
 
   /** Planned − completed while the run is in progress; drives the subtle
    * amber accent on skeletons whose block is the one currently executing. */
@@ -309,12 +321,17 @@ export function OutputsView({
         <div className="flex flex-col items-center justify-center gap-2 px-3 py-10 text-center">
           <Package className="h-10 w-10 text-muted-foreground" />
           <P className="font-medium text-muted-foreground">
-            {t('outputs.noOutputs')}
+            {t(failed ? 'outputs.failedNoOutputs' : 'outputs.noOutputs')}
           </P>
           {isRunning && (
             <P className="text-muted-foreground">
               {t('outputs.noOutputsRunning')}
             </P>
+          )}
+          {failed && onViewLogs && (
+            <Button variant="outline" size="sm" onClick={onViewLogs}>
+              {t('outputs.viewLogs')}
+            </Button>
           )}
         </div>
       </Card>
@@ -334,7 +351,8 @@ export function OutputsView({
         {shownAvailable !== totalAvailable && ` / ${totalAvailable}`}
         {shownPending > 0 && (
           <span className="ml-2">
-            · {t('outputs.pending')}: {shownPending}
+            · {t(failed ? 'outputs.notProduced' : 'outputs.pending')}:{' '}
+            {shownPending}
           </span>
         )}
         {shownLost > 0 && (
@@ -373,7 +391,22 @@ export function OutputsView({
         {!toolbarSlot && toolbar}
 
         {visibleItems.length === 0 ? (
-          // A `?mimes=` filter from the URL can match nothing until opaque
+          failed && shownPending > 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 px-3 py-10 text-center">
+              <AlertTriangle className="h-10 w-10 text-muted-foreground" />
+              <P className="font-medium text-muted-foreground">
+                {t('outputs.failedNoOutputs')}
+              </P>
+              <P className="text-muted-foreground">
+                {t('outputs.failedExpected', { count: shownPending })}
+              </P>
+              {onViewLogs && (
+                <Button variant="outline" size="sm" onClick={onViewLogs}>
+                  {t('outputs.viewLogs')}
+                </Button>
+              )}
+            </div>
+          ) : // A `?mimes=` filter from the URL can match nothing until opaque
           // items finish sniffing; show skeletons for those rather than a
           // "no match" that a moment later turns out wrong.
           pendingSniffItems.length > 0 ? (
@@ -391,13 +424,33 @@ export function OutputsView({
             </P>
           )
         ) : (
-          <GroupedGrid
-            groupBy={groupBy}
-            items={visibleItems}
-            runningBlockSet={runningBlockSet}
-            effectiveMime={effectiveMime}
-            onOpenViewer={(item, adapter) => setActiveViewer({ item, adapter })}
-          />
+          <>
+            <GroupedGrid
+              groupBy={groupBy}
+              items={visibleItems}
+              runningBlockSet={runningBlockSet}
+              effectiveMime={effectiveMime}
+              onOpenViewer={(item, adapter) =>
+                setActiveViewer({ item, adapter })
+              }
+            />
+            {failed && shownPending > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {t('outputs.failedNotProduced', { count: shownPending })}
+                {onViewLogs && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0"
+                    onClick={onViewLogs}
+                  >
+                    {t('outputs.viewLogs')}
+                  </Button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 

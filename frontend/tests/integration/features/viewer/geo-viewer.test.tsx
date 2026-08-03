@@ -130,16 +130,29 @@ function ViewerRoute({
   onViewStateChange?: (partial: Partial<ViewerUrlState>) => void
 }) {
   const [mode, setMode] = useState<CompareMode>(initialMode)
+  // Slot swap mirrors VisualisePage: a pure a↔b prop exchange.
+  const [swapped, setSwapped] = useState(false)
   const router = useRouter()
+  const srcA = {
+    id: `run:test-${portA}`,
+    baseUrl: `http://localhost:${portA}`,
+    label: 'Run A',
+  }
+  const srcB = {
+    id: `run:test-${portB}`,
+    baseUrl: `http://localhost:${portB}`,
+    label: 'Run B',
+  }
   return (
     <div style={{ width: 1100, height: 700 }}>
       <button onClick={() => router.history.push('/away')}>go away</button>
       <button onClick={() => router.history.push('/?probe=1')}>
         tweak search
       </button>
+      <button onClick={() => setSwapped((v) => !v)}>swap slots</button>
       <GeoViewer
-        a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
-        b={{ baseUrl: `http://localhost:${portB}`, label: 'Run B' }}
+        a={swapped ? srcB : srcA}
+        b={swapped ? srcA : srcB}
         mode={mode}
         onModeChange={setMode}
         initialViewState={initialViewState}
@@ -548,7 +561,7 @@ describe('GeoViewer', () => {
     // tests for the same workaround).
     const style = document.createElement('style')
     style.textContent =
-      '[data-slot="dialog-content"]{position:fixed;z-index:50}'
+      '[data-slot="dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
     document.head.appendChild(style)
 
     const { portA, portB } = registerDefaultPair()
@@ -569,7 +582,7 @@ describe('GeoViewer', () => {
     ;(map as HTMLElement).scrollIntoView({ block: 'center' })
     // x=200 keeps clear of the swipe divider at the 50% mark.
     await viewport.click({ position: { x: 200, y: 200 } })
-    await expect.element(screen.getByText('Annotation 1')).toBeVisible()
+    await expect.element(screen.getByText('New annotation')).toBeVisible()
     await screen
       .getByPlaceholder('Record your finding…')
       .fill('Deep low over the gulf')
@@ -582,17 +595,70 @@ describe('GeoViewer', () => {
 
     // Edit via the row's pencil (row click pans instead), then delete.
     await screen.getByRole('button', { name: 'Edit annotation 1' }).click()
-    await expect.element(screen.getByText('Annotation 1')).toBeVisible()
+    await expect.element(screen.getByText('Edit annotation')).toBeVisible()
     await screen.getByRole('button', { name: 'Delete' }).click()
     await expect
       .element(screen.getByText('Deep low over the gulf'))
       .not.toBeInTheDocument()
   })
 
+  it('labels are sticky through deletes, editable, and colorable', async () => {
+    const style = document.createElement('style')
+    style.textContent =
+      '[data-slot="dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
+    document.head.appendChild(style)
+
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByRole('button', { name: /Annotate/ }).click()
+    await screen.getByText('2 m temperature').first().click()
+    const map = document.querySelector('.ol-viewport')
+    const container = (map as HTMLElement).parentElement!
+    container.style.cssText = 'position:relative;width:800px;height:400px'
+    ;(map as HTMLElement).scrollIntoView({ block: 'center' })
+    const viewport = page.elementLocator(map as Element)
+
+    // Pin 1: label auto-suggested as "1".
+    await viewport.click({ position: { x: 200, y: 200 } })
+    await expect.element(screen.getByLabelText('Label')).toHaveValue('1')
+    await screen.getByPlaceholder('Record your finding…').fill('first')
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+    // Pin 2 (clear of pin 1's hit radius): suggested "2".
+    await viewport.click({ position: { x: 320, y: 260 } })
+    await expect.element(screen.getByLabelText('Label')).toHaveValue('2')
+    await screen.getByPlaceholder('Record your finding…').fill('second')
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+
+    // Deleting 1 must NOT renumber 2 — labels are sticky.
+    await screen.getByRole('button', { name: 'Remove annotation 1' }).click()
+    await expect
+      .poll(
+        () =>
+          screen.getByRole('button', { name: 'Remove annotation 1' }).elements()
+            .length,
+      )
+      .toBe(0)
+    expect(
+      screen.getByRole('button', { name: 'Remove annotation 2' }).elements(),
+    ).toHaveLength(1)
+
+    // Relabel + recolor via the editor.
+    await screen.getByRole('button', { name: 'Edit annotation 2' }).click()
+    await screen.getByLabelText('Label').fill('X9')
+    // Palette is collapsed to the current swatch — expand, then pick.
+    await screen.getByRole('button', { name: 'Pin color' }).click()
+    await screen.getByRole('radio', { name: 'Red' }).click()
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect
+      .element(screen.getByRole('button', { name: 'Remove annotation X9' }))
+      .toBeInTheDocument()
+    style.remove()
+  })
+
   it('annotates per panel in side-by-side mode', async () => {
     const style = document.createElement('style')
     style.textContent =
-      '[data-slot="dialog-content"]{position:fixed;z-index:50}'
+      '[data-slot="dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
     document.head.appendChild(style)
 
     const { portA, portB } = registerDefaultPair()
@@ -611,7 +677,7 @@ describe('GeoViewer', () => {
     await page
       .elementLocator(viewports[1])
       .click({ position: { x: 250, y: 200 } })
-    await expect.element(screen.getByText('Annotation 1')).toBeVisible()
+    await expect.element(screen.getByText('New annotation')).toBeVisible()
     await screen.getByPlaceholder('Record your finding…').fill('B-side eddy')
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
 
@@ -620,6 +686,277 @@ describe('GeoViewer', () => {
     await expect
       .element(screen.getByTitle('B', { exact: true }))
       .toBeInTheDocument()
+  })
+
+  it('annotations follow their source through a slot swap', async () => {
+    const style = document.createElement('style')
+    style.textContent =
+      '[data-slot="dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
+    document.head.appendChild(style)
+
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(
+      <Harness portA={portA} portB={portB} initialMode="side" />,
+    )
+    await screen.getByRole('button', { name: /Annotate/ }).click()
+
+    const viewports = document.querySelectorAll('.ol-viewport')
+    expect(viewports.length).toBe(2)
+    for (const v of viewports) {
+      const container = (v as HTMLElement).parentElement!
+      container.style.cssText = 'position:relative;width:500px;height:400px'
+    }
+    await page
+      .elementLocator(viewports[1])
+      .click({ position: { x: 250, y: 200 } })
+    await expect.element(screen.getByText('New annotation')).toBeVisible()
+    await screen.getByPlaceholder('Record your finding…').fill('B-side eddy')
+    await screen.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect
+      .element(screen.getByTitle('B', { exact: true }))
+      .toBeInTheDocument()
+
+    // Swap: the pin's source now sits in slot A — attribution follows it.
+    await screen.getByRole('button', { name: 'swap slots' }).click()
+    await expect
+      .element(screen.getByTitle('A', { exact: true }))
+      .toBeInTheDocument()
+    expect(screen.getByTitle('B', { exact: true }).elements()).toHaveLength(0)
+    style.remove()
+  })
+
+  it('unlinked per-side selections follow their source through a swap', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: 'tp', title: 'Total precipitation' }],
+    })
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    // Zero overlap auto-unlinks; activate one layer per side.
+    await screen.getByText('2 m temperature').first().click()
+    await screen.getByRole('button', { name: 'B', exact: true }).click()
+    await screen.getByText('Total precipitation').first().click()
+
+    await screen.getByRole('button', { name: 'swap slots' }).click()
+
+    // Each active-layer section now lists its source's own selection.
+    // (The label also appears in the map's slot tag — scope to <section>.)
+    const sectionWith = (label: string) =>
+      page.elementLocator(
+        screen
+          .getByText(label)
+          .elements()
+          .map((e) => e.closest('section'))
+          .find((s) => s !== null)!,
+      )
+    await expect
+      .element(
+        sectionWith('Run B').getByText('Total precipitation', { exact: true }),
+      )
+      .toBeVisible()
+    await expect
+      .element(
+        sectionWith('Run A').getByText('2 m temperature', { exact: true }),
+      )
+      .toBeVisible()
+    // The raw layer names never leak (an unmapped list would show '2t').
+    expect(screen.getByText('2t', { exact: true }).elements()).toHaveLength(0)
+    expect(screen.getByText('tp', { exact: true }).elements()).toHaveLength(0)
+  })
+
+  it('negates the time offset on swap so the alignment is preserved', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    await screen.getByLabelText('Time link mode').click()
+    await screen
+      .getByRole('option', { name: 'Time offset (B = A + Δ)' })
+      .click()
+    await screen.getByRole('button', { name: 'Align starts' }).click()
+    await expect.element(screen.getByText('B +6 h')).toBeVisible()
+
+    // Post-swap Δ must be −6 h — same physical pairing, sides exchanged.
+    await screen.getByRole('button', { name: 'swap slots' }).click()
+    await expect.element(screen.getByText('B −6 h')).toBeVisible()
+    await expect.element(screen.getByRole('textbox').first()).toHaveValue('-6')
+    expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
+  })
+
+  it('drops unlinked names a replaced source cannot serve', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: 'tp', title: 'Total precipitation' }],
+    })
+    const reports: Array<Partial<ViewerUrlState>> = []
+    const screen = await render(
+      <Harness
+        portA={portA}
+        portB={portB}
+        onViewStateChange={(p) => reports.push(p)}
+      />,
+    )
+
+    // Zero overlap auto-unlinks; select one layer per side.
+    await screen.getByText('2 m temperature').first().click()
+    await screen.getByRole('button', { name: 'B', exact: true }).click()
+    await screen.getByText('Total precipitation').first().click()
+    await vi.waitFor(() => {
+      const last = [...reports].reverse().find((r) => r.layersA !== undefined)
+      expect(last?.layersA).toEqual(['2t'])
+      expect(last?.layersB).toEqual(['tp'])
+    })
+
+    // A source without 2t replaces A: state and URL drop it, B survives.
+    const portA2 = nextPort++
+    registerMockWmsServer(portA2, {
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    await screen.rerender(
+      <Harness
+        portA={portA2}
+        portB={portB}
+        onViewStateChange={(p) => reports.push(p)}
+      />,
+    )
+    await vi.waitFor(() => {
+      const last = [...reports].reverse().find((r) => r.layersA !== undefined)
+      expect(last?.layersA).toEqual([])
+      expect(last?.layersB).toEqual(['tp'])
+    })
+    // No raw-name row lingers in the sidebar for the vanished layer.
+    expect(screen.getByText('2t', { exact: true }).elements()).toHaveLength(0)
+  })
+
+  it('keeps the clip window on the same instants when the axis grows', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    const early = '2026-07-05T18:00:00Z'
+    registerMockWmsServer(portA, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          time: '2026-07-06T00:00:00Z,2026-07-06T06:00:00Z',
+        },
+        { name: 'msl', title: 'Mean sea level pressure', time: early },
+      ],
+    })
+    registerMockWmsServer(portB, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          time: '2026-07-06T06:00:00Z,2026-07-06T12:00:00Z',
+        },
+        { name: 'msl', title: 'Mean sea level pressure', time: early },
+      ],
+    })
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+    await expect.element(screen.getByText('1 / 3')).toBeVisible()
+
+    // Window T00–T06 (A's current range).
+    await screen.getByTitle('Clip to A’s time range').click()
+    await expect.element(screen.getByText(/1 \/ 2/)).toBeVisible()
+
+    // A layer at T−6 h prepends an axis step. Index-kept bounds would
+    // slide the window to T−6–T00; epoch-kept bounds stay on T00–T06.
+    await screen.getByText('Mean sea level pressure').first().click()
+    await expect
+      .element(screen.getByText('2026-07-06 00:00Z – 2026-07-06 06:00Z'))
+      .toBeVisible()
+    await expect.element(screen.getByText(/1 \/ 2/)).toBeVisible()
+    await expect.element(screen.getByText('(4)')).toBeVisible()
+  })
+
+  it('resets pair-tuned time linking when a slot gets a different source', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    await screen.getByLabelText('Time link mode').click()
+    await screen
+      .getByRole('option', { name: 'Time offset (B = A + Δ)' })
+      .click()
+    await screen.getByRole('button', { name: 'Align starts' }).click()
+    await expect.element(screen.getByText('B +6 h')).toBeVisible()
+
+    // A different B: Δ was tuned for the old pair — back to exact.
+    const portB2 = nextPort++
+    registerMockWmsServer(portB2, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          time: '2026-07-06T06:00:00Z,2026-07-06T12:00:00Z',
+        },
+      ],
+    })
+    await screen.rerender(<Harness portA={portA} portB={portB2} />)
+    await expect
+      .element(screen.getByLabelText('Time link mode'))
+      .toHaveTextContent('Same time (exact)')
+    expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
+  })
+
+  it('keeps the offset when the SAME B is removed and re-added', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(
+      <ProgressiveHarness portA={portA} portB={portB} withB={true} />,
+    )
+    await screen.getByText('2 m temperature').first().click()
+
+    await screen.getByLabelText('Time link mode').click()
+    await screen
+      .getByRole('option', { name: 'Time offset (B = A + Δ)' })
+      .click()
+    await screen.getByRole('button', { name: 'Align starts' }).click()
+    await expect.element(screen.getByText('B +6 h')).toBeVisible()
+
+    // Remove B (solo renders as exact), then bring the same source back.
+    await screen.rerender(
+      <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
+    )
+    expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
+    await screen.rerender(
+      <ProgressiveHarness portA={portA} portB={portB} withB={true} />,
+    )
+    await expect.element(screen.getByText('B +6 h')).toBeVisible()
+  })
+
+  it('pinned legends and focus follow their source through a swap', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await screen.getByText('2 m temperature').first().click()
+
+    // Pin A's legend, focus B.
+    await screen
+      .getByRole('button', { name: 'Pin legend open' })
+      .first()
+      .click()
+    await expect
+      .element(screen.getByTitle('A · 2 m temperature'))
+      .toBeInTheDocument()
+    await screen.getByRole('button', { name: 'View only B' }).click()
+
+    // Swap: both stay with their sources, now in the other slots.
+    await screen.getByRole('button', { name: 'swap slots' }).click()
+    await expect
+      .element(screen.getByRole('button', { name: 'View only A' }))
+      .toHaveAttribute('aria-pressed', 'true')
+    await expect
+      .element(screen.getByTitle('B · 2 m temperature'))
+      .toBeInTheDocument()
+    expect(screen.getByTitle('A · 2 m temperature').elements()).toHaveLength(0)
   })
 
   it('clips the timeline to a source range via presets', async () => {
@@ -789,10 +1126,18 @@ function ProgressiveViewerRoute({
   return (
     <div style={{ width: 1100, height: 700 }}>
       <GeoViewer
-        a={{ baseUrl: `http://localhost:${portA}`, label: 'Run A' }}
+        a={{
+          id: `run:test-${portA}`,
+          baseUrl: `http://localhost:${portA}`,
+          label: 'Run A',
+        }}
         b={
           withB
-            ? { baseUrl: `http://localhost:${portB}`, label: 'Run B' }
+            ? {
+                id: `run:test-${portB}`,
+                baseUrl: `http://localhost:${portB}`,
+                label: 'Run B',
+              }
             : null
         }
         mode={mode}
@@ -1174,7 +1519,7 @@ describe('GeoViewer route-leave guard', () => {
   it('blocks leaving with annotations; offers export; Leave discards', async () => {
     const style = document.createElement('style')
     style.textContent =
-      '[data-slot="dialog-content"],[data-slot="alert-dialog-content"]{position:fixed;z-index:50}'
+      '[data-slot="dialog-content"],[data-slot="alert-dialog-content"]{position:fixed;top:0;left:0;z-index:50}'
     document.head.appendChild(style)
 
     const { portA, portB } = registerDefaultPair()
@@ -1269,6 +1614,40 @@ describe('GeoViewer responsive layout', () => {
         .toBe(0)
     } finally {
       await page.viewport(1280, 800)
+    }
+  })
+
+  it('below lg: one modal sheet at a time; the scrim closes it', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await expect
+      .element(screen.getByText('2 m temperature').first())
+      .toBeVisible()
+
+    const handles = () =>
+      screen
+        .getByRole('button', { name: 'Expand sidebar' })
+        .elements() as Array<HTMLElement>
+    try {
+      // Phone and tablet share the sheet behavior.
+      for (const width of [500, 900]) {
+        await page.viewport(width, 800)
+        await expect.poll(() => handles().length).toBe(2)
+
+        // Open left, then right — the sheets swap, never coexist.
+        handles()[0].click()
+        await expect.poll(() => handles().length).toBe(1)
+        handles()[0].click()
+        await expect.poll(() => handles().length).toBe(1)
+
+        // Scrim tap closes the open sheet — both handles return.
+        ;(
+          document.querySelector('[data-testid="sidebar-scrim"]') as HTMLElement
+        ).click()
+        await expect.poll(() => handles().length).toBe(2)
+      }
+    } finally {
+      await page.viewport(1280, 900)
     }
   })
 })
@@ -1376,6 +1755,36 @@ describe('GeoViewer URL view state', () => {
     await expect
       .element(screen.getByText('Total precipitation').first())
       .toBeVisible()
+  })
+
+  it('never reports an auto-unlink as a manual choice', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: 'tp', title: 'Total precipitation' }],
+    })
+    const reports: Array<Partial<ViewerUrlState>> = []
+    const screen = await render(
+      <Harness
+        portA={portA}
+        portB={portB}
+        onViewStateChange={(partial) => reports.push(partial)}
+      />,
+    )
+
+    // Zero overlap → auto-unlink kicks in…
+    await expect
+      .element(
+        screen.getByText(
+          'The two sources share no common layers — selection is per panel.',
+        ),
+      )
+      .toBeVisible()
+    // …but the URL must not pin it (restoring manual unlink blocks relink).
+    expect(reports.some((r) => r.unlinkedLayers === true)).toBe(false)
   })
 
   it('reports layer and time changes for the URL write-back', async () => {

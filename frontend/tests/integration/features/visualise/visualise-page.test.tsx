@@ -414,7 +414,9 @@ describe('VisualisePage', () => {
     await expect.poll(() => listMockLenses(), { timeout: 8000 }).toHaveLength(2)
 
     // Take B out of the view, then out of the basket (collected chip).
-    await screen.getByRole('button', { name: 'Single view' }).click()
+    await screen
+      .getByRole('button', { name: 'Remove B from view — continue with A' })
+      .click()
     await screen.getByRole('button', { name: 'Manage sources' }).click()
     // Native click: the unstyled dialog's inert backdrop confuses
     // Playwright hit-testing (see the stop-row test above).
@@ -432,6 +434,35 @@ describe('VisualisePage', () => {
         .filter((l) => l.status === 'running')
         .map((l) => l.lens_params.local_path),
     ).toEqual(['/data/output/job-completed-001_1'])
+  })
+
+  it("the slot bar's X on A promotes B to solo view", async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    const screen = await renderVisualisePage()
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toHaveTextContent('Run A')
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toHaveTextContent('Run B')
+
+    await screen
+      .getByRole('button', { name: 'Remove A from view — continue with B' })
+      .click()
+
+    // B took over slot A; the view is solo (no clear buttons, B stays
+    // in the basket for later).
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toHaveTextContent('Run B')
+    await expect
+      .poll(
+        () =>
+          screen.getByRole('button', { name: /from view/ }).elements().length,
+      )
+      .toBe(0)
+    expect(useComparisonStore.getState().entries).toHaveLength(2)
   })
 
   it('removing ACTIVE A promotes B into the vacated slot', async () => {
@@ -597,8 +628,9 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     await screen.getByLabelText('Source for slot B').click()
+    // Both pickers' mounted lists chip A now — assert presence, not unicity.
     await expect
-      .element(screen.getByTitle('Currently source A'))
+      .element(screen.getByTitle('Currently source A').first())
       .toBeInTheDocument()
     await screen.getByRole('option', { name: /Run A/ }).click()
     await expect
@@ -614,14 +646,18 @@ describe('VisualisePage', () => {
     const pickerB = screen.getByLabelText('Source for slot B')
     await expect.element(pickerB).toHaveTextContent('Run B')
 
-    await screen.getByRole('button', { name: 'Single view' }).click()
+    await screen
+      .getByRole('button', { name: 'Remove B from view — continue with A' })
+      .click()
     await expect.element(pickerB).toHaveTextContent('Pick a source…')
     // The `b=off` sentinel holds against the auto-fill effect, and the X
     // is gone while B is empty.
     await new Promise((r) => setTimeout(r, 1200))
     await expect.element(pickerB).toHaveTextContent('Pick a source…')
     expect(
-      screen.getByRole('button', { name: 'Single view' }).elements(),
+      screen
+        .getByRole('button', { name: 'Remove B from view — continue with A' })
+        .elements(),
     ).toHaveLength(0)
   })
 
@@ -639,7 +675,9 @@ describe('VisualisePage', () => {
 
     const pickerB = screen.getByLabelText('Source for slot B')
     await expect.element(pickerB).toHaveTextContent('maps.dwd.de')
-    await screen.getByRole('button', { name: 'Single view' }).click()
+    await screen
+      .getByRole('button', { name: 'Remove B from view — continue with A' })
+      .click()
     await expect.element(pickerB).toHaveTextContent('Pick a source…')
     await new Promise((r) => setTimeout(r, 1200))
     await expect.element(pickerB).toHaveTextContent('Pick a source…')

@@ -60,8 +60,8 @@ test.describe('Dashboard Content', () => {
   }) => {
     await page.getByRole('button', { name: 'Start from Scratch' }).click()
 
-    // A blank builder is the default; starters come from plugin templates.
-    await expect(page).toHaveURL(/\/configure$/)
+    // Scratch routes through the guarded fresh intent (workbench model).
+    await expect(page).toHaveURL(/\/configure\?fresh=true$/)
   })
 
   test('clicking a template card forks it into configure', async ({ page }) => {

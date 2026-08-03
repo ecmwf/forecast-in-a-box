@@ -12,8 +12,8 @@
  * First-class A/B slot assignment: two labelled pickers over the basket
  * entries with a swap button between them. B is cleared via a dedicated
  * X (never a fake Select item — a controlled Select re-commits its old
- * value on animated close, resurrecting B); A's entry is badged in the
- * B list, so picking it is the discoverable self-compare path.
+ * value on animated close, resurrecting B); each list chips the slots a
+ * row occupies, so picking the other slot's row self-compares.
  */
 
 import { ArrowLeftRight, X } from 'lucide-react'
@@ -42,7 +42,7 @@ export function CompareSlotBar({
   bRef,
   onAssign,
   onSwap,
-  onSingleView,
+  onClearSlot,
 }: {
   entries: ReadonlyArray<ComparisonEntry>
   aRef: string | undefined
@@ -50,26 +50,30 @@ export function CompareSlotBar({
   /** Plain assignment — picking the other slot's source self-compares, never swaps. */
   onAssign: (slot: 'a' | 'b', ref: string) => void
   onSwap: () => void
-  /** Clear B back to a single-source view. */
-  onSingleView: () => void
+  /** Remove one slot from the view; the other continues solo. */
+  onClearSlot: (slot: 'a' | 'b') => void
 }) {
   const { t } = useTranslation('visualise')
 
   return (
-    // Swap+B+X group as one unit so narrow screens wrap into two clean
-    // full-width rows instead of scattering the controls.
+    // Below lg the B group takes its own row and the swap trails it, so
+    // both rows lead with their slot badge (A over B, aligned).
     <div className="flex flex-wrap items-center gap-2">
-      <SlotPicker
-        slot="a"
-        entries={entries}
-        value={aRef}
-        onChange={(ref) => onAssign('a', ref)}
-      />
       <div className="flex max-w-full min-w-0 items-center gap-2">
+        <SlotPicker
+          slot="a"
+          entries={entries}
+          value={aRef}
+          onChange={(ref) => onAssign('a', ref)}
+          markRef={bRef}
+        />
+        {bRef && <ClearSlotButton slot="a" onClear={() => onClearSlot('a')} />}
+      </div>
+      <div className="flex max-w-full min-w-0 items-center gap-2 max-lg:w-full">
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9 shrink-0"
+          className="h-9 w-9 shrink-0 max-lg:order-last"
           onClick={onSwap}
           disabled={!aRef || !bRef}
           aria-label={t('slots.swap')}
@@ -84,29 +88,46 @@ export function CompareSlotBar({
           onChange={(ref) => onAssign('b', ref)}
           markRef={aRef}
         />
-        {bRef && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="-ml-1 h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={onSingleView}
-            aria-label={t('slots.singleView')}
-            title={t('slots.singleView')}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+        {bRef && <ClearSlotButton slot="b" onClear={() => onClearSlot('b')} />}
       </div>
     </div>
   )
 }
 
-/** Trigger-suffix that distinguishes same-named sources at a glance. */
+/** X while comparing: removes the slot from view, not from the basket. */
+function ClearSlotButton({
+  slot,
+  onClear,
+}: {
+  slot: 'a' | 'b'
+  onClear: () => void
+}) {
+  const { t } = useTranslation('visualise')
+  const label = t('slots.clearSlot', {
+    slot: slot.toUpperCase(),
+    other: slot === 'a' ? 'B' : 'A',
+  })
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="-ml-1 h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+      onClick={onClear}
+      aria-label={label}
+      title={label}
+    >
+      <X className="h-4 w-4" />
+    </Button>
+  )
+}
+
+/** Date suffix for same-named sources — skipped when the name embeds one. */
 function triggerSuffix(
   entry: ComparisonEntry,
   timeZone: string,
 ): string | null {
   if (entry.kind === 'output' && entry.runCreatedAt) {
+    if (/\d{4}-\d{2}-\d{2}/.test(entryDisplayName(entry))) return null
     return formatInZone(new Date(entry.runCreatedAt), timeZone, 'dd MMM HH:mm')
   }
   // wms/path labels already carry their host / directory name.
@@ -124,7 +145,7 @@ function SlotPicker({
   entries: ReadonlyArray<ComparisonEntry>
   value: string | undefined
   onChange: (ref: string) => void
-  /** Badge this entry as the other slot's current source (self-compare hint). */
+  /** The other slot's current ref — rows chip every slot they occupy. */
   markRef?: string
 }) {
   const { t } = useTranslation('visualise')
@@ -168,40 +189,55 @@ function SlotPicker({
             ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="min-w-[360px]">
+        <SelectContent className="max-w-xl min-w-[360px]">
           {entries.map((entry) => {
             const ref = entryRef(entry)
             const { kind, detail } = entryDetail(entry)
             const date = triggerSuffix(entry, timeZone)
+            // One chip per slot the row occupies (both on self-compare).
+            const chipSlots = (['a', 'b'] as const).filter((s) =>
+              s === slot ? ref === value : ref === markRef,
+            )
             return (
-              <SelectItem key={ref} value={ref}>
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span className="min-w-0 truncate">
+              <SelectItem
+                key={ref}
+                value={ref}
+                className="py-2 pr-2 [&_svg]:hidden"
+              >
+                {/* divs: the item styles its last SPAN child as a flex row. */}
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {/* flex-1 keeps the slot chips in a right-hand column. */}
+                    {/* whitespace-normal: the ItemText wrapper is nowrap. */}
+                    <span
+                      className="line-clamp-2 min-w-0 flex-1 break-words whitespace-normal"
+                      title={entryDisplayName(entry)}
+                    >
                       {entryDisplayName(entry)}
                     </span>
-                    {markRef === ref && (
+                    {chipSlots.map((s) => (
                       <span
-                        title={t('slots.isA')}
+                        key={s}
+                        title={t('slots.inSlot', { slot: s.toUpperCase() })}
                         className={cn(
-                          'rounded px-1 font-mono text-[10px] font-bold',
-                          SLOT_BADGE.a,
+                          'shrink-0 rounded px-1 font-mono text-[10px] font-bold',
+                          SLOT_BADGE[s],
                         )}
                       >
-                        A
+                        {s.toUpperCase()}
                       </span>
-                    )}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="rounded bg-muted px-1 font-mono text-[10px] uppercase">
+                    ))}
+                  </div>
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="shrink-0 rounded bg-muted px-1 font-mono text-[10px] uppercase">
                       {t(`slots.kind.${kind}`)}
                     </span>
-                    <span className="truncate font-mono">{detail}</span>
+                    <span className="min-w-0 truncate font-mono">{detail}</span>
                     {date && (
                       <span className="shrink-0 tabular-nums">{date}</span>
                     )}
-                  </span>
-                </span>
+                  </div>
+                </div>
               </SelectItem>
             )
           })}

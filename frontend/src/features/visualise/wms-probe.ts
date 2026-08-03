@@ -22,10 +22,10 @@
  */
 
 import { cspConnectPolicy } from './deployment'
+import type { CapabilitiesLimits } from '@/features/viewer/wms-capabilities'
 import {
-  appendWmsParams,
-  parseCapabilities,
-  toWmsEndpoint,
+  CapabilitiesError,
+  fetchCapabilities,
 } from '@/features/viewer/wms-capabilities'
 import { wmsCapabilitiesKey } from '@/features/viewer/hooks/useLensSource'
 import { queryClient } from '@/lib/queryClient'
@@ -34,13 +34,16 @@ export type WmsProbeResult =
   | { ok: true; baseUrl: string; label: string }
   | {
       ok: false
-      reason: 'invalid-url' | 'userinfo' | 'unreachable' | 'parse' | 'timeout'
+      reason:
+        | 'invalid-url'
+        | 'userinfo'
+        | 'unreachable'
+        | 'parse'
+        | 'timeout'
+        | 'interrupted'
     }
   | { ok: false; reason: 'blocked'; host: string }
   | { ok: false; reason: 'http'; status: number }
-
-// Generous: real met-service capabilities run to MBs and 20+ seconds.
-const PROBE_TIMEOUT_MS = 30_000
 
 /** Shared allowlist: WMS endpoints must be http(s), no embedded
  *  credentials (fetch rejects userinfo URLs anyway). Null = rejected. */
@@ -66,9 +69,10 @@ function hasUserinfo(raw: string): boolean {
   }
 }
 
+// Shared stall-aware limits with the viewer path (one knob, same fetch).
 export async function probeWmsEndpoint(
   raw: string,
-  { timeoutMs = PROBE_TIMEOUT_MS }: { timeoutMs?: number } = {},
+  limits: CapabilitiesLimits = {},
 ): Promise<WmsProbeResult> {
   const parsed = allowedWmsUrl(raw)
   if (!parsed) {
@@ -81,29 +85,16 @@ export async function probeWmsEndpoint(
   const baseUrl = parsed.toString()
 
   try {
-    const res = await fetch(
-      appendWmsParams(
-        toWmsEndpoint(baseUrl),
-        'service=WMS&version=1.3.0&request=GetCapabilities',
-      ),
-      { signal: AbortSignal.timeout(timeoutMs) },
-    )
-    if (!res.ok) return { ok: false, reason: 'http', status: res.status }
-    const xml = await res.text()
-    try {
-      // Seed the capabilities cache — activating the source is instant
-      // instead of re-downloading a multi-MB document.
-      queryClient.setQueryData(
-        wmsCapabilitiesKey(baseUrl),
-        parseCapabilities(xml),
-      )
-    } catch {
-      return { ok: false, reason: 'parse' }
-    }
+    const capabilities = await fetchCapabilities(baseUrl, undefined, limits)
+    // Seed the capabilities cache — activating the source needs no re-download.
+    queryClient.setQueryData(wmsCapabilitiesKey(baseUrl), capabilities)
     return { ok: true, baseUrl, label: parsed.host }
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'TimeoutError') {
-      return { ok: false, reason: 'timeout' }
+    if (err instanceof CapabilitiesError) {
+      if (err.kind === 'http') {
+        return { ok: false, reason: 'http', status: err.status ?? 0 }
+      }
+      return { ok: false, reason: err.kind }
     }
     // Network failure or CORS rejection — the browser can't tell them apart.
     return { ok: false, reason: 'unreachable' }

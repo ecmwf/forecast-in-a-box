@@ -11,6 +11,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
+import { builderSessionKey } from '@/features/fable-builder/utils/builder-session-key'
 
 const searchSchema = z.object({
   state: z.string().optional(),
@@ -21,6 +22,8 @@ const searchSchema = z.object({
   templatePlugin: z.string().optional(),
   /** Template display name for the example-values lookup */
   templateName: z.string().optional(),
+  /** Explicit blank-canvas intent; a bench holding unsaved work asks first. */
+  fresh: z.boolean().optional(),
 })
 
 export type ConfigureSearch = z.infer<typeof searchSchema>
@@ -31,16 +34,17 @@ export const Route = createFileRoute('/_authenticated/configure')({
 })
 
 function ConfigurePage() {
-  const { state, fableId, template, templatePlugin, templateName } =
+  const { state, fableId, template, templatePlugin, templateName, fresh } =
     Route.useSearch()
   return (
     <FableBuilderPage
-      key={fableId}
+      key={builderSessionKey({ fableId, template })}
       fableId={fableId}
       encodedState={state}
       templateMode={template}
       templatePlugin={templatePlugin}
       templateName={templateName}
+      fresh={fresh}
     />
   )
 }

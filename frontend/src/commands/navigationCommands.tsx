@@ -31,7 +31,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       icon: <Layers className="h-4 w-4 text-primary" />,
       category: 'Getting Started',
       keywords: ['new', 'blank', 'canvas', 'configure', 'forecast'],
-      action: () => navigate({ to: '/configure' }),
+      action: () => navigate({ to: '/configure', search: { fresh: true } }),
     },
 
     // Navigation

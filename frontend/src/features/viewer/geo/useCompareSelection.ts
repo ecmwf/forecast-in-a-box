@@ -65,6 +65,10 @@ export interface CompareSelection {
   setLayerOpacity: (slot: SourceSlot, name: string, opacity: number) => void
   layerOpacity: (slot: SourceSlot, name: string) => number
   setLinkMode: (mode: LinkMode, options?: { auto?: boolean }) => void
+  /** A slot swap exchanged the sources — the unlinked lists follow them. */
+  onSlotsSwapped: () => void
+  /** Drop unlinked names a settled catalog can't serve (opacities kept). */
+  retainServable: (slot: SourceSlot, names: ReadonlySet<string>) => void
   clear: () => void
 }
 
@@ -232,6 +236,23 @@ export function useCompareSelection(
     [linkMode, perSource, deriveForSlot, pairByKey],
   )
 
+  // Pair keys are source-independent; only the per-source lists move.
+  const onSlotsSwapped = useCallback(() => {
+    setPerSource((prev) => ({ a: prev.b, b: prev.a }))
+  }, [])
+
+  const retainServable = useCallback(
+    (slot: SourceSlot, names: ReadonlySet<string>) => {
+      setPerSource((prev) => {
+        const current = prev[slot]
+        const activeOrder = current.activeOrder.filter((n) => names.has(n))
+        if (activeOrder.length === current.activeOrder.length) return prev
+        return { ...prev, [slot]: { ...current, activeOrder } }
+      })
+    },
+    [],
+  )
+
   const clear = useCallback(() => {
     setLinkedOrder([])
     setLinkedOpacities(new Map())
@@ -259,6 +280,8 @@ export function useCompareSelection(
     layerOpacity: (slot, name) =>
       perSource[slot].layerOpacities.get(name) ?? DEFAULT_LAYER_OPACITY,
     setLinkMode,
+    onSlotsSwapped,
+    retainServable,
     clear,
   }
 }
