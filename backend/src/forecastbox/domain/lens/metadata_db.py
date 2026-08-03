@@ -22,7 +22,7 @@ from typing import Any, cast
 from sqlalchemy import Select, delete, func, or_, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
-from forecastbox.schemata.jobs import LensMetadata
+from forecastbox.schemata.lens import LensMetadata
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry
 from forecastbox.utility.time import current_time

@@ -65,7 +65,7 @@ from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.glyphs.validation import validate_glyph
 from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
-from forecastbox.schemata.jobs import BlueprintSource
+from forecastbox.schemata.blueprint import BlueprintSource
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.pagination import PaginationSpec

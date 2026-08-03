@@ -106,14 +106,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.debug(f"Starting FIAB with config: {config}")
     validate_runtime(config)
     try:
+        # Import every schemata submodule first, and only then call any discovered
+        # create_db_and_tables. Several domain schema modules share a single Base/engine
+        # (see forecastbox.schemata.jobs) and declare cross-module foreign keys, so all of
+        # them must have registered their ORM classes on that shared metadata before any
+        # create_db_and_tables runs -- calling it mid-iteration could create the database
+        # with tables missing simply because their module hadn't been imported yet.
+        pending_create_db_and_tables = []
         for module_info in pkgutil.iter_modules(forecastbox.schemata.__path__):
             module = importlib.import_module(f"forecastbox.schemata.{module_info.name}")
             if hasattr(module, "create_db_and_tables"):
-                result = module.create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
-                if inspect.isawaitable(result):
-                    await result
-                elif callable(result):
-                    result()
+                pending_create_db_and_tables.append(module.create_db_and_tables)
+        for create_db_and_tables in pending_create_db_and_tables:
+            result = create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
+            if inspect.isawaitable(result):
+                result = await result
+            if result is not None:
+                logger.warning(f"unexpected result from create_db_and_tables: {result.__class__}")
         _start_execution_runtime()
     except BaseException:
         execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)

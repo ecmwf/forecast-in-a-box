@@ -25,6 +25,7 @@ import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.plugin.errors import PluginError
 from forecastbox.domain.plugin.exceptions import PluginNotFound
 from forecastbox.schemata.jobs import Base
+from forecastbox.schemata.plugin import PluginState
 
 
 @pytest.fixture
@@ -68,8 +69,8 @@ def test_upsert_updates_version_without_clobbering(mem_session_maker: sessionmak
 
     with _jobs_module.sync_session_maker() as session:
         session.execute(
-            sa_update(_jobs_module.PluginState)
-            .where(_jobs_module.PluginState.plugin_id == "myStore:myPlugin")
+            sa_update(PluginState)
+            .where(PluginState.plugin_id == "myStore:myPlugin")
             .values(excluded_templates=["tplA"], glyph_remapping={"old": "new"})
         )
         session.commit()

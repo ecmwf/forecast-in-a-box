@@ -15,7 +15,7 @@ from forecastbox.domain.run.exceptions import CompilationDetailNotFound
 from forecastbox.domain.run.service import RunDetail
 from forecastbox.domain.run.types import RunId
 from forecastbox.routes.run import RunLookup, get_run, list_runs
-from forecastbox.schemata.jobs import Run
+from forecastbox.schemata.run import Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 

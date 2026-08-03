@@ -19,7 +19,7 @@ from sqlalchemy import Select, delete, func, or_, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.glyphs.types import GlobalGlyphId
-from forecastbox.schemata.jobs import GlobalGlyph
+from forecastbox.schemata.glyphs import GlobalGlyph
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, querySingle
 from forecastbox.utility.time import current_time

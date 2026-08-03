@@ -26,7 +26,7 @@ import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound, BlueprintVersionConflict
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.plugin.compatibility import get_fiabcore_version
-from forecastbox.schemata.jobs import Blueprint, BlueprintSource
+from forecastbox.schemata.blueprint import Blueprint, BlueprintSource
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
 from forecastbox.utility.time import current_time

@@ -10,7 +10,7 @@ from fiab_core.fable import BlockInstanceId
 
 from forecastbox.domain.run import service
 from forecastbox.domain.run.cascade import RunOutputCharacteristic, RunOutputs
-from forecastbox.schemata.jobs import Run
+from forecastbox.schemata.run import Run
 
 
 def test_get_mime_of_output_returns_declared_mime() -> None:

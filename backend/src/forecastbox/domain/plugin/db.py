@@ -32,7 +32,7 @@ from sqlalchemy import select, update
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.plugin.errors import PluginErrors
 from forecastbox.domain.plugin.exceptions import PluginNotFound
-from forecastbox.schemata.jobs import PluginState
+from forecastbox.schemata.plugin import PluginState
 from forecastbox.utility.db import dbRetry, querySingle
 from forecastbox.utility.time import current_time
 

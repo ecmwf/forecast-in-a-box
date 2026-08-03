@@ -32,7 +32,7 @@ from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
-from forecastbox.schemata.jobs import Run, RunStatus
+from forecastbox.schemata.run import Run, RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.db import dbRetry, executeAndCommit, querySingle
 from forecastbox.utility.pydantic import FiabBaseModel
