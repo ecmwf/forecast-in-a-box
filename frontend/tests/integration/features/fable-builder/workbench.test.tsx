@@ -147,7 +147,7 @@ describe('Fable Builder workbench', () => {
     // Undecided: the slot survives.
     expect(readDraft()?.fableName).toBe('Drafted work')
 
-    await screen.getByRole('button', { name: 'Your selection' }).click()
+    await screen.getByRole('button', { name: 'New configuration' }).click()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
@@ -183,12 +183,10 @@ describe('Fable Builder workbench', () => {
       .toBeVisible()
     // Saved bench: neutral wording instead of the loss warning.
     await expect
-      .element(
-        screen.getByRole('button', { name: 'Your current configuration' }),
-      )
+      .element(screen.getByRole('button', { name: 'Previous configuration' }))
       .toBeVisible()
 
-    await screen.getByRole('button', { name: 'Your selection' }).click()
+    await screen.getByRole('button', { name: 'New configuration' }).click()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
@@ -212,7 +210,7 @@ describe('Fable Builder workbench', () => {
       'draft_block',
     )
 
-    await screen.getByRole('button', { name: 'Your selection' }).click()
+    await screen.getByRole('button', { name: 'New configuration' }).click()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
@@ -244,7 +242,7 @@ describe('Fable Builder workbench', () => {
       .element(screen.getByText('Which configuration do you want to work on?'))
       .toBeVisible()
 
-    await screen.getByRole('button', { name: 'Your selection' }).click()
+    await screen.getByRole('button', { name: 'New configuration' }).click()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
@@ -262,7 +260,9 @@ describe('Fable Builder workbench', () => {
       .element(screen.getByText('Which configuration do you want to work on?'))
       .toBeVisible()
 
-    await screen.getByRole('button', { name: 'Your unsaved work' }).click()
+    await screen
+      .getByRole('button', { name: 'Previous configuration (unsaved)' })
+      .click()
 
     expect(mockNavigate).toHaveBeenCalledWith({
       to: '/configure',
@@ -287,7 +287,7 @@ describe('Fable Builder workbench', () => {
       .element(screen.getByText('Which configuration do you want to work on?'))
       .toBeVisible()
 
-    await screen.getByRole('button', { name: 'Your selection' }).click()
+    await screen.getByRole('button', { name: 'New configuration' }).click()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))

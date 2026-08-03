@@ -20,11 +20,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-// Hovering/focusing one card dims the other — only one survives the choice.
+// Dim the rival on hover only — auto-focus + hover can coexist and would gray out both cards.
 const DIM_WHEN_INCOMING_ACTIVE =
-  'transition-all duration-200 group-has-[[data-choice=incoming]:hover]:opacity-40 group-has-[[data-choice=incoming]:hover]:grayscale group-has-[[data-choice=incoming]:focus-visible]:opacity-40 group-has-[[data-choice=incoming]:focus-visible]:grayscale'
+  'transition-all duration-200 group-has-[[data-choice=incoming]:hover]:opacity-40 group-has-[[data-choice=incoming]:hover]:grayscale'
 const DIM_WHEN_BENCH_ACTIVE =
-  'transition-all duration-200 group-has-[[data-choice=bench]:hover]:opacity-40 group-has-[[data-choice=bench]:hover]:grayscale group-has-[[data-choice=bench]:focus-visible]:opacity-40 group-has-[[data-choice=bench]:focus-visible]:grayscale'
+  'transition-all duration-200 group-has-[[data-choice=bench]:hover]:opacity-40 group-has-[[data-choice=bench]:hover]:grayscale'
+const CARD_ACTIVE =
+  'outline-none hover:border-primary hover:bg-primary/5 hover:shadow-md focus-visible:border-primary focus-visible:bg-primary/5'
 
 export interface WorkbenchReplaceTarget {
   fable: FableBuilderV1
@@ -92,7 +94,7 @@ export function ReplaceWorkbenchDialog({
             data-choice="bench"
             aria-label={benchLabel}
             onClick={onCancel}
-            className={`flex flex-col items-start gap-2 rounded-lg border-2 p-4 text-left hover:border-primary hover:bg-primary/5 hover:shadow-md ${DIM_WHEN_INCOMING_ACTIVE}`}
+            className={`flex flex-col items-start gap-2 rounded-lg border-2 p-4 text-left ${CARD_ACTIVE} ${DIM_WHEN_INCOMING_ACTIVE}`}
           >
             <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {benchLabel}
@@ -121,7 +123,7 @@ export function ReplaceWorkbenchDialog({
             data-choice="incoming"
             aria-label={t('replaceDialog.incomingLabel')}
             onClick={onReplace}
-            className={`flex flex-col items-start gap-2 rounded-lg border-2 p-4 text-left hover:border-destructive hover:bg-destructive/5 hover:shadow-md ${DIM_WHEN_BENCH_ACTIVE}`}
+            className={`flex flex-col items-start gap-2 rounded-lg border-2 p-4 text-left ${CARD_ACTIVE} ${DIM_WHEN_BENCH_ACTIVE}`}
           >
             <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {t('replaceDialog.incomingLabel')}
