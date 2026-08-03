@@ -189,7 +189,7 @@ function SlotPicker({
             ) : null}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="max-w-md min-w-[360px]">
+        <SelectContent className="max-w-xl min-w-[360px]">
           {entries.map((entry) => {
             const ref = entryRef(entry)
             const { kind, detail } = entryDetail(entry)
@@ -208,7 +208,11 @@ function SlotPicker({
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex min-w-0 items-center gap-2">
                     {/* flex-1 keeps the slot chips in a right-hand column. */}
-                    <span className="min-w-0 flex-1 truncate">
+                    {/* whitespace-normal: the ItemText wrapper is nowrap. */}
+                    <span
+                      className="line-clamp-2 min-w-0 flex-1 break-words whitespace-normal"
+                      title={entryDisplayName(entry)}
+                    >
                       {entryDisplayName(entry)}
                     </span>
                     {chipSlots.map((s) => (
