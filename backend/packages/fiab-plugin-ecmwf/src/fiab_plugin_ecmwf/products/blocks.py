@@ -238,15 +238,15 @@ class CustomThresholdProbability(Product):
     title: str = "Custom Threshold Probability"
     description: str = "Computes probability of ensemble members being above/below the configured threshold"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
-        THRESHOLD: BlockConfigurationOption(
-            title="Threshold",
-            description="Threshold value to compute probability for",
-            value_type="float",
-        ),
         COMPARISON: BlockConfigurationOption(
             title="Comparison",
             description="Comparison operator for threshold",
             value_type="enumClosed['>=', '<=', '>', '<']",
+        ),
+        THRESHOLD: BlockConfigurationOption(
+            title="Threshold",
+            description="Threshold value to compute probability for",
+            value_type="float",
         ),
     }
     inputs: list[str] = ["dataset"]
