@@ -104,7 +104,7 @@ function VisualiseNavItem() {
       <Earth className="h-4 w-4" />
       {t('nav.visualise')}
       {count > 0 && (
-        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums">
+        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-muted-foreground/20 px-1 text-[10px] font-semibold text-muted-foreground tabular-nums">
           {count}
         </span>
       )}
