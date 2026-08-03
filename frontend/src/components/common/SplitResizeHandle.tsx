@@ -8,10 +8,10 @@
  * does it submit to any jurisdiction.
  */
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
-import { Separator } from 'react-resizable-panels'
 import { useTranslation } from 'react-i18next'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 /** Grip + hover hint + step-buttons-on-select; host must be relative with class `group/split`. */
@@ -63,41 +63,132 @@ export function SplitHandleChrome({
   )
 }
 
-/** Panel-group Separator with the chrome: drag, or click to select and step. */
-export function SplitResizeHandle({
-  onNudge,
+/** Two-pane horizontal split with the shared handle: drag, clean-click select,
+ * arrow keys, steppers, double-click reset. Uncontrolled; reports percentages. */
+export function SplitPane({
+  initialStartPct,
+  defaultStartPct = 42,
+  onChange,
+  minStartPx,
+  minEndPx,
+  start,
+  end,
   className,
 }: {
-  onNudge?: (direction: -1 | 1) => void
+  /** Restored width of the first pane in percent; falls back to the default. */
+  initialStartPct?: number
+  defaultStartPct?: number
+  onChange?: (startPct: number) => void
+  minStartPx: number
+  minEndPx: number
+  start: ReactNode
+  end: ReactNode
   className?: string
 }) {
-  const dragStartXRef = useRef<number | null>(null)
-  return (
-    <Separator
-      onPointerDownCapture={(event) => {
-        // Presses on the steppers are clicks, never drags.
-        if ((event.target as HTMLElement).closest('[data-steppers]')) return
-        dragStartXRef.current = event.clientX
-        ;(event.currentTarget as HTMLElement).setAttribute('data-dragging', '')
-      }}
-      onPointerUpCapture={(event) => {
-        const startX = dragStartXRef.current
-        dragStartXRef.current = null
-        ;(event.currentTarget as HTMLElement).removeAttribute('data-dragging')
-        // The library focuses on pointer-down; blur after a real drag so only a clean click selects.
-        if (startX !== null && Math.abs(event.clientX - startX) > 3) {
-          ;(event.currentTarget as HTMLElement).blur()
+  const { t } = useTranslation('common')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const startPaneRef = useRef<HTMLDivElement>(null)
+  const endPaneRef = useRef<HTMLDivElement>(null)
+  const [startPct, setStartPct] = useState(initialStartPct ?? defaultStartPct)
+  const startPctRef = useRef(startPct)
+
+  const clampPct = (pct: number, width: number): number => {
+    if (width <= 0) return pct
+    const min = (minStartPx / width) * 100
+    const max = 100 - (minEndPx / width) * 100
+    return max < min ? min : Math.min(max, Math.max(min, pct))
+  }
+
+  const apply = (pct: number): void => {
+    const next = clampPct(pct, containerRef.current?.clientWidth ?? 0)
+    startPctRef.current = next
+    setStartPct(next)
+    onChange?.(next)
+  }
+
+  const onPointerDown = (e: React.PointerEvent): void => {
+    e.preventDefault()
+    const strip = e.currentTarget as HTMLElement
+    const width = containerRef.current?.clientWidth ?? 0
+    if (width === 0) return
+    strip.setAttribute('data-dragging', '')
+    const startX = e.clientX
+    const startAt = startPctRef.current
+    let moved = false
+    let raf = 0
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX
+      if (Math.abs(dx) > 3) moved = true
+      startPctRef.current = clampPct(startAt + (dx / width) * 100, width)
+      // DOM-only, one write per frame — per-move React commits (and storage writes) stutter.
+      raf ||= requestAnimationFrame(() => {
+        raf = 0
+        const pct = startPctRef.current
+        if (startPaneRef.current) {
+          startPaneRef.current.style.flexGrow = String(pct)
         }
-      }}
-      className={cn(
-        'group/split relative w-4 shrink-0 cursor-col-resize outline-none',
-        'before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-border',
-        'hover:before:w-0.5 hover:before:bg-primary/50',
-        'focus-within:before:w-0.5 focus-within:before:bg-primary focus:before:w-0.5 focus:before:bg-primary',
-        className,
-      )}
-    >
-      <SplitHandleChrome onNudge={onNudge} />
-    </Separator>
+        if (endPaneRef.current) {
+          endPaneRef.current.style.flexGrow = String(100 - pct)
+        }
+      })
+    }
+    const onUp = () => {
+      cancelAnimationFrame(raf)
+      strip.removeAttribute('data-dragging')
+      // Commit once: state, persistence, aria — the drag itself was DOM-only.
+      apply(startPctRef.current)
+      // Only a clean click selects (shows the steppers); a drag never pins them.
+      if (!moved) strip.focus()
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+    }
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+  }
+
+  return (
+    <div ref={containerRef} className={cn('flex min-w-0', className)}>
+      <div
+        ref={startPaneRef}
+        className="flex min-h-0 min-w-0 flex-col"
+        style={{ flexGrow: startPct, flexBasis: 0, minWidth: minStartPx }}
+      >
+        {start}
+      </div>
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t('split.resize')}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(startPct)}
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        onDoubleClick={() => apply(defaultStartPct)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault()
+            apply(startPctRef.current + (e.key === 'ArrowRight' ? 2 : -2))
+          }
+        }}
+        className={cn(
+          'group/split relative w-4 shrink-0 cursor-col-resize outline-none',
+          'before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-border',
+          'hover:before:w-0.5 hover:before:bg-primary/50',
+          'focus-within:before:w-0.5 focus-within:before:bg-primary focus:before:w-0.5 focus:before:bg-primary',
+        )}
+      >
+        <SplitHandleChrome
+          onNudge={(direction) => apply(startPctRef.current + direction * 8)}
+        />
+      </div>
+      <div
+        ref={endPaneRef}
+        className="flex min-h-0 min-w-0 flex-col"
+        style={{ flexGrow: 100 - startPct, flexBasis: 0, minWidth: minEndPx }}
+      >
+        {end}
+      </div>
+    </div>
   )
 }

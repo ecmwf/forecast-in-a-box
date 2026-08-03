@@ -9,24 +9,21 @@
  */
 
 import { useCallback, useRef } from 'react'
-import type { RefObject } from 'react'
-import type { Layout } from 'react-resizable-panels'
 import { readStorageJson, writeStorageJson } from '@/lib/storage'
+
+/** Pane share in percent, keyed by pane id (sums to ~100). */
+export type SplitLayout = Record<string, number>
 
 /** Persisted split-pane layout: restored on mount, saved on every resize. */
 export function useSplitLayout(storageKey: string): {
-  defaultLayout: Layout | undefined
-  onLayoutChanged: (layout: Layout) => void
-  /** Latest applied layout — nudge handlers derive the next one from it. */
-  layoutRef: RefObject<Layout | null>
+  defaultLayout: SplitLayout | undefined
+  onLayoutChanged: (layout: SplitLayout) => void
 } {
-  const initialRef = useRef<Layout | null | undefined>(undefined)
-  initialRef.current ??= readStorageJson<Layout>(storageKey)
-  const layoutRef = useRef<Layout | null>(initialRef.current)
+  const initialRef = useRef<SplitLayout | null | undefined>(undefined)
+  initialRef.current ??= readStorageJson<SplitLayout>(storageKey)
 
   const onLayoutChanged = useCallback(
-    (layout: Layout) => {
-      layoutRef.current = layout
+    (layout: SplitLayout) => {
       writeStorageJson(storageKey, layout)
     },
     [storageKey],
@@ -35,6 +32,5 @@ export function useSplitLayout(storageKey: string): {
   return {
     defaultLayout: initialRef.current ?? undefined,
     onLayoutChanged,
-    layoutRef,
   }
 }

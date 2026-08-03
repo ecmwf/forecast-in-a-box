@@ -15,7 +15,6 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
-import { useGroupRef } from 'react-resizable-panels'
 import {
   ArrowLeft,
   FileJson,
@@ -35,15 +34,13 @@ import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { StoredOutputsCard } from './StoredOutputsCard'
-import type { CSSProperties, ReactNode, RefObject } from 'react'
-import type { GroupImperativeHandle, Layout } from 'react-resizable-panels'
+import type { CSSProperties, ReactNode } from 'react'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { useSplitLayout } from '@/hooks/useSplitLayout'
 import { useMedia } from '@/hooks/useMedia'
-import { SplitResizeHandle } from '@/components/common/SplitResizeHandle'
-import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
+import { SplitPane } from '@/components/common/SplitResizeHandle'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
@@ -70,18 +67,14 @@ const WIDE_TAB_CONTENT =
 /** Wide: resizable two-pane split (persisted); narrow: plain stacked flow. */
 function SplitOrStack({
   isWide,
-  groupRef,
-  defaultLayout,
-  onLayoutChanged,
-  onNudge,
+  initialStartPct,
+  onStartPctChange,
   canvas,
   details,
 }: {
   isWide: boolean
-  groupRef: RefObject<GroupImperativeHandle | null>
-  defaultLayout: Layout | undefined
-  onLayoutChanged: (layout: Layout) => void
-  onNudge: (direction: -1 | 1) => void
+  initialStartPct: number | undefined
+  onStartPctChange: (startPct: number) => void
   canvas: ReactNode
   details: ReactNode
 }) {
@@ -94,21 +87,16 @@ function SplitOrStack({
     )
   }
   return (
-    <ResizablePanelGroup
-      orientation="horizontal"
-      groupRef={groupRef}
-      defaultLayout={defaultLayout}
-      onLayoutChanged={onLayoutChanged}
+    <SplitPane
       className="min-h-0 flex-1"
-    >
-      <ResizablePanel id="canvas" defaultSize="42" minSize={320}>
-        {canvas}
-      </ResizablePanel>
-      <SplitResizeHandle onNudge={onNudge} />
-      <ResizablePanel id="details" defaultSize="58" minSize={460}>
-        {details}
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      initialStartPct={initialStartPct}
+      defaultStartPct={42}
+      onChange={onStartPctChange}
+      minStartPx={320}
+      minEndPx={460}
+      start={canvas}
+      end={details}
+    />
   )
 }
 
@@ -142,23 +130,17 @@ export function RunDetailPage() {
   const layoutMode = useUiStore((state) => state.layoutMode)
   const columnsFill = useViewportFill(true, { insetPx: 32 })
   const isWide = useMedia('(min-width: 1280px)')
-  const splitGroupRef = useGroupRef()
-  const {
-    defaultLayout: splitLayout,
-    onLayoutChanged: onSplitLayoutChanged,
-    layoutRef: splitLayoutRef,
-  } = useSplitLayout(STORAGE_KEYS.layout.runDetailSplit)
-  const nudgeSplit = useCallback(
-    (direction: -1 | 1) => {
-      const layout = splitLayoutRef.current
-      if (!layout || !('canvas' in layout) || !('details' in layout)) return
-      const step = 8
-      splitGroupRef.current?.setLayout({
-        canvas: layout.canvas + direction * step,
-        details: layout.details - direction * step,
-      })
-    },
-    [splitGroupRef, splitLayoutRef],
+  const { defaultLayout: splitLayout, onLayoutChanged: onSplitLayoutChanged } =
+    useSplitLayout(STORAGE_KEYS.layout.runDetailSplit)
+  // Stored shape predates SplitPane ({canvas, details} shares) — keep it.
+  const initialStartPct =
+    splitLayout && 'canvas' in splitLayout && 'details' in splitLayout
+      ? (splitLayout.canvas / (splitLayout.canvas + splitLayout.details)) * 100
+      : undefined
+  const onStartPctChange = useCallback(
+    (startPct: number) =>
+      onSplitLayoutChanged({ canvas: startPct, details: 100 - startPct }),
+    [onSplitLayoutChanged],
   )
   const { data: catalogue } = useBlockCatalogue()
 
@@ -323,10 +305,8 @@ export function RunDetailPage() {
       >
         <SplitOrStack
           isWide={isWide}
-          groupRef={splitGroupRef}
-          defaultLayout={splitLayout}
-          onLayoutChanged={onSplitLayoutChanged}
-          onNudge={nudgeSplit}
+          initialStartPct={initialStartPct}
+          onStartPctChange={onStartPctChange}
           canvas={
             <div className={WIDE_COLUMN}>
               {fableData?.builder && catalogue ? (
