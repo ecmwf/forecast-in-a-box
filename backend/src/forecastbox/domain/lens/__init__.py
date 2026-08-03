@@ -10,7 +10,8 @@
 """
 Manages the Lens domain -- external inspection tools (e.g. skinnyWMS) that clients
 can launch against the outputs of individual Runs for interactive visualisation and
-exploration.
+exploration. Also manages LensMetadata -- generic, frontend-managed metadata attached
+to a lens type (e.g. per-lens display preferences), persisted in `metadata_db.py`.
 
 Does not depend on any other domain, and is not depended on by any other domain.
 The association between a Lens instance and a specific Run output is handled

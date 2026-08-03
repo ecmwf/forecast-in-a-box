@@ -101,6 +101,28 @@ class GlobalGlyph(Base):
     )
 
 
+class LensMetadata(Base):
+    """Generic, frontend-managed metadata attached to a lens type (e.g. skinnyWMS).
+
+    Each user owns their own row per (lens_id, lens_metadata_id) pair -- mirrors
+    GlobalGlyph's (created_by, key) pattern. ``public`` rows represent an
+    admin-provided default/template and are visible (read-only) to every caller
+    in addition to their own rows; they are never merged server-side -- the
+    frontend is responsible for combining them as needed.
+    """
+
+    __tablename__ = "lens_metadata"
+
+    lens_id = Column(String(255), primary_key=True, nullable=False)
+    lens_metadata_id = Column(String(255), primary_key=True, nullable=False)
+    created_by = Column(String(255), primary_key=True, nullable=False)
+    created_at = Column(UTCDateTime, nullable=False)
+    updated_at = Column(UTCDateTime, nullable=False)
+
+    metadata_content = Column(JSON, nullable=True)
+    public = Column(Boolean, nullable=False, default=False)
+
+
 class ExperimentDefinition(Base):
     """Captures that a Blueprint should execute multiple times.
 
