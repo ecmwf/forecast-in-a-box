@@ -10,7 +10,6 @@
 import logging
 from importlib.resources import path
 
-import numpy as np
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, merge
 from earthkit.workflows.nodetree import datacubes as nodetree_datacubes
@@ -26,7 +25,7 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Product
-from fiab_core.types import ClosedEnumType, ListType, ParameterType, StringType
+from fiab_core.types import ClosedEnumType, FloatType, ListType, ParameterType, StringType
 from ppcore.products import action_from_outputs
 from ppcore.schema.exceptions import PProcDatasetError
 from ppcore.schema.forecast import ForecastDefinition
@@ -241,12 +240,12 @@ class CustomThresholdProbability(Product):
         COMPARISON: BlockConfigurationOption(
             title="Comparison",
             description="Comparison operator for threshold",
-            value_type="enumClosed['>=', '<=', '>', '<']",
+            value_type=ClosedEnumType([">=", "<=", ">", "<"]),
         ),
         THRESHOLD: BlockConfigurationOption(
             title="Threshold",
             description="Threshold value to compute probability for",
-            value_type="float",
+            value_type=FloatType(),
         ),
     }
     inputs: list[str] = ["dataset"]
@@ -299,12 +298,12 @@ class ThermalIndices(Product):
         PARAM: BlockConfigurationOption(
             title="Parameters",
             description="Parameters to compute",
-            value_type="list[str]",
+            value_type=ListType(ParameterType()),
         ),
         STEP: BlockConfigurationOption(
             title="Steps",
             description="Steps to compute",
-            value_type="list[str]",
+            value_type=ListType(StringType()),
         ),
     }
     inputs: list[str] = ["dataset"]

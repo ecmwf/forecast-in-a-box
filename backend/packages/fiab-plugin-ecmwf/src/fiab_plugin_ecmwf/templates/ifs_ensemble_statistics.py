@@ -72,7 +72,6 @@ template = BlueprintTemplate(
             factory_id=BlockFactoryId("ensembleStatistics"),
             instance=BlockInstance(
                 configuration_values={
-                    ConfigurationOptionId("param"): "2t",
                     ConfigurationOptionId("statistic"): "${statistic}",
                 },
                 input_ids={
