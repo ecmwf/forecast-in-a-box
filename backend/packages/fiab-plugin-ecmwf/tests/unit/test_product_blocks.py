@@ -46,6 +46,13 @@ from fiab_plugin_ecmwf.products.blocks import (
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, select
 
+PRODUCT_BLOCKS = [
+    BlockFactoryId("ensembleStatistics"),
+    BlockFactoryId("predefinedThresholdProbability"),
+    BlockFactoryId("customThresholdProbability"),
+    BlockFactoryId("thermalIndices"),
+]
+
 
 @pytest.fixture
 def ensemble_statistics_output() -> QubedOutput:
@@ -151,11 +158,7 @@ class TestEnsembleStatistics:
 
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):
-            assert expansion.factory not in [
-                BlockFactoryId("ensembleStatistics"),
-                BlockFactoryId("predefinedThresholdProbability"),
-                BlockFactoryId("customThresholdProbability"),
-            ]
+            assert expansion.factory not in PRODUCT_BLOCKS
 
 
 class TestPredefinedThresholdProb:
@@ -232,11 +235,7 @@ class TestPredefinedThresholdProb:
 
     def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
         for expansion in plugin().expander(threshold_probability_output):
-            assert expansion.factory not in [
-                BlockFactoryId("ensembleStatistics"),
-                BlockFactoryId("predefinedThresholdProbability"),
-                BlockFactoryId("customThresholdProbability"),
-            ]
+            assert expansion.factory not in PRODUCT_BLOCKS
 
 
 class TestCustomThresholdProb:
@@ -284,11 +283,7 @@ class TestCustomThresholdProb:
 
     def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
         for expansion in plugin().expander(threshold_probability_output):
-            assert expansion.factory not in [
-                BlockFactoryId("ensembleStatistics"),
-                BlockFactoryId("prescribedThresholdProbability"),
-                BlockFactoryId("customThresholdProbability"),
-            ]
+            assert expansion.factory not in PRODUCT_BLOCKS
 
 
 class TestThermalIndices:
@@ -377,12 +372,7 @@ class TestThermalIndices:
             [
                 {"class": "od", "stream": "oper", "type": "fc", "levtype": "sfc"},
                 set(),
-                {
-                    BlockFactoryId("ensembleStatistics"),
-                    BlockFactoryId("predefinedThresholdProbability"),
-                    BlockFactoryId("customThresholdProbability"),
-                    BlockFactoryId("thermalIndices"),
-                },
+                set(PRODUCT_BLOCKS),
             ],
             [
                 {"class": "od", "stream": "enfo", "type": "pf", "levtype": "sfc", ENSEMBLE: [0, 1, 2]},
