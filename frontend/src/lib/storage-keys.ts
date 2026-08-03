@@ -82,6 +82,8 @@ export const STORAGE_KEYS = {
   layout: {
     /** Run detail: pipeline canvas vs details tabs */
     runDetailSplit: 'fiab.layout.run-detail-split',
+    /** Geo viewer: docked sidebar widths (left/right, px) */
+    geoViewerPanels: 'fiab.layout.geo-viewer-panels',
   },
 
   /**

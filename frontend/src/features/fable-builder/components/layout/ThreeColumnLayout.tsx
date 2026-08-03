@@ -10,8 +10,8 @@
 
 import { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { PanelToggleHandle } from './PanelToggleHandle'
 import type { ReactNode } from 'react'
+import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useUiPreferencesStore } from '@/features/fable-builder/stores/uiPreferencesStore'
 import { SplitHandleChrome } from '@/components/common/SplitResizeHandle'
@@ -38,11 +38,15 @@ function useResizeHandle(
   return useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault()
+      const strip = e.currentTarget as HTMLElement
+      strip.setAttribute('data-dragging', '')
       startXRef.current = e.clientX
       startWidthRef.current = getCurrentWidth()
+      let moved = false
 
       const onMove = (ev: PointerEvent) => {
         const delta = ev.clientX - startXRef.current
+        if (Math.abs(delta) > 3) moved = true
         // Left sidebar: drag right = wider. Right sidebar: drag left = wider.
         const newWidth =
           direction === 'left'
@@ -52,6 +56,9 @@ function useResizeHandle(
       }
 
       const onUp = () => {
+        strip.removeAttribute('data-dragging')
+        // Only a clean click selects (shows the steppers); a drag never pins them.
+        if (!moved) strip.focus()
         document.removeEventListener('pointermove', onMove)
         document.removeEventListener('pointerup', onUp)
       }
@@ -89,13 +96,13 @@ export function ThreeColumnLayout({
 
   return (
     <div className="relative flex h-full min-h-0 w-full">
-      {/* Left margin zone when sidebar closed */}
-      <div
-        className={cn(
-          'relative shrink-0 transition-all duration-200',
-          isPaletteOpen ? 'w-0' : 'w-4 sm:w-6',
-        )}
-      />
+      {!isPaletteOpen && (
+        <CollapsedSidebarHandle
+          side="left"
+          onExpand={togglePalette}
+          label={t('layout.showBlockPalette')}
+        />
+      )}
 
       {/* Left Panel */}
       <aside
@@ -116,6 +123,7 @@ export function ThreeColumnLayout({
             role="separator"
             aria-orientation="vertical"
             aria-label={t('layout.resizeSidebar')}
+            aria-valuenow={Math.round(leftWidth)}
             tabIndex={0}
             onPointerDown={onLeftResize}
             onDoubleClick={resetLeftWidth}
@@ -132,16 +140,6 @@ export function ThreeColumnLayout({
             />
           </div>
         )}
-        <PanelToggleHandle
-          isOpen={isPaletteOpen}
-          onToggle={togglePalette}
-          position="left"
-          label={
-            isPaletteOpen
-              ? t('layout.hideBlockPalette')
-              : t('layout.showBlockPalette')
-          }
-        />
       </div>
 
       {/* Canvas */}
@@ -154,6 +152,7 @@ export function ThreeColumnLayout({
             role="separator"
             aria-orientation="vertical"
             aria-label={t('layout.resizeSidebar')}
+            aria-valuenow={Math.round(rightWidth)}
             tabIndex={0}
             onPointerDown={onRightResize}
             onDoubleClick={resetRightWidth}
@@ -172,16 +171,6 @@ export function ThreeColumnLayout({
             />
           </div>
         )}
-        <PanelToggleHandle
-          isOpen={isConfigPanelOpen}
-          onToggle={toggleConfigPanel}
-          position="right"
-          label={
-            isConfigPanelOpen
-              ? t('layout.hideConfigPanel')
-              : t('layout.showConfigPanel')
-          }
-        />
       </div>
 
       {/* Right Panel */}
@@ -196,13 +185,13 @@ export function ThreeColumnLayout({
         </div>
       </aside>
 
-      {/* Right margin zone when sidebar closed */}
-      <div
-        className={cn(
-          'relative shrink-0 transition-all duration-200',
-          isConfigPanelOpen ? 'w-0' : 'w-4 sm:w-6',
-        )}
-      />
+      {!isConfigPanelOpen && (
+        <CollapsedSidebarHandle
+          side="right"
+          onExpand={toggleConfigPanel}
+          label={t('layout.showConfigPanel')}
+        />
+      )}
     </div>
   )
 }

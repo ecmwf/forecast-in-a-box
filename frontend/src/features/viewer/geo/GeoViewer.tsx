@@ -45,7 +45,8 @@ import {
   rebaseLensUrl,
   skinnyWmsBasemap,
 } from '../wms-capabilities'
-import { CollapsedSidebarHandle } from '../components/CollapsedSidebarHandle'
+import { GeoPanelResizeStrip } from './GeoPanelResizeStrip'
+import { useGeoPanelWidths } from './useGeoPanelWidths'
 import { buildPairs } from './layer-pairing'
 import { useCompareSelection } from './useCompareSelection'
 import { useGetMapFailureLog } from './getmap-failures'
@@ -65,6 +66,7 @@ import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
+import type { GeoPanelSide } from './useGeoPanelWidths'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
@@ -72,6 +74,7 @@ import type { SourceSlot } from './layer-pairing'
 import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { ViewerUrlState } from './view-url-state'
+import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -474,6 +477,20 @@ export function GeoViewer({
     setLeftCollapsed(true)
     setRightCollapsed(true)
   }
+
+  // lg+ sidebar widths (persisted); the strips drag against live DOM width.
+  const {
+    widths: panelWidths,
+    styleVars: panelStyleVars,
+    setSide: setPanelWidth,
+  } = useGeoPanelWidths()
+  const panelsRef = useRef<HTMLDivElement>(null)
+  const measurePanel = useCallback((side: GeoPanelSide) => {
+    const el = panelsRef.current?.querySelector<HTMLElement>(
+      `[data-geo-panel="${side}"]`,
+    )
+    return el?.offsetWidth ?? 288
+  }, [])
   const expandLeft = () => {
     setLeftCollapsed(false)
     if (sheetViewport) setRightCollapsed(true)
@@ -818,7 +835,11 @@ export function GeoViewer({
         slotIds={{ a: a.id, b: bId }}
         meta={{ labelA: a.label, labelB: b?.label ?? null }}
       />
-      <div className="relative flex min-h-0 flex-1 gap-2">
+      <div
+        ref={panelsRef}
+        style={panelStyleVars}
+        className="relative flex min-h-0 flex-1 gap-2"
+      >
         {/* Collapse hides (not unmounts) the sidebars so working state —
             filter tab, search, level chips, expanded groups — survives
             reopening. Below sm an open sidebar overlays the map instead
@@ -881,6 +902,15 @@ export function GeoViewer({
             onCollapse={() => setLeftCollapsed(true)}
           />
         </div>
+        {!leftCollapsed && (
+          <GeoPanelResizeStrip
+            side="left"
+            valueNow={panelWidths.left ?? 288}
+            getWidth={() => measurePanel('left')}
+            onWidth={(px) => setPanelWidth('left', px)}
+            onReset={() => setPanelWidth('left', null)}
+          />
+        )}
         <div className="min-h-0 min-w-0 flex-1">
           {focusSlot === null && mode === 'side' && mapSourceB ? (
             <DualMapView
@@ -938,6 +968,15 @@ export function GeoViewer({
             />
           )}
         </div>
+        {!rightCollapsed && (
+          <GeoPanelResizeStrip
+            side="right"
+            valueNow={panelWidths.right ?? 288}
+            getWidth={() => measurePanel('right')}
+            onWidth={(px) => setPanelWidth('right', px)}
+            onReset={() => setPanelWidth('right', null)}
+          />
+        )}
         <div
           style={{ display: rightCollapsed ? 'none' : undefined }}
           className="max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-20 max-lg:flex max-lg:shadow-xl lg:contents"

@@ -221,7 +221,10 @@ export function GeoActiveLayersPanel({
 
   // Width steps mirror GeoLayerBrowser — the sidebars stay symmetric.
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background lg:w-60 xl:w-72">
+    <aside
+      data-geo-panel="left"
+      className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background lg:w-[var(--geo-left-w,15rem)] xl:w-[var(--geo-left-w,18rem)]"
+    >
       <div className="space-y-2.5 border-b border-border bg-muted/40 px-3 pt-2.5 pb-3">
         <div className="flex items-center justify-between">
           <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

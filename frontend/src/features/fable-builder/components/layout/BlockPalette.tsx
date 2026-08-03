@@ -9,7 +9,13 @@
  */
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Search,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
   BlockFactory,
@@ -27,6 +33,7 @@ import {
   parseDisplayPluginId,
 } from '@/api/types/fable.types'
 import { H2, P } from '@/components/base/typography'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -52,6 +59,7 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
     new Set(BLOCK_KIND_ORDER),
   )
   const addBlock = useFableBuilderStore((state) => state.addBlock)
+  const togglePalette = useFableBuilderStore((state) => state.togglePalette)
   const setDraggedFactory = useFableBuilderStore(
     (state) => state.setDraggedFactory,
   )
@@ -164,7 +172,19 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border p-4">
-        <H2 className="mb-3 text-sm font-semibold">{t('palette.title')}</H2>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <H2 className="text-sm font-semibold">{t('palette.title')}</H2>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={togglePalette}
+            title={t('layout.hideBlockPalette')}
+            aria-label={t('layout.hideBlockPalette')}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
         <div className="relative">
           <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
           <Input

@@ -21,11 +21,15 @@ import { cn } from '@/lib/utils'
 export function CollapsedSidebarHandle({
   side,
   onExpand,
+  label,
 }: {
   side: 'left' | 'right'
   onExpand: () => void
+  /** Accessible name; defaults to the generic expand label. */
+  label?: string
 }) {
   const { t } = useTranslation('executions')
+  const text = label ?? t('lens.expandSidebar')
   const Icon = side === 'left' ? ChevronRight : ChevronLeft
   return (
     <div
@@ -42,8 +46,8 @@ export function CollapsedSidebarHandle({
         size="icon"
         className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
         onClick={onExpand}
-        title={t('lens.expandSidebar')}
-        aria-label={t('lens.expandSidebar')}
+        title={text}
+        aria-label={text}
       >
         <Icon className="h-4 w-4" />
       </Button>

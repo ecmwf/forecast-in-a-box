@@ -104,7 +104,8 @@
     "pickPrompt": "Click a source chip above, or add a new source",
     "corsHint": "If this is an external server, it must send CORS headers",
     "bError": "Second source failed:",
-    "removeB": "Remove B"
+    "removeB": "Remove B",
+    "resize": "Resize panel"
   },
   "focus": {
     "aria": "Source focus",

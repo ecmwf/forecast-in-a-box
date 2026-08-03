@@ -9,7 +9,7 @@
  */
 
 import { useMemo, useRef } from 'react'
-import { AlertCircle, Link2, Trash2, X } from 'lucide-react'
+import { AlertCircle, ChevronRight, Link2, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
@@ -78,6 +78,9 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
       : null,
   )
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
+  const toggleConfigPanel = useFableBuilderStore(
+    (state) => state.toggleConfigPanel,
+  )
   const updateBlockConfig = useFableBuilderStore(
     (state) => state.updateBlockConfig,
   )
@@ -162,7 +165,17 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
 
   if (!selectedBlock || !factory) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+      <div className="relative flex h-full flex-col items-center justify-center p-6 text-center">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-3 left-3 h-6 w-6"
+          onClick={toggleConfigPanel}
+          title={t('layout.hideConfigPanel')}
+          aria-label={t('layout.hideConfigPanel')}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
         <div className="text-muted-foreground">
           <AlertCircle className="mx-auto mb-3 h-10 w-10 opacity-50" />
           <P>{t('configPanel.selectBlock')}</P>
@@ -207,6 +220,16 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
       <div className="border-b border-border p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0"
+              onClick={toggleConfigPanel}
+              title={t('layout.hideConfigPanel')}
+              aria-label={t('layout.hideConfigPanel')}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
             <div className={cn('shrink-0', metadata.color)}>
               <IconComponent className="h-5 w-5" />
             </div>
