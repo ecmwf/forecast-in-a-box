@@ -31,7 +31,6 @@ import {
 } from '@/features/executions/utils/taskLineage'
 import { humaniseTaskName } from '@/features/executions/utils/taskName'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
-import { ExperimentalNotice } from '@/features/executions/components/ExperimentalNotice'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { P } from '@/components/base/typography'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -308,7 +307,6 @@ export function CompilationForceGraph({
 
   return (
     <div className="flex h-[min(640px,calc(100vh-22rem))] min-h-[420px] flex-col gap-2 min-[1280px]:!h-full min-[1280px]:min-h-0">
-      <ExperimentalNotice />
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
         <span>{t('compilation.forceDescription')}</span>
         <div className="flex items-center gap-3">

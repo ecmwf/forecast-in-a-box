@@ -23,6 +23,11 @@ import type { JobStatus } from '@/api/types/job.types'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import {
+  formatInZone,
+  timeZoneOffsetLabel,
+  useAppTimeZone,
+} from '@/lib/datetime'
+import {
   getStatusBadgeClasses,
   getStatusBarColor,
 } from '@/features/executions/utils/job-status'
@@ -79,13 +84,13 @@ function formatElapsed(ms: number): string {
   return `${minutes}m ${seconds}s`
 }
 
+/** Live-only: null for terminal runs — now−createdAt is not their duration. */
 function useElapsedTime(createdAt: string | null, isTerminal: boolean) {
-  // createdAt is UTC with explicit offset — route through the measured
   const { serverTimeToLocal } = useServerTime()
   const [elapsed, setElapsed] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!createdAt) {
+    if (!createdAt || isTerminal) {
       setElapsed(null)
       return
     }
@@ -94,8 +99,6 @@ function useElapsedTime(createdAt: string | null, isTerminal: boolean) {
 
     const update = () => setElapsed(Date.now() - startTime)
     update()
-
-    if (isTerminal) return
 
     const interval = setInterval(update, 1000)
     return () => clearInterval(interval)
@@ -166,6 +169,12 @@ export function RunStatusHeader({
   const { t } = useTranslation(['executions', 'journal'])
   const terminal = isTerminalStatus(status)
   const elapsed = useElapsedTime(createdAt, terminal)
+  const timeZone = useAppTimeZone()
+  const { serverTimeToLocal } = useServerTime()
+  const startedAt =
+    terminal && createdAt
+      ? `${formatInZone(serverTimeToLocal(createdAt), timeZone, 'yyyy-MM-dd HH:mm')} ${timeZoneOffsetLabel(timeZone)}`
+      : null
 
   const progressPercent = parseFloat(progress) || 0
   const showBlockCount =
@@ -207,10 +216,16 @@ export function RunStatusHeader({
             {t(`status.${status}`)}
           </span>
 
-          {elapsed !== null && (
+          {startedAt !== null ? (
             <span className="text-sm text-muted-foreground">
-              {formatElapsed(elapsed)}
+              {t('detail.startedAt', { date: startedAt })}
             </span>
+          ) : (
+            elapsed !== null && (
+              <span className="text-sm text-muted-foreground">
+                {formatElapsed(elapsed)}
+              </span>
+            )
           )}
 
           {showBlockCount && (

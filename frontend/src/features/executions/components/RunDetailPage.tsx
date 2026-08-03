@@ -410,6 +410,7 @@ export function RunDetailPage() {
                     completedBlockIds={jobData.completed_block_ids}
                     plannedBlockIds={jobData.planned_block_ids}
                     toolbarSlot={toolbarSlot}
+                    onViewLogs={() => setActiveTab('logs')}
                   />
                 </TabsContent>
                 <TabsContent value="logs" className={WIDE_TAB_CONTENT}>
