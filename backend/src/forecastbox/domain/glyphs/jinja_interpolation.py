@@ -172,6 +172,13 @@ def get_custom_functions() -> list[CustomFunction]:
     return list(CUSTOM_FUNCTIONS)
 
 
+def is_jinja_reserved_name(s: str) -> bool:
+    """Return True if `s` collides with a jinja2 filter or global name registered in
+    the interpolation environment (e.g. ``floor_day``, ``timedelta``), and would
+    therefore shadow a built-in function rather than resolve as a glyph."""
+    return s in _FILTER_NAMES
+
+
 def render_expression(raw: str, variables: dict[str, str]) -> str:
     """Render ``raw`` as a Jinja2 template, substituting ``${...}`` expressions.
 

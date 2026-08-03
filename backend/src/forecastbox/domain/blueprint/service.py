@@ -52,6 +52,7 @@ from forecastbox.domain.glyphs import global_db, resolution
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values, remap_glyph_names
+from forecastbox.domain.glyphs.validation import validate_glyph
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import execution_manager
@@ -60,6 +61,10 @@ from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
+
+
+CORE_VERSION_MISMATCH_TAG_KEY = "CoreVersionMismatch"
+"""Reserved tag key used to flag a fiab-core major version mismatch; may not be set by callers."""
 
 
 class Tag(FiabBaseModel):
@@ -71,6 +76,17 @@ class Tag(FiabBaseModel):
 
     key: str
     value: str | None = None
+
+
+def tag_name_errors(tags: list[Tag]) -> list[str]:
+    """Return error messages for any tag using a key reserved for system use.
+
+    Does not raise -- callers combine the returned errors with other validation
+    errors before deciding how to surface them.
+    """
+    if any(t.key == CORE_VERSION_MISMATCH_TAG_KEY for t in tags):
+        return [f"Tag key {CORE_VERSION_MISMATCH_TAG_KEY!r} is reserved and may not be set by callers."]
+    return []
 
 
 class PluginBlockFactoryId(FiabBaseModel):
@@ -232,10 +248,12 @@ def _validate_expand_with_buckets(
     available_glyphs = set(all_glyphs_raw.keys())
 
     global_errors: list[str] = []
-    intrinsic_names = set(intrinsic_values.keys())
-    colliding_keys = set(local_glyphs.keys()) & intrinsic_names
-    for key in sorted(colliding_keys):
-        global_errors.append(f"Local glyph key {key!r} is reserved as an intrinsic glyph and cannot be overridden.")
+    for key in sorted(local_glyphs):
+        glyph_validation = validate_glyph(key)
+        if glyph_validation.e is not None:
+            # Soft path: flag the bad local glyph name but keep using its value as-is
+            # for the rest of validation -- this is not a showstopper.
+            global_errors.append(f"Local glyph key {key!r} {glyph_validation.e}.")
 
     # Build lookup and detect duplicate instance ids.
     block_lookup: dict[BlockInstanceId, RoutableBlock] = {}

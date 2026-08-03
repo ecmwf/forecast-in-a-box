@@ -48,18 +48,21 @@ from forecastbox.domain.blueprint.exceptions import (
     BlueprintVersionConflict,
 )
 from forecastbox.domain.blueprint.service import (
+    CORE_VERSION_MISMATCH_TAG_KEY,
     BlueprintBuilder,
     BlueprintSaveCommand,
     BlueprintValidationExpansion,
     PluginBlockFactoryId,
     SerializedBlockExpansion,
     Tag,
+    tag_name_errors,
 )
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.glyphs import global_db
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.glyphs.jinja_interpolation import get_custom_functions
 from forecastbox.domain.glyphs.types import GlobalGlyphId
+from forecastbox.domain.glyphs.validation import validate_glyph
 from forecastbox.domain.plugin.compatibility import get_fiabcore_version
 from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
 from forecastbox.schemata.jobs import BlueprintSource
@@ -78,22 +81,10 @@ router = APIRouter(
 )
 
 
-_CORE_VERSION_MISMATCH_KEY = "CoreVersionMismatch"
-
-
 def _maybe_append_coreversion_mismatch(tags: list[Tag], entity_coreversion: int, current_coreversion: int) -> None:
     """Append a ``CoreVersionMismatch`` tag when the stored and current fiab-core major versions differ."""
     if entity_coreversion != current_coreversion:
-        tags.append(Tag(key=_CORE_VERSION_MISMATCH_KEY, value=f"!{entity_coreversion} != {current_coreversion}"))
-
-
-def _reject_reserved_tags(tags: list[Tag]) -> None:
-    """Raise HTTP 422 if any tag uses a key reserved for system use."""
-    if any(t.key == _CORE_VERSION_MISMATCH_KEY for t in tags):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Tag key {_CORE_VERSION_MISMATCH_KEY!r} is reserved and may not be set by callers.",
-        )
+        tags.append(Tag(key=CORE_VERSION_MISMATCH_TAG_KEY, value=f"!{entity_coreversion} != {current_coreversion}"))
 
 
 # ---------------------------------------------------------------------------
@@ -272,12 +263,13 @@ async def create_blueprint(
     glyphs, config errors, intrinsic glyph key collisions, etc.).
     Returns 422 if any of the supplied tags has a reserved key.
     """
-    _reject_reserved_tags(request.tags)
+    tag_errors = tag_name_errors(request.tags)
     validation = await service.validate_expand(request.builder, auth_context, validate_only=True)
-    if validation.global_errors or validation.block_errors:
+    global_errors = tag_errors + validation.global_errors
+    if global_errors or validation.block_errors:
         raise HTTPException(
             status_code=422,
-            detail={"global_errors": validation.global_errors, "block_errors": validation.block_errors},
+            detail={"global_errors": global_errors, "block_errors": validation.block_errors},
         )
     payload = BlueprintSaveCommand(
         builder=request.builder,
@@ -398,12 +390,13 @@ async def update_blueprint(
     Returns 422 if any of the supplied tags has a reserved key.
     Returns the new version number on success.
     """
-    _reject_reserved_tags(request.tags)
+    tag_errors = tag_name_errors(request.tags)
     validation = await service.validate_expand(request.builder, auth_context, validate_only=True)
-    if validation.global_errors or validation.block_errors:
+    global_errors = tag_errors + validation.global_errors
+    if global_errors or validation.block_errors:
         raise HTTPException(
             status_code=422,
-            detail={"global_errors": validation.global_errors, "block_errors": validation.block_errors},
+            detail={"global_errors": global_errors, "block_errors": validation.block_errors},
         )
     payload = BlueprintSaveCommand(
         builder=request.builder,
@@ -602,11 +595,11 @@ async def post_global_glyph(
     must be absent when public=False).
     Returns 403 if a non-admin tries to create a public glyph.
     """
-    intrinsic_names = set(get_values_and_examples().keys())
-    if request.key in intrinsic_names:
+    glyph_validation = validate_glyph(request.key)
+    if glyph_validation.e is not None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Key {request.key!r} is reserved as an intrinsic glyph and cannot be overridden.",
+            detail=f"Key {request.key!r} {glyph_validation.e}.",
         )
     if request.public and request.overriddable is None:
         raise HTTPException(

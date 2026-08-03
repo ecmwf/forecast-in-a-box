@@ -112,8 +112,10 @@ def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin) -> No
     """
     from forecastbox.domain.blueprint.db import find_plugin_template_id, soft_delete_plugin_template, upsert_blueprint
     from forecastbox.domain.blueprint.service import (
+        Tag,
         remap_builder_glyphs,
         resolve_builder_with_examples,
+        tag_name_errors,
         template_to_builder,
         validate_expand_sync,
     )
@@ -150,7 +152,8 @@ def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin) -> No
                 builder = remap_builder_glyphs(builder, glyph_remapping)
             validation_builder = resolve_builder_with_examples(builder, template.example_values, template.example_glyphs)
             result = validate_expand_sync(validation_builder, auth, validate_only=True)
-            all_errors: list[str] = list(result.global_errors)
+            all_errors: list[str] = tag_name_errors([Tag(key=tag) for tag in template.tags])
+            all_errors.extend(result.global_errors)
             for block_errs in result.block_errors.values():
                 all_errors.extend(block_errs)
             if all_errors:
