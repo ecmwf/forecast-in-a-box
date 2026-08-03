@@ -111,6 +111,20 @@ describe('Fable Builder workbench', () => {
     expect(readDraft()?.fableName).toBe('Drafted work')
   })
 
+  it('the header broom issues the guarded fresh navigation', async () => {
+    seedWorkbench()
+
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'New configuration' }).click()
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: '/configure',
+      search: { fresh: true },
+    })
+  })
+
   it('a plain visit resumes the live session', async () => {
     useFableBuilderStore.getState().setFable(seedDraft().fable)
     useFableBuilderStore.setState({ isDirty: true })

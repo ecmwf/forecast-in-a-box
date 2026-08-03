@@ -50,6 +50,7 @@
     "form": "Form",
     "exportConfig": "Export Config",
     "loadConfig": "Load Config",
+    "newConfiguration": "New configuration",
     "exportFailed": "Failed to export config",
     "configLoaded": "Configuration loaded",
     "fileTooLargeTitle": "File too large",
