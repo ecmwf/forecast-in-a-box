@@ -54,6 +54,8 @@ For multi-step tasks, state a brief plan with verifiable checks.
 
 It is imperative formatting is correct and tests are passing. Make sure `npm run validate:fix` passes before you commit.
 
+Additionally, do not use fancy unicode or emoji characters when writing text/markdown files, commit messages, comments, or docstring.
+
 ---
 
 ## Project Overview
