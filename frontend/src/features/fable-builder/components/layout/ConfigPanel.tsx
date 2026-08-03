@@ -169,7 +169,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-3 left-3 h-6 w-6"
+          className="absolute top-3 left-3 h-6 w-6 max-lg:hidden"
           onClick={toggleConfigPanel}
           title={t('layout.hideConfigPanel')}
           aria-label={t('layout.hideConfigPanel')}
@@ -223,7 +223,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 shrink-0"
+              className="h-6 w-6 shrink-0 max-lg:hidden"
               onClick={toggleConfigPanel}
               title={t('layout.hideConfigPanel')}
               aria-label={t('layout.hideConfigPanel')}

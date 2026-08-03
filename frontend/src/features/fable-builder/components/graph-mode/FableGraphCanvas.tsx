@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
+  Controls,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
@@ -56,7 +57,8 @@ const edgeTypes: EdgeTypes = {
 }
 
 function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
-  const isDesktop = useMedia('(min-width: 768px)')
+  // Must match FableBuilderPage's layout breakpoint (lg).
+  const isDesktop = useMedia('(min-width: 1024px)')
   const resolvedTheme = useUiStore((state) => state.resolvedTheme)
   const isDark = resolvedTheme === 'dark'
 
@@ -69,6 +71,9 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const fitViewTrigger = useFableBuilderStore((state) => state.fitViewTrigger)
   const connectBlocks = useFableBuilderStore((state) => state.connectBlocks)
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
+  const openMobileConfig = useFableBuilderStore(
+    (state) => state.openMobileConfig,
+  )
   const setHoveredEdge = useFableBuilderStore((state) => state.setHoveredEdge)
   const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
 
@@ -232,13 +237,25 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     let x: number
     let y: number
 
+    // Mobile centres the ENTRY node — a fanned bbox parks the first cards off-centre.
+    const entry = nodes.reduce((first, node) =>
+      (
+        layoutDirection === 'LR'
+          ? node.position.x < first.position.x
+          : node.position.y < first.position.y
+      )
+        ? node
+        : first,
+    )
+
     if (layoutDirection === 'TB') {
       // Position near top
       y = padding - bounds.y
 
       if (isMobile) {
-        // On mobile: left-align to ensure visibility
-        x = padding - bounds.x
+        x =
+          containerWidth / 2 -
+          (entry.position.x + (entry.measured?.width ?? 0) / 2)
       } else {
         // On desktop: center horizontally
         const graphCenterX = bounds.x + bounds.width / 2
@@ -249,8 +266,9 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
       x = padding - bounds.x
 
       if (isMobile) {
-        // On mobile: top-align to ensure visibility
-        y = padding - bounds.y
+        y =
+          containerHeight / 2 -
+          (entry.position.y + (entry.measured?.height ?? 0) / 2)
       } else {
         // On desktop: center vertically
         const graphCenterY = bounds.y + bounds.height / 2
@@ -268,6 +286,36 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
       fitView({ padding: 0.3, maxZoom: 1 })
     }
   }, [fitViewTrigger, fitView])
+
+  // Refit only on >25% container jumps (rotation/breakpoint) — sidebar drags must not yank the viewport.
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+    let last: { w: number; h: number } | null = null
+    let timer = 0
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[entries.length - 1].contentRect
+      if (width === 0 || height === 0) return
+      if (last === null) {
+        last = { w: width, h: height }
+        return
+      }
+      const bigChange =
+        Math.abs(width - last.w) / last.w > 0.25 ||
+        Math.abs(height - last.h) / last.h > 0.25
+      if (!bigChange) return
+      last = { w: width, h: height }
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        fitView({ padding: 0.2, maxZoom: 1, duration: 200 })
+      }, 150)
+    })
+    observer.observe(element)
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(timer)
+    }
+  }, [fitView])
 
   // Reflect the store's selected block onto React Flow's `selected` node flag.
   // BlockNode reads only that prop, so a selection change re-renders just the
@@ -317,9 +365,14 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: FableNode) => {
+      // Sheet layout: tap = configure (no docked panel to reflect selection).
+      if (!isDesktop) {
+        openMobileConfig(node.id)
+        return
+      }
       selectBlock(node.id)
     },
-    [selectBlock],
+    [selectBlock, isDesktop, openMobileConfig],
   )
 
   // Hovering a wire reveals its qube-lens handle (ephemeral UI; see FableEdge).
@@ -358,6 +411,8 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           settling ? 'opacity-0' : 'transition-opacity duration-150',
         )}
         proOptions={{ hideAttribution: true }}
+        // Default 0.5 floor can't fit a wide pipeline into a phone container.
+        minZoom={0.1}
       >
         <Background
           variant={BackgroundVariant.Dots}
@@ -365,6 +420,11 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           size={1.5}
           color="#cbd5e1"
           className="dark:opacity-30"
+        />
+        <Controls
+          showInteractive={false}
+          position="bottom-left"
+          className="bottom-2! left-2!"
         />
         {isMiniMapOpen && isDesktop && (
           <MiniMap

@@ -438,6 +438,18 @@ export function FableBuilderHeader({
                     <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-40">
+                    <DropdownMenuItem onClick={undo} disabled={!canUndo}>
+                      <Undo2 className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="whitespace-nowrap">
+                        {t('header.undo')}
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={redo} disabled={!canRedo}>
+                      <Redo2 className="mr-2 h-4 w-4 shrink-0" />
+                      <span className="whitespace-nowrap">
+                        {t('header.redo')}
+                      </span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleShare}
                       disabled={!hasBlocks}

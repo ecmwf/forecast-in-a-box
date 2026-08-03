@@ -184,7 +184,8 @@ export function FableBuilderPage({
     enabled: !fableId && replaceTarget === null,
   })
 
-  const isDesktop = useMedia('(min-width: 768px)')
+  // lg, matching the geo viewer: portrait tablets get sheets, not a ~200px canvas.
+  const isDesktop = useMedia('(min-width: 1024px)')
 
   const {
     data: catalogue,

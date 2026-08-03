@@ -160,7 +160,7 @@ export const BlockNode = memo(function ({
             <Button
               variant="ghost"
               size="icon"
-              className="nodrag h-7 w-7 text-muted-foreground hover:text-primary md:hidden"
+              className="nodrag h-7 w-7 text-muted-foreground hover:text-primary lg:hidden"
               onClick={handleOpenConfig}
               aria-label={t('blockNode.configureBlock')}
             >
