@@ -120,9 +120,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         for create_db_and_tables in pending_create_db_and_tables:
             result = create_db_and_tables()  # type: ignore[call-non-callable] # NOTE no module protocol
             if inspect.isawaitable(result):
-                await result
-            elif callable(result):
-                result()
+                result = await result
+            if result is not None:
+                logger.warning(f"unexpected result from create_db_and_tables: {result.__class__}")
         _start_execution_runtime()
     except BaseException:
         execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
