@@ -1601,13 +1601,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
-    { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2" },
+    { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2,<1" },
     { name = "earthkit-plots", marker = "extra == 'runtime'", specifier = ">=0.3.5,<1.0" },
-    { name = "earthkit-workflows", specifier = ">=0.15.2" },
+    { name = "earthkit-workflows", specifier = ">=0.15.5" },
     { name = "earthkit-workflows-anemoi", specifier = ">=0.7.2" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
-    { name = "pproc-core", git = "https://github.com/ecmwf/pproc.git?subdirectory=pproc-core&rev=feature%2Fmono-repo" },
+    { name = "pproc-core", specifier = ">=0.2.1" },
     { name = "pymetkit", git = "https://github.com/ecmwf/metkit.git?rev=feature%2Fparamdb-api" },
 ]
 provides-extras = ["runtime"]
@@ -3172,16 +3172,21 @@ wheels = [
 
 [[package]]
 name = "pproc-core"
-version = "2.0.1.dev48"
-source = { git = "https://github.com/ecmwf/pproc.git?subdirectory=pproc-core&rev=feature%2Fmono-repo#12fd193706bc05a78064f9280b36d2498fe77462" }
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "code-meters", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "conflator", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "earthkit-time", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
-    { name = "earthkit-workflows", extra = ["vizualize"], marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "earthkit-workflows", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "numpy", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pandas", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pydantic", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "qubed", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fe/fb/a2e9e62234f31768ec66ea8ccf88136b20272fc92189006363777086a5b1/pproc_core-0.2.1.tar.gz", hash = "sha256:9f6869186cd5db5d2292387f7d873ec962d56d8edd7583ee0d6db413ea2ac116", size = 185503, upload-time = "2026-08-03T09:51:52.604Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/13/62e6853cfea13f94a17eb817913278793b750e91608440408841305bc586/pproc_core-0.2.1-py3-none-any.whl", hash = "sha256:c8ba5f06a05e7cfc4f052324acac779c6d9c9525e79074b3a20a6cda8c691688", size = 62498, upload-time = "2026-08-03T09:51:51.412Z" },
 ]
 
 [[package]]
