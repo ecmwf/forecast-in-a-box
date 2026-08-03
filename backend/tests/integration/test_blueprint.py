@@ -37,7 +37,7 @@ import pytest
 from fiab_core.fable import BlockFactoryId, BlockInstance, BlockInstanceId, ConfigurationOptionId, PluginCompositeId
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
-from forecastbox.domain.blueprint.service import BlueprintBuilder, BlueprintSaveCommand, RoutableBlock, Tag
+from forecastbox.domain.blueprint.service import CORE_VERSION_MISMATCH_TAG_KEY, BlueprintBuilder, BlueprintSaveCommand, RoutableBlock, Tag
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
 from forecastbox.routes.run import CompilationDetailResponse, RunCreateResponse
 
@@ -227,6 +227,23 @@ def test_blueprint_save_and_retrieve(backend_client_user: httpx.Client) -> None:
     assert response.is_success, response.text
     ids = [b["blueprint_id"] for b in response.json()["blueprints"]]
     assert saved["blueprint_id"] not in ids, "Blueprint should not appear when created_by does not match"
+
+
+def test_blueprint_create_combines_reserved_tag_and_local_glyph_errors(backend_client_user: httpx.Client) -> None:
+    """A reserved tag key and a reserved local glyph key are both reported together in a
+    single 422 response -- neither check short-circuits the other."""
+    builder = _make_builder_source_only()
+    builder.local_glyphs = {"runId": "should-not-be-allowed"}
+    payload = BlueprintSaveCommand(
+        builder=builder,
+        display_name="Bad Blueprint",
+        tags=[Tag(key=CORE_VERSION_MISMATCH_TAG_KEY)],
+    )
+    response = backend_client_user.post("/blueprint/create", json=payload.model_dump())
+    assert response.status_code == 422, response.text
+    global_errors = response.json()["detail"]["global_errors"]
+    assert any(CORE_VERSION_MISMATCH_TAG_KEY in err for err in global_errors)
+    assert any("runId" in err for err in global_errors)
 
 
 def test_blueprint_retrieve_nonexistent(backend_client_user: httpx.Client) -> None:
