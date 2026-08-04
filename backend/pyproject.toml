@@ -45,6 +45,7 @@ dependencies = [
   "sse-starlette",
   "toml",
   "uvicorn",
+  "websockets",
 ]
 
 urls."Source code" = "https://github.com/ecmwf/forecast-in-a-box"

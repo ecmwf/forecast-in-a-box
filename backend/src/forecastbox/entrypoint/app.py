@@ -9,6 +9,7 @@
 
 """FastAPI Entrypoint"""
 
+import asyncio
 import importlib
 import inspect
 import logging
@@ -37,6 +38,7 @@ from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_m
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
 from forecastbox.domain.gateway.service import shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
+from forecastbox.domain.notification.service import init_broadcaster
 from forecastbox.domain.plugin.manager import PluginManager, join_updater_thread, submit_load_plugins
 from forecastbox.domain.plugin.store import join_stores_thread, submit_initialize_stores
 from forecastbox.utility.concurrency.manager import execution_manager
@@ -129,6 +131,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         raise
 
     try:
+        # Init domain-specific singletons only after the general-purpose execution runtime (pools,
+        # event dispatcher) is up -- notification's dispatcher handler may run on the General pool
+        # any time after this point, and needs the broadcaster's event loop reference to be set.
+        init_broadcaster(asyncio.get_running_loop())
         if config.backend.allow_scheduler:
             start_scheduler()
         release_time, release_version = get_local_release()
