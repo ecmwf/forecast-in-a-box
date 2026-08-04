@@ -40,6 +40,7 @@ import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { GlyphFormDialog } from '@/features/glyphs/components/GlyphFormDialog'
 import { isValidGlyphKey } from '@/features/glyphs/utils/validate-key'
+import { useReservedGlyphReason } from '@/features/glyphs/utils/reserved-names'
 import { showToast } from '@/lib/toast'
 import { P } from '@/components/base/typography'
 import {
@@ -427,6 +428,7 @@ function LocalGlyphSection({
   exampleLabel: string
 }) {
   const { t } = useTranslation('glyphs')
+  const reservedReasonFor = useReservedGlyphReason()
   const setLocalGlyph = useFableBuilderStore((state) => state.setLocalGlyph)
   const removeLocalGlyph = useFableBuilderStore(
     (state) => state.removeLocalGlyph,
@@ -458,7 +460,13 @@ function LocalGlyphSection({
   const trimmedNewKey = newKey.trim()
   // Only flag the user once they've started typing — empty input shouldn't
   // light up red the moment the row appears.
-  const newKeyInvalid = trimmedNewKey !== '' && !isValidGlyphKey(trimmedNewKey)
+  const newKeyReserved =
+    trimmedNewKey !== '' && isValidGlyphKey(trimmedNewKey)
+      ? reservedReasonFor(trimmedNewKey)
+      : null
+  const newKeyInvalid =
+    (trimmedNewKey !== '' && !isValidGlyphKey(trimmedNewKey)) ||
+    newKeyReserved !== null
 
   function handleAdd() {
     const key = newKey.trim()
@@ -466,6 +474,15 @@ function LocalGlyphSection({
     if (!key || !value) return
     if (!isValidGlyphKey(key)) {
       showToast.error(t('panel.localKeyInvalid'))
+      return
+    }
+    const reserved = reservedReasonFor(key)
+    if (reserved) {
+      showToast.error(
+        reserved === 'intrinsic'
+          ? t('form.keyReservedIntrinsic')
+          : t('form.keyReservedJinja'),
+      )
       return
     }
     setLocalGlyph(key, value)
