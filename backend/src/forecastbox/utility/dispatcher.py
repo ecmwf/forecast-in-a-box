@@ -14,7 +14,7 @@ import logging
 import threading
 import time
 from collections import deque
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import dataclass
 from functools import partial
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 EventName = NewType("EventName", str)
 
 
-class DispatcherError(RuntimeError):
+class DispatcherError(Exception):
     """Base class for dispatcher errors."""
 
 
@@ -56,19 +56,24 @@ class DispatcherRegistrationError(DispatcherError):
 
 @dataclass(frozen=True, eq=True, slots=True)
 class Event:
-    """An event payload containing stable plain data, never runtime resources."""
+    """An event payload containing stable plain data, never runtime resources.
+
+    ``name`` is a label kept for observability (logging, status reporting) only -- it plays no
+    role in routing. Routing is protocol-based: handlers register a ``handler_type`` (typically a
+    runtime_checkable Protocol) and are invoked whenever ``isinstance(payload, handler_type)``.
+    """
 
     name: EventName
-    kwargs: Mapping[str, object]
+    payload: object
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "kwargs", freeze_recursively(dict(self.kwargs)))
+        object.__setattr__(self, "payload", freeze_recursively(self.payload))
 
 
 @dataclass(frozen=True, eq=True, slots=True)
 class DispatcherRegistration:
     handler_id: str
-    event_name: EventName
+    handler_type: type
     pool_name: ConcurrentPools
     handler: Callable[[Event], None]
 
@@ -76,7 +81,7 @@ class DispatcherRegistration:
 @dataclass(frozen=True, eq=True, slots=True)
 class DispatchResult:
     event_name: EventName
-    handler_count: int
+    matched_handlers: tuple[str, ...] = ()
     failed_handlers: tuple[str, ...] = ()
 
     @property
@@ -103,7 +108,6 @@ class DispatcherStatus(StatusModel):
     dispatched: int
     completed: int
     failed: int
-    handler_counts_by_event: Mapping[EventName, int]
     in_flight_handlers: int
     queue_failures: tuple[str, ...]
     aggregate_failures: tuple[str, ...]
@@ -139,15 +143,14 @@ class EventDispatcher:
         self._completed = 0
         self._failed = 0
         self._in_flight_handlers = 0
-        self._handler_counts: dict[EventName, int] = {}
         self._queue_failures: deque[str] = deque(maxlen=100)
         self._aggregate_failures: deque[str] = deque(maxlen=100)
 
     def register(self, registration: DispatcherRegistration) -> None:
         if not isinstance(registration, DispatcherRegistration):
             raise DispatcherRegistrationError("malformed dispatcher registration")
-        if not registration.handler_id or not isinstance(registration.event_name, str):
-            raise DispatcherRegistrationError("dispatcher registrations require an id and event name")
+        if not registration.handler_id or not isinstance(registration.handler_type, type):
+            raise DispatcherRegistrationError("dispatcher registrations require an id and a handler type")
         if not isinstance(registration.pool_name, ConcurrentPools):
             raise DispatcherRegistrationError("dispatcher registration has an unknown pool")
         if not callable(registration.handler) or inspect.iscoroutinefunction(registration.handler):
@@ -180,7 +183,6 @@ class EventDispatcher:
                 self._queue_failures.append(f"queue full for event {event.name}")
                 raise DispatcherQueueFull("event dispatcher queue is full") from error
             self._submitted += 1
-            self._handler_counts[event.name] = sum(reg.event_name == event.name for reg in self._registrations.values())
         return receipt
 
     def _accepting(self) -> bool:
@@ -193,7 +195,9 @@ class EventDispatcher:
     def _dispatch(self, queued: _QueuedEvent) -> None:
         event = queued.event
         with self._lock:
-            registrations = tuple(registration for registration in self._registrations.values() if registration.event_name == event.name)
+            registrations = tuple(
+                registration for registration in self._registrations.values() if isinstance(event.payload, registration.handler_type)
+            )
             self._in_flight_handlers += len(registrations)
             self._dispatched += len(registrations)
 
@@ -221,7 +225,7 @@ class EventDispatcher:
                 with self._lock:
                     self._aggregate_failures.append(f"{handler_id}: {error!r}")
 
-        result = DispatchResult(event.name, len(registrations), tuple(failures))
+        result = DispatchResult(event.name, tuple(registration.handler_id for registration in registrations), tuple(failures))
         with self._lock:
             self._in_flight_handlers -= len(registrations)
             if failures:
@@ -290,7 +294,6 @@ class EventDispatcher:
                 dispatched=self._dispatched,
                 completed=self._completed,
                 failed=self._failed,
-                handler_counts_by_event=dict(self._handler_counts),
                 in_flight_handlers=self._in_flight_handlers,
                 queue_failures=tuple(self._queue_failures),
                 aggregate_failures=tuple(self._aggregate_failures),
