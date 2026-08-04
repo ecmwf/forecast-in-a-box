@@ -26,7 +26,8 @@
   "fieldErrors": {
     "unknownConfigKey": "Unknown configuration key",
     "missingRequiredValue": "Missing required value",
-    "unknownGlyph": "Unknown glyph: {{glyph}}"
+    "unknownGlyph": "Unknown glyph: {{glyph}}",
+    "jinjaReservedReference": "'{{name}}' clashes with a Jinja filter or function and cannot be used as a variable — choose a different name."
   },
   "page": {
     "notFoundTitle": "The requested configuration was not found.",

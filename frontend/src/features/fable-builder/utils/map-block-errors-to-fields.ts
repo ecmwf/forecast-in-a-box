@@ -28,6 +28,7 @@ export interface FieldErrorMessages {
   unknownConfigKey: string
   missingRequiredValue: string
   unknownGlyph: (name: string) => string
+  jinjaReservedReference: (name: string) => string
 }
 
 /**
@@ -49,6 +50,10 @@ function parsePythonStringSet(input: string): Set<string> | null {
     names.add(match[1])
   }
   return names.size > 0 ? names : null
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function pushError(
@@ -73,6 +78,10 @@ function pushError(
  * - "Block contains missing config: {...}" → messages.missingRequiredValue
  * - "Configuration option 'x' is missing for block factory ..." →
  *   messages.missingRequiredValue
+ * - "Invalid value for configuration option 'x': ..." → verbatim, on `x`
+ * - "Jinja expression error: 'x' is undefined" → attributed to the config
+ *   keys whose value references `x` inside a `${...}` expression; when `x`
+ *   is jinja-reserved the clearer messages.jinjaReservedReference is shown
  *
  * `missingGlyphs[configKey] = [name, ...]` → messages.unknownGlyph(name) per name.
  * Missing-config errors for a key that also has unknown glyphs are dropped —
@@ -83,6 +92,8 @@ export function mapBlockErrorsToFields(
   errors: ReadonlyArray<string>,
   missingGlyphs: Record<string, ReadonlyArray<string>>,
   messages: FieldErrorMessages,
+  configurationValues: Record<string, string> = {},
+  isJinjaReserved?: (name: string) => boolean,
 ): MappedBlockErrors {
   const byConfigKey: Record<string, Array<string>> = {}
   const unmapped: Array<string> = []
@@ -128,6 +139,38 @@ export function mapBlockErrorsToFields(
         pushError(byConfigKey, missingOption[1], messages.missingRequiredValue)
       }
       continue
+    }
+
+    const invalidValue = error.match(
+      /^Invalid value for configuration option '([^']+)':/,
+    )
+    if (invalidValue) {
+      pushError(byConfigKey, invalidValue[1], error)
+      continue
+    }
+
+    const jinjaUndefined = error.match(
+      /^Jinja expression error: '([^']+)' is undefined/,
+    )
+    if (jinjaUndefined) {
+      const name = jinjaUndefined[1]
+      // "undefined" is misleading when the name is unusable by construction.
+      const message = isJinjaReserved?.(name)
+        ? messages.jinjaReservedReference(name)
+        : error
+      // Attribute by usage: the message names the glyph but not the field.
+      const usage = new RegExp(`\\$\\{[^}]*\\b${escapeRegExp(name)}\\b[^}]*\\}`)
+      const keys = Object.entries(configurationValues)
+        .filter(([, value]) => usage.test(value))
+        .map(([key]) => key)
+      if (keys.length > 0) {
+        for (const key of keys) pushError(byConfigKey, key, message)
+        continue
+      }
+      if (isJinjaReserved?.(name)) {
+        unmapped.push(message)
+        continue
+      }
     }
 
     unmapped.push(error)

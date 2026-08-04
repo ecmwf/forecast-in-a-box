@@ -16,6 +16,7 @@ const messages: FieldErrorMessages = {
   unknownConfigKey: 'Unknown configuration key',
   missingRequiredValue: 'Missing required value',
   unknownGlyph: (name) => `Unknown glyph: \${${name}}`,
+  jinjaReservedReference: (name) => `Reserved jinja name: ${name}`,
 }
 
 describe('mapBlockErrorsToFields', () => {
@@ -159,6 +160,7 @@ describe('mapBlockErrorsToFields', () => {
       unknownConfigKey: 'Schlüssel unbekannt',
       missingRequiredValue: 'Wert fehlt',
       unknownGlyph: (name) => `Unbekannter Glyph: ${name}`,
+      jinjaReservedReference: (name) => `Reservierter Name: ${name}`,
     }
     const result = mapBlockErrorsToFields(
       ["Block contains missing config: {'date'}"],
@@ -168,6 +170,79 @@ describe('mapBlockErrorsToFields', () => {
     expect(result.byConfigKey).toEqual({
       date: ['Wert fehlt'],
       expver: ['Unbekannter Glyph: runtd'],
+    })
+  })
+
+  describe('invalid configuration values', () => {
+    it('attributes the verbatim error to the named key', () => {
+      const error =
+        "Invalid value for configuration option 'format': expected enumClosed[str]('png','pdf','svg'). 'x' is not a valid option. Valid options are: png, pdf, svg"
+      const result = mapBlockErrorsToFields([error], {}, messages, {})
+      expect(result.byConfigKey).toEqual({ format: [error] })
+      expect(result.unmapped).toEqual([])
+    })
+  })
+
+  describe('jinja expression errors', () => {
+    const error = "Jinja expression error: 'format' is undefined"
+
+    it('attributes the verbatim error to keys whose value uses the glyph', () => {
+      const result = mapBlockErrorsToFields([error], {}, messages, {
+        format: '${format}',
+        domain: 'global',
+      })
+      expect(result.byConfigKey).toEqual({ format: [error] })
+      expect(result.unmapped).toEqual([])
+    })
+
+    it('attributes to every key referencing the glyph inside an expression', () => {
+      const result = mapBlockErrorsToFields([error], {}, messages, {
+        path: '${outputRoot}/x.${format}',
+        format: '${format | upper}',
+      })
+      expect(result.byConfigKey).toEqual({
+        path: [error],
+        format: [error],
+      })
+    })
+
+    it('stays unmapped when no configuration value uses the glyph', () => {
+      const result = mapBlockErrorsToFields([error], {}, messages, {
+        domain: 'global',
+      })
+      expect(result.byConfigKey).toEqual({})
+      expect(result.unmapped).toEqual([error])
+    })
+
+    it('does not match the bare name outside a ${...} expression', () => {
+      const result = mapBlockErrorsToFields([error], {}, messages, {
+        note: 'output format is png',
+      })
+      expect(result.unmapped).toEqual([error])
+    })
+
+    it('swaps in the reserved-name message when the name is jinja-reserved', () => {
+      const result = mapBlockErrorsToFields(
+        [error],
+        {},
+        messages,
+        { format: '${format}' },
+        (name) => name === 'format',
+      )
+      expect(result.byConfigKey).toEqual({
+        format: ['Reserved jinja name: format'],
+      })
+    })
+
+    it('uses the reserved-name message even when unattributed', () => {
+      const result = mapBlockErrorsToFields(
+        [error],
+        {},
+        messages,
+        {},
+        (name) => name === 'format',
+      )
+      expect(result.unmapped).toEqual(['Reserved jinja name: format'])
     })
   })
 })

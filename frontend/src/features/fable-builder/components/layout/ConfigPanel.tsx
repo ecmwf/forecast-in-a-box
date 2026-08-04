@@ -8,11 +8,12 @@
  * does it submit to any jurisdiction.
  */
 
-import { useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { AlertCircle, ChevronRight, Link2, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
+import { useReservedGlyphReason } from '@/features/glyphs/utils/reserved-names'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
   BLOCK_KIND_METADATA,
@@ -138,6 +139,11 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   }
 
   const fieldErrorMessages = useFieldErrorMessages()
+  const reservedReasonFor = useReservedGlyphReason()
+  const isJinjaReserved = useCallback(
+    (name: string) => reservedReasonFor(name) === 'jinja',
+    [reservedReasonFor],
+  )
   // Hook must be called unconditionally — guard inside rather than early-
   // returning above it.
   const liveMappedErrors = useMemo(
@@ -146,8 +152,16 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
         blockErrors ?? [],
         missingGlyphs ?? {},
         fieldErrorMessages,
+        selectedBlock?.configuration_values ?? {},
+        isJinjaReserved,
       ),
-    [blockErrors, missingGlyphs, fieldErrorMessages],
+    [
+      blockErrors,
+      missingGlyphs,
+      fieldErrorMessages,
+      selectedBlock,
+      isJinjaReserved,
+    ],
   )
 
   // Cache last-known restrictions per block so the field doesn't flash to
@@ -258,6 +272,16 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto p-4">
+        {/* Backend block errors that map to no specific field — verbatim. */}
+        {mappedErrors.unmapped.length > 0 && (
+          <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+            {mappedErrors.unmapped.map((message) => (
+              <P key={message} className="text-sm text-destructive">
+                {message}
+              </P>
+            ))}
+          </div>
+        )}
         {inputs.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
