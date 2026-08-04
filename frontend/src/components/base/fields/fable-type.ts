@@ -96,8 +96,11 @@ export function unionOf(types: ReadonlyArray<FableType>): FableType {
 
 // -------- Serialization (mirrors FableType.serialize) --------
 
-/** Quote rule mirrors the backend `_serialize_enum_item`: strings quoted, numbers raw. */
-function serializeEnumItem(item: string | number): string {
+/** Mirrors `_serialize_enum_item`: date/datetime items bare ISO, str-ish quoted. */
+function serializeEnumItem(item: string | number, subtype: FableType): string {
+  if (subtype.kind === 'date' || subtype.kind === 'datetime') {
+    return String(item)
+  }
   return typeof item === 'string' ? `'${item}'` : String(item)
 }
 
@@ -125,7 +128,9 @@ export function serializeValueType(t: FableType): string {
       return 'param'
     case 'enum': {
       const keyword = t.closed ? 'enumClosed' : 'enumOpen'
-      const items = t.items.map(serializeEnumItem).join(',')
+      const items = t.items
+        .map((item) => serializeEnumItem(item, t.subtype))
+        .join(',')
       return `${keyword}[${serializeValueType(t.subtype)}](${items})`
     }
     case 'list':

@@ -41,6 +41,20 @@ describe('serializeValueType', () => {
     expect(serializeValueType(paramType)).toBe('param')
   })
 
+  // fiab-core `_serialize_enum_item` dispatches on the declared subtype.
+  it('leaves date and datetime enum items unquoted', () => {
+    expect(serializeValueType(closedEnum(['2026-01-01'], dateType))).toBe(
+      'enumClosed[date](2026-01-01)',
+    )
+    expect(
+      serializeValueType(openEnum(['2026-01-01T00:00:00'], datetimeType)),
+    ).toBe('enumOpen[datetime](2026-01-01T00:00:00)')
+    // str-ish subtypes stay quoted, including artifact and param.
+    expect(serializeValueType(closedEnum(['fc:t:step0'], artifactType))).toBe(
+      "enumClosed[artifact]('fc:t:step0')",
+    )
+  })
+
   // Real emitters from fiab-plugin-ecmwf blocks.py / anemoi blocks.py.
   it('serializes enums exactly like the backend emitters', () => {
     expect(serializeValueType(closedEnum(['mars', 'ecmwf-open-data']))).toBe(
@@ -87,6 +101,9 @@ describe('parseFableType', () => {
       paramType,
       closedEnum(['mars', 'ecmwf-open-data']),
       closedEnum(['fc:t:step0', 'fc:t:step6'], artifactType),
+      closedEnum(['2026-01-01', '2026-01-02'], dateType),
+      openEnum(['2026-01-01T00:00:00'], datetimeType),
+      listOf(closedEnum(['2026-01-01'], dateType)),
       openEnum(['mars', 'opendata', 'polytope']),
       closedEnum([1, 2, 3]),
       openEnum([0.5, 1.5]),
