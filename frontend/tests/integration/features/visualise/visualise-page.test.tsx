@@ -174,25 +174,33 @@ describe('VisualisePage', () => {
       .toBeVisible()
   })
 
-  it('activates two sources as A/B and auto-starts one lens per directory', async () => {
-    useComparisonStore.getState().addEntry(RUN_A)
-    useComparisonStore.getState().addEntry(RUN_B)
-    const screen = await renderVisualisePage()
+  // Double-spawn tests: two staggered lens boots overrun the default test
+  // budget on slow CI runners.
+  it(
+    'activates two sources as A/B and auto-starts one lens per directory',
+    { timeout: 30000 },
+    async () => {
+      useComparisonStore.getState().addEntry(RUN_A)
+      useComparisonStore.getState().addEntry(RUN_B)
+      const screen = await renderVisualisePage()
 
-    // Chips carry the slot badges (name also appears in panel headers).
-    await expect.element(screen.getByText('Run A').first()).toBeVisible()
-    await expect.element(screen.getByText('Run B').first()).toBeVisible()
+      // Chips carry the slot badges (name also appears in panel headers).
+      await expect.element(screen.getByText('Run A').first()).toBeVisible()
+      await expect.element(screen.getByText('Run B').first()).toBeVisible()
 
-    // Each panel resolves its dir and starts its own lens.
-    await expect.poll(() => listMockLenses(), { timeout: 8000 }).toHaveLength(2)
-    const paths = listMockLenses()
-      .map((l) => l.lens_params.local_path)
-      .sort()
-    expect(paths).toEqual([
-      '/data/output/job-completed-001_1',
-      '/data/output/job-grib-b-008_1',
-    ])
-  })
+      // Each panel resolves its dir and starts its own lens.
+      await expect
+        .poll(() => listMockLenses(), { timeout: 15000 })
+        .toHaveLength(2)
+      const paths = listMockLenses()
+        .map((l) => l.lens_params.local_path)
+        .sort()
+      expect(paths).toEqual([
+        '/data/output/job-completed-001_1',
+        '/data/output/job-grib-b-008_1',
+      ])
+    },
+  )
 
   it('starts exactly one lens when both sources resolve to the same directory', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
@@ -407,34 +415,40 @@ describe('VisualisePage', () => {
     ).toEqual(['/data/output/job-completed-001_1'])
   })
 
-  it('removing a source stops its now-orphaned lens', async () => {
-    useComparisonStore.getState().addEntry(RUN_A)
-    useComparisonStore.getState().addEntry(RUN_B)
-    const screen = await renderVisualisePage()
-    await expect.poll(() => listMockLenses(), { timeout: 8000 }).toHaveLength(2)
+  it(
+    'removing a source stops its now-orphaned lens',
+    { timeout: 30000 },
+    async () => {
+      useComparisonStore.getState().addEntry(RUN_A)
+      useComparisonStore.getState().addEntry(RUN_B)
+      const screen = await renderVisualisePage()
+      await expect
+        .poll(() => listMockLenses(), { timeout: 15000 })
+        .toHaveLength(2)
 
-    // Take B out of the view, then out of the basket (collected chip).
-    await screen
-      .getByRole('button', { name: 'Remove B from view — continue with A' })
-      .click()
-    await screen.getByRole('button', { name: 'Manage sources' }).click()
-    // Native click: the unstyled dialog's inert backdrop confuses
-    // Playwright hit-testing (see the stop-row test above).
-    const removeB = screen.getByRole('button', { name: /Remove Run B/ })
-    await expect.element(removeB).toBeVisible()
-    ;(removeB.element() as HTMLElement).click()
+      // Take B out of the view, then out of the basket (collected chip).
+      await screen
+        .getByRole('button', { name: 'Remove B from view — continue with A' })
+        .click()
+      await screen.getByRole('button', { name: 'Manage sources' }).click()
+      // Native click: the unstyled dialog's inert backdrop confuses
+      // Playwright hit-testing (see the stop-row test above).
+      const removeB = screen.getByRole('button', { name: /Remove Run B/ })
+      await expect.element(removeB).toBeVisible()
+      ;(removeB.element() as HTMLElement).click()
 
-    await expect
-      .poll(() => listMockLenses().filter((l) => l.status === 'running'), {
-        timeout: 5000,
-      })
-      .toHaveLength(1)
-    expect(
-      listMockLenses()
-        .filter((l) => l.status === 'running')
-        .map((l) => l.lens_params.local_path),
-    ).toEqual(['/data/output/job-completed-001_1'])
-  })
+      await expect
+        .poll(() => listMockLenses().filter((l) => l.status === 'running'), {
+          timeout: 5000,
+        })
+        .toHaveLength(1)
+      expect(
+        listMockLenses()
+          .filter((l) => l.status === 'running')
+          .map((l) => l.lens_params.local_path),
+      ).toEqual(['/data/output/job-completed-001_1'])
+    },
+  )
 
   it("the slot bar's X on A promotes B to solo view", async () => {
     useComparisonStore.getState().addEntry(RUN_A)
