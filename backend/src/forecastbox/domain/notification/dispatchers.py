@@ -22,9 +22,9 @@ from forecastbox.utility.dispatcher import DispatcherRegistration, Event
 
 
 def _handle_client_notification_source(event: Event) -> None:
-    source = event.payload
-    assert isinstance(source, ClientNotificationSource)  # guaranteed by the dispatcher's isinstance match
-    publish(source.as_client_notification())
+    if not isinstance(event.payload, ClientNotificationSource):
+        raise TypeError(event.payload.__class__.__name__)
+    publish(event.payload.as_client_notification())
 
 
 dispatchers = (

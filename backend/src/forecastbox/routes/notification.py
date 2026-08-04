@@ -12,7 +12,7 @@
 Contains:
  - a websocket endpoint that clients connect to in order to receive broadcast ClientNotification
    messages; registration is implicit (connect => registered, disconnect => unregistered),
- - a POST test endpoint that publishes a TestNotificationEvent through the event dispatcher, purely
+ - a POST test endpoint that publishes a PlaceholderNotificationEvent through the event dispatcher, purely
    to exercise the dispatch-to-websocket path end to end (used by integration tests).
 """
 
@@ -20,7 +20,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from forecastbox.domain.notification.events import TestNotificationEvent
+from forecastbox.domain.notification.events import PlaceholderNotificationEvent
 from forecastbox.domain.notification.service import register_client, unregister_client
 from forecastbox.utility.dispatcher import Event, EventName, submit_event
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -32,15 +32,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["notification"])
 
 
-class TestNotificationRequest(FiabBaseModel):
-    __test__ = False  # not a pytest test class, despite the name
-
+class PlaceholderNotificationRequest(FiabBaseModel):
     identifier: str
 
 
-class TestNotificationResponse(FiabBaseModel):
-    __test__ = False  # not a pytest test class, despite the name
-
+class PlaceholderNotificationResponse(FiabBaseModel):
     status: str
 
 
@@ -58,7 +54,9 @@ async def notification_ws(websocket: WebSocket) -> None:
 
 
 @router.post("/testNotification")
-async def test_notification(request: TestNotificationRequest) -> TestNotificationResponse:
-    event = Event(name=EventName("notification.test"), payload=TestNotificationEvent(identifier=request.identifier))
+async def test_notification(request: PlaceholderNotificationRequest) -> PlaceholderNotificationResponse:
+    # NOTE deprecated but kept around until there is enough proper notifications which we can reliably
+    # test for in an integration test. This should be surely removed before a proper multi-user deploy
+    event = Event(name=EventName("notification.test"), payload=PlaceholderNotificationEvent(identifier=request.identifier))
     submit_event(event)
-    return TestNotificationResponse(status="submitted")
+    return PlaceholderNotificationResponse(status="submitted")

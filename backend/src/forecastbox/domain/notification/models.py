@@ -31,4 +31,5 @@ class ClientNotification(FiabBaseModel):
 class ClientNotificationSource(Protocol):
     """Implemented by domain events that should be surfaced to clients as a ClientNotification."""
 
-    def as_client_notification(self) -> ClientNotification: ...
+    def as_client_notification(self) -> ClientNotification:
+        raise NotImplementedError

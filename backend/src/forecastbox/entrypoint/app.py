@@ -107,6 +107,7 @@ def _start_execution_runtime() -> None:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.debug(f"Starting FIAB with config: {config}")
     validate_runtime(config)
+    # generic and autodiscoverable inits
     try:
         # Import every schemata submodule first, and only then call any discovered
         # create_db_and_tables. Several domain schema modules share a single Base/engine
@@ -130,10 +131,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
         raise
 
+    # domain-specific inits
     try:
-        # Init domain-specific singletons only after the general-purpose execution runtime (pools,
-        # event dispatcher) is up -- notification's dispatcher handler may run on the General pool
-        # any time after this point, and needs the broadcaster's event loop reference to be set.
         init_broadcaster(asyncio.get_running_loop())
         if config.backend.allow_scheduler:
             start_scheduler()

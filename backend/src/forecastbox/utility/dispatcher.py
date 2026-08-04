@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 EventName = NewType("EventName", str)
 
 
-class DispatcherError(RuntimeError):
+class DispatcherError(Exception):
     """Base class for dispatcher errors."""
 
 

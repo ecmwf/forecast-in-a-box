@@ -19,10 +19,8 @@ from forecastbox.domain.notification.models import ClientNotification
 
 
 @dataclass(frozen=True, eq=True, slots=True)
-class TestNotificationEvent:
+class PlaceholderNotificationEvent:
     """Emitted by the ``testNotification`` route, purely to exercise the dispatch-to-websocket path."""
-
-    __test__ = False  # not a pytest test class, despite the name -- silences pytest collection warnings
 
     identifier: str
 

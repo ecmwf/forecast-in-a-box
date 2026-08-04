@@ -7,19 +7,19 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for the TestNotificationEvent -- protocol conformance and conversion."""
+"""Unit tests for the PlaceholderNotificationEvent -- protocol conformance and conversion."""
 
-from forecastbox.domain.notification.events import TestNotificationEvent
+from forecastbox.domain.notification.events import PlaceholderNotificationEvent
 from forecastbox.domain.notification.models import ClientNotification, ClientNotificationSource
 
 
 def test_test_notification_event_implements_protocol() -> None:
-    event = TestNotificationEvent(identifier="abc123")
+    event = PlaceholderNotificationEvent(identifier="abc123")
     assert isinstance(event, ClientNotificationSource)
 
 
 def test_test_notification_event_as_client_notification() -> None:
-    event = TestNotificationEvent(identifier="abc123")
+    event = PlaceholderNotificationEvent(identifier="abc123")
     notification = event.as_client_notification()
 
     assert isinstance(notification, ClientNotification)

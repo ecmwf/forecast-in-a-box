@@ -10,7 +10,7 @@
 """Bridges the synchronous event dispatcher to the async websocket connections that deliver
 ClientNotification messages to clients.
 
-Concurrency notes for `NotificationBroadcaster` (see also review discussion for this feature):
+Concurrency notes for `NotificationBroadcaster`:
 - `_loop` is written exactly once, from `entrypoint.app`'s lifespan (`init_broadcaster`), on the
   event loop thread, before the app starts serving requests. It is later read from arbitrary
   General-pool worker threads inside `publish`. A single attribute read/write of a reference is
@@ -46,8 +46,12 @@ logger = logging.getLogger(__name__)
 PUBLISH_TIMEOUT_SECONDS = 5.0
 
 
-class NotificationBroadcasterNotInitialized(RuntimeError):
+class NotificationBroadcasterNotInitialized(Exception):
     """Raised when `publish` is called before `init_broadcaster` has run."""
+
+
+class NotificationPublishTimedOut(Exception):
+    """Raised when the notifications to the clients failed to be sent in due time"""
 
 
 class NotificationBroadcaster:
@@ -96,4 +100,7 @@ def publish(notification: ClientNotification) -> None:
         logger.error("NotificationBroadcaster.publish called before initialization -- dropping notification")
         raise NotificationBroadcasterNotInitialized("notification broadcaster event loop is not initialized")
     future = asyncio.run_coroutine_threadsafe(_broadcast(notification), loop)
-    future.result(timeout=PUBLISH_TIMEOUT_SECONDS)
+    try:
+        future.result(timeout=PUBLISH_TIMEOUT_SECONDS)
+    except TimeoutError:
+        raise NotificationPublishTimedOut() from None
