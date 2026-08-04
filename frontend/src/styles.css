@@ -298,20 +298,6 @@
   animation: run-node-ring 2s ease-in-out infinite;
 }
 
-/* Run canvas: breathing halo while a job executes — motion means "working". */
-@keyframes run-canvas-breathe {
-  0%,
-  100% {
-    box-shadow: 0 0 8px rgba(251, 191, 36, 0.15);
-  }
-  50% {
-    box-shadow: 0 0 18px rgba(251, 191, 36, 0.4);
-  }
-}
-.run-canvas-breathing {
-  animation: run-canvas-breathe 2.5s ease-in-out infinite;
-}
-
 /*
  * Fable-builder palette drag-and-drop: compatible handles pulse
  * (`.dnd-droppable`), the hovered one locks on (`.dnd-active`). box-shadow
