@@ -86,7 +86,11 @@ class EnsembleStatistics(Product):
         coords = axes(input_dataset)
         steps = _axis_value_strings(coords[STEP])
         stats = block.config_as_list(STATISTIC, str, allow_empty=False)
-        output = coxpand(select(input_dataset, {ENSEMBLE: 1}), [ENSEMBLE, TYPE], {TYPE: [self.stat_type(stat, steps[0]) for stat in stats]})
+        output = coxpand(
+            select(input_dataset, {ENSEMBLE: 1}),
+            [dim for dim in [ENSEMBLE, TYPE] if dim in coords],
+            {TYPE: [self.stat_type(stat, steps[0]) for stat in stats]},
+        )
         return output
 
     def compile(
@@ -212,7 +216,8 @@ class CustomThresholdProbability(Product):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
-        output = coxpand(select(input_dataset, {ENSEMBLE: 1}), [ENSEMBLE, TYPE], {TYPE: [self.stat_type]})
+        coords = axes(input_dataset)
+        output = coxpand(select(input_dataset, {ENSEMBLE: 1}), [dim for dim in [ENSEMBLE, TYPE] if dim in coords], {TYPE: [self.stat_type]})
         return output
 
     def compile(
