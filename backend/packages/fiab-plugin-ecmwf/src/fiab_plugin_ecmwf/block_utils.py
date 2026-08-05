@@ -27,12 +27,18 @@ COMPARISON = ConfigurationOptionId("comparison")
 
 
 def _param_id_to_param_key(param_id: str) -> str:
+    try:
+        param_id_int = int(param_id)
+    except ValueError:
+        return param_id
     db = ParamDB()
-    shortname = db.param_id_to_shortname(int(param_id))
+    shortname = db.param_id_to_shortname(param_id_int)
     return f"{shortname}-{param_id}"
 
 
 def _param_key_to_param_id(param_key: str) -> str:
+    if "-" not in param_key:
+        return param_key
     _, param_id = param_key.split("-", 1)
     return param_id
 
