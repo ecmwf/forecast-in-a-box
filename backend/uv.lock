@@ -3487,13 +3487,14 @@ crypto = [
 
 [[package]]
 name = "pymetkit"
-version = "1.18.3"
-source = { git = "https://github.com/ecmwf/metkit.git?rev=feature%2Fparamdb-api#365f7c4c2c527dc9b6702bc6970e1c25168ad420" }
+version = "1.19.2"
+source = { git = "https://github.com/ecmwf/metkit.git?rev=feature%2Fparamdb-api#03003d05b15c3c4dc0c1a7fcdcebdc6db6747edf" }
 dependencies = [
     { name = "cffi", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "findlibs", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "metkitlib", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "platformdirs", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pydantic", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pyyaml", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "requests", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
