@@ -16,6 +16,7 @@ work directly. The auto-coercion is bound to fiab-core.types.DatetimeType, as th
 inherently coupled.
 """
 
+import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -29,6 +30,7 @@ from jinja2.sandbox import SandboxedEnvironment
 
 from forecastbox.utility.time import value_dt2str
 
+logger = logging.getLogger(__name__)
 _dt_instance = DatetimeType()
 
 
@@ -164,7 +166,8 @@ def _make_env() -> SandboxedEnvironment:
 _ENV = _make_env()
 
 # Names that are part of the jinja2 environment (filters + globals) rather than user variables.
-_FILTER_NAMES: frozenset[str] = frozenset(_ENV.filters) | frozenset(_ENV.globals)
+_GLOBALS = frozenset(_ENV.globals)
+_FILTER_NAMES: frozenset[str] = frozenset(_ENV.filters) | _GLOBALS
 
 
 def get_custom_functions() -> list[CustomFunction]:
@@ -194,7 +197,7 @@ def render_expression(raw: str, variables: dict[str, str]) -> str:
 
 
 def _collect_glyph_names(node: nodes.Node, glyphs: set[str]) -> None:
-    if isinstance(node, nodes.Name) and node.ctx == "load" and node.name not in _FILTER_NAMES:
+    if isinstance(node, nodes.Name) and node.ctx == "load" and node.name not in _GLOBALS:
         glyphs.add(node.name)
     for child in node.iter_child_nodes():
         _collect_glyph_names(child, glyphs)
@@ -217,4 +220,8 @@ def extract_glyph_names(raw: str) -> Either[set[str], str]:  # type: ignore[inva
 
     glyphs: set[str] = set()
     _collect_glyph_names(ast, glyphs)
-    return Either.ok(glyphs - _FILTER_NAMES)
+    # NOTE we used to subtract _FILTER_NAMES here, but thats actually not necessary:
+    # an expression like ${myGlyph | aFilter(var1, var2)} will not return aFilter
+    # as a node anyway due to jinja ast typing. And in case user malforms by providing
+    # ${aFilter}, which oddly is valid in jinja, we *do* want to return it
+    return Either.ok(glyphs)

@@ -16,6 +16,7 @@
 # (resolution, error, missing), etc
 
 import datetime as dt
+import logging
 import re
 from dataclasses import dataclass
 
@@ -24,6 +25,8 @@ from fiab_core.fable import BlockInstance, ConfigurationOptionId
 
 from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.jinja_interpolation import extract_glyph_names, render_expression
+
+logger = logging.getLogger(__name__)
 
 PINNED_INTRINSIC_KEYS: frozenset[str] = frozenset({"startDatetime", "attemptCount"})
 """Intrinsic glyph keys that are always forced to their fresh intrinsic value in each attempt,
