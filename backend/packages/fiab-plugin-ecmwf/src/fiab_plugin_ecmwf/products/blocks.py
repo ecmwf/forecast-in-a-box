@@ -44,6 +44,7 @@ from fiab_plugin_ecmwf.block_utils import (
     _extract_dataset,
     _param_id_to_param_key,
     _param_key_to_param_id,
+    _parse_axis_value,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, select
 
@@ -182,7 +183,7 @@ class PredefinedThresholdProbability(Product):
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
         selected_param_id = _param_key_to_param_id(block.config_as_str(PARAM))
-        steps = block.config_as_list(STEP, str, allow_empty=False)
+        steps = [_parse_axis_value(step) for step in block.config_as_list(STEP, str, allow_empty=False)]
 
         actions = []
         for npath, narray in nodetree_arrays(input_task_action.nodes):
@@ -255,7 +256,7 @@ class CustomThresholdProbability(Product):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
-        output = coxpand(input_dataset, [ENSEMBLE, TYPE], {TYPE: [self.stat_type]})
+        output = coxpand(select(input_dataset, {ENSEMBLE: 1}), [ENSEMBLE, TYPE], {TYPE: [self.stat_type]})
         return output
 
     def compile(
@@ -300,11 +301,6 @@ class ThermalIndices(Product):
             description="Parameters to compute",
             value_type=ListType(ParameterType()),
         ),
-        STEP: BlockConfigurationOption(
-            title="Steps",
-            description="Steps to compute",
-            value_type=ListType(StringType()),
-        ),
     }
     inputs: list[str] = ["dataset"]
     thermo_params: list[str] = [
@@ -338,15 +334,13 @@ class ThermalIndices(Product):
         restrictions[PARAM] = ListType(ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(thermo_qube)[PARAM]]))
         selected_param_ids = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
         param_qube = thermo_qube.select({PARAM: selected_param_ids})
-
+        # Compute for all steps available for all selected parameters
         allowed_steps = set.intersection(*[set(x[STEP]) for x in datacubes(param_qube)])
-        restrictions[STEP] = ListType(ClosedEnumType(_axis_value_strings(allowed_steps)))
-        steps = block.config_as_list(STEP, str, allow_empty=False)
 
         # Select from input qube to ensure other keys, like ENSEMBLE = 0, are properly preserved in
         # output that might be missing in the output mars keys emitted by PProc
         output_qube = Qube.empty()
-        for datacube in param_qube.select({STEP: steps}).datacubes():
+        for datacube in param_qube.select({STEP: allowed_steps}).datacubes():
             datacube.pop(PARAM, None)
             output_qube = output_qube | select(input_dataset, datacube).dataqube
         return coxpand(QubedOutput(dataqube=output_qube), [PARAM], {PARAM: selected_param_ids})
@@ -359,21 +353,21 @@ class ThermalIndices(Product):
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task].select({"levtype": "sfc"})
         selected_param_ids = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
-        steps = block.config_as_list(STEP, str, allow_empty=False)
         surface_cubes = nodetree_datacubes(input_task_action.nodes)
         coords = {
             dim: surface_cubes[0][dim]
             for dim in surface_cubes[0].keys()
-            if all(surface_cubes[0][dim] == cube.get(dim, None) for cube in surface_cubes)
+            if all((surface_cubes[0][dim] == cube.get(dim, None) and len(surface_cubes[0][dim]) == 1) for cube in surface_cubes)
         }
+        thermo_qube = Qube.empty()
+        for output, _ in PPROC_SCHEMA.outputs_from_inputs(
+            forecast=ForecastDefinition(datacubes=surface_cubes),
+            output_template={**coords, PARAM: selected_param_ids, TYPE: [cube[TYPE] for cube in surface_cubes]},
+        ):
+            thermo_qube = thermo_qube | Qube.from_datacube(output)
 
-        outputs = [
-            output
-            for output, _ in PPROC_SCHEMA.outputs_from_inputs(
-                forecast=ForecastDefinition(datacubes=nodetree_datacubes(input_task_action.nodes)),
-                output_template={**coords, PARAM: selected_param_ids, STEP: steps, TYPE: [cube[TYPE] for cube in surface_cubes]},
-            )
-        ]
+        allowed_steps = set.intersection(*[set(x[STEP]) for x in datacubes(thermo_qube)])
+        outputs = list(datacubes(thermo_qube.select({STEP: allowed_steps})))
         action = action_from_outputs(
             requests=outputs,
             pproc_schema=PPROC_SCHEMA,
