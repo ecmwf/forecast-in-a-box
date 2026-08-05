@@ -73,7 +73,6 @@ def predefined_threshold_prob_configuration() -> BlockInstance:
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 PARAM: _param_id_to_param_key("131073"),
-                STEP: ["12"],
             },
         ),
         PredefinedThresholdProbability.configuration_options,
@@ -103,7 +102,6 @@ def thermal_indices_configuration() -> BlockInstance:
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
                 PARAM: [_param_id_to_param_key(id) for id in ["261023", "260242"]],
-                STEP: ["0", "6", "12"],
             },
         ),
         ThermalIndices.configuration_options,
@@ -205,17 +203,6 @@ class TestPredefinedThresholdProb:
             .restrictions
         )
         assert restrictions[PARAM].serialize() == f"enumClosed[str]('{_param_id_to_param_key('131073')}')"
-
-    def test_validator_adds_step_restrictions(
-        self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
-    ) -> None:
-        config = predefined_threshold_prob_configuration.with_configuration_values({PARAM: _param_id_to_param_key("131073")})
-        restrictions = (
-            plugin()
-            .validator(BlockFactoryId("predefinedThresholdProbability"), config.block, {"dataset": operational_forecast_source_output})
-            .restrictions
-        )
-        assert restrictions[STEP].serialize() == "list[enumClosed[str]('12')]"
 
     def test_compile(
         self,
