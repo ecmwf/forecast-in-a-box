@@ -11,9 +11,8 @@ import logging
 from importlib.resources import path
 
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, merge
+from earthkit.workflows.fluent import Action
 from earthkit.workflows.nodetree import datacubes as nodetree_datacubes
-from earthkit.workflows.nodetree import nodetree_arrays
 from earthkit.workflows.plugins.pproc.fluent import Action as PProcAction
 from fiab_core.fable import (
     ActionLookup,
@@ -25,9 +24,8 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Product
-from fiab_core.types import ClosedEnumType, FloatType, ListType, ParameterType, StringType
+from fiab_core.types import ClosedEnumType, FloatType, ListType, ParameterType
 from ppcore.products import action_from_outputs
-from ppcore.schema.exceptions import PProcDatasetError
 from ppcore.schema.forecast import ForecastDefinition
 from ppcore.schema.schema import Schema
 from qubed import Qube
@@ -44,9 +42,8 @@ from fiab_plugin_ecmwf.block_utils import (
     _extract_dataset,
     _param_id_to_param_key,
     _param_key_to_param_id,
-    _parse_axis_value,
 )
-from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, select
+from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, from_datacubes, select
 
 logger = logging.getLogger(__name__)
 
@@ -99,23 +96,11 @@ class EnsembleStatistics(Product):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
-        stats = block.config_as_list(STATISTIC, str, allow_empty=False)
-
-        requests = []
-        for _, narray in nodetree_arrays(input_task_action.nodes):
-            coords = {dim: values.data.tolist() for dim, values in narray.sel({ENSEMBLE: 1}).coords.items()}
-            coords.pop(ENSEMBLE)
-            step_values = coords[STEP]
-            requests.append(
-                {
-                    **coords,
-                    PARAM: coords[PARAM],
-                    TYPE: [self.stat_type(stat, step_values[0]) for stat in stats],
-                }
-            )
-
+        output_qube = self.validate(
+            block, {"dataset": QubedOutput(dataqube=from_datacubes(nodetree_datacubes(input_task_action.nodes)))}, {}
+        )
         action = action_from_outputs(
-            requests=requests,
+            requests=list(datacubes(output_qube)),
             pproc_schema=PPROC_SCHEMA,
             forecast=input_task_action.as_action(PProcAction),
         )
@@ -141,11 +126,6 @@ class PredefinedThresholdProbability(Product):
             description="Parameter to compute",
             value_type=ParameterType(),
         ),
-        STEP: BlockConfigurationOption(
-            title="Steps",
-            description="Steps to compute",
-            value_type=ListType(StringType()),
-        ),
     }
     inputs: list[str] = ["dataset"]
     stat_type: str = "ep"
@@ -154,14 +134,15 @@ class PredefinedThresholdProbability(Product):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
-        prob_qube = Qube.empty()
-        cubes = list(datacubes(input_dataset))
         sample_axes = axes(collapse(select(input_dataset, {ENSEMBLE: 1}), ENSEMBLE))
         unperturbed = axes(select(input_dataset, {ENSEMBLE: 0}))
         coords = {dim: list(values) for dim, values in sample_axes.items() if (len(values) == 1 and dim not in [ENSEMBLE, PARAM])}
+
+        prob_qube = Qube.empty()
         for output, _ in PPROC_SCHEMA.outputs_from_inputs(
             forecast=ForecastDefinition(
-                datacubes=cubes, unperturbed={dim: unperturbed[dim] for dim in ["stream", "type", "number"] if dim in unperturbed}
+                datacubes=list(datacubes(input_dataset)),
+                unperturbed={dim: unperturbed[dim] for dim in ["stream", "type", "number"] if dim in unperturbed},
             ),
             output_template={**coords, TYPE: self.stat_type, "selection": "default"},
         ):
@@ -169,11 +150,7 @@ class PredefinedThresholdProbability(Product):
         restrictions[PARAM] = ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(prob_qube)[PARAM]])
 
         selected_param_id = _param_key_to_param_id(block.config_as_str(PARAM))
-        param_qube = prob_qube.select({PARAM: selected_param_id})
-        restrictions[STEP] = ListType(ClosedEnumType(_axis_value_strings(axes(param_qube)[STEP])))
-
-        steps = block.config_as_list(STEP, str, allow_empty=False)
-        return QubedOutput(dataqube=param_qube.select({STEP: steps}))
+        return QubedOutput(dataqube=prob_qube.select({PARAM: selected_param_id}))
 
     def compile(
         self,
@@ -182,36 +159,15 @@ class PredefinedThresholdProbability(Product):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
-        selected_param_id = _param_key_to_param_id(block.config_as_str(PARAM))
-        steps = [_parse_axis_value(step) for step in block.config_as_list(STEP, str, allow_empty=False)]
-
-        actions = []
-        for npath, narray in nodetree_arrays(input_task_action.nodes):
-            coords = {dim: values.data.tolist() for dim, values in narray.sel({ENSEMBLE: 1}).coords.items()}
-            coords.pop(ENSEMBLE)
-            try:
-                actions.append(
-                    action_from_outputs(
-                        requests=[
-                            {
-                                **coords,
-                                PARAM: [selected_param_id],
-                                TYPE: self.stat_type,
-                                STEP: steps,
-                                "selection": "default",
-                            }
-                        ],
-                        pproc_schema=PPROC_SCHEMA,
-                        forecast=input_task_action.sel(path=npath).as_action(PProcAction),
-                    )
-                )
-            except PProcDatasetError as e:
-                logger.debug(e)
-                pass
-        assert len(actions) > 0, (
-            f"No valid actions could be constructed for the given parameter from {input_task_action.nodes} for param {selected_param_id} and steps {steps}"
+        output_qube = self.validate(
+            block, {"dataset": QubedOutput(dataqube=from_datacubes(nodetree_datacubes(input_task_action.nodes)))}, {}
         )
-        return Either.ok(merge(*actions))
+        action = action_from_outputs(
+            requests=list(datacubes(output_qube)),
+            pproc_schema=PPROC_SCHEMA,
+            forecast=input_task_action.as_action(PProcAction),
+        )
+        return Either.ok(action)
 
     def intersect(self, other: QubedOutput) -> bool:
         if not contains(other, ENSEMBLE) or len(axes(other)[ENSEMBLE]) <= 1:
@@ -266,23 +222,19 @@ class CustomThresholdProbability(Product):
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
         input_task_action = inputs[input_task]
-
-        requests = []
-        for _, narray in nodetree_arrays(input_task_action.nodes):
-            coords = {dim: values.data.tolist() for dim, values in narray.sel({ENSEMBLE: 1}).coords.items()}
-            coords.pop(ENSEMBLE)
-            requests.append(
+        output_qube = self.validate(
+            block, {"dataset": QubedOutput(dataqube=from_datacubes(nodetree_datacubes(input_task_action.nodes)))}, {}
+        )
+        action = action_from_outputs(
+            requests=[
                 {
-                    **coords,
-                    TYPE: self.stat_type,
+                    **cube,
                     THRESHOLD: block.config_as_float(THRESHOLD),
                     COMPARISON: block.config_as_str(COMPARISON),
                     "selection": "custom",
                 }
-            )
-
-        action = action_from_outputs(
-            requests=requests,
+                for cube in datacubes(output_qube)
+            ],
             pproc_schema=PPROC_SCHEMA,
             forecast=input_task_action.as_action(PProcAction),
         )
@@ -351,25 +303,12 @@ class ThermalIndices(Product):
         block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        input_task_action = inputs[input_task].select({"levtype": "sfc"})
-        selected_param_ids = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
-        surface_cubes = nodetree_datacubes(input_task_action.nodes)
-        coords = {
-            dim: surface_cubes[0][dim]
-            for dim in surface_cubes[0].keys()
-            if all((surface_cubes[0][dim] == cube.get(dim, None) and len(surface_cubes[0][dim]) == 1) for cube in surface_cubes)
-        }
-        thermo_qube = Qube.empty()
-        for output, _ in PPROC_SCHEMA.outputs_from_inputs(
-            forecast=ForecastDefinition(datacubes=surface_cubes),
-            output_template={**coords, PARAM: selected_param_ids, TYPE: [cube[TYPE] for cube in surface_cubes]},
-        ):
-            thermo_qube = thermo_qube | Qube.from_datacube(output)
-
-        allowed_steps = set.intersection(*[set(x[STEP]) for x in datacubes(thermo_qube)])
-        outputs = list(datacubes(thermo_qube.select({STEP: allowed_steps})))
+        input_task_action = inputs[input_task]
+        output_qube = self.validate(
+            block, {"dataset": QubedOutput(dataqube=from_datacubes(nodetree_datacubes(input_task_action.nodes)))}, {}
+        )
         action = action_from_outputs(
-            requests=outputs,
+            requests=list(datacubes(output_qube)),
             pproc_schema=PPROC_SCHEMA,
             forecast=input_task_action.as_action(PProcAction),
         )
