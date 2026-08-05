@@ -39,8 +39,13 @@ from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
 from fiab_plugin_ecmwf.qubed_utils import select
 
 
+@pytest.fixture(params=["aifs-ens", "ifs-ens"])
+def dataset(request: pytest.FixtureRequest) -> str:
+    return request.param
+
+
 @pytest.fixture
-def dummy_blockinstance() -> BlockInstance:
+def dummy_blockinstance(dataset: str) -> BlockInstance:
     return BlockInstance.from_block(
         BlockFactoryId("dummy"),
         BlockInstanceBase(
@@ -48,7 +53,7 @@ def dummy_blockinstance() -> BlockInstance:
             configuration_values={
                 SOURCE: "ecmwf-open-data",
                 BASETIME: datetime(2024, 1, 1),
-                FORECAST: "aifs-ens",
+                FORECAST: dataset,
             },
         ),
         OperationalForecastSource.configuration_options,
