@@ -39,13 +39,46 @@ from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
 from fiab_plugin_ecmwf.qubed_utils import select
 
 
+@pytest.fixture
+def dummy_blockinstance() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("dummy"),
+        BlockInstanceBase(
+            input_ids={},
+            configuration_values={
+                SOURCE: "ecmwf-open-data",
+                BASETIME: datetime(2024, 1, 1),
+                FORECAST: "aifs-ens",
+            },
+        ),
+        OperationalForecastSource.configuration_options,
+    )
+
+
+@pytest.fixture
+def dummy_blockinstance_output() -> QubedOutput:
+    return QubedOutput()
+
+
+@pytest.fixture
+def sample_forecast_source_output(dummy_blockinstance: BlockInstance) -> QubedOutput:
+    oper_output = cast(QubedOutput, OperationalForecastSource().validate(block=dummy_blockinstance, inputs={}, restrictions={}))
+    return select(oper_output, {PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]})
+
+
+@pytest.fixture
+def sample_forecast_source_action(dummy_blockinstance: BlockInstance) -> Action:
+    oper_action = OperationalForecastSource().compile(inputs={}, block=dummy_blockinstance).get_or_raise()
+    return oper_action.select({PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]}, expand=True)
+
+
 @pytest.fixture(params=["aifs-ens", "ifs-ens"])
 def dataset(request: pytest.FixtureRequest) -> str:
     return request.param
 
 
 @pytest.fixture
-def dummy_blockinstance(dataset: str) -> BlockInstance:
+def operational_forecast_blockinstance(dataset: str) -> BlockInstance:
     return BlockInstance.from_block(
         BlockFactoryId("dummy"),
         BlockInstanceBase(
@@ -61,19 +94,16 @@ def dummy_blockinstance(dataset: str) -> BlockInstance:
 
 
 @pytest.fixture
-def dummy_blockinstance_output() -> QubedOutput:
-    return QubedOutput()
-
-
-@pytest.fixture
-def operational_forecast_source_output(dummy_blockinstance: BlockInstance) -> QubedOutput:
-    oper_output = cast(QubedOutput, OperationalForecastSource().validate(block=dummy_blockinstance, inputs={}, restrictions={}))
+def operational_forecast_source_output(operational_forecast_blockinstance: BlockInstance) -> QubedOutput:
+    oper_output = cast(
+        QubedOutput, OperationalForecastSource().validate(block=operational_forecast_blockinstance, inputs={}, restrictions={})
+    )
     return select(oper_output, {PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]})
 
 
 @pytest.fixture
-def operational_forecast_source_action(dummy_blockinstance: BlockInstance) -> Action:
-    oper_action = OperationalForecastSource().compile(inputs={}, block=dummy_blockinstance).get_or_raise()
+def operational_forecast_source_action(operational_forecast_blockinstance: BlockInstance) -> Action:
+    oper_action = OperationalForecastSource().compile(inputs={}, block=operational_forecast_blockinstance).get_or_raise()
     return oper_action.select({PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]}, expand=True)
 
 
