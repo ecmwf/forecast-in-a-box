@@ -12,16 +12,16 @@ from qubed import Qube
 class ForecastDataset:
     datacubes: list[dict]
     member_zero: Optional[dict] = None
-    param_db_origin: Optional[int] = None
 
     def as_qube(self, ens_dim: str = "number", include_member_zero: bool = False, **extra: dict) -> Qube:
         qube = Qube.empty()
         paramdb = ParamDB()
-        for datacube in self.datacubes:
-            datacube = datacube.copy()
+        for cube in self.datacubes:
+            datacube = cube.copy()
             datacube.update(extra)
             datacube["param"] = [
-                str(paramdb.shortname_to_param_id(shortname, origin=self.param_db_origin)) for shortname in datacube["param"]
+                str(paramdb.shortname_to_param_id(shortname, context={k: cube[k] for k in ["class", "stream", "type"]}))
+                for shortname in datacube["param"]
             ]
             if ens_dim and self.is_member_zero(datacube):
                 if ens_dim in datacube:

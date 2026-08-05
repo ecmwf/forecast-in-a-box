@@ -2,7 +2,6 @@
     "member_zero": {
         "type": "cf"
     },
-    "param_db_origin": 0,
     "datacubes": [
         {
             "domain": [
