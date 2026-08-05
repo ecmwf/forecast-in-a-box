@@ -140,7 +140,8 @@ describe('parseValueType', () => {
       })
     })
 
-    // anemoiSource.input_source ships exactly this, spaces and all.
+    // anemoiSource.input_source ships this (the serializer emits no
+    // spaces after commas; tolerate both).
     it('parses enumOpen options as an open enum', () => {
       expect(
         parseValueType("enumOpen[str]('mars', 'opendata', 'polytope')"),
@@ -148,6 +149,39 @@ describe('parseValueType', () => {
         type: 'enum',
         options: ['mars', 'opendata', 'polytope'],
         closed: false,
+      })
+    })
+
+    it('parses int-subtype enums as selects over the wire strings', () => {
+      expect(parseValueType('enumClosed[int](1,2,3)')).toEqual({
+        type: 'enum',
+        options: ['1', '2', '3'],
+        closed: true,
+      })
+    })
+
+    it('parses float-subtype enums', () => {
+      expect(parseValueType('enumOpen[float](0.5,1.5)')).toEqual({
+        type: 'enum',
+        options: ['0.5', '1.5'],
+        closed: false,
+      })
+    })
+
+    it('parses a list of int-subtype enums as a closed multi-select', () => {
+      expect(parseValueType('list[enumClosed[int](1,2)]')).toEqual({
+        type: 'enumList',
+        options: ['1', '2'],
+        closed: true,
+      })
+    })
+
+    it('falls back to unknown for unsupported enum subtypes', () => {
+      expect(
+        parseValueType('enumClosed[datetime](2026-01-01T00:00:00)'),
+      ).toEqual({
+        type: 'unknown',
+        raw: 'enumClosed[datetime](2026-01-01T00:00:00)',
       })
     })
   })

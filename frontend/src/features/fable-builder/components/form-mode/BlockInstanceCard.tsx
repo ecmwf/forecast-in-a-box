@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   Bookmark,
@@ -27,6 +27,7 @@ import type {
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
+import { useReservedGlyphReason } from '@/features/glyphs/utils/reserved-names'
 import {
   useBlockValidation,
   useFableBuilderStore,
@@ -155,9 +156,21 @@ export function BlockInstanceCard({
   const errors = blockValidation?.errors ?? []
   const missingGlyphs = blockValidation?.missingGlyphs ?? {}
   const fieldErrorMessages = useFieldErrorMessages()
+  const reservedReasonFor = useReservedGlyphReason()
+  const isJinjaReserved = useCallback(
+    (name: string) => reservedReasonFor(name) === 'jinja',
+    [reservedReasonFor],
+  )
   const liveMappedErrors = useMemo(
-    () => mapBlockErrorsToFields(errors, missingGlyphs, fieldErrorMessages),
-    [errors, missingGlyphs, fieldErrorMessages],
+    () =>
+      mapBlockErrorsToFields(
+        errors,
+        missingGlyphs,
+        fieldErrorMessages,
+        instance.configuration_values,
+        isJinjaReserved,
+      ),
+    [errors, missingGlyphs, fieldErrorMessages, instance, isJinjaReserved],
   )
   const lastMappedErrorsRef = useRef(liveMappedErrors)
   if (validationState) {

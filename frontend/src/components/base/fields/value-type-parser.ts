@@ -9,36 +9,37 @@
  */
 
 /**
- * Value Type Parser
+ * Value Type Parser — widget projection over the FableType grammar.
  *
- * Parses backend value_type strings into structured types for dynamic field rendering.
+ * fable-type.ts owns the wire grammar (parse/serialize); this module
+ * flattens a parsed type onto the field widgets:
  *
- * Supported value types:
  * - str → string input
  * - int → number input (step=1)
  * - float → number input (step=any)
  * - datetime → datetime-local input
- * - date-iso8601 → date input
- * - list[str] → tag input (badges with add/remove)
- * - list[int] → tag input (badges with add/remove)
+ * - date (legacy alias date-iso8601) → date input
+ * - list[str] / list[int] → tag input (badges with add/remove)
  * - enum[str]('a','b','c') → select dropdown (open: suggestions, accept any string)
  * - enumClosed[str]('a','b','c') → select dropdown (closed: must be one of the listed)
- * - list[enumClosed[str](a,b,c)] → multi-select restricted to the listed items
- * - list[enum[str](a,b,c)] → multi-select with suggestions, accept any string
+ * - list[enumClosed[str]('a','b')] → multi-select restricted to the listed items
+ * - list[enum[str]('a','b')] → multi-select with suggestions, accept any string
  * - geodomain → geographic-area picker (presets / countries / draw a box)
  * - artifact → string input (catalog lookup / richer UI not yet implemented)
  * - param → string input (param name lookup not yet implemented)
- * - optional[T] → same widget as T, with optional=true flag
+ * - optional[T] → same widget as T, with optional=true flag (legacy — the
+ *   current backend grammar has no optional wrapper)
  *
- * `enum`/`enumList` carry `closed: boolean` (closed vs open) for forward
- * compat; no first-party factory emits the open form yet.
+ * `enum`/`enumList` carry `closed: boolean` (closed vs open);
+ * anemoiSource's `input_source` ships the open form.
  *
- * Enum expressions carry an explicit subtype in brackets, e.g.
- * `enumClosed[str]('a','b')` or `enumOpen[int](1,2)`. Only the `str`
- * subtype is rendered as a first-class field today; other subtypes fall
- * back to `unknown`.
+ * str/int/float/artifact/param enum subtypes render as selects over the wire strings;
+ * anything else the grammar knows but no widget exists for (other enum
+ * subtypes, union, bboxWSEN, …) falls back to `unknown`.
  */
 
+import { parseFableType } from './fable-type'
+import type { FableType } from './fable-type'
 import { getAppTimeZone, todayInZone } from '@/lib/datetime'
 
 export type ParsedValueType =
@@ -76,118 +77,69 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
 
   const trimmed = valueType.trim()
 
-  // Optional wrapper: unwrap "optional[<inner>]" and mark the result optional.
-  // Recurses so optional[int], optional[list[int]], optional[enum[...]] all work.
+  // Legacy optional wrapper: unwrap "optional[<inner>]" and mark the result
+  // optional. Recurses so optional[int], optional[enum[...]] etc. all work.
   const optionalMatch = trimmed.match(/^optional\[(.+)\]$/i)
   if (optionalMatch) {
     const inner = parseValueType(optionalMatch[1])
     return { ...inner, optional: true }
   }
 
-  const normalized = trimmed.toLowerCase()
-
-  // Simple types
-  if (normalized === 'str' || normalized === 'string') {
-    return { type: 'string' }
-  }
-
-  if (normalized === 'int' || normalized === 'integer') {
-    return { type: 'int' }
-  }
-
-  if (normalized === 'float' || normalized === 'number') {
-    return { type: 'float' }
-  }
-
-  if (normalized === 'datetime') {
-    return { type: 'datetime' }
-  }
-
-  if (normalized === 'date-iso8601' || normalized === 'date') {
-    return { type: 'date' }
-  }
-
-  if (normalized === 'geodomain') {
-    return { type: 'geodomain' }
-  }
-
-  // `artifact` and `param` are treated as plain strings for now; the backend
-  // reserves them for future catalog/param lookups but the frontend does not
-  // yet implement any such lookup, so they behave exactly like `str`.
-  if (normalized === 'artifact' || normalized === 'param') {
-    return { type: 'string' }
-  }
-
-  // List type: list[str], list[int], or list[enumClosed[...]]
-  // Match the trimmed string so leading/trailing whitespace does not fall through.
-  const listMatch = trimmed.match(/^list\[(.+)\]$/i)
-  if (listMatch) {
-    const itemValueType = parseValueType(listMatch[1])
-    if (itemValueType.type === 'string') {
-      return { type: 'list', itemType: 'string' }
-    }
-    if (itemValueType.type === 'int') {
-      return { type: 'list', itemType: 'int' }
-    }
-    if (itemValueType.type === 'enum') {
-      return {
-        type: 'enumList',
-        options: itemValueType.options,
-        closed: itemValueType.closed,
-      }
-    }
-    // Supported: list[str], list[int], list[enum[…]], list[enumClosed[…]].
-    return { type: 'unknown', raw: trimmed }
-  }
-
-  // Backend serializes enumClosed[subtype](...)/enumOpen[subtype](...); `enum` kept as an alias.
-  // Only the `str` subtype is supported as a first-class field; other subtypes are `unknown`.
-  const enumMatch = trimmed.match(
-    /^(enum|enumOpen|enumClosed)\[(\w+)\]\((.*)\)$/i,
-  )
-  if (enumMatch) {
-    const subtype = enumMatch[2].toLowerCase()
-    // `artifact` and `param` enum members are serialized as quoted strings
-    // (see backend's `_serialize_enum_item`), so they parse identically to
-    // a `str` subtype enum.
-    if (
-      subtype === 'str' ||
-      subtype === 'string' ||
-      subtype === 'artifact' ||
-      subtype === 'param'
-    ) {
-      const options = parseEnumOptions(enumMatch[3])
-      if (options.length > 0) {
-        return {
-          type: 'enum',
-          options,
-          closed: enumMatch[1].toLowerCase() === 'enumclosed',
-        }
-      }
-    }
-  }
-
-  return { type: 'unknown', raw: trimmed }
+  const parsed = parseFableType(trimmed)
+  return parsed ? flatten(parsed, trimmed) : { type: 'unknown', raw: trimmed }
 }
 
-/**
- * Parse enum options from a string like "'a','b','c'" or '"a","b","c"'
- */
-function parseEnumOptions(optionsStr: string): Array<string> {
-  return optionsStr
-    .split(',')
-    .map((option) => option.trim())
-    .filter(Boolean)
-    .map((option) => {
-      if (
-        option.length >= 2 &&
-        option[0] === option[option.length - 1] &&
-        (option[0] === "'" || option[0] === '"')
-      ) {
-        return option.slice(1, -1)
+/** str/int/float/artifact/param enums render as selects over the wire
+ *  strings — artifact/param members serialize quoted like str items. */
+function isSelectEnum(t: FableType): t is Extract<FableType, { kind: 'enum' }> {
+  return (
+    t.kind === 'enum' &&
+    (t.subtype.kind === 'str' ||
+      t.subtype.kind === 'int' ||
+      t.subtype.kind === 'float' ||
+      t.subtype.kind === 'artifact' ||
+      t.subtype.kind === 'param')
+  )
+}
+
+function flatten(t: FableType, raw: string): ParsedValueType {
+  switch (t.kind) {
+    case 'str':
+      return { type: 'string' }
+    // Reserved for future catalog/param lookups — plain strings until then.
+    case 'artifact':
+    case 'param':
+      return { type: 'string' }
+    case 'int':
+      return { type: 'int' }
+    case 'float':
+      return { type: 'float' }
+    case 'datetime':
+      return { type: 'datetime' }
+    case 'date':
+      return { type: 'date' }
+    case 'geodomain':
+      return { type: 'geodomain' }
+    case 'enum':
+      if (isSelectEnum(t)) {
+        return { type: 'enum', options: t.items.map(String), closed: t.closed }
       }
-      return option
-    })
+      return { type: 'unknown', raw }
+    case 'list':
+      if (t.item.kind === 'str') return { type: 'list', itemType: 'string' }
+      if (t.item.kind === 'int') return { type: 'list', itemType: 'int' }
+      if (isSelectEnum(t.item)) {
+        return {
+          type: 'enumList',
+          options: t.item.items.map(String),
+          closed: t.item.closed,
+        }
+      }
+      return { type: 'unknown', raw }
+    // Grammar-valid but widget-less: geodomainSingle, bboxWSEN, union.
+    default:
+      return { type: 'unknown', raw }
+  }
 }
 
 /**

@@ -220,8 +220,6 @@ function RunCanvasInner({
                   // definite height, not just `min-height`). Wide: `!h-full`
                   // overrides it so the canvas fills the bounded column.
                   'min-[1280px]:!h-full min-[1280px]:min-h-0 min-[1280px]:flex-1',
-                  // Terminal states stay neutral; only live work gets ambient motion.
-                  status === 'running' && 'run-canvas-breathing',
                 ],
           )}
         >

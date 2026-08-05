@@ -20,6 +20,8 @@ export function useFieldErrorMessages(): FieldErrorMessages {
       missingRequiredValue: t('fieldErrors.missingRequiredValue'),
       unknownGlyph: (name) =>
         t('fieldErrors.unknownGlyph', { glyph: `\${${name}}` }),
+      jinjaReservedReference: (name) =>
+        t('fieldErrors.jinjaReservedReference', { name }),
     }),
     [t],
   )

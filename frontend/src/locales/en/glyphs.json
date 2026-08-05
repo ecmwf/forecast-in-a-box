@@ -39,6 +39,8 @@
     "keyPlaceholder": "e.g. myVariable",
     "keyHelp": "Used as ${key} in fable configurations",
     "keyInvalid": "Key must start with a letter or underscore and contain only letters, digits and underscores. Hyphens, spaces and other characters are not allowed.",
+    "keyReservedIntrinsic": "This name is a built-in intrinsic glyph and cannot be used.",
+    "keyReservedJinja": "This name is a Jinja filter or function and cannot be used.",
     "value": "Value",
     "valuePlaceholder": "The value to interpolate",
     "public": "Public",
