@@ -767,6 +767,15 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_use
     assert post_resp.is_success, post_resp.text
 
     builder = _make_builder_full(tmpdir)
+
+    # Baseline: expand the blueprint before submission, using validate_only=True (the
+    # convenience/perf flag) since we only care about resolved_configuration_options here.
+    expand_before_resp = backend_client_user.put("/blueprint/expand", json=builder.model_dump(), params={"validate_only": True})
+    assert expand_before_resp.is_success, expand_before_resp.text
+    resolved_before = expand_before_resp.json()["resolved_configuration_options"]
+    assert resolved_before["source_time"]["text"].split(";")[2] == "initial_value"
+    assert resolved_before["source_time"]["text"].split(";")[3] == "local_glyph_value"
+
     save_req = BlueprintSaveCommand(builder=builder)
     save_resp = backend_client_user.post("/blueprint/create", json=save_req.model_dump())
     assert save_resp.is_success, save_resp.text
@@ -798,6 +807,34 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_use
     glyph_values = status_resp.json()["glyph_values"]
     assert glyph_values["basicExecuteGlobalGlyph"] == "initial_value"
     assert glyph_values["blueprintExecuteLocalGlyph"] == "local_glyph_value"
+    # The two glyphs not stored on CompilerRuntimeContext (they're always recomputed on
+    # restart) must nonetheless be surfaced in their original, as-submitted shape.
+    assert glyph_values["submitDatetime"] == created_at
+    assert glyph_values["attemptCount"] == "1"
+    assert glyph_values["runId"] == run_id
+
+    # Re-expand the blueprint using the glyph values retrieved from RunDetail as local
+    # glyphs, to verify the rendering matches what was actually executed. This is expected
+    # to report global_errors (the retrieved glyphs include reserved/intrinsic names like
+    # runId/submitDatetime/attemptCount), but the resolved_configuration_options must still
+    # be computed using the provided values.
+    builder_with_run_glyphs = builder.model_copy(update={"local_glyphs": glyph_values})
+    expand_after_resp = backend_client_user.put(
+        "/blueprint/expand", json=builder_with_run_glyphs.model_dump(), params={"validate_only": True}
+    )
+    assert expand_after_resp.is_success, expand_after_resp.text
+    expand_after_data = expand_after_resp.json()
+    assert expand_after_data["global_errors"], "expected reserved intrinsic glyph names to be flagged"
+    resolved_after = expand_after_data["resolved_configuration_options"]
+    # runId is now the real one (was an example value before submission).
+    assert resolved_after["sink_main"]["fname"] == f"{tmpdir}/output{run_id}.main.txt"
+    # submitDatetime, and the global/local glyphs, now match what was actually used at
+    # execution time (startDatetime is intentionally not reproducible here, since it is
+    # always recomputed fresh on every attempt and never persisted).
+    resolved_time_parts = resolved_after["source_time"]["text"].split(";")
+    assert resolved_time_parts[0] == created_at
+    assert resolved_time_parts[2] == "initial_value"
+    assert resolved_time_parts[3] == "local_glyph_value"
     outputTime.unlink()
 
     list_resp = backend_client_user.get("/run/list")

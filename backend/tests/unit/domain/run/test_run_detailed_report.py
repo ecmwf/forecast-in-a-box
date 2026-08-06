@@ -57,6 +57,7 @@ async def test_poll_and_update_requests_detailed_report_and_translates_to_block_
         progress=None,
         cascade_job_id="job-1",
         outputs=None,
+        compiler_runtime_context={},
     )
     response = SimpleNamespace(
         progresses={JobId("job-1"): SimpleNamespace(completed=False, pct="12.50", failure=None)},
@@ -102,6 +103,7 @@ async def test_poll_and_update_disables_detailed_report_when_cache_misses() -> N
         progress=None,
         cascade_job_id="job-1",
         outputs=None,
+        compiler_runtime_context={},
     )
     response = SimpleNamespace(
         progresses={JobId("job-1"): SimpleNamespace(completed=False, pct="12.50", failure=None)},
@@ -144,6 +146,7 @@ async def test_poll_and_update_returns_empty_detailed_fields_for_completed_runs(
         progress="100.00",
         cascade_job_id="job-1",
         outputs={"outputs": {"task-a": {"mime_type": "application/json", "original_block": "block-a"}}},
+        compiler_runtime_context={},
     )
 
     detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
@@ -167,6 +170,7 @@ async def test_get_run_asks_for_detailed_report_while_list_runs_does_not() -> No
         progress=None,
         cascade_job_id="job-1",
         outputs=None,
+        compiler_runtime_context={},
     )
     detailed = _run_detail(
         completed_block_ids={BlockInstanceId("block-a")},

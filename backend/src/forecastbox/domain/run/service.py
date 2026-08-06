@@ -314,7 +314,13 @@ async def poll_and_update(execution: RunRecord, detailed_report: bool = False) -
             outputs=raw_outputs,
             completed_block_ids=completed_block_ids,
             planned_block_ids=planned_block_ids,
-            glyph_values=execution.compiler_runtime_context.get("glyphs", None),
+            # NOTE: we add glyph values for submit date time and attempt count because they are
+            # *never* in the compiler runtime context, yet the client may require them for resolution
+            glyph_values={
+                **(execution.compiler_runtime_context.get("glyphs", None) or {}),
+                "submitDatetime": value_dt2str(execution.created_at),
+                "attemptCount": str(actual_attempt),
+            },
         )
 
     if status in ("submitted", "preparing", "running", "unknown") and cascade_job_id:
