@@ -114,6 +114,7 @@ class RunDetailResponse(FiabBaseModel):
     outputs: RunOutputsResponse | None = None
     completed_block_ids: list[BlockInstanceId] | None = None
     planned_block_ids: list[BlockInstanceId] | None = None
+    glyph_values: dict[str, str] | None = None
 
 
 class RunListResponse(FiabBaseModel):
@@ -195,6 +196,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
         outputs=outputs_response,
         completed_block_ids=maybe_list(domain_detail.completed_block_ids),
         planned_block_ids=maybe_list(domain_detail.planned_block_ids),
+        glyph_values=domain_detail.glyph_values,
     )
 
 

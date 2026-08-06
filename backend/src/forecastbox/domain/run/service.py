@@ -92,6 +92,7 @@ class RunDetail(FiabBaseModel):
     outputs: dict | None = None
     completed_block_ids: set[BlockInstanceId] | None = None
     planned_block_ids: set[BlockInstanceId] | None = None
+    glyph_values: dict[str, str] | None = None
 
 
 class ExecuteResult(FiabBaseModel):
@@ -313,6 +314,7 @@ async def poll_and_update(execution: RunRecord, detailed_report: bool = False) -
             outputs=raw_outputs,
             completed_block_ids=completed_block_ids,
             planned_block_ids=planned_block_ids,
+            glyph_values=execution.compiler_runtime_context.get("glyphs", None),
         )
 
     if status in ("submitted", "preparing", "running", "unknown") and cascade_job_id:

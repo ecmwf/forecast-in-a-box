@@ -795,6 +795,9 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_use
     assert compare_with_tolerance(_time_parts[1], _dt.fromisoformat(created_at_sec))
     assert _time_parts[2] == "initial_value"
     assert _time_parts[3] == "local_glyph_value"
+    glyph_values = status_resp.json()["glyph_values"]
+    assert glyph_values["basicExecuteGlobalGlyph"] == "initial_value"
+    assert glyph_values["blueprintExecuteLocalGlyph"] == "local_glyph_value"
     outputTime.unlink()
 
     list_resp = backend_client_user.get("/run/list")
