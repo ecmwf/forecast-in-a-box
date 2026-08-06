@@ -10,7 +10,6 @@
 
 from typing import cast
 
-import numpy as np
 import pytest
 from earthkit.workflows import nodetree
 from earthkit.workflows.fluent import Action, merge
@@ -137,7 +136,24 @@ class TestEnsembleStatistics:
         assert axes(output)[PARAM] == {"167", "151", "131"}
         assert axes(output)[TYPE] == {"em"}
 
-    def test_compile(
+    def test_from_anemoi_source_ensemble(
+        self, ensemble_statistics_configuration: BlockInstance, anemoi_source_ensemble_output: QubedOutput
+    ) -> None:
+        block = EnsembleStatistics()
+
+        assert block.intersect(other=anemoi_source_ensemble_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=ensemble_statistics_configuration,
+            inputs={"dataset": anemoi_source_ensemble_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert contains(output, PARAM)
+        assert axes(output)[PARAM] == {"2t", "msl"}
+        assert axes(output)[TYPE] == {"em"}
+
+    def test_operational_forecast_compile(
         self,
         operational_forecast_source_output: QubedOutput,
         operational_forecast_source_action: Action,
@@ -157,6 +173,26 @@ class TestEnsembleStatistics:
         assert set.union(*[set(req[TYPE]) for req in requests]) == {"em"}
         assert set.union(*[set(req[STEP]) for req in requests]) == {0, 6, 12}
         assert list(datacubes(output)) == requests
+
+    def test_anemoi_source_compile(
+        self,
+        anemoi_source_ensemble_output: QubedOutput,
+        anemoi_source_ensemble_action: Action,
+        ensemble_statistics_configuration: BlockInstance,
+    ) -> None:
+        block = EnsembleStatistics()
+        output = block.validate(block=ensemble_statistics_configuration, inputs={"dataset": anemoi_source_ensemble_output}, restrictions={})  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): anemoi_source_ensemble_action},
+            block=ensemble_statistics_configuration,
+        ).get_or_raise()
+        requests = nodetree.datacubes(action.nodes)
+        assert len(requests) == 1
+        assert set.union(*[set(req[PARAM]) for req in requests]) == {"2t", "msl"}
+        assert set.union(*[set(req[TYPE]) for req in requests]) == {"em"}
+        assert set.union(*[set(req[STEP]) for req in requests]) == set(range(1, 25))
+        # TODO: Re-enable when AnemoiSource validate and compile outputs match
+        # assert list(datacubes(output)) == requests
 
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):
@@ -253,7 +289,26 @@ class TestCustomThresholdProb:
         assert output_axes[TYPE] == {"ep"}
         assert len(output_axes[STEP]) > 0
 
-    def test_compile(
+    def test_from_anemoi_source_ensemble(
+        self, custom_threshold_prob_configuration: BlockInstance, anemoi_source_ensemble_output: QubedOutput
+    ) -> None:
+        block = CustomThresholdProbability()
+
+        assert block.intersect(other=anemoi_source_ensemble_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=custom_threshold_prob_configuration,
+            inputs={"dataset": anemoi_source_ensemble_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert contains(output, PARAM)
+        output_axes = axes(output)
+        assert len(output_axes[PARAM]) == 2
+        assert output_axes[TYPE] == {"ep"}
+        assert len(output_axes[STEP]) > 0
+
+    def test_operational_forecast_compile(
         self,
         operational_forecast_source_output: QubedOutput,
         operational_forecast_source_action: Action,
@@ -275,6 +330,30 @@ class TestCustomThresholdProb:
             assert request[TYPE] == ["ep"]
             assert set.isdisjoint(set(request[PARAM]), {"131", "151", "167"}) is False
         assert list(datacubes(output)) == requests
+
+    def test_anemoi_source__compile(
+        self,
+        anemoi_source_ensemble_output: QubedOutput,
+        anemoi_source_ensemble_action: Action,
+        custom_threshold_prob_configuration: BlockInstance,
+    ) -> None:
+        block = CustomThresholdProbability()
+        output = block.validate(
+            block=custom_threshold_prob_configuration, inputs={"dataset": anemoi_source_ensemble_output}, restrictions={}
+        )  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): anemoi_source_ensemble_action},
+            block=custom_threshold_prob_configuration,
+        ).get_or_raise()
+        requests = nodetree.datacubes(action.nodes)
+        assert len(requests) == 1
+        for request in requests:
+            assert THRESHOLD not in request
+            assert COMPARISON not in request
+            assert request[TYPE] == ["ep"]
+            assert set.isdisjoint(set(request[PARAM]), {"2t", "msl"}) is False
+        # TODO: Re-enable when AnemoiSource validate and compile outputs match
+        # assert list(datacubes(output)) == requests
 
     def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
         for expansion in plugin().expander(threshold_probability_output):

@@ -32,6 +32,8 @@ from qubed import Qube
 
 from fiab_plugin_ecmwf.environments import mars_dependencies, opendata_dependencies
 from .block_utils import (
+    BASE_TIME,
+    DIMENSION,
     DOMAIN,
     ENSEMBLE,
     FORECAST,
@@ -90,7 +92,7 @@ class OperationalForecastSource(Source):
             value_type=ClosedEnumType(list(FORECAST_DATASETS)),
             default_value=list(FORECAST_DATASETS.keys())[0],
         ),
-        BASETIME: BlockConfigurationOption(
+        BASE_TIME: BlockConfigurationOption(
             title="Base time",
             description="Base time of the forecast",
             value_type=DatetimeType(),
@@ -105,7 +107,7 @@ class OperationalForecastSource(Source):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         forecast = block.config_as_str(FORECAST)
-        basetime = block.config_as_datetime(BASETIME)
+        basetime = block.config_as_datetime(BASE_TIME)
         date = basetime.strftime("%Y%m%d")
         time = self._convert_time(basetime.time().hour)
 
@@ -125,7 +127,7 @@ class OperationalForecastSource(Source):
         fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
         paramdb = ParamDB()
 
-        basetime = block.config_as_datetime(BASETIME)
+        basetime = block.config_as_datetime(BASE_TIME)
         date = basetime.strftime("%Y%m%d")
         time = self._convert_time(basetime.time().hour)
 
