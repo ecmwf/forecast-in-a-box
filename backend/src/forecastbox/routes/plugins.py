@@ -154,7 +154,7 @@ def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin
 async def uninstall_plugin_endpoint(
     request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
 ) -> Response:
-    uninstall_plugin(pluginCompositeId)
+    await uninstall_plugin(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 

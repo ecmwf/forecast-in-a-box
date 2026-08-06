@@ -24,10 +24,11 @@ update that leaves unspecified fields (``None`` arguments) unchanged.
 """
 
 import datetime as dt
+import logging
 from dataclasses import dataclass
 from typing import Any, cast
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.plugin.errors import PluginErrors
@@ -35,6 +36,8 @@ from forecastbox.domain.plugin.exceptions import PluginNotFound
 from forecastbox.schemata.plugin import PluginState
 from forecastbox.utility.db import dbRetry, querySingle
 from forecastbox.utility.time import current_time
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -197,6 +200,20 @@ def clear_asset_ingest_needed(*, plugin_id: str) -> None:
     def function(i: int) -> None:
         with _jobs_module.sync_session_maker() as session:
             session.execute(update(PluginState).where(PluginState.plugin_id == plugin_id).values(asset_ingest_needed=False))
+            session.commit()
+
+    dbRetry(function)
+
+
+def delete_plugin_state(*, plugin_id: str) -> None:
+    """Removes the state row from the database (if any)"""
+
+    def function(i: int) -> None:
+        with _jobs_module.sync_session_maker() as session:
+            result = session.execute(delete(PluginState).where(PluginState.plugin_id == plugin_id))
+            deleted: int = result.rowcount  # ty:ignore
+            if deleted != 1:
+                raise ValueError(f"expected to delete exactly one row, found {deleted} instead")
             session.commit()
 
     dbRetry(function)
