@@ -463,13 +463,18 @@ def get_catalogue() -> dict[PluginCompositeId, BlockFactoryCatalogue]:
 async def expand_blueprint(
     blueprint: BlueprintBuilder,
     auth_context: AuthContext = Depends(get_auth_context),
+    validate_only: bool = False,
 ) -> BlueprintValidationExpansionResponse:
     """Validate a partially-constructed BlueprintBuilder and return completion options.
 
     Returns 200 regardless of whether validation errors are present; callers must
     inspect the returned error fields.
+
+    ``validate_only`` skips the (more expensive) expansion computation when the caller
+    only cares about resolved configuration options and validation errors -- e.g. when
+    re-rendering a previously executed Run for display purposes.
     """
-    result = await service.validate_expand(blueprint, auth_context, validate_only=False)
+    result = await service.validate_expand(blueprint, auth_context, validate_only=validate_only)
     return BlueprintValidationExpansionResponse(
         global_errors=result.global_errors,
         block_errors=result.block_errors,

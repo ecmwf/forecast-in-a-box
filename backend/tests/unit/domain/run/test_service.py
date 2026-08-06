@@ -77,6 +77,7 @@ def _make_running_execution(outputs: RunOutputs | None) -> SimpleNamespace:
         progress=None,
         cascade_job_id="job-1",
         outputs=outputs.model_dump() if outputs is not None else None,
+        compiler_runtime_context={},
     )
 
 
@@ -257,6 +258,7 @@ async def test_poll_and_update_failed_job_exposes_cached_values_as_available() -
             progress=None,
             cascade_job_id="job-1",
             outputs=outputs.model_dump(),
+            compiler_runtime_context={},
         ),
     )
 
