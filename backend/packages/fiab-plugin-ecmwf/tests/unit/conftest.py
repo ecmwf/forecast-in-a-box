@@ -13,6 +13,7 @@ from typing import cast
 
 import pytest
 from earthkit.workflows.fluent import Action
+from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstanceId,
@@ -23,16 +24,21 @@ from fiab_core.fable import (
 )
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 
+from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource
 from fiab_plugin_ecmwf.block_utils import (
-    BASETIME,
+    BASE_TIME,
+    CHECKPOINT,
     ENSEMBLE,
     FORECAST,
+    INPUT_SOURCE,
+    LEAD_TIME,
     PARAM,
     SOURCE,
     STATISTIC,
     STEP,
 )
 from fiab_plugin_ecmwf.blocks import (
+    FORECAST_DATASETS,
     OperationalForecastSource,
 )
 from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
@@ -47,7 +53,7 @@ def dummy_blockinstance() -> BlockInstance:
             input_ids={},
             configuration_values={
                 SOURCE: "ecmwf-open-data",
-                BASETIME: datetime(2024, 1, 1),
+                BASE_TIME: datetime(2024, 1, 1),
                 FORECAST: "aifs-ens",
             },
         ),
@@ -72,7 +78,35 @@ def sample_forecast_source_action(dummy_blockinstance: BlockInstance) -> Action:
     return oper_action.select({PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]}, expand=True)
 
 
-@pytest.fixture(params=["aifs-ens", "ifs-ens"])
+@pytest.fixture
+def anemoi_source_ensemble_configuration(dummy_checkpoint: CompositeArtifactId) -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("anemoiSource"),
+        BlockInstanceBase(
+            input_ids={},
+            configuration_values={
+                CHECKPOINT: dummy_checkpoint,
+                INPUT_SOURCE: "opendata",
+                LEAD_TIME: 24,
+                BASE_TIME: datetime(2024, 1, 1),
+                ENSEMBLE: 3,
+            },
+        ),
+        AnemoiSource.configuration_options,
+    )
+
+
+@pytest.fixture
+def anemoi_source_ensemble_output(anemoi_source_ensemble_configuration: BlockInstance) -> QubedOutput:
+    return AnemoiSource().validate(block=anemoi_source_ensemble_configuration, inputs={}, restrictions={})  # type: ignore[return-value]
+
+
+@pytest.fixture
+def anemoi_source_ensemble_action(anemoi_source_ensemble_configuration: BlockInstance) -> Action:
+    return AnemoiSource().compile(inputs={}, block=anemoi_source_ensemble_configuration).get_or_raise()
+
+
+@pytest.fixture(params=list(FORECAST_DATASETS.keys()))
 def dataset(request: pytest.FixtureRequest) -> str:
     return request.param
 
@@ -85,7 +119,7 @@ def operational_forecast_blockinstance(dataset: str) -> BlockInstance:
             input_ids={},
             configuration_values={
                 SOURCE: "ecmwf-open-data",
-                BASETIME: datetime(2024, 1, 1),
+                BASE_TIME: datetime(2024, 1, 1),
                 FORECAST: dataset,
             },
         ),
