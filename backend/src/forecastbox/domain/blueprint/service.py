@@ -391,6 +391,27 @@ def _validate_expand_with_buckets(
                 block_errors[blockId] += [f"References non-existent block(s): {missing}"]
                 invalidable.add(blockId)
 
+    # NOTE it may happen that the user did like ${format} in a configuration option, ie,
+    # used a filter name in place of a glyph. Thats technically jinja valid, but we
+    # forbid using filter names as glyph names for clarity -- hence there is no way this
+    # would ever render. At this stage of the code, if ${format} gets used but is not
+    # declared a local glyph, it is treated as a missing glyph -- which is misleading,
+    # because specifying the glyph would just give a *different* error. Hence we inspect
+    # missing glyphs for invalid glyph values, and convert them to more explicit block
+    # errors
+    for blockId, value in missing_glyphs_result.items():
+        invalid_glyph_names_reason: dict[str, str] = {}
+        invalid_glyph_names_occurrence: dict[str, list[str]] = defaultdict(list)
+        for configurationOptionId, missingGlyphs in value.items():
+            for missingGlyph in missingGlyphs:
+                e = validate_glyph(missingGlyph).e
+                if e is not None:
+                    invalid_glyph_names_reason[missingGlyph] = f"Invalid glyph name: {missingGlyph} (due to {e}); appears in ["
+                    invalid_glyph_names_occurrence[missingGlyph].append(configurationOptionId)
+            missingGlyphs -= invalid_glyph_names_reason.keys()
+        for invalidGlyph, prefix in invalid_glyph_names_reason.items():
+            block_errors[blockId] += [prefix + ", ".join(invalid_glyph_names_occurrence[invalidGlyph]) + "]"]
+
     return BlueprintValidationExpansion(
         possible_sources=possible_sources,
         possible_expansions=possible_expansions,
