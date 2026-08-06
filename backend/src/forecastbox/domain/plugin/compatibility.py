@@ -28,6 +28,7 @@ import importlib
 import logging
 from collections.abc import Iterator
 
+import git
 from cascade.low.func import Either
 from packaging.specifiers import SpecifierSet
 from packaging.version import InvalidVersion, Version
@@ -41,7 +42,16 @@ logger = logging.getLogger(__name__)
 def get_fiabcore_version() -> Version:
     """Return the currently installed version of ``fiab-core`` as a ``Version`` object."""
     raw = importlib.metadata.version("fiab-core")
-    return Version(raw)
+    if raw == "0.0.0":
+        # basically $(git describe --tags --abbrev=0 --match="c*")
+        r = git.Repo("..")
+        tags = (t.name for t in r.tags if t.name.startswith("c"))
+        mostRecent = max(tags, key=lambda x: int(r.git.rev_list(f"tags/{x}", "--count")))
+        noPrefix = mostRecent[1:]
+        dropLast = noPrefix.rsplit(".", 1)[0]
+        return Version(dropLast)
+    else:
+        return Version(raw)
 
 
 def plugin_default_specifier() -> SpecifierSet:
