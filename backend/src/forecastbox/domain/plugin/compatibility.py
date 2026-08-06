@@ -46,7 +46,7 @@ def get_fiabcore_version() -> Version:
         # basically $(git describe --tags --abbrev=0 --match="c*")
         r = git.Repo("..")
         tags = (t.name for t in r.tags if t.name.startswith("c"))
-        mostRecent = max(tags, key=lambda x: int(r.git.rev_list(f"tags/{x}", "--count")))
+        mostRecent = max(tags, key=lambda x: int(r.git.rev_list(f"tags/{x}", "--count")), default="c0.0.0.0")
         noPrefix = mostRecent[1:]
         dropLast = noPrefix.rsplit(".", 1)[0]
         return Version(dropLast)
