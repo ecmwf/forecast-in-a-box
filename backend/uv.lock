@@ -1246,7 +1246,7 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows"
-version = "0.15.5"
+version = "0.15.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "array-api-compat", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -1262,9 +1262,9 @@ dependencies = [
     { name = "sortedcontainers", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "xarray", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/63/3b01673695df477ede39178a6db2b7f72fb30d94cf4d1dead71358a4faef/earthkit_workflows-0.15.5.tar.gz", hash = "sha256:06717d020794ad0856556fb1c862cd4fe397784719da8fe4f7e7aea503460d44", size = 10866450, upload-time = "2026-08-03T08:44:10.269Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/41/841f353ed970f6106b390fb525699b5fc0fa1dbb0eca8684dba3fbaec1b5/earthkit_workflows-0.15.6.tar.gz", hash = "sha256:eb0204437018ae35cad5a22cf1c83596f581c80b0d33229ef778516140bee30a", size = 10866763, upload-time = "2026-08-06T10:23:00.752Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/4f/cb17554d664662ec1176cf61e4cc85e491c30214d91d8ca0aefea8636bc8/earthkit_workflows-0.15.5-py3-none-any.whl", hash = "sha256:d1df6abe0df117dee85b88f44599e557e7d03e4b97db3931dca74b1b817bd959", size = 215033, upload-time = "2026-08-03T08:44:08.484Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/83/fae11fe17a7b10a2266869e49c01505e4783425fbe543fa7c34ec0e8db56/earthkit_workflows-0.15.6-py3-none-any.whl", hash = "sha256:b7f6426b5a424a814b3ab94ccd5a835880c8eadb40327c1855b10c9e7b2d5c05", size = 215129, upload-time = "2026-08-06T10:22:59.384Z" },
 ]
 
 [[package]]
@@ -1609,11 +1609,11 @@ requires-dist = [
     { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
     { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2,<1" },
     { name = "earthkit-plots", marker = "extra == 'runtime'", specifier = ">=0.3.5,<1.0" },
-    { name = "earthkit-workflows", specifier = ">=0.15.5" },
+    { name = "earthkit-workflows", specifier = ">=0.15.6" },
     { name = "earthkit-workflows-anemoi", specifier = ">=0.7.2" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
-    { name = "pproc-core", specifier = ">=0.2.1" },
+    { name = "pproc-core", specifier = ">=0.3.0" },
     { name = "pymetkit", git = "https://github.com/ecmwf/metkit.git?rev=feature%2Fparamdb-api" },
 ]
 provides-extras = ["runtime"]
@@ -3183,7 +3183,7 @@ wheels = [
 
 [[package]]
 name = "pproc-core"
-version = "0.2.1"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "code-meters", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -3195,9 +3195,9 @@ dependencies = [
     { name = "pydantic", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "qubed", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fe/fb/a2e9e62234f31768ec66ea8ccf88136b20272fc92189006363777086a5b1/pproc_core-0.2.1.tar.gz", hash = "sha256:9f6869186cd5db5d2292387f7d873ec962d56d8edd7583ee0d6db413ea2ac116", size = 185503, upload-time = "2026-08-03T09:51:52.604Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/59/7a/72cdd0068a1d08e9831d73f1061c44a976edc4a950f6ddf376a1ee7a6565/pproc_core-0.3.0.tar.gz", hash = "sha256:6eb9587433f9b5d6b35188faa6f788cda6687bd87c04a57873000979c8e7c7ce", size = 186022, upload-time = "2026-08-06T11:08:25.906Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a8/13/62e6853cfea13f94a17eb817913278793b750e91608440408841305bc586/pproc_core-0.2.1-py3-none-any.whl", hash = "sha256:c8ba5f06a05e7cfc4f052324acac779c6d9c9525e79074b3a20a6cda8c691688", size = 62498, upload-time = "2026-08-03T09:51:51.412Z" },
+    { url = "https://files.pythonhosted.org/packages/73/e2/48341c7b13f42a5452a1110bf16248a28473bdb11fc53898265683104adb/pproc_core-0.3.0-py3-none-any.whl", hash = "sha256:5af83391fa755709ddf2af2408577b75128081bfab8589a63d1601546b6dcaae", size = 62829, upload-time = "2026-08-06T11:08:24.61Z" },
 ]
 
 [[package]]
