@@ -80,6 +80,12 @@ def try_version(pip_source: str, module_name: str) -> str:
                 version = module._version
                 if isinstance(version, str):
                     return version
+        version_module = try_import(module_name + "._version")
+        if version_module is not None:
+            if hasattr(version_module, "version"):
+                version = version_module.version
+                if isinstance(version, str):
+                    return version
         return "unknown"
 
 
@@ -112,15 +118,17 @@ def _parse_pip_install(pip_output: str) -> dict[str, str]:
 
     Lines starting with `` + `` are newly-installed entries, e.g.:
     ``  + fiab-plugin-test==0.1.0 (from file:///path/to/package)``
+    We also include lines starting with `` ~ ``, which may have been cached from the `uv`'s PoV
+    but for us are at this stage nevertheless new (presumably).
 
     Returns a dict mapping package name to version string.
     """
     rv: dict[str, str] = {}
     for line in pip_output.splitlines():
         clean = line.strip()
-        if not clean.startswith("+"):
+        if not (clean.startswith("+") or clean.startswith("~")):
             continue
-        parts = clean.lstrip("+ ").split("==")
+        parts = clean.lstrip("+ ").lstrip("~ ").split("==")
         if len(parts) != 2:
             logger.warning(f"Suspicious pip output line: {clean!r} -- ignoring")
             continue

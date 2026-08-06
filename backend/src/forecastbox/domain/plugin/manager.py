@@ -32,6 +32,7 @@ import re
 import threading
 import time
 from concurrent.futures import Future
+from functools import partial
 
 from cascade.low.func import Either
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
@@ -41,8 +42,15 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from forecastbox.domain.plugin.compatibility import install_plugin_compatibly
-from forecastbox.domain.plugin.db import clear_asset_ingest_needed, get_plugin_state, update_template_errors, upsert_plugin_state
+from forecastbox.domain.plugin.db import (
+    clear_asset_ingest_needed,
+    delete_plugin_state,
+    get_plugin_state,
+    update_template_errors,
+    upsert_plugin_state,
+)
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
+from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.concurrency.synchronization import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_version
@@ -411,9 +419,18 @@ def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Ve
     return ""
 
 
-def uninstall_plugin(pluginId: PluginCompositeId) -> None:
+async def uninstall_plugin(pluginId: PluginCompositeId) -> None:
+    logger.debug(f"about to uninstall {pluginId=}")
     if pluginId not in config.external.plugins:
         raise ValueError(f"plugin {pluginId} not installed")
+    # db remove
+    logger.debug(f"about to db remove {pluginId=}")
+    await execution_manager.await_jobs_db(
+        "plugin.state.delete",
+        partial(delete_plugin_state, plugin_id=PluginCompositeId.to_str(pluginId)),
+    )
+    # config entry remove
+    logger.debug(f"about to config remove {pluginId=}")
     with timed_acquire(config_edit_lock, 5) as result:
         if not result:
             raise ValueError("failed to acquire the shared lock")

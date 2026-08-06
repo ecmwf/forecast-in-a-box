@@ -85,7 +85,7 @@ def install_plugin_compatibly(pip_source: str, version: Version | None) -> Eithe
     package names to their version strings, or ``Either.error(msg)`` on failure.
     Never raises.
     """
-    if pip_source.startswith("-e"):
+    if pip_source.startswith("-e") or pip_source.startswith("file://"):
         pkgs = pip_source.split(" ", 1)
     else:
         if version is not None:
