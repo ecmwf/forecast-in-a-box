@@ -27,7 +27,7 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
 from fiab_core.tools.validators import positive
-from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
+from fiab_core.types import ClosedEnumType, DatetimeType, DivisibleByType, IntType, OpenEnumType
 
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
@@ -138,6 +138,7 @@ class AnemoiBaseBlock:
         """Add restrictions to the block configuration options based on the checkpoint properties"""
         if not checkpoint.is_ensemble_model and checkpoint.is_ensemble_model is not None:
             restrictions[ENSEMBLE] = ClosedEnumType([1])  # Only allow single member for non-ensemble models
+        restrictions[LEAD_TIME] = DivisibleByType(checkpoint.model_step)
 
     def get_input_qube(self, checkpoint: CheckpointArtifact, ensemble_members: int | set = 0) -> QubedOutput:
         """Get the input qube for the given checkpoint and ensemble members"""
