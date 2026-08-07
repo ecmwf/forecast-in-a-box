@@ -22,7 +22,11 @@ const messages: FieldErrorMessages = {
 describe('mapBlockErrorsToFields', () => {
   it('returns empty result for empty inputs', () => {
     const result = mapBlockErrorsToFields([], {}, messages)
-    expect(result).toEqual({ byConfigKey: {}, unmapped: [] })
+    expect(result).toEqual({
+      byConfigKey: {},
+      unmapped: [],
+      invalidGlyphNames: [],
+    })
   })
 
   describe('Block contains extra / missing config', () => {
@@ -87,7 +91,11 @@ describe('mapBlockErrorsToFields', () => {
 
     it('treats an empty missingGlyphs map as a no-op', () => {
       const result = mapBlockErrorsToFields([], {}, messages)
-      expect(result).toEqual({ byConfigKey: {}, unmapped: [] })
+      expect(result).toEqual({
+        byConfigKey: {},
+        unmapped: [],
+        invalidGlyphNames: [],
+      })
     })
   })
 
@@ -180,6 +188,48 @@ describe('mapBlockErrorsToFields', () => {
       const result = mapBlockErrorsToFields([error], {}, messages, {})
       expect(result.byConfigKey).toEqual({ format: [error] })
       expect(result.unmapped).toEqual([])
+    })
+  })
+
+  describe('invalid glyph names', () => {
+    // #630 rewrites a filter/intrinsic clash into this, naming its options.
+    const error =
+      "Invalid glyph name: format (due to clashes with jinja keyword 'format'); appears in [format, path]"
+
+    it('attributes the verbatim error to every option it names', () => {
+      const result = mapBlockErrorsToFields([error], {}, messages, {})
+      expect(result.byConfigKey).toEqual({ format: [error], path: [error] })
+      expect(result.unmapped).toEqual([])
+    })
+
+    it('handles a single option', () => {
+      const single =
+        "Invalid glyph name: runId (due to clashes with intrinsic glyph 'runId'); appears in [path]"
+      const result = mapBlockErrorsToFields([single], {}, messages, {})
+      expect(result.byConfigKey).toEqual({ path: [single] })
+    })
+
+    it('reports the rejected name so it cannot be offered for definition', () => {
+      const result = mapBlockErrorsToFields([error], {}, messages, {})
+      expect(result.invalidGlyphNames).toEqual(['format'])
+    })
+
+    it('suppresses the unknown-glyph message for a rejected name', () => {
+      // The backend still lists it as missing (#630 does not strip it yet).
+      const result = mapBlockErrorsToFields(
+        [error],
+        { format: ['format'] },
+        messages,
+        {},
+      )
+      expect(result.byConfigKey.format).toEqual([error])
+    })
+
+    it('stays unmapped when it names no option', () => {
+      const empty = 'Invalid glyph name: x (due to y); appears in []'
+      const result = mapBlockErrorsToFields([empty], {}, messages, {})
+      expect(result.byConfigKey).toEqual({})
+      expect(result.unmapped).toEqual([empty])
     })
   })
 

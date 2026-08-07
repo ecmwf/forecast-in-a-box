@@ -26,6 +26,7 @@ import type {
   BlockInstanceId,
   PluginBlockFactoryId,
 } from '@/api/types/fable.types'
+import { definableGlyphs } from '@/features/fable-builder/utils/definable-glyphs'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
 import { useReservedGlyphReason } from '@/features/glyphs/utils/reserved-names'
 import {
@@ -179,6 +180,8 @@ export function BlockInstanceCard({
   const mappedErrors = validationState
     ? liveMappedErrors
     : lastMappedErrorsRef.current
+  const definableMissingGlyphs =
+    definableGlyphs(missingGlyphs, mappedErrors.invalidGlyphNames) ?? {}
 
   if (!factory) {
     return null
@@ -321,7 +324,7 @@ export function BlockInstanceCard({
                 <BlockValidationProvider
                   resolvedConfig={resolvedConfigForBlock}
                   fieldErrors={mappedErrors.byConfigKey}
-                  missingGlyphs={missingGlyphs}
+                  missingGlyphs={definableMissingGlyphs}
                 >
                   <div className="space-y-4">
                     {Object.entries(factory.configuration_options).map(
