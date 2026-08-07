@@ -43,7 +43,7 @@ def test_download_model(backend_client_admin: httpx.Client, backend_client: http
     expected_checkpoints = {f"{test_model_artifact_id}{e}" for e in range(4)}
 
     # Connect the notification websocket before submitting any downloads, so we cannot miss the
-    # artifactDownloaded notifications emitted once each of them completes.
+    # artifactDownloadFinished notifications emitted once each of them completes.
     with connect_notification_websocket(backend_client) as websocket:
         # Submit download for all 4 models in parallel
         for checkpoint_id in expected_checkpoints:
@@ -69,16 +69,15 @@ def test_download_model(backend_client_admin: httpx.Client, backend_client: http
 
         retry_until(do_action, verify_ok, attempts=128, sleep=0.2, error_msg="Failed to download all artifacts")
 
-        # Collect the artifactDownloaded notifications for the 4 checkpoints we just downloaded.
-        # Unrelated artifactDownloaded notifications (eg from another test's artifacts, running
+        # Collect the artifactDownloadFinished notifications for the 4 checkpoints we just downloaded.
+        # Unrelated artifactDownloadFinished notifications (eg from another test's artifacts, running
         # concurrently) are ignored rather than failing the test.
         remaining_checkpoints = set(expected_checkpoints)
         refresh_routes: set[str] = set()
-        deadline = time.monotonic() + 15
+        timeout = 15
         while remaining_checkpoints:
-            budget = deadline - time.monotonic()
             try:
-                notification = wait_next_notification(websocket, "artifact", "artifactDownloaded", total_timeout=max(budget, 0.1))
+                notification, timeout = wait_next_notification(websocket, "artifact", "artifactDownloadFinished", total_timeout=timeout)
             except NotificationTimeoutError:
                 break
             if notification.context.get("artifact_store_id") != fake_artifact_store_id:
@@ -86,11 +85,13 @@ def test_download_model(backend_client_admin: httpx.Client, backend_client: http
             local_id = notification.context.get("artifact_local_id")
             if local_id not in remaining_checkpoints:
                 continue
+            is_success = notification.context.get("success")
+            assert is_success
             remaining_checkpoints.discard(local_id)
             refresh_routes.update(notification.refreshRoutes)
             assert notification.detailRoute == "api/v1/artifacts/model_details"
 
-        assert not remaining_checkpoints, f"did not receive artifactDownloaded notifications for {remaining_checkpoints}"
+        assert not remaining_checkpoints, f"did not receive artifactDownloadFinished notifications for {remaining_checkpoints}"
         assert len(refresh_routes) == 1, f"expected exactly one distinct refresh route, got {refresh_routes}"
         refresh_route = next(iter(refresh_routes))
         assert refresh_route.startswith("api/v1/")

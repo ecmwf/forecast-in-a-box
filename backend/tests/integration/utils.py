@@ -32,8 +32,9 @@ def wait_next_notification(
     domain_name: str,
     domain_event: str,
     total_timeout: float = 15,
-) -> ClientNotification:
+) -> tuple[ClientNotification, float]:
     """Receive notifications off `websocket` until one matching `domain_name`/`domain_event` arrives.
+    Returns it as well as the remaining timeout budget.
 
     Notifications for other domains/events (eg emitted by other tests running concurrently) are
     silently discarded. Raises `NotificationTimeoutError` if none arrives within `total_timeout`
@@ -52,7 +53,7 @@ def wait_next_notification(
             ) from None
         notification = ClientNotification.model_validate_json(raw)
         if notification.sourceDomainName == domain_name and notification.sourceDomainEvent == domain_event:
-            return notification
+            return notification, deadline - time.monotonic()
         # a notification from a different domain/event, possibly from a concurrently running test -- ignore it
 
 

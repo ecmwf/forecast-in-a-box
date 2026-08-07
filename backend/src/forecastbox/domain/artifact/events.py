@@ -9,9 +9,9 @@
 
 """Events emitted by the Artifact domain.
 
-Currently only the completion of an artifact download is surfaced to clients, via the
-``ClientNotificationSource`` protocol -- see ``domain.notification``. Progress reports are
-intentionally not surfaced this way, clients are expected to poll for those.
+Currently only the completion of an artifact download is surfaced to clients.
+Progress reports are intentionally not surfaced this way, clients are expected to poll for those.
+Artifact deletion or registry fetch both happen in a blocking manner, thus no need for notification.
 """
 
 from dataclasses import dataclass
@@ -21,19 +21,22 @@ from forecastbox.domain.notification.models import ClientNotification
 
 
 @dataclass(frozen=True, eq=True, slots=True)
-class ArtifactDownloadedEvent:
+class ArtifactDownloadFinishedEvent:
     """Emitted once an artifact download completes and the artifact becomes locally available."""
 
     composite_id: CompositeArtifactId
+    is_success: bool
 
     def as_client_notification(self) -> ClientNotification:
+        result = ("un" if not self.is_success else "") + "successfully"
         return ClientNotification(
-            text=f"Artifact {self.composite_id.artifact_local_id} finished downloading",
+            text=f"Artifact {self.composite_id.artifact_local_id} finished downloading {result}",
             sourceDomainName="artifact",
-            sourceDomainEvent="artifactDownloaded",
+            sourceDomainEvent="artifactDownloadFinished",
             context={
                 "artifact_store_id": self.composite_id.artifact_store_id,
                 "artifact_local_id": self.composite_id.artifact_local_id,
+                "success": self.is_success,
             },
             detailRoute="api/v1/artifacts/model_details",
             refreshRoutes=["api/v1/artifacts/list_models"],

@@ -30,7 +30,7 @@ from pyrsistent.typing import PMap, PSet
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.domain.artifact.catalog import get_artifacts_catalog
-from forecastbox.domain.artifact.events import ArtifactDownloadedEvent
+from forecastbox.domain.artifact.events import ArtifactDownloadFinishedEvent
 from forecastbox.domain.artifact.io import delete_artifact, download_artifact, list_storage
 from forecastbox.utility import tunnel
 from forecastbox.utility.concurrency.synchronization import timed_acquire
@@ -148,13 +148,19 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
                 else:
                     logger.warning(f"expected {composite_id} to be in ongoing downloads")
         logger.info(f"Successfully downloaded artifact {composite_id}")
+        is_success = True
     except Exception as e:
         logger.exception(f"artifact download failed for {composite_id}: {repr(e)}")
         report_artifact_download_progress(composite_id, failure=repr(e))
-        return
+        is_success = False
 
     try:
-        submit_event(Event(name=EventName("artifact.downloaded"), payload=ArtifactDownloadedEvent(composite_id=composite_id)))
+        submit_event(
+            Event(
+                name=EventName("artifact.downloaded"),
+                payload=ArtifactDownloadFinishedEvent(composite_id=composite_id, is_success=is_success),
+            )
+        )
     except Exception as e:
         logger.exception(f"failed to submit download-completed notification for {composite_id}: {repr(e)}")
 

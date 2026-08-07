@@ -29,10 +29,11 @@ def test_notification_websocket_receives_test_notification(backend_client: httpx
         response = backend_client.post("/notification/testNotification", json={"identifier": identifier})
         assert response.is_success
 
-        notification = wait_next_notification(websocket, "notification", "testNotification", total_timeout=15)
+        timeout = 15
+        notification, timeout = wait_next_notification(websocket, "notification", "testNotification", total_timeout=timeout)
         while notification.context.get("identifier") != identifier:
             # a testNotification from a different, concurrently running test -- ignore it
-            notification = wait_next_notification(websocket, "notification", "testNotification", total_timeout=15)
+            notification, timeout = wait_next_notification(websocket, "notification", "testNotification", total_timeout=timeout)
 
         assert notification.sourceDomainName == "notification"
         assert notification.sourceDomainEvent == "testNotification"
