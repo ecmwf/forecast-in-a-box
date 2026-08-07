@@ -74,9 +74,11 @@ export function PluginRow({
   const isWarningOnly = plugin.errorSeverity === 'warning'
   const pypiUrl = getPyPIUrl(plugin.pipSource)
 
-  // Roughly when line-clamp-6 will cut the tooltip text (~45 chars/line)
-  const diagnosticsClamped =
-    (plugin.errorDetail?.reduce((n, e) => n + e.detail.length, 0) ?? 0) > 240
+  // Entry count, not a character guess: each entry is separately clamped, so
+  // the tooltip height is bounded without ever cutting the list mid-line.
+  const tooltipDiagnostics = plugin.errorDetail?.slice(0, 3)
+  const hiddenDiagnostics =
+    (plugin.errorDetail?.length ?? 0) - (tooltipDiagnostics?.length ?? 0)
 
   return (
     <div
@@ -106,19 +108,24 @@ export function PluginRow({
                   )}
                 </TooltipTrigger>
                 <TooltipContent>
-                  {plugin.errorDetail ? (
-                    <div className="max-w-xs">
-                      <div className="line-clamp-6">
-                        <PluginDiagnostics errors={plugin.errorDetail} plain />
-                      </div>
-                      {diagnosticsClamped && (
+                  {plugin.errorDetail && tooltipDiagnostics ? (
+                    // No width of its own: TooltipContent already caps the
+                    // width, and a nested max-w-xs overflows its px-3 padding.
+                    <div className="min-w-0">
+                      <PluginDiagnostics errors={tooltipDiagnostics} plain />
+                      {(hiddenDiagnostics > 0 ||
+                        plugin.errorDetail.length > 0) && (
                         <P className="mt-1 text-xs text-inherit opacity-70">
-                          {t('diagnostics.seeDetails')}
+                          {hiddenDiagnostics > 0
+                            ? t('diagnostics.moreAndSeeDetails', {
+                                count: hiddenDiagnostics,
+                              })
+                            : t('diagnostics.seeDetails')}
                         </P>
                       )}
                     </div>
                   ) : (
-                    <P className="max-w-xs text-xs text-inherit">
+                    <P className="min-w-0 text-xs text-inherit">
                       {t('status.errored')}
                     </P>
                   )}
