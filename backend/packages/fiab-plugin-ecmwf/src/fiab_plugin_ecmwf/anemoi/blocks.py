@@ -27,7 +27,7 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
 from fiab_core.tools.validators import positive
-from fiab_core.types import DatetimeType, IntType, OpenEnumType
+from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
 
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
@@ -112,7 +112,57 @@ class AnemoiBuilder:
         )
 
 
-class AnemoiSource(Source):
+class AnemoiBaseBlock:
+    """Base class for Anemoi blocks that run a model, providing common validation and restriction logic"""
+
+    def validate_lead_time(self, checkpoint: CheckpointArtifact, lead_time: int) -> None:
+        """Validate the lead time configuration option against the checkpoint properties"""
+        validation_error = checkpoint.validate_lead_time(lead_time)
+        if validation_error is not None:
+            raise ValueError(validation_error)
+
+    def validate_ensemble(self, checkpoint: CheckpointArtifact, ensemble_members: int | set) -> None:
+        """Validate the ensemble configuration option against the checkpoint properties"""
+        if checkpoint.is_ensemble_model is None:  # Cannot know if the model is an ensemble or not, so cannot validate
+            return
+        if (
+            (isinstance(ensemble_members, int) and ensemble_members > 1)
+            or (isinstance(ensemble_members, set) and ensemble_members)
+            and not checkpoint.is_ensemble_model
+        ):
+            raise ValueError(
+                f"Checkpoint {checkpoint.artifact} is not an ensemble model, but ensemble members requested: {ensemble_members}"
+            )
+
+    def add_restrictions(self, checkpoint: CheckpointArtifact, restrictions: ConfigurationOptionRestriction) -> None:
+        """Add restrictions to the block configuration options based on the checkpoint properties"""
+        if not checkpoint.is_ensemble_model and checkpoint.is_ensemble_model is not None:
+            restrictions[ENSEMBLE] = ClosedEnumType([1])  # Only allow single member for non-ensemble models
+
+    def get_input_qube(self, checkpoint: CheckpointArtifact, ensemble_members: int | set = 0) -> QubedOutput:
+        """Get the input qube for the given checkpoint and ensemble members"""
+        qubed_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
+        if isinstance(ensemble_members, int):
+            if ensemble_members > 1 and checkpoint.is_ensemble_model:
+                qubed_input = expand(qubed_input, {ENSEMBLE: range(1, ensemble_members + 1)})
+        elif isinstance(ensemble_members, set):
+            if ensemble_members and checkpoint.is_ensemble_model:
+                qubed_input = expand(qubed_input, {ENSEMBLE: sorted(ensemble_members)})
+        return QubedOutput(dataqube=qubed_input)
+
+    def get_output_qube(self, checkpoint: CheckpointArtifact, lead_time: int, ensemble_members: int | set = 0) -> QubedOutput:
+        """Get the output qube for the given checkpoint, lead time, and ensemble members"""
+        qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time))
+        if isinstance(ensemble_members, int):
+            if ensemble_members > 1 and checkpoint.is_ensemble_model:
+                qubed_output = expand(qubed_output, {ENSEMBLE: range(1, ensemble_members + 1)})
+        elif isinstance(ensemble_members, set):
+            if ensemble_members and checkpoint.is_ensemble_model:
+                qubed_output = expand(qubed_output, {ENSEMBLE: sorted(ensemble_members)})
+        return QubedOutput(dataqube=qubed_output)
+
+
+class AnemoiSource(Source, AnemoiBaseBlock):
     title: str = "Anemoi Model Source"
     description: str = "Get a forecast from an Anemoi checkpoint, initialised from a source."
     inputs: list[str] = []
@@ -154,14 +204,11 @@ class AnemoiSource(Source):
         checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
         lead_time = block.config_as_int(LEAD_TIME, validator=positive)
 
-        validation_error = checkpoint.validate_lead_time(lead_time)
-        if validation_error is not None:
-            raise ValueError(validation_error)
+        self.validate_lead_time(checkpoint, lead_time)
+        self.validate_ensemble(checkpoint, ensemble_members)
+        self.add_restrictions(checkpoint, restrictions)
 
-        qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time))
-        if ensemble_members > 1:
-            qubed_output = expand(qubed_output, {"number": range(1, ensemble_members + 1)})
-        return QubedOutput(dataqube=qubed_output)
+        return self.get_output_qube(checkpoint, lead_time, ensemble_members)
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
@@ -181,7 +228,7 @@ class AnemoiSource(Source):
         return Either.ok(action)
 
 
-class AnemoiInputSource(Source):
+class AnemoiInputSource(Source, AnemoiBaseBlock):
     title: str = "Anemoi Model Input Source"
     description: str = "Get the initial conditions for an Anemoi forecast, from a source, no forecast output."
     inputs: list[str] = []
@@ -215,10 +262,10 @@ class AnemoiInputSource(Source):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
-        number = block.config_as_int(ENSEMBLE, validator=positive)
-        model_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
-        model_input = expand(model_input, {ENSEMBLE: [number]})
-        return QubedOutput(dataqube=model_input)
+        ensemble_members = block.config_as_int(ENSEMBLE, validator=positive)
+
+        self.validate_ensemble(checkpoint, ensemble_members)
+        return self.get_input_qube(checkpoint, ensemble_members)
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
@@ -237,7 +284,7 @@ class AnemoiInputSource(Source):
         return Either.ok(action)
 
 
-class AnemoiTransform(Transform):
+class AnemoiTransform(Transform, AnemoiBaseBlock):
     title: str = "Anemoi Model Transform"
     description: str = "Run an Anemoi model from a prior node"
     inputs: list[str] = ["initial conditions"]
@@ -261,19 +308,19 @@ class AnemoiTransform(Transform):
         checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
         lead_time = block.config_as_int(LEAD_TIME, validator=positive)
         qubed_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
+
         if not contains(inputs["dataset"], qubed_input):
             difference_qube = qubed_input ^ inputs["dataset"].dataqube
             raise ValueError(f"Input dataset is not compatible with the model checkpoint. Difference in qubes: {difference_qube}")
 
-        validation_error = checkpoint.validate_lead_time(lead_time)
-        if validation_error is not None:
-            raise ValueError(validation_error)
-
-        qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time=lead_time))
         input_dataset = inputs["dataset"]
-        if contains(input_dataset, ENSEMBLE):
-            qubed_output = expand(qubed_output, {ENSEMBLE: axes(input_dataset)[ENSEMBLE]})
-        return QubedOutput(dataqube=qubed_output)
+        ensemble_members = axes(input_dataset).get(ENSEMBLE, 0)
+
+        self.validate_lead_time(checkpoint, lead_time)
+        self.validate_ensemble(checkpoint, ensemble_members)
+        self.add_restrictions(checkpoint, restrictions)
+
+        return self.get_output_qube(checkpoint, lead_time, ensemble_members)
 
     def compile(  # type:ignore[invalid-argument] # semigroup
         self,
