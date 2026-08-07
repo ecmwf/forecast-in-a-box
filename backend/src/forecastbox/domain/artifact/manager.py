@@ -30,10 +30,12 @@ from pyrsistent.typing import PMap, PSet
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.domain.artifact.catalog import get_artifacts_catalog
+from forecastbox.domain.artifact.events import ArtifactDownloadedEvent
 from forecastbox.domain.artifact.io import delete_artifact, download_artifact, list_storage
 from forecastbox.utility import tunnel
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import config
+from forecastbox.utility.dispatcher import Event, EventName, submit_event
 from forecastbox.utility.tunnel import CommandHandle
 
 logger = logging.getLogger(__name__)
@@ -149,6 +151,12 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
     except Exception as e:
         logger.exception(f"artifact download failed for {composite_id}: {repr(e)}")
         report_artifact_download_progress(composite_id, failure=repr(e))
+        return
+
+    try:
+        submit_event(Event(name=EventName("artifact.downloaded"), payload=ArtifactDownloadedEvent(composite_id=composite_id)))
+    except Exception as e:
+        logger.exception(f"failed to submit download-completed notification for {composite_id}: {repr(e)}")
 
 
 def submit_artifact_download(composite_id: CompositeArtifactId) -> Either[int, str]:  # ty: ignore[invalid-type-arguments]
