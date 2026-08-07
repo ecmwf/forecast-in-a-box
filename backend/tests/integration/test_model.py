@@ -1,12 +1,20 @@
+import time
 from typing import Any
 
 import httpx
 
 from .conftest import fake_artifact_registry_port, fake_artifact_store_id, test_model_artifact_id
-from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token, retry_until
+from .utils import (
+    NotificationTimeoutError,
+    connect_notification_websocket,
+    extract_auth_token_from_response,
+    prepare_cookie_with_auth_token,
+    retry_until,
+    wait_next_notification,
+)
 
 
-def test_download_model(backend_client_admin: httpx.Client) -> None:
+def test_download_model(backend_client_admin: httpx.Client, backend_client: httpx.Client) -> None:
     """Downloads bunch of artifacts in parallel, tests they successfully appear"""
 
     # Verify fake artifact registry is up
@@ -32,30 +40,70 @@ def test_download_model(backend_client_admin: httpx.Client) -> None:
             assert model["local_compatibility_detail"] is None
             assert "tags" in model
 
-    # Submit download for all 4 models in parallel
     expected_checkpoints = {f"{test_model_artifact_id}{e}" for e in range(4)}
-    for checkpoint_id in expected_checkpoints:
-        composite_id = {
-            "artifact_store_id": fake_artifact_store_id,
-            "artifact_local_id": checkpoint_id,
-        }
-        response = backend_client_admin.post("/artifacts/download_model", json=composite_id).raise_for_status()
-        result = response.json()
-        assert result["status"] in ["download submitted", "download in progress"], f"Unexpected status: {result}"
 
-    # Wait until all 4 are available
-    def do_action() -> Any:
-        return backend_client_admin.get("/artifacts/list_models").raise_for_status().json()
+    # Connect the notification websocket before submitting any downloads, so we cannot miss the
+    # artifactDownloadFinished notifications emitted once each of them completes.
+    with connect_notification_websocket(backend_client) as websocket:
+        # Submit download for all 4 models in parallel
+        for checkpoint_id in expected_checkpoints:
+            composite_id = {
+                "artifact_store_id": fake_artifact_store_id,
+                "artifact_local_id": checkpoint_id,
+            }
+            response = backend_client_admin.post("/artifacts/download_model", json=composite_id).raise_for_status()
+            result = response.json()
+            assert result["status"] in ["download submitted", "download in progress"], f"Unexpected status: {result}"
 
-    def verify_ok(models: Any) -> bool | None:
-        available = {
+        # Wait until all 4 are available
+        def do_action() -> Any:
+            return backend_client_admin.get("/artifacts/list_models").raise_for_status().json()
+
+        def verify_ok(models: Any) -> bool | None:
+            available = {
+                m["composite_id"]["artifact_local_id"]
+                for m in models
+                if m["composite_id"]["artifact_store_id"] == fake_artifact_store_id and m["is_available"]
+            }
+            return True if expected_checkpoints.issubset(available) else None
+
+        retry_until(do_action, verify_ok, attempts=128, sleep=0.2, error_msg="Failed to download all artifacts")
+
+        # Collect the artifactDownloadFinished notifications for the 4 checkpoints we just downloaded.
+        # Unrelated artifactDownloadFinished notifications (eg from another test's artifacts, running
+        # concurrently) are ignored rather than failing the test.
+        remaining_checkpoints = set(expected_checkpoints)
+        refresh_routes: set[str] = set()
+        timeout = 15
+        while remaining_checkpoints:
+            try:
+                notification, timeout = wait_next_notification(websocket, "artifact", "artifactDownloadFinished", total_timeout=timeout)
+            except NotificationTimeoutError:
+                break
+            if notification.context.get("artifact_store_id") != fake_artifact_store_id:
+                continue
+            local_id = notification.context.get("artifact_local_id")
+            if local_id not in remaining_checkpoints:
+                continue
+            is_success = notification.context.get("success")
+            assert is_success
+            remaining_checkpoints.discard(local_id)
+            refresh_routes.update(notification.refreshRoutes)
+            assert notification.detailRoute == "api/v1/artifacts/model_details"
+
+        assert not remaining_checkpoints, f"did not receive artifactDownloadFinished notifications for {remaining_checkpoints}"
+        assert len(refresh_routes) == 1, f"expected exactly one distinct refresh route, got {refresh_routes}"
+        refresh_route = next(iter(refresh_routes))
+        assert refresh_route.startswith("api/v1/")
+        stripped_route = refresh_route.removeprefix("api/v1/")
+
+        refreshed = backend_client_admin.get(f"/{stripped_route}").raise_for_status().json()
+        refreshed_available = {
             m["composite_id"]["artifact_local_id"]
-            for m in models
+            for m in refreshed
             if m["composite_id"]["artifact_store_id"] == fake_artifact_store_id and m["is_available"]
         }
-        return True if expected_checkpoints.issubset(available) else None
-
-    retry_until(do_action, verify_ok, attempts=128, sleep=0.2, error_msg="Failed to download all artifacts")
+        assert expected_checkpoints.issubset(refreshed_available)
 
     # Test model details endpoint for checkpoint0
     main_composite_id = {

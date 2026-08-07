@@ -1,11 +1,60 @@
+import contextlib
 import datetime
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from typing import Any, TypeVar, cast
 
 import httpx
+import websockets.sync.client
+
+from forecastbox.domain.notification.models import ClientNotification
 
 T = TypeVar("T")
+
+
+class NotificationTimeoutError(TimeoutError):
+    """Raised by `wait_next_notification` when no matching notification arrives within the budget."""
+
+
+@contextlib.contextmanager
+def connect_notification_websocket(backend_client: httpx.Client) -> Generator[websockets.sync.client.ClientConnection, None, None]:
+    """Open a websocket connection to the `/notification/ws` endpoint of the given backend client.
+
+    Usage: `with connect_notification_websocket(backend_client) as websocket: ...`
+    """
+    ws_url = str(backend_client.base_url).rstrip("/").replace("http://", "ws://", 1) + "/notification/ws"
+    with websockets.sync.client.connect(ws_url, open_timeout=5) as websocket:
+        yield websocket
+
+
+def wait_next_notification(
+    websocket: websockets.sync.client.ClientConnection,
+    domain_name: str,
+    domain_event: str,
+    total_timeout: float = 15,
+) -> tuple[ClientNotification, float]:
+    """Receive notifications off `websocket` until one matching `domain_name`/`domain_event` arrives.
+    Returns it as well as the remaining timeout budget.
+
+    Notifications for other domains/events (eg emitted by other tests running concurrently) are
+    silently discarded. Raises `NotificationTimeoutError` if none arrives within `total_timeout`
+    seconds in total.
+    """
+    deadline = time.monotonic() + total_timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise NotificationTimeoutError(f"did not receive a notification for {domain_name}.{domain_event} within {total_timeout}s")
+        try:
+            raw = websocket.recv(timeout=remaining)
+        except TimeoutError:
+            raise NotificationTimeoutError(
+                f"did not receive a notification for {domain_name}.{domain_event} within {total_timeout}s"
+            ) from None
+        notification = ClientNotification.model_validate_json(raw)
+        if notification.sourceDomainName == domain_name and notification.sourceDomainEvent == domain_event:
+            return notification, deadline - time.monotonic()
+        # a notification from a different domain/event, possibly from a concurrently running test -- ignore it
 
 
 def retry_until(

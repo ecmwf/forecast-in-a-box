@@ -11,7 +11,7 @@
 protocol that other domains' events implement to produce one.
 """
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -22,7 +22,7 @@ class ClientNotification(FiabBaseModel):
     text: str  # the full text that the frontend will display
     sourceDomainName: str  # domain as understood by backend: artifact, plugin, blueprint, run, ...
     sourceDomainEvent: str  # event name within the domain: artifactDownloaded, pluginUpdated, runFinished, ...
-    context: dict[str, str]  # arbitrary key-value, with schema specific to the sourceDomainEvent
+    context: dict[str, Any]  # arbitrary key-value, with schema specific to the sourceDomainEvent
     detailRoute: str | None  # optionally a direct route that the client could visit for more details
     refreshRoutes: list[str]  # possibly empty list of routes that the client should refresh to update its internal state
 

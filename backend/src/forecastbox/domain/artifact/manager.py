@@ -30,10 +30,12 @@ from pyrsistent.typing import PMap, PSet
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.domain.artifact.catalog import get_artifacts_catalog
+from forecastbox.domain.artifact.events import ArtifactDownloadFinishedEvent
 from forecastbox.domain.artifact.io import delete_artifact, download_artifact, list_storage
 from forecastbox.utility import tunnel
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import config
+from forecastbox.utility.dispatcher import Event, EventName, submit_event
 from forecastbox.utility.tunnel import CommandHandle
 
 logger = logging.getLogger(__name__)
@@ -146,9 +148,21 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
                 else:
                     logger.warning(f"expected {composite_id} to be in ongoing downloads")
         logger.info(f"Successfully downloaded artifact {composite_id}")
+        is_success = True
     except Exception as e:
         logger.exception(f"artifact download failed for {composite_id}: {repr(e)}")
         report_artifact_download_progress(composite_id, failure=repr(e))
+        is_success = False
+
+    try:
+        submit_event(
+            Event(
+                name=EventName("artifact.downloaded"),
+                payload=ArtifactDownloadFinishedEvent(composite_id=composite_id, is_success=is_success),
+            )
+        )
+    except Exception as e:
+        logger.exception(f"failed to submit download-completed notification for {composite_id}: {repr(e)}")
 
 
 def submit_artifact_download(composite_id: CompositeArtifactId) -> Either[int, str]:  # ty: ignore[invalid-type-arguments]
@@ -282,6 +296,8 @@ def delete_model(composite_id: CompositeArtifactId) -> Either[str, str]:  # ty: 
 
     # TODO race condition possibility 1/ pop in one thread 2/ another request triggers a download
     # 3/ unlink happens while download is ongoing -> fix by making the delete two-step
+    # TODO delete is now blocking operation, possibly taking some time -- we may want to switch
+    # to a submit-based one. Do not forget to emit a notification after completion/failure then
     handle = _ssh_handle_if_needed()
     try:
         delete_artifact(composite_id, config.backend.data_path, handle=handle)
