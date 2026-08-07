@@ -142,23 +142,25 @@ class AnemoiBaseBlock:
     def get_input_qube(self, checkpoint: CheckpointArtifact, ensemble_members: int | set = 0) -> QubedOutput:
         """Get the input qube for the given checkpoint and ensemble members"""
         qubed_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
-        if isinstance(ensemble_members, int):
-            if ensemble_members > 1 and checkpoint.is_ensemble_model:
-                qubed_input = expand(qubed_input, {ENSEMBLE: range(1, ensemble_members + 1)})
-        elif isinstance(ensemble_members, set):
-            if ensemble_members and checkpoint.is_ensemble_model:
-                qubed_input = expand(qubed_input, {ENSEMBLE: sorted(ensemble_members)})
+        if checkpoint.is_ensemble_model is False:
+            return QubedOutput(dataqube=qubed_input)
+
+        if isinstance(ensemble_members, int) and ensemble_members > 1:
+            qubed_input = expand(qubed_input, {ENSEMBLE: [ensemble_members]})
+        elif isinstance(ensemble_members, set) and ensemble_members:
+            qubed_input = expand(qubed_input, {ENSEMBLE: sorted(ensemble_members)})
         return QubedOutput(dataqube=qubed_input)
 
     def get_output_qube(self, checkpoint: CheckpointArtifact, lead_time: int, ensemble_members: int | set = 0) -> QubedOutput:
         """Get the output qube for the given checkpoint, lead time, and ensemble members"""
         qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time))
-        if isinstance(ensemble_members, int):
-            if ensemble_members > 1 and checkpoint.is_ensemble_model:
-                qubed_output = expand(qubed_output, {ENSEMBLE: range(1, ensemble_members + 1)})
-        elif isinstance(ensemble_members, set):
-            if ensemble_members and checkpoint.is_ensemble_model:
-                qubed_output = expand(qubed_output, {ENSEMBLE: sorted(ensemble_members)})
+        if checkpoint.is_ensemble_model is False:
+            return QubedOutput(dataqube=qubed_output)
+
+        if isinstance(ensemble_members, int) and ensemble_members > 1:
+            qubed_output = expand(qubed_output, {ENSEMBLE: [ensemble_members]})
+        elif isinstance(ensemble_members, set) and ensemble_members:
+            qubed_output = expand(qubed_output, {ENSEMBLE: sorted(ensemble_members)})
         return QubedOutput(dataqube=qubed_output)
 
 
