@@ -277,3 +277,13 @@ def select(
     {'param': {'2t'}, 'time': {0, 1, 2}}
     """
     return QubedOutput(dataqube=qube.dataqube.select(selection))
+
+
+@support_qubed_output
+def datacubes(qube: Qube) -> Iterable[dict[str, Any | list[Any]]]:
+    return qube.datacubes()
+
+
+def from_datacubes(datacubes: Iterable[dict[str, Any | list[Any]]]) -> Qube:
+    """Return Qube from an iterable of datacubes"""
+    return functools.reduce(lambda q, dc: q | Qube.from_datacube(dc), datacubes, Qube.empty())

@@ -16,14 +16,13 @@ from fiab_core.tools.plugins import QubedPluginBuilder
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.blocks import (
-    EnsembleStatistics,
     GribSink,
     MapPlotSink,
     OperationalForecastSource,
     Select,
-    TemporalStatistics,
     ZarrSink,
 )
+from fiab_plugin_ecmwf.products.blocks import CustomThresholdProbability, EnsembleStatistics, PredefinedThresholdProbability, ThermalIndices
 from fiab_plugin_ecmwf.templates.aifs_forecast import template as _aifs_forecast_template
 from fiab_plugin_ecmwf.templates.ifs_ensemble_statistics import template as _ensemble_statistics_template
 from fiab_plugin_ecmwf.templates.prototype import template as _snapshot_template
@@ -31,7 +30,9 @@ from fiab_plugin_ecmwf.templates.prototype import template as _snapshot_template
 blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("operationalForecastSource"): OperationalForecastSource(),
     BlockFactoryId("ensembleStatistics"): EnsembleStatistics(),
-    BlockFactoryId("temporalStatistics"): TemporalStatistics(),
+    BlockFactoryId("predefinedThresholdProbability"): PredefinedThresholdProbability(),
+    BlockFactoryId("customThresholdProbability"): CustomThresholdProbability(),
+    BlockFactoryId("thermalIndices"): ThermalIndices(),
     BlockFactoryId("select"): Select(),
     BlockFactoryId("zarrSink"): ZarrSink(),
     BlockFactoryId("gribSink"): GribSink(),
