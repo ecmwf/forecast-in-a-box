@@ -282,6 +282,8 @@ def delete_model(composite_id: CompositeArtifactId) -> Either[str, str]:  # ty: 
 
     # TODO race condition possibility 1/ pop in one thread 2/ another request triggers a download
     # 3/ unlink happens while download is ongoing -> fix by making the delete two-step
+    # TODO delete is now blocking operation, possibly taking some time -- we may want to switch
+    # to a submit-based one. Do not forget to emit a notification after completion/failure then
     handle = _ssh_handle_if_needed()
     try:
         delete_artifact(composite_id, config.backend.data_path, handle=handle)
