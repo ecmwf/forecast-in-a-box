@@ -18,6 +18,7 @@ from fiab_core.types.definitions import (
     ClosedEnumType,
     DatetimeType,
     DateType,
+    DivisibleByType,
     FableType,
     FloatType,
     GeoDomainSingleType,
@@ -100,6 +101,21 @@ class TestFloatType:
             t.validate_convert(42.5)
         with pytest.raises(NotStringInput):
             t.validate_convert(None)
+
+
+class TestDivisibleByType:
+    """Tests for DivisibleByType"""
+
+    def test_convert_valid_strings(self) -> None:
+        t = DivisibleByType(7)
+        assert t.validate_convert("42") == 42
+        assert t.validate_convert("-42") == -42
+        assert t.validate_convert("0") == 0
+
+    def test_convert_invalid_string_raises_value_error(self) -> None:
+        t = DivisibleByType(7)
+        with pytest.raises(WrongType):
+            t.validate_convert("43")
 
 
 class TestDateType:
