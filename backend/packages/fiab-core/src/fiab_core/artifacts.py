@@ -87,6 +87,9 @@ class AnemoiCheckpointConfiguration(FiabCoreBaseModel):
     region_of_interest: str | None = Field(
         default=None, description="Region to extract from cutout for output, only valid for nested models, and must be in input_options"
     )
+    is_ensemble_model: bool | None = Field(
+        default=None, description="Whether this model can be run as an ensemble, which has implications for how the model is invoked"
+    )
 
 
 class AnemoiCheckpoint(FiabCoreBaseModel):
