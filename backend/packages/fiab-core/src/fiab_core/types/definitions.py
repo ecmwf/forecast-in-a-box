@@ -85,6 +85,25 @@ class FloatType(FableType):
         return "float"
 
 
+class DivisibleByType(FableType):
+    """The divisible-by type. Converts string to int and checks divisibility by a given divisor."""
+
+    def __init__(self, divisor: int) -> None:
+        self.divisor = divisor
+
+    def validate_convert(self, value: Any) -> int:
+        try:
+            int_value = int(value)
+        except ValueError:
+            raise WrongType(f"Cannot convert {value!r} to int")
+        if int_value % self.divisor != 0:
+            raise WrongType(f"{int_value} is not divisible by {self.divisor}")
+        return int_value
+
+    def serialize(self) -> str:
+        return f"divisibleBy[{self.divisor}]"
+
+
 class DateType(FableType):
     """The date type. Converts ISO 8601 date string (YYYY-MM-DD) to datetime.date."""
 
