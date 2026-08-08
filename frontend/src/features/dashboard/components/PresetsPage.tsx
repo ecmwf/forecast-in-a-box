@@ -171,7 +171,7 @@ const PresetRow = memo(function ({
               type="button"
               onClick={() => onToggleFavourite(preset.blueprintId)}
               className={cn(
-                'transition-colors hover:text-yellow-500',
+                'hit-target-y transition-colors hover:text-yellow-500',
                 preset.isFavourite && 'text-yellow-500',
               )}
               aria-label={t('dashboard:presets.bookmark')}

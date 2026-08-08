@@ -48,6 +48,7 @@ const navItems = [
 
 const itemClass = cn(
   'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors',
+  'hit-target-y',
   'hover:bg-background/50',
   'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
 )

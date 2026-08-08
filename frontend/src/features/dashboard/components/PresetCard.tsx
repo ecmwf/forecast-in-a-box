@@ -63,7 +63,7 @@ export function PresetCard({
           onClick={onToggleFavourite}
           aria-label={t('item.bookmark')}
           className={cn(
-            'shrink-0 text-muted-foreground transition-colors hover:text-yellow-500',
+            'hit-target-y shrink-0 text-muted-foreground transition-colors hover:text-yellow-500',
             preset.isFavourite && 'text-yellow-500',
           )}
         >

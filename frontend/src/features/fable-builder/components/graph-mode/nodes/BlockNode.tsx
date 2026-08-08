@@ -140,8 +140,7 @@ export const BlockNode = memo(function ({
           'shadow-[0_0_0_2px_rgba(220,38,38,1),0_15px_35px_-5px_rgba(220,38,38,0.15)]',
       )}
     >
-      {/* Overlay-clipped: a 6px bar cannot render the card's 16px corner
-          radius itself (CSS clamps radii to the element height). */}
+      {/* Overlay clips the bar to the card radius — a 6px bar can't render it itself. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"

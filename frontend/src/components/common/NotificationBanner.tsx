@@ -83,7 +83,7 @@ export function NotificationBanner({
       {onDismiss && (
         <button
           onClick={onDismiss}
-          className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1.5 transition-opacity hover:bg-black/5 hover:opacity-70 sm:right-4 dark:hover:bg-white/10"
+          className="hit-target absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1.5 transition-opacity hover:bg-black/5 hover:opacity-70 sm:right-4 dark:hover:bg-white/10"
           aria-label={t('notificationBanner.dismiss')}
         >
           <X className="h-4 w-4" />

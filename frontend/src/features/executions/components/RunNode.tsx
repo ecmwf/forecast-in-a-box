@@ -107,8 +107,7 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
         />
       )}
 
-      {/* Overlay-clipped: the 4px bar cannot render the card's corner radius
-          itself (CSS clamps radii to the element height). */}
+      {/* Overlay clips the bar to the card radius — a 4px bar can't render it itself. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"

@@ -24,12 +24,10 @@
   --destructive-foreground: oklch(0.9851 0 0);
   --border: oklch(0.9197 0.004 286.3202);
   --input: oklch(0.9197 0.004 286.3202);
-  /* Seam for a future ≥3:1 field-border; currently pinned to --input
-     (team decision 2026-08: no AA mandate, aesthetics take priority). */
+  /* Field-border seam, pinned to --input while no contrast mandate applies. */
   --input-border: oklch(0.9197 0.004 286.3202);
   --ring: var(--primary);
-  /* Status/slot roles pinned to the app's established colours; --danger is
-     the text-red (matches --destructive in light, readable red-400 in dark). */
+  /* Status/slot roles at the app's established colours; --danger is the text red, --destructive the fill. */
   --success: oklch(0.6031 0.1344 160.9226);
   --warning: oklch(0.5548 0.1271 62.5245);
   --info: oklch(0.4878 0.2432 264.4045);
@@ -83,8 +81,7 @@
   --card-foreground: oklch(0.9851 0 0);
   --popover: oklch(0.1408 0.0044 285.8229);
   --popover-foreground: oklch(0.9851 0 0);
-  /* #4da6dd — ECMWF blue lightened for dark (7.4:1 on bg); foreground flips
-     dark so solid primary fills keep ≥4.5:1 */
+  /* ECMWF blue lightened for dark; foreground flips dark to keep solid fills readable. */
   --primary: oklch(0.6939 0.1173 238.8118);
   --primary-foreground: oklch(0.1408 0.0044 285.8229);
   --secondary: oklch(0.2739 0.0055 286.0326);
@@ -93,7 +90,7 @@
   --muted-foreground: oklch(0.7057 0.0144 286.0246);
   --accent: oklch(0.2739 0.0055 286.0326);
   --accent-foreground: oklch(0.9851 0 0);
-  /* #c10007 fill + light text — the previous pair was red-on-dark-red (2.6:1) */
+  /* Light text on red — not shadcn's red-on-dark-red pair. */
   --destructive: oklch(0.5095 0.2086 28.513);
   --destructive-foreground: oklch(0.9851 0 0);
   --border: oklch(0.2739 0.0055 286.0326);
@@ -206,6 +203,32 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+}
+
+/* ≥44px pointer target, visually unchanged; -y extends only vertically for controls in a row. */
+@utility hit-target {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+@utility hit-target-y {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: max(100%, 44px);
+    transform: translateY(-50%);
+  }
 }
 
 @layer base {
