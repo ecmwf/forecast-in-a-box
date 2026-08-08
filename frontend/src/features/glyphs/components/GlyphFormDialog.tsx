@@ -199,9 +199,9 @@ export function GlyphFormDialog({
               }
             />
             {keyFormatInvalid ? (
-              <P className="text-sm text-destructive">{t('form.keyInvalid')}</P>
+              <P className="text-sm text-danger">{t('form.keyInvalid')}</P>
             ) : reservedMessage ? (
-              <P className="text-sm text-destructive">{reservedMessage}</P>
+              <P className="text-sm text-danger">{reservedMessage}</P>
             ) : (
               <P className="text-sm text-muted-foreground">
                 {t('form.keyHelp')}

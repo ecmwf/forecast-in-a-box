@@ -139,7 +139,7 @@ export function ArtifactDetailPage({
             <Button
               variant="outline"
               size="sm"
-              className="text-destructive hover:text-destructive"
+              className="text-danger hover:text-danger"
               onClick={() => onDelete(detail.composite_id)}
               disabled={isDeleting}
             >
@@ -159,7 +159,7 @@ export function ArtifactDetailPage({
               <Button
                 variant="outline"
                 size="sm"
-                className="text-destructive hover:text-destructive"
+                className="text-danger hover:text-danger"
                 onClick={() => onCancelDownload?.(detail.composite_id)}
               >
                 <X className="mr-1 h-4 w-4" />

@@ -705,7 +705,7 @@ export function GeoViewer({
   if (sourceA.error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 rounded-md border border-border bg-card p-6 text-center text-sm">
-        <P className="max-w-md text-destructive">{sourceA.error}</P>
+        <P className="max-w-md text-danger">{sourceA.error}</P>
         {!isLoopbackUrl(a.baseUrl) && (
           <P className="text-xs text-muted-foreground">{t('panel.corsHint')}</P>
         )}

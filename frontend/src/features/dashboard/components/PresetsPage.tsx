@@ -197,7 +197,7 @@ const PresetRow = memo(function ({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
+                  className="text-danger focus:text-danger"
                   onClick={() => onDelete(preset.blueprintId, preset.version)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />

@@ -92,8 +92,8 @@ function PanelBody({ state }: { state: ComparisonSourceState }) {
           : (state.error ?? t('lens.failed'))
       return (
         <Centered>
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          <span className="max-w-sm text-destructive">{message}</span>
+          <AlertTriangle className="h-4 w-4 text-danger" />
+          <span className="max-w-sm text-danger">{message}</span>
           <Button
             variant="outline"
             size="sm"

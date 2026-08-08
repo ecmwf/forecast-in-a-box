@@ -20,8 +20,8 @@ import type { SourceSlot } from './layer-pairing'
 import { cn } from '@/lib/utils'
 
 const SLOT_DOT_CLASS: Record<SourceSlot, string> = {
-  a: 'bg-blue-600 dark:bg-blue-500',
-  b: 'bg-orange-600 dark:bg-orange-500',
+  a: 'bg-slot-a',
+  b: 'bg-slot-b',
 }
 
 export function CompareSlotTag({

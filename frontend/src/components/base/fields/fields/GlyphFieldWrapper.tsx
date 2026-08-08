@@ -178,9 +178,7 @@ export function GlyphFieldWrapper({
           plain
         )}
         {errorMessage && (
-          <p className="mt-1 truncate text-xs text-destructive">
-            {errorMessage}
-          </p>
+          <p className="mt-1 truncate text-xs text-danger">{errorMessage}</p>
         )}
         {missingGlyphNames?.map((name) => (
           <DefineVariableButton key={name} name={name} />
@@ -290,7 +288,7 @@ export function GlyphFieldWrapper({
       </InputGroup>
 
       {errorMessage && (
-        <p className="mt-1 truncate text-xs text-destructive">{errorMessage}</p>
+        <p className="mt-1 truncate text-xs text-danger">{errorMessage}</p>
       )}
 
       {missingGlyphNames?.map((name) => (

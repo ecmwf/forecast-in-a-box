@@ -248,7 +248,7 @@ function RunAction({ run }: { run: ForecastRunViewModel }) {
     run.status === 'completed'
       ? {
           label: t('item.viewResults'),
-          className: 'text-emerald-600 dark:text-emerald-400',
+          className: 'text-success',
         }
       : run.status === 'failed'
         ? {

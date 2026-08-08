@@ -107,8 +107,15 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
         />
       )}
 
-      <div className={cn('h-1 rounded-t-lg', kindMeta.topBarColor)} />
-      <div className="space-y-1 p-2.5">
+      {/* Overlay-clipped: the 4px bar cannot render the card's corner radius
+          itself (CSS clamps radii to the element height). */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+      >
+        <div className={cn('h-1', kindMeta.topBarColor)} />
+      </div>
+      <div className="space-y-1 px-2.5 pt-3.5 pb-2.5">
         <div className="flex items-center gap-1.5">
           <Icon className={cn('h-3.5 w-3.5 shrink-0', kindMeta.color)} />
           <span className="truncate text-sm font-medium">{nodeData.label}</span>

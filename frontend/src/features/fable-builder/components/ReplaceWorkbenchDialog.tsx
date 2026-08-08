@@ -141,7 +141,7 @@ export function ReplaceWorkbenchDialog({
               </span>
             ) : null}
             {unsaved ? (
-              <span className="mt-auto flex items-center gap-1 pt-1 text-sm text-destructive">
+              <span className="mt-auto flex items-center gap-1 pt-1 text-sm text-danger">
                 <AlertTriangle className="h-3.5 w-3.5" />
                 {t('replaceDialog.discardHint')}
               </span>

@@ -26,8 +26,8 @@ import { cn } from '@/lib/utils'
 import { formatInZone, useAppTimeZone } from '@/lib/datetime'
 
 export const SLOT_BADGE_CLASS = {
-  A: 'bg-blue-600 text-white dark:bg-blue-500',
-  B: 'bg-orange-600 text-white dark:bg-orange-500',
+  A: 'bg-slot-a text-white',
+  B: 'bg-slot-b text-white',
 } as const
 
 const SLOT_RING_CLASS = {

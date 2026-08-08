@@ -121,7 +121,7 @@ export function EnumListField({
         </ComboboxContent>
       </Combobox>
       {errorMessage && (
-        <p className="mt-1 truncate text-xs text-destructive">{errorMessage}</p>
+        <p className="mt-1 truncate text-xs text-danger">{errorMessage}</p>
       )}
     </div>
   )

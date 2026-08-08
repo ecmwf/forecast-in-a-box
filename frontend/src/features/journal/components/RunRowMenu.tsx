@@ -144,7 +144,7 @@ export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => setDeleteOpen(true)}
-            className="text-destructive focus:text-destructive"
+            className="text-danger focus:text-danger"
           >
             <Trash2 className="h-4 w-4" />
             {t('item.delete')}

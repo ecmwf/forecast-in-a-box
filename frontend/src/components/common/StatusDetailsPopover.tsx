@@ -66,7 +66,7 @@ const statusColors: Record<ComponentStatus, string> = {
 }
 
 const statusTextColors: Record<ComponentStatus, string> = {
-  up: 'text-emerald-600 dark:text-emerald-400',
+  up: 'text-success',
   down: 'text-red-600 dark:text-red-400',
   off: 'text-muted-foreground',
 }

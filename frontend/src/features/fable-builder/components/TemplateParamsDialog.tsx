@@ -506,7 +506,7 @@ export function TemplateParamsDialog({
         </GlyphContext.Provider>
 
         {applyError && (
-          <p className="text-xs text-destructive" role="alert">
+          <p className="text-xs text-danger" role="alert">
             {applyError}
           </p>
         )}

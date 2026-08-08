@@ -886,7 +886,7 @@ export function LoadErrorBadge({
           : 'absolute top-10 right-2 z-10'
       }
     >
-      <div className="max-w-64 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
+      <div className="max-w-64 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-danger">
         {t('timeline.loadErrorLayers', {
           slot,
           layers: more > 0 ? `${shown} +${more}` : shown,

@@ -19,7 +19,7 @@ interface ErrorPanelProps {
 export function ErrorPanel({ message }: ErrorPanelProps) {
   return (
     <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
-      <P className="text-destructive">{message}</P>
+      <P className="text-danger">{message}</P>
     </div>
   )
 }

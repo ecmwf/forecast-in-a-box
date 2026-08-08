@@ -71,7 +71,7 @@ export function ConfigSummaryCard({
       <div className="mb-2 flex items-center justify-between">
         <span className="font-medium">{factory.title}</span>
         {hasErrors && (
-          <span className="inline-flex items-center gap-1 rounded border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">
+          <span className="inline-flex items-center gap-1 rounded border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-sm font-medium text-danger">
             <AlertCircle className="h-3 w-3" />
             {errors.length}
           </span>
@@ -79,7 +79,7 @@ export function ConfigSummaryCard({
       </div>
 
       {hasErrors && (
-        <div className="mb-2 rounded bg-destructive/10 p-2 text-sm text-destructive">
+        <div className="mb-2 rounded bg-destructive/10 p-2 text-sm text-danger">
           <ul className="list-disc space-y-0.5 pl-4">
             {errors.map((error, index) => (
               <li key={`${error}-${index}`}>{error}</li>

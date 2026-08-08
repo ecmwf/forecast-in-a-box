@@ -24,7 +24,18 @@
   --destructive-foreground: oklch(0.9851 0 0);
   --border: oklch(0.9197 0.004 286.3202);
   --input: oklch(0.9197 0.004 286.3202);
-  --ring: oklch(0.8711 0.0055 286.286);
+  /* Seam for a future ≥3:1 field-border; currently pinned to --input
+     (team decision 2026-08: no AA mandate, aesthetics take priority). */
+  --input-border: oklch(0.9197 0.004 286.3202);
+  --ring: var(--primary);
+  /* Status/slot roles pinned to the app's established colours; --danger is
+     the text-red (matches --destructive in light, readable red-400 in dark). */
+  --success: oklch(0.6031 0.1344 160.9226);
+  --warning: oklch(0.5548 0.1271 62.5245);
+  --info: oklch(0.4878 0.2432 264.4045);
+  --danger: oklch(0.583 0.2387 28.4765);
+  --slot-a: oklch(0.5465 0.2455 262.8657);
+  --slot-b: oklch(0.6481 0.2166 37.071);
   --chart-1: oklch(0.6471 0.2173 36.8511);
   --chart-2: oklch(0.6049 0.107 184.1653);
   --chart-3: oklch(0.3972 0.0698 227.1914);
@@ -72,19 +83,30 @@
   --card-foreground: oklch(0.9851 0 0);
   --popover: oklch(0.1408 0.0044 285.8229);
   --popover-foreground: oklch(0.9851 0 0);
-  --primary: oklch(0.5095 0.1273 244.6584);
-  --primary-foreground: oklch(0.9851 0 0);
+  /* #4da6dd — ECMWF blue lightened for dark (7.4:1 on bg); foreground flips
+     dark so solid primary fills keep ≥4.5:1 */
+  --primary: oklch(0.6939 0.1173 238.8118);
+  --primary-foreground: oklch(0.1408 0.0044 285.8229);
   --secondary: oklch(0.2739 0.0055 286.0326);
   --secondary-foreground: oklch(0.9851 0 0);
   --muted: oklch(0.2739 0.0055 286.0326);
   --muted-foreground: oklch(0.7057 0.0144 286.0246);
   --accent: oklch(0.2739 0.0055 286.0326);
   --accent-foreground: oklch(0.9851 0 0);
-  --destructive: oklch(0.3967 0.1408 25.7138);
-  --destructive-foreground: oklch(0.6378 0.2373 25.4359);
+  /* #c10007 fill + light text — the previous pair was red-on-dark-red (2.6:1) */
+  --destructive: oklch(0.5095 0.2086 28.513);
+  --destructive-foreground: oklch(0.9851 0 0);
   --border: oklch(0.2739 0.0055 286.0326);
   --input: oklch(0.2739 0.0055 286.0326);
-  --ring: oklch(0.4422 0.0162 285.7167);
+  --input-border: oklch(0.2739 0.0055 286.0326);
+  /* #5cb3e8 — 8.6:1 on the dark background */
+  --ring: oklch(0.7341 0.1139 237.8051);
+  --success: oklch(0.7688 0.1687 161.9487);
+  --warning: oklch(0.829 0.1712 81.0381);
+  --info: oklch(0.7341 0.1139 237.8051);
+  --danger: oklch(0.7022 0.1892 22.2279);
+  --slot-a: oklch(0.6187 0.2067 259.2316);
+  --slot-b: oklch(0.6996 0.202 44.4414);
   --chart-1: oklch(0.4878 0.2432 264.4045);
   --chart-2: oklch(0.7019 0.1577 160.4375);
   --chart-3: oklch(0.7724 0.1728 65.367);
@@ -142,7 +164,14 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-input-border: var(--input-border);
   --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-danger: var(--danger);
+  --color-slot-a: var(--slot-a);
+  --color-slot-b: var(--slot-b);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);

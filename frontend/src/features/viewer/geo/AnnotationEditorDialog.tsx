@@ -187,7 +187,7 @@ export function AnnotationEditorDialog({
           {draft?.id !== null && (
             <Button
               variant="outline"
-              className="mr-auto text-destructive"
+              className="mr-auto text-danger"
               onClick={onDelete}
             >
               {t('annotations.delete')}

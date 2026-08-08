@@ -495,12 +495,12 @@ function SlotBStatusChip({ state }: { state: ComparisonSourceState }) {
   if (state.phase === 'running' || state.phase === 'idle') return null
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <span className="flex h-4 w-4 items-center justify-center rounded bg-orange-600 font-mono text-[10px] font-bold text-white dark:bg-orange-500">
+      <span className="flex h-4 w-4 items-center justify-center rounded bg-slot-b font-mono text-[10px] font-bold text-white">
         B
       </span>
       {state.phase === 'failed' || state.phase === 'dirError' ? (
         <>
-          <span className="max-w-64 truncate text-destructive">
+          <span className="max-w-64 truncate text-danger">
             {('error' in state && state.error) || t('lens.failed')}
           </span>
           <Button

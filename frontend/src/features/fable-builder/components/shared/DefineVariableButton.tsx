@@ -93,7 +93,7 @@ export function DefineVariableButton({ name }: { name: string }) {
       <div className="mt-1 flex items-center gap-1.5">
         <CornerDownRight
           aria-hidden
-          className="h-3.5 w-3.5 shrink-0 text-destructive/70"
+          className="h-3.5 w-3.5 shrink-0 text-danger/70"
         />
         <Button
           type="button"
@@ -153,7 +153,7 @@ export function DefineVariableButton({ name }: { name: string }) {
               />
             </div>
             {error && (
-              <p className="text-xs text-destructive" role="alert">
+              <p className="text-xs text-danger" role="alert">
                 {error}
               </p>
             )}

@@ -331,7 +331,7 @@ export function AuthenticatedHeader() {
               <DropdownMenuGroup>
                 <DropdownMenuItem
                   onClick={handleSignOut}
-                  className="text-destructive focus:text-destructive"
+                  className="text-danger focus:text-danger"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   {t('userMenu.signOut')}
