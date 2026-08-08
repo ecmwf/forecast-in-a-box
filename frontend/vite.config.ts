@@ -14,8 +14,10 @@ import tailwindcss from '@tailwindcss/vite'
 import { visualizer } from 'rollup-plugin-visualizer'
 
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
-// Dependency-free data module — safe to share with the app bundle.
-import { CURATED_WMS_SERVERS } from './src/features/visualise/curated-wms'
+// Dependency-free data module — safe to share with the app bundle. Must stay
+// a relative path: the config loader runs before tsconfig aliases exist.
+// noinspection ES6PreferShortImport
+import { CURATED_WMS_SERVERS } from './src/features/visualise/curated-wms.ts'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
