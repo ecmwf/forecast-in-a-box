@@ -204,7 +204,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
             # NOTE consider running all pip invocations at once -- worse error reporting but better perf
             if pluginSettings.update_strategy == "auto":
                 logger.info(f"auto-updating {pluginSettings.module_name}")
-                result = install_plugin_compatibly(pluginSettings.pip_source, None)
+                result = install_plugin_compatibly(pluginSettings.pip_source, None, pluginSettings.module_name)
                 if result.e:
                     install_error = result.e
                 else:
@@ -212,7 +212,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
             else:
                 if try_import(pluginSettings.module_name) is None:
                     logger.info(f"installing {pluginSettings.module_name} for the first time")
-                    result = install_plugin_compatibly(pluginSettings.pip_source, None)
+                    result = install_plugin_compatibly(pluginSettings.pip_source, None, pluginSettings.module_name)
                     if result.e:
                         install_error = result.e
                     else:
@@ -297,7 +297,7 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             return
         installed_versions: dict[str, str] = {}
         if install:
-            install_result = install_plugin_compatibly(pluginSettings.pip_source, version)
+            install_result = install_plugin_compatibly(pluginSettings.pip_source, version, pluginSettings.module_name)
             if install_result.e:
                 upsert_plugin_state(
                     plugin_id=plugin_id_str,
@@ -306,7 +306,11 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
                 )
                 raise RuntimeError(f"install failed for {pluginId}: {install_result.e}")
             installed_versions = install_result.t or {}
-        # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases
+        # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases:
+        # reloading the top-level module does not reload already-imported submodules/dependencies,
+        # replace previously-imported symbols, update existing instances, or reinitialize extension
+        # modules/registries. See domain.plugin.compatibility's module docstring for the full caveat.
+        importlib.invalidate_caches()
         importlib.reload(importlib.import_module(pluginSettings.module_name))
         result = load_single(pluginSettings)
         logger.debug(f"plugin {pluginId} loaded with success: {result.t is not None}")
