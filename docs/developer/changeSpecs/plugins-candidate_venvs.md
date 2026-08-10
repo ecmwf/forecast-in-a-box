@@ -4,7 +4,7 @@
 
 Replace mutation of the running backend's Python environment with validated environment generations and a near-zero-downtime backend handover.
 
-This document is an architectural direction rather than an implementation-ready plan. It assumes the immediate environment-freezing hardening described in `plugins-immediate_hardening.md` has already been implemented, but the repository may otherwise have changed substantially by the time this work starts. Reconfirm all process, gateway, status, persistence, and plugin-manager assumptions before designing the final solution.
+This document is an architectural direction rather than an implementation-ready plan. It was written at the time when plugin installs was made more robust by introducing a constraints file capturing the current state of venv, but the repository may otherwise have changed substantially by the time this work starts. Reconfirm all process, gateway, status, persistence, and plugin-manager assumptions before designing the final solution.
 
 The central rule is:
 

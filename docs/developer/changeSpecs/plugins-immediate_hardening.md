@@ -159,14 +159,9 @@ An empty constraints file is valid when the environment contains no ordinary pro
 
 Run `uv pip check --python <interpreter>` before attempting installation, or otherwise record the equivalent baseline. A broken starting environment must not be confused with damage caused by the requested plugin.
 
-Decide and document one policy:
+Refuse plugin installation when the existing environment is inconsistent
 
-- preferred production policy: refuse plugin installation when the existing environment is inconsistent;
-- transitional policy: record existing issues and require the post-install check not to introduce additional issues.
-
-The second policy requires structured comparison and must not rely on comparing incidental human-readable ordering. If this is not practical, fail closed and require a clean baseline.
-
-The current development workspace may contain editable or deliberately mismatched packages, so tests must mock this command and integration tests must build controlled environments rather than assuming the repository development environment is clean.
+The active development workspace may contain editable or deliberately mismatched packages, so tests must mock this command.
 
 ### Dry-run check
 
@@ -271,16 +266,7 @@ Update `backend/tests/unit/domain/plugins/test_compatibility.py` to cover orches
 
 ### Integration tests
 
-Create controlled temporary virtual environments and build tiny local wheels for at least these scenarios:
-
-1. A plugin with a new dependency installs successfully without changing existing packages.
-2. A plugin requiring a different version of an existing package fails during dry-run and leaves that package unchanged.
-3. Updating the selected plugin is allowed while another installed plugin remains pinned.
-4. An editable/local protected package is preserved and is not replaced from an index.
-5. An editable/local selected plugin can be updated.
-6. A successful real installation passes `uv pip check` and can be imported after cache invalidation.
-
-Do not make integration tests depend on mutable public PyPI state. Use local wheels and `--find-links` or the repository's existing package-test infrastructure.
+There isn't much plugins coverage in integration tests, hence your work should not make any changes there.
 
 ## Acceptance criteria
 
@@ -294,5 +280,6 @@ The task is complete when:
 - package consistency is checked after installation before plugin reload;
 - current plugin manager result reporting remains functional;
 - the `compatibility.py` module docstring clearly records all limitations above;
-- unit and controlled-environment integration tests cover conflict rejection and source preservation;
+- unit tests cover conflict rejection and source preservation;
+- integration tests pass without change;
 - `uv run prek` and the relevant backend validation commands pass.
