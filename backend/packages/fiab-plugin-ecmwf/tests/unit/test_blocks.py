@@ -262,19 +262,23 @@ class TestOperationalForecastSource:
     def test_creation(self, dummy_blockinstance_output: QubedOutput, forecast: str) -> None:
         block = OperationalForecastSource()
 
+        assert not block.intersect(other=dummy_blockinstance_output)  # type: ignore[arg-type]
         block_instance = BlockInstance.from_block(
             BlockFactoryId("operationalForecastSource"),
-            _block_instance(
-                "operationalForecastSource",
-                {
-                    "source": "ecmwf-open-data",
-                    "base_time": datetime(2024, 1, 1),
-                    "forecast": forecast,
-                },
+            BlockInstanceBase(
+                input_ids={},
+                configuration_values=_config(
+                    dict(
+                        {
+                            "source": "ecmwf-open-data",
+                            "base_time": datetime(2024, 1, 1),
+                            "forecast": forecast,
+                        },
+                    )
+                ),
             ),
             OperationalForecastSource.configuration_options,
         )
-        assert not block.intersect(other=dummy_blockinstance_output)  # type: ignore[arg-type]
         output = block.validate(block=block_instance, inputs={}, restrictions={})  # type: ignore[assignment]
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
