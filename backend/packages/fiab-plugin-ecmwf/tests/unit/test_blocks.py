@@ -48,6 +48,7 @@ from fiab_plugin_ecmwf.blocks import (
     TemporalStatistics,
     ZarrSink,
 )
+from fiab_plugin_ecmwf.datasets import ForecastDataset
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
 
 
@@ -234,37 +235,33 @@ def map_plot_sink_configuration() -> BlockInstance:
     )
 
 
+class MockedForecastDataset(ForecastDataset):
+    def as_qube(self, ens_dim: str = "number", include_member_zero: bool = False) -> Qube:
+        full_qube = super().as_qube(ens_dim, include_member_zero=include_member_zero)
+        return full_qube.select(
+            {
+                PARAM: ["2t", "msl", "tp", "mwp", "swh", "u", "v"],
+                STEP: ["0", "6", "12"],
+                ENSEMBLE: ["0", "1", "2", "3", "4"],
+            }
+        )
+
+
+@pytest.fixture
+def mock_forecast_preset(monkeypatch: pytest.MonkeyPatch) -> None:
+    mocked_datasets = {
+        name: MockedForecastDataset(FORECAST_DATASETS[name].datacubes, FORECAST_DATASETS[name].member_zero)
+        for name in FORECAST_DATASETS.keys()
+    }
+    for name, dataset in mocked_datasets.items():
+        monkeypatch.setitem(FORECAST_DATASETS, name, dataset)
+
+
 class TestOperationalForecastSource:
     @pytest.mark.parametrize("forecast", FORECAST_DATASETS.keys())
     def test_creation(self, dummy_blockinstance_output: QubedOutput, forecast: str) -> None:
         block = OperationalForecastSource()
 
-        assert not block.intersect(other=dummy_blockinstance_output)  # type: ignore[arg-type]
-        block_instance = BlockInstance.from_block(
-            BlockFactoryId("operationalForecastSource"),
-            BlockInstanceBase(
-                input_ids={},
-                configuration_values=_config(
-                    dict(
-                        {
-                            "source": "ecmwf-open-data",
-                            "base_time": datetime(2024, 1, 1),
-                            "forecast": forecast,
-                        },
-                    )
-                ),
-            ),
-            OperationalForecastSource.configuration_options,
-        )
-        output = block.validate(block=block_instance, inputs={}, restrictions={})  # type: ignore[assignment]
-        assert isinstance(output, QubedOutput)
-        assert output.dataqube is not None
-        assert contains(output, "param")
-        assert contains(output, "step")
-        assert contains(output, "number")
-
-    def test_compile_builds_action_from_catalogue(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        block = OperationalForecastSource()
         block_instance = BlockInstance.from_block(
             BlockFactoryId("operationalForecastSource"),
             _block_instance(
@@ -272,16 +269,40 @@ class TestOperationalForecastSource:
                 {
                     "source": "ecmwf-open-data",
                     "base_time": datetime(2024, 1, 1),
-                    "forecast": "aifs-ens",
+                    "forecast": forecast,
+                },
+            ),
+            OperationalForecastSource.configuration_options,
+        )
+        assert not block.intersect(other=dummy_blockinstance_output)  # type: ignore[arg-type]
+        output = block.validate(block=block_instance, inputs={}, restrictions={})  # type: ignore[assignment]
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert contains(output, "param")
+        assert contains(output, "step")
+        assert contains(output, "number")
+
+    @pytest.mark.parametrize("forecast", ["aifs-ens", "ifs-ens"])
+    @pytest.mark.parametrize("time", [0, 6])
+    def test_compile_builds_action_from_catalogue(self, mock_forecast_preset: pytest.FixtureRequest, forecast: str, time: int) -> None:
+        block = OperationalForecastSource()
+        block_instance = BlockInstance.from_block(
+            BlockFactoryId("operationalForecastSource"),
+            _block_instance(
+                "operationalForecastSource",
+                {
+                    "source": "ecmwf-open-data",
+                    "base_time": datetime(2024, 1, 1, time),
+                    "forecast": forecast,
                 },
             ),
             OperationalForecastSource.configuration_options,
         )
         action = block.compile({}, block_instance).get_or_raise()
-        action = action.select({PARAM: ["2t", "u"], STEP: [0, 6], ENSEMBLE: [1]}, expand=True)
         for _, array in nodetree_arrays(action.nodes):
-            assert array.sizes[STEP] == 2
-            assert array.sizes[ENSEMBLE] > 0
+            assert set(array.coords[PARAM].data.tolist()).issubset({"2t", "msl", "tp", "mwp", "swh", "u", "v"})
+            assert array.sizes[STEP] == 3
+            assert array.sizes[ENSEMBLE] == 5
         assert "levelist" in nodetree_dimensions(action.nodes)
 
     @pytest.mark.parametrize(

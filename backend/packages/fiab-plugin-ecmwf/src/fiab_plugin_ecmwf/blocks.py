@@ -155,7 +155,7 @@ class OperationalForecastSource(Source):
         fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
 
         basetime = block.config_as_datetime(BASETIME)
-        date = basetime.date().isoformat()
+        date = basetime.strftime("%Y%m%d")
         time = self._convert_time(basetime.time().hour)
 
         subqube = fc_qube.select({"time": time}).compress()
@@ -166,36 +166,47 @@ class OperationalForecastSource(Source):
             ens_branches = set()
             for index, datacube in enumerate(subqube.select({LEVTYPE: levtype}).datacubes()):
                 ens_branch = f"{path}/{datacube[PARAM]}"
+                datacube.update({"date": [date], "time": [time]})
                 datacube_path = f"{ens_branch}/{index}"
-                expansion_datacube = datacube.copy()
-                coords = {PARAM: datacube[PARAM]}
-                if fc_preset.is_member_zero(datacube):
-                    coords[ENSEMBLE] = 0
                 ens_branches.add(ens_branch)
 
-                levtype_actions[datacube_path] = from_source(
+                new_action = from_source(
                     np.asarray(
                         [
-                            Payload(
-                                "fiab_plugin_ecmwf.runtime.source.earthkit_source",
-                                [block.config_as_str(SOURCE)],
-                                {
-                                    "requests": [
-                                        dict(
-                                            {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
-                                            date=date,
-                                            time=time,
-                                            param=p,
-                                        )
-                                    ],
-                                },
-                            )
-                            for p in datacube[PARAM]
+                            [
+                                Payload(
+                                    "fiab_plugin_ecmwf.runtime.source.earthkit_source",
+                                    [block.config_as_str(SOURCE)],
+                                    {
+                                        "requests": [
+                                            dict(
+                                                {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
+                                                param=p,
+                                                step=step,
+                                            )
+                                        ],
+                                    },
+                                )
+                                for p in datacube[PARAM]
+                            ]
+                            for step in datacube[STEP]
                         ]
                     ),
-                    dims=[PARAM],
-                    coords=coords,
-                ).expand_as_qube(Qube.from_datacube(expansion_datacube), dims=[STEP, ENSEMBLE, LEVTYPE, LEVEL])
+                    dims=[STEP, PARAM],
+                    coords={STEP: datacube[STEP], PARAM: datacube[PARAM]},
+                )
+                expand_dims = [dim for dim, values in datacube.items() if (len(values) > 1 and dim not in [STEP, PARAM])]
+                if len(expand_dims) > 0:
+                    new_action = new_action.expand_as_qube(
+                        Qube.from_datacube(datacube),
+                        dims=expand_dims,
+                    )
+                new_action.set_scalar_coords(
+                    {dim: values[0] for dim, values in datacube.items() if (len(values) == 1 and dim not in [STEP, PARAM])}
+                )
+                if fc_preset.is_member_zero(datacube):
+                    new_action.set_scalar_coords({ENSEMBLE: 0}, override=True, make_dim=True)
+                levtype_actions[datacube_path] = new_action
             merged = merge(**levtype_actions)
             for branch in ens_branches:
                 merged = merged.combine_branches(dim=ENSEMBLE, path=branch)
