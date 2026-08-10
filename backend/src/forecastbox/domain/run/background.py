@@ -95,10 +95,10 @@ def execute_background(
         relevant_glyphs_and_values = expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names)
         used_glyphs = {k: all_glyphs_raw[k] for k in relevant_glyphs_and_values.keys() if k not in PINNED_INTRINSIC_KEYS}
 
-        exec_spec, run_outputs, compilation_detail, resolved_configuration_options = compile_builder(builder, relevant_glyphs_and_values)
+        compilation_result = compile_builder(builder, relevant_glyphs_and_values)
 
         persisted_context = compiler_runtime_context.model_copy(
-            update={"glyphs": used_glyphs, "resolution": resolved_configuration_options}
+            update={"glyphs": used_glyphs, "resolution": compilation_result.resolved_configuration_options}
         )
         db.update_run_runtime(
             run_id,
@@ -108,12 +108,12 @@ def execute_background(
         )
 
         logger.debug(f"starting background submission of {run_id=}")
-        response = execute_cascade(exec_spec)
+        response = execute_cascade(compilation_result.execution_spec)
         if response.job_id is not None:
             try:
                 store_compilation_detail(
                     run_id,
-                    compilation_detail,
+                    compilation_result.compilation_detail,
                 )
             except TooLargeEntry as e:
                 logger.warning(f"failed to cache compilation detail for {run_id=}, {attempt_count=}: {repr(e)}")
@@ -122,7 +122,7 @@ def execute_background(
                 attempt_count,
                 cascade_job_id=response.job_id,
                 cascade_proc=get_current_cascade_proc(),
-                outputs=run_outputs.model_dump(),
+                outputs=compilation_result.run_outputs.model_dump(),
             )
         else:
             error = (response.error or "no error provided by cascade")[:255]

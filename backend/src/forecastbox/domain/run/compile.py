@@ -9,6 +9,7 @@
 
 """Compilation of a BlueprintBuilder into an ExecutionSpecification."""
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import cast
 
@@ -73,24 +74,35 @@ def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
     return list(artifacts)
 
 
-def compile_builder(
-    blueprint: BlueprintBuilder, glyph_values: dict[str, str]
-) -> tuple[ExecutionSpecification, RunOutputs, CompilationDetail, dict[BlockInstanceId, dict[ConfigurationOptionId, str]]]:
-    """Compile a BlueprintBuilder into an ExecutionSpecification and RunOutputs.
+@dataclass(frozen=True, slots=True)
+class CompilationResult:
+    """Result of compiling a BlueprintBuilder into an ExecutionSpecification.
+
+    ``execution_spec`` and ``run_outputs`` are the compiled cascade job and its declared
+    external outputs, respectively (``execution_spec.job.job_instance.ext_outputs`` is set to
+    the authoritative list of cascade external outputs -- previously a side effect of
+    ``execute_cascade``).
+
+    ``compilation_detail`` carries task-level lookups produced during compilation.
+
+    ``resolved_configuration_options`` maps each block instance id to the subset of its
+    configuration options that referenced at least one glyph, together with their final
+    (post-resolution) string values. This is used to persist the resolution actually used
+    at execution time, for later inspection/reproducibility.
+    """
+
+    execution_spec: ExecutionSpecification
+    run_outputs: RunOutputs
+    compilation_detail: CompilationDetail
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
+
+
+def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -> CompilationResult:
+    """Compile a BlueprintBuilder into a CompilationResult.
 
     Raises ``ValueError`` if any block cannot be validated/compiled. When ``glyph_values`` is
     non-empty, ${glyph} patterns in configuration values are resolved before compilation.
-
-    Sets ``job_instance.ext_outputs`` to the authoritative list of cascade external
-    outputs (previously a side effect of ``execute_cascade``).
-
-    The fourth element of the returned tuple maps each block instance id to the subset of
-    its configuration options that referenced at least one glyph, together with their final
-    (post-resolution) string values. This is used to persist the resolution actually used at
-    execution time, for later inspection/reproducibility.
     """
-    # TODO this is a bulky method, returning a tuple of things -- worth simplifying,
-    # like a single dto or perhaps derive the RunOutputs from CompilationDetail
     graph = Graph([])
     plugins = PluginManager.plugins
     action_lookup = {}
@@ -191,9 +203,9 @@ def compile_builder(
     else:
         environment = EnvironmentSpecification(runtime_artifacts=graph_artifacts)
     compilation_detail = CompilationDetail(task_detail=task_detail)
-    return (
-        ExecutionSpecification(job=job, environment=environment),
-        RunOutputs(outputs=run_outputs),
-        compilation_detail,
-        resolved_configuration_options,
+    return CompilationResult(
+        execution_spec=ExecutionSpecification(job=job, environment=environment),
+        run_outputs=RunOutputs(outputs=run_outputs),
+        compilation_detail=compilation_detail,
+        resolved_configuration_options=resolved_configuration_options,
     )
