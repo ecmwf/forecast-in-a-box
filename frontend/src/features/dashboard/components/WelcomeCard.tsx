@@ -268,7 +268,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
                       className={cn(
                         'flex items-center text-sm font-medium',
                         trend >= 0
-                          ? 'text-emerald-600 dark:text-emerald-400'
+                          ? 'text-success'
                           : 'text-red-600 dark:text-red-400',
                       )}
                     >

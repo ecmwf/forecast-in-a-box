@@ -650,7 +650,7 @@ function LocalGlyphSection({
                 </button>
               </div>
               {newKeyInvalid ? (
-                <P className="mt-1 text-xs text-destructive">
+                <P className="mt-1 text-xs text-danger">
                   {t('panel.localKeyInvalid')}
                 </P>
               ) : null}
@@ -710,7 +710,7 @@ function LocalGlyphRow({
           <button
             type="button"
             onClick={onDelete}
-            className="hover:text-destructive"
+            className="hover:text-danger"
           >
             <Trash2 className="h-3 w-3" />
           </button>

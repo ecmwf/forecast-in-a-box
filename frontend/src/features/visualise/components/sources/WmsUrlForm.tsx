@@ -140,7 +140,7 @@ export function WmsUrlForm() {
         </Button>
       </div>
       {errorText && (
-        <P id={errorId} className="text-xs text-destructive">
+        <P id={errorId} className="text-xs text-danger">
           {errorText}
         </P>
       )}

@@ -32,8 +32,8 @@ import { cn } from '@/lib/utils'
 import { formatInZone, useAppTimeZone } from '@/lib/datetime'
 
 const SLOT_BADGE: Record<'a' | 'b', string> = {
-  a: 'bg-blue-600 text-white dark:bg-blue-500',
-  b: 'bg-orange-600 text-white dark:bg-orange-500',
+  a: 'bg-slot-a text-white',
+  b: 'bg-slot-b text-white',
 }
 
 export function CompareSlotBar({

@@ -49,8 +49,8 @@ const AUTOPLAY_INTERVAL_MS = 1200
 const HOUR_MS = 3600_000
 
 const TRACK_ON_CLASS: Record<SourceSlot, string> = {
-  a: 'bg-blue-600 dark:bg-blue-500',
-  b: 'bg-orange-600 dark:bg-orange-500',
+  a: 'bg-slot-a',
+  b: 'bg-slot-b',
 }
 
 /** Failed loads stay in the slot's hue — a light tint says "this slot

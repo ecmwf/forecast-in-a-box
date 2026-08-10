@@ -171,7 +171,7 @@ const PresetRow = memo(function ({
               type="button"
               onClick={() => onToggleFavourite(preset.blueprintId)}
               className={cn(
-                'transition-colors hover:text-yellow-500',
+                'hit-target-y transition-colors hover:text-yellow-500',
                 preset.isFavourite && 'text-yellow-500',
               )}
               aria-label={t('dashboard:presets.bookmark')}
@@ -197,7 +197,7 @@ const PresetRow = memo(function ({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
+                  className="text-danger focus:text-danger"
                   onClick={() => onDelete(preset.blueprintId, preset.version)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />

@@ -105,7 +105,7 @@ export function ArtifactRow({
         <Button
           variant="outline"
           size="icon"
-          className="text-destructive hover:text-destructive"
+          className="text-danger hover:text-danger"
           onClick={() => onDelete(artifact.id)}
           disabled={isDeleting}
           aria-label={t('actions.delete')}

@@ -140,14 +140,15 @@ export const BlockNode = memo(function ({
           'shadow-[0_0_0_2px_rgba(220,38,38,1),0_15px_35px_-5px_rgba(220,38,38,0.15)]',
       )}
     >
+      {/* Overlay clips the bar to the card radius — a 6px bar can't render it itself. */}
       <div
-        className={cn(
-          'h-1.5 w-full rounded-t-2xl opacity-80',
-          metadata.topBarColor,
-        )}
-      />
+        aria-hidden
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+      >
+        <div className={cn('h-1.5 w-full opacity-80', metadata.topBarColor)} />
+      </div>
 
-      <div className="p-5">
+      <div className="px-5 pt-6.5 pb-5">
         <div className="mb-3 flex items-start justify-between">
           <div className="flex items-center gap-2">
             <IconComponent className={cn('h-5 w-5', metadata.color)} />
@@ -173,7 +174,7 @@ export const BlockNode = memo(function ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="nodrag h-7 w-7 text-muted-foreground hover:text-destructive"
+                    className="nodrag h-7 w-7 text-muted-foreground hover:text-danger"
                     onClick={(e) => e.stopPropagation()}
                   />
                 }
@@ -321,7 +322,7 @@ export const BlockNode = memo(function ({
             <Plus
               className={cn(
                 'h-2.5 w-2.5',
-                hasErrors ? 'text-destructive' : 'text-muted-foreground',
+                hasErrors ? 'text-danger' : 'text-muted-foreground',
               )}
             />
           </Handle>

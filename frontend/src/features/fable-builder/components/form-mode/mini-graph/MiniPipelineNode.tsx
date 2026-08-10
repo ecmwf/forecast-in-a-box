@@ -123,7 +123,7 @@ export const MiniPipelineNode = memo(function ({
 
           {/* Validation icon */}
           {hasErrors ? (
-            <AlertCircle className="h-3 w-3 shrink-0 text-destructive" />
+            <AlertCircle className="h-3 w-3 shrink-0 text-danger" />
           ) : (
             <Check className="h-3 w-3 shrink-0 text-green-500" />
           )}

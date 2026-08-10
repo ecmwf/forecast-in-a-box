@@ -110,7 +110,7 @@ export function ScheduleDetailPage() {
   if (isError || !schedule) {
     return (
       <div className={containerClass}>
-        <P className="text-destructive">{t('errors.scheduleNotFound')}</P>
+        <P className="text-danger">{t('errors.scheduleNotFound')}</P>
       </div>
     )
   }

@@ -62,7 +62,7 @@ export function LoadingSplashScreen({
         {error && (
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
             <svg
-              className="h-8 w-8 text-destructive"
+              className="h-8 w-8 text-danger"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -91,12 +91,12 @@ export function LoadingSplashScreen({
         {/* Error Message */}
         {error && (
           <div className="max-w-md space-y-4">
-            <H2 className="text-xl font-semibold text-destructive">
+            <H2 className="text-xl font-semibold text-danger">
               {t('splash.errorTitle')}
             </H2>
             <P className="text-muted-foreground">{t('splash.errorIntro')}</P>
             <div className="rounded-lg bg-destructive/10 p-4">
-              <P className="font-mono text-destructive">{error}</P>
+              <P className="font-mono text-danger">{error}</P>
             </div>
 
             {/* Retry Button */}

@@ -68,7 +68,7 @@ const statusColors: Record<
   green: {
     bg: 'bg-emerald-500',
     pulseRing: 'bg-emerald-100 dark:bg-emerald-900/30',
-    text: 'text-emerald-600 dark:text-emerald-400',
+    text: 'text-success',
     ring: 'ring-emerald-500/20',
   },
   orange: {

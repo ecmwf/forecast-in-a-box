@@ -14,7 +14,7 @@ import { tanstackConfig } from '@tanstack/eslint-config'
 import licenseHeader from 'eslint-plugin-license-header'
 
 export default [
-  { ignores: ['dist', '*.config.js', 'public'] },
+  { ignores: ['dist', '*.config.js', 'public', 'development_guidelines'] },
   ...pluginQuery.configs['flat/recommended'],
   ...tanstackConfig,
   {

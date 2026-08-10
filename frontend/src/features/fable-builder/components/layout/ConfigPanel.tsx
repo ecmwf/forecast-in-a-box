@@ -276,7 +276,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
         {mappedErrors.unmapped.length > 0 && (
           <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
             {mappedErrors.unmapped.map((message) => (
-              <P key={message} className="text-sm text-destructive">
+              <P key={message} className="text-sm text-danger">
                 {message}
               </P>
             ))}

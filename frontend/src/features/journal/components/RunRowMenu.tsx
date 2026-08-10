@@ -110,7 +110,7 @@ export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
           render={
             <button
               type="button"
-              className="transition-colors hover:text-primary"
+              className="hit-target-y transition-colors hover:text-primary"
               aria-label={t('item.moreOptions')}
             />
           }
@@ -144,7 +144,7 @@ export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => setDeleteOpen(true)}
-            className="text-destructive focus:text-destructive"
+            className="text-danger focus:text-danger"
           >
             <Trash2 className="h-4 w-4" />
             {t('item.delete')}

@@ -98,7 +98,7 @@ export class ErrorBoundary extends Component<
         <div className="flex min-h-screen items-center justify-center p-4">
           <Card className="max-w-md">
             <CardHeader>
-              <CardTitle className="text-destructive">
+              <CardTitle className="text-danger">
                 {i18n.t('errors:boundary.title')}
               </CardTitle>
               <CardDescription>

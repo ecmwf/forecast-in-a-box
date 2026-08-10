@@ -86,7 +86,7 @@ export const ForecastRunRow = memo(function ({
               type="button"
               onClick={() => setMetadataOpen(true)}
               aria-label={t('item.editMetadata')}
-              className="shrink-0 text-muted-foreground opacity-0 transition-[color,opacity] group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:text-primary [@media(hover:none)]:opacity-100"
+              className="hit-target-y shrink-0 text-muted-foreground opacity-0 transition-[color,opacity] group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:text-primary [@media(hover:none)]:opacity-100"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -190,7 +190,7 @@ export const ForecastRunRow = memo(function ({
               type="button"
               onClick={() => onToggleBookmark(run.runId)}
               className={cn(
-                'transition-colors hover:text-yellow-500',
+                'hit-target-y transition-colors hover:text-yellow-500',
                 run.isBookmarked && 'text-yellow-500',
               )}
               aria-label={
@@ -248,7 +248,7 @@ function RunAction({ run }: { run: ForecastRunViewModel }) {
     run.status === 'completed'
       ? {
           label: t('item.viewResults'),
-          className: 'text-emerald-600 dark:text-emerald-400',
+          className: 'text-success',
         }
       : run.status === 'failed'
         ? {

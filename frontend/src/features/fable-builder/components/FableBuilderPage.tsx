@@ -540,7 +540,7 @@ export function FableBuilderPage({
   if (!catalogue) {
     return (
       <div className="flex min-h-100 flex-col items-center justify-center gap-4">
-        <P className="text-destructive">{t('page.catalogueLoadFailed')}</P>
+        <P className="text-danger">{t('page.catalogueLoadFailed')}</P>
         <Button variant="outline" onClick={() => refetchCatalogue()}>
           {t('common:retry')}
         </Button>

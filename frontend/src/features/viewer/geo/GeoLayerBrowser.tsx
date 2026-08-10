@@ -43,8 +43,8 @@ import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
 export const SLOT_CHIP_CLASS: Record<SourceSlot, string> = {
-  a: 'bg-blue-600/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
-  b: 'bg-orange-600/15 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300',
+  a: 'bg-slot-a/15 text-blue-700 dark:bg-slot-a/20 dark:text-blue-300',
+  b: 'bg-slot-b/15 text-orange-700 dark:bg-slot-b/20 dark:text-orange-300',
 }
 
 /** groupByTitlePrefix, or one flat pass-through cluster when toggled off. */
@@ -355,7 +355,7 @@ function LinkedSections({
     if (error !== null) {
       return (
         <div className="space-y-2 p-2">
-          <P className="text-sm text-destructive">
+          <P className="text-sm text-danger">
             {t('picker.layersError', { error })}
           </P>
           <Button size="sm" variant="outline" onClick={onRetry}>
@@ -718,7 +718,7 @@ function UnlinkedSourceSection({
           ) : source.error !== null ? (
             // A failed catalog must never masquerade as an empty search.
             <div className="space-y-2 px-2 py-1">
-              <P className="text-sm text-destructive">
+              <P className="text-sm text-danger">
                 {t('picker.layersError', { error: source.error })}
               </P>
               <Button size="sm" variant="outline" onClick={source.retry}>
