@@ -9,7 +9,9 @@
 
 """Compilation of a BlueprintBuilder into an ExecutionSpecification."""
 
+from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 
 from cascade.low.core import DatasetId, TaskId
 from cascade.low.func import assert_never
@@ -17,13 +19,13 @@ from earthkit.workflows.compilers import graph2job
 from earthkit.workflows.fluent import PayloadBuildingContext
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fiab_core.artifacts import CompositeArtifactId
-from fiab_core.fable import BlockInstanceId, BlockInstanceOutput, NoOutput, RawOutput
+from fiab_core.fable import BlockInstanceId, BlockInstanceOutput, ConfigurationOptionId, NoOutput, RawOutput
 
 from forecastbox.domain.blueprint.cascade import EnvironmentSpecification
 from forecastbox.domain.blueprint.configuration_values import convert_known_configuration_values
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
-from forecastbox.domain.glyphs.resolution import merge_glyph_values, resolve_configurations
+from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, extract_glyphs, merge_glyph_values, resolve_configurations
 from forecastbox.domain.plugin.manager import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob, RunOutputCharacteristic, RunOutputs
 from forecastbox.domain.run.detail import CompilationDetail, TaskDetail, _fluentName_to_taskId, fluentNode_to_detail
@@ -72,19 +74,35 @@ def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
     return list(artifacts)
 
 
-def compile_builder(
-    blueprint: BlueprintBuilder, glyph_values: dict[str, str]
-) -> tuple[ExecutionSpecification, RunOutputs, CompilationDetail]:
-    """Compile a BlueprintBuilder into an ExecutionSpecification and RunOutputs.
+@dataclass(frozen=True, slots=True)
+class CompilationResult:
+    """Result of compiling a BlueprintBuilder into an ExecutionSpecification.
+
+    ``execution_spec`` and ``run_outputs`` are the compiled cascade job and its declared
+    external outputs, respectively (``execution_spec.job.job_instance.ext_outputs`` is set to
+    the authoritative list of cascade external outputs -- previously a side effect of
+    ``execute_cascade``).
+
+    ``compilation_detail`` carries task-level lookups produced during compilation.
+
+    ``resolved_configuration_options`` maps each block instance id to the subset of its
+    configuration options that referenced at least one glyph, together with their final
+    (post-resolution) string values. This is used to persist the resolution actually used
+    at execution time, for later inspection/reproducibility.
+    """
+
+    execution_spec: ExecutionSpecification
+    run_outputs: RunOutputs
+    compilation_detail: CompilationDetail
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
+
+
+def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -> CompilationResult:
+    """Compile a BlueprintBuilder into a CompilationResult.
 
     Raises ``ValueError`` if any block cannot be validated/compiled. When ``glyph_values`` is
     non-empty, ${glyph} patterns in configuration values are resolved before compilation.
-
-    Sets ``job_instance.ext_outputs`` to the authoritative list of cascade external
-    outputs (previously a side effect of ``execute_cascade``).
     """
-    # TODO this is a bulky method, returning a tuple of things -- worth simplifying,
-    # like a single dto or perhaps derive the RunOutputs from CompilationDetail
     graph = Graph([])
     plugins = PluginManager.plugins
     action_lookup = {}
@@ -94,6 +112,7 @@ def compile_builder(
     # Maps sink block ids to mime type used in RunOutputs (only relevant for external outputs).
     block_to_mime: dict[BlockInstanceId, str] = {}
     sink_tasks: set[TaskId] = set()
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
 
     block_lookup = {b.instance_id: b for b in blueprint.blocks}
 
@@ -106,7 +125,14 @@ def compile_builder(
         missing_config = sorted(block_factory.configuration_options.keys() - routable.instance.configuration_values.keys())
         if missing_config:
             raise ValueError(f"compile failed at {blockId=} with missing configuration options: {missing_config}")
+        extract_result = extract_glyphs(routable.instance)
+        if extract_result.e is not None:
+            raise ValueError(f"compile failed at {blockId=} with {extract_result.e}")
+        extracted = cast(ExtractedGlyphs, extract_result.t)
         resolve_configurations(routable.instance, glyph_values)
+        resolved_configuration_options[blockId] = {
+            k: routable.instance.configuration_values[k] for k in extracted.glyphed_options if k in routable.instance.configuration_values
+        }
         converted_values = convert_known_configuration_values(routable.instance, block_factory)
         if converted_values.t is None:
             raise ValueError(f"compile failed at {blockId=} with {converted_values.e}")
@@ -177,4 +203,9 @@ def compile_builder(
     else:
         environment = EnvironmentSpecification(runtime_artifacts=graph_artifacts)
     compilation_detail = CompilationDetail(task_detail=task_detail)
-    return ExecutionSpecification(job=job, environment=environment), RunOutputs(outputs=run_outputs), compilation_detail
+    return CompilationResult(
+        execution_spec=ExecutionSpecification(job=job, environment=environment),
+        run_outputs=RunOutputs(outputs=run_outputs),
+        compilation_detail=compilation_detail,
+        resolved_configuration_options=resolved_configuration_options,
+    )
