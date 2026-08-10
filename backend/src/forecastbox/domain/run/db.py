@@ -24,6 +24,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, cast
 
+from fiab_core.fable import BlockInstanceId, ConfigurationOptionId
 from pydantic import Field
 from sqlalchemy import func, select, update
 
@@ -48,6 +49,9 @@ class CompilerRuntimeContext(FiabBaseModel):
     """
 
     glyphs: dict[str, str] = Field(default_factory=dict)
+    resolution: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
+    """Maps each block instance id to the configuration options that were resolved via
+    glyph substitution, together with their final (post-resolution) string values."""
 
 
 @dataclass(frozen=True, eq=True, slots=True)

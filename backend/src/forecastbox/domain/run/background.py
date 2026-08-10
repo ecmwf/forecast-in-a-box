@@ -95,9 +95,11 @@ def execute_background(
         relevant_glyphs_and_values = expand_glyph_values(all_glyphs_raw, roots=referenced_glyph_names)
         used_glyphs = {k: all_glyphs_raw[k] for k in relevant_glyphs_and_values.keys() if k not in PINNED_INTRINSIC_KEYS}
 
-        exec_spec, run_outputs, compilation_detail = compile_builder(builder, relevant_glyphs_and_values)
+        exec_spec, run_outputs, compilation_detail, resolved_configuration_options = compile_builder(builder, relevant_glyphs_and_values)
 
-        persisted_context = compiler_runtime_context.model_copy(update={"glyphs": used_glyphs})
+        persisted_context = compiler_runtime_context.model_copy(
+            update={"glyphs": used_glyphs, "resolution": resolved_configuration_options}
+        )
         db.update_run_runtime(
             run_id,
             attempt_count,
