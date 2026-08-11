@@ -12,13 +12,11 @@
 These are low-level helpers used by the plugin manager and other components
 that need to interact with the Python package environment at runtime.
 
-The ``freeze_*``/``run_pip_*`` family of functions below is deliberately kept free
-of any plugin-domain policy (which package is "the plugin", version specifiers,
-``fiab-core`` compatibility rules, ...). That logic lives in
-``forecastbox.domain.plugin.compatibility``. This module only knows how to: freeze
-an environment, parse the freeze output into structured entries, exclude one
-distribution by name, render the remainder as pip constraints/requirements, and run
-``uv pip install``/``uv pip check`` with an explicit interpreter.
+This module supports safe venv mutation algorithms, by handling the generic
+aspects: freeze an environment, parse the freeze output into structured
+entries, exclude one distribution by name, render the remainder as pip
+constraints/requirements, and run ``uv pip install``/``uv pip check``
+with an explicit interpreter.
 """
 
 import contextlib
@@ -128,15 +126,15 @@ def try_updatedatetime(pip_source: str) -> str:
 
 def parse_install_output(pip_output: str) -> dict[str, str]:
     """Parse ``uv pip install`` output to extract newly-installed packages and their versions.
+    Does not verify whether the install *actually* happened -- hence don't use for pip
+    invocations that were dry-runned.
 
     Lines starting with `` + `` are newly-installed entries, e.g.:
     ``  + fiab-plugin-test==0.1.0 (from file:///path/to/package)``
     We also include lines starting with `` ~ ``, which may have been cached from `uv`'s PoV
     but for us are at this stage nevertheless new (presumably).
 
-    Returns a dict mapping package name to version string. This must only be called on the
-    output of a real (non ``--dry-run``) installation -- dry-run output must never be reported
-    as an actual install.
+    Returns a dict mapping package name to version string.
     """
     rv: dict[str, str] = {}
     for line in pip_output.splitlines():

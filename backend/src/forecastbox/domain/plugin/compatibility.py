@@ -15,11 +15,11 @@ Centralises the version-compatibility rules between plugins and ``fiab-core``:
   if and only if ``a == x`` (same major version).
 
 It also owns the runtime plugin installation policy: ``install_plugin_compatibly``
-protects the *entire* installed environment while ``uv`` resolves a requested plugin,
-not just ``fiab-core``. This is an immediate risk-reduction measure on top of the
-current shared-virtual-environment architecture (the backend still mutates its own
+protects the *entire* installed environment while ``uv`` resolves a requested plugin.
+This is an immediate risk-reduction measure on top of the current
+shared-virtual-environment architecture (the backend still mutates its own
 active venv and reloads Python modules in-process); see
-``docs/developer/changeSpecs/plugins-candidate_venvs.md`` for the intended
+``docs/developer/changeSpecs/plugins-candidate_venvs.md`` for a possible
 architectural successor that replaces in-place mutation with validated candidate
 environments and a handover.
 
@@ -157,6 +157,8 @@ def get_compatible_versions(plugin_settings: PluginSettings, available_versions:
 def _plugin_requirement_args(pip_source: str, version: Version | None) -> list[str]:
     """Build the CLI requirement tokens for the requested plugin install/update."""
     if pip_source.startswith("-e") or pip_source.startswith("file://"):
+        if version is not None:
+            raise ValueError(f"unexpected {version=} for locally installable {pip_source=}")
         return pip_source.split(" ", 1)
     if version is not None:
         return [f"{pip_source}=={version}"]
@@ -223,7 +225,7 @@ def install_plugin_compatibly(pip_source: str, version: Version | None, module_n
     try:
         target_name = _resolve_target_distribution_name(pip_source, module_name)
     except PackagesError as e:
-        msg = f"stage=identify: {e}"
+        msg = f"stage=identify: {e!r}"
         logger.error(msg)
         return Either.error(msg)
 
@@ -237,7 +239,7 @@ def install_plugin_compatibly(pip_source: str, version: Version | None, module_n
         raw_lines = freeze_environment(python)
         snapshot = parse_frozen_environment(raw_lines)
     except PackagesError as e:
-        msg = f"stage=freeze: {e}"
+        msg = f"stage=freeze: {e!r}"
         logger.error(msg)
         return Either.error(msg)
 
