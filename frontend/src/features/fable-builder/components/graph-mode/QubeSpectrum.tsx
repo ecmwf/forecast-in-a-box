@@ -116,7 +116,7 @@ export function QubeSpectrum({
                   />
                 }
               />
-              <TooltipContent variant="light" side="top" sideOffset={6}>
+              <TooltipContent side="top" sideOffset={6}>
                 {t('qubeLens.barTooltip', {
                   dimension: dim.key,
                   count: dim.values.length,
