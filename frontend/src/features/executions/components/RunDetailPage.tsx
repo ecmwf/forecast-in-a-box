@@ -143,6 +143,8 @@ export function RunDetailPage() {
     [onSplitLayoutChanged],
   )
   const { data: catalogue } = useBlockCatalogue()
+  // As-run values off the run detail (#640); null on older runs.
+  const resolvedConfig = jobData?.resolution ?? undefined
 
   // Sync scroll-to-top before paint — a tall /configure scroll position
   // otherwise clamps into the shorter loading layout and exposes the footer.
@@ -316,6 +318,7 @@ export function RunDetailPage() {
                   status={jobData.status}
                   completedBlockIds={jobData.completed_block_ids}
                   plannedBlockIds={jobData.planned_block_ids}
+                  resolvedConfig={resolvedConfig}
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-12 text-center">

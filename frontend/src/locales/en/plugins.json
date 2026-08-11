@@ -69,6 +69,8 @@
   },
   "diagnostics": {
     "seeDetails": "See the details page for the full text",
+    "moreAndSeeDetails_one": "+{{count}} more — see the details page for the full text",
+    "moreAndSeeDetails_other": "+{{count}} more — see the details page for the full text",
     "source": {
       "install": "Installation",
       "load": "Plugin load",

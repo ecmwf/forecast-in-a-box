@@ -12,6 +12,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import { AlertCircle, ChevronRight, Link2, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
+import { definableGlyphs } from '@/features/fable-builder/utils/definable-glyphs'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
 import { useReservedGlyphReason } from '@/features/glyphs/utils/reserved-names'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
@@ -226,6 +227,10 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
     validationState || !selectedBlockId
       ? liveMappedErrors
       : (lastMappedErrorsRef.current[selectedBlockId] ?? liveMappedErrors)
+  const definableMissingGlyphs = definableGlyphs(
+    missingGlyphs,
+    mappedErrors.invalidGlyphNames,
+  )
   const configOptions = Object.entries(factory.configuration_options)
   const inputs = factory.inputs
 
@@ -307,7 +312,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
           <BlockValidationProvider
             resolvedConfig={resolvedConfigForBlock}
             fieldErrors={mappedErrors.byConfigKey}
-            missingGlyphs={missingGlyphs}
+            missingGlyphs={definableMissingGlyphs}
           >
             <div className="space-y-3">
               <div className="text-sm font-medium">

@@ -213,6 +213,32 @@ export const opaqueMimeExecution: JobExecutionDetail = {
   planned_block_ids: null,
 }
 
+/** Test-only fixture: completed run of the glyphed `template-typed-inputs`
+ * fable with an as-run `resolution` (#640, glyphed options only). Inject via
+ * {@link injectMockExecution}. */
+export const resolvedConfigExecution: JobExecutionDetail = {
+  run_id: 'job-resolved-009',
+  attempt_count: 1,
+  status: 'completed',
+  created_at: oneHourAgo,
+  updated_at: oneHourAgo,
+  blueprint_id: 'template-typed-inputs',
+  blueprint_version: 1,
+  error: null,
+  progress: '100',
+  cascade_job_id: 'cascade-009',
+  lost_task_ids: {},
+  outputs: null,
+  completed_block_ids: null,
+  planned_block_ids: null,
+  resolution: {
+    block_source_1: {
+      forecast: 'grib',
+      base_time: '72 Europe',
+    },
+  },
+}
+
 /** Terminal run with `outputs: null` — drives the backend's "no recorded
  * outputs yet" 500 from /run/outputContent. Inject via injectMockExecution. */
 export const noStoredOutputsExecution: JobExecutionDetail = {

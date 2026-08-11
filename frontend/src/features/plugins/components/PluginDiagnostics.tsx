@@ -64,7 +64,9 @@ export function PluginDiagnostics({
         const severity = normalizePluginErrorSeverity(error.severity)
         const { Icon, className: iconClass } = SEVERITY_ICONS[severity]
         return (
-          <li key={index} className="flex items-start gap-1.5 text-xs">
+          // min-w-0: without it the text cannot shrink and long paths in raw
+          // exception text overflow the tooltip instead of wrapping.
+          <li key={index} className="flex min-w-0 items-start gap-1.5 text-xs">
             <Icon
               className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', iconClass)}
               aria-label={t(
@@ -75,7 +77,7 @@ export function PluginDiagnostics({
                     : 'diagnostics.severity.error',
               )}
             />
-            <span>
+            <span className="min-w-0 break-words">
               <span className="font-medium">
                 {sourceLabels[error.source] ?? error.source}
               </span>

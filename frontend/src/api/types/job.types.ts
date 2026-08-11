@@ -68,6 +68,11 @@ export const JobExecutionDetailSchema = z.object({
   outputs: RunOutputsSchema.nullable(),
   completed_block_ids: z.array(z.string()).nullable().optional(),
   planned_block_ids: z.array(z.string()).nullable().optional(),
+  /** As-run values of glyphed options, by block then option; absent pre-#640. */
+  resolution: z
+    .record(z.string(), z.record(z.string(), z.string()))
+    .nullable()
+    .optional(),
 })
 
 /** routes/run.py: CompilationDetailTask */

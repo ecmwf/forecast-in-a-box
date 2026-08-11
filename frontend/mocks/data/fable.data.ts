@@ -312,10 +312,16 @@ export function calculateExpansion(fable: FableBuilderV1): {
   block_errors: Record<string, Array<string>>
   possible_sources: Array<PluginBlockFactoryId>
   possible_expansions: Record<string, Array<BlockExpansion>>
+  resolved_configuration_options: Record<string, Record<string, string>>
   missing_glyphs: Record<string, Record<string, Array<string>>>
 } {
   const block_errors: Record<string, Array<string>> = {}
   const possible_expansions: Record<string, Array<BlockExpansion>> = {}
+  const resolved_configuration_options: Record<
+    string,
+    Record<string, string>
+  > = {}
+  const localGlyphs = fable.local_glyphs ?? {}
 
   // Available blocks by kind (using new PluginCompositeId format)
   // Only ecmwf-base plugin is loaded
@@ -378,6 +384,22 @@ export function calculateExpansion(fable: FableBuilderV1): {
       block_errors[blockId] = errors
     }
 
+    // Substitute `${name}` from local_glyphs like the backend; unresolved stay put.
+    const resolvedForBlock: Record<string, string> = {}
+    for (const [optionId, value] of Object.entries(
+      instance.configuration_values,
+    )) {
+      if (!value.includes('${')) continue
+      const substituted = value.replace(
+        /\$\{\s*(\w+)[^}]*\}/g,
+        (match, name: string) => localGlyphs[name] ?? match,
+      )
+      if (substituted !== value) resolvedForBlock[optionId] = substituted
+    }
+    if (Object.keys(resolvedForBlock).length > 0) {
+      resolved_configuration_options[blockId] = resolvedForBlock
+    }
+
     // Calculate possible expansions based on block kind
     if (factory.kind === 'source' || factory.kind === 'transform') {
       possible_expansions[blockId] = qubedBlocks
@@ -391,6 +413,7 @@ export function calculateExpansion(fable: FableBuilderV1): {
     block_errors,
     possible_sources: sourceBlocks,
     possible_expansions,
+    resolved_configuration_options,
     missing_glyphs: {},
   }
 }

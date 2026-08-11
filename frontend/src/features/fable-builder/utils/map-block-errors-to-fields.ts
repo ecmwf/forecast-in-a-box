@@ -21,6 +21,8 @@ export interface MappedBlockErrors {
   byConfigKey: Record<string, Array<string>>
   /** Errors that could not be attributed to a specific field. */
   unmapped: Array<string>
+  /** Glyph names the backend rejected outright — defining them cannot succeed. */
+  invalidGlyphNames: Array<string>
 }
 
 /** Pre-translated messages — callers resolve via i18next so this util stays pure. */
@@ -79,6 +81,8 @@ function pushError(
  * - "Configuration option 'x' is missing for block factory ..." →
  *   messages.missingRequiredValue
  * - "Invalid value for configuration option 'x': ..." → verbatim, on `x`
+ * - "Invalid glyph name: g (due to r); appears in [a, b]" → verbatim, on the
+ *   keys it names
  * - "Jinja expression error: 'x' is undefined" → attributed to the config
  *   keys whose value references `x` inside a `${...}` expression; when `x`
  *   is jinja-reserved the clearer messages.jinjaReservedReference is shown
@@ -97,6 +101,7 @@ export function mapBlockErrorsToFields(
 ): MappedBlockErrors {
   const byConfigKey: Record<string, Array<string>> = {}
   const unmapped: Array<string> = []
+  const invalidGlyphNames: Array<string> = []
   const keysWithUnknownGlyphs = new Set(
     Object.entries(missingGlyphs)
       .filter(([, names]) => names.length > 0)
@@ -149,6 +154,22 @@ export function mapBlockErrorsToFields(
       continue
     }
 
+    // Backend names the offending options, so no usage lookup is needed.
+    const invalidGlyphName = error.match(
+      /^Invalid glyph name: (\S+) .*appears in \[(.*)\]$/,
+    )
+    if (invalidGlyphName) {
+      invalidGlyphNames.push(invalidGlyphName[1])
+      const keys = invalidGlyphName[2]
+        .split(',')
+        .map((key) => key.trim())
+        .filter(Boolean)
+      if (keys.length > 0) {
+        for (const key of keys) pushError(byConfigKey, key, error)
+        continue
+      }
+    }
+
     const jinjaUndefined = error.match(
       /^Jinja expression error: '([^']+)' is undefined/,
     )
@@ -176,11 +197,14 @@ export function mapBlockErrorsToFields(
     unmapped.push(error)
   }
 
+  const invalid = new Set(invalidGlyphNames)
   for (const [configKey, glyphNames] of Object.entries(missingGlyphs)) {
     for (const name of glyphNames) {
+      // An invalid name is not merely unknown; its own error already says so.
+      if (invalid.has(name)) continue
       pushError(byConfigKey, configKey, messages.unknownGlyph(name))
     }
   }
 
-  return { byConfigKey, unmapped }
+  return { byConfigKey, unmapped, invalidGlyphNames }
 }
