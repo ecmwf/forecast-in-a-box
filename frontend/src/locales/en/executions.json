@@ -16,6 +16,9 @@
     "specUnavailableDescription": "The original configuration was not stored for this job.",
     "copySpec": "Copy",
     "copied": "Copied",
+    "copyValue": "Copy value",
+    "copyTemplate": "Copy template",
+    "copyFailed": "Couldn't copy to clipboard",
     "specCopyFailed": "Couldn't copy specification",
     "startedAt": "Started {{date}}"
   },

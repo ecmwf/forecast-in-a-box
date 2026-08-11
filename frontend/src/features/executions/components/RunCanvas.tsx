@@ -51,6 +51,17 @@ export function useShowConfig() {
   return useContext(ShowConfigContext)
 }
 
+/** As-run values keyed by block, then option; empty until they resolve. */
+const ResolvedConfigContext = createContext<
+  Record<string, Record<string, string>>
+>({})
+
+export function useResolvedConfigFor(
+  blockId: string,
+): Record<string, string> | undefined {
+  return useContext(ResolvedConfigContext)[blockId]
+}
+
 export interface BlockProgressInfo {
   completedSet: ReadonlySet<BlockInstanceId>
   plannedSet: ReadonlySet<BlockInstanceId>
@@ -77,10 +88,15 @@ interface RunCanvasProps {
   /** Optional + nullable: backend emits only on /run/get and clears on terminal status. */
   completedBlockIds?: ReadonlyArray<BlockInstanceId> | null
   plannedBlockIds?: ReadonlyArray<BlockInstanceId> | null
+  /** As-run values by block then option; absent while loading or unrecorded. */
+  resolvedConfig?: Record<string, Record<string, string>>
 }
 
 /** Fit never zooms past 1:1 — a tiny graph stays natural-sized, not blown up. */
 const FIT_MAX_ZOOM = 1
+
+/** Stable identity so an absent map does not remount every consumer. */
+const EMPTY_RESOLVED: Record<string, Record<string, string>> = {}
 
 const nodeTypes: Record<string, typeof RunNode> = {
   sourceBlock: RunNode,
@@ -99,6 +115,7 @@ function RunCanvasInner({
   status,
   completedBlockIds,
   plannedBlockIds,
+  resolvedConfig,
 }: RunCanvasProps) {
   // Primitive selectors (per field) — an object-returning selector would
   // mint a new reference each render and loop Zustand's Object.is check.
@@ -206,94 +223,100 @@ function RunCanvasInner({
 
   return (
     <ShowConfigContext value={showConfig}>
-      <BlockProgressContext value={blockProgress}>
-        <div
-          ref={containerRef}
-          style={maximized ? undefined : { height: `${canvasHeight}px` }}
-          className={cn(
-            'relative overflow-hidden',
-            maximized
-              ? 'fixed inset-0 z-50 bg-background'
-              : [
-                  'rounded-lg',
-                  // Narrow: inline `height` is the authority (React Flow needs a
-                  // definite height, not just `min-height`). Wide: `!h-full`
-                  // overrides it so the canvas fills the bounded column.
-                  'min-[1280px]:!h-full min-[1280px]:min-h-0 min-[1280px]:flex-1',
-                ],
-          )}
-        >
-          <ReactFlow
-            nodes={layoutedNodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            nodesDraggable={false}
-            nodesConnectable={false}
-            elementsSelectable={false}
-            panOnDrag={true}
-            zoomOnScroll={true}
-            fitView={true}
-            fitViewOptions={{ padding: 0.15, maxZoom: FIT_MAX_ZOOM }}
-            // Default 0.5 floor can't fit a wide pipeline into a phone container.
-            minZoom={0.1}
-            proOptions={{ hideAttribution: true }}
-            onNodeClick={(_event, node) => {
-              // Toggle: click the already-selected block to clear.
-              setSelectedBlockId(selectedBlockId === node.id ? null : node.id)
-            }}
-            onPaneClick={() => {
-              if (selectedBlockId !== null) setSelectedBlockId(null)
-            }}
+      <ResolvedConfigContext value={resolvedConfig ?? EMPTY_RESOLVED}>
+        <BlockProgressContext value={blockProgress}>
+          <div
+            ref={containerRef}
+            style={maximized ? undefined : { height: `${canvasHeight}px` }}
+            className={cn(
+              'relative overflow-hidden',
+              maximized
+                ? 'fixed inset-0 z-50 bg-background'
+                : [
+                    'rounded-lg',
+                    // Narrow: inline `height` is the authority (React Flow needs a
+                    // definite height, not just `min-height`). Wide: `!h-full`
+                    // overrides it so the canvas fills the bounded column.
+                    'min-[1280px]:!h-full min-[1280px]:min-h-0 min-[1280px]:flex-1',
+                  ],
+            )}
           >
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={24}
-              size={1.5}
-              color="#cbd5e1"
-              className="dark:opacity-30"
-            />
-            <Controls
-              showInteractive={false}
-              position="bottom-left"
-              className="bottom-2! left-2!"
-            />
-            <Panel position="top-left" className="top-2! left-2!">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 bg-background/80 text-sm backdrop-blur-sm"
-                onClick={() => setShowConfig((prev) => !prev)}
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-                {showConfig
-                  ? t('detail.hideParameters')
-                  : t('detail.showParameters')}
-              </Button>
-            </Panel>
-            <Panel position="top-right" className="top-2! right-2!">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7 bg-background/80 backdrop-blur-sm"
-                onClick={() => setMaximized((prev) => !prev)}
-                aria-label={t(
-                  maximized ? 'detail.restoreCanvas' : 'detail.maximizeCanvas',
-                )}
-                title={t(
-                  maximized ? 'detail.restoreCanvas' : 'detail.maximizeCanvas',
-                )}
-              >
-                {maximized ? (
-                  <Minimize2 className="h-3.5 w-3.5" />
-                ) : (
-                  <Maximize2 className="h-3.5 w-3.5" />
-                )}
-              </Button>
-            </Panel>
-          </ReactFlow>
-        </div>
-      </BlockProgressContext>
+            <ReactFlow
+              nodes={layoutedNodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              elementsSelectable={false}
+              panOnDrag={true}
+              zoomOnScroll={true}
+              fitView={true}
+              fitViewOptions={{ padding: 0.15, maxZoom: FIT_MAX_ZOOM }}
+              // Default 0.5 floor can't fit a wide pipeline into a phone container.
+              minZoom={0.1}
+              proOptions={{ hideAttribution: true }}
+              onNodeClick={(_event, node) => {
+                // Toggle: click the already-selected block to clear.
+                setSelectedBlockId(selectedBlockId === node.id ? null : node.id)
+              }}
+              onPaneClick={() => {
+                if (selectedBlockId !== null) setSelectedBlockId(null)
+              }}
+            >
+              <Background
+                variant={BackgroundVariant.Dots}
+                gap={24}
+                size={1.5}
+                color="#cbd5e1"
+                className="dark:opacity-30"
+              />
+              <Controls
+                showInteractive={false}
+                position="bottom-left"
+                className="bottom-2! left-2!"
+              />
+              <Panel position="top-left" className="top-2! left-2!">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 bg-background/80 text-sm backdrop-blur-sm"
+                  onClick={() => setShowConfig((prev) => !prev)}
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  {showConfig
+                    ? t('detail.hideParameters')
+                    : t('detail.showParameters')}
+                </Button>
+              </Panel>
+              <Panel position="top-right" className="top-2! right-2!">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7 bg-background/80 backdrop-blur-sm"
+                  onClick={() => setMaximized((prev) => !prev)}
+                  aria-label={t(
+                    maximized
+                      ? 'detail.restoreCanvas'
+                      : 'detail.maximizeCanvas',
+                  )}
+                  title={t(
+                    maximized
+                      ? 'detail.restoreCanvas'
+                      : 'detail.maximizeCanvas',
+                  )}
+                >
+                  {maximized ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </Panel>
+            </ReactFlow>
+          </div>
+        </BlockProgressContext>
+      </ResolvedConfigContext>
     </ShowConfigContext>
   )
 }

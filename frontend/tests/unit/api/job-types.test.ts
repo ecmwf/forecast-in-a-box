@@ -69,6 +69,27 @@ describe('JobExecutionDetailSchema', () => {
     expect(result.planned_block_ids).toBeNull()
   })
 
+  it('parses the per-block resolution map recorded since ecmwf#640', () => {
+    const result = JobExecutionDetailSchema.parse({
+      ...baseDetail,
+      status: 'completed',
+      resolution: { block_source_1: { base_time: '2026-05-15T00:00:00' } },
+    })
+    expect(result.resolution).toEqual({
+      block_source_1: { base_time: '2026-05-15T00:00:00' },
+    })
+  })
+
+  it('accepts absent and null resolution (pre-#640 backends and old runs)', () => {
+    expect(
+      JobExecutionDetailSchema.parse(baseDetail).resolution,
+    ).toBeUndefined()
+    expect(
+      JobExecutionDetailSchema.parse({ ...baseDetail, resolution: null })
+        .resolution,
+    ).toBeNull()
+  })
+
   it('rejects non-array values in the block-id fields', () => {
     expect(() =>
       JobExecutionDetailSchema.parse({

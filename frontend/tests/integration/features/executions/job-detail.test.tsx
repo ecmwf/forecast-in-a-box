@@ -34,6 +34,7 @@ import {
   mixedAvailabilityExecution,
   opaqueMimeExecution,
   resetJobsState,
+  resolvedConfigExecution,
 } from '@tests/../mocks/data/job.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
@@ -250,6 +251,33 @@ describe('RunDetailPage Integration', () => {
       const screen = await renderDetailPage('job-running-002')
       await expect.element(screen.getByText(/Pending: 1/)).toBeVisible()
       await expect.element(screen.getByText('Group by')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('as-run configuration (ecmwf#640 resolution)', () => {
+    it('shows resolved values instead of glyph templates on the canvas', async () => {
+      injectMockExecution(resolvedConfigExecution)
+      const screen = await renderDetailPage('job-resolved-009')
+
+      // Params show by default; glyphed options show as-run values.
+      await expect.element(screen.getByText('grib')).toBeVisible()
+      await expect.element(screen.getByText('72 Europe')).toBeVisible()
+      await expect.element(screen.getByText('mars')).toBeVisible()
+      await expect
+        .element(screen.getByText('${format}'))
+        .not.toBeInTheDocument()
+    })
+
+    it('falls back to stored templates on runs without a recorded resolution', async () => {
+      // Same glyphed fable, but a pre-#640 run: no resolution recorded.
+      injectMockExecution({
+        ...resolvedConfigExecution,
+        run_id: 'job-unresolved-010',
+        resolution: null,
+      })
+      const screen = await renderDetailPage('job-unresolved-010')
+
+      await expect.element(screen.getByText('${format}')).toBeVisible()
     })
   })
 })
