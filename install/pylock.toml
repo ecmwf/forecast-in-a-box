@@ -490,11 +490,11 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/ac/24/1f869196bceb97a
 
 [[packages]]
 name = "earthkit-workflows"
-version = "0.15.3"
+version = "0.15.4"
 marker = "sys_platform == 'darwin' or sys_platform == 'linux'"
 index = "https://pypi.org/simple"
-sdist = { url = "https://files.pythonhosted.org/packages/3e/c8/d8574ef224779cc90832d4a442e1c271bf58b92b12eb10097f92d976d276/earthkit_workflows-0.15.3.tar.gz", upload-time = 2026-07-17T14:02:57Z, size = 10866389, hashes = { sha256 = "5ffdf088e4a7a2510067da5aa1f041f34aba07c76728b58e1e3224b245843f83" } }
-wheels = [{ url = "https://files.pythonhosted.org/packages/27/0d/0997d07f28a48494705151e8d62e8e5355536fd1b4c4fe6eaa45f84a3e19/earthkit_workflows-0.15.3-py3-none-any.whl", upload-time = 2026-07-17T14:02:55Z, size = 217568, hashes = { sha256 = "ab2badd1dc53b6ca1ff346c6c783d13070e929ccfb9556a23b93a676a1c9e577" } }]
+sdist = { url = "https://files.pythonhosted.org/packages/ed/06/79fb057cfd15a979b4ecc7e61f4620551671b5095c218d29b5a4dc7109a4/earthkit_workflows-0.15.4.tar.gz", upload-time = 2026-07-29T09:49:59Z, size = 10866443, hashes = { sha256 = "3c5c55872d718992476866c8c6a013426544df4f9c5055dc3bfe68bba5490df4" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/f7/15/486d3f4a2ac02dd913fa1d79b59440575c987d8f4caf363d209471badb89/earthkit_workflows-0.15.4-py3-none-any.whl", upload-time = 2026-07-29T09:49:57Z, size = 214914, hashes = { sha256 = "1b31130e17bdb5160baf2d791812edecd84632f78e0c512aac9a8854d83f9a1a" } }]
 
 [[packages]]
 name = "eccodes"
