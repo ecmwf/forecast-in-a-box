@@ -7,9 +7,7 @@ against an actual `uv` binary and a real (if tiny and disposable) set of install
 complementing the mocked unit tests in `backend/tests/unit/domain/plugins/test_compatibility.py`
 and `backend/tests/unit/utility/test_packages.py`.
 
-It implements the scenario list from
-`docs/developer/changeSpecs/plugins-integration_tests.md`:
-
+It implements the following scenarios:
 1. A plugin with a new dependency installs successfully without changing existing packages.
 2. A plugin requiring a different version of an existing package fails during dry-run and leaves
    that package unchanged.
