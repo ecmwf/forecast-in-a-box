@@ -152,8 +152,7 @@ def test_local_editable_protected_requirements_included(monkeypatch: pytest.Monk
         monkeypatch,
         freeze_lines=["some-package @ file:///wheelhouse/some_package.whl", "pkg-b==2.0.0"],
     )
-    with patch("forecastbox.domain.plugin.compatibility.importlib.metadata.distributions", return_value=[]):
-        install_plugin_compatibly("my-plugin", Version("2.5.0"), "my_plugin")
+    install_plugin_compatibly("my-plugin", Version("2.5.0"), "my_plugin")
     _python, _constraints_text, extra_args, _plugin_args, _dry, _path = install_calls[0]
     assert "some-package @ file:///wheelhouse/some_package.whl" in extra_args
 
@@ -260,12 +259,11 @@ def test_constraints_file_cleaned_up_on_dry_run_failure(monkeypatch: pytest.Monk
 
 def test_ambiguous_local_target_identity_raises_identify_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("forecastbox.domain.plugin.compatibility.run_pip_check", lambda python: _ok())
-
-    def fake_packages_distributions() -> dict[str, list[str]]:
-        return {"my_plugin": ["my-plugin-a", "my-plugin-b"]}
-
-    with patch("forecastbox.domain.plugin.compatibility.importlib.metadata.packages_distributions", fake_packages_distributions):
-        result = install_plugin_compatibly("-e /some/path", None, "my_plugin")
+    monkeypatch.setattr(
+        "forecastbox.domain.plugin.compatibility.query_module_distribution_map",
+        lambda python: {"my_plugin": ["my-plugin-a", "my-plugin-b"]},
+    )
+    result = install_plugin_compatibly("-e /some/path", None, "my_plugin")
     assert result.e is not None
     assert "identify" in result.e
 

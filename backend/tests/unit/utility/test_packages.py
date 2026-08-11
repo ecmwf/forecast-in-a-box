@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import importlib.metadata
+import json
 import subprocess
 from datetime import UTC
 from types import ModuleType
@@ -28,6 +29,7 @@ from forecastbox.utility.packages import (
     get_package_versions,
     parse_frozen_environment,
     parse_install_output,
+    query_module_distribution_map,
     render_constraints,
     run_pip_check,
     run_pip_install,
@@ -252,6 +254,47 @@ def test_freeze_environment_uv_missing_raises() -> None:
             freeze_environment("/usr/bin/python3")
 
 
+# ---------------------------------------------------------------------------
+# query_module_distribution_map
+# ---------------------------------------------------------------------------
+
+
+def test_query_module_distribution_map_targets_given_interpreter() -> None:
+    fake = MagicMock()
+    fake.returncode = 0
+    fake.stdout = json.dumps({"fiab_plugin_test": ["fiab-plugin-test"]})
+    fake.stderr = ""
+    fake.args = []
+    with patch("subprocess.run", return_value=fake) as mock_run:
+        mapping = query_module_distribution_map("/some/venv/bin/python3")
+    assert mapping == {"fiab_plugin_test": ["fiab-plugin-test"]}
+    args = mock_run.call_args[0][0]
+    assert args[0] == "/some/venv/bin/python3"
+    assert args[1] == "-c"
+
+
+def test_query_module_distribution_map_failure_raises() -> None:
+    fake = MagicMock()
+    fake.returncode = 1
+    fake.stdout = ""
+    fake.stderr = "boom"
+    fake.args = []
+    with patch("subprocess.run", return_value=fake):
+        with pytest.raises(PackagesError):
+            query_module_distribution_map("/usr/bin/python3")
+
+
+def test_query_module_distribution_map_bad_json_raises() -> None:
+    fake = MagicMock()
+    fake.returncode = 0
+    fake.stdout = "not json"
+    fake.stderr = ""
+    fake.args = []
+    with patch("subprocess.run", return_value=fake):
+        with pytest.raises(PackagesError):
+            query_module_distribution_map("/usr/bin/python3")
+
+
 def test_run_pip_check_returns_command_result() -> None:
     fake = MagicMock()
     fake.returncode = 0
@@ -272,7 +315,7 @@ def test_run_pip_check_returns_command_result() -> None:
 
 
 def test_parse_frozen_environment_ordinary_pin() -> None:
-    snapshot = parse_frozen_environment(["pydantic==2.12.0"])
+    snapshot = parse_frozen_environment(["pydantic==2.12.0"], "/usr/bin/python3")
     assert len(snapshot.distributions) == 1
     entry = snapshot.distributions[0]
     assert entry.kind == "pin"
@@ -283,24 +326,24 @@ def test_parse_frozen_environment_ordinary_pin() -> None:
 
 def test_parse_frozen_environment_preserves_markers() -> None:
     line = 'pydantic==2.12.0; python_version >= "3.8"'
-    snapshot = parse_frozen_environment([line])
+    snapshot = parse_frozen_environment([line], "/usr/bin/python3")
     assert snapshot.distributions[0].constraint == line
 
 
 def test_parse_frozen_environment_canonicalizes_names() -> None:
-    snapshot = parse_frozen_environment(["Fiab_Plugin.Test==0.1.0"])
+    snapshot = parse_frozen_environment(["Fiab_Plugin.Test==0.1.0"], "/usr/bin/python3")
     assert snapshot.distributions[0].name == "fiab-plugin-test"
 
 
 def test_parse_frozen_environment_skips_blank_and_comment_lines() -> None:
-    snapshot = parse_frozen_environment(["", "   ", "# a comment", "pkg==1.0.0"])
+    snapshot = parse_frozen_environment(["", "   ", "# a comment", "pkg==1.0.0"], "/usr/bin/python3")
     assert len(snapshot.distributions) == 1
     assert snapshot.distributions[0].name == "pkg"
 
 
 def test_parse_frozen_environment_pep508_file_reference() -> None:
     line = "some-package @ file:///wheelhouse/some_package.whl"
-    snapshot = parse_frozen_environment([line])
+    snapshot = parse_frozen_environment([line], "/usr/bin/python3")
     entry = snapshot.distributions[0]
     assert entry.kind == "local"
     assert entry.name == "some-package"
@@ -309,19 +352,14 @@ def test_parse_frozen_environment_pep508_file_reference() -> None:
 
 
 def test_parse_frozen_environment_editable_resolves_via_metadata() -> None:
-    fake_dist = MagicMock()
-    fake_dist.metadata = {"Name": "fiab-core"}
-    fake_dist.origin = None
+    fake_result = MagicMock()
+    fake_result.returncode = 0
+    fake_result.stdout = json.dumps({"/workspace/fiab-core": "fiab-core"})
+    fake_result.stderr = ""
+    fake_result.args = []
 
-    def fake_read_text(name: str) -> str | None:
-        if name == "direct_url.json":
-            return '{"url": "file:///workspace/fiab-core", "dir_info": {"editable": true}}'
-        return None
-
-    fake_dist.read_text.side_effect = fake_read_text
-
-    with patch("importlib.metadata.distributions", return_value=[fake_dist]):
-        snapshot = parse_frozen_environment(["-e file:///workspace/fiab-core"])
+    with patch("subprocess.run", return_value=fake_result):
+        snapshot = parse_frozen_environment(["-e file:///workspace/fiab-core"], "/usr/bin/python3")
     entry = snapshot.distributions[0]
     assert entry.kind == "editable"
     assert entry.name == "fiab-core"
@@ -329,12 +367,14 @@ def test_parse_frozen_environment_editable_resolves_via_metadata() -> None:
 
 
 def test_parse_frozen_environment_editable_with_origin_attribute() -> None:
-    fake_dist = MagicMock()
-    fake_dist.metadata = {"Name": "fiab-core"}
-    fake_dist.origin = MagicMock(url="file:///workspace/fiab-core")
+    fake_result = MagicMock()
+    fake_result.returncode = 0
+    fake_result.stdout = json.dumps({"/workspace/fiab-core": "fiab-core"})
+    fake_result.stderr = ""
+    fake_result.args = []
 
-    with patch("importlib.metadata.distributions", return_value=[fake_dist]):
-        snapshot = parse_frozen_environment(["--editable file:///workspace/fiab-core"])
+    with patch("subprocess.run", return_value=fake_result):
+        snapshot = parse_frozen_environment(["--editable file:///workspace/fiab-core"], "/usr/bin/python3")
     entry = snapshot.distributions[0]
     assert entry.kind == "editable"
     assert entry.name == "fiab-core"
@@ -342,30 +382,38 @@ def test_parse_frozen_environment_editable_with_origin_attribute() -> None:
 
 
 def test_parse_frozen_environment_editable_egg_fragment_does_not_need_metadata() -> None:
-    snapshot = parse_frozen_environment(["-e file:///workspace/some-project#egg=some-project"])
+    snapshot = parse_frozen_environment(["-e file:///workspace/some-project#egg=some-project"], "/usr/bin/python3")
     entry = snapshot.distributions[0]
     assert entry.kind == "editable"
     assert entry.name == "some-project"
 
 
 def test_parse_frozen_environment_unidentifiable_editable_fails_closed() -> None:
-    with patch("importlib.metadata.distributions", return_value=[]):
+    fake_result = MagicMock()
+    fake_result.returncode = 0
+    fake_result.stdout = json.dumps({})
+    fake_result.stderr = ""
+    fake_result.args = []
+
+    with patch("subprocess.run", return_value=fake_result):
         with pytest.raises(PackagesError):
-            parse_frozen_environment(["-e file:///unknown/path"])
+            parse_frozen_environment(["-e file:///unknown/path"], "/usr/bin/python3")
 
 
 def test_parse_frozen_environment_malformed_requirement_fails_closed() -> None:
     with pytest.raises(PackagesError):
-        parse_frozen_environment(["not a valid requirement!!!"])
+        parse_frozen_environment(["not a valid requirement!!!"], "/usr/bin/python3")
 
 
 def test_parse_frozen_environment_path_with_spaces() -> None:
-    fake_dist = MagicMock()
-    fake_dist.metadata = {"Name": "spacey-project"}
-    fake_dist.origin = MagicMock(url="file:///workspace/spacey project")
+    fake_result = MagicMock()
+    fake_result.returncode = 0
+    fake_result.stdout = json.dumps({"/workspace/spacey project": "spacey-project"})
+    fake_result.stderr = ""
+    fake_result.args = []
 
-    with patch("importlib.metadata.distributions", return_value=[fake_dist]):
-        snapshot = parse_frozen_environment(["-e file:///workspace/spacey project"])
+    with patch("subprocess.run", return_value=fake_result):
+        snapshot = parse_frozen_environment(["-e file:///workspace/spacey project"], "/usr/bin/python3")
     entry = snapshot.distributions[0]
     assert entry.requirement_args == ("-e", "/workspace/spacey project")
 
@@ -376,29 +424,31 @@ def test_parse_frozen_environment_path_with_spaces() -> None:
 
 
 def test_exclude_distribution_removes_ordinary_pin() -> None:
-    snapshot = parse_frozen_environment(["pkg-a==1.0.0", "pkg-b==2.0.0"])
+    snapshot = parse_frozen_environment(["pkg-a==1.0.0", "pkg-b==2.0.0"], "/usr/bin/python3")
     result = exclude_distribution(snapshot, "pkg-a")
     assert [d.name for d in result.distributions] == ["pkg-b"]
 
 
 def test_exclude_distribution_removes_editable() -> None:
-    fake_dist = MagicMock()
-    fake_dist.metadata = {"Name": "fiab-core"}
-    fake_dist.origin = MagicMock(url="file:///workspace/fiab-core")
-    with patch("importlib.metadata.distributions", return_value=[fake_dist]):
-        snapshot = parse_frozen_environment(["-e file:///workspace/fiab-core", "pkg-b==2.0.0"])
+    fake_result = MagicMock()
+    fake_result.returncode = 0
+    fake_result.stdout = json.dumps({"/workspace/fiab-core": "fiab-core"})
+    fake_result.stderr = ""
+    fake_result.args = []
+    with patch("subprocess.run", return_value=fake_result):
+        snapshot = parse_frozen_environment(["-e file:///workspace/fiab-core", "pkg-b==2.0.0"], "/usr/bin/python3")
     result = exclude_distribution(snapshot, "fiab-core")
     assert [d.name for d in result.distributions] == ["pkg-b"]
 
 
 def test_exclude_distribution_canonical_name_matching() -> None:
-    snapshot = parse_frozen_environment(["Fiab_Plugin.Test==0.1.0"])
+    snapshot = parse_frozen_environment(["Fiab_Plugin.Test==0.1.0"], "/usr/bin/python3")
     result = exclude_distribution(snapshot, "FIAB-PLUGIN-TEST")
     assert result.distributions == ()
 
 
 def test_exclude_distribution_does_not_remove_similarly_named() -> None:
-    snapshot = parse_frozen_environment(["my-plugin==1.0.0", "my-plugin-extra==1.0.0"])
+    snapshot = parse_frozen_environment(["my-plugin==1.0.0", "my-plugin-extra==1.0.0"], "/usr/bin/python3")
     result = exclude_distribution(snapshot, "my-plugin")
     assert [d.name for d in result.distributions] == ["my-plugin-extra"]
 
@@ -409,7 +459,7 @@ def test_exclude_distribution_does_not_remove_similarly_named() -> None:
 
 
 def test_render_constraints_joins_pins_with_trailing_newline() -> None:
-    snapshot = parse_frozen_environment(["pkg-a==1.0.0", "pkg-b==2.0.0"])
+    snapshot = parse_frozen_environment(["pkg-a==1.0.0", "pkg-b==2.0.0"], "/usr/bin/python3")
     text = render_constraints(snapshot)
     assert text == "pkg-a==1.0.0\npkg-b==2.0.0\n"
 
@@ -420,25 +470,30 @@ def test_render_constraints_empty_snapshot_is_valid_empty_string() -> None:
 
 
 def test_render_constraints_excludes_editable_local() -> None:
-    fake_dist = MagicMock()
-    fake_dist.metadata = {"Name": "fiab-core"}
-    fake_dist.origin = MagicMock(url="file:///workspace/fiab-core")
-    with patch("importlib.metadata.distributions", return_value=[fake_dist]):
-        snapshot = parse_frozen_environment(["-e file:///workspace/fiab-core", "pkg-b==2.0.0"])
+    fake_result = MagicMock()
+    fake_result.returncode = 0
+    fake_result.stdout = json.dumps({"/workspace/fiab-core": "fiab-core"})
+    fake_result.stderr = ""
+    fake_result.args = []
+    with patch("subprocess.run", return_value=fake_result):
+        snapshot = parse_frozen_environment(["-e file:///workspace/fiab-core", "pkg-b==2.0.0"], "/usr/bin/python3")
     assert render_constraints(snapshot) == "pkg-b==2.0.0\n"
 
 
 def test_extract_editable_local_requirements_tokenizes_correctly() -> None:
-    fake_dist = MagicMock()
-    fake_dist.metadata = {"Name": "fiab-core"}
-    fake_dist.origin = MagicMock(url="file:///workspace/fiab-core")
-    with patch("importlib.metadata.distributions", return_value=[fake_dist]):
+    fake_result = MagicMock()
+    fake_result.returncode = 0
+    fake_result.stdout = json.dumps({"/workspace/fiab-core": "fiab-core"})
+    fake_result.stderr = ""
+    fake_result.args = []
+    with patch("subprocess.run", return_value=fake_result):
         snapshot = parse_frozen_environment(
             [
                 "-e file:///workspace/fiab-core",
                 "some-package @ file:///wheelhouse/some_package.whl",
                 "pkg-b==2.0.0",
-            ]
+            ],
+            "/usr/bin/python3",
         )
     args = extract_editable_local_requirements(snapshot)
     assert args == ["-e", "/workspace/fiab-core", "some-package @ file:///wheelhouse/some_package.whl"]

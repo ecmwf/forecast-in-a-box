@@ -23,6 +23,7 @@ import contextlib
 import datetime as dt
 import importlib
 import importlib.metadata
+import json
 import logging
 import os
 import pathlib
@@ -34,7 +35,6 @@ from types import ModuleType
 from typing import Literal
 
 import httpx
-import orjson
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import Version
@@ -225,36 +225,74 @@ def freeze_environment(python: str) -> list[str]:
     return result.stdout.splitlines()
 
 
-def _build_source_distribution_map() -> dict[str, str]:
-    """Map a normalized local filesystem path (as found in ``file://`` origins/direct_url.json)
-    to the canonicalized distribution name installed from that path. Used to identify the
-    distribution behind an editable/local ``uv pip freeze`` entry that does not carry an explicit
-    name (plain ``-e <path>`` lines).
+def _build_source_distribution_map(python: str) -> dict[str, str]:
+    """Ask the *python* interpreter -- which is the target environment being frozen, and may not be
+    the interpreter currently running this code -- for a mapping of local filesystem source path to
+    canonicalized distribution name, for every installed distribution that has a ``file://`` origin
+    (editable or local installs). Used to identify the distribution behind an editable/local
+    ``uv pip freeze`` entry that does not carry an explicit name (plain ``-e <path>`` lines).
+
+    Queries via a subprocess running in *python* rather than in-process ``importlib.metadata``,
+    because the target environment is not necessarily the one this process is running in (e.g. the
+    backend inspecting its own venv is the common case, but tooling/tests may point this at a
+    different interpreter entirely). The subprocess script only uses the standard library so it
+    works even when the target environment has neither ``packaging`` nor ``orjson`` installed.
     """
-    mapping: dict[str, str] = {}
-    for distribution in importlib.metadata.distributions():
-        name = distribution.metadata["Name"] if distribution.metadata else None
-        if not name:
-            continue
-        url: str | None = None
-        origin = getattr(distribution, "origin", None)
-        if origin is not None and isinstance(getattr(origin, "url", None), str):
-            url = origin.url
-        else:
-            try:
-                direct_url_text = distribution.read_text("direct_url.json")
-            except Exception:
-                direct_url_text = None
-            if direct_url_text:
-                try:
-                    info = orjson.loads(direct_url_text)
-                    url = info.get("url")
-                except Exception:
-                    url = None
-        if url and url.startswith("file://"):
-            path = url[len("file://") :].rstrip("/")
-            mapping[path] = canonicalize_name(name)
-    return mapping
+    script = (
+        "import importlib.metadata, json\n"
+        "mapping = {}\n"
+        "for dist in importlib.metadata.distributions():\n"
+        "    name = dist.metadata.get('Name') if dist.metadata else None\n"
+        "    if not name:\n"
+        "        continue\n"
+        "    url = None\n"
+        "    origin = getattr(dist, 'origin', None)\n"
+        "    if origin is not None and isinstance(getattr(origin, 'url', None), str):\n"
+        "        url = origin.url\n"
+        "    else:\n"
+        "        try:\n"
+        "            direct_url_text = dist.read_text('direct_url.json')\n"
+        "        except Exception:\n"
+        "            direct_url_text = None\n"
+        "        if direct_url_text:\n"
+        "            try:\n"
+        "                info = json.loads(direct_url_text)\n"
+        "                url = info.get('url')\n"
+        "            except Exception:\n"
+        "                url = None\n"
+        "    if url and url.startswith('file://'):\n"
+        "        path = url[len('file://'):].rstrip('/')\n"
+        "        mapping[path] = name\n"
+        "print(json.dumps(mapping))\n"
+    )
+    result = _run_command([python, "-c", script])
+    if not result.ok:
+        raise PackagesError(f"failed to query installed distribution metadata from {python!r}: {result.stderr or result.stdout}")
+    try:
+        raw_mapping = json.loads(result.stdout)
+    except Exception as ex:
+        raise PackagesError(f"failed to parse distribution metadata from {python!r}: {ex}") from ex
+    return {path: canonicalize_name(name) for path, name in raw_mapping.items()}
+
+
+def query_module_distribution_map(python: str) -> dict[str, list[str]]:
+    """Ask the *python* interpreter -- the target environment, not necessarily the one currently
+    running this code -- for its ``importlib.metadata.packages_distributions()`` mapping (top-level
+    importable module name -> distribution name(s) providing it). Used to identify the distribution
+    behind a plugin's configured ``module_name`` when its ``pip_source`` is local/editable/URL and so
+    cannot be parsed for a distribution name directly (see
+    ``forecastbox.domain.plugin.compatibility._resolve_target_distribution_name``). Queried via
+    subprocess, using only the standard library in the target interpreter, for the same reason as
+    ``_build_source_distribution_map``: the target environment is not necessarily this process's own.
+    """
+    script = "import importlib.metadata, json\nprint(json.dumps(importlib.metadata.packages_distributions()))\n"
+    result = _run_command([python, "-c", script])
+    if not result.ok:
+        raise PackagesError(f"failed to query module/distribution mapping from {python!r}: {result.stderr or result.stdout}")
+    try:
+        return json.loads(result.stdout)
+    except Exception as ex:
+        raise PackagesError(f"failed to parse module/distribution mapping from {python!r}: {ex}") from ex
 
 
 def _classify_editable_or_local(line: str, source_map: dict[str, str]) -> FrozenDistribution:
@@ -280,8 +318,11 @@ def _classify_editable_or_local(line: str, source_map: dict[str, str]) -> Frozen
     raise PackagesError(f"cannot classify frozen local/editable requirement: {line!r}")
 
 
-def parse_frozen_environment(lines: Iterable[str]) -> EnvironmentSnapshot:
-    """Classify raw ``uv pip freeze`` lines into ordinary pins and editable/local sources.
+def parse_frozen_environment(lines: Iterable[str], python: str) -> EnvironmentSnapshot:
+    """Classify raw ``uv pip freeze`` lines (as produced for *python*) into ordinary pins and
+    editable/local sources. *python* is only used, lazily, to resolve bare ``-e <path>`` entries
+    (see ``_build_source_distribution_map``); it must be the same interpreter the lines were frozen
+    from.
 
     Raises ``PackagesError`` if an editable/local entry cannot be associated with a distribution
     name -- we fail closed rather than silently drop or silently keep an unidentified source (see
@@ -295,7 +336,7 @@ def parse_frozen_environment(lines: Iterable[str]) -> EnvironmentSnapshot:
             continue
         if line.startswith("-e ") or line.startswith("--editable ") or line.startswith("file://") or " @ " in line:
             if source_map is None:
-                source_map = _build_source_distribution_map()
+                source_map = _build_source_distribution_map(python)
             distributions.append(_classify_editable_or_local(line, source_map))
             continue
         try:

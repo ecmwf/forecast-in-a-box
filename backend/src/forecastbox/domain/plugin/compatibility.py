@@ -106,6 +106,7 @@ from forecastbox.utility.packages import (
     freeze_environment,
     parse_frozen_environment,
     parse_install_output,
+    query_module_distribution_map,
     render_constraints,
     run_pip_check,
     run_pip_install,
@@ -179,7 +180,7 @@ def _registry_distribution_name(pip_source: str) -> str | None:
     return canonicalize_name(req.name)
 
 
-def _resolve_target_distribution_name(pip_source: str, module_name: str) -> str | None:
+def _resolve_target_distribution_name(pip_source: str, module_name: str, python: str) -> str | None:
     """Determine the canonical distribution name of the plugin currently being installed/updated,
     so it can be excluded from the frozen environment snapshot.
 
@@ -188,17 +189,19 @@ def _resolve_target_distribution_name(pip_source: str, module_name: str) -> str 
 
     For local/editable/URL/VCS sources we cannot reliably derive the distribution name from
     ``pip_source`` itself (a directory basename is not a distribution name), so we instead look
-    at installed metadata via ``importlib.metadata.packages_distributions()``, which maps the
-    plugin's configured top-level import module to the distribution(s) currently providing it.
-    If nothing is installed yet (first install) this correctly returns ``None`` -- there is
-    nothing to exclude. If more than one distribution provides that top-level module we refuse to
-    guess and raise, rather than possibly excluding (and so failing to protect) the wrong one.
+    at installed metadata in the *target* environment (``python``, queried via
+    ``query_module_distribution_map`` -- not necessarily the interpreter currently running this
+    code), which maps the plugin's configured top-level import module to the distribution(s)
+    currently providing it there. If nothing is installed yet (first install) this correctly
+    returns ``None`` -- there is nothing to exclude. If more than one distribution provides that
+    top-level module we refuse to guess and raise, rather than possibly excluding (and so failing
+    to protect) the wrong one.
     """
     registry_name = _registry_distribution_name(pip_source)
     if registry_name is not None:
         return registry_name
     top_level = module_name.split(".", 1)[0]
-    mapping = importlib.metadata.packages_distributions()
+    mapping = query_module_distribution_map(python)
     candidates = {canonicalize_name(name) for name in mapping.get(top_level, [])}
     if not candidates:
         return None
@@ -223,7 +226,7 @@ def install_plugin_compatibly(pip_source: str, version: Version | None, module_n
     plugin_requirement_args = _plugin_requirement_args(pip_source, version)
 
     try:
-        target_name = _resolve_target_distribution_name(pip_source, module_name)
+        target_name = _resolve_target_distribution_name(pip_source, module_name, python)
     except PackagesError as e:
         msg = f"stage=identify: {e!r}"
         logger.error(msg)
@@ -237,7 +240,7 @@ def install_plugin_compatibly(pip_source: str, version: Version | None, module_n
 
     try:
         raw_lines = freeze_environment(python)
-        snapshot = parse_frozen_environment(raw_lines)
+        snapshot = parse_frozen_environment(raw_lines, python)
     except PackagesError as e:
         msg = f"stage=freeze: {e!r}"
         logger.error(msg)

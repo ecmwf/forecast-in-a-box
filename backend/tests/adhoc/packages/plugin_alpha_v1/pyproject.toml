@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fiab-adhoctest-plugin-alpha"
+version = "1.0.0"
+requires-python = ">=3.10"
+dependencies = ["fiab-core"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
