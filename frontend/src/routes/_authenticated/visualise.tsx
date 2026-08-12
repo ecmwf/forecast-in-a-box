@@ -21,8 +21,8 @@ import { VisualisePage } from '@/features/visualise/components/VisualisePage'
  * SLOT_B_OFF). The basket itself is localStorage, and lens
  * ids/ports are runtime-only. Unlike other routes, `a`/`b` are
  * deliberately always materialized once sources are active: the "default
- * pair" depends on client-local basket state, so a shared URL must pin it
- * explicitly.
+ * pair" depends on client-local state (last-used pair, then basket
+ * order), so a shared URL must pin it explicitly.
  *
  * The slim view state rides along so the copied URL reproduces the view,
  * not just the pair (encode/decode in view-url-state.ts): `la`/`lb`

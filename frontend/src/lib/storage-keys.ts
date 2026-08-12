@@ -87,6 +87,14 @@ export const STORAGE_KEYS = {
   },
 
   /**
+   * Visualise page (direct localStorage)
+   */
+  visualise: {
+    /** Last-used A/B slot pair; seeds the slots on a bare /visualise visit */
+    lastPair: 'fiab.visualise.last-pair',
+  },
+
+  /**
    * Zustand store persistence keys
    */
   stores: {
