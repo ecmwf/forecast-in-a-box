@@ -23,6 +23,7 @@ from fiab_core.fable import (
     BlockInstance as BlockInstanceBase,
 )
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
+from qubed import Qube
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource
 from fiab_plugin_ecmwf.block_utils import (
@@ -41,8 +42,32 @@ from fiab_plugin_ecmwf.blocks import (
     FORECAST_DATASETS,
     OperationalForecastSource,
 )
+from fiab_plugin_ecmwf.datasets import ForecastDataset
 from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
 from fiab_plugin_ecmwf.qubed_utils import select
+
+
+class MockedForecastDataset(ForecastDataset):
+    def as_qube(self, ens_dim: str = "number", include_member_zero: bool = False, **extra: dict) -> Qube:
+        full_qube = super().as_qube(ens_dim, include_member_zero=include_member_zero, **extra)
+        selected_qube = full_qube.select(
+            {
+                PARAM: ["165", "166", "167", "168", "169", "175", "176", "177", "228021", "47", "151", "140232", "140232", "131", "132"],
+                STEP: ["0", "6", "12"],
+                ENSEMBLE: ["0", "1", "2", "3", "4"],
+            }
+        )
+        return selected_qube
+
+
+@pytest.fixture
+def mock_forecast_preset(monkeypatch: pytest.MonkeyPatch) -> None:
+    mocked_datasets = {
+        name: MockedForecastDataset(FORECAST_DATASETS[name].datacubes, FORECAST_DATASETS[name].member_zero)
+        for name in FORECAST_DATASETS.keys()
+    }
+    for name, dataset in mocked_datasets.items():
+        monkeypatch.setitem(FORECAST_DATASETS, name, dataset)
 
 
 @pytest.fixture
@@ -73,7 +98,7 @@ def sample_forecast_source_output(dummy_blockinstance: BlockInstance) -> QubedOu
 
 
 @pytest.fixture
-def sample_forecast_source_action(dummy_blockinstance: BlockInstance) -> Action:
+def sample_forecast_source_action(mock_forecast_preset: pytest.FixtureRequest, dummy_blockinstance: BlockInstance) -> Action:
     oper_action = OperationalForecastSource().compile(inputs={}, block=dummy_blockinstance).get_or_raise()
     return oper_action.select({PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]}, expand=True)
 
@@ -136,7 +161,9 @@ def operational_forecast_source_output(operational_forecast_blockinstance: Block
 
 
 @pytest.fixture
-def operational_forecast_source_action(operational_forecast_blockinstance: BlockInstance) -> Action:
+def operational_forecast_source_action(
+    mock_forecast_preset: pytest.FixtureRequest, operational_forecast_blockinstance: BlockInstance
+) -> Action:
     oper_action = OperationalForecastSource().compile(inputs={}, block=operational_forecast_blockinstance).get_or_raise()
     return oper_action.select({PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]}, expand=True)
 
