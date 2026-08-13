@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from earthkit.workflows.fluent import Action
+from earthkit.workflows.nodetree import datacubes as nodetree_datacubes
 from earthkit.workflows.nodetree import nodetree_arrays, nodetree_dimensions
 from fiab_core.fable import (
     BlockFactoryId,
@@ -40,8 +41,7 @@ from fiab_plugin_ecmwf.block_utils import (
     VALUES,
     _param_id_to_param_key,
 )
-from fiab_plugin_ecmwf.blocks import FORECAST_DATASETS, GribSink, MapPlotSink, OperationalForecastSource, Select, ZarrSink
-from fiab_plugin_ecmwf.datasets import ForecastDataset
+from fiab_plugin_ecmwf.blocks import GribSink, MapPlotSink, OperationalForecastSource, Select, ZarrSink
 from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
 
@@ -136,28 +136,6 @@ def map_plot_sink_configuration() -> BlockInstance:
     )
 
 
-class MockedForecastDataset(ForecastDataset):
-    def as_qube(self, ens_dim: str = "number", include_member_zero: bool = False) -> Qube:
-        full_qube = super().as_qube(ens_dim, include_member_zero=include_member_zero)
-        return full_qube.select(
-            {
-                PARAM: ["2t", "msl", "tp", "mwp", "swh", "u", "v"],
-                STEP: ["0", "6", "12"],
-                ENSEMBLE: ["0", "1", "2", "3", "4"],
-            }
-        )
-
-
-@pytest.fixture
-def mock_forecast_preset(monkeypatch: pytest.MonkeyPatch) -> None:
-    mocked_datasets = {
-        name: MockedForecastDataset(FORECAST_DATASETS[name].datacubes, FORECAST_DATASETS[name].member_zero)
-        for name in FORECAST_DATASETS.keys()
-    }
-    for name, dataset in mocked_datasets.items():
-        monkeypatch.setitem(FORECAST_DATASETS, name, dataset)
-
-
 class TestOperationalForecastSource:
     def test_creation(self, dummy_blockinstance_output: QubedOutput, operational_forecast_blockinstance: BlockInstance) -> None:
         block = OperationalForecastSource()
@@ -187,10 +165,11 @@ class TestOperationalForecastSource:
             OperationalForecastSource.configuration_options,
         )
         action = block.compile({}, block_instance).get_or_raise()
-        for _, array in nodetree_arrays(action.nodes):
-            assert set(array.coords[PARAM].data.tolist()).issubset({"2t", "msl", "tp", "mwp", "swh", "u", "v"})
-            assert array.sizes[STEP] == 3
-            assert array.sizes[ENSEMBLE] == 5
+        datacubes = list(nodetree_datacubes(action.nodes))
+
+        assert set.union(*[set(cube[PARAM]) for cube in datacubes]).issuperset({"167", "151", "140232", "131", "132"})
+        assert len(set.union(*[set(cube[STEP]) for cube in datacubes])) == 3
+        assert len(set.union(*[set(cube[ENSEMBLE]) for cube in datacubes])) == 5
         assert "levelist" in nodetree_dimensions(action.nodes)
 
     @pytest.mark.parametrize(

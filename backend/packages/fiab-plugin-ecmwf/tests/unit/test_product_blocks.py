@@ -412,6 +412,7 @@ class TestThermalIndices:
     )
     def test_compile(
         self,
+        mock_forecast_preset: pytest.FixtureRequest,
         dummy_blockinstance: BlockInstance,
         full_operational_forecast_source_output: QubedOutput,
         thermal_indices_configuration: BlockInstance,
