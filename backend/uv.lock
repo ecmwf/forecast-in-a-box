@@ -1613,7 +1613,7 @@ requires-dist = [
     { name = "earthkit-workflows-anemoi", specifier = ">=0.7.2" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
-    { name = "pproc-core", specifier = ">=0.3.0" },
+    { name = "pproc-core", specifier = ">=0.3.1" },
     { name = "pymetkit", git = "https://github.com/ecmwf/metkit.git?rev=feature%2Fparamdb-api" },
 ]
 provides-extras = ["runtime"]
@@ -3183,7 +3183,7 @@ wheels = [
 
 [[package]]
 name = "pproc-core"
-version = "0.3.0"
+version = "0.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "code-meters", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -3195,9 +3195,9 @@ dependencies = [
     { name = "pydantic", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "qubed", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/59/7a/72cdd0068a1d08e9831d73f1061c44a976edc4a950f6ddf376a1ee7a6565/pproc_core-0.3.0.tar.gz", hash = "sha256:6eb9587433f9b5d6b35188faa6f788cda6687bd87c04a57873000979c8e7c7ce", size = 186022, upload-time = "2026-08-06T11:08:25.906Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/e9/706c14ff15217f801c752ba66dfe2ce35b6b950d24afd300828f4608119d/pproc_core-0.3.1.tar.gz", hash = "sha256:e882eed7b647f38188c4666794628eb3f6ae62a2d01c54d2c47a0b8ee5c917b7", size = 187557, upload-time = "2026-08-13T09:15:54.761Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/e2/48341c7b13f42a5452a1110bf16248a28473bdb11fc53898265683104adb/pproc_core-0.3.0-py3-none-any.whl", hash = "sha256:5af83391fa755709ddf2af2408577b75128081bfab8589a63d1601546b6dcaae", size = 62829, upload-time = "2026-08-06T11:08:24.61Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/ea/3120226a5319c9b0911b3dc8498ad7093a89d37a729a66ede5e4a689a3e6/pproc_core-0.3.1-py3-none-any.whl", hash = "sha256:2e6fdeca0de2bb2074786f9f7f3c4fe809e16a2ef93cf1d3276cbb6b4150cd17", size = 62905, upload-time = "2026-08-13T09:15:53.518Z" },
 ]
 
 [[package]]
