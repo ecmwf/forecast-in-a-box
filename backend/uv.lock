@@ -726,6 +726,15 @@ wheels = [
 ]
 
 [[package]]
+name = "code-meters"
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b7/c6/49cb64fc3f7cdb12f10aad07f5ab7a6a750f81c5fc9c6cd912a7471364cf/code-meters-0.0.3.tar.gz", hash = "sha256:1c9b9e4f078d0df9290ea48bdeed5d3e7102261c3fccb68253e9fea9071bafdb", size = 10129, upload-time = "2024-02-23T15:50:40.138Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/3d/ed5fea1e8b2b6f86116a8fbe7cf50194f488276db86871fce39c74e620fb/code_meters-0.0.3-py3-none-any.whl", hash = "sha256:d77fbe9bdfb2b50239addc1976a66867dff6031e1c79be5962ede903fba92ef6", size = 8801, upload-time = "2024-02-23T15:50:38.443Z" },
+]
+
+[[package]]
 name = "conflator"
 version = "0.1.8"
 source = { registry = "https://pypi.org/simple" }
@@ -1237,7 +1246,7 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows"
-version = "0.15.5"
+version = "0.15.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "array-api-compat", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -1253,9 +1262,9 @@ dependencies = [
     { name = "sortedcontainers", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "xarray", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/63/3b01673695df477ede39178a6db2b7f72fb30d94cf4d1dead71358a4faef/earthkit_workflows-0.15.5.tar.gz", hash = "sha256:06717d020794ad0856556fb1c862cd4fe397784719da8fe4f7e7aea503460d44", size = 10866450, upload-time = "2026-08-03T08:44:10.269Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/41/841f353ed970f6106b390fb525699b5fc0fa1dbb0eca8684dba3fbaec1b5/earthkit_workflows-0.15.6.tar.gz", hash = "sha256:eb0204437018ae35cad5a22cf1c83596f581c80b0d33229ef778516140bee30a", size = 10866763, upload-time = "2026-08-06T10:23:00.752Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/4f/cb17554d664662ec1176cf61e4cc85e491c30214d91d8ca0aefea8636bc8/earthkit_workflows-0.15.5-py3-none-any.whl", hash = "sha256:d1df6abe0df117dee85b88f44599e557e7d03e4b97db3931dca74b1b817bd959", size = 215033, upload-time = "2026-08-03T08:44:08.484Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/83/fae11fe17a7b10a2266869e49c01505e4783425fbe543fa7c34ec0e8db56/earthkit_workflows-0.15.6-py3-none-any.whl", hash = "sha256:b7f6426b5a424a814b3ab94ccd5a835880c8eadb40327c1855b10c9e7b2d5c05", size = 215129, upload-time = "2026-08-06T10:22:59.384Z" },
 ]
 
 [[package]]
@@ -1578,6 +1587,8 @@ dependencies = [
     { name = "earthkit-workflows", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "earthkit-workflows-anemoi", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "fiab-core", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pproc-core", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pymetkit", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
 
 [package.optional-dependencies]
@@ -1596,12 +1607,14 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
-    { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2" },
+    { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2,<1" },
     { name = "earthkit-plots", marker = "extra == 'runtime'", specifier = ">=0.3.5,<1.0" },
-    { name = "earthkit-workflows", specifier = ">=0.9.0" },
+    { name = "earthkit-workflows", specifier = ">=0.15.6" },
     { name = "earthkit-workflows-anemoi", specifier = ">=0.7.2" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
+    { name = "pproc-core", specifier = ">=0.3.1" },
+    { name = "pymetkit", git = "https://github.com/ecmwf/metkit.git?rev=feature%2Fparamdb-api" },
 ]
 provides-extras = ["runtime"]
 
@@ -3169,6 +3182,25 @@ wheels = [
 ]
 
 [[package]]
+name = "pproc-core"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "code-meters", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "conflator", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "earthkit-time", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "earthkit-workflows", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "numpy", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pandas", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pydantic", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "qubed", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f8/e9/706c14ff15217f801c752ba66dfe2ce35b6b950d24afd300828f4608119d/pproc_core-0.3.1.tar.gz", hash = "sha256:e882eed7b647f38188c4666794628eb3f6ae62a2d01c54d2c47a0b8ee5c917b7", size = 187557, upload-time = "2026-08-13T09:15:54.761Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/ea/3120226a5319c9b0911b3dc8498ad7093a89d37a729a66ede5e4a689a3e6/pproc_core-0.3.1-py3-none-any.whl", hash = "sha256:2e6fdeca0de2bb2074786f9f7f3c4fe809e16a2ef93cf1d3276cbb6b4150cd17", size = 62905, upload-time = "2026-08-13T09:15:53.518Z" },
+]
+
+[[package]]
 name = "prek"
 version = "0.3.6"
 source = { registry = "https://pypi.org/simple" }
@@ -3451,6 +3483,20 @@ wheels = [
 [package.optional-dependencies]
 crypto = [
     { name = "cryptography", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+]
+
+[[package]]
+name = "pymetkit"
+version = "1.19.2"
+source = { git = "https://github.com/ecmwf/metkit.git?rev=feature%2Fparamdb-api#03003d05b15c3c4dc0c1a7fcdcebdc6db6747edf" }
+dependencies = [
+    { name = "cffi", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "findlibs", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "metkitlib", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "platformdirs", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pydantic", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pyyaml", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "requests", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
 
 [[package]]
