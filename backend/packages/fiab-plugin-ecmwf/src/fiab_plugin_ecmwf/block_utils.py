@@ -1,4 +1,5 @@
 from typing import Any
+import functools
 
 from fiab_core.fable import ConfigurationOptionId, QubedOutput
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
@@ -29,6 +30,7 @@ TYPE = ConfigurationOptionId("type")
 VALUES = ConfigurationOptionId("values")
 
 
+@functools.cache
 def _param_id_to_param_key(param_id: str) -> str:
     try:
         param_id_int = int(param_id)
@@ -39,6 +41,7 @@ def _param_id_to_param_key(param_id: str) -> str:
     return f"{shortname}-{param_id}"
 
 
+@functools.cache
 def _param_key_to_param_id(param_key: str) -> str:
     if "-" not in param_key:
         return param_key

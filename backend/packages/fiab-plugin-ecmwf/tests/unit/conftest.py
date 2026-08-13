@@ -63,7 +63,7 @@ class MockedForecastDataset(ForecastDataset):
 @pytest.fixture
 def mock_forecast_preset(monkeypatch: pytest.MonkeyPatch) -> None:
     mocked_datasets = {
-        name: MockedForecastDataset(FORECAST_DATASETS[name].datacubes, FORECAST_DATASETS[name].member_zero)
+        name: MockedForecastDataset(FORECAST_DATASETS[name].datacubes, FORECAST_DATASETS[name].member_zero, False)
         for name in FORECAST_DATASETS.keys()
     }
     for name, dataset in mocked_datasets.items():
