@@ -340,10 +340,10 @@
 @keyframes run-node-ring {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.35);
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 35%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.25);
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--primary) 25%, transparent);
   }
 }
 .run-node-ringing {
