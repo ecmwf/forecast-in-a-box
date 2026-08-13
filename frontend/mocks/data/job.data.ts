@@ -272,7 +272,17 @@ resetJobsState()
 
 // ─── Execution accessors ──────────────────────────────────────────────────
 
+/** Test seam: seeded runs would grandfather every "fresh" onboarding visit. */
+function emptyRunsRequested(): boolean {
+  try {
+    return localStorage.getItem('fiab.mock.empty-runs') !== null
+  } catch {
+    return false
+  }
+}
+
 export function getAllExecutions(): Array<JobExecutionDetail> {
+  if (emptyRunsRequested()) return []
   return Object.values(executionsState).sort((a, b) => {
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })

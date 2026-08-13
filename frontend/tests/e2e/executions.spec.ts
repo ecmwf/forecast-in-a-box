@@ -15,7 +15,7 @@
  * Covers page loading, status filtering, search, and detail navigation.
  */
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
 
 async function navigateTo(page: Page, path: string) {

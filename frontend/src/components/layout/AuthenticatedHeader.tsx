@@ -11,7 +11,7 @@
 /** Header for authenticated pages: system status, help, and settings menu. */
 
 import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
   Blocks,
@@ -26,6 +26,7 @@ import {
   Monitor,
   Moon,
   Settings,
+  Sparkles,
   Sun,
   User,
   Variable,
@@ -65,6 +66,7 @@ import { cn } from '@/lib/utils'
 import { useUser } from '@/hooks/useUser'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useUiStore } from '@/stores/uiStore'
+import { useOnboardingStore } from '@/stores/onboardingStore'
 import { timeZoneOffsetLabel, useAppTimeZone } from '@/lib/datetime'
 
 export function AuthenticatedHeader() {
@@ -81,6 +83,7 @@ export function AuthenticatedHeader() {
   const timeZone = useAppTimeZone()
   const [tzDialogOpen, setTzDialogOpen] = useState(false)
   const { t } = useTranslation('common')
+  const navigate = useNavigate()
 
   const isAuthenticated = authType === 'authenticated'
   const isSuperuser = user?.is_superuser ?? false
@@ -89,6 +92,12 @@ export function AuthenticatedHeader() {
 
   const handleSignOut = async () => {
     await signOut()
+  }
+
+  // Non-destructive replay of the welcome tour: status and progress persist.
+  const handleOpenWelcomeTour = () => {
+    useOnboardingStore.getState().openWelcome()
+    void navigate({ to: '/overview' })
   }
 
   return (
@@ -140,6 +149,7 @@ export function AuthenticatedHeader() {
             size="icon"
             className="text-muted-foreground"
             aria-label={t('userMenu.help')}
+            onClick={handleOpenWelcomeTour}
           >
             <HelpCircle className="h-5 w-5" />
           </Button>
@@ -272,6 +282,10 @@ export function AuthenticatedHeader() {
 
               {/* Help & Documentation */}
               <DropdownMenuGroup>
+                <DropdownMenuItem onClick={handleOpenWelcomeTour}>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {t('userMenu.welcomeTour')}
+                </DropdownMenuItem>
                 <DropdownMenuItem>
                   <HelpCircle className="mr-2 h-4 w-4" />
                   {t('userMenu.helpSupport')}

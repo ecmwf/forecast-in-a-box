@@ -15,7 +15,7 @@
  * Uses MSW mocks for API responses.
  */
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test.describe('Navigation', () => {
   test('loads the landing page', async ({ page }) => {

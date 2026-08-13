@@ -1,0 +1,55 @@
+{
+  "welcome": {
+    "dontShowAgain": "Don't show this again",
+    "reopened": "Reopened from Help · Welcome tour",
+    "skip": "Skip for now",
+    "close": "Close",
+    "back": "Back",
+    "takeTour": "Take the tour",
+    "continue": "Continue",
+    "stepCounter": "{{current}} of {{total}}"
+  },
+  "steps": {
+    "welcome": {
+      "title": "Welcome to Forecast-in-a-Box",
+      "body": "Run state-of-the-art AI weather forecasts on your own hardware, with free open data. This short tour covers the essentials — about two minutes."
+    },
+    "dashboard": {
+      "title": "Your dashboard, at a glance",
+      "body": "The Overview page surfaces system status, downloaded models, and a journal of recent and scheduled forecasts — plus ready-made starting points for your first run."
+    },
+    "blocks": {
+      "title": "Compose forecasts from blocks",
+      "body": "A forecast is a pipeline. A source provides the data — an Anemoi model, an operational forecast, or a source a plugin adds. Transforms select parameters, products compute statistics, and one run can fan out to several outputs. Connect blocks on the canvas; configure each in the side panel."
+    },
+    "execution": {
+      "title": "Run it, then inspect results in place",
+      "body": "Every submitted workflow becomes an execution record: the resolved configuration graph on the left, with outputs, logs, task graph, and the full run specification in tabs on the right."
+    },
+    "viewer": {
+      "title": "Visualise and compare on the map",
+      "body": "Stored GRIB outputs render as WMS layers in the integrated viewer — no downloads. Load two sources as A and B, compare them in several modes, and step through lead times on a shared timeline. External WMS-compatible servers — even third-party ones — can be linked in for comparison."
+    },
+    "activate": {
+      "title": "Run your first forecast",
+      "body": "Pick a starting preset — it opens pre-configured in the workflow builder, ready to adjust and run. You can save your own presets later.",
+      "bodyGated": "Pick a starting preset to open it in the workflow builder. One thing first:"
+    }
+  },
+  "activate": {
+    "openConfigure": "Open in Configure",
+    "recommended": "Recommended",
+    "pluginsOk": "All required plugins installed — ready to configure.",
+    "empty": "No starter presets are available yet — you can still start from a blank canvas.",
+    "gate": {
+      "title": "No plugins are installed yet",
+      "adminBody": "Presets come from plugins. Install the ECMWF base plugin and the starting presets appear here — installation takes about a minute.",
+      "adminAction": "Go to plugins",
+      "lockedBody": "An administrator needs to install a plugin before Forecast-in-a-Box can forecast. Everything unlocks automatically once that's done.",
+      "lockedAction": "Got it"
+    }
+  },
+  "dots": {
+    "goTo": "Go to step {{step}}"
+  }
+}
