@@ -393,3 +393,14 @@
     transform: translateX(400%);
   }
 }
+
+/* TanStack Charts tooltip on app tokens (run-activity chart). */
+.run-activity-tooltip {
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  font-size: 0.75rem;
+  padding: 0.375rem 0.5rem;
+  box-shadow: 0 4px 8px -1px rgb(0 0 0 / 0.1);
+}
