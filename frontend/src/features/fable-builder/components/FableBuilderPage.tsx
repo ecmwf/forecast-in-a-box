@@ -9,11 +9,11 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Package } from 'lucide-react'
 import { FableBuilderHeader } from './FableBuilderHeader'
-import { ReplaceWorkbenchDialog } from './ReplaceWorkbenchDialog'
+import { WorkbenchShelfBanner } from './WorkbenchShelfBanner'
 import { BlockPalette } from './layout/BlockPalette'
 import { ConfigPanel } from './layout/ConfigPanel'
 import { MobileLayout } from './layout/MobileLayout'
@@ -25,21 +25,17 @@ import { TemplateParamsDialog } from './TemplateParamsDialog'
 import type { TFunction } from 'i18next'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type { TemplateParameters } from '@/features/fable-builder/utils/template-parameters'
-import type {
-  WorkbenchIncoming,
-  WorkbenchReplaceTarget,
-} from './ReplaceWorkbenchDialog'
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { deriveTemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { useAllGlyphs } from '@/features/fable-builder/hooks/useAllGlyphs'
 import { useURLStateSync } from '@/features/fable-builder/hooks/useURLStateSync'
 import {
-  clearDraft,
   readDraft,
   useDraftPersistence,
 } from '@/features/fable-builder/hooks/useDraftPersistence'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { shelveBenchIfDirty } from '@/features/fable-builder/stores/workbenchShelfStore'
 import { hasUnterminatedGlyph } from '@/features/fable-builder/utils/glyph-display'
 import { decodeFableFromURL } from '@/features/fable-builder/utils/url-state'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -95,23 +91,6 @@ function getValidationErrorMessage(
   return error.message || t('page.validationErrorGeneric')
 }
 
-/** The bench occupant — any non-empty canvas asks before replacement; null = blank. */
-function benchAtRisk(): WorkbenchReplaceTarget | null {
-  const state = useFableBuilderStore.getState()
-  if (Object.keys(state.fable.blocks).length > 0) {
-    return {
-      fable: state.fable,
-      fableName: state.fableName,
-      unsaved: state.isDirty,
-    }
-  }
-  const draft = readDraft()
-  if (draft && Object.keys(draft.fable.blocks).length > 0) {
-    return { fable: draft.fable, fableName: draft.fableName, unsaved: true }
-  }
-  return null
-}
-
 interface FableBuilderPageProps {
   fableId?: string
   encodedState?: string
@@ -121,7 +100,7 @@ interface FableBuilderPageProps {
   templatePlugin?: string
   /** Template display name for the example-values lookup */
   templateName?: string
-  /** Explicit blank-canvas intent; a bench holding unsaved work asks first. */
+  /** Explicit blank-canvas intent; unsaved bench work parks on the shelf. */
   fresh?: boolean
 }
 
@@ -160,13 +139,11 @@ export function FableBuilderPage({
   )
   const setIsValidating = useFableBuilderStore((state) => state.setIsValidating)
 
-  const navigate = useNavigate()
   const initializedRef = useRef(false)
-  // Decided synchronously at mount, before any payload can touch the store.
-  const [replaceTarget, setReplaceTarget] =
-    useState<WorkbenchReplaceTarget | null>(() =>
-      fableId || encodedState || templateMode || fresh ? benchAtRisk() : null,
-    )
+  // Payload arrivals park dirty bench work first; false until that ran.
+  const [arrivalReady, setArrivalReady] = useState(
+    () => !(fableId || encodedState || templateMode || fresh),
+  )
   const [templateInitialized, setTemplateInitialized] = useState(false)
   const [templateParamsDone, setTemplateParamsDone] = useState(false)
   // Set after "Load config"; resolved into loadedParams once glyphs are known
@@ -178,10 +155,52 @@ export function FableBuilderPage({
   // Auto-persist the workbench to localStorage
   useDraftPersistence()
 
-  // Held back while the dialog is open — the payload must not land early.
+  // Incoming payloads replace the bench immediately; dirty work parks on the shelf.
+  useEffect(() => {
+    if (arrivalReady) return
+    // Returning to the template already forked resumes it (canvas, then cold draft).
+    if (templateMode && fableId) {
+      const state = useFableBuilderStore.getState()
+      if (
+        state.forkParentId === fableId &&
+        Object.keys(state.fable.blocks).length > 0
+      ) {
+        initializedRef.current = true
+        setTemplateParamsDone(true)
+        setArrivalReady(true)
+        return
+      }
+      const draft = readDraft()
+      if (
+        Object.keys(state.fable.blocks).length === 0 &&
+        draft?.forkParentId === fableId &&
+        Object.keys(draft.fable.blocks).length > 0
+      ) {
+        setFable(draft.fable, draft.fableId)
+        if (draft.fableName) setFableName(draft.fableName)
+        useFableBuilderStore.setState({
+          isDirty: true,
+          forkParentId: draft.forkParentId,
+          ...(draft.fableVersion && { fableVersion: draft.fableVersion }),
+        })
+        initializedRef.current = true
+        setTemplateParamsDone(true)
+        setArrivalReady(true)
+        return
+      }
+    }
+    const incoming = encodedState ? decodeFableFromURL(encodedState) : null
+    const { shelved, evicted } = shelveBenchIfDirty(incoming)
+    if (evicted) showToast.warning(t('configure:shelf.evicted'))
+    if (shelved) showToast.info(t('configure:shelf.setAside'))
+    setArrivalReady(true)
+    // Mount-scoped, like the payload props themselves.
+  }, [])
+
+  // Held back until the arrival parked the bench — payloads must not land early.
   useURLStateSync({
     encodedState: fableId ? undefined : encodedState,
-    enabled: !fableId && replaceTarget === null,
+    enabled: !fableId && arrivalReady,
   })
 
   // lg, matching the geo viewer: portrait tablets get sheets, not a ~200px canvas.
@@ -224,23 +243,21 @@ export function FableBuilderPage({
     error: validationError,
   } = useFableValidation(debouncedFable, !fableHasOpenGlyph)
 
-  // Fresh intent: reset now — also mid-session; an occupied bench asks first.
+  // Fresh intent: reset now — also mid-session; dirty work parks on the shelf.
   useEffect(() => {
-    if (!fresh) return
-    const risk = benchAtRisk()
-    if (risk) {
-      setReplaceTarget(risk)
-      return
-    }
+    if (!fresh || !arrivalReady) return
+    const { shelved, evicted } = shelveBenchIfDirty()
+    if (evicted) showToast.warning(t('configure:shelf.evicted'))
+    if (shelved) showToast.info(t('configure:shelf.setAside'))
     newFable()
     initializedRef.current = true
-  }, [fresh, newFable])
+  }, [fresh, arrivalReady, newFable, t])
 
   // Initialize fable state - only runs once per mount.
   useEffect(() => {
     if (initializedRef.current) return
-    // Awaiting the user's replace decision — nothing may load yet.
-    if (replaceTarget) return
+    // The arrival must park the bench before anything may load.
+    if (!arrivalReady) return
 
     // Template mode: fork — load the template's builder without adopting its
     // identity, so saving creates a new blueprint (parent_id = the template).
@@ -305,31 +322,8 @@ export function FableBuilderPage({
     fableRetrieveData,
     encodedState,
     templateMode,
-    replaceTarget,
+    arrivalReady,
   ])
-
-  function handleReplaceConfirm(): void {
-    clearDraft()
-    // A pending flush must not re-bank the work the user just discarded.
-    useFableBuilderStore.setState({ isDirty: false })
-    if (fresh) {
-      newFable()
-      initializedRef.current = true
-    }
-    setReplaceTarget(null)
-  }
-
-  function handleReplaceCancel(): void {
-    // Navigate only — clearing the target here would un-gate init for one render.
-    navigate({ to: '/configure', replace: true })
-  }
-
-  // The ask is moot once no payload is pending (cancel landed).
-  useEffect(() => {
-    if (!fableId && !encodedState && !templateMode && !fresh) {
-      setReplaceTarget(null)
-    }
-  }, [fableId, encodedState, templateMode, fresh])
 
   // Template mode: collect parameters via a dialog once builder + examples
   // are ready, then overlay values (mirrors the backend's ingest overlay).
@@ -479,38 +473,10 @@ export function FableBuilderPage({
     }
   }, [catalogue, debouncedFable, validationResult, setValidationState])
 
-  // Picker preview of the incoming side; names and builders arrive reactively.
-  const incomingFromState = useMemo(
-    () => (encodedState ? decodeFableFromURL(encodedState) : null),
-    [encodedState],
-  )
-  const incoming: WorkbenchIncoming = fresh
-    ? { label: null, fable: null, isNew: true }
-    : {
-        label:
-          (templateMode ? templateName : undefined) ??
-          fableRetrieveData?.display_name ??
-          null,
-        fable: fableId ? (existingFable ?? null) : incomingFromState,
-        isNew: false,
-      }
-
-  // Rendered in every page state; conditionally mounted — an effect-driven
-  // open=false flip can strand the portal, so closing means unmounting.
-  const replaceDialog = replaceTarget ? (
-    <ReplaceWorkbenchDialog
-      target={replaceTarget}
-      incoming={incoming}
-      onCancel={handleReplaceCancel}
-      onReplace={handleReplaceConfirm}
-    />
-  ) : null
-
   if (catalogueLoading || (fableId && fableLoading)) {
     return (
       <div className="flex min-h-100 items-center justify-center">
         <LoadingSpinner size="lg" />
-        {replaceDialog}
       </div>
     )
   }
@@ -562,6 +528,8 @@ export function FableBuilderPage({
           onConfigLoaded={() => setLoadedCheckPending(true)}
         />
 
+        <WorkbenchShelfBanner />
+
         {/* Wrapper is relative so the validation banner overlays absolutely —
             toggling it must not shift the canvas. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -584,8 +552,6 @@ export function FableBuilderPage({
           )}
         </div>
       </div>
-
-      {replaceDialog}
 
       {/* Lives here, not inside ReviewStep, so "Run Once" can open it straight
           from the edit canvas without first routing through the review page. */}

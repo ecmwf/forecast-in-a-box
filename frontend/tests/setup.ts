@@ -72,6 +72,14 @@ function resetSharedState(): void {
   localStorage.clear()
 }
 
+/** Shelf reset stays lazy: a static import would pull storage→logger into
+ *  every file's module graph before logger.test.ts can stub console. */
+async function resetShelfState(): Promise<void> {
+  const { useWorkbenchShelfStore } =
+    await import('@/features/fable-builder/stores/workbenchShelfStore')
+  useWorkbenchShelfStore.getState().clear()
+}
+
 /**
  * Global teardown between tests.
  *
@@ -89,13 +97,15 @@ afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0))
   worker.resetHandlers()
   resetSharedState()
+  await resetShelfState()
 })
 
 // Belt-and-braces: a second reset right before each test body runs, so a
 // failed afterEach or a module-scoped write from an unrelated file can't
 // poison the next test either.
-beforeEach(() => {
+beforeEach(async () => {
   resetSharedState()
+  await resetShelfState()
 })
 
 // Stop the worker after all tests complete

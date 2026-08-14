@@ -54,6 +54,8 @@ export const STORAGE_KEYS = {
     favourites: 'fiab.fable.favourites',
     /** The workbench draft — the single auto-saved work-in-progress */
     draft: 'fiab.fable.draft',
+    /** Configuration set aside when an incoming one replaced it */
+    shelf: 'fiab.fable.shelf',
     /** Legacy per-target draft map — read once for migration into `draft` */
     drafts: 'fiab.fable.drafts',
     /** Pipeline (form-mode) sidebar open/closed flag */

@@ -81,22 +81,6 @@
     "saving": "Saving draft…",
     "saved": "Draft saved"
   },
-  "replaceDialog": {
-    "title": "Which configuration do you want to work on?",
-    "subtitle": "There is unsaved work on the canvas — choose what to continue with.",
-    "subtitleSaved": "A configuration is open on the canvas — choose what to continue with.",
-    "benchLabel": "Previous configuration (unsaved)",
-    "benchLabelSaved": "Previous configuration",
-    "discardHintSaved": "Replaces your current configuration",
-    "incomingLabel": "New configuration",
-    "blockCount_one": "{{count}} block",
-    "blockCount_other": "{{count}} blocks",
-    "newConfiguration": "New, empty configuration",
-    "unknownIncoming": "Selected configuration",
-    "blankCanvas": "Blank canvas",
-    "keepHint": "Keep working on this",
-    "discardHint": "Discards your unsaved work"
-  },
   "validationStatus": {
     "validating": "Validating",
     "valid": "Valid",
@@ -309,5 +293,24 @@
       "issues": "{{count}} validation issue",
       "issues_other": "{{count}} validation issues"
     }
+  },
+  "shelf": {
+    "title": "Unsaved work set aside",
+    "setAside": "Previous configuration set aside — restore it from the bar above the canvas.",
+    "evicted": "Replaced the configuration that was set aside earlier.",
+    "swapped": "Your work swapped onto the shelf — restore it from the bar above the canvas.",
+    "restore": "Restore",
+    "export": "Export",
+    "discard": "Discard set-aside configuration",
+    "untitled": "Untitled configuration",
+    "blockCount_one": "{{count}} block",
+    "blockCount_other": "{{count}} blocks",
+    "justNow": "just now",
+    "minutesAgo_one": "{{count}} minute ago",
+    "minutesAgo_other": "{{count}} minutes ago",
+    "hoursAgo_one": "{{count}} hour ago",
+    "hoursAgo_other": "{{count}} hours ago",
+    "daysAgo_one": "{{count}} day ago",
+    "daysAgo_other": "{{count}} days ago"
   }
 }
