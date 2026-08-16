@@ -170,7 +170,7 @@ class TestAnemoiSourceValidate:
 
     def test_ensemble_has_number_axis(self, anemoi_source_ensemble_output: QubedOutput) -> None:
         assert contains(anemoi_source_ensemble_output, "number")
-        assert set(axes(anemoi_source_ensemble_output)["number"]) == {1, 2, 3}
+        assert set(axes(anemoi_source_ensemble_output)["number"]) == {3}
 
     def test_ensemble_preserves_param_axis(self, anemoi_source_ensemble_output: QubedOutput) -> None:
         assert contains(anemoi_source_ensemble_output, "param")
@@ -308,15 +308,13 @@ class TestAnemoiTransformValidate:
             restrictions={},
         )
         assert isinstance(output, QubedOutput)
-        assert contains(anemoi_input_source_output, "number")
-        assert contains(output, "number")
-
-        assert axes(anemoi_input_source_output)["number"] == axes(output)["number"]
+        assert not contains(anemoi_input_source_output, "number")
+        assert not contains(output, "number")
 
     def test_valid_propagates_number_axis(
         self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput
     ) -> None:
-        input_with_number = expand(anemoi_input_source_output, {"number": [1, 2, 3]})
+        input_with_number = expand(anemoi_input_source_output, {"number": [3]})
         output = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
             inputs={"dataset": input_with_number},
@@ -324,7 +322,7 @@ class TestAnemoiTransformValidate:
         )
         assert isinstance(output, QubedOutput)
         assert contains(output, "number")
-        assert set(axes(output)["number"]) == {1, 2, 3}
+        assert set(axes(output)["number"]) == {3}
 
     def test_output_has_step_axis(self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput) -> None:
         output: QubedOutput = AnemoiTransform().validate(
@@ -451,7 +449,7 @@ class TestFlowAnemoiSourceToTransform:
             restrictions={},
         )  # type: ignore[assignment]
         assert contains(output, "number")
-        assert set(axes(output)["number"]) == {1, 2, 3}
+        assert set(axes(output)["number"]) == {3}
 
 
 class TestFlowAnemoiInputSourceToTransform:
@@ -470,8 +468,7 @@ class TestFlowAnemoiInputSourceToTransform:
         assert isinstance(output, QubedOutput)
         assert contains(output, "param")
         assert contains(output, "step")
-        assert contains(output, "number")
-        assert axes(output)["number"] == axes(anemoi_input_source_output)["number"]
+        assert not contains(output, "number")
 
 
 class TestFlowChainedTransforms:

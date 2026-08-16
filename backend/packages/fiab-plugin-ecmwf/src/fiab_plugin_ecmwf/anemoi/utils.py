@@ -95,15 +95,25 @@ class CheckpointArtifact:
 
     def validate_lead_time(self, lead_time: int) -> str | None:
         """Validate configured lead time against the checkpoint timestep."""
-        checkpoint = self.checkpoint()
-        model_step_seconds = _timestep_seconds(checkpoint.timestep)
-        lead_time_seconds = lead_time * 3600
-
-        if lead_time_seconds <= model_step_seconds:
-            return f"Configuration option 'lead_time' must be greater than checkpoint timestep {checkpoint.timestep!r}, got {lead_time}h"
-        if lead_time_seconds % model_step_seconds != 0:
-            return f"Configuration option 'lead_time' must be a multiple of checkpoint timestep {checkpoint.timestep!r}, got {lead_time}h"
+        if lead_time <= self.model_step:
+            return f"Configuration option 'lead_time' must be greater than checkpoint timestep {self.model_step!r}, got {lead_time}h"
+        if lead_time % self.model_step != 0:
+            return f"Configuration option 'lead_time' must be a multiple of checkpoint timestep {self.model_step!r}, got {lead_time}h"
         return None
+
+    @property
+    def model_step(self) -> int:
+        """Get the model step in hours from the checkpoint artifact"""
+        checkpoint = self.checkpoint()
+        return _timestep_seconds(checkpoint.timestep) // 3600
+
+    @property
+    def is_ensemble_model(self) -> bool | None:
+        """Get whether the model can be run as an ensemble from the checkpoint artifact"""
+        checkpoint = self.checkpoint()
+        if checkpoint.configuration.is_ensemble_model is None:
+            return None
+        return checkpoint.configuration.is_ensemble_model is True
 
     def get_model_output(self, lead_time: int) -> Qube | dict[str, Qube]:
         """Get the model output qube from the checkpoint artifact"""
