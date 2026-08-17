@@ -17,7 +17,6 @@
 import { Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { ContinueWorkbenchCard } from './ContinueWorkbenchCard'
 import { GettingStartedCard } from './GettingStartedCard'
 import {
   TemplateStarterCard,
@@ -29,7 +28,6 @@ import {
   STARTER_TEMPLATE_LIMIT,
   useStarterTemplates,
 } from '@/features/dashboard/hooks/useStarterTemplates'
-import { useWorkbenchSummary } from '@/features/fable-builder/hooks/useWorkbenchSummary'
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -66,7 +64,6 @@ export function GettingStartedSection({
   const navigate = useNavigate()
   const { starters, hasStarters, isLoading, isError, refetch } =
     useStarterTemplates()
-  const workbench = useWorkbenchSummary()
 
   const content = (
     <>
@@ -76,8 +73,6 @@ export function GettingStartedSection({
           {t('gettingStarted.subtitle')}
         </P>
       </div>
-
-      {workbench && <ContinueWorkbenchCard summary={workbench} />}
 
       {/* Fixed four tracks: the card count varies, but matching the presets row
           below matters more than absorbing the gap. */}

@@ -132,7 +132,7 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
         'relative cursor-pointer rounded-lg border bg-card shadow-sm transition-colors',
         showConfig && configEntries.length > 0 ? 'w-[200px]' : 'w-[140px]',
         isCompleted && 'border-l-2 border-l-emerald-500',
-        isRunning && 'run-node-ringing border-amber-500',
+        isRunning && 'run-node-ringing border-primary',
         isPlannedIdle && 'opacity-60',
         isHovered && !isSelected && 'bg-primary/10',
         isSelected &&
@@ -185,7 +185,7 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
             <CheckCircle2 className="ml-auto h-3.5 w-3.5 shrink-0 text-emerald-500" />
           )}
           {isRunning && (
-            <Loader2 className="ml-auto h-3.5 w-3.5 shrink-0 animate-spin text-amber-500" />
+            <Loader2 className="ml-auto h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
           )}
         </div>
         <span className="text-sm text-muted-foreground">{kindMeta.label}</span>

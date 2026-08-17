@@ -57,6 +57,8 @@ import {
   encodeViewerUrlState,
 } from '@/features/viewer/geo/view-url-state'
 import { GeoViewerSkeleton } from '@/features/viewer/geo/GeoViewerSkeleton'
+import { readStorageJson, writeStorageJson } from '@/lib/storage'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
@@ -116,12 +118,12 @@ function useActivePair(): ActivePair & {
   const aValid = search.a !== undefined && byRef.has(search.a)
   const bValid = search.b !== undefined && byRef.has(search.b)
 
-  // Materialize missing slots from basket order (route file explains why
-  // the pair is always pinned in the URL). `b=off` is a deliberate single
-  // view — never re-fill it. Unresolved refs belong to
-  // useHydrateComparisonFromUrl (add/strip/rewrite) — wait, or filling the
-  // sibling slot races that update. `replace` keeps history clean while
-  // chips are clicked around.
+  // Materialize missing slots from the last-used pair, then basket order
+  // (route file explains why the pair is always pinned in the URL).
+  // `b=off` is a deliberate single view — never re-fill it. Unresolved
+  // refs belong to useHydrateComparisonFromUrl (add/strip/rewrite) — wait,
+  // or filling the sibling slot races that update. `replace` keeps
+  // history clean while chips are clicked around.
   useEffect(() => {
     if (entries.length === 0) return
     const refs = entries.map((e) => entryRef(e))
@@ -132,8 +134,25 @@ function useActivePair(): ActivePair & {
     const bUnresolved =
       !bMissing && search.b !== SLOT_B_OFF && !byRef.has(search.b!)
     if (aUnresolved || bUnresolved) return
-    const nextA = aMissing ? refs.find((r) => r !== search.b) : search.a
-    const nextB = bMissing ? refs.find((r) => r !== nextA) : search.b
+    const stored = readStorageJson<{ a: string; b: string }>(
+      STORAGE_KEYS.visualise.lastPair,
+    )
+    const storedA =
+      stored && byRef.has(stored.a) && stored.a !== search.b
+        ? stored.a
+        : undefined
+    const nextA = aMissing
+      ? (storedA ?? refs.find((r) => r !== search.b))
+      : search.a
+    const storedB =
+      stored &&
+      (stored.b === SLOT_B_OFF || byRef.has(stored.b)) &&
+      stored.b !== nextA
+        ? stored.b
+        : undefined
+    const nextB = bMissing
+      ? (storedB ?? refs.find((r) => r !== nextA))
+      : search.b
     if (nextA !== search.a || nextB !== search.b) {
       void navigate({
         search: (prev) => ({ ...prev, a: nextA, b: nextB }),
@@ -141,6 +160,16 @@ function useActivePair(): ActivePair & {
       })
     }
   }, [entries, byRef, search.a, search.b, navigate])
+
+  // Remember the resolved pair so a bare /visualise restores it.
+  useEffect(() => {
+    if (!aValid) return
+    if (search.b !== SLOT_B_OFF && !bValid) return
+    writeStorageJson(STORAGE_KEYS.visualise.lastPair, {
+      a: search.a!,
+      b: search.b!,
+    })
+  }, [aValid, bValid, search.a, search.b])
 
   // Plain assignment — the same source in both slots is a real workflow
   // (unlink layers, compare two parameters of one run; or pair with the

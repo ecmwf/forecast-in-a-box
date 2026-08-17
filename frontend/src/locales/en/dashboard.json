@@ -70,16 +70,6 @@
         "control": "Full Control"
       }
     },
-    "continue": {
-      "title": "Continue where you left off",
-      "untitled": "Untitled configuration",
-      "blockCount_one": "{{count}} block",
-      "blockCount_other": "{{count}} blocks",
-      "edited": "edited {{timeLabel}}",
-      "justNow": "just now",
-      "minutesAgo": "{{count}} min ago",
-      "open": "Continue"
-    },
     "templates": {
       "loading": "Loading templates",
       "emptyTitle": "No plugin templates available",

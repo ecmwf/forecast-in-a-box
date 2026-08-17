@@ -25,6 +25,12 @@ export default mergeConfig(
         'lz-string',
         'date-fns',
         '@date-fns/tz',
+        '@tanstack/charts',
+        '@tanstack/charts/motion',
+        '@tanstack/charts/scales/band',
+        '@tanstack/charts/scales/linear',
+        '@tanstack/charts/tooltip',
+        '@tanstack/react-charts/tooltip',
       ],
     },
     test: {

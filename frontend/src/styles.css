@@ -340,10 +340,10 @@
 @keyframes run-node-ring {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.35);
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 35%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.25);
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--primary) 25%, transparent);
   }
 }
 .run-node-ringing {
@@ -392,4 +392,15 @@
   100% {
     transform: translateX(400%);
   }
+}
+
+/* TanStack Charts tooltip on app tokens (run-activity chart). */
+.run-activity-tooltip {
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  font-size: 0.75rem;
+  padding: 0.375rem 0.5rem;
+  box-shadow: 0 4px 8px -1px rgb(0 0 0 / 0.1);
 }

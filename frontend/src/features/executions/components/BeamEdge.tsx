@@ -10,8 +10,9 @@
 
 /**
  * Animated beam edge for the execution canvas — used while a job is running.
- * A static dashed track plus a thin "worm" — a single short dash that flows
- * source → target via stroke-dashoffset on a path normalized to pathLength=100.
+ * A dashed track with slow drifting dots on every edge; edges into
+ * currently-running blocks (`data.worm`) add a glowing "worm" — a short dash
+ * flowing source → target via stroke-dashoffset on a pathLength=100 path.
  */
 
 import { getSmoothStepPath } from '@xyflow/react'
@@ -25,7 +26,9 @@ export function BeamEdge({
   targetY,
   sourcePosition,
   targetPosition,
+  data,
 }: EdgeProps) {
+  const worm = data?.worm !== false
   const [path] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -47,47 +50,69 @@ export function BeamEdge({
 
   return (
     <>
-      <defs>
-        <filter
-          id={filterId}
-          filterUnits="userSpaceOnUse"
-          x={minX}
-          y={minY}
-          width={w}
-          height={h}
-        >
-          <feGaussianBlur stdDeviation="1.2" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
+      {worm && (
+        <defs>
+          <filter
+            id={filterId}
+            filterUnits="userSpaceOnUse"
+            x={minX}
+            y={minY}
+            width={w}
+            height={h}
+          >
+            <feGaussianBlur stdDeviation="1.2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+      )}
 
       {/* Static dashed track. */}
       <path
         d={path}
-        stroke="rgb(245 158 11 / 0.4)"
+        stroke="var(--muted-foreground)"
+        strokeOpacity={0.3}
         strokeWidth={1.5}
         strokeDasharray="3 6"
         strokeLinecap="round"
         fill="none"
       />
 
-      {/* Worm: short dash on a path normalized to length 100, dashoffset
-          animated so the dash flows source → target. The glow filter gives
-          a subtle bloom; thin stroke keeps it from dominating. */}
+      {/* Drifting dots: round-cap micro-dashes on a slower loop than the
+          worm, so it periodically overtakes them. */}
       <path
         d={path}
         pathLength={100}
-        stroke="rgb(249 115 22)"
-        strokeWidth={1.5}
-        strokeDasharray="12 88"
+        stroke="var(--primary)"
+        strokeOpacity={0.75}
+        strokeWidth={3}
+        strokeDasharray="0.1 49.9"
         strokeLinecap="round"
         fill="none"
-        filter={`url(#${filterId})`}
-        style={{ animation: 'beam-flow 1.6s linear infinite' }}
+        style={{
+          animation: 'beam-flow 5.2s linear infinite',
+          animationDelay: '-2s',
+        }}
       />
+
+      {/* Worm: short dash on a path normalized to length 100, dashoffset
+          animated so the dash flows source → target. The glow filter gives
+          a subtle bloom; thin stroke keeps it from dominating. */}
+      {worm && (
+        <path
+          d={path}
+          pathLength={100}
+          stroke="var(--primary)"
+          strokeWidth={1.5}
+          strokeDasharray="12 88"
+          strokeLinecap="round"
+          fill="none"
+          filter={`url(#${filterId})`}
+          style={{ animation: 'beam-flow 1.6s linear infinite' }}
+        />
+      )}
     </>
   )
 }

@@ -200,16 +200,15 @@ function RunCanvasInner({
     })
     const hasPlanInfo = blockProgress.plannedSet.size > 0
     const remapped = edgeList.map((e) => {
-      // Not running → always smoothstep.
-      // Running with detailed plan → beam only edges into currently-running
-      // blocks; finished and not-yet-started edges stay static.
-      // Running without detailed plan (older backend, or pre-plan tick) →
-      // fall back to beaming everything as before.
-      const shouldBeam =
+      // Running → every edge gets the ambient beam (track + drifting dots);
+      // the glowing worm marks only edges into currently-running blocks
+      // (or everything when no detailed plan is available).
+      const worm =
         isRunning && (!hasPlanInfo || blockProgress.runningSet.has(e.target))
       return {
         ...e,
-        type: shouldBeam ? ('beam' as const) : ('smoothstep' as const),
+        type: isRunning ? ('beam' as const) : ('smoothstep' as const),
+        data: { worm },
         animated: false,
         style: undefined,
       }

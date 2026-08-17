@@ -54,6 +54,8 @@ import type * as GeoViewerModule from '@/features/viewer/geo/GeoViewer'
 import { Route as VisualiseRoute } from '@/routes/_authenticated/visualise'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
+import { entryRef } from '@/features/visualise/entry-ref'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
 import i18n from '@/lib/i18n'
 
 // While armed the viewer throws on render (error-boundary tests) — a
@@ -232,6 +234,40 @@ describe('VisualisePage', () => {
     await screen.getByRole('button', { name: 'Swap A and B' }).click()
     await expect.element(pickerA).toHaveTextContent('Run B')
     await expect.element(pickerB).toHaveTextContent('Run A')
+  })
+
+  it('a bare visit restores the last-used pair over basket order', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    localStorage.setItem(
+      STORAGE_KEYS.visualise.lastPair,
+      JSON.stringify({ a: entryRef(RUN_B), b: entryRef(RUN_A) }),
+    )
+    const screen = await renderVisualisePage()
+
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toHaveTextContent('Run B')
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toHaveTextContent('Run A')
+  })
+
+  it('falls back to basket order when the stored pair left the basket', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    localStorage.setItem(
+      STORAGE_KEYS.visualise.lastPair,
+      JSON.stringify({ a: 'run:gone~x', b: 'run:gone~y' }),
+    )
+    const screen = await renderVisualisePage()
+
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toHaveTextContent('Run A')
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toHaveTextContent('Run B')
   })
 
   it('swapping hands a healthy source to a slot whose start had failed', async () => {

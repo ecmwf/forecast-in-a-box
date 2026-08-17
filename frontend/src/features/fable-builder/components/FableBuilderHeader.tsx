@@ -36,8 +36,9 @@ import type {
 } from '@/api/types/fable.types'
 import { getBlocksByKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { shelveBenchIfDirty } from '@/features/fable-builder/stores/workbenchShelfStore'
+import { downloadFableJson } from '@/features/fable-builder/utils/export-config'
 import { useUndoRedoShortcuts } from '@/features/fable-builder/hooks/useUndoRedoShortcuts'
-import { formatInZone, getAppTimeZone } from '@/lib/datetime'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import {
@@ -113,7 +114,7 @@ export function FableBuilderHeader({
         : undefined
 
   const navigate = useNavigate()
-  // Routes through the fresh intent — the workbench picker guards an occupied bench.
+  // Routes through the fresh intent — dirty bench work parks on the shelf.
   function handleNewConfiguration(): void {
     void navigate({ to: '/configure', search: { fresh: true } })
   }
@@ -151,21 +152,7 @@ export function FableBuilderHeader({
 
   function handleExportConfig(): void {
     try {
-      const json = JSON.stringify(fable, null, 2)
-      const blob = new Blob([json], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const date = formatInZone(
-        new Date(),
-        getAppTimeZone(),
-        "yyyy-MM-dd'T'HH-mm-ss",
-      )
-      a.download = `${displayName.replace(/\s+/g, '_').toLowerCase()}_${date}_config.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadFableJson(fable, displayName)
     } catch (error) {
       showToast.error(
         t('header.exportFailed'),
@@ -203,8 +190,13 @@ export function FableBuilderHeader({
           'blocks' in parsed &&
           typeof parsed.blocks === 'object'
         ) {
+          const { shelved, evicted } = shelveBenchIfDirty(
+            parsed as FableBuilderV1,
+          )
+          if (evicted) showToast.warning(t('shelf.evicted'))
           setFable(parsed as FableBuilderV1, null)
           showToast.success(t('header.configLoaded'))
+          if (shelved) showToast.info(t('shelf.setAside'))
           onConfigLoaded?.()
         } else {
           showToast.error(

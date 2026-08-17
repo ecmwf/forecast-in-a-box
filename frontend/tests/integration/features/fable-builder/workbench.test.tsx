@@ -8,13 +8,19 @@
  * does it submit to any jurisdiction.
  */
 
+/**
+ * Workbench replace semantics: incoming configurations land immediately;
+ * dirty bench work parks on the shelf and the banner restores/discards it.
+ */
+
 import { useState } from 'react'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import type { FableDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 import { readDraft } from '@/features/fable-builder/hooks/useDraftPersistence'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { useWorkbenchShelfStore } from '@/features/fable-builder/stores/workbenchShelfStore'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 // Mock useMedia to simulate desktop layout (three-column with sidebars)
@@ -22,7 +28,7 @@ vi.mock('@/hooks/useMedia', () => ({
   useMedia: () => true,
 }))
 
-// Partial mock — cancel navigates to /configure, absent from the test router.
+// Partial mock — restore navigates to /configure, absent from the test router.
 const mockNavigate = vi.fn()
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -70,6 +76,15 @@ function seedWorkbench(): void {
   localStorage.setItem(STORAGE_KEYS.fable.draft, JSON.stringify(seedDraft()))
 }
 
+function seedLiveDirtyBench(): void {
+  useFableBuilderStore.getState().setFable(seedDraft().fable)
+  useFableBuilderStore.setState({ fableName: 'Drafted work', isDirty: true })
+}
+
+function shelfName(): string | undefined {
+  return useWorkbenchShelfStore.getState().shelf?.fableName
+}
+
 /** Mirrors ConfigurePage: the route stays mounted while the search turns fresh. */
 function FreshToggleHarness() {
   const [fresh, setFresh] = useState(false)
@@ -82,18 +97,10 @@ function FreshToggleHarness() {
 }
 
 describe('Fable Builder workbench', () => {
-  // Unstyled browser tests: restore dialog stacking so the backdrop can't
-  // swallow clicks; top/left pin keeps it in the viewport.
-  beforeAll(() => {
-    const style = document.createElement('style')
-    style.textContent =
-      '[data-slot="alert-dialog-content"]{position:fixed;top:0;left:0;z-index:50;background:#fff}'
-    document.head.appendChild(style)
-  })
-
   beforeEach(() => {
     localStorage.clear()
     useFableBuilderStore.getState().reset()
+    useWorkbenchShelfStore.getState().clear()
     vi.clearAllMocks()
   })
 
@@ -109,6 +116,7 @@ describe('Fable Builder workbench', () => {
     expect(useFableBuilderStore.getState().isDirty).toBe(true)
     // The slot mirrors the bench — it is not consumed by the restore.
     expect(readDraft()?.fableName).toBe('Drafted work')
+    expect(shelfName()).toBeUndefined()
   })
 
   it('the header broom issues the guarded fresh navigation', async () => {
@@ -126,8 +134,7 @@ describe('Fable Builder workbench', () => {
   })
 
   it('a plain visit resumes the live session', async () => {
-    useFableBuilderStore.getState().setFable(seedDraft().fable)
-    useFableBuilderStore.setState({ isDirty: true })
+    seedLiveDirtyBench()
 
     const screen = await renderWithRouter(<FableBuilderPage />)
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
@@ -137,7 +144,7 @@ describe('Fable Builder workbench', () => {
     )
   })
 
-  it('fresh with a clean bench blanks the canvas without asking', async () => {
+  it('fresh with a clean bench blanks the canvas without a banner', async () => {
     const screen = await renderWithRouter(<FreshToggleHarness />)
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
 
@@ -146,45 +153,43 @@ describe('Fable Builder workbench', () => {
     expect(
       Object.keys(useFableBuilderStore.getState().fable.blocks),
     ).toHaveLength(0)
-    await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
-      .not.toBeInTheDocument()
+    expect(screen.getByTestId('workbench-shelf-banner').query()).toBeNull()
   })
 
-  it('fresh at mount over a banked bench asks; replace blanks and clears', async () => {
+  it('fresh at mount shelves the banked bench and blanks immediately', async () => {
     seedWorkbench()
 
     const screen = await renderWithRouter(<FableBuilderPage fresh />)
-    await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
-      .toBeVisible()
-    // Undecided: the slot survives.
-    expect(readDraft()?.fableName).toBe('Drafted work')
-
-    await screen.getByRole('button', { name: 'New configuration' }).click()
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
       .toHaveLength(0)
+    expect(shelfName()).toBe('Drafted work')
+    // Parked work moved off the draft slot — a flush must not re-bank it.
     expect(readDraft()).toBeNull()
+    await expect
+      .element(screen.getByTestId('workbench-shelf-banner'))
+      .toBeVisible()
   })
 
-  it('fresh at mount over a live dirty bench asks first', async () => {
-    // As after applying template params: content + dirty in the live store.
-    useFableBuilderStore.getState().setFable(seedDraft().fable)
-    useFableBuilderStore.setState({ isDirty: true })
+  it('mid-session fresh shelves live dirty work and blanks', async () => {
+    const screen = await renderWithRouter(<FreshToggleHarness />)
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
 
-    const screen = await renderWithRouter(<FableBuilderPage fresh />)
+    seedLiveDirtyBench()
+    await screen.getByRole('button', { name: 'go fresh' }).click()
 
     await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toHaveLength(0)
+    expect(shelfName()).toBe('Drafted work')
+    await expect
+      .element(screen.getByTestId('workbench-shelf-banner'))
       .toBeVisible()
-    expect(Object.keys(useFableBuilderStore.getState().fable.blocks)).toContain(
-      'draft_block',
-    )
   })
 
-  it('a clean saved bench still asks — one rule, no exemptions', async () => {
+  it('a clean saved bench is replaced silently — nothing to lose', async () => {
     // An opened blueprint, unedited: blocks live, isDirty false.
     useFableBuilderStore.getState().setFable(seedDraft().fable, 'bp-live')
 
@@ -193,133 +198,64 @@ describe('Fable Builder workbench', () => {
     )
 
     await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
-      .toBeVisible()
-    // Saved bench: neutral wording instead of the loss warning.
-    await expect
-      .element(screen.getByRole('button', { name: 'Previous configuration' }))
-      .toBeVisible()
-
-    await screen.getByRole('button', { name: 'New configuration' }).click()
-
-    await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
       .toContain('block_source_1')
+    expect(shelfName()).toBeUndefined()
+    expect(screen.getByTestId('workbench-shelf-banner').query()).toBeNull()
   })
 
-  it('mid-session fresh over unsaved work asks; replace clears the bench', async () => {
-    const screen = await renderWithRouter(<FreshToggleHarness />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
-
-    useFableBuilderStore.getState().setFable(seedDraft().fable)
-    useFableBuilderStore.setState({ fableName: 'Working title', isDirty: true })
-
-    await screen.getByRole('button', { name: 'go fresh' }).click()
-
-    await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
-      .toBeVisible()
-    // Nothing lost yet — the bench is intact behind the dialog.
-    expect(Object.keys(useFableBuilderStore.getState().fable.blocks)).toContain(
-      'draft_block',
-    )
-
-    await screen.getByRole('button', { name: 'New configuration' }).click()
-
-    await expect
-      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
-      .toHaveLength(0)
-    expect(readDraft()).toBeNull()
-  })
-
-  it('a clean bench loads a blueprint without asking', async () => {
-    const screen = await renderWithRouter(
-      <FableBuilderPage fableId="fable-001" />,
-    )
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
-
-    await expect
-      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
-      .toContain('block_source_1')
-    await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
-      .not.toBeInTheDocument()
-  })
-
-  it('opening a blueprint over banked work asks; replace proceeds', async () => {
+  it('opening a blueprint over banked work shelves it and proceeds', async () => {
     seedWorkbench()
 
     const screen = await renderWithRouter(
       <FableBuilderPage fableId="fable-001" />,
     )
-    await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
-      .toBeVisible()
-
-    await screen.getByRole('button', { name: 'New configuration' }).click()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
       .toContain('block_source_1')
+    expect(shelfName()).toBe('Drafted work')
     expect(readDraft()).toBeNull()
-  })
-
-  it('picking your own work keeps the bench and abandons the load', async () => {
-    seedWorkbench()
-
-    const screen = await renderWithRouter(
-      <FableBuilderPage fableId="fable-001" />,
-    )
     await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
+      .element(screen.getByTestId('workbench-shelf-banner'))
       .toBeVisible()
-
-    await screen
-      .getByRole('button', { name: 'Previous configuration (unsaved)' })
-      .click()
-
-    expect(mockNavigate).toHaveBeenCalledWith({
-      to: '/configure',
-      replace: true,
-    })
-    expect(readDraft()?.fableName).toBe('Drafted work')
-    // Init must stay gated until navigation lands (cleared-target race regression).
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    expect(
-      Object.keys(useFableBuilderStore.getState().fable.blocks),
-    ).toHaveLength(0)
   })
 
-  it('a template entry over a live dirty bench asks before forking', async () => {
-    useFableBuilderStore.getState().setFable(seedDraft().fable)
-    useFableBuilderStore.setState({ isDirty: true })
+  it('a template entry over a live dirty bench shelves and forks', async () => {
+    seedLiveDirtyBench()
 
     const screen = await renderWithRouter(
       <FableBuilderPage fableId="fable-001" templateMode />,
     )
-    await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
-      .toBeVisible()
-
-    await screen.getByRole('button', { name: 'New configuration' }).click()
 
     await expect
       .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
       .toContain('block_source_1')
     expect(useFableBuilderStore.getState().forkParentId).toBe('fable-001')
+    expect(shelfName()).toBe('Drafted work')
+    await expect
+      .element(screen.getByTestId('workbench-shelf-banner'))
+      .toBeVisible()
   })
 
-  it('an encoded URL payload over banked work asks first', async () => {
-    seedWorkbench()
+  it('returning to the template already on the bench resumes the fork', async () => {
+    useFableBuilderStore.getState().setFable(seedDraft().fable)
+    useFableBuilderStore.setState({
+      forkParentId: 'fable-001',
+      fableName: 'My fork',
+      isDirty: true,
+    })
 
     const screen = await renderWithRouter(
-      <FableBuilderPage encodedState="some-shared-state" />,
+      <FableBuilderPage fableId="fable-001" templateMode />,
     )
-    await expect
-      .element(screen.getByText('Which configuration do you want to work on?'))
-      .toBeVisible()
-    // Undecided — the slot must stay stored.
-    expect(readDraft()?.fableName).toBe('Drafted work')
+    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+
+    // The fork survives — no re-fork, nothing shelved.
+    expect(Object.keys(useFableBuilderStore.getState().fable.blocks)).toContain(
+      'draft_block',
+    )
+    expect(shelfName()).toBeUndefined()
   })
 
   it('template mode forks pristine', async () => {
@@ -335,5 +271,84 @@ describe('Fable Builder workbench', () => {
     expect(useFableBuilderStore.getState().fableId).toBeNull()
     // Untouched fork with nothing applied: still clean, replaced silently.
     expect(useFableBuilderStore.getState().isDirty).toBe(false)
+  })
+
+  it('restore over a clean bench consumes the shelf', async () => {
+    seedWorkbench()
+    const screen = await renderWithRouter(<FableBuilderPage fresh />)
+    await expect
+      .element(screen.getByTestId('workbench-shelf-banner'))
+      .toBeVisible()
+
+    await screen.getByRole('button', { name: 'Restore' }).click()
+
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toContain('draft_block')
+    expect(useFableBuilderStore.getState().fableName).toBe('Drafted work')
+    expect(useFableBuilderStore.getState().isDirty).toBe(true)
+    expect(shelfName()).toBeUndefined()
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: '/configure',
+      replace: true,
+    })
+    expect(screen.getByTestId('workbench-shelf-banner').query()).toBeNull()
+  })
+
+  it('restore over dirty work swaps it onto the shelf — lossless both ways', async () => {
+    seedWorkbench()
+    const screen = await renderWithRouter(
+      <FableBuilderPage fableId="fable-001" />,
+    )
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toContain('block_source_1')
+
+    // Edit the loaded blueprint so the bench is worth keeping.
+    useFableBuilderStore.setState({
+      fableName: 'Edited blueprint',
+      isDirty: true,
+    })
+
+    await screen.getByRole('button', { name: 'Restore' }).click()
+
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toContain('draft_block')
+    // The swap: previous canvas work is now the set-aside configuration.
+    expect(shelfName()).toBe('Edited blueprint')
+    await expect
+      .element(screen.getByTestId('workbench-shelf-banner'))
+      .toBeVisible()
+  })
+
+  it('discard clears the shelf for good', async () => {
+    seedWorkbench()
+    const screen = await renderWithRouter(<FableBuilderPage fresh />)
+    await expect
+      .element(screen.getByTestId('workbench-shelf-banner'))
+      .toBeVisible()
+
+    await screen
+      .getByRole('button', { name: 'Discard set-aside configuration' })
+      .click()
+
+    expect(shelfName()).toBeUndefined()
+    expect(localStorage.getItem(STORAGE_KEYS.fable.shelf)).toBeNull()
+    expect(screen.getByTestId('workbench-shelf-banner').query()).toBeNull()
+  })
+
+  it('a second shelving evicts the earlier set-aside configuration', async () => {
+    useWorkbenchShelfStore
+      .getState()
+      .shelve(seedDraft({ fableName: 'Older set-aside' }))
+    seedLiveDirtyBench()
+
+    await renderWithRouter(<FableBuilderPage fableId="fable-001" />)
+
+    await expect
+      .poll(() => Object.keys(useFableBuilderStore.getState().fable.blocks))
+      .toContain('block_source_1')
+    expect(shelfName()).toBe('Drafted work')
   })
 })
