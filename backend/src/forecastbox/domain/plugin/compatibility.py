@@ -23,25 +23,30 @@ active venv and reloads Python modules in-process); see
 architectural successor that replaces in-place mutation with validated candidate
 environments and a handover.
 
+``install_plugin_compatibly`` assumes the environment already satisfies ``uv pip check`` --
+it performs no baseline check of its own. Callers that want to guard against attributing
+pre-existing, unrelated environment breakage to the plugin being installed/updated must call
+``check_environment_baseline()`` themselves first; see ``domain.plugin.manager`` for how the
+plugin manager uses it (once per initial batch load, and once per single-plugin update, before
+any install is attempted).
+
 Algorithm for ``install_plugin_compatibly``
 --------------------------------------------
 1. Build the requested plugin requirement from ``pip_source``/``version``/the installed
    ``fiab-core`` major (``plugin_default_specifier``).
-2. Run ``uv pip check`` as a baseline -- refuse to install if the environment is already broken,
-   so we don't attribute pre-existing breakage to this plugin.
-3. Freeze the environment of the *running backend interpreter* (``sys.executable``, not whatever
+2. Freeze the environment of the *running backend interpreter* (``sys.executable``, not whatever
    venv a shell happens to be in) with ``uv pip freeze`` and classify every entry into ordinary
    ``name==version`` pins and editable/local/URL sources.
-4. Identify which frozen distribution (if any) is the plugin being installed/updated, by
+3. Identify which frozen distribution (if any) is the plugin being installed/updated, by
    canonical distribution name, and exclude it from the snapshot so it is allowed to change.
-5. Write the remaining ordinary pins to a temporary constraints file, and keep the remaining
+4. Write the remaining ordinary pins to a temporary constraints file, and keep the remaining
    editable/local entries as explicit requirement arguments.
-6. Run ``uv pip install --dry-run`` with the constraints file, the preserved editable/local
+5. Run ``uv pip install --dry-run`` with the constraints file, the preserved editable/local
    requirements, and the requested plugin requirement.
-7. Only if the dry run succeeds, run the identical command for real (differing only by the
+6. Only if the dry run succeeds, run the identical command for real (differing only by the
    absence of ``--dry-run``).
-8. Run ``uv pip check`` again as a post-install check.
-9. Return the parsed installed-version mapping (from the real install's output only) for the
+7. Run ``uv pip check`` again as a post-install check.
+8. Return the parsed installed-version mapping (from the real install's output only) for the
    plugin manager to persist and reload.
 
 Known limitations (read before touching this module)
@@ -80,8 +85,12 @@ Public API
 ----------
 plugin_default_specifier()
     Build the default ``SpecifierSet`` for a plugin install based on the installed fiab-core major.
+check_environment_baseline()
+    Raise ``PluginEnvironmentAlreadyBroken`` if the running interpreter's environment already
+    fails ``uv pip check``, before any plugin install/update is attempted.
 install_plugin_compatibly(pip_source, version, module_name)
-    Install or update a plugin, freezing and preserving the rest of the environment.
+    Install or update a plugin, freezing and preserving the rest of the environment. Assumes the
+    environment is already known-good; does not run the baseline check itself.
 get_compatible_versions(plugin_settings, available_versions)
     Filter an iterable of version strings to only compatible ones.
 """
@@ -98,6 +107,7 @@ from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
+from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
 from forecastbox.utility.config import PluginSettings
 from forecastbox.utility.packages import (
     PackagesError,
@@ -138,6 +148,24 @@ def plugin_default_specifier() -> SpecifierSet:
     """
     major = get_fiabcore_version().major
     return SpecifierSet(f">={major}.0.0,<{major + 1}.0.0")
+
+
+def check_environment_baseline() -> None:
+    """Raise ``PluginEnvironmentAlreadyBroken`` if ``uv pip check`` already fails for the running
+    backend interpreter's environment (``sys.executable``), before any plugin install/update has
+    been attempted.
+
+    ``install_plugin_compatibly`` no longer performs this check itself (see the module docstring);
+    callers are expected to invoke this once, up front, if they want that guarantee -- once per
+    initial batch load, or once per single-plugin update, rather than once per individual plugin
+    install attempt.
+    """
+    python = sys.executable
+    baseline = run_pip_check(python)
+    if not baseline.ok:
+        msg = f"stage=baseline-check: existing environment already fails `uv pip check`, refusing to install: {baseline.stderr or baseline.stdout}"
+        logger.error(msg)
+        raise PluginEnvironmentAlreadyBroken(msg)
 
 
 def get_compatible_versions(plugin_settings: PluginSettings, available_versions: Iterator[str]) -> Iterator[str]:
@@ -229,12 +257,6 @@ def install_plugin_compatibly(pip_source: str, version: Version | None, module_n
         target_name = _resolve_target_distribution_name(pip_source, module_name, python)
     except PackagesError as e:
         msg = f"stage=identify: {e!r}"
-        logger.error(msg)
-        return Either.error(msg)
-
-    baseline = run_pip_check(python)
-    if not baseline.ok:
-        msg = f"stage=baseline-check: existing environment already fails `uv pip check`, refusing to install: {baseline.stderr or baseline.stdout}"
         logger.error(msg)
         return Either.error(msg)
 

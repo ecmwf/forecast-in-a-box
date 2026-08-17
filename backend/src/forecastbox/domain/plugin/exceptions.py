@@ -24,3 +24,13 @@ class PluginManagerBusy(Exception):
     The caller should translate this to an HTTP 503 (Service Unavailable / Retry Later)
     response so the client can retry the request after a short back-off.
     """
+
+
+class PluginEnvironmentAlreadyBroken(Exception):
+    """Raised by domain.plugin.compatibility.check_environment_baseline when `uv pip check`
+    already fails before any plugin install/update has been attempted.
+
+    Signals that the failure predates and is unrelated to the current plugin operation, so it
+    must not be attributed to a specific plugin: no plugin-specific state should be written, and
+    the caller should instead surface this as a process-wide plugin updater error.
+    """

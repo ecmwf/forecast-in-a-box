@@ -16,10 +16,12 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 from forecastbox.domain.plugin.compatibility import (
+    check_environment_baseline,
     get_compatible_versions,
     install_plugin_compatibly,
     plugin_default_specifier,
 )
+from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
 from forecastbox.utility.config import PluginSettings
 from forecastbox.utility.packages import CommandResult, PackagesError
 
@@ -83,20 +85,19 @@ def test_install_specifier_consistent_with_major() -> None:
 def _patch_all(
     monkeypatch: pytest.MonkeyPatch,
     *,
-    baseline: CommandResult | None = None,
     freeze_lines: list[str] | None = None,
     dry_run: CommandResult | None = None,
     real_install: CommandResult | None = None,
     post_check: CommandResult | None = None,
 ) -> list[tuple]:
-    baseline = baseline if baseline is not None else _ok()
     dry_run_result = dry_run if dry_run is not None else _ok()
     real_install = real_install if real_install is not None else _ok(stderr="  + my-plugin==2.5.0\n")
     post_check = post_check if post_check is not None else _ok()
     freeze_lines = freeze_lines if freeze_lines is not None else ["pydantic==2.12.0", "other-pkg==1.0.0"]
 
-    checks = iter([baseline, post_check])
-    monkeypatch.setattr("forecastbox.domain.plugin.compatibility.run_pip_check", lambda python: next(checks))
+    # install_plugin_compatibly no longer runs a baseline check itself (see check_environment_baseline);
+    # its only run_pip_check call is the post-install check.
+    monkeypatch.setattr("forecastbox.domain.plugin.compatibility.run_pip_check", lambda python: post_check)
     monkeypatch.setattr("forecastbox.domain.plugin.compatibility.freeze_environment", lambda python: freeze_lines)
 
     install_calls: list[tuple] = []
@@ -168,14 +169,15 @@ def test_local_editable_target_update_does_not_preserve_old_source(monkeypatch: 
     assert plugin_args == ["my-plugin==2.5.0"]
 
 
-def test_baseline_check_failure_stops_before_freeze(monkeypatch: pytest.MonkeyPatch) -> None:
-    freeze_called = []
+def test_check_environment_baseline_raises_on_broken_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("forecastbox.domain.plugin.compatibility.run_pip_check", lambda python: _fail(stderr="broken baseline"))
-    monkeypatch.setattr("forecastbox.domain.plugin.compatibility.freeze_environment", lambda python: freeze_called.append(True) or [])
-    result = install_plugin_compatibly("my-plugin", Version("2.5.0"), "my_plugin")
-    assert result.e is not None
-    assert "baseline-check" in result.e
-    assert not freeze_called
+    with pytest.raises(PluginEnvironmentAlreadyBroken, match="broken baseline"):
+        check_environment_baseline()
+
+
+def test_check_environment_baseline_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("forecastbox.domain.plugin.compatibility.run_pip_check", lambda python: _ok())
+    check_environment_baseline()  # should not raise
 
 
 def test_freeze_failure_stops_before_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:
