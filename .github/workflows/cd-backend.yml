@@ -58,7 +58,7 @@ jobs:
 
           # build
           source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
-          pushd backend && patchFiabCoreDep "$TAG_FIABCORE_MAJ" && popd
+          pushd backend && patchFiabCoreDep "$TAG_FIABCORE_MAJ" && git add pyproject.toml && popd
           just fiabwheel
           pushd backend
           uv export -o pylock.toml --no-emit-workspace --all-extras --no-dev > /dev/null

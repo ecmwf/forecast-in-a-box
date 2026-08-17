@@ -81,6 +81,8 @@ def _set_updater_error(trigger: str, message: str) -> None:
             PluginManager.updater_error = message
         else:
             logger.error("failed to acquire lock to record updater_error")
+            # NOTE we set the field anyway -- we rather corrupt than drop here
+            PluginManager.updater_error = message
     try:
         submit_event(
             Event(
