@@ -57,6 +57,7 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
 
     check_backend_ready(config, handle, attempts, spawn_gateway)
     if should_install_default_plugin():
+        logger.debug("will install default plugins")
         install_default_plugins(config)
 
     if config.backend.launch_browser:

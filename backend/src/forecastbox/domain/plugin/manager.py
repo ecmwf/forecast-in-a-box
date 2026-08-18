@@ -40,6 +40,7 @@ from cascade.low.func import Either
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
 from packaging.version import Version
+from pydantic import ValidationError
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
@@ -112,7 +113,15 @@ def _updater_failure_notifier(trigger: str) -> Iterator[None]:
 
 def load_single(plugin: PluginSettings) -> Either[Plugin, str]:  # type: ignore[invalid-argument]
     errors = []
-    plugin_impl = try_import(plugin.module_name)
+    try:
+        plugin_impl = try_import(plugin.module_name)
+    except ValidationError as e:
+        # NOTE this should not typically happen -- it suggests a mismatch in core contract
+        msg = f"plugin {plugin.module_name} failed to validate with {e!r}"
+        logger.error(msg)
+        errors.append(msg)
+        return Either.error("\n".join(errors))
+
     if plugin_impl is None:
         errors.append(f"failed to import plugin {plugin.module_name}")
     elif not hasattr(plugin_impl, "plugin"):
@@ -256,7 +265,12 @@ def load_plugins(plugins: PluginsSettings) -> None:
                 else:
                     installed_versions = result.t or {}
             else:
-                if try_import(pluginSettings.module_name) is None:
+                try:
+                    is_found = try_import(pluginSettings.module_name) is None
+                except Exception:
+                    # NOTE we just want to check whether we should run pip. This error will be resurfaced later during load_plugin
+                    is_found = True
+                if is_found:
                     logger.info(f"installing {pluginSettings.module_name} for the first time")
                     result = install_plugin_compatibly(pluginSettings.pip_source, None, pluginSettings.module_name)
                     if result.e:
