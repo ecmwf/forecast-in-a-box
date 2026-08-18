@@ -55,10 +55,11 @@ jobs:
           preparePythonWheelVersion $TAG
           TAG_FIABCORE=$(extractFiabCoreTag "$TAG")
           TAG_FIABCORE_MAJ=$(majorFromVersion "$TAG_FIABCORE")
+          TAG_MAJ=$(majorFromVersion "$TAG")
 
           # build
           source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
-          pushd backend && patchFiabCoreDep "$TAG_FIABCORE_MAJ" && git add pyproject.toml && popd
+          pushd backend && patchFiabCoreDep "$TAG_FIABCORE_MAJ" && patchFallbackVersion "$TAG_MAJ" && git add pyproject.toml && popd
           just fiabwheel
           pushd backend
           uv export -o pylock.toml --no-emit-workspace --all-extras --no-dev > /dev/null

@@ -182,3 +182,27 @@ function patchFiabCoreDep() {
     # address+pattern approach.
     sed -i -E "s|${MATCH}.*|${REPLACE_WITH}|" pyproject.toml
 }
+
+function patchFallbackVersion() {
+    # args
+    # $1 <major> -- integer major version, e.g. "2"
+    # behaviour -- rewrites the setuptools_scm fallback_version in pyproject.toml
+    # in CWD to "${major}.0.0 # SENTINEL".
+    # This is separate from patchFiabCoreDep because it also applies to the
+    # fiab-core project itself (which has no fiab-core dependency line to patch).
+    # Fails hard if pyproject.toml does not contain exactly one line matching MATCH.
+    local major="$1"
+
+    local SENTINEL="auto-updateable"
+    local MATCH='fallback_version[[:space:]]*=[[:space:]]*"[^"]*".*'"$SENTINEL"
+    local REPLACE_WITH="fallback_version = \"${major}.0.0\" # ${SENTINEL} -- do not remove this comment"
+
+    local count
+    count=$(grep -cE "$MATCH" pyproject.toml || true)
+    if [[ "$count" -ne 1 ]]; then
+        echo "patchFallbackVersion: expected exactly 1 ${SENTINEL} fallback_version line in pyproject.toml, found $count" >&2
+        exit 1
+    fi
+
+    sed -i -E "s|${MATCH}.*|${REPLACE_WITH}|" pyproject.toml
+}
