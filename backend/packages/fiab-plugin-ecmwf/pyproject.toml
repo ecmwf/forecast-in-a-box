@@ -41,7 +41,7 @@ __version__ = "{version}"
 '''
 local_scheme = "no-local-version"
 root = ".."
-fallback_version = "0.0.0" # auto-updateable -- do not remove this comment
+fallback_version = "2.0.0" # auto-updateable -- do not remove this comment
 tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 
 [tool.ruff]
