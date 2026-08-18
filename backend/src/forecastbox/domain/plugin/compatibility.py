@@ -151,14 +151,11 @@ def plugin_default_specifier() -> SpecifierSet:
 
 
 def check_environment_baseline() -> None:
-    """Raise ``PluginEnvironmentAlreadyBroken`` if ``uv pip check`` already fails for the running
-    backend interpreter's environment (``sys.executable``), before any plugin install/update has
-    been attempted.
+    """Raise ``PluginEnvironmentAlreadyBroken`` if ``uv pip check`` fails for the running
+    backend interpreter's environment (``sys.executable``).
 
-    ``install_plugin_compatibly`` no longer performs this check itself (see the module docstring);
-    callers are expected to invoke this once, up front, if they want that guarantee -- once per
-    initial batch load, or once per single-plugin update, rather than once per individual plugin
-    install attempt.
+    Execute this before any operation like plugin install/update, to not mis-attribute broken
+    state to it. These operations are *not* expected to perform this check on their own.
     """
     python = sys.executable
     baseline = run_pip_check(python)

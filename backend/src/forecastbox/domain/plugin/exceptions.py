@@ -28,9 +28,6 @@ class PluginManagerBusy(Exception):
 
 class PluginEnvironmentAlreadyBroken(Exception):
     """Raised by domain.plugin.compatibility.check_environment_baseline when `uv pip check`
-    already fails before any plugin install/update has been attempted.
-
-    Signals that the failure predates and is unrelated to the current plugin operation, so it
-    must not be attributed to a specific plugin: no plugin-specific state should be written, and
-    the caller should instead surface this as a process-wide plugin updater error.
+    fails in the existing active environment -- signals that no pip activity should be
+    carried further, and that user should be notified.
     """

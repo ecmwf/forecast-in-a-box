@@ -72,16 +72,16 @@ class PluginManager:
 
 
 def _set_updater_error(trigger: str, message: str) -> None:
-    """Best-effort set ``PluginManager.updater_error`` under the lock, then unconditionally emit
-    a client notification carrying the same error text -- the notification is sent even if the
-    lock could not be acquired, so a stuck lock does not silence the failure from clients.
+    """Best-effort set ``PluginManager.updater_error`` under the lock, prefering corruption over
+    dropping the message outright. Then unconditionally emit a client notification carrying
+    the same error text.
     """
     with timed_acquire(PluginManager.lock, 5) as result:
         if result:
             PluginManager.updater_error = message
         else:
             logger.error("failed to acquire lock to record updater_error")
-            # NOTE we set the field anyway -- we rather corrupt than drop here
+            # NOTE we set the field regardless of the lock -- we rather corrupt than drop in this case
             PluginManager.updater_error = message
     try:
         submit_event(
@@ -98,14 +98,11 @@ def _set_updater_error(trigger: str, message: str) -> None:
 def _updater_failure_notifier(trigger: str) -> Iterator[None]:
     """Wrap a load/install operation run from the updater thread. On any exception, records
     ``PluginManager.updater_error`` and notifies clients of the failure via ``_set_updater_error``.
-
-    ``PluginEnvironmentAlreadyBroken`` is handled separately from other exceptions purely for
-    logging: it signals an already-detected, expected condition (logged at error level), whereas
-    any other exception is logged with a full traceback since it represents an unexpected bug.
     """
     try:
         yield
     except PluginEnvironmentAlreadyBroken as e:
+        # NOTE this exception is handled separately for cleaner logging -- no need for the full trace
         logger.error(f"{trigger} refused: {e}")
         _set_updater_error(trigger, str(e))
     except Exception as e:

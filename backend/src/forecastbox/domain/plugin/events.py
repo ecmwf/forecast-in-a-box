@@ -7,11 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Events emitted by the Plugin domain.
-
-Currently only the process-wide plugin updater error is surfaced to clients, matching
-``PluginManager.updater_error`` -- see ``domain.plugin.manager`` for where this is set.
-"""
+"""Events emitted by the Plugin domain."""
 
 from dataclasses import dataclass
 
