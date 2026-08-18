@@ -31,17 +31,20 @@ import logging
 import re
 import threading
 import time
+from collections.abc import Iterator
 from concurrent.futures import Future
+from contextlib import contextmanager
 from functools import partial
 
 from cascade.low.func import Either
 from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
 from fiab_core.plugin import Plugin
 from packaging.version import Version
+from pydantic import ValidationError
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
-from forecastbox.domain.plugin.compatibility import install_plugin_compatibly
+from forecastbox.domain.plugin.compatibility import check_environment_baseline, install_plugin_compatibly
 from forecastbox.domain.plugin.db import (
     clear_asset_ingest_needed,
     delete_plugin_state,
@@ -50,9 +53,12 @@ from forecastbox.domain.plugin.db import (
     upsert_plugin_state,
 )
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
+from forecastbox.domain.plugin.events import PluginGlobalErrorEvent
+from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
 from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.concurrency.synchronization import delayed_thread, timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
+from forecastbox.utility.dispatcher import Event, EventName, submit_event
 from forecastbox.utility.packages import try_import, try_version
 
 logger = logging.getLogger(__name__)
@@ -66,9 +72,56 @@ class PluginManager:
     updater_error: str | None = None
 
 
+def _set_updater_error(trigger: str, message: str) -> None:
+    """Best-effort set ``PluginManager.updater_error`` under the lock, prefering corruption over
+    dropping the message outright. Then unconditionally emit a client notification carrying
+    the same error text.
+    """
+    with timed_acquire(PluginManager.lock, 5) as result:
+        if result:
+            PluginManager.updater_error = message
+        else:
+            logger.error("failed to acquire lock to record updater_error")
+            # NOTE we set the field regardless of the lock -- we rather corrupt than drop in this case
+            PluginManager.updater_error = message
+    try:
+        submit_event(
+            Event(
+                name=EventName("plugin.global_error"),
+                payload=PluginGlobalErrorEvent(trigger=trigger, error=message),
+            )
+        )
+    except Exception as e:
+        logger.exception(f"failed to submit plugin global-error notification for {trigger!r}: {repr(e)}")
+
+
+@contextmanager
+def _updater_failure_notifier(trigger: str) -> Iterator[None]:
+    """Wrap a load/install operation run from the updater thread. On any exception, records
+    ``PluginManager.updater_error`` and notifies clients of the failure via ``_set_updater_error``.
+    """
+    try:
+        yield
+    except PluginEnvironmentAlreadyBroken as e:
+        # NOTE this exception is handled separately for cleaner logging -- no need for the full trace
+        logger.error(f"{trigger} refused: {e}")
+        _set_updater_error(trigger, str(e))
+    except Exception as e:
+        logger.exception(f"{trigger} failed with {repr(e)}")
+        _set_updater_error(trigger, repr(e))
+
+
 def load_single(plugin: PluginSettings) -> Either[Plugin, str]:  # type: ignore[invalid-argument]
     errors = []
-    plugin_impl = try_import(plugin.module_name)
+    try:
+        plugin_impl = try_import(plugin.module_name)
+    except ValidationError as e:
+        # NOTE this should not typically happen -- it suggests a mismatch in core contract
+        msg = f"plugin {plugin.module_name} failed to validate with {e!r}"
+        logger.error(msg)
+        errors.append(msg)
+        return Either.error("\n".join(errors))
+
     if plugin_impl is None:
         errors.append(f"failed to import plugin {plugin.module_name}")
     elif not hasattr(plugin_impl, "plugin"):
@@ -190,7 +243,9 @@ def _ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin) -> No
 
 def load_plugins(plugins: PluginsSettings) -> None:
     logger.info("starting initial plugin load")
-    try:
+    trigger = "Initial plugin load"
+    with _updater_failure_notifier(trigger):
+        check_environment_baseline()
         lookup: dict[PluginCompositeId, Plugin] = {}
         errors: dict[PluginCompositeId, PluginErrors] = {}
         for pluginKey, pluginSettings in plugins.items():
@@ -204,15 +259,20 @@ def load_plugins(plugins: PluginsSettings) -> None:
             # NOTE consider running all pip invocations at once -- worse error reporting but better perf
             if pluginSettings.update_strategy == "auto":
                 logger.info(f"auto-updating {pluginSettings.module_name}")
-                result = install_plugin_compatibly(pluginSettings.pip_source, None)
+                result = install_plugin_compatibly(pluginSettings.pip_source, None, pluginSettings.module_name)
                 if result.e:
                     install_error = result.e
                 else:
                     installed_versions = result.t or {}
             else:
-                if try_import(pluginSettings.module_name) is None:
+                try:
+                    is_found = try_import(pluginSettings.module_name) is None
+                except Exception:
+                    # NOTE we just want to check whether we should run pip. This error will be resurfaced later during load_plugin
+                    is_found = True
+                if is_found:
                     logger.info(f"installing {pluginSettings.module_name} for the first time")
-                    result = install_plugin_compatibly(pluginSettings.pip_source, None)
+                    result = install_plugin_compatibly(pluginSettings.pip_source, None, pluginSettings.module_name)
                     if result.e:
                         install_error = result.e
                     else:
@@ -281,23 +341,19 @@ def load_plugins(plugins: PluginsSettings) -> None:
             _ingest_plugin_templates(pluginKey, plugin_result)
 
         logger.debug("global plugin loading finished")
-    except Exception as e:
-        logger.exception(f"updating thread failed with {repr(e)}")
-        with timed_acquire(PluginManager.lock, 5) as _:
-            # NOTE we ignore result -- we rather corrupt than deadlock
-            PluginManager.updater_error = repr(e)
 
 
 def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, install: bool, version: Version | None) -> None:
     plugin_id_str = PluginCompositeId.to_str(pluginId)
-    try:
+    with _updater_failure_notifier(f"Update of plugin {pluginId}"):
         db_state = get_plugin_state(plugin_id_str)
         if db_state is not None and not db_state.enabled:
             logger.info(f"skipping disabled plugin {pluginId} in update_single")
             return
         installed_versions: dict[str, str] = {}
         if install:
-            install_result = install_plugin_compatibly(pluginSettings.pip_source, version)
+            check_environment_baseline()
+            install_result = install_plugin_compatibly(pluginSettings.pip_source, version, pluginSettings.module_name)
             if install_result.e:
                 upsert_plugin_state(
                     plugin_id=plugin_id_str,
@@ -306,7 +362,11 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
                 )
                 raise RuntimeError(f"install failed for {pluginId}: {install_result.e}")
             installed_versions = install_result.t or {}
-        # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases
+        # NOTE we need to recommend in the docs to re-launch app after this change, this wont cover all cases:
+        # reloading the top-level module does not reload already-imported submodules/dependencies,
+        # replace previously-imported symbols, update existing instances, or reinitialize extension
+        # modules/registries. See domain.plugin.compatibility's module docstring for the full caveat.
+        importlib.invalidate_caches()
         importlib.reload(importlib.import_module(pluginSettings.module_name))
         result = load_single(pluginSettings)
         logger.debug(f"plugin {pluginId} loaded with success: {result.t is not None}")
@@ -337,11 +397,6 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
         if result.t is not None:
             _ingest_plugin_templates(pluginId, result.t)
         logger.debug(f"single plugin loading finished: {pluginId}")
-    except Exception as e:
-        logger.exception(f"updating thread failed with {repr(e)}")
-        with timed_acquire(PluginManager.lock, 5) as _:
-            # NOTE we ignore result -- we rather corrupt than deadlock
-            PluginManager.updater_error = repr(e)
 
 
 def unload_single(pluginId: PluginCompositeId) -> None:
@@ -366,7 +421,12 @@ def submit_load_plugins(start_after: Future[None]) -> None:
     with timed_acquire(PluginManager.lock, 0.2) as result:
         if not result:
             logger.error("failed to submit load_plugins")
-            # NOTE we ignore result -- we rather corrupt than deadlock
+            # NOTE we set updater_error directly here (skipping _set_updater_error) and
+            # deliberately do not emit a client notification: this runs during application
+            # startup, before the app is serving requests, so no client could possibly have
+            # registered yet to receive it. Notifications are not persisted/replayed -- unlike
+            # updater_error, which is polled via the status route -- so a notification here
+            # would simply be dropped. Revisit this if notifications ever become persisted.
             PluginManager.updater_error = "failed to submit load_plugins"
         elif PluginManager.updater is not None:
             raise TypeError("attempted to submit load_plugins but updater is already in progress")

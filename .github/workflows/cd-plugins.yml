@@ -52,12 +52,14 @@ jobs:
           preparePythonWheelVersion $TAG
           TAG_FIABCORE=$(extractFiabCoreTag "$TAG")
           TAG_FIABCORE_MAJ=$(majorFromVersion "$TAG_FIABCORE")
+          TAG_MAJ=$(majorFromVersion "$TAG")
 
           cd backend/packages
           mkdir packagesDist
 
           pushd fiab-plugin-ecmwf
           patchFiabCoreDep "$TAG_FIABCORE_MAJ"
+          patchFallbackVersion "$TAG_MAJ"
           git add pyproject.toml
           source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
           uv pip install "fiab-core==${TAG_FIABCORE}"
@@ -71,6 +73,7 @@ jobs:
 
           pushd fiab-plugin-demo
           patchFiabCoreDep "$TAG_FIABCORE_MAJ"
+          patchFallbackVersion "$TAG_MAJ"
           git add pyproject.toml
           source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
           uv pip install "fiab-core==${TAG_FIABCORE}"

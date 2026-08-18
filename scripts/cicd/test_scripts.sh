@@ -233,6 +233,61 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Tests: patchFallbackVersion
+# ---------------------------------------------------------------------------
+test_patch_fallback_version() {
+    echo "--- patchFallbackVersion ---"
+
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    # Happy path: sentinel present, single matching line
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+[tool.setuptools_scm]
+fallback_version = "0.0.0" # auto-updateable -- do not remove this comment
+tag_regex = 'irrelevant'
+EOF
+
+    pushd "$tmpdir" > /dev/null
+    patchFallbackVersion "2"
+    popd > /dev/null
+
+    local result
+    result=$(cat "$tmpdir/pyproject.toml")
+    assert_contains "patches fallback_version to 2.0.0" 'fallback_version = "2.0.0"' "$result"
+    assert_not_contains "old fallback removed" '"0.0.0"' "$result"
+    assert_contains "sentinel comment present after patch" "auto-updateable" "$result"
+    assert_contains "other line unchanged" "tag_regex = 'irrelevant'" "$result"
+
+    # Applying patch again (idempotent re-patch to different major)
+    pushd "$tmpdir" > /dev/null
+    patchFallbackVersion "3"
+    popd > /dev/null
+    result=$(cat "$tmpdir/pyproject.toml")
+    assert_contains "re-patch works" 'fallback_version = "3.0.0"' "$result"
+    assert_contains "sentinel still present after re-patch" "auto-updateable" "$result"
+
+    # Fails when sentinel comment is absent
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+fallback_version = "0.0.0"
+EOF
+    pushd "$tmpdir" > /dev/null
+    assert_fails "fails without sentinel comment" patchFallbackVersion "2"
+    popd > /dev/null
+
+    # Fails when multiple sentinel lines match
+    cat > "$tmpdir/pyproject.toml" << 'EOF'
+fallback_version = "0.0.0" # auto-updateable -- do not remove this comment
+fallback_version = "0.0.0" # auto-updateable -- do not remove this comment
+EOF
+    pushd "$tmpdir" > /dev/null
+    assert_fails "fails with multiple sentinel lines" patchFallbackVersion "2"
+    popd > /dev/null
+
+    rm -rf "$tmpdir"
+}
+
+# ---------------------------------------------------------------------------
 # Tests: getLatestTagAndIncrement
 # ---------------------------------------------------------------------------
 test_get_latest_tag_and_increment() {
@@ -522,6 +577,7 @@ test_prepare_python_wheel_version
 test_extract_fiab_core_tag
 test_major_from_version
 test_patch_fiab_core_dep
+test_patch_fallback_version
 test_get_latest_tag_and_increment
 test_validate_tag
 test_tag_from_input_or_latest
