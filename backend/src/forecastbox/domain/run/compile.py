@@ -26,7 +26,7 @@ from forecastbox.domain.blueprint.configuration_values import convert_known_conf
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs, get_values_and_examples
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, extract_glyphs, merge_glyph_values, resolve_configurations
-from forecastbox.domain.plugin.manager import PluginManager
+from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.run.cascade import ExecutionSpecification, RawCascadeJob, RunOutputCharacteristic, RunOutputs
 from forecastbox.domain.run.detail import CompilationDetail, TaskDetail, _fluentName_to_taskId, fluentNode_to_detail
 from forecastbox.domain.run.types import RunId

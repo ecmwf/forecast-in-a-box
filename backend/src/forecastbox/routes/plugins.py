@@ -29,7 +29,8 @@ from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.db import PluginStateRecord, get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.detail import PluginListing, build_plugin_listing
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy, PluginNotFound
-from forecastbox.domain.plugin.manager import PluginManager, submit_update_single, uninstall_plugin, unload_single
+from forecastbox.domain.plugin.manager import submit_unload_single, submit_update_single, uninstall_plugin
+from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_plugin
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.concurrency.manager import execution_manager
@@ -192,7 +193,8 @@ async def update_plugin_settings_endpoint(
     except PluginNotFound:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id_str} not found")
     if body.isEnabled is False:
-        unload_single(body.pluginCompositeId)
+        await submit_unload_single(body.pluginCompositeId)
+        return get_catalogue_redirect(request)
     result = submit_update_single(body.pluginCompositeId, install=False, version=None)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)

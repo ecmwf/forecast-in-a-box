@@ -53,7 +53,7 @@ from forecastbox.domain.glyphs.exceptions import GlyphCircularReferenceError
 from forecastbox.domain.glyphs.intrinsic import get_values_and_examples
 from forecastbox.domain.glyphs.resolution import ExtractedGlyphs, expand_glyph_values, merge_glyph_values, remap_glyph_names
 from forecastbox.domain.glyphs.validation import validate_glyph
-from forecastbox.domain.plugin.manager import PluginManager
+from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.graph import topological_order

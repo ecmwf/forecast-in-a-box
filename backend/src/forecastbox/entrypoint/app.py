@@ -39,8 +39,8 @@ from forecastbox.domain.experiment.scheduling.background import start_scheduler,
 from forecastbox.domain.gateway.service import shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
 from forecastbox.domain.notification.service import init_broadcaster
-from forecastbox.domain.plugin.manager import PluginManager, join_updater_thread, submit_load_plugins
-from forecastbox.domain.plugin.store import join_stores_thread, submit_initialize_stores
+from forecastbox.domain.plugin.manager import submit_load_plugins
+from forecastbox.domain.plugin.store import submit_initialize_stores
 from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.config import ConcurrentThreads, config, validate_runtime
 from forecastbox.utility.dispatcher import (
@@ -153,8 +153,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             shutdown_all_lens_instances()
             await shutdown_processes()
             shutdown_tunnels()
-            join_updater_thread(timeout_sec=10)
-            join_stores_thread(timeout_sec=10)
             join_artifact_manager(timeout_sec=10)
         finally:
             execution_manager.shutdown(timeout=config.backend.concurrency.shutdown_timeout_seconds)
