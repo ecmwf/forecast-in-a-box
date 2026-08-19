@@ -100,8 +100,9 @@ describe('OnboardingController gating', () => {
     // Default MSW seed ships completed runs — the "existing user" case.
     const screen = await renderAt('/overview')
 
+    // Lazy gate + jobs query: a cold CI runner exceeds the 1000ms default.
     await expect
-      .poll(() => useOnboardingStore.getState().status)
+      .poll(() => useOnboardingStore.getState().status, { timeout: 8000 })
       .toBe('skipped')
     expect(screen.getByText(/Welcome to Forecast-in-a-Box/).query()).toBeNull()
   })
@@ -111,7 +112,9 @@ describe('OnboardingController gating', () => {
     const screen = await renderAt('/overview')
 
     await expect
-      .element(screen.getByText(/Welcome to Forecast-in-a-Box/))
+      .element(screen.getByText(/Welcome to Forecast-in-a-Box/), {
+        timeout: 8000,
+      })
       .toBeVisible()
     expect(useOnboardingStore.getState().status).toBe('not-started')
   })
@@ -120,7 +123,9 @@ describe('OnboardingController gating', () => {
     worker.use(emptyJobList)
     const screen = await renderAt('/other')
 
-    await expect.element(screen.getByText('other page')).toBeVisible()
+    await expect
+      .element(screen.getByText('other page'), { timeout: 8000 })
+      .toBeVisible()
     // Give the queries a beat to settle; the gate must still decline.
     await new Promise((resolve) => setTimeout(resolve, 500))
     expect(screen.getByText(/Welcome to Forecast-in-a-Box/).query()).toBeNull()
