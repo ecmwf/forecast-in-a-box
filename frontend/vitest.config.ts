@@ -25,12 +25,15 @@ export default mergeConfig(
         'lz-string',
         'date-fns',
         '@date-fns/tz',
+        // First-import of a not-yet-optimized subpath re-optimizes mid-run
+        // and dual-loads React ("Cannot read properties of null").
         '@tanstack/charts',
         '@tanstack/charts/motion',
         '@tanstack/charts/scales/band',
         '@tanstack/charts/scales/linear',
         '@tanstack/charts/tooltip',
         '@tanstack/react-charts/tooltip',
+        '@base-ui/react/checkbox',
       ],
     },
     test: {

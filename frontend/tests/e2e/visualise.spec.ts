@@ -14,7 +14,7 @@
  * both: the route, the empty-state hub, and the permanent nav item).
  */
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
 
 async function establishSession(page: Page) {
