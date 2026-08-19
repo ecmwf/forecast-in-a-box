@@ -20,18 +20,13 @@ const base: GateSignals = {
   welcomeOpen: false,
   snoozedAt: null,
   pathname: '/overview',
-  catalogueSettled: true,
-  catalogueEmpty: false,
   jobsSettled: true,
   jobsTotal: 0,
 }
 
 describe('decideGate', () => {
   it('opens for a fresh user on /overview with settled data', () => {
-    expect(decideGate(base, NOW)).toEqual({
-      kind: 'open',
-      pluginStepNeeded: false,
-    })
+    expect(decideGate(base, NOW)).toEqual({ kind: 'open' })
   })
 
   it('never auto-opens off /overview', () => {
@@ -40,25 +35,15 @@ describe('decideGate', () => {
     })
   })
 
-  it('waits while either query is unsettled', () => {
-    expect(decideGate({ ...base, catalogueSettled: false }, NOW)).toEqual({
-      kind: 'wait',
-    })
+  it('waits while the jobs query is unsettled', () => {
     expect(decideGate({ ...base, jobsSettled: false }, NOW)).toEqual({
       kind: 'wait',
     })
   })
 
-  it('grandfathers users who already have runs', () => {
+  it('skips users who already have runs', () => {
     expect(decideGate({ ...base, jobsTotal: 3 }, NOW)).toEqual({
-      kind: 'grandfather',
-    })
-  })
-
-  it('empty catalogue opens with the plugin pivot', () => {
-    expect(decideGate({ ...base, catalogueEmpty: true }, NOW)).toEqual({
-      kind: 'open',
-      pluginStepNeeded: true,
+      kind: 'existing-user',
     })
   })
 
@@ -81,16 +66,16 @@ describe('decideGate', () => {
         { ...snoozed, snoozedAt: NOW - SNOOZE_REAPPEAR_MS - 60_000 },
         NOW,
       ),
-    ).toEqual({ kind: 'open', pluginStepNeeded: false })
+    ).toEqual({ kind: 'open' })
   })
 
   it('a missing snooze timestamp self-heals as due', () => {
     expect(
       decideGate({ ...base, status: 'snoozed', snoozedAt: null }, NOW),
-    ).toEqual({ kind: 'open', pluginStepNeeded: false })
+    ).toEqual({ kind: 'open' })
   })
 
-  it('re-checks grandfathering at snooze-reshow time', () => {
+  it('re-checks for prior runs at snooze-reshow time', () => {
     expect(
       decideGate(
         {
@@ -101,10 +86,10 @@ describe('decideGate', () => {
         },
         NOW,
       ),
-    ).toEqual({ kind: 'grandfather' })
+    ).toEqual({ kind: 'existing-user' })
   })
 
-  it('manual welcomeOpen bypasses route, status, and grandfathering', () => {
+  it('manual welcomeOpen bypasses route, status, and the run check', () => {
     expect(
       decideGate(
         {
@@ -116,15 +101,15 @@ describe('decideGate', () => {
         },
         NOW,
       ),
-    ).toEqual({ kind: 'open', pluginStepNeeded: false })
+    ).toEqual({ kind: 'open' })
   })
 
-  it('manual open still waits for data (the final pane needs the branch)', () => {
+  it('manual open never waits: it never checks prior runs', () => {
     expect(
       decideGate(
         { ...base, welcomeOpen: true, status: 'skipped', jobsSettled: false },
         NOW,
       ),
-    ).toEqual({ kind: 'wait' })
+    ).toEqual({ kind: 'open' })
   })
 })

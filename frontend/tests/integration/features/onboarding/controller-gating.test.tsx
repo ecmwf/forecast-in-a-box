@@ -9,7 +9,7 @@
  */
 
 /**
- * OnboardingController gating against live MSW queries — grandfathering,
+ * OnboardingController gating against live MSW queries — existing users,
  * fresh-user open, and the only-on-/overview rule.
  */
 
@@ -96,7 +96,7 @@ describe('OnboardingController gating', () => {
     document.head.appendChild(style)
   })
 
-  it('silently grandfathers a browser that already has runs', async () => {
+  it('silently skips a browser that already has runs', async () => {
     // Default MSW seed ships completed runs — the "existing user" case.
     const screen = await renderAt('/overview')
 

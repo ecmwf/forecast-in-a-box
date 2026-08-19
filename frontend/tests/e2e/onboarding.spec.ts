@@ -11,7 +11,7 @@
 /**
  * First-run onboarding e2e — raw @playwright/test on purpose: fixtures.ts
  * suppresses the dialog for every other spec, this one exercises it.
- * The mock's seeded runs would grandfather a fresh visit, so tests hide
+ * The mock's seeded runs would mark a fresh visit as existing, so tests hide
  * them via the `fiab.mock.empty-runs` seam.
  */
 
@@ -35,7 +35,7 @@ async function visitOverview(page: Page, options: VisitOptions = {}) {
       if (state) {
         window.localStorage.setItem(
           'fiab.store.onboarding',
-          JSON.stringify({ state, version: 1 }),
+          JSON.stringify({ state, version: 2 }),
         )
       }
     },

@@ -16,12 +16,6 @@ import { cn } from '@/lib/utils'
 /** Chips a preset card has room for. */
 const MAX_TAGS = 2
 
-/** Sample presets shown (inert) while the plugin gate blocks the real ones. */
-const GATED_SAMPLES = [
-  { name: 'AIFS 72-Hour Forecast', tags: ['AIFS', 'Map plot + GRIB'] },
-  { name: 'IFS Ensemble Statistics', tags: ['IFS Ensemble', 'Mean or Std'] },
-] as const
-
 function CardShell({
   className,
   children,
@@ -55,42 +49,19 @@ function TagChips({ tags }: { tags: ReadonlyArray<string> }) {
   )
 }
 
-/**
- * The activate step's vignette: real starter templates as selectable preset
- * cards. Gated instances get an inert preview of what installing unlocks.
- */
+/** The activate step's vignette: starter templates as selectable cards. */
 export function PresetPicker({
   starters,
   isLoading,
-  gated,
   selected,
   onSelect,
 }: {
   starters: ReadonlyArray<TemplateEntry>
   isLoading: boolean
-  gated: boolean
   selected: number
   onSelect: (index: number) => void
 }) {
   const { t } = useTranslation('onboarding')
-
-  if (gated) {
-    return (
-      <div
-        aria-hidden
-        className="absolute inset-0 flex items-center justify-center px-6"
-      >
-        <div className="pointer-events-none grid w-full max-w-115 grid-cols-2 gap-3 opacity-70">
-          {GATED_SAMPLES.map(({ name, tags }) => (
-            <CardShell key={name}>
-              <span className="text-[13px] font-semibold">{name}</span>
-              <TagChips tags={tags} />
-            </CardShell>
-          ))}
-        </div>
-      </div>
-    )
-  }
 
   if (isLoading) {
     return (

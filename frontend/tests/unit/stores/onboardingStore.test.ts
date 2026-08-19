@@ -22,7 +22,6 @@ describe('onboardingStore', () => {
     expect(state.welcomeOpen).toBe(false)
     expect(state.snoozedAt).toBeNull()
     expect(state.snoozeCount).toBe(0)
-    expect(state.pluginStepNeeded).toBeNull()
   })
 
   it('plain close snoozes: stamps snoozedAt and counts', () => {

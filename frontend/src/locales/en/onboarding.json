@@ -32,22 +32,13 @@
     },
     "activate": {
       "title": "Run your first forecast",
-      "body": "Pick a starting preset — it opens pre-configured in the workflow builder, ready to adjust and run. You can save your own presets later.",
-      "bodyGated": "Pick a starting preset to open it in the workflow builder. One thing first:"
+      "body": "Pick a starting preset — it opens pre-configured in the workflow builder, ready to adjust and run. You can save your own presets later."
     }
   },
   "activate": {
     "openConfigure": "Open in Configure",
     "recommended": "Recommended",
-    "pluginsOk": "All required plugins installed — ready to configure.",
-    "empty": "No starter presets are available yet — you can still start from a blank canvas.",
-    "gate": {
-      "title": "No plugins are installed yet",
-      "adminBody": "Presets come from plugins. Install the ECMWF base plugin and the starting presets appear here — installation takes about a minute.",
-      "adminAction": "Go to plugins",
-      "lockedBody": "An administrator needs to install a plugin before Forecast-in-a-Box can forecast. Everything unlocks automatically once that's done.",
-      "lockedAction": "Got it"
-    }
+    "empty": "No starter presets are available yet — you can still start from a blank canvas."
   },
   "dots": {
     "goTo": "Go to step {{step}}"

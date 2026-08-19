@@ -23,8 +23,6 @@ export interface GateSignals {
   snoozedAt: number | null
   pathname: string
   /** Query settled = success or error; the gate never acts on loading data. */
-  catalogueSettled: boolean
-  catalogueEmpty: boolean
   jobsSettled: boolean
   jobsTotal: number
 }
@@ -33,21 +31,13 @@ export type GateDecision =
   | { kind: 'closed' }
   /** Signals not settled yet — show nothing, decide next render. */
   | { kind: 'wait' }
-  /** Existing user (has runs) — silently skip, never show. */
-  | { kind: 'grandfather' }
-  | { kind: 'open'; pluginStepNeeded: boolean }
+  /** Has prior runs — silently skip, never show. */
+  | { kind: 'existing-user' }
+  | { kind: 'open' }
 
 export function decideGate(signals: GateSignals, now: number): GateDecision {
-  const {
-    status,
-    welcomeOpen,
-    snoozedAt,
-    pathname,
-    catalogueSettled,
-    catalogueEmpty,
-    jobsSettled,
-    jobsTotal,
-  } = signals
+  const { status, welcomeOpen, snoozedAt, pathname, jobsSettled, jobsTotal } =
+    signals
 
   if (!welcomeOpen) {
     if (pathname !== '/overview') return { kind: 'closed' }
@@ -62,15 +52,12 @@ export function decideGate(signals: GateSignals, now: number): GateDecision {
     if (cooldownActive) return { kind: 'closed' }
   }
 
-  // Both auto and manual opens wait for data: the final pane's branch
-  // (templates vs plugin install) must be decidable before first paint.
-  if (!catalogueSettled || !jobsSettled) return { kind: 'wait' }
+  // Loading jobs read as zero; only auto-opens check them, so only they wait.
+  if (!welcomeOpen && !jobsSettled) return { kind: 'wait' }
 
-  // Grandfather applies at first show AND at snooze-reshow time: someone
-  // who ran forecasts on their own is done being onboarded.
-  if (!welcomeOpen && jobsTotal > 0) return { kind: 'grandfather' }
+  // Checked at first show AND at snooze-reshow: someone who ran forecasts
+  // on their own is done being onboarded.
+  if (!welcomeOpen && jobsTotal > 0) return { kind: 'existing-user' }
 
-  // Errors count as empty: a broken catalogue should pivot to plugin
-  // guidance rather than promise template cards it cannot render.
-  return { kind: 'open', pluginStepNeeded: catalogueEmpty }
+  return { kind: 'open' }
 }

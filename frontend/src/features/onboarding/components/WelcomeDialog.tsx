@@ -11,7 +11,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
-import { TriangleAlert } from 'lucide-react'
 import { PresetPicker } from './PresetPicker'
 import {
   BlocksIllustration,
@@ -20,7 +19,6 @@ import {
   ViewerIllustration,
   WelcomeIllustration,
 } from './StepIllustrations'
-import { useCanManagePlugins } from '@/features/onboarding/hooks/useCanManagePlugins'
 import { useStarterTemplates } from '@/features/dashboard/hooks/useStarterTemplates'
 import { templateConfigureSearch } from '@/features/dashboard/hooks/useTemplatePresets'
 import { useOnboardingStore } from '@/stores/onboardingStore'
@@ -46,14 +44,9 @@ const STEPS = [
 ] as const
 
 /** Six-step welcome tour: what FIAB is, how it works, and a real start. */
-export function WelcomeDialog({
-  pluginStepNeeded,
-}: {
-  pluginStepNeeded: boolean
-}) {
+export function WelcomeDialog() {
   const { t } = useTranslation('onboarding')
   const navigate = useNavigate()
-  const canManagePlugins = useCanManagePlugins()
   const { starters, isLoading } = useStarterTemplates()
 
   const [step, setStep] = useState(0)
@@ -74,24 +67,11 @@ export function WelcomeDialog({
     ? step === 0
       ? t('welcome.takeTour')
       : t('welcome.continue')
-    : pluginStepNeeded
-      ? canManagePlugins
-        ? t('activate.gate.adminAction')
-        : t('activate.gate.lockedAction')
-      : t('activate.openConfigure')
+    : t('activate.openConfigure')
 
   const primaryAction = () => {
     if (!isLast) {
       setStep(step + 1)
-      return
-    }
-    if (pluginStepNeeded) {
-      if (canManagePlugins) {
-        useOnboardingStore.getState().startPluginInstall()
-        void navigate({ to: '/admin/plugins' })
-      } else {
-        useOnboardingStore.getState().skip()
-      }
       return
     }
     useOnboardingStore.getState().startForecast()
@@ -124,7 +104,6 @@ export function WelcomeDialog({
               <PresetPicker
                 starters={starters}
                 isLoading={isLoading}
-                gated={pluginStepNeeded}
                 selected={selectedPreset}
                 onSelect={setSelectedPreset}
               />
@@ -133,12 +112,7 @@ export function WelcomeDialog({
         </div>
 
         {/* Text area — fixed height so the dialog never resizes between steps */}
-        <div
-          className={cn(
-            'flex flex-col gap-2 px-7 pt-6 pb-5',
-            pluginStepNeeded ? 'min-h-59' : 'min-h-47',
-          )}
-        >
+        <div className="flex min-h-47 flex-col gap-2 px-7 pt-6 pb-5">
           <div className="flex items-center gap-2.5">
             <span className="font-mono text-[11px] text-muted-foreground">
               {t('welcome.stepCounter', {
@@ -169,34 +143,8 @@ export function WelcomeDialog({
             {t(`steps.${stepId}.title`)}
           </DialogTitle>
           <DialogDescription className="text-sm leading-[1.55] text-pretty">
-            {stepId === 'activate' && pluginStepNeeded
-              ? t('steps.activate.bodyGated')
-              : t(`steps.${stepId}.body`)}
+            {t(`steps.${stepId}.body`)}
           </DialogDescription>
-
-          {isLast && pluginStepNeeded && (
-            <div className="mt-1.5 flex items-start gap-2.5 rounded-lg border border-warning/25 bg-warning/5 px-3 py-2.5">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[13px] font-semibold">
-                  {t('activate.gate.title')}
-                </span>
-                <span className="text-xs leading-normal text-muted-foreground">
-                  {canManagePlugins
-                    ? t('activate.gate.adminBody')
-                    : t('activate.gate.lockedBody')}
-                </span>
-              </div>
-            </div>
-          )}
-          {isLast && !pluginStepNeeded && (
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className="size-2 rounded-full bg-success" />
-              <span className="text-xs text-muted-foreground">
-                {t('activate.pluginsOk')}
-              </span>
-            </div>
-          )}
         </div>
 
         <DialogFooter className="flex-row items-center justify-between gap-3 border-t px-7 py-4 sm:justify-between">

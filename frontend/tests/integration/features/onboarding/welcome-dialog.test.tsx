@@ -45,9 +45,7 @@ describe('WelcomeDialog', () => {
   })
 
   it('walks the six steps and lands on the real starter presets', async () => {
-    const screen = await renderWithRouter(
-      withAuth(<WelcomeDialog pluginStepNeeded={false} />),
-    )
+    const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
     await expect
       .element(screen.getByText('Welcome to Forecast-in-a-Box'))
@@ -80,9 +78,7 @@ describe('WelcomeDialog', () => {
   })
 
   it('the dots jump straight to a step', async () => {
-    const screen = await renderWithRouter(
-      withAuth(<WelcomeDialog pluginStepNeeded={false} />),
-    )
+    const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
     await screen.getByRole('button', { name: 'Go to step 5' }).click()
     await expect
@@ -91,9 +87,7 @@ describe('WelcomeDialog', () => {
   })
 
   it('"Skip for now" snoozes with a timestamp', async () => {
-    const screen = await renderWithRouter(
-      withAuth(<WelcomeDialog pluginStepNeeded={false} />),
-    )
+    const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
     await screen.getByRole('button', { name: 'Skip for now' }).click()
     const state = useOnboardingStore.getState()
@@ -103,9 +97,7 @@ describe('WelcomeDialog', () => {
   })
 
   it('the checkbox turns dismissal into a permanent skip', async () => {
-    const screen = await renderWithRouter(
-      withAuth(<WelcomeDialog pluginStepNeeded={false} />),
-    )
+    const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
     await screen.getByText("Don't show this again").click()
     await screen.getByRole('button', { name: 'Skip for now' }).click()
@@ -113,9 +105,7 @@ describe('WelcomeDialog', () => {
   })
 
   it('"Open in Configure" activates onboarding with the selected preset', async () => {
-    const screen = await renderWithRouter(
-      withAuth(<WelcomeDialog pluginStepNeeded={false} />),
-    )
+    const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
     await screen.getByRole('button', { name: 'Go to step 6' }).click()
     const firstCard = screen.getByTestId('onboarding-preset-card').first()
@@ -131,9 +121,7 @@ describe('WelcomeDialog', () => {
   it('a reopen from a decided state swaps the checkbox for the Help note', async () => {
     useOnboardingStore.getState().skip()
     useOnboardingStore.getState().openWelcome()
-    const screen = await renderWithRouter(
-      withAuth(<WelcomeDialog pluginStepNeeded={false} />),
-    )
+    const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
     await expect
       .element(screen.getByText('Welcome to Forecast-in-a-Box'))

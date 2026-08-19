@@ -139,7 +139,7 @@ export const STORE_VERSIONS = {
   fableBuilder: 2, // v2: Removed configDisplayMode, added isMiniMapOpen
   activity: 2, // v2: navigateTo rewritten for /executions→/execute, /dashboard→/overview
   comparison: 1,
-  onboarding: 1,
+  onboarding: 2, // v2: Removed pluginStepNeeded
 } as const
 
 /**

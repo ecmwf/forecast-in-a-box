@@ -25,7 +25,7 @@ export const SNOOZE_CAP = 3
 export type OnboardingStatus =
   | 'not-started' // never seen — welcome dialog auto-opens on /overview
   | 'snoozed' // plainly dismissed — reappears after SNOOZE_REAPPEAR_MS
-  | 'skipped' // opted out (checkbox / grandfathered / snooze cap) — never auto-reshows
+  | 'skipped' // opted out (checkbox / existing user / snooze cap) — never auto-reshows
   | 'active' // started a first forecast — never auto-reshows
 
 interface OnboardingState {
@@ -35,11 +35,6 @@ interface OnboardingState {
   /** Epoch ms of the last plain dismissal; drives the reappear cooldown. */
   snoozedAt: number | null
   snoozeCount: number
-  /**
-   * Whether the tour includes plugin-install guidance — frozen at first
-   * open so the final step doesn't pop in or vanish; null = undetermined.
-   */
-  pluginStepNeeded: boolean | null
 
   /** Manual reopen (settings/Help) — never mutates the persisted status. */
   openWelcome: () => void
@@ -47,11 +42,8 @@ interface OnboardingState {
   closeWelcome: (dontShowAgain: boolean) => void
   /** Preset card / blank-canvas click — the tour did its job. */
   startForecast: () => void
-  /** Admin CTA behind the fresh-instance plugin gate. */
-  startPluginInstall: () => void
-  /** Grandfathering and other silent opt-outs. */
+  /** Existing-user detection and other silent opt-outs. */
   skip: () => void
-  setPluginStepNeeded: (needed: boolean) => void
   /** Back to a pristine never-seen state (tests, storage reset) */
   reset: () => void
 }
@@ -61,7 +53,6 @@ const initialState = {
   welcomeOpen: false,
   snoozedAt: null as number | null,
   snoozeCount: 0,
-  pluginStepNeeded: null as boolean | null,
 }
 
 export const useOnboardingStore = create<OnboardingState>()(
@@ -91,11 +82,8 @@ export const useOnboardingStore = create<OnboardingState>()(
 
         startForecast: () => set({ status: 'active', welcomeOpen: false }),
 
-        startPluginInstall: () => set({ status: 'active', welcomeOpen: false }),
-
         skip: () => set({ status: 'skipped', welcomeOpen: false }),
 
-        setPluginStepNeeded: (pluginStepNeeded) => set({ pluginStepNeeded }),
         reset: () => set({ ...initialState }),
       }),
       {
@@ -105,8 +93,22 @@ export const useOnboardingStore = create<OnboardingState>()(
           status: state.status,
           snoozedAt: state.snoozedAt,
           snoozeCount: state.snoozeCount,
-          pluginStepNeeded: state.pluginStepNeeded,
         }),
+        // Strip v1's `pluginStepNeeded`; the shallow merge would re-add it.
+        migrate: (persisted, version) => {
+          if (
+            version >= 2 ||
+            typeof persisted !== 'object' ||
+            persisted === null
+          ) {
+            return persisted
+          }
+          const { pluginStepNeeded: _dropped, ...rest } = persisted as Record<
+            string,
+            unknown
+          >
+          return rest
+        },
       },
     ),
     { name: 'OnboardingStore' },

@@ -12,7 +12,6 @@ import { useEffect } from 'react'
 import { useRouterState } from '@tanstack/react-router'
 import { decideGate } from './gating'
 import { WelcomeDialog } from './components/WelcomeDialog'
-import { useBlockCatalogue } from '@/api/hooks/useFable'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 
@@ -21,11 +20,9 @@ export function WelcomeGate() {
   const status = useOnboardingStore((state) => state.status)
   const welcomeOpen = useOnboardingStore((state) => state.welcomeOpen)
   const snoozedAt = useOnboardingStore((state) => state.snoozedAt)
-  const frozenPluginStep = useOnboardingStore((state) => state.pluginStepNeeded)
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
-  const catalogue = useBlockCatalogue()
   const jobs = useJobStatusCounts()
 
   const decision = decideGate(
@@ -34,9 +31,6 @@ export function WelcomeGate() {
       welcomeOpen,
       snoozedAt,
       pathname,
-      catalogueSettled: catalogue.isSuccess || catalogue.isError,
-      catalogueEmpty:
-        !catalogue.data || Object.keys(catalogue.data).length === 0,
       // On error the query settles with the empty default — an existing
       // user then sees one skippable dialog; accepted trade-off.
       jobsSettled: !jobs.isLoading,
@@ -46,22 +40,11 @@ export function WelcomeGate() {
   )
 
   useEffect(() => {
-    if (decision.kind === 'grandfather') {
+    if (decision.kind === 'existing-user') {
       useOnboardingStore.getState().skip()
-      return
     }
-    // Freeze the branch at first open so the final pane never flips mid-flow.
-    if (decision.kind === 'open' && frozenPluginStep === null) {
-      useOnboardingStore
-        .getState()
-        .setPluginStepNeeded(decision.pluginStepNeeded)
-    }
-  }, [decision.kind, frozenPluginStep, decision])
+  }, [decision.kind])
 
   if (decision.kind !== 'open') return null
-  return (
-    <WelcomeDialog
-      pluginStepNeeded={frozenPluginStep ?? decision.pluginStepNeeded}
-    />
-  )
+  return <WelcomeDialog />
 }

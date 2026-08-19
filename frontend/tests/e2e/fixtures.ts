@@ -23,7 +23,7 @@ export const test = base.extend({
     await page.addInitScript(() => {
       window.localStorage.setItem(
         'fiab.store.onboarding',
-        JSON.stringify({ state: { status: 'skipped' }, version: 1 }),
+        JSON.stringify({ state: { status: 'skipped' }, version: 2 }),
       )
     })
     await use(page)
