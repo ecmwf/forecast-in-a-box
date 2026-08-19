@@ -114,23 +114,31 @@ executor until Phase 3.1 migrates it; do not move it to `Io` in this work.
 
 ## Module layout and responsibility split
 
-Refactor only within `domain/plugin`; do not add a new cross-domain abstraction.
-The desired result is small modules with an explicit dependency direction:
+Refactor only the code currently in `domain/plugin/manager.py` and
+`domain/plugin/store.py`; do not add a new cross-domain abstraction. The layout
+below is the target for that extracted/reorganized code, not a complete listing
+of the plugin package. Existing `compatibility.py`, `db.py`, `detail.py`,
+`errors.py`, `events.py`, and `exceptions.py` remain separate concerns unless a
+step below explicitly updates their imports or documentation.
 
 ```text
 state.py             shared immutable plugin state and short synchronized state changes
-manager.py           public orchestration facade and execution-manager submission boundary
-loading.py           synchronous pip/import/load/reload/unload worker operations
+manager.py           execution-manager submission boundary and public operation orchestration
+loading.py           synchronous plugin load/update/reload/unload worker orchestration
 template_ingest.py   temporary synchronous plugin-to-blueprint template work
 store.py             store models, fetch/populate work, immutable store publication, Io submission
+compatibility.py     version compatibility and isolated environment-install policy
 ```
 
-`manager.py` should continue to expose `PluginManager` as the stable import
-location for current consumers (`routes`, `run`, `blueprint`, and `detail`),
-while the implementation class/state helpers live in `state.py`. This avoids a
-large unrelated import-path migration. It is acceptable for `manager.py` to be
-a thin facade around `state.py` and `loading.py`; it must no longer own a Python
-thread or the long-running worker implementation.
+Do not add compatibility re-exports. Every consumer must import from the module
+that defines the symbol after the split. In particular, callers that currently
+need `PluginManager` (`routes/plugins.py`, `routes/blueprint.py`,
+`domain/blueprint/service.py`, `domain/run/compile.py`, and
+`domain/plugin/detail.py`) import it from `forecastbox.domain.plugin.state`;
+callers of submission, unload, readiness, status, and catalogue operations
+import those functions from `forecastbox.domain.plugin.manager`. Update all production and test
+imports atomically, then ensure `manager.py` does not re-export `PluginManager`
+or worker implementation details merely to preserve an old path.
 
 `template_ingest.py` should contain the existing `_ingest_plugin_templates`
 logic and the temporary direct blueprint imports. Those imports remain lazy only
@@ -141,11 +149,24 @@ handlers in Phase 5. Do not make the imports top-level and do not change the
 current per-template error isolation, glyph remapping, validation, soft-delete,
 or persistence behavior.
 
-`loading.py` should contain the synchronous worker-only functions: loading one
-plugin, version extraction, initial bulk loading, single update, and the
-synchronous unload primitive. It uses the state helpers for short publications
-and calls the synchronous locked DB helpers directly. It must not import routes,
-the entrypoint, or an event loop.
+`loading.py` owns the synchronous worker workflow: loading one plugin, version
+extraction, initial bulk loading, deciding whether installation is necessary,
+calling the compatibility policy, import/reload, state publication, template
+ingestion, and the synchronous unload primitive. It uses state helpers for
+short publications and calls synchronous locked DB helpers directly. It must
+not import routes, the entrypoint, or an event loop.
+
+Keep `compatibility.py` intact as the independent policy/helper module. Its
+public version helpers are used outside plugin loading by route code, and its
+installation function encapsulates the detailed environment-freeze,
+constraints, dry-run, real-install, and post-install policy without knowing
+about `PluginManager`, pool submission, plugin state, or database publication.
+`loading.py` invokes `check_environment_baseline()` and
+`install_plugin_compatibly()` at the existing points in the worker workflow;
+those calls must not move into `manager.py` or be duplicated. This gives a
+clear separation: `compatibility.py` answers whether and how the active Python
+environment may change, while `loading.py` decides when a particular configured
+plugin is installed, imported, reloaded, and published.
 
 `state.py` should retain the existing `PMap` publication pattern and the one
 short state lock. Replace thread-object state with minimal semantic state:
@@ -165,10 +186,8 @@ read a compact state snapshot and continue returning `running`, `ok`, or
 execution-manager status response.
 
 Preserve the present policy that a recorded global updater failure prevents a
-later single update until the process is restarted. In particular, do not add an
-implicit retry, reset endpoint, or automatic task retry. If the existing
-behavior is intentionally changed during review, it must be called out as a
-separate product/operational decision.
+later single update until the process is restarted. Do not add an implicit
+retry, reset endpoint, or automatic task retry.
 
 ## Implementation steps
 
@@ -210,15 +229,21 @@ Create the state and worker split described above before changing submission
 sites. Move code without changing its business ordering first, then replace the
 thread ownership.
 
-1. Move `PluginManager`, immutable map publication, updater-error recording,
-   concise status/readiness queries, and catalogue snapshot access into
-   `state.py` plus the `manager.py` facade. Remove the `updater` field entirely.
+1. Move `PluginManager` and its immutable-map publication plus short state
+   transitions into `state.py`. Keep `manager.py` limited to operation
+   reservation, execution-manager submission, readiness/status/catalogue
+   queries, and async request-facing orchestration. Remove the `updater` field
+   entirely and migrate every production/test import to the defining module;
+   do not leave a `PluginManager` re-export in `manager.py`.
 2. Move the current template-ingestion body to `template_ingest.py`, preserving
    its synchronous direct DB calls and existing temporary lazy blueprint
    imports. Update the current template-ingest unit tests to import it from its
    defining module.
 3. Move `load_single`, `_version_from_install`, `load_plugins`,
-   `update_single`, and the synchronous unload body to `loading.py`. Preserve:
+   `update_single`, and the synchronous unload body to `loading.py`. Keep
+   `compatibility.py` as the environment/version policy dependency described
+   above, rather than merging its tested resolver policy into the loader.
+   Preserve:
    - current bulk load ordering and all per-plugin DB writes;
    - publish-before-template-ingestion behavior so validation can resolve the
      newly loaded plugin catalogue;
@@ -255,7 +280,16 @@ thread ownership.
 Implement the facade methods in `domain/plugin/manager.py` using the state and
 worker wrappers.
 
-1. `submit_load_plugins(catalog_future)` must atomically reserve the initial
+1. Make the limited catalog-future contract correction before wiring the
+   continuation: in the legacy
+   `domain/artifact/manager.py::_refresh_catalog_task`, retain the existing
+   `refresh_error` update and logging, then re-raise the original exception.
+   This does not migrate the artifact executor, state, or shutdown ownership
+   from Phase 3.1; it makes the already returned startup `Future` accurately
+   represent a failed refresh so its existing consumer can honor the dependency
+   contract. Add focused coverage for the failed future and retained
+   `refresh_error` state.
+2. `submit_load_plugins(catalog_future)` must atomically reserve the initial
    operation, set readiness to not-ready while the catalog is pending, and call:
 
    ```python
@@ -270,7 +304,7 @@ worker wrappers.
    This replaces `delayed_thread`. It is a continuation, so no worker is
    occupied while waiting for catalog refresh. It is manager-monitored and does
    not return a domain-owned thread or executor.
-2. Attach a small completion callback to `catalog_future` solely to update the
+3. Attach a small completion callback to `catalog_future` solely to update the
    domain operation state if the dependency itself fails. It must consume the
    dependency exception, record a clear startup dependency error, leave
    `plugins_ready()` false, and not invoke the load worker. The manager's
@@ -278,22 +312,22 @@ worker wrappers.
    monitored failure history. The callback must only make a short state update;
    it must not acquire the jobs lock, publish plugins, or submit work while
    holding the state lock.
-3. `submit_update_single(...)` must retain its current synchronous acceptance
+4. `submit_update_single(...)` must retain its current synchronous acceptance
    contract for routes: validate that the configured plugin exists, reject an
    existing global failure or in-progress operation, reserve the operation, and
    submit the worker wrapper with `submit_monitored` to
    `PluginManagement` using `TaskName("plugin.update")`. The route may still
    return its current immediate 202-style response after acceptance.
-4. If normal monitored submission is rejected synchronously, roll back the
+5. If normal monitored submission is rejected synchronously, roll back the
    in-progress reservation before re-raising `SubmissionRejected`. Do not mark
    it as a completed plugin update and do not leave the domain permanently
    `running`. The existing common 503 handler then reports temporary pool or
    lifecycle saturation.
-5. Remove `join_updater_thread` and all thread liveness/join logic. Replace
+6. Remove `join_updater_thread` and all thread liveness/join logic. Replace
    `status_brief()`'s `updater.is_alive()` check with the semantic operation
    state. It must correctly handle the pre-startup and waiting-for-catalog
    cases without dereferencing a missing thread.
-6. Keep task names stable and specific: `plugin.initial-load` and
+7. Keep task names stable and specific: `plugin.initial-load` and
    `plugin.update`. These names, along with pool counters/failures, are the
    operational task detail; the top-level plugin status remains the existing
    compact domain-facing readiness/error summary until the later status
@@ -464,33 +498,3 @@ test.
   artifact legacy join remains untouched for Phase 3.1.
 - Phase 5's event-based blueprint reaction and the already delivered
   notification handler remain behaviorally unchanged.
-
-## Open question and implementation concern
-
-### Artifact catalog failure is not currently observable through its Future
-
-Phase 3.3 requires `submit_after(catalog_future, ...)` to skip initial plugin
-loading when catalog refresh fails. The current legacy
-`artifact.manager._refresh_catalog_task` catches every exception, records
-`ArtifactManager.refresh_error`, and returns normally. Consequently its
-`Future` succeeds even when refresh failed, so the execution manager's
-`submit_after` cannot detect the dependency failure and would start plugin
-loading anyway.
-
-This conflicts with the Phase 3.3 required semantics, but changing artifact
-execution ownership is explicitly deferred to Phase 3.1. Before implementation,
-the reviewer should choose one of these narrowly scoped resolutions:
-
-1. Recommended: make the legacy refresh task re-raise after it records
-   `refresh_error`. This does not migrate its executor or state ownership, but
-   makes its already-public startup `Future` accurately represent failure and
-   permits the required continuation behavior.
-2. Preserve the legacy successful-Future behavior and explicitly accept that
-   initial plugin loading still proceeds after a failed catalog refresh. This
-   is contrary to the migration requirement and should only be chosen with an
-   approved deviation recorded in the result document.
-
-No other open design decision is expected. In particular, do not add a
-per-task-status API to `ExecutionManager`: its existing pool counters and
-failure history plus the plugin domain's minimal operation state are sufficient
-for this fixed set of operations.
