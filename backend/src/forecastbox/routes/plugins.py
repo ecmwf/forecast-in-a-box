@@ -18,7 +18,7 @@ import logging
 from functools import partial
 from typing import Annotated, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from fiab_core.fable import BlockInstanceId, BlueprintTemplateExampleInput, ConfigurationOptionId, PluginCompositeId
 from packaging.version import InvalidVersion, Version
@@ -62,15 +62,16 @@ async def get_plugin_list() -> PluginListing:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugin manager is busy; retry later")
 
 
-# TODO ideally we'd return the redirect here, but that is basically guaranteed to end up with a 503 because
-# the plugins aren't ready yet -- we probably need to await here or smth
-# get_catalogue_redirect = lambda request: RedirectResponse(request.url_for("get_catalogue"), status_code=status.HTTP_303_SEE_OTHER)
-get_catalogue_redirect = lambda request: Response(status_code=202)
+# NOTE many routes are lazy in the sense they *submit* an operation (for eg pip install) and return with a success, before that
+# operation is finished. We don't treat it as a clean 200, because it could actually fail later.
+# Whether it succeeded would be ultimately derived from /list endpoint, but we don't want to return a redirect either, because
+# that route would quite possibly fail right await due to submitted update being in progress.
+# Ultimately, the caller is expected to subscribe to notifications, which will contain the success/failure + url to refresh
+Accepted = Response(status_code=202)
 
 
 @router.post("/update")
 async def update_plugin(
-    request: Request,
     pluginCompositeId: PluginCompositeId,
     version: str | None = None,
     admin: UserRead | None = Depends(get_admin_user),
@@ -103,7 +104,7 @@ async def update_plugin(
     result = await submit_update_single(pluginCompositeId, install=True, version=target)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
-    return get_catalogue_redirect(request)
+    return Accepted
 
 
 class PluginVersions(FiabBaseModel):
@@ -145,20 +146,16 @@ def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends(
 
 
 @router.post("/install")
-async def install_plugin(
-    request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
-) -> Response:
+async def install_plugin(pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
     # TODO possibly add optional version parameter
     await submit_install_single(pluginCompositeId)
-    return get_catalogue_redirect(request)
+    return Accepted
 
 
 @router.post("/uninstall")
-async def uninstall_plugin_endpoint(
-    request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
-) -> Response:
+async def uninstall_plugin_endpoint(pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
     await submit_uninstall_single(pluginCompositeId)
-    return get_catalogue_redirect(request)
+    return Accepted
 
 
 class PluginSettingsUpdateRequest(FiabBaseModel):
@@ -175,7 +172,6 @@ class PluginSettingsUpdateRequest(FiabBaseModel):
 
 @router.post("/settings")
 async def update_plugin_settings_endpoint(
-    request: Request,
     body: PluginSettingsUpdateRequest,
     admin: UserRead | None = Depends(get_admin_user),
 ) -> Response:
@@ -196,11 +192,11 @@ async def update_plugin_settings_endpoint(
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id_str} not found")
     if body.isEnabled is False:
         await submit_unload_single(body.pluginCompositeId)
-        return get_catalogue_redirect(request)
+        return Accepted
     result = await submit_update_single(body.pluginCompositeId, install=False, version=None)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
-    return get_catalogue_redirect(request)
+    return Accepted
 
 
 class TemplateExampleValuesResponse(FiabBaseModel):
