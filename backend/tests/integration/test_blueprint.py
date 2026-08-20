@@ -42,7 +42,7 @@ from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
 from forecastbox.routes.run import CompilationDetailResponse, RunCreateResponse
 
 from .conftest import fake_artifact_store_id, test_blueprint_artifact_id, testPluginId
-from .utils import compare_with_tolerance, retry_until
+from .utils import compare_with_tolerance, connect_notification_websocket, retry_until, wait_next_notification
 
 
 def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
@@ -333,27 +333,36 @@ def test_plugin_template_exclusion(backend_client_user: httpx.Client, backend_cl
     )
 
     # Exclude testExclusion and set a glyph remapping for testRemapping via the admin settings route.
-    response = backend_client_admin.post(
-        "/plugin/settings",
-        json={
-            "pluginCompositeId": testPluginId.model_dump(),
-            "excluded_templates": ["testExclusion"],
-            "glyph_remapping": {"pluginGlyphOld": "pluginGlyphNew", "localOld": "localNew"},
-        },
-        timeout=10,
-    )
-    assert response.status_code in (200, 202), f"Unexpected status from /plugin/settings: {response.status_code} {response.text}"
+    with connect_notification_websocket(backend_client_user) as websocket:
+        response = backend_client_admin.post(
+            "/plugin/settings",
+            json={
+                "pluginCompositeId": testPluginId.model_dump(),
+                "excluded_templates": ["testExclusion"],
+                "glyph_remapping": {"pluginGlyphOld": "pluginGlyphNew", "localOld": "localNew"},
+            },
+            timeout=10,
+        )
+        assert response.status_code in (200, 202), f"Unexpected status from /plugin/settings: {response.status_code} {response.text}"
 
-    # Wait for the re-ingest to complete.
-    def do_action() -> dict:
-        resp = backend_client_user.get("/status", timeout=10)
-        assert resp.is_success
-        return resp.json()
+        # Wait for the re-ingest to complete.
+        def do_action() -> dict:
+            resp = backend_client_user.get("/status", timeout=10)
+            assert resp.is_success
+            return resp.json()
 
-    def verify_ok(data: dict) -> dict | None:
-        return data if data.get("plugins") == "ok" else None
+        def verify_ok(data: dict) -> dict | None:
+            return data if data.get("plugins") == "ok" else None
 
-    retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin re-ingest did not reach 'ok' status")
+        retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin re-ingest did not reach 'ok' status")
+
+        # A pluginSettingsApplied notification for this plugin must have been emitted.
+        expected_plugin_id = PluginCompositeId.to_str(testPluginId)
+        timeout = 15
+        while True:
+            notification, timeout = wait_next_notification(websocket, "plugin", "pluginSettingsApplied", total_timeout=timeout)
+            if notification.context.get("plugin_id") == expected_plugin_id:
+                break
 
     # testExclusion must be gone; testBasic and testRemapping must remain.
     response = backend_client_user.get("/blueprint/list", timeout=10)

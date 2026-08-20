@@ -24,6 +24,13 @@ from pyrsistent import pmap
 
 import forecastbox.domain.plugin.submit as submit_module
 from forecastbox.domain.plugin.errors import PluginErrors
+from forecastbox.domain.plugin.events import (
+    PluginInstalledEvent,
+    PluginSettingsAppliedEvent,
+    PluginUninstalledEvent,
+    PluginUnloadedEvent,
+    PluginUpdatedEvent,
+)
 from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.plugin.status import plugins_ready
 from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected
@@ -117,6 +124,27 @@ def test_run_managed_finishes_ok_on_normal_completion() -> None:
     assert PluginManager.updater_error is None
 
 
+def test_run_managed_notifies_success_when_on_success_given() -> None:
+    PluginManager.operation_in_progress = True
+    payload = PluginUninstalledEvent(plugin_id="store/plugin")
+    with patch.object(submit_module, "_notify_success") as mock_notify:
+        submit_module._run_managed("trigger", lambda: None, ("plugin.uninstalled", payload))
+    mock_notify.assert_called_once_with("plugin.uninstalled", payload)
+
+
+def test_run_managed_does_not_notify_success_on_failure() -> None:
+    PluginManager.operation_in_progress = True
+    payload = PluginUninstalledEvent(plugin_id="store/plugin")
+
+    def _boom() -> None:
+        raise RuntimeError("boom")
+
+    with patch.object(submit_module, "_notify_success") as mock_notify:
+        with pytest.raises(RuntimeError):
+            submit_module._run_managed("trigger", _boom, ("plugin.uninstalled", payload))
+    mock_notify.assert_not_called()
+
+
 def test_run_managed_does_not_convert_per_plugin_errors_to_global_failure() -> None:
     """A worker that records per-plugin PluginErrors without raising is a normal completion."""
     PluginManager.operation_in_progress = True
@@ -182,6 +210,64 @@ async def test_submit_update_single_blocked_by_existing_global_failure() -> None
     assert "failed" in result
 
 
+@pytest.mark.asyncio
+async def test_submit_update_single_emits_updated_event_by_default() -> None:
+    with (
+        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+    ):
+
+        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
+            task()
+
+        mock_await_submit.side_effect = _run
+        with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
+            await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
+    mock_notify.assert_called_once()
+    event_name, payload = mock_notify.call_args.args
+    assert event_name == "plugin.updated"
+    assert isinstance(payload, PluginUpdatedEvent)
+    assert payload.plugin_id == PluginCompositeId.to_str(_PLUGIN_ID)
+
+
+@pytest.mark.asyncio
+async def test_submit_update_single_emits_installed_event_when_is_new_install() -> None:
+    with (
+        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+    ):
+
+        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
+            task()
+
+        mock_await_submit.side_effect = _run
+        with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
+            await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None, is_new_install=True)
+    mock_notify.assert_called_once()
+    event_name, payload = mock_notify.call_args.args
+    assert event_name == "plugin.installed"
+    assert isinstance(payload, PluginInstalledEvent)
+
+
+@pytest.mark.asyncio
+async def test_submit_update_single_emits_settings_applied_event_when_not_installing() -> None:
+    with (
+        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+    ):
+
+        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
+            task()
+
+        mock_await_submit.side_effect = _run
+        with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
+            await submit_module.submit_update_single(_PLUGIN_ID, install=False, version=None)
+    mock_notify.assert_called_once()
+    event_name, payload = mock_notify.call_args.args
+    assert event_name == "plugin.settings_applied"
+    assert isinstance(payload, PluginSettingsAppliedEvent)
+
+
 # ---------------------------------------------------------------------------
 # submit_unload_single / submit_uninstall_single -- available after a failed update
 # ---------------------------------------------------------------------------
@@ -199,12 +285,17 @@ async def test_submit_unload_single_available_after_prior_update_failure() -> No
             task()
 
         mock_await_submit.side_effect = _run
-        await submit_module.submit_unload_single(_PLUGIN_ID)
+        with patch.object(submit_module, "_notify_success") as mock_notify:
+            await submit_module.submit_unload_single(_PLUGIN_ID)
     mock_unload_single.assert_called_once_with(_PLUGIN_ID)
     mock_await_submit.assert_called_once()
     args, _ = mock_await_submit.call_args
     assert args[0] == ConcurrentPools.PluginManagement
     assert args[1] == "plugin.unload"
+    mock_notify.assert_called_once()
+    event_name, payload = mock_notify.call_args.args
+    assert event_name == "plugin.unloaded"
+    assert isinstance(payload, PluginUnloadedEvent)
 
 
 @pytest.mark.asyncio
@@ -227,12 +318,17 @@ async def test_submit_uninstall_single_uses_plugin_management_pool_and_task_name
             task()
 
         mock_await_submit.side_effect = _run
-        await submit_module.submit_uninstall_single(_PLUGIN_ID)
+        with patch.object(submit_module, "_notify_success") as mock_notify:
+            await submit_module.submit_uninstall_single(_PLUGIN_ID)
     mock_uninstall_sync.assert_called_once_with(_PLUGIN_ID)
     mock_await_submit.assert_called_once()
     args, _ = mock_await_submit.call_args
     assert args[0] == ConcurrentPools.PluginManagement
     assert args[1] == "plugin.uninstall"
+    mock_notify.assert_called_once()
+    event_name, payload = mock_notify.call_args.args
+    assert event_name == "plugin.uninstalled"
+    assert isinstance(payload, PluginUninstalledEvent)
 
 
 @pytest.mark.asyncio

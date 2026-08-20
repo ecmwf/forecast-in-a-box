@@ -34,3 +34,94 @@ class PluginGlobalErrorEvent:
             detailRoute="api/v1/plugin/list",
             refreshRoutes=["api/v1/plugin/list"],
         )
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class PluginInstalledEvent:
+    """Emitted once a plugin has been installed and loaded successfully for the first time,
+    corresponding to the ``POST /api/v1/plugin/install`` route."""
+
+    plugin_id: str
+
+    def as_client_notification(self) -> ClientNotification:
+        return ClientNotification(
+            text=f"Plugin {self.plugin_id} installed successfully",
+            sourceDomainName="plugin",
+            sourceDomainEvent="pluginInstalled",
+            context={"plugin_id": self.plugin_id},
+            detailRoute="api/v1/plugin/list",
+            refreshRoutes=["api/v1/plugin/list"],
+        )
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class PluginUpdatedEvent:
+    """Emitted once an already-installed plugin has been updated (pip re-install plus reload)
+    successfully, corresponding to the ``POST /api/v1/plugin/update`` route."""
+
+    plugin_id: str
+
+    def as_client_notification(self) -> ClientNotification:
+        return ClientNotification(
+            text=f"Plugin {self.plugin_id} updated successfully",
+            sourceDomainName="plugin",
+            sourceDomainEvent="pluginUpdated",
+            context={"plugin_id": self.plugin_id},
+            detailRoute="api/v1/plugin/list",
+            refreshRoutes=["api/v1/plugin/list"],
+        )
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class PluginSettingsAppliedEvent:
+    """Emitted once a plugin's settings change (excluding disable) has been applied and the
+    plugin reloaded/re-ingested successfully, corresponding to the ``POST /api/v1/plugin/settings``
+    route when the plugin stays enabled."""
+
+    plugin_id: str
+
+    def as_client_notification(self) -> ClientNotification:
+        return ClientNotification(
+            text=f"Plugin {self.plugin_id} settings applied successfully",
+            sourceDomainName="plugin",
+            sourceDomainEvent="pluginSettingsApplied",
+            context={"plugin_id": self.plugin_id},
+            detailRoute="api/v1/plugin/list",
+            refreshRoutes=["api/v1/plugin/list"],
+        )
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class PluginUnloadedEvent:
+    """Emitted once a plugin has been disabled/unloaded successfully, corresponding to the
+    ``POST /api/v1/plugin/settings`` route when ``isEnabled`` is set to ``False``."""
+
+    plugin_id: str
+
+    def as_client_notification(self) -> ClientNotification:
+        return ClientNotification(
+            text=f"Plugin {self.plugin_id} disabled successfully",
+            sourceDomainName="plugin",
+            sourceDomainEvent="pluginUnloaded",
+            context={"plugin_id": self.plugin_id},
+            detailRoute="api/v1/plugin/list",
+            refreshRoutes=["api/v1/plugin/list"],
+        )
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class PluginUninstalledEvent:
+    """Emitted once a plugin has been uninstalled successfully, corresponding to the
+    ``POST /api/v1/plugin/uninstall`` route."""
+
+    plugin_id: str
+
+    def as_client_notification(self) -> ClientNotification:
+        return ClientNotification(
+            text=f"Plugin {self.plugin_id} uninstalled successfully",
+            sourceDomainName="plugin",
+            sourceDomainEvent="pluginUninstalled",
+            context={"plugin_id": self.plugin_id},
+            detailRoute="api/v1/plugin/list",
+            refreshRoutes=["api/v1/plugin/list"],
+        )
