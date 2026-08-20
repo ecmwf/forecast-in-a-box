@@ -7,11 +7,26 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for plugin status utility functions -- status_brief and plugins_ready."""
+"""Unit tests for plugin status utility functions -- status_brief, plugins_ready, catalogue_view."""
 
-from unittest.mock import patch
+from collections.abc import Generator
+from unittest.mock import MagicMock, patch
 
-from forecastbox.domain.plugin.status import plugins_ready, status_brief
+import pytest
+from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
+from pyrsistent import pmap
+
+from forecastbox.domain.plugin.state import PluginManager
+from forecastbox.domain.plugin.status import catalogue_view, plugins_ready, status_brief
+
+_PLUGIN_ID = PluginCompositeId(store=PluginStoreId("store"), local=PluginId("plugin"))
+
+
+@pytest.fixture(autouse=True)
+def _reset_plugin_state() -> Generator[None, None, None]:
+    PluginManager.plugins = pmap()
+    yield
+    PluginManager.plugins = pmap()
 
 
 def test_status_brief_ok() -> None:
@@ -56,3 +71,27 @@ def test_plugins_ready_false_when_failed() -> None:
         mock_pm.updater_error = "crash"
         mock_pm.operation_in_progress = False
         assert plugins_ready() is False
+
+
+# ---------------------------------------------------------------------------
+# catalogue_view
+# ---------------------------------------------------------------------------
+
+
+def test_catalogue_view_returns_snapshot_of_published_plugins() -> None:
+    plugin = MagicMock()
+    plugin.catalogue = "fake-catalogue"
+    PluginManager.plugins = pmap({_PLUGIN_ID: plugin})
+
+    result = catalogue_view()
+
+    assert result == {_PLUGIN_ID: "fake-catalogue"}
+
+
+def test_catalogue_view_returns_false_when_lock_not_acquired() -> None:
+    busy_lock = PluginManager.lock
+    busy_lock.acquire()
+    try:
+        assert catalogue_view() is False
+    finally:
+        busy_lock.release()

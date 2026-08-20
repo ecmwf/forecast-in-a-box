@@ -34,4 +34,4 @@ def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
             return False
         else:
             plugins = PluginManager.plugins
-    return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
+    return {plugin_id: plugin.catalogue for plugin_id, plugin in plugins.items()}

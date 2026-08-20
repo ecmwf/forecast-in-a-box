@@ -145,9 +145,11 @@ def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends(
 
 
 @router.post("/install")
-def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
+async def install_plugin(
+    request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
+) -> Response:
     # TODO possibly add optional version parameter
-    submit_install_single(pluginCompositeId)
+    await submit_install_single(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 

@@ -7,8 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""API for submitting venv-mutating operations in a safe manner  to the bounded
-``ConcurrentPools.PluginManagement.
+"""API for submitting venv-mutating operations in a safe manner to the bounded
+``ConcurrentPools.PluginManagement``.
 
 Assumed to be invoked from the plugins router in API, and during application startup.
 
@@ -33,22 +33,15 @@ from collections.abc import Callable
 from concurrent.futures import Future
 from functools import partial
 
-from fiab_core.fable import BlockFactoryCatalogue, PluginCompositeId
+from fiab_core.fable import PluginCompositeId
 from packaging.version import Version
 
 from forecastbox.domain.plugin.events import PluginGlobalErrorEvent
 from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
 from forecastbox.domain.plugin.loading import load_plugins as _load_plugins
 from forecastbox.domain.plugin.loading import uninstall_plugin_sync, unload_single, update_single
-from forecastbox.domain.plugin.state import (
-    PluginManager,
-    finish_ok,
-    finish_with_error,
-    release_reservation,
-    reserve_operation,
-)
+from forecastbox.domain.plugin.state import finish_ok, finish_with_error, release_reservation, reserve_operation
 from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected, TaskName, execution_manager
-from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import PluginsSettings, config
 from forecastbox.utility.dispatcher import Event, EventName, submit_event
 

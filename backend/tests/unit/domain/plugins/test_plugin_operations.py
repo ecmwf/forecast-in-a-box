@@ -16,7 +16,7 @@ uninstall use the correct pool/task names without creating or joining a thread.
 
 from collections.abc import Generator
 from concurrent.futures import Future
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
@@ -145,7 +145,7 @@ def _fake_config_with_plugin() -> MagicMock:
 async def test_submit_update_single_uses_plugin_management_pool_and_task_name() -> None:
     with (
         patch.object(submit_module, "config", _fake_config_with_plugin()),
-        patch.object(submit_module.execution_manager, "submit_monitored") as mock_submit,
+        patch.object(submit_module.execution_manager, "awaitable_submit", new=AsyncMock()) as mock_submit,
     ):
         result = await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     assert result == ""
@@ -167,7 +167,7 @@ async def test_submit_update_single_rejects_overlapping_operation() -> None:
 async def test_submit_update_single_rolls_back_reservation_on_submission_rejected() -> None:
     with (
         patch.object(submit_module, "config", _fake_config_with_plugin()),
-        patch.object(submit_module.execution_manager, "submit_monitored", side_effect=SubmissionRejected("pool full")),
+        patch.object(submit_module.execution_manager, "awaitable_submit", side_effect=SubmissionRejected("pool full")),
     ):
         with pytest.raises(SubmissionRejected):
             await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)

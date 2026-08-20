@@ -33,7 +33,7 @@ from packaging.version import Version
 from pyrsistent import pmap
 
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry
-from forecastbox.routes.plugins import get_plugin_versions, get_template_example_values, update_plugin
+from forecastbox.routes.plugins import get_plugin_versions, get_template_example_values, install_plugin, update_plugin
 from forecastbox.utility.config import PluginSettings
 
 # ---------------------------------------------------------------------------
@@ -185,26 +185,40 @@ def test_versions_pip_source_passed_to_get_package_versions() -> None:
     mock_gpv.assert_called_once_with("fiab-plugin-ecmwf")
 
 
-def test_update_without_version_selects_newest_compatible_version() -> None:
+@pytest.mark.asyncio
+async def test_update_without_version_selects_newest_compatible_version() -> None:
     with (
         _patch_store(),
         _patch_versions(["1.0.0", "1.2.0", "2.0.0"]),
         _patch_fiabcore("1.0.0"),
-        patch("forecastbox.routes.plugins.submit_update_single", return_value="") as mock_submit,
+        patch("forecastbox.routes.plugins.submit_update_single", new=AsyncMock(return_value="")) as mock_submit,
     ):
-        update_plugin(MagicMock(), _COMPOSITE_ID)
+        await update_plugin(MagicMock(), _COMPOSITE_ID)
     mock_submit.assert_called_once_with(_COMPOSITE_ID, install=True, version=Version("1.2.0"))
 
 
-def test_update_without_version_rejects_when_no_compatible_version_exists() -> None:
+@pytest.mark.asyncio
+async def test_update_without_version_rejects_when_no_compatible_version_exists() -> None:
     with (
         _patch_store(),
         _patch_versions(["2.0.0"]),
         _patch_fiabcore("1.0.0"),
     ):
         with pytest.raises(HTTPException) as exc_info:
-            update_plugin(MagicMock(), _COMPOSITE_ID)
+            await update_plugin(MagicMock(), _COMPOSITE_ID)
     assert exc_info.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# /install route -- must await the now-async submit_install_single
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_install_plugin_awaits_submit_install_single() -> None:
+    with patch("forecastbox.routes.plugins.submit_install_single", new=AsyncMock()) as mock_submit:
+        await install_plugin(MagicMock(), _COMPOSITE_ID)
+    mock_submit.assert_awaited_once_with(_COMPOSITE_ID)
 
 
 # ---------------------------------------------------------------------------
