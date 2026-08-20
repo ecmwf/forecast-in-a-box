@@ -22,6 +22,7 @@ import type { ClientNotification } from '@/api/types/notification.types'
 import { clientNotificationSchema } from '@/api/types/notification.types'
 import { API_PREFIX } from '@/api/endpoints'
 import { artifactKeys, wakeDownloadPolling } from '@/api/hooks/useArtifacts'
+import { pluginKeys } from '@/api/hooks/usePlugins'
 import { createLogger } from '@/lib/logger'
 import { queryClient } from '@/lib/queryClient'
 
@@ -30,6 +31,8 @@ const log = createLogger('Notifications')
 /** Normalized backend refresh route -> query keys it makes stale. */
 const refreshRouteQueryKeys = new Map<string, ReadonlyArray<QueryKey>>([
   ['artifacts/list_models', [artifactKeys.list()]],
+  // plugin.pluginGlobalError — the listing's 60s staleTime would hide it.
+  ['plugin/list', [pluginKeys.list()]],
 ])
 
 /** Routes arrive as "api/v1/artifacts/list_models", with or without a leading slash. */

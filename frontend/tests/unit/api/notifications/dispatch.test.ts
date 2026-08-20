@@ -18,6 +18,7 @@ import {
   resyncRegisteredRoutes,
 } from '@/api/notifications/dispatch'
 import { artifactKeys, wakeDownloadPolling } from '@/api/hooks/useArtifacts'
+import { pluginKeys } from '@/api/hooks/usePlugins'
 import { queryClient } from '@/lib/queryClient'
 
 vi.mock('@/api/hooks/useArtifacts', async (importOriginal) => {
@@ -85,6 +86,22 @@ describe('dispatchClientNotification', () => {
     dispatchClientNotification(notification())
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: artifactKeys.list(),
+    })
+  })
+
+  it('invalidates the plugin listing on a plugin global error', () => {
+    dispatchClientNotification(
+      notification({
+        text: 'Initial plugin load failed: environment already broken',
+        sourceDomainName: 'plugin',
+        sourceDomainEvent: 'pluginGlobalError',
+        context: { trigger: 'Initial plugin load', error: 'broken' },
+        detailRoute: 'api/v1/plugin/list',
+        refreshRoutes: ['api/v1/plugin/list'],
+      }),
+    )
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: pluginKeys.list(),
     })
   })
 
