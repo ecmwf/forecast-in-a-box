@@ -16,7 +16,8 @@ from forecastbox.domain.notification.models import ClientNotification
 
 @dataclass(frozen=True, eq=True, slots=True)
 class PluginGlobalErrorEvent:
-    """Emitted whenever the plugin updater thread fails, mirroring ``PluginManager.updater_error``."""
+    """Emitted whenever a managed plugin-management task fails unexpectedly, mirroring the
+    domain-facing ``updater_error`` field in ``forecastbox.domain.plugin.state.PluginManager``."""
 
     trigger: str
     """What operation was running when the failure occurred, e.g. ``"Initial plugin load"`` or

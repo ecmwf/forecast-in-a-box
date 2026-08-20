@@ -26,8 +26,8 @@ environments and a handover.
 ``install_plugin_compatibly`` assumes the environment already satisfies ``uv pip check`` --
 it performs no baseline check of its own. Callers that want to guard against attributing
 pre-existing, unrelated environment breakage to the plugin being installed/updated must call
-``check_environment_baseline()`` themselves first; see ``domain.plugin.manager`` for how the
-plugin manager uses it (once per initial batch load, and once per single-plugin update, before
+``check_environment_baseline()`` themselves first; see ``domain.plugin.loading`` for how the
+plugin loader uses it (once per initial batch load, and once per single-plugin update, before
 any install is attempted).
 
 Algorithm for ``install_plugin_compatibly``
@@ -55,7 +55,7 @@ Known limitations (read before touching this module)
    and preserves every other currently-installed distribution. A different install order, or
    resolving several plugins together in a fresh environment, could produce a valid combined
    state that an incremental, one-plugin-at-a-time install like this one rejects.
-2. Plugin uninstall (see ``domain.plugin.manager.uninstall_plugin``) only removes the configured/
+2. Plugin uninstall (see ``domain.plugin.loading.uninstall_plugin_sync``) only removes the configured/
    loaded plugin entry; it does not uninstall the plugin's distribution or its dependencies.
    Packages a plugin introduced become part of later environment snapshots and are consequently
    protected by this same mechanism. We cannot reliably infer which packages are now unused,

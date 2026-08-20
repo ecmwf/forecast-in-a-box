@@ -7,11 +7,18 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""API for Plugin Stores -- data parsing and extractions"""
+"""API for Plugin Stores -- data retrieval and extractions.
+
+Owns a lock-protected state StoresManager which reflects what the configured
+stores actually offer as plugins.
+
+Owns operations that modify the config file."""
+# TODO ideally we transition all the individual plugin info into the database.
+# But we need to solve the default plugin selection/installation first then
 
 import logging
 import threading
-import time
+from functools import partial
 
 import httpx
 import orjson
@@ -22,7 +29,8 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 from typing_extensions import Self
 
-from forecastbox.domain.plugin.manager import submit_update_single
+from forecastbox.domain.plugin.submit import submit_update_single
+from forecastbox.utility.concurrency.manager import ConcurrentPools, TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
 from forecastbox.utility.httpx import fetch_content
@@ -107,11 +115,10 @@ def populate_store(store: PluginStore, client: httpx.Client) -> None:
 class StoresManager:
     stores: PMap[PluginStoreId, PluginStore] = pmap()
     stores_lock: threading.Lock = threading.Lock()
-    stores_updater: threading.Thread | None = None
 
 
 def initialize_stores(plugin_stores_config: PluginStoresConfig) -> None:
-    # assumed to be submitted from a thread
+    # assumed to be submitted through ConcurrentPools.Io
     with httpx.Client() as client:
         # a thread pool / async could work here but we dont expect many stores here
         stores = {key: fetch_store(client, value) for key, value in plugin_stores_config.items()}
@@ -136,15 +143,27 @@ def get_plugins_detail() -> dict[PluginCompositeId, tuple[PluginStoreEntry, Plug
 
 
 def submit_initialize_stores() -> None:
-    with timed_acquire(StoresManager.stores_lock, 10) as result:
-        if not result:
-            logger.error("failed to initialize stores")
-            return
-        StoresManager.stores_updater = threading.Thread(target=initialize_stores, args=(config.external.plugin_stores,))
-        StoresManager.stores_updater.start()
+    """Submit store initialization as a monitored task on the shared ``Io`` pool.
+
+    Fire-and-forget: an unexpected exception is recorded by the execution manager's
+    monitored-failure history. Callers continue to see an empty store map (via
+    ``get_plugins_detail``/``StoresManager.stores``) until a successful publication
+    replaces it -- a partial store map is never published.
+    """
+
+    # NOTE No need to protect from concurrent runs -- http fetches are safe, and
+    # the last operation which mutates the global state is lock protected, and we
+    # are ok with last one winning.
+    execution_manager.submit_monitored(
+        ConcurrentPools.Io,
+        TaskName("plugin.stores.initialize"),
+        partial(initialize_stores, config.external.plugin_stores),
+    )
 
 
-def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
+async def submit_install_single(plugin_composite_key: PluginCompositeId) -> None:
+    """Retrieves the information from the store, inserts the record of plugin being presents
+    into the config file, then submits the actual pip operation via `plugins.submit`"""
     # No lock needed for reads with pyrsistent immutable structures
     if not StoresManager.stores:
         raise ValueError("stores not initialized")
@@ -167,18 +186,4 @@ def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
             )
             config.save_to_file()
 
-    submit_update_single(plugin_composite_key, install=True, version=None)
-
-
-def join_stores_thread(timeout_sec: int) -> None:
-    # TODO candidate for ecpyutil, duplicated in plugin.manager
-    barrier = (time.perf_counter_ns() / 1e9) + timeout_sec
-    with timed_acquire(StoresManager.stores_lock, timeout_sec) as result:
-        if not result:
-            logger.error("failed to lock for joining updater thread")
-        else:
-            if StoresManager.stores_updater is not None:
-                budget = barrier - (time.perf_counter_ns() / 1e9)
-                StoresManager.stores_updater.join(budget)
-                if StoresManager.stores_updater.is_alive():
-                    logger.error("failed to join StoresManager updater thread")
+    await submit_update_single(plugin_composite_key, install=True, version=None)

@@ -78,6 +78,7 @@ class ConcurrencySettings(FiabBaseModel):
     startup_timeout_seconds: float = Field(default=10, gt=0)
     shutdown_timeout_seconds: float = Field(default=10, gt=0)
 
+    # TODO this actually can be default pydantic validator, not needed to be runtime-only
     def validate_runtime(self) -> list[str]:
         errors: list[str] = []
         required_pools = set(ConcurrentPools)

@@ -29,8 +29,9 @@ from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.db import PluginStateRecord, get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.detail import PluginListing, build_plugin_listing
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy, PluginNotFound
-from forecastbox.domain.plugin.manager import PluginManager, submit_update_single, uninstall_plugin, unload_single
-from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_plugin
+from forecastbox.domain.plugin.state import PluginManager
+from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_single
+from forecastbox.domain.plugin.submit import submit_uninstall_single, submit_unload_single, submit_update_single
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.config import PluginSettings, config
@@ -68,7 +69,7 @@ get_catalogue_redirect = lambda request: Response(status_code=202)
 
 
 @router.post("/update")
-def update_plugin(
+async def update_plugin(
     request: Request,
     pluginCompositeId: PluginCompositeId,
     version: str | None = None,
@@ -99,7 +100,7 @@ def update_plugin(
                 detail=f"No compatible versions found for plugin {pluginCompositeId!r}",
             )
         target = Version(versions.versions[0])
-    result = submit_update_single(pluginCompositeId, install=True, version=target)
+    result = await submit_update_single(pluginCompositeId, install=True, version=target)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return get_catalogue_redirect(request)
@@ -144,9 +145,11 @@ def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends(
 
 
 @router.post("/install")
-def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
+async def install_plugin(
+    request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
+) -> Response:
     # TODO possibly add optional version parameter
-    submit_install_plugin(pluginCompositeId)
+    await submit_install_single(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 
@@ -154,7 +157,7 @@ def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin
 async def uninstall_plugin_endpoint(
     request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
 ) -> Response:
-    await uninstall_plugin(pluginCompositeId)
+    await submit_uninstall_single(pluginCompositeId)
     return get_catalogue_redirect(request)
 
 
@@ -192,8 +195,9 @@ async def update_plugin_settings_endpoint(
     except PluginNotFound:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id_str} not found")
     if body.isEnabled is False:
-        unload_single(body.pluginCompositeId)
-    result = submit_update_single(body.pluginCompositeId, install=False, version=None)
+        await submit_unload_single(body.pluginCompositeId)
+        return get_catalogue_redirect(request)
+    result = await submit_update_single(body.pluginCompositeId, install=False, version=None)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return get_catalogue_redirect(request)
