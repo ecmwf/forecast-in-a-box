@@ -10,7 +10,7 @@
 """Unit tests for the protocol-based dispatch matching in utility/dispatcher.py."""
 
 from concurrent.futures import Future
-from typing import cast
+from typing import Callable, cast
 
 import pytest
 
@@ -28,10 +28,10 @@ from forecastbox.utility.dispatcher import (
 class _FakeManager:
     """Runs handler tasks inline, sidestepping ExecutionManager pool registration entirely."""
 
-    def _submit_monitored_receipt(self, pool_name: object, task_name: object, task: object) -> Future:  # ty: ignore[invalid-argument]
+    def _submit_monitored_receipt(self, pool_name: object, task_name: object, task: Callable[[], object]) -> Future:
         future: Future = Future()
         try:
-            future.set_result(cast(object, task)())  # ty: ignore[call-non-callable]
+            future.set_result(task())
         except BaseException as error:
             future.set_exception(error)
         return future

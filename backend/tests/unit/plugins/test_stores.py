@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import orjson
 import pytest
-from fiab_core.fable import PluginId
+from fiab_core.fable import PluginId, PluginStoreId
 
 from forecastbox.domain.plugin.store import PluginStore, PluginStoreEntry, StoresManager, fetch_store, get_plugins_detail
 from forecastbox.utility.config import ConcurrentPools, PluginStoreConfig
@@ -73,7 +73,7 @@ def test_initialize_stores_publishes_only_after_successful_fetch(monkeypatch: py
     monkeypatch.setattr(store_module, "fetch_store", _boom)
 
     with pytest.raises(RuntimeError):
-        store_module.initialize_stores({"someStore": MagicMock()})
+        store_module.initialize_stores({PluginStoreId("someStore"): MagicMock()})
 
     assert dict(StoresManager.stores) == {}
 

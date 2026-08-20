@@ -14,7 +14,7 @@ managed-operation wrapper's error/notification behaviour, and that update/unload
 uninstall use the correct pool/task names without creating or joining a thread.
 """
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from concurrent.futures import Future
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -195,7 +195,7 @@ async def test_submit_unload_single_available_after_prior_update_failure() -> No
         patch.object(submit_module, "unload_single") as mock_unload_single,
     ):
 
-        async def _run(pool_name: object, task_name: object, task: object) -> None:
+        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
             task()
 
         mock_await_submit.side_effect = _run
@@ -223,7 +223,7 @@ async def test_submit_uninstall_single_uses_plugin_management_pool_and_task_name
         patch.object(submit_module, "uninstall_plugin_sync") as mock_uninstall_sync,
     ):
 
-        async def _run(pool_name: object, task_name: object, task: object) -> None:
+        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
             task()
 
         mock_await_submit.side_effect = _run

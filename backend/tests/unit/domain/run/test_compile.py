@@ -16,6 +16,7 @@ from fiab_core.fable import (
     PluginCompositeId,
 )
 from fiab_core.plugin import BlockValidation, Plugin
+from fiab_core.types.definitions import IntType
 from pyrsistent import pmap
 
 from forecastbox.domain.blueprint.service import BlueprintBuilder, RoutableBlock
@@ -158,7 +159,7 @@ def test_compile_builder_fails_missing_config_before_plugin_compile(monkeypatch:
                     title="",
                     description="",
                     configuration_options={
-                        option_id: BlockConfigurationOption(title="", description="", value_type="int"),
+                        option_id: BlockConfigurationOption(title="", description="", value_type=IntType()),
                     },
                     inputs=[],
                 )
