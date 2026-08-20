@@ -32,7 +32,7 @@ Content-Security-Policy:
 | `style-src` | `'self' 'unsafe-inline'` | Tailwind + runtime style injection (e.g. react-globe.gl / three.js) |
 | `img-src` | `'self' data: blob:` | App icons are same-origin; three.js globe textures use `data:` and `blob:` URIs |
 | `font-src` | `'self'` | IBM Plex Sans is bundled via `@fontsource-variable` |
-| `connect-src` | `'self'` | Fetch API calls and `EventSource` (SSE) to same-origin backend |
+| `connect-src` | `'self'` | Fetch API calls, `EventSource` (SSE), and the notification WebSocket, all same-origin. CSP3 lets `'self'` match the page origin's `ws:`/`wss:` scheme upgrade, which every browser this app supports implements |
 | `worker-src` | `'self'` | MSW service worker (`mockServiceWorker.js`) in dev/test; omit in production if unused |
 | `frame-src` | `'none'` | App does not embed iframes |
 | `object-src` | `'none'` | No plugins (Flash, Java, etc.) |
@@ -42,7 +42,8 @@ Content-Security-Policy:
 
 ### Notes
 
-- If you serve the backend on a different origin (e.g. `https://api.example.com`), add it to `connect-src`.
+- If you serve the backend on a different origin (e.g. `https://api.example.com`), add it to `connect-src` — including `wss://api.example.com` for the notification WebSocket, since `'self'`'s scheme-upgrade leniency applies only to the page's own origin.
+- Reverse proxies in front of the backend must forward WebSocket upgrades on `/api/v1/notification/ws` (nginx: `proxy_http_version 1.1` plus the `Upgrade`/`Connection` headers).
 - `'unsafe-inline'` in `style-src` is required because three.js and some UI libraries inject styles at runtime. If this is unacceptable, consider using a CSP nonce strategy.
 - `worker-src 'self'` can be removed in production if MSW is not used.
 

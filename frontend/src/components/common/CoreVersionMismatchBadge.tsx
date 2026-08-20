@@ -48,12 +48,12 @@ export function CoreVersionMismatchBadge({
 
   return (
     <Tooltip>
-      <TooltipTrigger>
+      {/* The trigger is the flex child, so w-fit and layout classes go here. */}
+      <TooltipTrigger className={cn('w-fit', className)}>
         <span
           className={cn(
             'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium',
             'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
-            className,
           )}
         >
           <AlertTriangle className="h-3.5 w-3.5" />

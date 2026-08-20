@@ -110,4 +110,40 @@ describe('createPollingTask', () => {
       }),
     ).rejects.toThrow('boom')
   })
+
+  it('wake() ends the between-poll delay early', async () => {
+    let n = 0
+    let wake: (() => void) | null = null
+    const controller = new AbortController()
+
+    const task = createPollingTask<number>({
+      poll: () => Promise.resolve(++n),
+      until: (v) => v >= 2,
+      // Far beyond the test timeout — only a wake can finish this quickly
+      interval: 600_000,
+      signal: controller.signal,
+      onWake: (w) => {
+        wake = w
+      },
+    })
+    setTimeout(() => wake?.(), 20)
+
+    expect(await task).toBe(2)
+  })
+
+  it('aborting rejects even while a wake is registered', async () => {
+    let n = 0
+    const controller = new AbortController()
+
+    const task = createPollingTask<number>({
+      poll: () => Promise.resolve(++n),
+      until: (v) => v >= 2,
+      interval: 600_000,
+      signal: controller.signal,
+      onWake: () => {},
+    })
+    setTimeout(() => controller.abort(), 20)
+
+    await expect(task).rejects.toThrow(/aborted/i)
+  })
 })

@@ -121,6 +121,8 @@ export default defineConfig(({ mode }) => {
             target: env.VITE_API_BASE || 'http://localhost:8000',
             changeOrigin: true,
             secure: false,
+            // Forward WebSocket upgrades (notification push channel)
+            ws: true,
             cookieDomainRewrite: 'localhost',
             // Rewrite Location headers in redirect responses to use the proxy host
             // This fixes issues with backend 303 redirects containing absolute URLs to port 8000

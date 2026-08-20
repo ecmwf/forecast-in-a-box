@@ -46,6 +46,7 @@ import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PluginsFilters } from '@/features/plugins/components/PluginsFilters'
+import { compareInstalledPlugins } from '@/features/plugins/utils/plugin-sort'
 import { PluginsList } from '@/features/plugins/components/PluginsList'
 import { UninstalledPluginsSection } from '@/features/plugins/components/UninstalledPluginsSection'
 import { UpdatesAvailableSection } from '@/features/plugins/components/UpdatesAvailableSection'
@@ -134,15 +135,7 @@ function TestPluginsPage() {
     const withUpdates = filteredPlugins.filter((p) => p.hasUpdate)
     const installed = filteredPlugins
 
-    installed.sort((a, b) => {
-      if (a.hasUpdate !== b.hasUpdate) {
-        return a.hasUpdate ? -1 : 1
-      }
-      if (a.isEnabled !== b.isEnabled) {
-        return a.isEnabled ? -1 : 1
-      }
-      return a.name.localeCompare(b.name)
-    })
+    installed.sort(compareInstalledPlugins)
 
     return {
       pluginsWithUpdates: filteringAvailable ? [] : withUpdates,

@@ -138,6 +138,14 @@ export const API_ENDPOINTS = {
   },
 
   /**
+   * Notification push channel
+   */
+  notification: {
+    /** WS - Server-push ClientNotification stream */
+    ws: `${API_PREFIX}/notification/ws`,
+  },
+
+  /**
    * Job monitoring and execution endpoints
    */
   job: {
