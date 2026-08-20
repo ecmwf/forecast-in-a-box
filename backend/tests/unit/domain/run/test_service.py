@@ -10,12 +10,12 @@ from fiab_core.fable import BlockInstanceId
 
 from forecastbox.domain.run import service
 from forecastbox.domain.run.cascade import RunOutputCharacteristic, RunOutputs
-from forecastbox.schemata.run import Run
+from forecastbox.domain.run.db import RunRecord
 
 
 def test_get_mime_of_output_returns_declared_mime() -> None:
     execution = cast(
-        Run,
+        RunRecord,
         SimpleNamespace(
             run_id="run-1",
             outputs=RunOutputs(
@@ -37,7 +37,7 @@ def test_get_mime_of_output_returns_declared_mime() -> None:
 
 def test_get_mime_of_output_rejects_unknown_task() -> None:
     execution = cast(
-        Run,
+        RunRecord,
         SimpleNamespace(
             run_id="run-1",
             outputs=RunOutputs(
@@ -129,7 +129,7 @@ async def test_poll_and_update_fetches_textual_value_for_newly_available_task() 
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=update_mock),
         patch("forecastbox.domain.run.service.api.decoded_result", return_value=text_bytes),
     ):
-        detail = await service.poll_and_update(cast(Run, execution))
+        detail = await service.poll_and_update(cast(RunRecord, execution))
 
     assert detail.status == "completed"
     # The outputs kwarg passed to update_run_runtime must include the fetched value
@@ -160,7 +160,7 @@ async def test_poll_and_update_skips_non_textual_output() -> None:
         patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=update_mock),
     ):
-        await service.poll_and_update(cast(Run, execution))
+        await service.poll_and_update(cast(RunRecord, execution))
 
     # Only the JobProgressRequest was made — no ResultRetrievalRequest
     assert call_count == 1
@@ -194,7 +194,7 @@ async def test_poll_and_update_does_not_refetch_already_cached_value() -> None:
         patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=update_mock),
     ):
-        await service.poll_and_update(cast(Run, execution))
+        await service.poll_and_update(cast(RunRecord, execution))
 
     # Only the JobProgressRequest, no ResultRetrievalRequest
     assert call_count == 1
@@ -225,7 +225,7 @@ async def test_poll_and_update_handles_fetch_failure_gracefully() -> None:
         patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=update_mock),
     ):
-        detail = await service.poll_and_update(cast(Run, execution))
+        detail = await service.poll_and_update(cast(RunRecord, execution))
 
     # Polling itself must succeed — the fetch failure is non-fatal
     assert detail.status == "running"
@@ -244,7 +244,7 @@ async def test_poll_and_update_failed_job_exposes_cached_values_as_available() -
         }
     )
     execution = cast(
-        Run,
+        RunRecord,
         SimpleNamespace(
             run_id="run-1",
             attempt_count=1,
@@ -284,7 +284,7 @@ async def test_poll_and_update_completed_job_with_changed_gateway_exposes_cached
     execution.cascade_proc = 41
 
     with patch("forecastbox.domain.run.service.get_current_cascade_proc", return_value=42):
-        detail = await service.poll_and_update(cast(Run, execution))
+        detail = await service.poll_and_update(cast(RunRecord, execution))
 
     assert detail.status == "completed"
     assert detail.available_task_ids == [TaskId("task-text")]
