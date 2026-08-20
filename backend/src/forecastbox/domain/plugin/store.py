@@ -186,4 +186,4 @@ async def submit_install_single(plugin_composite_key: PluginCompositeId) -> None
             )
             config.save_to_file()
 
-    await submit_update_single(plugin_composite_key, install=True, version=None, is_new_install=True)
+    await submit_update_single(plugin_composite_key, install=True, version=None)

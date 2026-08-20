@@ -125,3 +125,11 @@ class PluginUninstalledEvent:
             detailRoute="api/v1/plugin/list",
             refreshRoutes=["api/v1/plugin/list"],
         )
+
+
+PluginSuccessNotification = (
+    PluginInstalledEvent | PluginUpdatedEvent | PluginSettingsAppliedEvent | PluginUnloadedEvent | PluginUninstalledEvent
+)
+"""Union of all plugin-domain events that represent a successful operation completion,
+deliberately excluding ``PluginGlobalErrorEvent`` so the type system flags any attempt to
+pass a failure event where a success notification is expected."""

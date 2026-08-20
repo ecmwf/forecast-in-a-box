@@ -124,12 +124,22 @@ def test_run_managed_finishes_ok_on_normal_completion() -> None:
     assert PluginManager.updater_error is None
 
 
+def test_notify_success_derives_event_name_from_payload() -> None:
+    payload = PluginSettingsAppliedEvent(plugin_id="store/plugin")
+    with patch.object(submit_module, "submit_event") as mock_submit_event:
+        submit_module._notify_success(payload)
+    mock_submit_event.assert_called_once()
+    (event,) = mock_submit_event.call_args.args
+    assert event.name == "plugin.settingsApplied"
+    assert event.payload == payload
+
+
 def test_run_managed_notifies_success_when_on_success_given() -> None:
     PluginManager.operation_in_progress = True
     payload = PluginUninstalledEvent(plugin_id="store/plugin")
     with patch.object(submit_module, "_notify_success") as mock_notify:
-        submit_module._run_managed("trigger", lambda: None, ("plugin.uninstalled", payload))
-    mock_notify.assert_called_once_with("plugin.uninstalled", payload)
+        submit_module._run_managed("trigger", lambda: None, payload)
+    mock_notify.assert_called_once_with(payload)
 
 
 def test_run_managed_does_not_notify_success_on_failure() -> None:
@@ -141,7 +151,7 @@ def test_run_managed_does_not_notify_success_on_failure() -> None:
 
     with patch.object(submit_module, "_notify_success") as mock_notify:
         with pytest.raises(RuntimeError):
-            submit_module._run_managed("trigger", _boom, ("plugin.uninstalled", payload))
+            submit_module._run_managed("trigger", _boom, payload)
     mock_notify.assert_not_called()
 
 
@@ -211,7 +221,7 @@ async def test_submit_update_single_blocked_by_existing_global_failure() -> None
 
 
 @pytest.mark.asyncio
-async def test_submit_update_single_emits_updated_event_by_default() -> None:
+async def test_submit_update_single_emits_installed_event_when_plugin_not_yet_loaded() -> None:
     with (
         patch.object(submit_module, "config", _fake_config_with_plugin()),
         patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
@@ -224,14 +234,13 @@ async def test_submit_update_single_emits_updated_event_by_default() -> None:
         with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
             await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     mock_notify.assert_called_once()
-    event_name, payload = mock_notify.call_args.args
-    assert event_name == "plugin.updated"
-    assert isinstance(payload, PluginUpdatedEvent)
-    assert payload.plugin_id == PluginCompositeId.to_str(_PLUGIN_ID)
+    (payload,) = mock_notify.call_args.args
+    assert isinstance(payload, PluginInstalledEvent)
 
 
 @pytest.mark.asyncio
-async def test_submit_update_single_emits_installed_event_when_is_new_install() -> None:
+async def test_submit_update_single_emits_updated_event_when_plugin_already_loaded() -> None:
+    PluginManager.plugins = PluginManager.plugins.set(_PLUGIN_ID, MagicMock())
     with (
         patch.object(submit_module, "config", _fake_config_with_plugin()),
         patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
@@ -242,11 +251,11 @@ async def test_submit_update_single_emits_installed_event_when_is_new_install() 
 
         mock_await_submit.side_effect = _run
         with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
-            await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None, is_new_install=True)
+            await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     mock_notify.assert_called_once()
-    event_name, payload = mock_notify.call_args.args
-    assert event_name == "plugin.installed"
-    assert isinstance(payload, PluginInstalledEvent)
+    (payload,) = mock_notify.call_args.args
+    assert isinstance(payload, PluginUpdatedEvent)
+    assert payload.plugin_id == PluginCompositeId.to_str(_PLUGIN_ID)
 
 
 @pytest.mark.asyncio
@@ -263,8 +272,7 @@ async def test_submit_update_single_emits_settings_applied_event_when_not_instal
         with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
             await submit_module.submit_update_single(_PLUGIN_ID, install=False, version=None)
     mock_notify.assert_called_once()
-    event_name, payload = mock_notify.call_args.args
-    assert event_name == "plugin.settings_applied"
+    (payload,) = mock_notify.call_args.args
     assert isinstance(payload, PluginSettingsAppliedEvent)
 
 
@@ -293,8 +301,7 @@ async def test_submit_unload_single_available_after_prior_update_failure() -> No
     assert args[0] == ConcurrentPools.PluginManagement
     assert args[1] == "plugin.unload"
     mock_notify.assert_called_once()
-    event_name, payload = mock_notify.call_args.args
-    assert event_name == "plugin.unloaded"
+    (payload,) = mock_notify.call_args.args
     assert isinstance(payload, PluginUnloadedEvent)
 
 
@@ -326,8 +333,7 @@ async def test_submit_uninstall_single_uses_plugin_management_pool_and_task_name
     assert args[0] == ConcurrentPools.PluginManagement
     assert args[1] == "plugin.uninstall"
     mock_notify.assert_called_once()
-    event_name, payload = mock_notify.call_args.args
-    assert event_name == "plugin.uninstalled"
+    (payload,) = mock_notify.call_args.args
     assert isinstance(payload, PluginUninstalledEvent)
 
 

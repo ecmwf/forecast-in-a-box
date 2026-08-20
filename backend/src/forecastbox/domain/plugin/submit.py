@@ -40,6 +40,7 @@ from forecastbox.domain.plugin.events import (
     PluginGlobalErrorEvent,
     PluginInstalledEvent,
     PluginSettingsAppliedEvent,
+    PluginSuccessNotification,
     PluginUninstalledEvent,
     PluginUnloadedEvent,
     PluginUpdatedEvent,
@@ -47,7 +48,7 @@ from forecastbox.domain.plugin.events import (
 from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
 from forecastbox.domain.plugin.loading import load_plugins as _load_plugins
 from forecastbox.domain.plugin.loading import uninstall_plugin_sync, unload_single, update_single
-from forecastbox.domain.plugin.state import finish_ok, finish_with_error, release_reservation, reserve_operation
+from forecastbox.domain.plugin.state import PluginManager, finish_ok, finish_with_error, release_reservation, reserve_operation
 from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected, TaskName, execution_manager
 from forecastbox.utility.config import PluginsSettings, config
 from forecastbox.utility.dispatcher import Event, EventName, submit_event
@@ -67,21 +68,23 @@ def _notify_failure(trigger: str, message: str) -> None:
         logger.exception(f"failed to submit plugin global-error notification for {trigger!r}: {repr(e)}")
 
 
-def _notify_success(event_name: str, payload: object) -> None:
+def _notify_success(payload: PluginSuccessNotification) -> None:
+    notification = payload.as_client_notification()
+    suffix = notification.sourceDomainEvent[len("plugin") :]
+    event_name = "plugin." + suffix[:1].lower() + suffix[1:]
     try:
         submit_event(Event(name=EventName(event_name), payload=payload))
     except Exception as e:
         logger.exception(f"failed to submit plugin success notification {event_name!r}: {repr(e)}")
 
 
-def _run_managed(trigger: str, worker: Callable[[], None], on_success: tuple[str, object] | None = None) -> None:
+def _run_managed(trigger: str, worker: Callable[[], None], on_success: PluginSuccessNotification | None = None) -> None:
     """Run one managed plugin operation assuming its reservation has already been made.
 
     On normal completion, marks the operation idle and, if ``on_success`` was provided,
-    emits the given ``(event_name, payload)`` as a client notification. On an unexpected
-    exception, records ``updater_error``, emits the existing ``PluginGlobalErrorEvent``
-    notification, and re-raises so the execution manager records the failure in its own
-    monitored history.
+    emits it as a client notification. On an unexpected exception, records
+    ``updater_error``, emits the existing ``PluginGlobalErrorEvent`` notification, and
+    re-raises so the execution manager records the failure in its own monitored history.
     """
     try:
         worker()
@@ -99,7 +102,7 @@ def _run_managed(trigger: str, worker: Callable[[], None], on_success: tuple[str
     else:
         finish_ok()
         if on_success is not None:
-            _notify_success(*on_success)
+            _notify_success(on_success)
 
 
 def _run_load_all(plugins: PluginsSettings) -> None:
@@ -132,15 +135,13 @@ def submit_load_all(start_after: Future[None]) -> None:
     )
 
 
-async def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Version | None, is_new_install: bool = False) -> str:
+async def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Version | None) -> str:
     """Reserve and submit an install/update/reload operation for one plugin.
 
-    ``is_new_install`` only affects which success notification is emitted: pass ``True``
-    when this is the first-ever install of the plugin (``POST /plugin/install``), and leave
-    it ``False`` for both an explicit version update (``POST /plugin/update``) and a settings
-    change that merely reloads the plugin (``POST /plugin/settings``) without a fresh pip
-    install (``install=False``); the latter is reported as a settings-applied event rather
-    than an update.
+    The success notification emitted depends on the situation: a settings-only change
+    (``install=False``, from ``POST /plugin/settings``) is reported as settings-applied;
+    otherwise, if the plugin is already present in ``PluginManager.plugins`` it is reported
+    as an update, and if not, as a fresh install.
     """
     pluginSettings = config.external.plugins.get(pluginId, None)
     if pluginSettings is None:
@@ -150,12 +151,13 @@ async def submit_update_single(pluginId: PluginCompositeId, install: bool, versi
         return result.reason
     trigger = f"Update of plugin {pluginId}"
     plugin_id_str = PluginCompositeId.to_str(pluginId)
-    if is_new_install:
-        on_success = ("plugin.installed", PluginInstalledEvent(plugin_id=plugin_id_str))
-    elif install:
-        on_success = ("plugin.updated", PluginUpdatedEvent(plugin_id=plugin_id_str))
+    on_success: PluginSuccessNotification
+    if not install:
+        on_success = PluginSettingsAppliedEvent(plugin_id=plugin_id_str)
+    elif pluginId in PluginManager.plugins:
+        on_success = PluginUpdatedEvent(plugin_id=plugin_id_str)
     else:
-        on_success = ("plugin.settings_applied", PluginSettingsAppliedEvent(plugin_id=plugin_id_str))
+        on_success = PluginInstalledEvent(plugin_id=plugin_id_str)
     try:
         await execution_manager.awaitable_submit(
             ConcurrentPools.PluginManagement,
@@ -176,7 +178,7 @@ async def submit_unload_single(pluginId: PluginCompositeId) -> None:
     if not result.accepted:
         raise SubmissionRejected(result.reason)
     trigger = f"Unload of plugin {pluginId}"
-    on_success = ("plugin.unloaded", PluginUnloadedEvent(plugin_id=PluginCompositeId.to_str(pluginId)))
+    on_success = PluginUnloadedEvent(plugin_id=PluginCompositeId.to_str(pluginId))
     try:
         await execution_manager.awaitable_submit(
             ConcurrentPools.PluginManagement,
@@ -196,7 +198,7 @@ async def submit_uninstall_single(pluginId: PluginCompositeId) -> None:
     if not result.accepted:
         raise SubmissionRejected(result.reason)
     trigger = f"Uninstall of plugin {pluginId}"
-    on_success = ("plugin.uninstalled", PluginUninstalledEvent(plugin_id=PluginCompositeId.to_str(pluginId)))
+    on_success = PluginUninstalledEvent(plugin_id=PluginCompositeId.to_str(pluginId))
     try:
         await execution_manager.awaitable_submit(
             ConcurrentPools.PluginManagement,
