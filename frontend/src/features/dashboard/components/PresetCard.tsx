@@ -79,18 +79,19 @@ export function PresetCard({
         </p>
       )}
 
-      <p className="text-sm text-muted-foreground">
-        {t('item.outputs', { count: outputCount })}
-        {parent?.display_name &&
-          ` · ${t('dashboard:presets.basedOn', { name: parent.display_name })}`}
-      </p>
-
-      {preset.coreVersionMismatch && (
-        <CoreVersionMismatchBadge
-          detail={preset.coreVersionMismatch}
-          className="self-start"
-        />
-      )}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <p className="text-sm text-muted-foreground">
+          {t('item.outputs', { count: outputCount })}
+          {parent?.display_name &&
+            ` · ${t('dashboard:presets.basedOn', { name: parent.display_name })}`}
+        </p>
+        {preset.coreVersionMismatch && (
+          <CoreVersionMismatchBadge
+            detail={preset.coreVersionMismatch}
+            className="ml-auto"
+          />
+        )}
+      </div>
 
       {(modelLabel || outputKinds.length > 0 || preset.tags.length > 0) && (
         <div className="flex flex-wrap gap-1.5">
