@@ -116,3 +116,13 @@ def ingest_plugin_templates(plugin_id: PluginCompositeId, plugin: Plugin) -> Non
             logger.error(f"failed to ingest template {template.display_name!r} from plugin {plugin_id_str!r}: {repr(e)}")
 
     update_template_errors(plugin_id=plugin_id_str, template_errors=template_errors)
+
+
+def unload_plugin_templates(plugin_id: PluginCompositeId) -> None:
+    """Marks all templates by a particular plugin as deleted, to complete a plugin unloading.
+
+    Similarly to ingest, this is hierarchy-breaching until refactored to events"""
+    from forecastbox.domain.blueprint.db import soft_delete_all_plugin_templates
+
+    plugin_id_str = PluginCompositeId.to_str(plugin_id)
+    soft_delete_all_plugin_templates(created_by=plugin_id_str)

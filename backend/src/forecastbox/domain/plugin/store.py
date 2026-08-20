@@ -7,7 +7,14 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""API for Plugin Stores -- data parsing and extractions"""
+"""API for Plugin Stores -- data retrieval and extractions.
+
+Owns a lock-protected state StoresManager which reflects what the configured
+stores actually offer as plugins.
+
+Owns operations that modify the config file."""
+# TODO ideally we transition all the individual plugin info into the database.
+# But we need to solve the default plugin selection/installation first then
 
 import logging
 import threading
@@ -22,7 +29,7 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 from typing_extensions import Self
 
-from forecastbox.domain.plugin.manager import submit_update_single
+from forecastbox.domain.plugin.submit import submit_update_single
 from forecastbox.utility.concurrency.manager import ConcurrentPools, TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
@@ -143,6 +150,10 @@ def submit_initialize_stores() -> None:
     ``get_plugins_detail``/``StoresManager.stores``) until a successful publication
     replaces it -- a partial store map is never published.
     """
+
+    # NOTE No need to protect from concurrent runs -- http fetches are safe, and
+    # the last operation which mutates the global state is lock protected, and we
+    # are ok with last one winning.
     execution_manager.submit_monitored(
         ConcurrentPools.Io,
         TaskName("plugin.stores.initialize"),
@@ -150,7 +161,9 @@ def submit_initialize_stores() -> None:
     )
 
 
-def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
+async def submit_install_single(plugin_composite_key: PluginCompositeId) -> None:
+    """Retrieves the information from the store, inserts the record of plugin being presents
+    into the config file, then submits the actual pip operation via `plugins.submit`"""
     # No lock needed for reads with pyrsistent immutable structures
     if not StoresManager.stores:
         raise ValueError("stores not initialized")
@@ -173,4 +186,4 @@ def submit_install_plugin(plugin_composite_key: PluginCompositeId) -> None:
             )
             config.save_to_file()
 
-    submit_update_single(plugin_composite_key, install=True, version=None)
+    await submit_update_single(plugin_composite_key, install=True, version=None)

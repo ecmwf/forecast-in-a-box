@@ -7,7 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for the plugin-operation submission boundary in domain.plugin.manager.
+"""Unit tests for the plugin-operation submission boundary in domain.plugin.submit.
 
 Covers reservation/rollback, the submit_after-based initial-load continuation, the
 managed-operation wrapper's error/notification behaviour, and that update/unload/
@@ -22,9 +22,10 @@ import pytest
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 from pyrsistent import pmap
 
-import forecastbox.domain.plugin.manager as manager_module
+import forecastbox.domain.plugin.submit as submit_module
 from forecastbox.domain.plugin.errors import PluginErrors
 from forecastbox.domain.plugin.state import PluginManager
+from forecastbox.domain.plugin.status import plugins_ready
 from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected
 
 _PLUGIN_ID = PluginCompositeId(store=PluginStoreId("store"), local=PluginId("plugin"))
@@ -44,22 +45,22 @@ def _reset_plugin_state() -> Generator[None, None, None]:
 
 
 # ---------------------------------------------------------------------------
-# submit_load_plugins / initial load continuation
+# submit_load_all / initial load continuation
 # ---------------------------------------------------------------------------
 
 
-def test_submit_load_plugins_uses_submit_after_not_delayed_thread() -> None:
+def test_submit_load_all_uses_submit_after_not_delayed_thread() -> None:
     catalog_future: Future[None] = Future()
-    assert not hasattr(manager_module, "delayed_thread")
-    with patch.object(manager_module.execution_manager, "submit_after") as mock_submit_after:
-        manager_module.submit_load_plugins(catalog_future)
+    assert not hasattr(submit_module, "delayed_thread")
+    with patch.object(submit_module.execution_manager, "submit_after") as mock_submit_after:
+        submit_module.submit_load_all(catalog_future)
     mock_submit_after.assert_called_once()
     args, kwargs = mock_submit_after.call_args
     assert args[0] is catalog_future
     assert args[1] == ConcurrentPools.PluginManagement
     assert args[2] == "plugin.initial-load"
     assert PluginManager.operation_in_progress is True
-    assert manager_module.plugins_ready() is False
+    assert plugins_ready() is False
 
 
 def test_failed_catalog_dependency_leaves_not_ready_and_does_not_run_loader() -> None:
@@ -71,17 +72,17 @@ def test_failed_catalog_dependency_leaves_not_ready_and_does_not_run_loader() ->
         ran_loader = True
 
     with (
-        patch.object(manager_module.execution_manager, "submit_after") as mock_submit_after,
-        patch.object(manager_module, "run_initial_load", side_effect=_fake_run_initial_load),
+        patch.object(submit_module.execution_manager, "submit_after") as mock_submit_after,
+        patch.object(submit_module, "_run_load_all", side_effect=_fake_run_initial_load),
     ):
-        manager_module.submit_load_plugins(catalog_future)
+        submit_module.submit_load_all(catalog_future)
         # Simulate the dependency failing -- the real ExecutionManager.submit_after would not
         # invoke the task in this case; only our own done-callback runs.
         catalog_future.set_exception(RuntimeError("catalog refresh boom"))
 
     mock_submit_after.assert_called_once()
     assert ran_loader is False
-    assert manager_module.plugins_ready() is False
+    assert plugins_ready() is False
     assert PluginManager.updater_error is not None
     assert "catalog refresh boom" in PluginManager.updater_error
 
@@ -97,9 +98,9 @@ def test_run_managed_records_error_notifies_and_reraises_on_unexpected_exception
     def _boom() -> None:
         raise RuntimeError("worker exploded")
 
-    with patch.object(manager_module, "_notify_failure") as mock_notify:
+    with patch.object(submit_module, "_notify_failure") as mock_notify:
         with pytest.raises(RuntimeError):
-            manager_module._run_managed("Some trigger", _boom)
+            submit_module._run_managed("Some trigger", _boom)
 
     mock_notify.assert_called_once()
     trigger_arg, message_arg = mock_notify.call_args.args
@@ -111,7 +112,7 @@ def test_run_managed_records_error_notifies_and_reraises_on_unexpected_exception
 
 def test_run_managed_finishes_ok_on_normal_completion() -> None:
     PluginManager.operation_in_progress = True
-    manager_module._run_managed("trigger", lambda: None)
+    submit_module._run_managed("trigger", lambda: None)
     assert PluginManager.operation_in_progress is False
     assert PluginManager.updater_error is None
 
@@ -123,7 +124,7 @@ def test_run_managed_does_not_convert_per_plugin_errors_to_global_failure() -> N
     def _worker_with_per_plugin_error() -> None:
         PluginManager.errors = PluginManager.errors.set(_PLUGIN_ID, PluginErrors([]))
 
-    manager_module._run_managed("trigger", _worker_with_per_plugin_error)
+    submit_module._run_managed("trigger", _worker_with_per_plugin_error)
     assert PluginManager.updater_error is None
     assert PluginManager.operation_in_progress is False
 
@@ -140,12 +141,13 @@ def _fake_config_with_plugin() -> MagicMock:
     return fake_config
 
 
-def test_submit_update_single_uses_plugin_management_pool_and_task_name() -> None:
+@pytest.mark.asyncio
+async def test_submit_update_single_uses_plugin_management_pool_and_task_name() -> None:
     with (
-        patch.object(manager_module, "config", _fake_config_with_plugin()),
-        patch.object(manager_module.execution_manager, "submit_monitored") as mock_submit,
+        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        patch.object(submit_module.execution_manager, "submit_monitored") as mock_submit,
     ):
-        result = manager_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
+        result = await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     assert result == ""
     mock_submit.assert_called_once()
     args, _ = mock_submit.call_args
@@ -153,32 +155,35 @@ def test_submit_update_single_uses_plugin_management_pool_and_task_name() -> Non
     assert args[1] == "plugin.update"
 
 
-def test_submit_update_single_rejects_overlapping_operation() -> None:
+@pytest.mark.asyncio
+async def test_submit_update_single_rejects_overlapping_operation() -> None:
     PluginManager.operation_in_progress = True
-    with patch.object(manager_module, "config", _fake_config_with_plugin()):
-        result = manager_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
+    with patch.object(submit_module, "config", _fake_config_with_plugin()):
+        result = await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     assert "not idle" in result
 
 
-def test_submit_update_single_rolls_back_reservation_on_submission_rejected() -> None:
+@pytest.mark.asyncio
+async def test_submit_update_single_rolls_back_reservation_on_submission_rejected() -> None:
     with (
-        patch.object(manager_module, "config", _fake_config_with_plugin()),
-        patch.object(manager_module.execution_manager, "submit_monitored", side_effect=SubmissionRejected("pool full")),
+        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        patch.object(submit_module.execution_manager, "submit_monitored", side_effect=SubmissionRejected("pool full")),
     ):
         with pytest.raises(SubmissionRejected):
-            manager_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
+            await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     assert PluginManager.operation_in_progress is False
 
 
-def test_submit_update_single_blocked_by_existing_global_failure() -> None:
+@pytest.mark.asyncio
+async def test_submit_update_single_blocked_by_existing_global_failure() -> None:
     PluginManager.updater_error = "prior failure"
-    with patch.object(manager_module, "config", _fake_config_with_plugin()):
-        result = manager_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
+    with patch.object(submit_module, "config", _fake_config_with_plugin()):
+        result = await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     assert "failed" in result
 
 
 # ---------------------------------------------------------------------------
-# submit_unload_single / uninstall_plugin -- available after a failed update
+# submit_unload_single / submit_uninstall_single -- available after a failed update
 # ---------------------------------------------------------------------------
 
 
@@ -186,15 +191,15 @@ def test_submit_update_single_blocked_by_existing_global_failure() -> None:
 async def test_submit_unload_single_available_after_prior_update_failure() -> None:
     PluginManager.updater_error = "prior failure"
     with (
-        patch.object(manager_module.execution_manager, "awaitable_submit") as mock_await_submit,
-        patch.object(manager_module, "unload_single") as mock_unload_single,
+        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+        patch.object(submit_module, "unload_single") as mock_unload_single,
     ):
 
         async def _run(pool_name: object, task_name: object, task: object) -> None:
             task()
 
         mock_await_submit.side_effect = _run
-        await manager_module.submit_unload_single(_PLUGIN_ID)
+        await submit_module.submit_unload_single(_PLUGIN_ID)
     mock_unload_single.assert_called_once_with(_PLUGIN_ID)
     mock_await_submit.assert_called_once()
     args, _ = mock_await_submit.call_args
@@ -206,23 +211,23 @@ async def test_submit_unload_single_available_after_prior_update_failure() -> No
 async def test_submit_unload_single_rejects_overlapping_operation() -> None:
     PluginManager.operation_in_progress = True
     with pytest.raises(SubmissionRejected):
-        await manager_module.submit_unload_single(_PLUGIN_ID)
+        await submit_module.submit_unload_single(_PLUGIN_ID)
 
 
 @pytest.mark.asyncio
-async def test_uninstall_plugin_uses_plugin_management_pool_and_task_name() -> None:
+async def test_submit_uninstall_single_uses_plugin_management_pool_and_task_name() -> None:
     fake_config = _fake_config_with_plugin()
     with (
-        patch.object(manager_module, "config", fake_config),
-        patch.object(manager_module.execution_manager, "awaitable_submit") as mock_await_submit,
-        patch.object(manager_module, "uninstall_plugin_sync") as mock_uninstall_sync,
+        patch.object(submit_module, "config", fake_config),
+        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+        patch.object(submit_module, "uninstall_plugin_sync") as mock_uninstall_sync,
     ):
 
         async def _run(pool_name: object, task_name: object, task: object) -> None:
             task()
 
         mock_await_submit.side_effect = _run
-        await manager_module.uninstall_plugin(_PLUGIN_ID)
+        await submit_module.submit_uninstall_single(_PLUGIN_ID)
     mock_uninstall_sync.assert_called_once_with(_PLUGIN_ID)
     mock_await_submit.assert_called_once()
     args, _ = mock_await_submit.call_args
@@ -231,12 +236,12 @@ async def test_uninstall_plugin_uses_plugin_management_pool_and_task_name() -> N
 
 
 @pytest.mark.asyncio
-async def test_uninstall_plugin_rolls_back_reservation_on_submission_rejected() -> None:
+async def test_submit_uninstall_single_rolls_back_reservation_on_submission_rejected() -> None:
     fake_config = _fake_config_with_plugin()
     with (
-        patch.object(manager_module, "config", fake_config),
-        patch.object(manager_module.execution_manager, "awaitable_submit", side_effect=SubmissionRejected("pool full")),
+        patch.object(submit_module, "config", fake_config),
+        patch.object(submit_module.execution_manager, "awaitable_submit", side_effect=SubmissionRejected("pool full")),
     ):
         with pytest.raises(SubmissionRejected):
-            await manager_module.uninstall_plugin(_PLUGIN_ID)
+            await submit_module.submit_uninstall_single(_PLUGIN_ID)
     assert PluginManager.operation_in_progress is False

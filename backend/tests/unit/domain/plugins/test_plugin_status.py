@@ -7,29 +7,29 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Unit tests for PluginManager utility functions -- status_brief and plugins_ready."""
+"""Unit tests for plugin status utility functions -- status_brief and plugins_ready."""
 
 from unittest.mock import patch
 
-from forecastbox.domain.plugin.manager import plugins_ready, status_brief
+from forecastbox.domain.plugin.status import plugins_ready, status_brief
 
 
 def test_status_brief_ok() -> None:
-    with patch("forecastbox.domain.plugin.manager.PluginManager") as mock_pm:
+    with patch("forecastbox.domain.plugin.status.PluginManager") as mock_pm:
         mock_pm.updater_error = None
         mock_pm.operation_in_progress = False
         assert status_brief() == "ok"
 
 
 def test_status_brief_running() -> None:
-    with patch("forecastbox.domain.plugin.manager.PluginManager") as mock_pm:
+    with patch("forecastbox.domain.plugin.status.PluginManager") as mock_pm:
         mock_pm.updater_error = None
         mock_pm.operation_in_progress = True
         assert status_brief() == "running"
 
 
 def test_status_brief_failure() -> None:
-    with patch("forecastbox.domain.plugin.manager.PluginManager") as mock_pm:
+    with patch("forecastbox.domain.plugin.status.PluginManager") as mock_pm:
         mock_pm.updater_error = "some error"
         mock_pm.operation_in_progress = False
         result = status_brief()
@@ -38,21 +38,21 @@ def test_status_brief_failure() -> None:
 
 
 def test_plugins_ready_true_when_ok() -> None:
-    with patch("forecastbox.domain.plugin.manager.PluginManager") as mock_pm:
+    with patch("forecastbox.domain.plugin.status.PluginManager") as mock_pm:
         mock_pm.updater_error = None
         mock_pm.operation_in_progress = False
         assert plugins_ready() is True
 
 
 def test_plugins_ready_false_when_running() -> None:
-    with patch("forecastbox.domain.plugin.manager.PluginManager") as mock_pm:
+    with patch("forecastbox.domain.plugin.status.PluginManager") as mock_pm:
         mock_pm.updater_error = None
         mock_pm.operation_in_progress = True
         assert plugins_ready() is False
 
 
 def test_plugins_ready_false_when_failed() -> None:
-    with patch("forecastbox.domain.plugin.manager.PluginManager") as mock_pm:
+    with patch("forecastbox.domain.plugin.status.PluginManager") as mock_pm:
         mock_pm.updater_error = "crash"
         mock_pm.operation_in_progress = False
         assert plugins_ready() is False

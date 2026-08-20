@@ -39,8 +39,8 @@ from forecastbox.domain.experiment.scheduling.background import start_scheduler,
 from forecastbox.domain.gateway.service import shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
 from forecastbox.domain.notification.service import init_broadcaster
-from forecastbox.domain.plugin.manager import submit_load_plugins
 from forecastbox.domain.plugin.store import submit_initialize_stores
+from forecastbox.domain.plugin.submit import submit_load_all as submit_load_plugins
 from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.config import ConcurrentThreads, config, validate_runtime
 from forecastbox.utility.dispatcher import (

@@ -7,9 +7,8 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""API for internal plugin management -- submitting install/import/reload/unload work
-to the bounded ``ConcurrentPools.PluginManagement`` pool, and readiness/status/catalogue
-queries.
+"""API for submitting venv-mutating operations in a safe manner  to the bounded
+``ConcurrentPools.PluginManagement.
 
 Assumed to be invoked from the plugins router in API, and during application startup.
 
@@ -92,14 +91,12 @@ def _run_managed(trigger: str, worker: Callable[[], None]) -> None:
         finish_ok()
 
 
-def run_initial_load(plugins: PluginsSettings) -> None:
+def _run_load_all(plugins: PluginsSettings) -> None:
     _run_managed("Initial plugin load", partial(_load_plugins, plugins))
 
 
-def submit_load_plugins(start_after: Future[None]) -> None:
-    """Reserve the initial-load operation and submit it as a continuation of the artifact
-    catalog refresh future. Replaces the previous ``delayed_thread``-based startup thread.
-    """
+def submit_load_all(start_after: Future[None]) -> None:
+    """Reserve and submit the initial load-all-plugins operation"""
     result = reserve_operation()
     if not result.accepted:
         logger.error(f"failed to submit load_plugins: {result.reason}")
@@ -107,11 +104,9 @@ def submit_load_plugins(start_after: Future[None]) -> None:
         return
 
     def _record_dependency_failure(done: Future[None]) -> None:
-        # NOTE this callback only updates the short domain state; it must not acquire the
-        # jobs lock, publish plugins, or submit work while holding the state lock. The
-        # execution manager's own `submit_after` already records the dependency failure in
-        # its monitored failure history; this only keeps `plugins_ready()`/`status_brief()`
-        # consistent and avoids invoking the load worker at all.
+        # NOTE this is just a rollback -- we reserve prior to submit, but the callable
+        # would *not* be executed if the prerequisite has failed, hence would not rollback
+        # on its own.
         try:
             done.result()
         except BaseException as error:
@@ -122,32 +117,11 @@ def submit_load_plugins(start_after: Future[None]) -> None:
         start_after,
         ConcurrentPools.PluginManagement,
         TaskName("plugin.initial-load"),
-        partial(run_initial_load, config.external.plugins),
+        partial(_run_load_all, config.external.plugins),
     )
 
 
-def status_brief() -> str:
-    if PluginManager.updater_error is not None:
-        return f"failure: {PluginManager.updater_error}"
-    elif PluginManager.operation_in_progress:
-        return "running"
-    else:
-        return "ok"
-
-
-def plugins_ready() -> bool:
-    return status_brief() == "ok"
-
-
-def catalogue_view() -> dict[PluginCompositeId, BlockFactoryCatalogue] | bool:
-    with timed_acquire(PluginManager.lock, 1.0) as result:
-        if not result:
-            return False
-        else:
-            return {plugin_id: plugin.catalogue for plugin_id, plugin in PluginManager.plugins.items()}
-
-
-def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Version | None) -> str:
+async def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Version | None) -> str:
     pluginSettings = config.external.plugins.get(pluginId, None)
     if pluginSettings is None:
         return f"plugin {pluginId} not configured"
@@ -156,7 +130,7 @@ def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Ve
         return result.reason
     trigger = f"Update of plugin {pluginId}"
     try:
-        execution_manager.submit_monitored(
+        await execution_manager.awaitable_submit(
             ConcurrentPools.PluginManagement,
             TaskName("plugin.update"),
             partial(_run_managed, trigger, partial(update_single, pluginId, pluginSettings, install, version)),
@@ -171,7 +145,7 @@ async def submit_unload_single(pluginId: PluginCompositeId) -> None:
     """Reserve and await an unload operation. The caller (route) owns success/failure
     reporting; a recorded global ``updater_error`` does not block this cleanup path.
     """
-    result = reserve_operation(block_on_error=False)
+    result = reserve_operation(refuse_on_error=False)
     if not result.accepted:
         raise SubmissionRejected(result.reason)
     trigger = f"Unload of plugin {pluginId}"
@@ -186,11 +160,11 @@ async def submit_unload_single(pluginId: PluginCompositeId) -> None:
         raise
 
 
-async def uninstall_plugin(pluginId: PluginCompositeId) -> None:
+async def submit_uninstall_single(pluginId: PluginCompositeId) -> None:
     logger.debug(f"about to uninstall {pluginId=}")
     if pluginId not in config.external.plugins:
         raise ValueError(f"plugin {pluginId} not installed")
-    result = reserve_operation(block_on_error=False)
+    result = reserve_operation(refuse_on_error=False)
     if not result.accepted:
         raise SubmissionRejected(result.reason)
     trigger = f"Uninstall of plugin {pluginId}"

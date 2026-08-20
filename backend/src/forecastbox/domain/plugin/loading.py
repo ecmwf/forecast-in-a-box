@@ -9,18 +9,12 @@
 
 """Synchronous plugin load/update/reload/unload worker orchestration.
 
-Every function here is meant to run on the single-worker
+Every function here is meant to run in the single-worker
 ``ConcurrentPools.PluginManagement`` pool (or, for tests, be called directly).
-None of them import routes, the entrypoint, or hold a reference to an event
-loop. Unexpected exceptions are left to propagate to the caller (see
-``domain.plugin.manager``'s managed-operation wrapper), while per-plugin
+Unexpected exceptions are left to propagate to the caller (see
+``domain.plugin.submit``'s managed-operation wrapper), while per-plugin
 install/load outcomes are represented as ``PluginErrors`` and are normal,
-non-raising completions.
-
-``compatibility.check_environment_baseline()`` and
-``compatibility.install_plugin_compatibly()`` are called at the points below
-and must not be duplicated or moved elsewhere; see
-``domain.plugin.compatibility`` for the policy they implement.
+non-raising completions, to be persisted in a structured form.
 """
 
 import importlib
@@ -37,7 +31,7 @@ from forecastbox.domain.plugin.compatibility import check_environment_baseline, 
 from forecastbox.domain.plugin.db import delete_plugin_state, get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.domain.plugin.state import publish_bulk_snapshot, publish_single_snapshot, publish_unloaded
-from forecastbox.domain.plugin.template_ingest import ingest_plugin_templates
+from forecastbox.domain.plugin.template_ingest import ingest_plugin_templates, unload_plugin_templates
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_version
@@ -45,7 +39,12 @@ from forecastbox.utility.packages import try_import, try_version
 logger = logging.getLogger(__name__)
 
 
-def load_single(plugin: PluginSettings) -> Either[Plugin, str]:  # type: ignore[invalid-argument]
+def _load_single(plugin: PluginSettings) -> Either[Plugin, str]:  # type: ignore[invalid-argument]
+    """Attempts to import the module and retrieve the `plugin` attribute, oversee the pydantic
+    validation, and return the valid object
+
+    Not expected to raise -- import errors and pydantic validation errors are propagated as Either.e
+    """
     errors = []
     try:
         plugin_impl = try_import(plugin.module_name)
@@ -78,6 +77,8 @@ def _version_from_install(installed: dict[str, str], module_name: str) -> str | 
     Normalises names per PEP 503 (``[-_.]+`` -> ``-``, lowercase) before comparing,
     so ``fiab_plugin_test`` matches ``fiab-plugin-test`` in the pip output.
     """
+    # TODO this should live in utility in some form. Possibly normalize by default
+    # to keep it simple
     target = re.sub(r"[-_.]+", "-", module_name).lower()
     for name, ver in installed.items():
         if re.sub(r"[-_.]+", "-", name).lower() == target:
@@ -114,7 +115,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
             try:
                 is_found = try_import(pluginSettings.module_name) is None
             except Exception:
-                # NOTE we just want to check whether we should run pip. This error will be resurfaced later during load_single
+                # NOTE we just want to check whether we should run pip. This error will be resurfaced later during _load_single
                 is_found = True
             if is_found:
                 logger.info(f"installing {pluginSettings.module_name} for the first time")
@@ -152,7 +153,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
                 ]
             )
             continue
-        plugin_result = load_single(pluginSettings)
+        plugin_result = _load_single(pluginSettings)
         if plugin_result.t is not None:
             lookup[pluginKey] = plugin_result.t
             version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
@@ -183,7 +184,7 @@ def load_plugins(plugins: PluginsSettings) -> None:
     for pluginKey, plugin_result in lookup.items():
         ingest_plugin_templates(pluginKey, plugin_result)
 
-    logger.debug("global plugin loading finished")
+    logger.info("global plugin loading finished")
 
 
 def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, install: bool, version: Version | None) -> None:
@@ -211,7 +212,7 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
     # modules/registries. See domain.plugin.compatibility's module docstring for the full caveat.
     importlib.invalidate_caches()
     importlib.reload(importlib.import_module(pluginSettings.module_name))
-    result = load_single(pluginSettings)
+    result = _load_single(pluginSettings)
     logger.debug(f"plugin {pluginId} loaded with success: {result.t is not None}")
     version_install = _version_from_install(installed_versions, pluginSettings.module_name)
     version_imported = try_version(pluginSettings.pip_source, pluginSettings.module_name)
@@ -241,16 +242,12 @@ def unload_single(plugin_id: PluginCompositeId) -> None:
 
     Synchronous primitive shared by the plugin-settings disable path and uninstall.
     """
-    plugin_id_str = PluginCompositeId.to_str(plugin_id)
     if not publish_unloaded(plugin_id):
-        logger.warning("failed to acquire lock for unload_single")
-        return
-    # DB write outside the lock: remove blueprint templates.
-    # Note: this import is a breach of the dependency hierarchy (plugin domain depending
-    # on blueprint domain), and is temporary -- see domain.plugin.template_ingest's module docstring.
-    from forecastbox.domain.blueprint.db import soft_delete_all_plugin_templates
-
-    soft_delete_all_plugin_templates(created_by=plugin_id_str)
+        logger.error("failed to mark plugin as unloaded! Will still be available")
+        # we raise to mark this future as failed
+        raise TimeoutError("failed to mark plugin as unloaded due to lock acquisition")
+    # DB write outside the lock: remove blueprint templates
+    unload_plugin_templates(plugin_id)
 
 
 def uninstall_plugin_sync(plugin_id: PluginCompositeId) -> None:

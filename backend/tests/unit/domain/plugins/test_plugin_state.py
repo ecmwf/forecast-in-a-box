@@ -54,9 +54,9 @@ def test_reserve_operation_blocked_by_error_by_default() -> None:
     assert result.accepted is False
 
 
-def test_reserve_operation_ignores_error_when_block_on_error_false() -> None:
+def test_reserve_operation_ignores_error_when_refuse_on_error_false() -> None:
     PluginManager.updater_error = "boom"
-    result = reserve_operation(block_on_error=False)
+    result = reserve_operation(refuse_on_error=False)
     assert result.accepted is True
 
 

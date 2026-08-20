@@ -18,7 +18,7 @@ from fastapi import APIRouter, Request
 
 from forecastbox.domain.experiment.scheduling.background import status_scheduler
 from forecastbox.domain.gateway.service import get_gateway_url
-from forecastbox.domain.plugin.manager import status_brief
+from forecastbox.domain.plugin.status import status_brief
 from forecastbox.utility.concurrency.manager import ExecutionStatus, execution_manager
 from forecastbox.utility.config import config
 
