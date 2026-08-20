@@ -52,6 +52,7 @@ import {
 } from '@tests/../mocks/data/wms.data'
 import type * as GeoViewerModule from '@/features/viewer/geo/GeoViewer'
 import { Route as VisualiseRoute } from '@/routes/_authenticated/visualise'
+import { setPollIntervalsForTests } from '@/api/pollIntervals'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import { entryRef } from '@/features/visualise/entry-ref'
@@ -134,6 +135,13 @@ const RUN_B = {
 } as const
 
 beforeEach(() => {
+  // Production cadence costs 15-20 s per liveness/outage cycle.
+  setPollIntervalsForTests({
+    lensList: 250,
+    lensStarting: 100,
+    lensRunning: 250,
+    lensRetryBase: 40,
+  })
   resetJobsState()
   injectMockExecution(secondGribRunExecution)
   resetLensState()
@@ -378,7 +386,7 @@ describe('VisualisePage', () => {
 
   it(
     'keeps the running viewer through a transient status-poll outage',
-    { timeout: 60000 },
+    { timeout: 15000 },
     async () => {
       useComparisonStore.getState().addEntry(RUN_A)
       const screen = await renderVisualisePage()
@@ -390,11 +398,12 @@ describe('VisualisePage', () => {
       failNextLensStatusPolls(3)
       await expect
         .poll(() => pendingLensStatusFailures(), {
-          timeout: 30000,
-          interval: 500,
+          timeout: 10000,
+          interval: 100,
         })
         .toBe(0)
-      await new Promise((r) => setTimeout(r, 800))
+      // One further poll cycle, so wrong failure UI would have shown.
+      await new Promise((r) => setTimeout(r, 400))
 
       // Stale-running keeps the viewer mounted; no failure UI, no remount.
       await expect.element(screen.getByText(/display is static/)).toBeVisible()
@@ -602,7 +611,7 @@ describe('VisualisePage', () => {
 
   it(
     'revives a lens the backend marks failed after it served',
-    { timeout: 40000 },
+    { timeout: 15000 },
     async () => {
       useComparisonStore.getState().addEntry(RUN_A)
       const screen = await renderVisualisePage()
@@ -615,7 +624,7 @@ describe('VisualisePage', () => {
       await expect
         .element(screen.getByText(/display is static/), { timeout: 10000 })
         .toBeVisible()
-      await new Promise((r) => setTimeout(r, 2200))
+      await new Promise((r) => setTimeout(r, 500))
       const firstId = listMockLenses()[0].lens_instance_id
 
       // External stop on the real backend keeps the record, status failed.
@@ -631,7 +640,7 @@ describe('VisualisePage', () => {
               lensesNow[0].lens_instance_id !== firstId
             )
           },
-          { timeout: 25000 },
+          { timeout: 10000 },
         )
         .toBe(true)
     },

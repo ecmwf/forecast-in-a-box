@@ -35,6 +35,7 @@ import { useConfigStore } from '@/stores/configStore'
 import { useUiStore } from '@/stores/uiStore'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useStatusStore } from '@/features/status/stores/statusStore'
+import { resetPollIntervals } from '@/api/pollIntervals'
 
 // Start MSW browser worker before all tests
 beforeAll(async () => {
@@ -50,6 +51,9 @@ beforeAll(async () => {
  *  retrieve error` from sporadically seeing a stale `fable-100`/`fable-101`
  *  from an earlier save mutation. */
 function resetSharedState(): void {
+  // Back to production cadences; file-level beforeEach overrides run later.
+  resetPollIntervals()
+
   // MSW handler-scoped mutable state
   resetFableHandlerState()
   resetPluginsHandlerState()

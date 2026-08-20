@@ -40,6 +40,7 @@ import {
 } from '@/api/types/plugins.types'
 import { getCatalogue } from '@/api/endpoints/fable'
 import { fableKeys } from '@/api/hooks/useFable'
+import { pollIntervals } from '@/api/pollIntervals'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('usePlugins')
@@ -129,7 +130,6 @@ export function usePlugins(catalogue?: BlockFactoryCatalogue) {
  * relying on TanStack Query's retry budget, which is too small for
  * large plugins.
  */
-const CATALOGUE_POLL_INTERVAL_MS = 2000
 const CATALOGUE_POLL_TIMEOUT_MS = 60_000
 
 async function waitForCatalogue(): Promise<void> {
@@ -140,7 +140,7 @@ async function waitForCatalogue(): Promise<void> {
       return
     } catch {
       log.debug('Catalogue not ready yet, retrying...')
-      await new Promise((r) => setTimeout(r, CATALOGUE_POLL_INTERVAL_MS))
+      await new Promise((r) => setTimeout(r, pollIntervals.pluginCatalogue))
     }
   }
   log.warn('Catalogue poll timed out — proceeding with details refresh')

@@ -45,6 +45,7 @@ import {
   useUpdatePlugin,
 } from '@/api/hooks/usePlugins'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import { setPollIntervalsForTests } from '@/api/pollIntervals'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
@@ -273,6 +274,8 @@ function TestPluginsPage() {
 describe('Plugin Updates Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Don't sit out the production 2 s catalogue-recovery poll.
+    setPollIntervalsForTests({ pluginCatalogue: 50 })
   })
 
   // -----------------------------------------------------------------------
