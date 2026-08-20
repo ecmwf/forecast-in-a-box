@@ -193,7 +193,7 @@ async def test_update_without_version_selects_newest_compatible_version() -> Non
         _patch_fiabcore("1.0.0"),
         patch("forecastbox.routes.plugins.submit_update_single", new=AsyncMock(return_value="")) as mock_submit,
     ):
-        await update_plugin(MagicMock(), _COMPOSITE_ID)
+        await update_plugin(_COMPOSITE_ID)
     mock_submit.assert_called_once_with(_COMPOSITE_ID, install=True, version=Version("1.2.0"))
 
 
@@ -205,7 +205,7 @@ async def test_update_without_version_rejects_when_no_compatible_version_exists(
         _patch_fiabcore("1.0.0"),
     ):
         with pytest.raises(HTTPException) as exc_info:
-            await update_plugin(MagicMock(), _COMPOSITE_ID)
+            await update_plugin(_COMPOSITE_ID)
     assert exc_info.value.status_code == 400
 
 
@@ -217,7 +217,7 @@ async def test_update_without_version_rejects_when_no_compatible_version_exists(
 @pytest.mark.asyncio
 async def test_install_plugin_awaits_submit_install_single() -> None:
     with patch("forecastbox.routes.plugins.submit_install_single", new=AsyncMock()) as mock_submit:
-        await install_plugin(MagicMock(), _COMPOSITE_ID)
+        await install_plugin(_COMPOSITE_ID)
     mock_submit.assert_awaited_once_with(_COMPOSITE_ID)
 
 
