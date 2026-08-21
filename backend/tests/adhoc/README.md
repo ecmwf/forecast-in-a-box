@@ -16,6 +16,10 @@ It implements the following scenarios:
 5. An editable/local selected plugin can be updated.
 6. A successful real installation passes `uv pip check` and can be imported after cache
    invalidation.
+7. A freshly editable-installed plugin becomes importable in the *same* interpreter process that
+   performed the install, without a restart -- exercising `forecastbox.utility.pth_activation`
+   directly (not `install_plugin_compatibly`, since that module's other dependencies, e.g. `git`,
+   are not installed in the scratch venv; `pth_activation` has none beyond the standard library).
 
 ## Running
 
@@ -70,6 +74,10 @@ other adhoc package (e.g. `fiab-adhoctest-plugin-beta` depends on `fiab-adhoctes
   conflicting with the pinned `1.0.0` already installed.
 * `plugin_delta_v1` / `plugin_delta_v2` -- `fiab-adhoctest-plugin-delta` at `1.0.0`/`1.1.0`,
   depends on `fiab-core` only. `v1` is the seeded baseline; `v2` is the requested update.
+* `plugin_epsilon` -- `fiab-adhoctest-plugin-epsilon` at `1.0.0`, no deps. Unlike every other
+  package here, it is never pre-built into the wheelhouse or pre-seeded into the scratch venv:
+  scenario 7 performs its editable install itself (via a nested subprocess running under the
+  scratch venv's own interpreter), so it can observe the environment both before and after.
 
 `fiab-core` itself is built from `backend/packages/fiab-core` into the same wheelhouse, so the
 scratch environment never needs any package from outside this repository.

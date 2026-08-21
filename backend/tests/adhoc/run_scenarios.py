@@ -73,6 +73,7 @@ from forecastbox.utility.packages import freeze_environment, run_pip_check
 HERE = Path(__file__).resolve().parent
 PACKAGES_DIR = HERE / "packages"
 FIAB_CORE_DIR = HERE.parents[1] / "packages" / "fiab-core"
+BACKEND_SRC = HERE.parents[1] / "src"
 
 SOURCES = {
     "pseudonumpy_v1": PACKAGES_DIR / "pseudonumpy_v1",
@@ -84,6 +85,9 @@ SOURCES = {
     "plugin_gamma": PACKAGES_DIR / "plugin_gamma",
     "plugin_delta_v1": PACKAGES_DIR / "plugin_delta_v1",
     "plugin_delta_v2": PACKAGES_DIR / "plugin_delta_v2",
+    # deliberately *not* built into the wheelhouse/seeded baseline -- see
+    # scenario_editable_install_becomes_importable_without_restart.
+    "plugin_epsilon": PACKAGES_DIR / "plugin_epsilon",
 }
 
 # built into the wheelhouse (used via --find-links, "as if it was a registry"); plugin_alpha is
@@ -336,6 +340,68 @@ def scenario_successful_install_passes_check_and_is_importable(scratch: Scratch)
         raise ScenarioError(f"imported plugin reported unexpected version: {proc.stdout!r}")
 
 
+def scenario_editable_install_becomes_importable_without_restart(scratch: Scratch) -> None:
+    """7. A freshly editable-installed plugin becomes importable in the *same* interpreter process
+    that performed the install, without a restart.
+
+    This exercises ``forecastbox.utility.pth_activation`` -- the mechanism
+    ``install_plugin_compatibly`` relies on to fix the problem this scenario is named after (see
+    that module's docstring). We deliberately do *not* call ``install_plugin_compatibly`` itself
+    here: it lives in ``forecastbox.domain.plugin.compatibility``, which pulls in dependencies
+    (``git``, ``pydantic``, ...) that are not installed in the scratch venv. ``pth_activation`` has
+    no dependencies beyond the standard library, so it can be imported directly in a subprocess
+    running under the scratch venv's *own* interpreter (via ``PYTHONPATH``) -- which is essential:
+    the activation mechanism only does anything when it is asked to act on the interpreter that is
+    actually running it (see ``is_running_interpreter``), which the ``targeting()`` context manager
+    used by the other scenarios deliberately is not (it only reassigns ``sys.executable`` on *this*
+    process, which keeps running under the outer, non-scratch interpreter throughout).
+
+    ``fiab-adhoctest-plugin-epsilon`` is used here specifically because, unlike every other adhoc
+    package, it is never pre-built into the wheelhouse or pre-seeded into the scratch venv: this
+    scenario performs its editable install itself, so it can observe the *before* state.
+    """
+    epsilon_dir = SOURCES["plugin_epsilon"]
+    script = f"""
+import sys
+sys.path.insert(0, {str(BACKEND_SRC)!r})
+import importlib
+import subprocess
+
+from forecastbox.utility.pth_activation import (
+    activate_new_pth_files,
+    is_running_interpreter,
+    own_site_packages_dir,
+    snapshot_pth_filenames,
+)
+
+assert is_running_interpreter(sys.executable), "sanity: pth_activation must see this as its own interpreter"
+
+site_dir = own_site_packages_dir()
+before = snapshot_pth_filenames(site_dir)
+
+result = subprocess.run(
+    ["uv", "pip", "install", "--python", sys.executable, "-e", {str(epsilon_dir)!r}],
+    capture_output=True,
+    text=True,
+)
+assert result.returncode == 0, f"editable install failed: {{result.stderr}}"
+
+after = snapshot_pth_filenames(site_dir)
+activated = activate_new_pth_files(site_dir, before, after)
+assert activated, f"expected at least one new .pth file, before={{before}} after={{after}}"
+importlib.invalidate_caches()
+
+import fiab_adhoctest_plugin_epsilon as m
+
+print(m.__version__)
+"""
+    proc = subprocess.run([str(scratch.venv_python), "-c", script], capture_output=True, text=True, env=scratch.env)
+    if proc.returncode != 0:
+        raise ScenarioError(f"editable-install activation scenario failed: {proc.stderr}")
+    if proc.stdout.strip() != "1.0.0":
+        raise ScenarioError(f"unexpected version after in-process activation: {proc.stdout!r} (stderr: {proc.stderr})")
+
+
 SCENARIOS: list[Callable[[Scratch], None]] = [
     scenario_new_dependency_installs_without_touching_others,
     scenario_conflicting_version_fails_dry_run,
@@ -343,6 +409,7 @@ SCENARIOS: list[Callable[[Scratch], None]] = [
     scenario_editable_local_protected_package_preserved,
     scenario_editable_local_selected_plugin_can_be_updated,
     scenario_successful_install_passes_check_and_is_importable,
+    scenario_editable_install_becomes_importable_without_restart,
 ]
 
 
