@@ -45,8 +45,12 @@ Algorithm for ``install_plugin_compatibly``
    requirements, and the requested plugin requirement.
 6. Only if the dry run succeeds, run the identical command for real (differing only by the
    absence of ``--dry-run``).
-7. Run ``uv pip check`` again as a post-install check.
-8. Return the parsed installed-version mapping (from the real install's output only) for the
+7. If the real install's target interpreter is the one actually running this code (see
+   ``forecastbox.utility.pth_activation``), activate any ``.pth`` files newly created by the
+   install (as happens for editable/``-e`` installs), so the plugin becomes importable in this
+   process without a restart.
+8. Run ``uv pip check`` again as a post-install check.
+9. Return the parsed installed-version mapping (from the real install's output only) for the
    plugin manager to persist and reload.
 
 Known limitations (read before touching this module)
@@ -80,6 +84,10 @@ Known limitations (read before touching this module)
 8. Repeated single-plugin installs are order-dependent and can leave unnecessary transitive
    packages installed over time (see point 2). This is an accepted limitation of this immediate
    hardening, to be addressed by the candidate-environment design referenced above.
+9. Editable-install activation (see ``forecastbox.utility.pth_activation``) only extends ``sys.path``/
+   ``sys.meta_path`` for ``.pth`` files newly created by this install; it never removes entries for a
+   plugin that is later moved or uninstalled. Combined with point 3, a full process restart remains
+   the only way to guarantee a fully coherent set of importable modules.
 
 Public API
 ----------
@@ -121,6 +129,12 @@ from forecastbox.utility.packages import (
     run_pip_check,
     run_pip_install,
     temporary_constraints_file,
+)
+from forecastbox.utility.pth_activation import (
+    activate_editable_installs,
+    is_running_interpreter,
+    own_site_packages_dir,
+    snapshot_pth_filenames,
 )
 
 logger = logging.getLogger(__name__)
@@ -276,6 +290,9 @@ def install_plugin_compatibly(pip_source: str, version: Version | None, module_n
         f"{len(extra_requirement_args)} preserved editable/local requirement tokens"
     )
 
+    activation_site_dir = own_site_packages_dir() if is_running_interpreter(python) else None
+    before_pth = snapshot_pth_filenames(activation_site_dir) if activation_site_dir is not None else set()
+
     with temporary_constraints_file(constraints_text) as constraints_path:
         dry_run = run_pip_install(python, constraints_path, extra_requirement_args, plugin_requirement_args, dry_run=True)
         if not dry_run.ok:
@@ -290,6 +307,14 @@ def install_plugin_compatibly(pip_source: str, version: Version | None, module_n
             return Either.error(msg)
 
     installed_versions = parse_install_output(real_install.stderr)
+
+    if activation_site_dir is not None:
+        activated = activate_editable_installs(python, activation_site_dir, before_pth)
+        if activated:
+            logger.info(
+                f"activated {len(activated)} newly created .pth file(s) so {plugin_requirement_args} is importable "
+                f"without a restart: {activated}"
+            )
 
     post_check = run_pip_check(python)
     if not post_check.ok:
