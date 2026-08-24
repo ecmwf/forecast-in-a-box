@@ -19,6 +19,7 @@ import types
 import webbrowser
 from multiprocessing import Process, get_context
 
+import httpx
 from fiab_core.fable import PluginCompositeId
 
 import forecastbox.entrypoint.bootstrap.service
@@ -27,7 +28,7 @@ from forecastbox.entrypoint.bootstrap.checks import check_backend_ready, install
 from forecastbox.entrypoint.bootstrap.config import export_recursive, setup_process
 from forecastbox.entrypoint.bootstrap.launchers import launch_backend
 from forecastbox.entrypoint.bootstrap.procs import ChildProcessGroup, previous_cleanup
-from forecastbox.utility.config import FIABConfig, UnmanagedGateway, validate_runtime
+from forecastbox.utility.config import FIABConfig, LocalGateway, UnmanagedGateway, validate_runtime
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
@@ -66,6 +67,26 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
     return handle
 
 
+def _maybe_shutdown_local_gateway(config: FIABConfig) -> None:
+    """Best-effort shutdown of a locally-managed Cascade gateway process.
+
+    The gateway (when using LocalGateway) is spawned as a child of the `backend` process itself
+    (in response to the `/gateway/start` call in `check_backend_ready`), so `ChildProcessGroup.shutdown`
+    (which only knows about the `backend` process) cannot reach it. We ask the still-alive backend
+    to kill its own gateway child before we tear the backend process down.
+
+    TODO: RemoteGateway also spawns a process (over an ssh tunnel) that is not stopped here. Extend
+    this once we have a reliable way to tear that down as well.
+    """
+    if not isinstance(config.cascade.gateway, LocalGateway):
+        return
+    try:
+        with httpx.Client() as client:
+            client.post(config.backend.local_url() + "/api/v1/gateway/kill", timeout=5)
+    except Exception:
+        logger.warning("failed to shut down the local cascade gateway during teardown", exc_info=True)
+
+
 if __name__ == "__main__":
     # NOTE this is referenced from scripts/fiab.sh -- if you refactor this module, pay attention to it
     config = FIABConfig()
@@ -73,6 +94,7 @@ if __name__ == "__main__":
     handles = launch_all(config)
 
     def sigterm_handler(_signo: int, _stack_frame: types.FrameType | None) -> None:
+        _maybe_shutdown_local_gateway(config)
         handles.shutdown()
         sys.exit(0)
 
