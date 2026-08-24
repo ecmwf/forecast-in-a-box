@@ -40,6 +40,7 @@ INPUT_SOURCE_EXTRAS: dict[str, list[str]] = {
     "opendata": ["anemoi-plugins-ecmwf-inference[opendata]"],
     "polytope": ["anemoi-plugins-ecmwf-inference[polytope]"],
     "mars": ["earthkit-data[mars]"],
+    "dummy": [],
 }
 
 ENSEMBLE = ConfigurationOptionId("number")
@@ -178,7 +179,7 @@ class AnemoiSource(Source, AnemoiBaseBlock):
         INPUT_SOURCE: BlockConfigurationOption(
             title="Input Source",
             description="Source of the initial conditions",
-            value_type=OpenEnumType(["mars", "opendata", "polytope"]),
+            value_type=OpenEnumType(list(INPUT_SOURCE_EXTRAS.keys())),
             default_value="opendata",
         ),
         LEAD_TIME: BlockConfigurationOption(
