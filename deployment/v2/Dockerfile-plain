@@ -1,0 +1,18 @@
+# dockerfile with a plain fiab installation
+# - the most recent release, pulled in at the build time
+# - no config override, meaning all defaults
+# - not properly warmed up (a TODO in fiab.sh captures this -- we do *not* install the default plugin, and we do *not* cache any runtime deps)
+
+FROM debian:stable-slim
+
+RUN : \
+    && apt-get update \
+    && apt-get install -y bash curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --user-group --create-home --shell /bin/false fiab \
+    && :
+
+USER fiab
+COPY fiab.sh /home/fiab/fiab.sh
+RUN /home/fiab/fiab.sh warmup
+ENTRYPOINT /home/fiab/fiab.sh
