@@ -18,6 +18,7 @@ import {
   resyncRegisteredRoutes,
 } from '@/api/notifications/dispatch'
 import { artifactKeys, wakeDownloadPolling } from '@/api/hooks/useArtifacts'
+import { fableKeys } from '@/api/hooks/useFable'
 import { pluginKeys } from '@/api/hooks/usePlugins'
 import { queryClient } from '@/lib/queryClient'
 
@@ -47,6 +48,20 @@ function notification(
     refreshRoutes: ['api/v1/artifacts/list_models'],
     ...overrides,
   }
+}
+
+function pluginNotification(
+  event: string,
+  context: Record<string, unknown> = { plugin_id: 'ecmwf:toy1' },
+): ClientNotification {
+  return notification({
+    text: `Plugin ecmwf:toy1 ${event}`,
+    sourceDomainName: 'plugin',
+    sourceDomainEvent: event,
+    context,
+    detailRoute: 'api/v1/plugin/list',
+    refreshRoutes: ['api/v1/plugin/list'],
+  })
 }
 
 describe('normalizeRefreshRoute', () => {
@@ -91,18 +106,23 @@ describe('dispatchClientNotification', () => {
 
   it('invalidates the plugin listing on a plugin global error', () => {
     dispatchClientNotification(
-      notification({
-        text: 'Initial plugin load failed: environment already broken',
-        sourceDomainName: 'plugin',
-        sourceDomainEvent: 'pluginGlobalError',
-        context: { trigger: 'Initial plugin load', error: 'broken' },
-        detailRoute: 'api/v1/plugin/list',
-        refreshRoutes: ['api/v1/plugin/list'],
+      pluginNotification('pluginGlobalError', {
+        trigger: 'Initial plugin load',
+        error: 'broken',
       }),
     )
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: pluginKeys.list(),
     })
+  })
+
+  // The listing alone would leave the builder's catalogue stale.
+  it.each([
+    ['the block catalogue', () => fableKeys.catalogue()],
+    ['the blueprint listing', () => fableKeys.blueprintsBase()],
+  ])('also invalidates %s on a plugin event', (_label, queryKey) => {
+    dispatchClientNotification(pluginNotification('pluginInstalled'))
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKey() })
   })
 
   it('ignores unmapped refresh routes without invalidating', () => {
