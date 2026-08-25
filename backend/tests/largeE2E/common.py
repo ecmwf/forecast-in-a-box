@@ -150,13 +150,3 @@ def find_plugin_id(client: httpx.Client, factory_id: str) -> dict[str, str]:
     if len(matches) != 1:
         raise AssertionError(f"expected exactly one installed plugin exposing factory {factory_id!r}, found {len(matches)}: {matches}")
     return matches[0]
-
-
-if __name__ == "__main__":
-    # Standalone readiness check, used by scripts/start_backend.sh right after backgrounding the
-    # backend process: `uvx --with httpx python common.py`
-    configure_logging()
-    with make_client() as _client:
-        logger.info(f"waiting for backend at {_client.base_url} to become ready...")
-        wait_for_backend_ready(_client)
-        logger.info("backend is ready")
