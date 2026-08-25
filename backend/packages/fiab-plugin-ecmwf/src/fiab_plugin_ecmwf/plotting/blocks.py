@@ -151,7 +151,7 @@ class MapPlotSink(Sink):
 
         action = selected.map(
             Payload(
-                "fiab_plugin_ecmwf.runtime.plots.map_plot",
+                "fiab_plugin_ecmwf.plotting.runtime.map_plot",
                 kwargs={
                     "domain": block.config_as_geodomain(DOMAIN).with_bbox_earthkitplots().value or None,
                     "format": block.config_as_str(FORMAT),

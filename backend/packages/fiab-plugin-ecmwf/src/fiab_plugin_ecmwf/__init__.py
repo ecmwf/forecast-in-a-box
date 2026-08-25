@@ -20,8 +20,8 @@ from fiab_plugin_ecmwf.blocks import (
     OperationalForecastSource,
     Select,
 )
-from fiab_plugin_ecmwf.output import GribSink, ZarrSink
-from fiab_plugin_ecmwf.plotting import MapPlotSink
+from fiab_plugin_ecmwf.output.blocks import GribSink, ZarrSink
+from fiab_plugin_ecmwf.plotting.blocks import MapPlotSink
 from fiab_plugin_ecmwf.products.blocks import CustomThresholdProbability, EnsembleStatistics, PredefinedThresholdProbability, ThermalIndices
 from fiab_plugin_ecmwf.templates.aifs_forecast import template as _aifs_forecast_template
 from fiab_plugin_ecmwf.templates.ifs_ensemble_statistics import template as _ensemble_statistics_template

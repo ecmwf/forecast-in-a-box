@@ -87,7 +87,7 @@ class ZarrSink(Sink):
             .concatenate(dim=temp_dim)
             .map(
                 Payload(
-                    "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
+                    "fiab_plugin_ecmwf.output.runtime.write_zarr",
                     kwargs={"path": block.config_as_str(PATH)},
                     metadata={"environment": ["zarr"]},
                 )
@@ -149,7 +149,7 @@ class GribSink(Sink):
 
         action = action.map(
             Payload(
-                "fiab_plugin_ecmwf.runtime.sinks.write_grib",
+                "fiab_plugin_ecmwf.output.runtime.write_grib",
                 kwargs={"path": block.config_as_str(PATH)},
             )
         )

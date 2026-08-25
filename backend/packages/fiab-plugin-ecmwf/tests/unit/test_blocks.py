@@ -42,8 +42,8 @@ from fiab_plugin_ecmwf.block_utils import (
     _param_id_to_param_key,
 )
 from fiab_plugin_ecmwf.blocks import OperationalForecastSource, Select
-from fiab_plugin_ecmwf.output import GribSink, ZarrSink
-from fiab_plugin_ecmwf.plotting import MapPlotSink
+from fiab_plugin_ecmwf.output.blocks import GribSink, ZarrSink
+from fiab_plugin_ecmwf.plotting.blocks import MapPlotSink
 from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
 
