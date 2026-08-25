@@ -317,6 +317,72 @@ class GeoDomainType(UnionType):
         return "geodomain"
 
 
+# GRID TYPES
+
+
+class NamedGridType(StringType):
+    """A string representing a named grid"""
+
+    def _is_gaussian_grid(self, value: str) -> bool:
+        """Check if the value is a valid Gaussian grid name, e.g., 'N320'."""
+        if not isinstance(value, str):
+            return False
+        if not value[1:].isdigit():
+            return False
+        if value[0].upper() in ["N", "O"]:
+            return True
+        return False
+
+    def validate_convert(self, value: Any) -> str:
+        v = super().validate_convert(value)
+
+        if not self._is_gaussian_grid(v):
+            raise WrongType(f"{v!r} is not a valid grid name. Must be a Gaussian grid (e.g., 'N320').")
+        return v
+
+    def serialize(self) -> str:
+        return "named-grid"
+
+
+class LatLonGridType(FloatType):
+    """A float representing the latitude or longitude resolution of a grid. Must be positive."""
+
+    def validate_convert(self, value: Any) -> float:
+        v = super().validate_convert(value)
+        if v <= 0:
+            raise WrongType(f"Grid resolution must be positive, got {v}")
+        return v
+
+
+class TupleFloatGridType(ListType):
+    """A list of exactly two floats representing a grid resolution, e.g., [lat_res, lon_res]."""
+
+    def __init__(self) -> None:
+        super().__init__(FloatType())
+
+    def validate_convert(self, value: Any) -> list[float]:
+        result = super().validate_convert(value)
+        if len(result) != 2:
+            raise WrongType(f"TupleFloatGridType must have exactly 2 elements, got {len(result)}")
+        lat_res, lon_res = result
+        if lat_res <= 0 or lon_res <= 0:
+            raise WrongType(f"Grid resolutions must be positive floats, got lat_res={lat_res}, lon_res={lon_res}")
+        return result
+
+    def serialize(self) -> str:
+        return "tuple-float-grid"
+
+
+class GridType(UnionType):
+    """An alias for a union over named grid and tuple of floats representing grid resolution."""
+
+    def __init__(self) -> None:
+        super().__init__([NamedGridType(), TupleFloatGridType(), LatLonGridType()])
+
+    def serialize(self) -> str:
+        return "grid"
+
+
 class ArtifactType(FableType):
     """A string representing an id from the artifact catalog. Utilized by the frontend
     to perform catalog lookup to build a better UI form, displaying additional info."""
