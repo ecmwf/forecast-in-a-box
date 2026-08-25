@@ -30,7 +30,7 @@ from fiab_core.fable import (
     Error,
     QubedOutput,
 )
-from fiab_core.tools.convert import GeoDomainWrapper
+from fiab_core.tools.convert import GeoDomainWrapper, GridWrapper
 from fiab_core.types import ArtifactType, ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
 
 
@@ -210,6 +210,11 @@ class BlockInstanceRich:
         raw_value = self._get_raw_value(option_id)
         # NOTE we ignore types as we trust parser -- but its fragile!
         return GeoDomainWrapper(raw_value)  # ty:ignore[invalid-argument-type]
+
+    def config_as_gridspec(self, key: str | ConfigurationOptionId) -> GridWrapper:
+        option_id, option = self._get_configuration_option(key)
+        raw_value = self._get_raw_value(option_id)
+        return GridWrapper(raw_value)  # ty:ignore[invalid-argument-type]
 
 
 class QubedBlockBuilder(abc.ABC):

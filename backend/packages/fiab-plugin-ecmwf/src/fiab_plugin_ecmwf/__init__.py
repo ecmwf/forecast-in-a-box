@@ -20,6 +20,7 @@ from fiab_plugin_ecmwf.blocks import (
     OperationalForecastSource,
     Select,
 )
+from fiab_plugin_ecmwf.geography.blocks import AreaCutout, Regrid
 from fiab_plugin_ecmwf.output.blocks import GribSink, ZarrSink
 from fiab_plugin_ecmwf.plotting.blocks import MapPlotSink
 from fiab_plugin_ecmwf.products.blocks import CustomThresholdProbability, EnsembleStatistics, PredefinedThresholdProbability, ThermalIndices
@@ -40,6 +41,8 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("anemoiInputSource"): AnemoiInputSource(),
     BlockFactoryId("anemoiTransform"): AnemoiTransform(),
     BlockFactoryId("mapPlotSink"): MapPlotSink(),
+    BlockFactoryId("areaCutout"): AreaCutout(),
+    BlockFactoryId("regrid"): Regrid(),
 }
 
 _base_plugin = QubedPluginBuilder(block_builders=blocks, base_environment=["fiab-plugin-ecmwf"]).as_plugin()
