@@ -49,6 +49,8 @@ const log = createLogger('usePlugins')
 export const pluginKeys = {
   all: ['plugin'] as const,
   list: () => [...pluginKeys.all, 'list'] as const,
+  /** Mutation key — lets notification dispatch skip what this tab started. */
+  mutation: () => [...pluginKeys.all, 'mutation'] as const,
 }
 
 /**
@@ -159,6 +161,7 @@ function usePluginMutation<TVariables>(
   const queryClient = useQueryClient()
 
   return useMutation({
+    mutationKey: pluginKeys.mutation(),
     mutationFn: async (variables: TVariables) => {
       await action(variables)
       // Poll until the catalogue is available again (plugins finished reloading)

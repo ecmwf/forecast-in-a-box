@@ -15,8 +15,10 @@
  * map to query keys, server state keeps flowing through TanStack Query, so
  * a missed notification is a slower update, not data loss. Unknown routes
  * only log — each new backend producer costs one registry line.
+ * Plugin events also toast: they finish as background tasks, silent otherwise.
  */
 
+import i18n from 'i18next'
 import type { QueryKey } from '@tanstack/react-query'
 import type { ClientNotification } from '@/api/types/notification.types'
 import { clientNotificationSchema } from '@/api/types/notification.types'
@@ -26,6 +28,7 @@ import { fableKeys } from '@/api/hooks/useFable'
 import { pluginKeys } from '@/api/hooks/usePlugins'
 import { createLogger } from '@/lib/logger'
 import { queryClient } from '@/lib/queryClient'
+import { showToast } from '@/lib/toast'
 
 const log = createLogger('Notifications')
 
@@ -72,6 +75,83 @@ const domainHandlers = new Map<
   ],
 ])
 
+/** Backend ships `store:local`; the UI shows `store/local`. */
+function pluginDisplayId(pluginId: string): string {
+  const separator = pluginId.indexOf(':')
+  return separator === -1
+    ? pluginId
+    : `${pluginId.slice(0, separator)}/${pluginId.slice(separator + 1)}`
+}
+
+/** Plugin mutations take either the id itself or `{ compositeId }`. */
+function mutationPluginId(variables: unknown): string | null {
+  if (typeof variables !== 'object' || variables === null) return null
+  const candidate =
+    'compositeId' in variables ? variables.compositeId : variables
+  if (typeof candidate !== 'object' || candidate === null) return null
+  const { store, local } = candidate as { store?: unknown; local?: unknown }
+  return typeof store === 'string' && typeof local === 'string'
+    ? `${store}/${local}`
+    : null
+}
+
+/** True while this tab's own mutation for that plugin is still in flight. */
+function trackedHere(displayId: string): boolean {
+  return (
+    queryClient.isMutating({
+      mutationKey: pluginKeys.mutation(),
+      predicate: (mutation) =>
+        mutationPluginId(mutation.state.variables) === displayId,
+    }) > 0
+  )
+}
+
+/** Success event -> copy key, spelled out because i18next types the key. */
+type PluginSuccessCopy =
+  | 'plugins:notifications.installed'
+  | 'plugins:notifications.updated'
+  | 'plugins:notifications.settingsApplied'
+  | 'plugins:notifications.unloaded'
+  | 'plugins:notifications.uninstalled'
+
+const pluginSuccessCopy = new Map<string, PluginSuccessCopy>([
+  ['pluginInstalled', 'plugins:notifications.installed'],
+  ['pluginUpdated', 'plugins:notifications.updated'],
+  ['pluginSettingsApplied', 'plugins:notifications.settingsApplied'],
+  ['pluginUnloaded', 'plugins:notifications.unloaded'],
+  ['pluginUninstalled', 'plugins:notifications.uninstalled'],
+])
+
+/** Toast a plugin event unless this tab started it. Failures always toast:
+ *  the route only submits, so the mutation resolves even when the task fails. */
+function toastPluginNotification(notification: ClientNotification): void {
+  if (notification.sourceDomainEvent === 'pluginGlobalError') {
+    const { trigger, error } = notification.context
+    showToast.error(
+      typeof trigger === 'string'
+        ? i18n.t('plugins:notifications.globalError', { trigger })
+        : i18n.t('plugins:notifications.globalErrorGeneric'),
+      typeof error === 'string' ? error : undefined,
+    )
+    return
+  }
+
+  const copyKey = pluginSuccessCopy.get(notification.sourceDomainEvent)
+  if (!copyKey) return
+
+  const pluginId = notification.context.plugin_id
+  if (typeof pluginId !== 'string') {
+    log.warn('Plugin notification without plugin_id', {
+      event: notification.sourceDomainEvent,
+    })
+    return
+  }
+
+  const displayId = pluginDisplayId(pluginId)
+  if (trackedHere(displayId)) return
+  showToast.success(i18n.t(copyKey, { plugin: displayId }))
+}
+
 export function dispatchClientNotification(
   notification: ClientNotification,
 ): void {
@@ -92,6 +172,10 @@ export function dispatchClientNotification(
   domainHandlers.get(
     `${notification.sourceDomainName}:${notification.sourceDomainEvent}`,
   )?.(notification)
+
+  if (notification.sourceDomainName === 'plugin') {
+    toastPluginNotification(notification)
+  }
 }
 
 /** Raw frame -> validated notification -> dispatch; malformed input logs and drops. */
