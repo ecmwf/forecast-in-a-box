@@ -18,14 +18,13 @@ jobs:
         arch_type: [ARM64]
         python_version: ["3.11"] # replace with 3.14 in ~26/01, once all wheels etc available
     runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - working-directory: backend/tests/largeE2E
+        run: |
           set -euo pipefail
-          mkdir /tmp/tmpFiabHome # we want a clean env for install
-          export FIAB_LOGSTDOUT=yea
-          export FIAB_ROOT=/tmp/tmpFiabHome
-          bash ./scripts/fiab.sh warmup
-          source /tmp/tmpFiabHome/venv/bin/activate
-          PYTHONPATH=backend/tests/largeE2E python -m bigtest
+          just install
+          trap 'just stop' EXIT
+          just start
+          just run

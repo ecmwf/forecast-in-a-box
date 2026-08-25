@@ -1,0 +1,22 @@
+fiab_root := justfile_directory() + "/.fiab"
+
+# Sets up the fiab venv/lock/config in a scratch FIAB_ROOT under this directory, without launching it.
+install:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    REPO_ROOT="$(git -C '{{justfile_directory()}}' rev-parse --show-toplevel)"
+    FIAB_ROOT="{{fiab_root}}" bash "$REPO_ROOT/scripts/fiab.sh" warmup
+
+# Starts the backend in the background (see scripts/start_backend.sh) and waits for it to be ready.
+start:
+    FIAB_ROOT="{{fiab_root}}" bash scripts/start_backend.sh
+
+# Runs every case_* scenario against whatever backend is reachable (default http://localhost:8000,
+# override with FIAB_E2E_BASE_URL) -- this is the only recipe a developer running their own `just
+# dev` needs.
+run:
+    uvx --with httpx python run_scenarios.py
+
+# Stops the backend started by `just start`.
+stop:
+    FIAB_ROOT="{{fiab_root}}" bash scripts/stop_backend.sh
