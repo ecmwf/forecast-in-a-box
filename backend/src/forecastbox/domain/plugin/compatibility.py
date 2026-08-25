@@ -108,7 +108,6 @@ import logging
 import sys
 from collections.abc import Iterator
 
-import git
 from cascade.low.func import Either
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import SpecifierSet
@@ -144,13 +143,7 @@ def get_fiabcore_version() -> Version:
     """Return the currently installed version of ``fiab-core`` as a ``Version`` object."""
     raw = importlib.metadata.version("fiab-core")
     if raw == "0.0.0":
-        # basically $(git describe --tags --abbrev=0 --match="c*")
-        r = git.Repo("..")
-        tags = (t.name for t in r.tags if t.name.startswith("c"))
-        mostRecent = max(tags, key=lambda x: int(r.git.rev_list(f"tags/{x}", "--count")), default="c0.0.0.0")
-        noPrefix = mostRecent[1:]
-        dropLast = noPrefix.rsplit(".", 1)[0]
-        return Version(dropLast)
+        raise ValueError("Wrong fiab-core version -- issue in fallback?")
     else:
         return Version(raw)
 
