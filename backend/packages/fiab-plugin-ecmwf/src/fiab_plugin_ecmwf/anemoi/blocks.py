@@ -334,7 +334,7 @@ class AnemoiTransform(Transform, AnemoiBaseBlock):
 
         input_dataset = inputs["initial conditions"]
         ensemble_members = axes(input_dataset).get(ENSEMBLE, 0)
-        base_time = list(axes(input_dataset).get(BASE_TIME, None))[0]
+        base_time = list(axes(input_dataset).get(BASE_TIME, set()))[0]
 
         self.validate_lead_time(checkpoint, lead_time)
         self.validate_ensemble(checkpoint, ensemble_members)
