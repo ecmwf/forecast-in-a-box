@@ -1,4 +1,5 @@
 import logging
+import os
 import platform
 import subprocess
 from dataclasses import dataclass
@@ -42,7 +43,16 @@ def get_platform_info() -> PlatformInfo | None:
             output = subprocess.check_output(cmd, encoding="utf-8").strip()
 
             # If multiple GPUs exist, this returns multiple lines
-            gpu_memory_mib = sum([int(x) for x in output.split("\n")])
+            gpu_memory_mib = (int(x) for x in output.split("\n"))
+            visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
+            if visible is None:
+                gpu_memory_mib = sum(gpu_memory_mib)
+            else:
+                if visible:
+                    available = set(int(e) for e in visible.split(","))
+                    gpu_memory_mib = sum(e for (i, e) in enumerate(gpu_memory_mib) if i in available)
+                else:
+                    gpu_memory_mib = None
             return PlatformInfo(platform_name="linux", gpu_memory_mib=gpu_memory_mib)
         except FileNotFoundError:
             logger.debug("nvidia-smi not found. Ensure NVIDIA drivers are installed.")
