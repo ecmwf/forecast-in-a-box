@@ -57,6 +57,13 @@ def get_checkpoint_enum_type() -> FableType:
     return ClosedEnumType(values, subtype=ArtifactType())
 
 
+def _expand_qube(qube: Qube | dict[str, Qube], dim: dict[str, Any]) -> Qube | dict[str, Qube]:
+    """Expand the qube along the specified dimension(s), handling both single qube and multiple qube cases."""
+    if isinstance(qube, dict):
+        return {key: expand(q, dim) for key, q in qube.items()}
+    return expand(qube, dim)
+
+
 class CheckpointArtifact:
     """Wrapper around the checkpoint artifact to provide utility methods for accessing the checkpoint data and creating model input configuration."""
 
@@ -120,14 +127,14 @@ class CheckpointArtifact:
         checkpoint = self.checkpoint()
         qube = self._open_qube_json(checkpoint.output_qube)
 
+        if checkpoint.extra_metadata:
+            qube = _expand_qube(qube, checkpoint.extra_metadata)
+
         lead_time_seconds = lead_time * 3600
         model_step_seconds = _timestep_seconds(checkpoint.timestep)
         steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
-        if isinstance(qube, dict):
-            nested_qube = cast(dict[str, Qube], qube)
-            return {key: expand(q, {"step": steps}) for key, q in nested_qube.items()}
-        return expand(qube, {"step": steps})
+        return _expand_qube(qube, {"step": steps})
 
     def get_additional_kwargs(self) -> dict[str, Any]:
         """Get additional kwargs for the model inference from the checkpoint artifact, such as post processors and control options."""
