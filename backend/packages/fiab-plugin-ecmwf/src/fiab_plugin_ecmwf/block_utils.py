@@ -1,5 +1,5 @@
-from typing import Any
 import functools
+from typing import Any
 
 from fiab_core.fable import ConfigurationOptionId, QubedOutput
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
