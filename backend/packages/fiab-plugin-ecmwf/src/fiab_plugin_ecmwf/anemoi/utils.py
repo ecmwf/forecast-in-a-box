@@ -17,7 +17,6 @@ from typing import Any, cast
 
 from earthkit.data.utils.dates import to_timedelta
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
-from fiab_core.fable import QubedOutput
 from fiab_core.tools.plugins import _detect_editable_install
 from fiab_core.types import ArtifactType, ClosedEnumType, FableType
 from qubed import Qube
@@ -60,7 +59,8 @@ def get_checkpoint_enum_type() -> FableType:
 def _expand_qube(qube: Qube | dict[str, Qube], dim: dict[str, Any]) -> Qube | dict[str, Qube]:
     """Expand the qube along the specified dimension(s), handling both single qube and multiple qube cases."""
     if isinstance(qube, dict):
-        return {key: expand(q, dim) for key, q in qube.items()}
+        nested_qube = cast(dict[str, Qube], qube)
+        return {key: expand(q, dim) for key, q in nested_qube.items()}
     return expand(qube, dim)
 
 
