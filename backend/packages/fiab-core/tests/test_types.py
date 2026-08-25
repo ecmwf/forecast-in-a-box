@@ -303,6 +303,10 @@ class TestGeoDomainType:
         # west > east is a valid box crossing the antimeridian
         assert GeoDomainType().validate_convert("170,-10,-170,10") == [170, -10, -170, 10]
 
+    def test_numeric_float_resolves(self) -> None:
+        # a float bbox is valid,  we can resolve it to a list of four floats
+        assert GeoDomainType().validate_convert("-10.25,35.5,30,60") == [-10.25, 35.5, 30.0, 60.0]
+
     def test_bbox_south_greater_than_north_raises(self) -> None:
         with pytest.raises(WrongType, match="Cannot convert"):
             GeoDomainType().validate_convert("-10,60,30,35")
@@ -313,8 +317,6 @@ class TestGeoDomainType:
 
     def test_numeric_but_not_integer_bbox_raises(self) -> None:
         # an almost-bbox must fail loudly instead of being resolved as four region names
-        with pytest.raises(WrongType, match="Cannot convert"):
-            GeoDomainType().validate_convert("-10.25,35.5,30,60")
         with pytest.raises(WrongType, match="Cannot convert"):
             GeoDomainType().validate_convert("nan,35,30,60")
         with pytest.raises(WrongType, match="Cannot convert"):
@@ -520,10 +522,12 @@ class TestBoundingBoxWSENType:
         with pytest.raises(WrongType):
             t.validate_convert("")
 
-    def test_convert_non_integer_elements_raises_error(self) -> None:
+    def test_convert_float_elements(self) -> None:
         t = BoundingBoxWSENType()
-        with pytest.raises(WrongType):
-            t.validate_convert("1.5,2,3,4")
+        assert t.validate_convert("-10.5,40.2,30.1,70.9") == [-10.5, 40.2, 30.1, 70.9]
+
+    def test_convert_non_numeric_elements_raises_error(self) -> None:
+        t = BoundingBoxWSENType()
         with pytest.raises(WrongType):
             t.validate_convert("a,b,c,d")
 
