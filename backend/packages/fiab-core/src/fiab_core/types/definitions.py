@@ -133,11 +133,19 @@ class IntType(FableType):
 class FloatType(FableType):
     """The float type. Converts string to float."""
 
+    def __init__(self, real: bool = False, traits: _Traits = None) -> None:
+        """If real is True, only allow real numbers (no NaN or inf)."""
+        super().__init__(traits)
+        self.real = real
+
     def validate_convert_main(self, value: Any) -> float:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         try:
-            return float(value)
+            result = float(value)
+            if self.real and (result != result or result in (float("inf"), float("-inf"))):
+                raise WrongType(f"Expected a real number, got {value!r}")
+            return result
         except ValueError:
             raise WrongType(f"Cannot convert {value!r} to float")
 
@@ -355,9 +363,9 @@ class BoundingBoxWSENType(ListType):
     - west > east is allowed and means the box crosses the antimeridian."""
 
     def __init__(self, traits: _Traits = None) -> None:
-        super().__init__(IntType(), traits=traits)
+        super().__init__(FloatType(real=True), traits=traits)
 
-    def validate_convert_main(self, value: Any) -> list[int]:
+    def validate_convert_main(self, value: Any) -> list[float]:
         result = super().validate_convert_main(value)
         if len(result) != 4:
             raise WrongType(f"BoundingBoxWSEN must have exactly 4 elements, got {len(result)}")
