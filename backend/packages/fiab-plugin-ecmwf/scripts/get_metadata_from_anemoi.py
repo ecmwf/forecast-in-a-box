@@ -2,6 +2,7 @@
 # /// script
 # dependencies = [
 #    "earthkit-workflows-anemoi",
+#    "qubed",
 #    "anemoi-inference",
 #    "fire",
 # ]
@@ -17,6 +18,8 @@ Usage:
 
 from functools import lru_cache
 from typing import Any
+
+from qubed import Qube
 
 
 @lru_cache(maxsize=None)
@@ -39,6 +42,8 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
 
     in_qube = _expansion_qube(in_variables, variables_metadata, model_step, 6).remove_by_key("step")
     out_qube = _expansion_qube(out_variables, variables_metadata, model_step, 6).remove_by_key("step")
+
+    out_qube = out_qube | Qube.from_datacube({"class": "ai", "type": "fc", "stream": "oper"})
 
     return {"input_qube": in_qube.to_json(), "output_qube": out_qube.to_json()}
 
