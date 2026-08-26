@@ -57,7 +57,7 @@ def normalise_grid(grid: GridSpec | None) -> str | None:
         return str(grid).upper()
 
 
-def _make_job(grid: str | None, area: str | list[float] | None, packing: str, accuracy: int) -> "mir.Job":
+def _make_job(grid: str | None, area: str | list[float] | None, packing: str, accuracy: int) -> "mir.Job":  # type: ignore[reportUndefinedVariable]
     import mir
 
     job_args = {}
