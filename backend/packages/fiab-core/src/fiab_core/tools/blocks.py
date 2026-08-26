@@ -214,6 +214,10 @@ class BlockInstanceRich:
     def config_as_gridspec(self, key: str | ConfigurationOptionId) -> GridWrapper:
         option_id, option = self._get_configuration_option(key)
         raw_value = self._get_raw_value(option_id)
+        if not isinstance(raw_value, (str, list)):
+            raise BlockInstanceConfigurationError(
+                f"Configuration option {option_id!r} expected str or list[float], got {type(raw_value).__name__}"
+            )
         return GridWrapper(raw_value)  # ty:ignore[invalid-argument-type]
 
 

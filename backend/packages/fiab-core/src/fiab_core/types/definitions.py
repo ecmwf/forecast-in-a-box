@@ -10,6 +10,7 @@
 """Definitions of all the types"""
 
 import logging
+import math
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Any, Iterable, Literal, get_args
@@ -82,7 +83,7 @@ class FloatType(FableType):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         try:
             result = float(value)
-            if self.real and (result != result or result in (float("inf"), float("-inf"))):
+            if self.real and not (math.isnan(result) or math.isinf(result)):
                 raise WrongType(f"Expected a real number, got {value!r}")
             return result
         except ValueError:
