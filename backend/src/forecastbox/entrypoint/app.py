@@ -106,6 +106,8 @@ def _start_execution_runtime() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.debug(f"Starting FIAB with config: {config}")
+    # NOTE validate_runtime call is ~redundant as all launchers of `app` call it as well.
+    # But we do include anyway in case of the serialization or mutation went wrong
     validate_runtime(config)
     # generic and autodiscoverable inits
     try:

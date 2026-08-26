@@ -10,6 +10,11 @@
 """Launcher methods for backend and cascade -- utilized by
 - entrypoint.main for launch_backend,
 - entrypoint.bootstrap.service for launch_backend,
+
+Basically just a wrapper on uvicorn launching, as we need to override the logging configuration.
+
+The actual logic of instantiating the backend (the FastAPI app, the background threads, etc) happens in
+entrypoint/app.py, as it is coupled to FastAPI's API
 """
 
 import asyncio

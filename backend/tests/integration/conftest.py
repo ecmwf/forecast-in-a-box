@@ -203,7 +203,6 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         p_artifacts = get_mp_ctx("other").Process(target=run_artifact_registry, args=(shutdown_event_artifacts,))
         p_artifacts.start()
 
-        validate_runtime(config)
         handles = launch_all(config)
         client = httpx.Client(base_url=config.backend.local_url() + "/api/v1", follow_redirects=True)
         # we need to call admin register before yielding this to anybody, because the first registered user is admin
