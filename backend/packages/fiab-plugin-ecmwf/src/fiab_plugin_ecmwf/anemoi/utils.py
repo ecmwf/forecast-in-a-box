@@ -13,7 +13,7 @@ from copy import deepcopy
 from functools import reduce
 from operator import or_
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Iterable, Mapping, cast
 
 from earthkit.data.utils.dates import to_timedelta
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
@@ -56,7 +56,7 @@ def get_checkpoint_enum_type() -> FableType:
     return ClosedEnumType(values, subtype=ArtifactType())
 
 
-def _expand_qube(qube: Qube | dict[str, Qube], dim: dict[str, Any]) -> Qube | dict[str, Qube]:
+def _expand_qube(qube: Qube | dict[str, Qube], dim: Mapping[str, Iterable[Any]]) -> Qube | dict[str, Qube]:
     """Expand the qube along the specified dimension(s), handling both single qube and multiple qube cases."""
     if isinstance(qube, dict):
         nested_qube = cast(dict[str, Qube], qube)
@@ -127,11 +127,9 @@ class CheckpointArtifact:
         checkpoint = self.checkpoint()
         qube = self._open_qube_json(checkpoint.output_qube)
 
-        if checkpoint.extra_metadata:
-            qube = _expand_qube(qube, checkpoint.extra_metadata)
-
         lead_time_seconds = lead_time * 3600
         model_step_seconds = _timestep_seconds(checkpoint.timestep)
+
         steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
         return _expand_qube(qube, {"step": steps})
