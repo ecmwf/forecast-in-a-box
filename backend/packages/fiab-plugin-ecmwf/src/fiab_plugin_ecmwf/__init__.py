@@ -14,14 +14,14 @@ from fiab_core.plugin import Plugin
 from fiab_core.tools.blocks import QubedBlockBuilder
 from fiab_core.tools.plugins import QubedPluginBuilder
 
+from fiab_plugin_ecmwf import block_utils
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.blocks import (
-    GribSink,
-    MapPlotSink,
     OperationalForecastSource,
     Select,
-    ZarrSink,
 )
+from fiab_plugin_ecmwf.output.blocks import GribSink, ZarrSink
+from fiab_plugin_ecmwf.plotting.blocks import MapPlotSink
 from fiab_plugin_ecmwf.products.blocks import CustomThresholdProbability, EnsembleStatistics, PredefinedThresholdProbability, ThermalIndices
 from fiab_plugin_ecmwf.templates.aifs_forecast import template as _aifs_forecast_template
 from fiab_plugin_ecmwf.templates.ifs_ensemble_statistics import template as _ensemble_statistics_template

@@ -29,7 +29,7 @@ from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
 from fiab_core.tools.validators import positive
 from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
 
-from fiab_plugin_ecmwf.block_utils import (
+from fiab_plugin_ecmwf.constants import (
     BASE_TIME,
     CHECKPOINT,
     ENSEMBLE,
