@@ -34,6 +34,7 @@ fable_type: bare_type traits?
           | "geodomainSingle" -> geo_domain_single_type
           | "geodomain" -> geo_domain_type
           | "bboxWSEN" -> bounding_box_wsen_type
+          | "grid" -> grid_type
           | "enumClosed" "[" fable_type "]" "(" enum_items ")" -> closed_enum_type
           | "enumOpen" "[" fable_type "]" "(" enum_items ")" -> open_enum_type
           | "list" "[" fable_type "]" -> list_type

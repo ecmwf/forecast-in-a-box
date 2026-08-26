@@ -463,7 +463,7 @@ class GridType(FableType):
             return False
         return lat_res > 0 and lon_res > 0
 
-    def validate_convert(self, value: Any) -> str | list[int | float] | int | float:
+    def validate_convert_main(self, value: Any) -> str | list[int | float] | int | float:
         if isinstance(value, str):
             if self._is_gaussian_grid(value):
                 return value
@@ -483,7 +483,7 @@ class GridType(FableType):
 
         raise WrongType(f"Value {value!r} is not a valid grid type")
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "grid"
 
 
