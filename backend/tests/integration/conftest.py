@@ -155,11 +155,21 @@ def backend_client() -> Generator[httpx.Client, None, None]:
     shutdown_event_artifacts = None
     p_artifacts = None
     client = None
+    frontend_symlink = None
     try:
         td = tempfile.TemporaryDirectory()
         td_data = tempfile.TemporaryDirectory()
         os.environ["FIAB_ROOT"] = td.name
-        os.environ["FIAB_TEST_FRONTEND"] = str(pathlib.Path(__file__).parent / "static")
+
+        # The `static/` directory is normally produced by the frontend build and bundled into
+        # the wheel (see the `fiabwheel` recipe in the repo root's justfile). On a clean checkout
+        # it does not exist, so we symlink in a placeholder used purely for these integration
+        # tests. If a developer already has a real build in place, we leave it untouched.
+        assert forecastbox.utility.config.__file__ is not None
+        static_dir = pathlib.Path(forecastbox.utility.config.__file__).parent.parent / "static"
+        if not static_dir.exists():
+            static_dir.symlink_to(pathlib.Path(__file__).parent / "static", target_is_directory=True)
+            frontend_symlink = static_dir
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         # we need to monkeypath this, because of eager import this was already initialised
         # to user's personal config file
@@ -226,6 +236,8 @@ def backend_client() -> Generator[httpx.Client, None, None]:
             td.cleanup()
         if td_data is not None:
             td_data.cleanup()
+        if frontend_symlink is not None:
+            frontend_symlink.unlink(missing_ok=True)
 
 
 @pytest.fixture(scope="session")
