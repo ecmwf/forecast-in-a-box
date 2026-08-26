@@ -29,6 +29,13 @@ from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
 from fiab_core.tools.validators import positive
 from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
 
+from fiab_plugin_ecmwf.block_utils import (
+    BASE_TIME,
+    CHECKPOINT,
+    ENSEMBLE,
+    INPUT_SOURCE,
+    LEAD_TIME,
+)
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
 from .utils import (
@@ -42,12 +49,6 @@ INPUT_SOURCE_EXTRAS: dict[str, list[str]] = {
     "mars": ["earthkit-data[mars]"],
     "dummy": [],
 }
-
-ENSEMBLE = ConfigurationOptionId("number")
-CHECKPOINT = ConfigurationOptionId("checkpoint")
-LEAD_TIME = ConfigurationOptionId("lead_time")
-INPUT_SOURCE = ConfigurationOptionId("input_source")
-BASE_TIME = ConfigurationOptionId("base_time")
 
 
 def strip_timezone(dt: datetime) -> datetime:

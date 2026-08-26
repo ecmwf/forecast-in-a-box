@@ -4,29 +4,45 @@ from importlib.resources import files
 from typing import Optional
 
 import yaml
+from pymetkit import ParamDB
 from qubed import Qube
 
 
-@dataclass(frozen=True, eq=True, slots=True)
+@dataclass(init=False, frozen=True, eq=True, slots=True)
 class ForecastDataset:
     datacubes: list[dict]
     member_zero: Optional[dict] = None
 
-    def as_qube(self, ens_dim: str = "number", include_member_zero: bool = False) -> Qube:
+    def __init__(self, datacubes: list[dict], member_zero: Optional[dict] = None, shortname_to_paramid: bool = True) -> None:
+        if shortname_to_paramid:
+            paramdb = ParamDB()
+            for index, cube in enumerate(datacubes):
+                cube = cube.copy()
+                cube["param"] = [
+                    str(paramdb.shortname_to_param_id(shortname, context={k: cube[k] for k in ["class", "stream", "type"]}))
+                    for shortname in cube["param"]
+                ]
+                datacubes[index] = cube
+        object.__setattr__(self, "datacubes", datacubes)
+        object.__setattr__(self, "member_zero", member_zero)
+
+    def as_qube(self, ens_dim: str = "number", include_member_zero: bool = False, **extra: dict) -> Qube:
         qube = Qube.empty()
-        for datacube in self.datacubes:
+        for cube in self.datacubes:
+            datacube = cube.copy()
+            datacube.update(extra)
             if ens_dim and self.is_member_zero(datacube):
                 if ens_dim in datacube:
                     raise ValueError(f"Datacube for member zero should not contain ensemble dim: `{ens_dim}`")
                 if include_member_zero:
                     datacube = datacube.copy()
                     datacube[ens_dim] = [0]
-                    new_qube = Qube.from_datacube(datacube)
+                    new_qube = Qube.from_datacube(dict(sorted(datacube.items())))
                 else:
-                    new_qube = Qube.from_datacube(datacube)
+                    new_qube = Qube.from_datacube(dict(sorted(datacube.items())))
                     new_qube.add_metadata({ens_dim: 0})
             else:
-                new_qube = Qube.from_datacube(datacube)
+                new_qube = Qube.from_datacube(dict(sorted(datacube.items())))
             qube = qube | new_qube
         return qube
 

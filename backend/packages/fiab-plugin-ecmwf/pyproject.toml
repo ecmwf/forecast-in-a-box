@@ -18,12 +18,14 @@ dynamic = [ "version" ]
 
 dependencies = [
     "fiab-core>=2,<3", # auto-updateable -- do not remove this comment
-    "earthkit-workflows>=0.9.0",
+    "earthkit-workflows>=0.15.6",
     "earthkit-workflows-anemoi>=0.7.2",
+    "pproc-core>=0.3.1",
+    "pymetkit @ git+https://git@github.com/ecmwf/metkit.git@feature/paramdb-api",
 ]
 
 optional-dependencies.runtime = [
-    "earthkit-data>=0.18.2",
+    "earthkit-data>=0.18.2,<1",
     "earthkit>=0.13.2",
     "earthkit-plots>=0.3.5,<1.0",
     "earthkit-workflows-anemoi[runtime-inference]",
