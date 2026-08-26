@@ -21,7 +21,7 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Transform
-from fiab_core.types import GeoDomainType, GridType
+from fiab_core.types import BoundingBoxWSENType, GeoDomainSingleType, GridType, UnionType
 
 from ..block_utils import (
     _extract_dataset,
@@ -33,6 +33,8 @@ from ..constants import (
 from ..qubed_utils import axes, common_dimensions, contains, coxpand, expand
 
 logger = logging.getLogger(__name__)
+
+AreaType = UnionType([BoundingBoxWSENType(), GeoDomainSingleType()])
 
 
 class Regrid(Transform):
@@ -84,7 +86,7 @@ class AreaCutout(Transform):
         DOMAIN: BlockConfigurationOption(
             title="Domain",
             description="Area to cut out: auto (fit the data), global, a named region/country (select several to union), or a drawn bounding box",
-            value_type=GeoDomainType(),
+            value_type=AreaType,
         ),
     }
     inputs: list[str] = ["dataset"]
