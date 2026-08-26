@@ -10,6 +10,7 @@
 """Definitions of all the types"""
 
 import logging
+import math
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Any, Iterable, Literal, get_args
@@ -73,11 +74,18 @@ class IntType(FableType):
 class FloatType(FableType):
     """The float type. Converts string to float."""
 
+    def __init__(self, real: bool = False) -> None:
+        """If real is True, only allow real numbers (no NaN or inf)."""
+        self.real = real
+
     def validate_convert(self, value: Any) -> float:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         try:
-            return float(value)
+            result = float(value)
+            if self.real and (math.isnan(result) or math.isinf(result)):
+                raise WrongType(f"Expected a real number, got {value!r}")
+            return result
         except ValueError:
             raise WrongType(f"Cannot convert {value!r} to float")
 
@@ -260,9 +268,9 @@ class BoundingBoxWSENType(ListType):
     - west > east is allowed and means the box crosses the antimeridian."""
 
     def __init__(self) -> None:
-        super().__init__(IntType())
+        super().__init__(FloatType(real=True))
 
-    def validate_convert(self, value: Any) -> list[int]:
+    def validate_convert(self, value: Any) -> list[float]:
         result = super().validate_convert(value)
         if len(result) != 4:
             raise WrongType(f"BoundingBoxWSEN must have exactly 4 elements, got {len(result)}")
@@ -308,6 +316,86 @@ class GeoDomainType(UnionType):
 
     def serialize(self) -> str:
         return "geodomain"
+
+
+# GRID TYPES
+
+
+class GridType(FableType):
+    """Grid type. A union of named grid, lat/lon resolution, or tuple of lat/lon resolutions."""
+
+    def _ignore(self, value: str) -> bool:
+        if value == "auto":
+            return True
+        return False
+
+    def _is_gaussian_grid(self, value: str) -> bool:
+        """Check if the value is a valid Gaussian grid name, e.g., 'N320'."""
+        if not isinstance(value, str):
+            return False
+        if not value[1:].isdigit():
+            return False
+        if value[0].upper() in ["N", "O"]:
+            return True
+        return False
+
+    def _is_latlon_resolution(self, value: list[int | float] | int | float | str) -> bool:
+        """Check if the value is a valid lat/lon resolution, e.g., [0.25, 0.25], or a single positive number."""
+
+        if isinstance(value, (int, float)):
+            return value > 0
+
+        if isinstance(value, str):
+            return self._validate_string_resolution(value)
+
+        if isinstance(value, list):
+            return self._validate_list_resolution(value)
+
+        return False
+
+    def _validate_string_resolution(self, value: str) -> bool:
+        """Validate string resolution (single number or slash-separated values)."""
+        try:
+            if "/" in value:
+                parts = value.split("/")
+                return all(float(part) > 0 for part in parts)
+            return float(value) > 0
+        except ValueError:
+            return False
+
+    def _validate_list_resolution(self, value: list) -> bool:
+        """Validate list resolution as [lat_res, lon_res] pair."""
+        if len(value) != 2:
+            return False
+        lat_res, lon_res = value
+        if not isinstance(lat_res, (int, float)) or not isinstance(lon_res, (int, float)):
+            return False
+        return lat_res > 0 and lon_res > 0
+
+    def validate_convert(self, value: Any) -> str | list[int | float] | int | float | None:
+        if isinstance(value, str):
+            if self._is_gaussian_grid(value):
+                return value
+            if self._is_latlon_resolution(value):
+                return list(map(float, value.split("/"))) if "/" in value else float(value)
+            if self._ignore(value):
+                return None
+            raise WrongType(f"String value {value!r} is neither a valid Gaussian grid, a valid lat/lon resolution, or 'auto'.")
+
+        if isinstance(value, list):
+            if self._is_latlon_resolution(value):
+                return value
+            raise WrongType(f"List value {value!r} is not a valid lat/lon resolution")
+
+        if isinstance(value, (int, float)):
+            if self._is_latlon_resolution(value):
+                return value
+            raise WrongType(f"Numeric value {value!r} is not a valid lat/lon resolution")
+
+        raise WrongType(f"Value {value!r} is not a valid grid type")
+
+    def serialize(self) -> str:
+        return "grid"
 
 
 class ArtifactType(FableType):
