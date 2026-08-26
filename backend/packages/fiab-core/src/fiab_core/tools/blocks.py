@@ -232,9 +232,10 @@ class BlockInstanceRich:
             )
         raw_value = self._get_raw_value(option_id)
         if isinstance(raw_value, (str, list)):
+            typed_raw_value = cast(str | list[int | float], raw_value)
             if validator is not None:
-                validator(raw_value, option_id)
-            return raw_value
+                validator(typed_raw_value, option_id)
+            return typed_raw_value
         raise BlockInstanceConfigurationError(
             f"Configuration option {option_id!r} expected str or list[int | float], got {type(raw_value).__name__}"
         )
