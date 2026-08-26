@@ -82,6 +82,7 @@ i18n
       'glyphs',
       'journal',
       'visualise',
+      'onboarding',
     ],
 
     // Interpolation options
