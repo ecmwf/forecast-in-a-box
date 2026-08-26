@@ -19,6 +19,7 @@ entrypoint/app.py, as it is coupled to FastAPI's API
 
 import asyncio
 import logging
+import sys
 
 import uvicorn
 
@@ -28,7 +29,12 @@ from forecastbox.utility.config import FIABConfig
 logger = logging.getLogger(__name__)
 
 
-async def _uvicorn_run(app_name: str, host: str, port: int) -> None:
+async def _uvicorn_run(app_name: str, host: str, port: int) -> bool:
+    """Runs the uvicorn server until it stops. Returns True if either the startup or the
+    shutdown lifespan sequence failed, per uvicorn's own bookkeeping -- see
+    `forecastbox.entrypoint.app.lifespan` and `forecastbox.utility.initializer` for how such
+    a failure can arise on our side.
+    """
     # NOTE we pass None to log config to not interfere with original logging setting
     config = uvicorn.Config(
         app_name,
@@ -43,6 +49,7 @@ async def _uvicorn_run(app_name: str, host: str, port: int) -> None:
     #    reload_dirs=["forecastbox"],
     server = uvicorn.Server(config)
     await server.serve()
+    return bool(server.lifespan.startup_failed or server.lifespan.shutdown_failed)
 
 
 def launch_backend() -> None:
@@ -56,6 +63,9 @@ def launch_backend() -> None:
     host = config.backend.uvicorn_host
     task = _uvicorn_run("forecastbox.entrypoint.app:app", host, port)
     try:
-        asyncio.run(task)
+        lifespan_failed = asyncio.run(task)
     except KeyboardInterrupt:
-        pass  # no need to spew stacktrace to log
+        return  # no need to spew stacktrace to log
+    if lifespan_failed:
+        logger.error("backend lifespan startup or shutdown failed, exiting with error code")
+        sys.exit(1)
