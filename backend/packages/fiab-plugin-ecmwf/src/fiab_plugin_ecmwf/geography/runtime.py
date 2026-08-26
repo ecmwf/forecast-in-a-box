@@ -57,7 +57,7 @@ def _get_bbox_from_string(identifier: str) -> BBox:
 
 def _ensure_mir_installed() -> None:
     try:
-        import mir
+        import mir  # type: ignore[unresolved-import]
     except ImportError as e:
         raise RuntimeError("Cannot import `mir`") from e
 

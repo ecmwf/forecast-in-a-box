@@ -58,7 +58,7 @@ def normalise_grid(grid: GridSpec | None) -> str | None:
 
 
 def _make_job(grid: str | None, area: str | list[float] | None, packing: str, accuracy: int) -> "mir.Job":  # type: ignore[reportUndefinedVariable]
-    import mir
+    import mir  # type: ignore[unresolved-import]
 
     job_args = {}
     if grid:
@@ -131,7 +131,7 @@ def _mir_regrid_array(
     regridding the first field through the GRIB path), overriding the
     per-field identity keys (``TEMPLATE_OVERRIDE_KEYS``).
     """
-    import mir
+    import mir  # type: ignore[unresolved-import]
 
     # Partition: fields without a gridspec (e.g. spectral) cannot use the
     # array interface and go through the GRIB round-trip instead.
