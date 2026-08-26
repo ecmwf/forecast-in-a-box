@@ -24,16 +24,16 @@ const ALL_STATUSES: Array<JobStatus> = [
 ]
 
 describe('getStatusBadgeClasses', () => {
-  it('returns blue classes for submitted', () => {
-    expect(getStatusBadgeClasses('submitted')).toContain('bg-blue-50')
+  it('returns amber classes for submitted', () => {
+    expect(getStatusBadgeClasses('submitted')).toContain('bg-amber-100')
   })
 
-  it('returns blue classes for preparing', () => {
-    expect(getStatusBadgeClasses('preparing')).toContain('bg-blue-50')
+  it('returns amber classes for preparing', () => {
+    expect(getStatusBadgeClasses('preparing')).toContain('bg-amber-100')
   })
 
-  it('returns amber classes for running', () => {
-    expect(getStatusBadgeClasses('running')).toContain('bg-amber-100')
+  it('returns brand-blue classes for running', () => {
+    expect(getStatusBadgeClasses('running')).toContain('bg-primary/10')
   })
 
   it('returns emerald classes for completed', () => {
@@ -52,12 +52,12 @@ describe('getStatusBadgeClasses', () => {
 })
 
 describe('getStatusBarColor', () => {
-  it('returns blue bar for submitted', () => {
-    expect(getStatusBarColor('submitted')).toBe('bg-blue-500')
+  it('returns amber bar for submitted', () => {
+    expect(getStatusBarColor('submitted')).toBe('bg-amber-500')
   })
 
-  it('returns amber bar for running', () => {
-    expect(getStatusBarColor('running')).toBe('bg-amber-500')
+  it('returns brand-blue bar for running', () => {
+    expect(getStatusBarColor('running')).toBe('bg-primary')
   })
 
   it('returns emerald bar for completed', () => {
