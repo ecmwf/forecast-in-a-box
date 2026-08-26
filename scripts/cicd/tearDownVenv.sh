@@ -1,6 +1,6 @@
 # needs to be standalone because we source this
 VENV_COPY=$VIRTUAL_ENV
-deactivate
+source deactivate
 rm -rf $VENV_COPY
 
 # TODO these two variables should be stack-based instead, ie, dont unset but restore previous state instead
