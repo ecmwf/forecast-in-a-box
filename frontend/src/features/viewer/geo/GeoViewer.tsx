@@ -75,6 +75,7 @@ import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { ViewerUrlState } from './view-url-state'
 import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -854,7 +855,11 @@ export function GeoViewer({
           />
         )}
         {leftCollapsed && (
-          <CollapsedSidebarHandle side="left" onExpand={expandLeft} />
+          <CollapsedSidebarHandle
+            side="left"
+            onExpand={expandLeft}
+            buttonAttrs={tourAttr(TOUR.visualise.expandLeft)}
+          />
         )}
         <div
           style={{ display: leftCollapsed ? 'none' : undefined }}
@@ -911,7 +916,10 @@ export function GeoViewer({
             onReset={() => setPanelWidth('left', null)}
           />
         )}
-        <div className="min-h-0 min-w-0 flex-1">
+        <div
+          className="min-h-0 min-w-0 flex-1"
+          {...tourAttr(TOUR.visualise.map)}
+        >
           {focusSlot === null && mode === 'side' && mapSourceB ? (
             <DualMapView
               view={viewRef.current}
@@ -992,7 +1000,11 @@ export function GeoViewer({
           />
         </div>
         {rightCollapsed && (
-          <CollapsedSidebarHandle side="right" onExpand={expandRight} />
+          <CollapsedSidebarHandle
+            side="right"
+            onExpand={expandRight}
+            buttonAttrs={tourAttr(TOUR.visualise.expandRight)}
+          />
         )}
       </div>
       <GeoTimeSlider

@@ -43,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 const AUTOPLAY_INTERVAL_MS = 1200
@@ -162,7 +163,10 @@ export function GeoTimeSlider({
   // Keep the bar present (no layout jump) and say WHY there is no slider.
   if (sharedAxis && steps.length === 0) {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-3 text-xs text-muted-foreground">
+      <div
+        className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-3 text-xs text-muted-foreground"
+        {...tourAttr(TOUR.visualise.timelineStatic)}
+      >
         <TimerOff className="h-3.5 w-3.5 shrink-0" />
         {tCompare('timeline.static')}
       </div>
@@ -195,7 +199,10 @@ export function GeoTimeSlider({
   })()
 
   return (
-    <div className="space-y-2 rounded-md border border-border bg-card px-4 py-3">
+    <div
+      className="space-y-2 rounded-md border border-border bg-card px-4 py-3"
+      {...tourAttr(TOUR.visualise.timeline)}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {tCompare('timeline.label')}
@@ -369,6 +376,7 @@ export function GeoTimeSlider({
                   onChange(safeIndex >= rangeEnd ? rangeStart : safeIndex + 1)
                 }
                 aria-label={t('lens.nextStep')}
+                {...tourActionAttr('time-step')}
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>

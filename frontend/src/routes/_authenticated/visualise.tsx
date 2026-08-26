@@ -48,6 +48,8 @@ const visualiseSearchSchema = z.object({
   dt: z.number().int().optional().catch(undefined),
   cam: z.string().max(64).optional().catch(undefined),
   bm: z.string().max(64).optional().catch(undefined),
+  /** Plain-link tour launch (help surfaces, welcome tour); stripped on start. */
+  tour: z.enum(['first-map']).optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/_authenticated/visualise')({

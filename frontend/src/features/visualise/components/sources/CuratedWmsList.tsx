@@ -22,6 +22,7 @@ import {
 } from '@/features/visualise/stores/comparisonStore'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
+import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { showToast } from '@/lib/toast'
 
 export function CuratedWmsList() {
@@ -72,7 +73,7 @@ export function CuratedWmsList() {
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5" {...tourAttr(TOUR.visualise.knownWms)}>
       <P className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {t('picker.curated.title')}
       </P>
@@ -103,6 +104,8 @@ export function CuratedWmsList() {
                 className="h-7 shrink-0 gap-1"
                 disabled={added || checking}
                 onClick={() => void add(server)}
+                {...tourActionAttr('add')}
+                data-server={server.name}
               >
                 {checking ? (
                   <Loader2 className="h-3 w-3 animate-spin" />

@@ -16,7 +16,7 @@
  */
 
 import { useState } from 'react'
-import { ArrowRight, Earth, Rows3 } from 'lucide-react'
+import { ArrowRight, Earth, GraduationCap, Rows3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { CuratedWmsList } from './sources/CuratedWmsList'
@@ -25,26 +25,48 @@ import { RunSourceList } from './sources/RunSourceList'
 import { RunningLensList } from './sources/RunningLensList'
 import { WmsUrlForm } from './sources/WmsUrlForm'
 import { EmptyState } from '@/components/common/EmptyState'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { P } from '@/components/base/typography'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
+import { useTutorialsStore } from '@/stores/tutorialsStore'
 
 export function VisualiseHub() {
-  const { t } = useTranslation('visualise')
+  const { t } = useTranslation(['visualise', 'tutorials'])
   const [search, setSearch] = useState('')
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-2">
-      <EmptyState
-        icon={Earth}
-        title={t('hub.title')}
-        description={t('hub.description')}
-      />
+      <div {...tourAttr(TOUR.visualise.hub)}>
+        <EmptyState
+          icon={Earth}
+          title={t('hub.title')}
+          description={t('hub.description')}
+        />
+        {/* Tour entry point where new users look first; the Help dialog
+            offers the same tour. */}
+        <div className="flex justify-center pb-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground"
+            onClick={() =>
+              useTutorialsStore.getState().start('visualise-first-map')
+            }
+          >
+            <GraduationCap className="h-3.5 w-3.5" />
+            {t('tutorials:launch.hubCta', {
+              name: t('tutorials:firstMap.title'),
+            })}
+          </Button>
+        </div>
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="min-w-0 space-y-3 rounded-lg border border-border bg-card p-4">
           <RunningLensList />
           <P className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
             <Rows3 className="h-3.5 w-3.5" />
-            {t('hub.previousResults')}
+            {t('picker.recentRuns')}
           </P>
           <Input
             type="search"

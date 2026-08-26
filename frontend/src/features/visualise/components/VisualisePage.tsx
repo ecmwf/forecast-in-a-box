@@ -52,6 +52,7 @@ import type { ComparisonEntry } from '../entry-ref'
 import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
+import type { TutorialId } from '@/stores/tutorialsStore'
 import {
   decodeViewerUrlState,
   encodeViewerUrlState,
@@ -59,6 +60,9 @@ import {
 import { GeoViewerSkeleton } from '@/features/viewer/geo/GeoViewerSkeleton'
 import { readStorageJson, writeStorageJson } from '@/lib/storage'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { useOverlayCloseRequest } from '@/lib/overlay-requests'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
+import { useTutorialsStore } from '@/stores/tutorialsStore'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
@@ -94,6 +98,11 @@ const makeGeoViewer = () =>
   )
 
 const route = getRouteApi('/_authenticated/visualise')
+
+/** `?tour=` values → tutorial ids (the route schema owns the enum). */
+const TOUR_PARAM: Record<'first-map', TutorialId> = {
+  'first-map': 'visualise-first-map',
+}
 
 export interface ActivePair {
   a: ComparisonEntry | null
@@ -287,7 +296,20 @@ export function VisualisePage() {
     [],
   )
 
+  // `?tour=` makes tour launches plain links; the param is one-shot.
+  const tourParam = search.tour
+  useEffect(() => {
+    if (tourParam === undefined) return
+    useTutorialsStore.getState().start(TOUR_PARAM[tourParam])
+    void navigate({
+      search: (prev) => ({ ...prev, tour: undefined }),
+      replace: true,
+    })
+  }, [tourParam, navigate])
+
   const [pickerOpen, setPickerOpen] = useState(false)
+  // The picker is this page's only closable overlay.
+  useOverlayCloseRequest(useCallback(() => setPickerOpen(false), []))
   const [GeoViewer, setGeoViewer] = useState(() => makeGeoViewer())
   const stateA = useComparisonSource(a, { autoStart: true })
   const stateB = useComparisonSource(b, { autoStart: true })
@@ -331,7 +353,12 @@ export function VisualisePage() {
           <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
             <DialogTrigger
               render={
-                <Button variant="outline" size="sm" className="gap-1.5" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  {...tourAttr(TOUR.visualise.addSource)}
+                />
               }
             >
               <Plus className="h-3.5 w-3.5" />

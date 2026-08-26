@@ -30,6 +30,7 @@ import type glyphsEN from '@/locales/en/glyphs.json'
 import type journalEN from '@/locales/en/journal.json'
 import type visualiseEN from '@/locales/en/visualise.json'
 import type onboardingEN from '@/locales/en/onboarding.json'
+import type tutorialsEN from '@/locales/en/tutorials.json'
 
 declare module 'i18next' {
   interface CustomTypeOptions {
@@ -51,6 +52,7 @@ declare module 'i18next' {
       journal: typeof journalEN
       visualise: typeof visualiseEN
       onboarding: typeof onboardingEN
+      tutorials: typeof tutorialsEN
     }
   }
 }

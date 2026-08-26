@@ -378,7 +378,6 @@
   "hub": {
     "title": "Visualise forecasts on a map",
     "description": "Load a previously generated result, connect an external WMS server, or point at a GRIB folder on the host. One source opens a map view; a second turns it into a comparison.",
-    "previousResults": "Previous results",
     "browseAll": "Browse all runs"
   }
 }

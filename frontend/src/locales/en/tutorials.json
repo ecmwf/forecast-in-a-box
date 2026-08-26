@@ -1,0 +1,74 @@
+{
+  "common": {
+    "start": "Start",
+    "next": "Next",
+    "back": "Back",
+    "continue": "Continue",
+    "done": "Done",
+    "skipStep": "Skip step",
+    "skipTour": "Skip tour",
+    "showMe": "Show me",
+    "showMeUnavailable": "Nothing to press here yet — do this step by hand, or skip it",
+    "close": "Close tour",
+    "stepOf": "{{current}} of {{total}}",
+    "stepDone": "Done — you can move on",
+    "waitingFor": "Waiting for this part of the page…",
+    "endedToast": "Tour ended — restart it any time from the page's Help dialog"
+  },
+  "launch": {
+    "sectionTitle": "Guided tours",
+    "take": "Take the interactive tour",
+    "completed": "Completed",
+    "hubCta": "Take the \"{{name}}\" tour"
+  },
+  "firstMap": {
+    "title": "Visualise forecasts on a map",
+    "description": "Connect a live weather server, put a layer on the map, step it through time, and compare two forecast providers. About 3 minutes.",
+    "steps": {
+      "orient": {
+        "title": "Visualise forecasts on a map",
+        "body": "This page turns forecast data into interactive maps. In the next three minutes you'll connect a live weather server, put a layer on the map, step it through time, and compare two forecast providers.",
+        "midSessionTitle": "Take the tour from the top",
+        "midSessionBody": "You already have a source on the map — the tour still walks the whole flow from the start. Steps you've already done are marked as done; move through them with \"Continue\"."
+      },
+      "addServer": {
+        "title": "Connect a live weather server",
+        "body": "These are public weather map services. Press \"Add\" on {{server}} — the map workspace opens with its live data. Forecasts you've run yourself appear under \"Recent runs with stored outputs\" — they go on the map the same way."
+      },
+      "map": {
+        "title": "This is your map",
+        "body": "Drag to pan, scroll to zoom — try it. The toolbar above holds the view tools; press \"F\" any time to fit the whole globe."
+      },
+      "layer": {
+        "title": "Put data on the map",
+        "body": "The panel on the right lists every layer the active source offers. Search for something familiar — try \"temperature\" — and click a row: it draws on the map."
+      },
+      "active": {
+        "title": "Your active layers live here",
+        "body": "Every layer on the map is listed here with its legend and an opacity slider — reorder them to change drawing order. This panel is mission control for what's on the map."
+      },
+      "time": {
+        "title": "Step through time",
+        "body": "This timeline is the forecast's \"Valid time\" axis, one mark per timestep. Click one step further along — or use the arrow buttons — and the map redraws for that moment.",
+        "staticTitle": "About time",
+        "staticBody": "The layer you picked has no time dimension, so it looks the same at every instant. Most forecast layers are time-enabled — add one and this timeline comes alive."
+      },
+      "compare": {
+        "title": "Add a second forecast",
+        "body": "Press \"Manage sources\" and add {{compareServer}} from the known servers — if it is already in your collection, pick it for slot B in the bar above instead. Either way B fills, and the map shows both forecasts side by side."
+      },
+      "layerB": {
+        "title": "Give B a layer too",
+        "body": "B's side stays empty until it has a layer of its own. In the layer browser, switch to \"B\" and click one of {{compareServer}}'s layers — it draws on B's half."
+      },
+      "modes": {
+        "title": "Compare the two forecasts",
+        "body": "A and B are side by side right now. Try another mode up here — swipe, flicker, or spy — each one is a different way to spot where the forecasts disagree."
+      },
+      "done": {
+        "title": "That's a live forecast comparison",
+        "body": "One more thing about time: with two sources the timeline only offers the timesteps A and B share — and some layers carry no time info at all. Everything you see lives in the page URL, so copying the address shares this exact view. Press \"H\" for help whenever you need it."
+      }
+    }
+  }
+}

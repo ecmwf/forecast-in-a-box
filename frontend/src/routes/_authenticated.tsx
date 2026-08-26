@@ -21,6 +21,7 @@ import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { OnboardingController } from '@/features/onboarding/OnboardingController'
+import { TutorialsController } from '@/features/tutorials/TutorialsController'
 import { useConfigStore } from '@/stores/configStore'
 import { checkSession } from '@/api/endpoints/auth'
 import { useNotificationSocket } from '@/api/hooks/useNotificationSocket'
@@ -64,6 +65,7 @@ function AuthenticatedLayout() {
     >
       <Outlet />
       <OnboardingController />
+      <TutorialsController />
     </DashboardLayout>
   )
 }

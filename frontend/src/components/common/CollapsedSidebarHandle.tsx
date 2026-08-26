@@ -22,11 +22,14 @@ export function CollapsedSidebarHandle({
   side,
   onExpand,
   label,
+  buttonAttrs,
 }: {
   side: 'left' | 'right'
   onExpand: () => void
   /** Accessible name; defaults to the generic expand label. */
   label?: string
+  /** Extra `data-*` attributes for the expand button (test/tour hooks). */
+  buttonAttrs?: Record<`data-${string}`, string | undefined>
 }) {
   const { t } = useTranslation('executions')
   const text = label ?? t('lens.expandSidebar')
@@ -48,6 +51,7 @@ export function CollapsedSidebarHandle({
         onClick={onExpand}
         title={text}
         aria-label={text}
+        {...buttonAttrs}
       >
         <Icon className="h-4 w-4" />
       </Button>

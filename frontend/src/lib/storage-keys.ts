@@ -114,6 +114,8 @@ export const STORAGE_KEYS = {
     comparison: 'fiab.store.comparison',
     /** First-run onboarding status */
     onboarding: 'fiab.store.onboarding',
+    /** Per-tutorial guided-tour outcomes */
+    tutorials: 'fiab.store.tutorials',
   },
 } as const
 
@@ -140,6 +142,7 @@ export const STORE_VERSIONS = {
   activity: 2, // v2: navigateTo rewritten for /executions→/execute, /dashboard→/overview
   comparison: 1,
   onboarding: 2, // v2: Removed pluginStepNeeded
+  tutorials: 1,
 } as const
 
 /**

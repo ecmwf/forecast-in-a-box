@@ -22,6 +22,51 @@ export default [
       'no-restricted-imports': ['error', { patterns: ['@radix-ui/*'] }],
     },
   },
+  // Tours stay decoupled from pages (AGENTS.md → Key Rules), enforced here.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/features/tutorials/**', 'src/routes/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@radix-ui/*'] },
+            {
+              group: [
+                '@/features/tutorials/*',
+                '!@/features/tutorials/anchors',
+              ],
+              message:
+                'Page code may import only @/features/tutorials/anchors; start tours via @/stores/tutorialsStore.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/features/tutorials/engine/**', 'src/features/tutorials/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@radix-ui/*'] },
+            {
+              group: [
+                '@/features/*',
+                '!@/features/tutorials',
+                '!@/features/tutorials/**',
+              ],
+              message:
+                'The tour engine knows no page domain — put domain signals in the tour definition.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     files: ['!src/components/ui/**'],
     plugins: {

@@ -40,6 +40,7 @@ import type { LensSource } from '../hooks/useLensSource'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { P } from '@/components/base/typography'
+import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 export const SLOT_CHIP_CLASS: Record<SourceSlot, string> = {
@@ -137,6 +138,7 @@ export function GeoLayerBrowser({
   return (
     <aside
       data-geo-panel="right"
+      {...tourAttr(TOUR.visualise.layerBrowser)}
       className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background lg:w-[var(--geo-right-w,15rem)] xl:w-[var(--geo-right-w,18rem)]"
     >
       <div className="space-y-2 border-b border-border bg-muted/40 px-3 pt-2.5 pb-2.5">
@@ -198,6 +200,8 @@ export function GeoLayerBrowser({
                 onClick={() => setSlotFilter(f)}
                 aria-pressed={effectiveFilter === f}
                 title={f === 'both' ? t('browser.bothHint') : undefined}
+                {...tourActionAttr('slot-filter')}
+                data-slot-filter={f}
                 className={cn(
                   'flex-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
                   effectiveFilter === f
@@ -528,6 +532,10 @@ function PairRow({
       type="button"
       onClick={() => selection.togglePair(pair.key)}
       aria-pressed={active}
+      // Pressable "Show me" target only while it actually adds.
+      {...(active ? {} : tourActionAttr('layer-row'))}
+      data-source-slots={`${pair.perSource.a ? 'a' : ''}${pair.perSource.b ? 'b' : ''}`}
+      data-time-aware={pairIsStatic(pair) ? undefined : ''}
       className={cn(
         'flex w-full items-center gap-2 rounded text-left transition-colors hover:bg-accent',
         compact ? 'px-1.5 py-1' : 'px-2 py-1.5',
@@ -657,6 +665,9 @@ function UnlinkedSourceSection({
                   type="button"
                   onClick={() => selection.toggleLayer(slot, name)}
                   aria-pressed={active}
+                  {...(active ? {} : tourActionAttr('layer-row'))}
+                  data-source-slots={slot}
+                  data-time-aware={layerIsTimeAware(layer) ? '' : undefined}
                   className={cn(
                     'flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-accent',
                     active && 'bg-primary/10',
