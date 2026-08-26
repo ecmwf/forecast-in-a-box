@@ -59,3 +59,5 @@ if __name__ == "__main__":
         raise ValueError(f"start failure: {backend.exitcode}")
 
     check_backend_ready(config, handle, not isinstance(config.cascade.gateway, UnmanagedGateway))
+
+    # TODO this is missing the interrupt/term handlers and awaits -- yet another reason to unify

@@ -10,6 +10,12 @@
 """Entrypoint for the standalone fiab execution (frontend, backend and cascade spawned by a single process).
 Also used in case backend+cascade were launched by the OS as a service, in which case we only check the service
 for liveness and open the browser window here, with the rest logic happening in standalone.service
+
+The responsibility of this module is to spawn the backend process, and do post-start health checks and setup
+endpoint calls (like http call to install default plugins), and register sigterm handlers.
+
+The actual logic of instantiating the backend (the FastAPI app, the background threads, etc) happens in
+entrypoint/app.py, as it is coupled to FastAPI's API
 """
 
 import logging
@@ -67,26 +73,6 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
     return handle
 
 
-def _maybe_shutdown_local_gateway(config: FIABConfig) -> None:
-    """Best-effort shutdown of a locally-managed Cascade gateway process.
-
-    The gateway (when using LocalGateway) is spawned as a child of the `backend` process itself
-    (in response to the `/gateway/start` call in `check_backend_ready`), so `ChildProcessGroup.shutdown`
-    (which only knows about the `backend` process) cannot reach it. We ask the still-alive backend
-    to kill its own gateway child before we tear the backend process down.
-
-    TODO: RemoteGateway also spawns a process (over an ssh tunnel) that is not stopped here. Extend
-    this once we have a reliable way to tear that down as well.
-    """
-    if not isinstance(config.cascade.gateway, LocalGateway):
-        return
-    try:
-        with httpx.Client() as client:
-            client.post(config.backend.local_url() + "/api/v1/gateway/kill", timeout=5)
-    except Exception:
-        logger.warning("failed to shut down the local cascade gateway during teardown", exc_info=True)
-
-
 if __name__ == "__main__":
     # NOTE this is referenced from scripts/fiab.sh -- if you refactor this module, pay attention to it
     config = FIABConfig()
@@ -94,7 +80,7 @@ if __name__ == "__main__":
     handles = launch_all(config)
 
     def sigterm_handler(_signo: int, _stack_frame: types.FrameType | None) -> None:
-        _maybe_shutdown_local_gateway(config)
+        # when receiving sigterm, we need to explicitly propagate it, otherwise we'd get zombies
         handles.shutdown()
         sys.exit(0)
 
@@ -103,4 +89,5 @@ if __name__ == "__main__":
         handles.wait()
     except KeyboardInterrupt:
         logger.info("keyboard interrupt, application shutting down")
+        # NOTE the Keyboard Interrupt propagates to all subprocesses, we dont really need to do anything except await them
         handles.wait()
