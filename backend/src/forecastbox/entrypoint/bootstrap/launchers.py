@@ -62,10 +62,11 @@ def launch_backend() -> None:
     port = config.backend.uvicorn_port
     host = config.backend.uvicorn_host
     task = _uvicorn_run("forecastbox.entrypoint.app:app", host, port)
+    lifespan_failed = None
     try:
         lifespan_failed = asyncio.run(task)
     except KeyboardInterrupt:
-        return  # no need to spew stacktrace to log
+        pass  # no need to spew stacktrace to log
     if lifespan_failed:
         logger.error("backend lifespan startup or shutdown failed, exiting with error code")
         sys.exit(1)
