@@ -47,22 +47,3 @@ class GeoDomainWrapper:
     def with_bbox_dwarrowsmap(self) -> Self:
         """WNSE order, as used by dwarrows when drawing their maps, clockwise from the top"""
         return self.with_bbox_ordering("wnse")
-
-
-GridRuntimeType = str | list[float]
-
-
-@dataclass
-class GridWrapper:
-    value: GridRuntimeType
-
-    def as_grid_spec(self) -> dict[Literal["grid"], str | list[float]]:
-        """Return a dict suitable for passing to earthkit.plots.Figure / domain"""
-        if isinstance(self.value, str):
-            return {"grid": self.value}
-        elif isinstance(self.value, float) or isinstance(self.value, int):
-            return {"grid": str(self.value)}
-        elif isinstance(self.value, list) and len(self.value) == 2:
-            return {"grid": "/".join(str(v) for v in self.value)}
-        else:
-            raise ValueError(f"expected grid to be a string or a list of two floats, but got {self.value!r} instead")

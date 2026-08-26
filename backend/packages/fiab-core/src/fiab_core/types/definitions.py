@@ -321,8 +321,8 @@ class GeoDomainType(UnionType):
 # GRID TYPES
 
 
-class NamedGridType(StringType):
-    """A string representing a named grid"""
+class GridType(FableType):
+    """Grid type. A union of named grid, lat/lon resolution, or tuple of lat/lon resolutions."""
 
     def _is_gaussian_grid(self, value: str) -> bool:
         """Check if the value is a valid Gaussian grid name, e.g., 'N320'."""
@@ -334,51 +334,58 @@ class NamedGridType(StringType):
             return True
         return False
 
-    def validate_convert(self, value: Any) -> str:
-        v = super().validate_convert(value)
+    def _is_latlon_resolution(self, value: list[int | float] | int | float | str) -> bool:
+        """Check if the value is a valid lat/lon resolution, e.g., [0.25, 0.25], or a single positive number."""
 
-        if not self._is_gaussian_grid(v):
-            raise WrongType(f"{v!r} is not a valid grid name. Must be a Gaussian grid (e.g., 'N320').")
-        return v
+        if isinstance(value, (int, float)):
+            return value > 0
 
-    def serialize(self) -> str:
-        return "named-grid"
+        if isinstance(value, str):
+            return self._validate_string_resolution(value)
 
+        if isinstance(value, list):
+            return self._validate_list_resolution(value)
 
-class LatLonGridType(FloatType):
-    """A float representing the latitude or longitude resolution of a grid. Must be positive."""
+        return False
 
-    def validate_convert(self, value: Any) -> float:
-        v = super().validate_convert(value)
-        if v <= 0:
-            raise WrongType(f"Grid resolution must be positive, got {v}")
-        return v
+    def _validate_string_resolution(self, value: str) -> bool:
+        """Validate string resolution (single number or slash-separated values)."""
+        try:
+            if "/" in value:
+                parts = value.split("/")
+                return all(float(part) > 0 for part in parts)
+            return float(value) > 0
+        except ValueError:
+            return False
 
+    def _validate_list_resolution(self, value: list) -> bool:
+        """Validate list resolution as [lat_res, lon_res] pair."""
+        if len(value) != 2:
+            return False
+        lat_res, lon_res = value
+        if not isinstance(lat_res, (int, float)) or not isinstance(lon_res, (int, float)):
+            return False
+        return lat_res > 0 and lon_res > 0
 
-class TupleFloatGridType(ListType):
-    """A list of exactly two floats representing a grid resolution, e.g., [lat_res, lon_res]."""
+    def validate_convert(self, value: Any) -> str | list[int | float] | int | float:
+        if isinstance(value, str):
+            if self._is_gaussian_grid(value):
+                return value
+            if self._is_latlon_resolution(value):
+                return list(map(float, value.split("/"))) if "/" in value else float(value)
+            raise WrongType(f"String value {value!r} is neither a valid Gaussian grid nor a valid lat/lon resolution")
 
-    def __init__(self) -> None:
-        super().__init__(FloatType())
+        if isinstance(value, list):
+            if self._is_latlon_resolution(value):
+                return value
+            raise WrongType(f"List value {value!r} is not a valid lat/lon resolution")
 
-    def validate_convert(self, value: Any) -> list[float]:
-        result = super().validate_convert(value)
-        if len(result) != 2:
-            raise WrongType(f"TupleFloatGridType must have exactly 2 elements, got {len(result)}")
-        lat_res, lon_res = result
-        if lat_res <= 0 or lon_res <= 0:
-            raise WrongType(f"Grid resolutions must be positive floats, got lat_res={lat_res}, lon_res={lon_res}")
-        return result
+        if isinstance(value, (int, float)):
+            if self._is_latlon_resolution(value):
+                return value
+            raise WrongType(f"Numeric value {value!r} is not a valid lat/lon resolution")
 
-    def serialize(self) -> str:
-        return "tuple-float-grid"
-
-
-class GridType(UnionType):
-    """An alias for a union over named grid and tuple of floats representing grid resolution."""
-
-    def __init__(self) -> None:
-        super().__init__([NamedGridType(), TupleFloatGridType(), LatLonGridType()])
+        raise WrongType(f"Value {value!r} is not a valid grid type")
 
     def serialize(self) -> str:
         return "grid"

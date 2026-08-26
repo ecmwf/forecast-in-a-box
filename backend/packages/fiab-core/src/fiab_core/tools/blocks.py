@@ -30,8 +30,19 @@ from fiab_core.fable import (
     Error,
     QubedOutput,
 )
-from fiab_core.tools.convert import GeoDomainWrapper, GridWrapper
-from fiab_core.types import ArtifactType, ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
+from fiab_core.tools.convert import GeoDomainWrapper
+from fiab_core.types import (
+    ArtifactType,
+    ClosedEnumType,
+    DatetimeType,
+    DateType,
+    FloatType,
+    GridType,
+    IntType,
+    ListType,
+    OpenEnumType,
+    StringType,
+)
 
 
 class BlockInstanceConfigurationError(ValueError):
@@ -211,14 +222,22 @@ class BlockInstanceRich:
         # NOTE we ignore types as we trust parser -- but its fragile!
         return GeoDomainWrapper(raw_value)  # ty:ignore[invalid-argument-type]
 
-    def config_as_gridspec(self, key: str | ConfigurationOptionId) -> GridWrapper:
+    def config_as_grid(
+        self, key: str | ConfigurationOptionId, validator: Callable[[Any, ConfigurationOptionId], None] | None = None
+    ) -> str | list[int | float]:
         option_id, option = self._get_configuration_option(key)
-        raw_value = self._get_raw_value(option_id)
-        if not isinstance(raw_value, (str, list)):
+        if not isinstance(option.value_type, GridType):
             raise BlockInstanceConfigurationError(
-                f"Configuration option {option_id!r} expected str or list[float], got {type(raw_value).__name__}"
+                f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not GridType"
             )
-        return GridWrapper(raw_value)  # ty:ignore[invalid-argument-type]
+        raw_value = self._get_raw_value(option_id)
+        if isinstance(raw_value, (str, list)):
+            if validator is not None:
+                validator(raw_value, option_id)
+            return raw_value
+        raise BlockInstanceConfigurationError(
+            f"Configuration option {option_id!r} expected str or list[int | float], got {type(raw_value).__name__}"
+        )
 
 
 class QubedBlockBuilder(abc.ABC):
