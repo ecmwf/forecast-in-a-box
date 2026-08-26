@@ -51,7 +51,7 @@ class Regrid(Transform):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
-        output = expand(input_dataset, {GRID: [block.config_as_gridspec(GRID).value]})
+        output = expand(input_dataset, {GRID: [block.config_as_grid(GRID)]})
         return output
 
     def compile(
@@ -60,13 +60,13 @@ class Regrid(Transform):
         block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        gridspec = block.config_as_gridspec(DOMAIN).as_grid_spec()
+        grid = block.config_as_grid(DOMAIN)
 
         action = inputs[input_task].map(
             Payload(
                 "fiab_plugin_ecmwf.regridding.runtime.regrid",
                 kwargs={
-                    "gridspec": gridspec,
+                    "grid": grid,
                 },
                 metadata={"environment": ["mir-python"]},
             )
