@@ -38,6 +38,8 @@ export default mergeConfig(
     },
     test: {
       globals: true,
+      // Chromium's benign ResizeObserver notice; keep it out of the report.
+      onConsoleLog: (log) => !log.includes('ResizeObserver loop'),
       include: [
         'src/**/*.{test,spec}.{ts,tsx}',
         'tests/**/*.{test,spec}.{ts,tsx}',

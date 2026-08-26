@@ -9,9 +9,10 @@
  */
 
 /**
- * Shared e2e test base: suppresses the first-run welcome dialog, which
- * would otherwise open over /overview in every spec. onboarding.spec.ts
- * imports raw @playwright/test instead to exercise the dialog itself.
+ * Shared e2e test base: suppresses the first-run welcome dialog and marks
+ * the guided tour taken, so specs see the steady-state surfaces.
+ * onboarding.spec.ts / tutorial-visualise.spec.ts import raw
+ * @playwright/test instead to exercise these surfaces themselves.
  */
 
 import { test as base } from '@playwright/test'
@@ -19,11 +20,19 @@ import { test as base } from '@playwright/test'
 export const test = base.extend({
   page: async ({ page }, use) => {
     // Runs before every document load, so it also survives reloads.
-    // Shape must track STORE_VERSIONS.onboarding (src/lib/storage-keys.ts).
+    // Shapes must track STORE_VERSIONS.onboarding / STORE_VERSIONS.tutorials
+    // (src/lib/storage-keys.ts).
     await page.addInitScript(() => {
       window.localStorage.setItem(
         'fiab.store.onboarding',
         JSON.stringify({ state: { status: 'skipped' }, version: 2 }),
+      )
+      window.localStorage.setItem(
+        'fiab.store.tutorials',
+        JSON.stringify({
+          state: { statuses: { 'visualise-first-map': 'dismissed' } },
+          version: 1,
+        }),
       )
     })
     await use(page)

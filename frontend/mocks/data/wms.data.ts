@@ -68,6 +68,11 @@ export function hasMockWmsServer(key: string | number): boolean {
   return servers.has(String(key))
 }
 
+/** Some config would serve this key (explicit registration or the default). */
+export function hasMockWmsConfig(key: string | number): boolean {
+  return servers.has(String(key)) || defaultConfig !== null
+}
+
 function createServer(config: MockWmsServerConfig): MockWmsServer {
   return {
     config,

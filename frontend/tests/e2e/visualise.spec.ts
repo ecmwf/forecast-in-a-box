@@ -37,7 +37,10 @@ test.describe('Visualise page', () => {
       page.getByRole('heading', { name: 'Visualise', exact: true }),
     ).toBeVisible({ timeout: 10000 })
     // Empty basket → the hub with all three source paths.
-    await expect(page.getByText('Visualise forecasts on a map')).toBeVisible()
+    // Exact: the tour CTA repeats the hub title inside its label.
+    await expect(
+      page.getByText('Visualise forecasts on a map', { exact: true }),
+    ).toBeVisible()
     await expect(page.getByText('GRIB directory on this host')).toBeVisible()
     await expect(
       page.getByText('External WMS server', { exact: true }),
