@@ -742,7 +742,10 @@ class TestGridType:
         assert GridType().validate_convert(0.25) == 0.25
         assert GridType().validate_convert(1) == 1
 
-    @pytest.mark.parametrize("value", ["X320", "N", "N-1", "Nabc", "grid"])
+    def test_auto_sentinel_returns_none(self) -> None:
+        assert GridType().validate_convert("auto") is None
+
+    @pytest.mark.parametrize("value", ["X320", "N", "N-1", "Nabc", "grid", "AUTO", "auto,N320"])
     def test_invalid_named_grid_string_raises(self, value: str) -> None:
         with pytest.raises(WrongType):
             GridType().validate_convert(value)
