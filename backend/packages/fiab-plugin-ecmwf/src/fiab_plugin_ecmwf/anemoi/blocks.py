@@ -36,8 +36,11 @@ from .utils import (
     get_checkpoint_enum_type,
 )
 
+opendata_dep = "anemoi-plugins-ecmwf-inference[opendata]>=0.7.0"
 INPUT_SOURCE_EXTRAS: dict[str, list[str]] = {
-    "opendata": ["anemoi-plugins-ecmwf-inference[opendata]"],
+    "opendata": [opendata_dep],
+    "opendata:google": [opendata_dep],
+    "opendata:aws": [opendata_dep],
     "polytope": ["anemoi-plugins-ecmwf-inference[polytope]"],
     "mars": ["earthkit-data[mars]"],
     "dummy": [],
