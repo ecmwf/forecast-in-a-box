@@ -83,7 +83,7 @@ class FloatType(FableType):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         try:
             result = float(value)
-            if self.real and not (math.isnan(result) or math.isinf(result)):
+            if self.real and (math.isnan(result) or math.isinf(result)):
                 raise WrongType(f"Expected a real number, got {value!r}")
             return result
         except ValueError:
