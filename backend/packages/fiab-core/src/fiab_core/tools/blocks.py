@@ -224,20 +224,22 @@ class BlockInstanceRich:
 
     def config_as_grid(
         self, key: str | ConfigurationOptionId, validator: Callable[[Any, ConfigurationOptionId], None] | None = None
-    ) -> str | list[int | float]:
+    ) -> str | list[int | float] | int | float | None:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.value_type, GridType):
             raise BlockInstanceConfigurationError(
                 f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not GridType"
             )
         raw_value = self._get_raw_value(option_id)
-        if isinstance(raw_value, (str, list)):
-            typed_raw_value = cast(str | list[int | float], raw_value)
+        if isinstance(raw_value, (str, list, int, float)):
+            typed_raw_value = cast(str | list[int | float] | int | float, raw_value)
             if validator is not None:
                 validator(typed_raw_value, option_id)
             return typed_raw_value
+        if raw_value is None:
+            return None
         raise BlockInstanceConfigurationError(
-            f"Configuration option {option_id!r} expected str or list[int | float], got {type(raw_value).__name__}"
+            f"Configuration option {option_id!r} expected str, list[int | float], int, float or None, got {type(raw_value).__name__}"
         )
 
 

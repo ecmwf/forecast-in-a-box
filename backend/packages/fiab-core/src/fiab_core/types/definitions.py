@@ -324,6 +324,11 @@ class GeoDomainType(UnionType):
 class GridType(FableType):
     """Grid type. A union of named grid, lat/lon resolution, or tuple of lat/lon resolutions."""
 
+    def _ignore(self, value: str) -> bool:
+        if value == "auto":
+            return True
+        return False
+
     def _is_gaussian_grid(self, value: str) -> bool:
         """Check if the value is a valid Gaussian grid name, e.g., 'N320'."""
         if not isinstance(value, str):
@@ -367,13 +372,15 @@ class GridType(FableType):
             return False
         return lat_res > 0 and lon_res > 0
 
-    def validate_convert(self, value: Any) -> str | list[int | float] | int | float:
+    def validate_convert(self, value: Any) -> str | list[int | float] | int | float | None:
         if isinstance(value, str):
             if self._is_gaussian_grid(value):
                 return value
             if self._is_latlon_resolution(value):
                 return list(map(float, value.split("/"))) if "/" in value else float(value)
-            raise WrongType(f"String value {value!r} is neither a valid Gaussian grid nor a valid lat/lon resolution")
+            if self._ignore(value):
+                return None
+            raise WrongType(f"String value {value!r} is neither a valid Gaussian grid, a valid lat/lon resolution, or 'auto'.")
 
         if isinstance(value, list):
             if self._is_latlon_resolution(value):
