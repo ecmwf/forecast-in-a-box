@@ -1,12 +1,16 @@
 # TODO add Dockerfile-gpu and Dockerfile-dist-*, and differentiate commands below with an arg (plain/gpu/dist)
 
 build:
+    #!/usr/bin/env bash
     cp ../../scripts/fiab.sh . # NOTE we could have context the repo root -- but too bulky and not needed
-    # TODO tag with the release version?
-    docker build -t fiab-base -f Dockerfile-plain .
+    # TODO use an actual release version rather than a backend tag
+    # NOTE that the backend version is not just for the tag, but also for invalidating the docker cache
+    backend_tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
+    docker build --build-arg FIAB_RELEASE="v$backend_tag" -t "fiab-base:${backend_tag}" -f Dockerfile-plain .
+    docker tag "fiab-base:${backend_tag}" fiab-base:latest
 
 run:
-    docker run --rm -it -p 8000:8000 fiab-base
+    docker run --rm -it -p 8000:8000 fiab-base:latest
 
 # TODO add command for publish
 # TODO add command for integration test

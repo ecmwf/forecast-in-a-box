@@ -13,6 +13,8 @@ RUN : \
     && :
 
 USER fiab
+ARG FIAB_RELEASE="v0.0.0"
+ENV FIAB_RELEASE=$FIAB_RELEASE
 COPY fiab.sh /home/fiab/fiab.sh
 RUN /home/fiab/fiab.sh warmup
-ENTRYPOINT /home/fiab/fiab.sh
+ENTRYPOINT ["/home/fiab/fiab.sh"]
