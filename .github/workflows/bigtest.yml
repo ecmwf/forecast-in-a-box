@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - working-directory: backend/tests/largeE2E
         run: |
           set -euo pipefail
