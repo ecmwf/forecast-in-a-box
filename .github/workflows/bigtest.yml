@@ -12,12 +12,13 @@ on:
 jobs:
   macos:
     name: macos
-    strategy:
-      fail-fast: true
-      matrix:
-        arch_type: [ARM64]
-        python_version: ["3.11"] # replace with 3.14 in ~26/01, once all wheels etc available
-    runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
+    # strategy:
+      # fail-fast: true
+      # matrix:
+        # arch_type: [ARM64]
+        # python_version: ["3.11"] # replace with 3.14 in ~26/01, once all wheels etc available
+    # runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
+    runs-on: ["Linux", "platform-builder-docker-xl"]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
