@@ -1,16 +1,33 @@
 # TODO add Dockerfile-gpu and Dockerfile-dist-*, and differentiate commands below with an arg (plain/gpu/dist)
 
-build:
+build release_tag="":
     #!/usr/bin/env bash
     cp ../../scripts/fiab.sh . # NOTE we could have context the repo root -- but too bulky and not needed
-    # TODO use an actual release version rather than a backend tag
-    # NOTE that the backend version is not just for the tag, but also for invalidating the docker cache
-    backend_tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
-    docker build --build-arg FIAB_RELEASE="v$backend_tag" -t "fiab-base:${backend_tag}" -f Dockerfile-plain .
-    docker tag "fiab-base:${backend_tag}" fiab-base:latest
+    release_tag="{{release_tag}}"
+    if [ -z "$release_tag" ]; then
+        # NOTE that the backend version is not just for the tag, but also for invalidating the docker cache
+        backend_tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
+        release_tag="v$backend_tag"
+    fi
+    tag="${release_tag#v}"
+    docker build --build-arg FIAB_RELEASE="$release_tag" -t "fiab-slim:${tag}" -f Dockerfile-slim .
+    docker tag "fiab-slim:${tag}" fiab-slim:latest
 
 run:
-    docker run --rm -it -p 8000:8000 fiab-base:latest
+    docker run --rm -it -p 8000:8000 fiab-slim:latest
 
-# TODO add command for publish
+publish release_tag="":
+    #!/usr/bin/env bash
+    release_tag="{{release_tag}}"
+    if [ -z "$release_tag" ]; then
+        backend_tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
+        release_tag="v$backend_tag"
+    fi
+    tag="${release_tag#v}"
+    registry="eccr.ecmwf.int/forecast-in-a-box/fiab-slim"
+    docker tag "fiab-slim:${tag}" "${registry}:${tag}"
+    docker tag "fiab-slim:${tag}" "${registry}:latest"
+    docker push "${registry}:${tag}"
+    docker push "${registry}:latest"
+
 # TODO add command for integration test
