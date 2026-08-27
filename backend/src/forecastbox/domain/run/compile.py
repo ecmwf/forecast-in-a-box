@@ -210,9 +210,7 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
         task_id, detail = fluentNode_to_detail(node, task_block_id)
         task_detail[task_id] = detail
     job_instance = graph2job(graph)
-    logger.info(f"before hotfix {job_instance}")
     _hotfix_gpu_availability(job_instance)
-    logger.info(f"after hotfix {job_instance}")
 
     job_instance.ext_outputs = [dataset_id for task_id in sink_tasks for dataset_id in job_instance.outputs_of(task_id)]
 
