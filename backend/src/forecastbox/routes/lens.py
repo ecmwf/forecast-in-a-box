@@ -28,10 +28,12 @@ import pathlib
 from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast, get_args
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.lens import metadata_db
+from forecastbox.domain.lens import proxy as lens_proxy
 from forecastbox.domain.lens.manager import (
     LensInstanceDetail,
     LensInstanceId,
@@ -145,6 +147,26 @@ def stop_lens(lens_instance_id: LensInstanceId) -> str:
 def list_lenses() -> list[LensInstanceDetailResponse]:
     """List all active lens instances with their current status."""
     return [LensInstanceDetailResponse.from_detail(iid, detail) for iid, detail in list_instances()]
+
+
+@router.api_route(
+    "/proxy/{lens_instance_id}/{upstream_path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+)
+async def proxy_lens(
+    lens_instance_id: LensInstanceId,
+    upstream_path: str,
+    request: Request,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> StreamingResponse:
+    """Reverse-proxy a request to the running lens instance identified by `lens_instance_id`.
+
+    See `domain.lens.proxy` for the full client/lens contract.
+    """
+    # TODO implement granual auth: user-lens matrix
+    # (auth_context is currently only used to require an authenticated caller;
+    #  once the user-lens matrix exists, check ownership here.)
+    return await lens_proxy.forward(lens_instance_id, upstream_path, request)
 
 
 @router.get("/supported")

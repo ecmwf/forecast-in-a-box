@@ -30,6 +30,7 @@ from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_m
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
 from forecastbox.domain.gateway.service import shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
+from forecastbox.domain.lens.proxy import aclose_client as aclose_lens_proxy_client
 from forecastbox.domain.notification.service import init_broadcaster
 from forecastbox.domain.plugin.store import submit_initialize_stores
 from forecastbox.domain.plugin.submit import submit_load_all as submit_load_plugins
@@ -172,6 +173,10 @@ def _stop_lens() -> None:
     shutdown_all_lens_instances()
 
 
+async def _stop_lens_proxy_client() -> None:
+    await aclose_lens_proxy_client()
+
+
 def build_initializers() -> Initializers:
     """Assemble the ordered list of startup/teardown steps for the application lifespan.
 
@@ -197,6 +202,7 @@ def build_initializers() -> Initializers:
             Initializer("tunnels", stop=_stop_tunnels),
             Initializer("processes", stop=_stop_processes),
             Initializer("lens", stop=_stop_lens),
+            Initializer("lens_proxy_client", stop=_stop_lens_proxy_client),
         ]
     )
     return Initializers(initializers)
