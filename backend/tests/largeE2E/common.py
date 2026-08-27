@@ -76,8 +76,12 @@ def retry_until(
     AssertionError after exhausting all attempts.
     """
     for _ in range(attempts):
-        result = do_action()
-        ok = verify_ok(result)
+        ok = None
+        try:
+            result = do_action()
+            ok = verify_ok(result)
+        except httpx.ReadTimeout:
+            pass
         if ok is not None:
             return ok
         time.sleep(sleep)

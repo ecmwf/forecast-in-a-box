@@ -1,4 +1,4 @@
-name: bigtest
+name: E2E Test -- installs released backend, runs a forecast with actual small model on dummy data
 
 # DA BIG TEST
 # launches the backend, downloads a model, executes full blown forecast job, ensures success
@@ -8,20 +8,17 @@ on:
   # Trigger the workflow manually
   workflow_dispatch: ~
 
-
 jobs:
-  macos:
-    name: macos
-    strategy:
-      fail-fast: true
-      matrix:
-        arch_type: [ARM64]
-        python_version: ["3.11"] # replace with 3.14 in ~26/01, once all wheels etc available
-    runs-on: [self-hosted, macOS, "${{ matrix.arch_type }}"]
+  bigtest:
+    name: Run the bigtest
+    # runs-on: [self-hosted, macOS, "ARM64"] # err code 143 -- may have been runner being broken at the time
+    runs-on: ["Linux", "platform-builder-docker-xl"]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - working-directory: backend/tests/largeE2E
+        name: Run the bigtest
         run: |
           set -euo pipefail
           just install

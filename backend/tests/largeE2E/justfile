@@ -1,3 +1,9 @@
+# NOTE some CI runners mount /tmp (just's default location for shebang-recipe
+# scripts) noexec, which makes just fail with "Permission denied (os error 13)"
+# when it tries to execute the generated script. Point just at a directory
+# that is guaranteed to be exec-able instead (the repo checkout itself).
+set tempdir := "."
+
 fiab_root := justfile_directory() + "/.fiab"
 
 # Sets up the fiab venv/lock/config in a scratch FIAB_ROOT under this directory, without launching it.
