@@ -190,6 +190,9 @@ export const API_ENDPOINTS = {
     list: `${API_PREFIX}/lens/list`,
     /** GET - List supported lens types */
     supported: `${API_PREFIX}/lens/supported`,
+    /** GET/POST - Proxy base; the running lens is reached at
+     *  `${proxyBase}/<lens_instance_id>/<upstream path>` */
+    proxyBase: `${API_PREFIX}/lens/proxy`,
   },
 
   /**

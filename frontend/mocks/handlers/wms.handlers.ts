@@ -12,10 +12,13 @@
  * MSW handlers for SkinnyWMS lens servers (the WMS endpoints behind lens
  * ports, not the backend lens-manager API — that's lens.handlers.ts).
  *
- * The viewer talks to lenses cross-origin with `crossOrigin: 'anonymous'`
- * image sources, so every response carries CORS headers. GetMap and legend
- * requests return a 1×1 transparent PNG — tests assert on controls and
- * state, never on rendered pixels.
+ * Production reaches a lens only through the backend's same-origin proxy
+ * (`/api/v1/lens/proxy/<id>/...`); requests routed there are keyed by
+ * instance id. Tests that talk to a bare `http://localhost:<port>` origin
+ * directly (exercising the viewer against an "external-style" WMS) are
+ * keyed by port instead — both share the same mock registry via a
+ * string key. GetMap and legend requests return a 1×1 transparent PNG —
+ * tests assert on controls and state, never on rendered pixels.
  */
 
 import { HttpResponse, delay, http } from 'msw'
@@ -25,6 +28,7 @@ import {
   recordGetMap,
   serveCapabilities,
 } from '../data/wms.data'
+import { API_ENDPOINTS } from '@/api/endpoints'
 
 // Translucent 1×1 PNGs (red / blue) — GetMap alternates the color by
 // port so two mock lenses are visually distinguishable and comparison
@@ -45,8 +49,19 @@ const PNG_BLUE = Uint8Array.from(
 
 const CORS = { 'Access-Control-Allow-Origin': '*' }
 
-function pngResponse(port = 0) {
-  const png = port % 2 === 0 ? PNG_RED : PNG_BLUE
+/** `id` from `/api/v1/lens/proxy/<id>/...`, when present. */
+const LENS_PROXY_ID_RE = new RegExp(`${API_ENDPOINTS.lens.proxyBase}/([^/]+)/`)
+
+/** Routing key for the mock registry: the lens instance id when the
+ *  request went through the proxy path, else the origin's port (bare
+ *  `http://host:port` test doubles). */
+function wmsKeyFor(url: URL): string {
+  const proxied = LENS_PROXY_ID_RE.exec(url.pathname)
+  return proxied ? decodeURIComponent(proxied[1]) : url.port
+}
+
+function pngResponse(key: string) {
+  const png = Number(key) % 2 === 0 ? PNG_RED : PNG_BLUE
   return new HttpResponse(png.slice().buffer, {
     headers: { ...CORS, 'Content-Type': 'image/png' },
   })
@@ -86,10 +101,10 @@ export const wmsHandlers = [
     const param = (key: string) =>
       url.searchParams.get(key) ?? url.searchParams.get(key.toUpperCase())
     const req = (param('request') ?? '').toLowerCase()
-    const port = Number(url.port)
+    const key = wmsKeyFor(url)
 
     if (req === 'getcapabilities') {
-      const result = serveCapabilities(port)
+      const result = serveCapabilities(key)
       if (result.kind === 'unavailable') {
         return new HttpResponse(null, { status: 503, headers: CORS })
       }
@@ -100,21 +115,21 @@ export const wmsHandlers = [
     // GetMap and anything else image-like. Registered failure TIMEs get
     // a WMS service exception (stale-capabilities servers do this).
     if (req === 'getmap') {
-      recordGetMap(port, param('TIME'))
-      const delayMs = getMapDelayFor(port)
+      recordGetMap(key, param('TIME'))
+      const delayMs = getMapDelayFor(key)
       if (delayMs > 0) await delay(delayMs)
     }
-    if (req === 'getmap' && getMapFailsFor(port, param('TIME'))) {
+    if (req === 'getmap' && getMapFailsFor(key, param('TIME'))) {
       return new HttpResponse('<ServiceExceptionReport/>', {
         headers: { ...CORS, 'Content-Type': 'text/xml' },
       })
     }
-    return pngResponse(port)
+    return pngResponse(key)
   }),
 
   // Legend images — capabilities advertise them on the lens's internal bind
   // address; the viewer rebases them onto the browser-reachable origin.
-  http.get('*/legend', () => pngResponse()),
+  http.get('*/legend', () => pngResponse('0')),
 
   // Carto vector basemap style requested by the viewer on mount.
   http.get('https://basemaps.cartocdn.com/*', () =>

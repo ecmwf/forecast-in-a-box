@@ -20,6 +20,7 @@
 
 // The singleton, not `@/lib/i18n` — no init side-effect in a plain module.
 import i18n from 'i18next'
+import { API_ENDPOINTS } from '@/api/endpoints'
 
 export interface ParsedStyle {
   name: string
@@ -55,19 +56,13 @@ export interface ParsedCapabilities {
   bbox: [number, number, number, number]
 }
 
-/** Loopback origins host our own lens servers — never CORS territory,
- *  and worth a patient capabilities retry while SkinnyWMS boots. */
-export function isLoopbackUrl(url: string): boolean {
-  try {
-    const host = new URL(url).hostname
-    return (
-      host === 'localhost' ||
-      host === '[::1]' ||
-      /^127(\.\d{1,3}){3}$/.test(host)
-    )
-  } catch {
-    return false
-  }
+/** True when `baseUrl` is our own lens proxy path (a same-origin, relative
+ *  path under `/lens/proxy/<id>`) rather than an external/curated WMS
+ *  endpoint (always an absolute URL — see `allowedWmsUrl`). Lens traffic is
+ *  never CORS territory and is worth a patient capabilities retry while
+ *  SkinnyWMS boots behind it. */
+export function isLensProxyUrl(baseUrl: string): boolean {
+  return baseUrl.startsWith(`${API_ENDPOINTS.lens.proxyBase}/`)
 }
 
 const DEFAULT_BBOX: [number, number, number, number] = [-180, -90, 180, 90]
@@ -772,20 +767,22 @@ export function uniquePressureLevels(
 }
 
 /**
- * Rewrite an absolute URL emitted by the lens (which embeds its local bind
- * address, e.g. `http://0.0.0.0:54321/wms?...`) so it is fetched via
- * `baseUrl` (the browser-reachable lens origin): the upstream path + query
- * are grafted onto it. Returns the input unchanged on parse failure.
+ * Rewrite an absolute URL emitted by the lens (which embeds its internal
+ * bind address, e.g. `http://0.0.0.0:54321/wms?...`) so it is fetched via
+ * `baseUrl` (the browser-reachable lens proxy path): the upstream path +
+ * query are grafted onto it. Returns the input unchanged on parse failure.
  */
 export function rebaseLensUrl(url: string, baseUrl: string): string {
   try {
-    // Rebasing exists for loopback lens servers that advertise internal
-    // origins. External endpoints carry a path and/or query in the base
-    // (e.g. `…/wms/?token=…`) and advertise public URLs — grafting the
-    // base onto those doubles the path/query, so use them verbatim.
+    const upstream = new URL(url)
+    if (isLensProxyUrl(baseUrl)) {
+      return `${baseUrl.replace(/\/$/, '')}${upstream.pathname}${upstream.search}`
+    }
+    // External endpoints carry a path and/or query in the base (e.g.
+    // `…/wms/?token=…`) and advertise public URLs — grafting the base onto
+    // those doubles the path/query, so use them verbatim.
     const base = new URL(baseUrl)
     if (base.pathname !== '/' || base.search !== '') return url
-    const upstream = new URL(url)
     return `${baseUrl.replace(/\/$/, '')}${upstream.pathname}${upstream.search}`
   } catch {
     return url
@@ -793,13 +790,16 @@ export function rebaseLensUrl(url: string, baseUrl: string): string {
 }
 
 /**
- * Resolve a source's WMS request endpoint. Lens sources are bare origins
- * (`http://host:port`) whose service lives at `/wms`; external servers
- * arrive as full endpoints that may carry a path and/or query (e.g.
- * `https://eccharts.ecmwf.int/wms/?token=…`) and must be used verbatim —
- * appending `/wms` to those produces garbage URLs.
+ * Resolve a source's WMS request endpoint. The lens proxy base is a
+ * same-origin path whose service lives at `<proxyBase>/wms`; external
+ * servers arrive as full endpoints that may carry a path and/or query
+ * (e.g. `https://eccharts.ecmwf.int/wms/?token=…`) and must be used
+ * verbatim — appending `/wms` to those produces garbage URLs.
  */
 export function toWmsEndpoint(baseUrl: string): string {
+  if (isLensProxyUrl(baseUrl)) {
+    return `${baseUrl.replace(/\/+$/, '')}/wms`
+  }
   try {
     const url = new URL(baseUrl)
     if (url.pathname !== '/' || url.search !== '') return baseUrl
