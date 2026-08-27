@@ -1,0 +1,27 @@
+name: Build and Push Docker Images to registries
+
+# instructions:
+# this should fire on release event, but also allow for manual dispatch
+# there should be a push param (bool, default true), which would allow for turning off the publish step
+# as a first step, this should invoke `just build` from the deployment/v2 directory. Mind you need to set up the `just` binary
+# the `just build` currently derives the `backend_tag` from calling git. You will need to rework that as follows:
+# - the just recipe accepts a release_tag param, and only if not given, derives it from backend_tag
+# - this action allows for specifying the release_tag as its input
+# - when invoked by a release trigger, it takes the release_tag from the release
+# as a second step, the action should invoke `just publish` from deployment/v2, which however does not exist yet.
+# It should push the image to 
+# eccr.ecmwf.int/forecast-in-a-box/fiab-slim
+# (rewrite the justfile in deployment/v2 to use fiab-slim instead of fiab-base, and rename Dockerfile-plain to -slim as well)
+# You also need to set up the login, smth like this
+#      - name: Log in to a Container Registry
+#        uses: docker/login-action@v3
+#        with:
+#          registry: 'eccr.ecmwf.int'
+#          username: secrets.ECMWF_DOCKER_REGISTRY_USERNAME
+#          password: secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN
+#
+# the whole thing should run on
+#    runs-on: ["Linux", "platform-builder-docker-xl"]
+#
+# do not test it by actually executing the workflow, that is undesirable. Just make sure the yaml/justfile look correct, pass all the linting etc
+#
