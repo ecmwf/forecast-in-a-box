@@ -1,5 +1,11 @@
 # TODO add Dockerfile-gpu and Dockerfile-dist-*, and differentiate commands below with an arg (plain/gpu/dist)
 
+# NOTE some CI runners mount /tmp (just's default location for shebang-recipe
+# scripts) noexec, which makes just fail with "Permission denied (os error 13)"
+# when it tries to execute the generated script. Point just at a directory
+# that is guaranteed to be exec-able instead (the repo checkout itself).
+set tempdir := "."
+
 build release_tag="":
     #!/usr/bin/env bash
     cp ../../scripts/fiab.sh . # NOTE we could have context the repo root -- but too bulky and not needed
