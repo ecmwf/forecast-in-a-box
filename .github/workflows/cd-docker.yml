@@ -21,6 +21,8 @@ jobs:
     runs-on: ["Linux", "platform-builder-docker-xl"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # we need tags to derive release version in case not provided
       - uses: extractions/setup-just@v3
 
       - name: Log in to a Container Registry
