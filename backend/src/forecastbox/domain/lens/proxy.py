@@ -216,7 +216,7 @@ async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request:
         request.method,
         url,
         headers=headers,
-        **({"content": request.stream()} if _has_body(request) else {}),
+        **({"content": request.stream()} if _has_body(request) else {}),  # ty:ignore # NOTE ty is for some reason mishandling the kwarg expansion
     )
 
     # NOTE here we raise HTTP exceptions directly, not domain exceptions -- because we are indeed
