@@ -89,13 +89,13 @@ def test_download_model(backend_client_admin: httpx.Client, backend_client: http
             assert is_success
             remaining_checkpoints.discard(local_id)
             refresh_routes.update(notification.refreshRoutes)
-            assert notification.detailRoute == "api/v1/artifacts/model_details"
+            assert notification.detailRoute == "/api/v1/artifacts/model_details"
 
         assert not remaining_checkpoints, f"did not receive artifactDownloadFinished notifications for {remaining_checkpoints}"
         assert len(refresh_routes) == 1, f"expected exactly one distinct refresh route, got {refresh_routes}"
         refresh_route = next(iter(refresh_routes))
-        assert refresh_route.startswith("api/v1/")
-        stripped_route = refresh_route.removeprefix("api/v1/")
+        assert refresh_route.startswith("/api/v1/")
+        stripped_route = refresh_route.removeprefix("/api/v1/")
 
         refreshed = backend_client_admin.get(f"/{stripped_route}").raise_for_status().json()
         refreshed_available = {

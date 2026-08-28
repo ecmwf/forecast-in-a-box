@@ -80,6 +80,7 @@ from fastapi.responses import StreamingResponse
 from starlette.datastructures import Headers
 
 from forecastbox.domain.lens.core import PREFIX as PREFIX_ROOT
+from forecastbox.domain.lens.exceptions import UnproxyableLens
 from forecastbox.domain.lens.manager import LensInstanceId, get_status
 
 logger = logging.getLogger(__name__)
@@ -128,17 +129,17 @@ async def aclose_client() -> None:
 def _resolve_port(lens_instance_id: LensInstanceId) -> int:
     """Resolve a lens_instance_id to its bound port.
 
-    Raises KeyError if the instance is unknown, and RuntimeError if it is known but
-    not `running`, or if it has a number of ports other than exactly one (an
-    invariant violation for the currently supported lens types).
+    Forwards NoLensFound if the instance is unknown, and raises UnproxyableRens if it
+    is known but not `running`, or if it has a number of ports other than exactly one
+    (an invariant violation for the currently supported lens types).
     """
     detail = get_status(lens_instance_id)
     if detail.status != "running":
-        raise RuntimeError(f"Lens instance {lens_instance_id!r} is not running (status={detail.status!r})")
+        raise UnproxyableLens(f"Lens instance {lens_instance_id!r} is not running (status={detail.status!r})")
     if len(detail.ports) != 1:
         logger.error(f"Lens instance {lens_instance_id!r} does not expose exactly one port: {detail.ports!r}")
-        raise RuntimeError(f"Lens instance {lens_instance_id!r} does not expose exactly one port")
-    return next(iter(detail.ports))
+        raise UnproxyableLens(f"Lens instance {lens_instance_id!r} does not expose exactly one port")
+    return next(iter(detail.ports))  # odd but its a set, we cant just [0] it
 
 
 def _filtered_headers(headers: httpx.Headers | Headers, *, drop: frozenset[str] = frozenset()) -> list[tuple[str, str]]:
@@ -186,15 +187,10 @@ async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request:
     """Forward `request` to the lens identified by `lens_instance_id`, streaming both
     the request body upstream and the response body back downstream.
 
-    Raises HTTPException(404) if the lens instance is unknown or not running, and
-    HTTPException(502/503) if the upstream connection fails.
+    Forwards exceptions such as NoLensFound or UnproxyableLens.
+    Raises HTTP exceptions in case of upstream connection failure.
     """
-    try:
-        port = _resolve_port(lens_instance_id)
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"Lens instance {lens_instance_id!r} not found")
-    except RuntimeError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    port = _resolve_port(lens_instance_id)
 
     url = _build_upstream_url(port, upstream_path, request.url.query)
     headers = _build_upstream_headers(request, port, lens_instance_id)
@@ -207,6 +203,8 @@ async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request:
         content=request.stream(),
     )
 
+    # NOTE here we raise HTTP exceptions directly, not domain exceptions -- because we are indeed
+    # converting underlying http errors
     try:
         upstream_response = await client.send(upstream_request, stream=True)
     except httpx.ConnectError:

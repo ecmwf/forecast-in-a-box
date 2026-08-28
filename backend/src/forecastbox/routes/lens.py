@@ -35,6 +35,7 @@ from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.lens import metadata_db
 from forecastbox.domain.lens import proxy as lens_proxy
 from forecastbox.domain.lens.core import PREFIX
+from forecastbox.domain.lens.exceptions import NoLensFound, UnproxyableLens
 from forecastbox.domain.lens.manager import (
     LensInstanceDetail,
     LensInstanceId,
@@ -126,7 +127,7 @@ def get_lens_status(lens_instance_id: LensInstanceId) -> LensInstanceDetailRespo
     """Get the status of a lens instance."""
     try:
         return LensInstanceDetailResponse.from_detail(lens_instance_id, get_status(lens_instance_id))
-    except KeyError:
+    except NoLensFound:
         raise HTTPException(status_code=404, detail=f"Lens instance {lens_instance_id!r} not found")
 
 
@@ -135,7 +136,7 @@ def stop_lens(lens_instance_id: LensInstanceId) -> str:
     """Stop and remove a lens instance."""
     try:
         stop_instance(lens_instance_id)
-    except KeyError:
+    except NoLensFound:
         raise HTTPException(status_code=404, detail=f"Lens instance {lens_instance_id!r} not found")
     except TimeoutError:
         raise HTTPException(status_code=503, detail="Lens manager is busy")
@@ -165,7 +166,12 @@ async def proxy_lens(
     # TODO implement granual auth: user-lens matrix
     # (auth_context is currently only used to require an authenticated caller;
     #  once the user-lens matrix exists, check ownership here.)
-    return await lens_proxy.forward(lens_instance_id, upstream_path, request)
+    try:
+        return await lens_proxy.forward(lens_instance_id, upstream_path, request)
+    except NoLensFound:
+        raise HTTPException(status_code=404, detail=f"Lens instance {lens_instance_id!r} not found")
+    except UnproxyableLens as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/supported")
