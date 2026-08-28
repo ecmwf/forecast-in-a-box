@@ -60,7 +60,7 @@ dev *args:
 
     args=({{args}})
 
-    for arg in "${args[@]}" ; do
+    for arg in ${args[@]+"${args[@]}"} ; do
         if [ "$arg" == "full-reinstall" ] ; then
             echo "full reinstall! Will drop the db and sync the venv"
             pushd backend
