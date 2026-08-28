@@ -176,6 +176,22 @@ def _build_upstream_headers(request: Request, port: int, lens_instance_id: LensI
     return headers
 
 
+def _has_body(request: Request) -> bool:
+    """Does this request carry a body worth streaming upstream?
+
+    Passing a stream for a bodyless GET makes httpx frame it as
+    Transfer-Encoding: chunked. gunicorn's sync worker never drains that body,
+    so it closes the socket with request data unread, the kernel answers RST,
+    and our in-flight response body read dies mid-stream.
+    """
+    if request.headers.get("transfer-encoding"):
+        return True
+    try:
+        return int(request.headers.get("content-length", "0")) > 0
+    except ValueError:
+        return False
+
+
 def _build_upstream_url(port: int, upstream_path: str, query: str) -> str:
     url = f"http://127.0.0.1:{port}/{upstream_path}"
     if query:
@@ -200,7 +216,7 @@ async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request:
         request.method,
         url,
         headers=headers,
-        content=request.stream(),
+        **({"content": request.stream()} if _has_body(request) else {}),
     )
 
     # NOTE here we raise HTTP exceptions directly, not domain exceptions -- because we are indeed

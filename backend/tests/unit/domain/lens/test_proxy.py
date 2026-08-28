@@ -159,3 +159,51 @@ class TestForward:
         chunks: list[bytes] = [chunk async for chunk in response.body_iterator]  # type: ignore[misc]
         assert b"".join(chunks) == b"hello world"
         upstream_response.aclose.assert_awaited_once()
+
+
+class TestUpstreamRequestFraming:
+    """A bodyless GET must not be framed as chunked upstream.
+
+    gunicorn's sync worker never drains a request body on a GET: it answers and
+    closes the socket with that body unread, the kernel sends RST rather than a
+    clean FIN, and the response we are still streaming back is truncated.
+    """
+
+    @staticmethod
+    def _running(iid: LensInstanceId) -> None:
+        mock_proc = MagicMock(spec=subprocess.Popen)
+        mock_proc.poll.return_value = None
+        LensInstanceManager.instances = pmap({iid: LensInstance(process=mock_proc, lens_params={}, lens_name="skinnyWMS", ports={19042})})
+
+    @staticmethod
+    def _upstream() -> AsyncMock:
+        async def fake_aiter_raw() -> AsyncIterator[bytes]:
+            yield b"ok"
+
+        response = AsyncMock()
+        response.status_code = 200
+        response.headers = httpx.Headers({"content-type": "image/png"})
+        response.aiter_raw = fake_aiter_raw
+        response.aclose = AsyncMock()
+        return response
+
+    @pytest.mark.asyncio
+    async def test_bodyless_get_is_not_chunked(self) -> None:
+        iid = LensInstanceId("running-id")
+        self._running(iid)
+        send = AsyncMock(return_value=self._upstream())
+        with patch.object(httpx.AsyncClient, "send", send):
+            await lens_proxy.forward(iid, "wms", _make_request())
+        sent = send.await_args.args[0]
+        assert "transfer-encoding" not in {name.lower() for name in sent.headers}
+
+    @pytest.mark.asyncio
+    async def test_request_with_a_body_is_still_streamed(self) -> None:
+        iid = LensInstanceId("running-id")
+        self._running(iid)
+        request = _make_request("POST", headers=[(b"host", b"example.com"), (b"content-length", b"12")])
+        send = AsyncMock(return_value=self._upstream())
+        with patch.object(httpx.AsyncClient, "send", send):
+            await lens_proxy.forward(iid, "wms", request)
+        sent = send.await_args.args[0]
+        assert sent.headers.get("transfer-encoding") == "chunked"
