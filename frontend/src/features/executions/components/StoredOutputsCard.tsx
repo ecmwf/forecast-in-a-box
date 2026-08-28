@@ -35,7 +35,7 @@ import {
   useStartSkinnyWms,
   useStopLens,
 } from '@/api/hooks/useLens'
-import { buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
+import { buildAbsoluteWmsCapabilitiesUrl } from '@/api/endpoints/lens'
 import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
 import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
@@ -185,17 +185,18 @@ function StoredOutputRowItem({
   const statusQuery = useLensStatus(lensId ?? undefined)
 
   const status = lensId ? statusQuery.data?.status : undefined
-  const port = lensId ? statusQuery.data?.ports[0] : undefined
-  const running = status === 'running' && port !== undefined
+  const running = status === 'running'
   const failed =
     !!lensId &&
     (statusQuery.isError || status === 'failed' || status === 'terminated')
 
-  const copyUrl = (lensPort: number) => {
-    void navigator.clipboard.writeText(buildWmsCapabilitiesUrl(lensPort)).then(
-      () => showToast.success(t('storedOutputs.wmsUrlCopied')),
-      () => showToast.error(t('storedOutputs.wmsUrlCopyFailed')),
-    )
+  const copyUrl = (lensInstanceId: string) => {
+    void navigator.clipboard
+      .writeText(buildAbsoluteWmsCapabilitiesUrl(lensInstanceId))
+      .then(
+        () => showToast.success(t('storedOutputs.wmsUrlCopied')),
+        () => showToast.error(t('storedOutputs.wmsUrlCopyFailed')),
+      )
   }
 
   const copyPath = (path: string) => {
@@ -246,7 +247,7 @@ function StoredOutputRowItem({
   }
 
   const copy = () => {
-    if (port !== undefined) copyUrl(port)
+    if (lensId) copyUrl(lensId)
   }
 
   const stop = () => {

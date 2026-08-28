@@ -41,7 +41,7 @@ import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { formatStep } from '../format'
 import { BASEMAPS, DEFAULT_BASEMAP_ID, SKINNYWMS_BASEMAP } from '../ol-layers'
 import {
-  isLoopbackUrl,
+  isLensProxyUrl,
   rebaseLensUrl,
   skinnyWmsBasemap,
 } from '../wms-capabilities'
@@ -706,7 +706,7 @@ export function GeoViewer({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 rounded-md border border-border bg-card p-6 text-center text-sm">
         <P className="max-w-md text-danger">{sourceA.error}</P>
-        {!isLoopbackUrl(a.baseUrl) && (
+        {!isLensProxyUrl(a.baseUrl) && (
           <P className="text-xs text-muted-foreground">{t('panel.corsHint')}</P>
         )}
         <Button

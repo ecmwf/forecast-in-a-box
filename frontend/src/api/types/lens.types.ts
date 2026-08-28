@@ -14,7 +14,8 @@
  * A lens is an external inspection tool (e.g. SkinnyWMS) launched against a
  * filesystem path produced by a sink block. The frontend starts a lens via
  * POST, polls its status until `running`, then mounts a viewer that talks
- * directly to the lens's exposed port.
+ * to the lens through the backend's same-origin proxy path (see
+ * `buildLensBaseUrl` in `@/api/endpoints/lens`).
  */
 
 import { z } from 'zod'
@@ -33,6 +34,8 @@ export const LensInstanceDetailResponseSchema = z.object({
   status: LensStatusSchema,
   lens_name: z.string(),
   lens_params: z.record(z.string(), z.unknown()),
+  /** Retained for backend introspection only; the frontend addresses the
+   *  lens through the proxy path, not these ports directly. */
   ports: z.array(z.number()),
 })
 

@@ -29,7 +29,7 @@ from starlette.exceptions import HTTPException
 import forecastbox.routes
 from forecastbox.domain.admin import get_local_release
 from forecastbox.entrypoint.initializers import build_initializers
-from forecastbox.utility.config import config, validate_runtime
+from forecastbox.utility.config import ROUTE_PREFIX, config, validate_runtime
 from forecastbox.utility.fastapi import register_common_exception_handling
 
 logger = logging.getLogger(__name__)
@@ -52,8 +52,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(
-    docs_url="/api/v1/docs",
-    openapi_url="/api/v1/openapi.json",
+    docs_url=f"{ROUTE_PREFIX}/docs",
+    openapi_url=f"{ROUTE_PREFIX}/openapi.json",
     title="Forecast in a Box API",
     version="1.0.0",
     lifespan=lifespan,
@@ -97,17 +97,17 @@ async def add_process_time_header(request: Request, call_next: Callable[[Request
 @app.middleware("http")
 async def circumvent_auth(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     # TODO this is a hotfix, we'd instead like to fix properly in api/routers/auth.py
-    if request.url.path == "/api/v1/users/me" and config.auth.passthrough:
+    if request.url.path == f"{ROUTE_PREFIX}/users/me" and config.auth.passthrough:
         return JSONResponse({"is_superuser": True})
     else:
         return await call_next(request)
 
 
-@app.get("/api/v1/share/{job_id}/{dataset_id}", response_class=HTMLResponse, tags=["share"], summary="Share Image")
+@app.get(ROUTE_PREFIX + "/share/{job_id}/{dataset_id}", response_class=HTMLResponse, tags=["share"], summary="Share Image")
 async def share_image(request: Request, job_id: str, dataset_id: str) -> HTMLResponse:
     """Endpoint to share an image from a job and dataset ID."""
     base_url = str(request.base_url).rstrip("/")
-    image_url = f"{base_url}/api/v1/job/{job_id}/{dataset_id}"
+    image_url = f"{base_url}{ROUTE_PREFIX}/job/{job_id}/{dataset_id}"
     return templates.TemplateResponse(request, "share.html", {"image_url": image_url, "image_name": f"{job_id}_{dataset_id}"})
 
 

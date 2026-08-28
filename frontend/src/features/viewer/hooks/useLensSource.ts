@@ -21,7 +21,7 @@ import {
   CapabilitiesError,
   fetchCapabilities,
   groupLayers,
-  isLoopbackUrl,
+  isLensProxyUrl,
 } from '../wms-capabilities'
 import type {
   LayerGroup,
@@ -30,11 +30,11 @@ import type {
 } from '../wms-capabilities'
 
 // GetCapabilities retry — lens `running` precedes WMS-port readiness.
-// Loopback = our own lens: a cold SkinnyWMS boot can take tens of
-// seconds, so keep trying (~35 s) instead of parking on an error the
-// next attempt would clear. External servers keep the snappy ladder.
+// Our lens proxy: a cold SkinnyWMS boot can take tens of seconds, so keep
+// trying (~35 s) instead of parking on an error the next attempt would
+// clear. External servers keep the snappy ladder.
 const EXTERNAL_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
-const LOOPBACK_RETRY_DELAYS_MS = [
+const LENS_RETRY_DELAYS_MS = [
   300, 600, 1200, 2400, 4800, 5000, 5000, 5000, 5000, 5000,
 ] as const
 
@@ -61,8 +61,8 @@ export interface LensSource {
 /** `baseUrl: null` yields an inert source: no fetch, empty layers. */
 export function useLensSource(baseUrl: string | null): LensSource {
   const retryDelays =
-    baseUrl !== null && isLoopbackUrl(baseUrl)
-      ? LOOPBACK_RETRY_DELAYS_MS
+    baseUrl !== null && isLensProxyUrl(baseUrl)
+      ? LENS_RETRY_DELAYS_MS
       : EXTERNAL_RETRY_DELAYS_MS
   const query = useQuery({
     queryKey: wmsCapabilitiesKey(baseUrl ?? ''),

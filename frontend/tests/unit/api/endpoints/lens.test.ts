@@ -9,35 +9,48 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildLensBaseUrl, buildWmsCapabilitiesUrl } from '@/api/endpoints/lens'
+import {
+  buildAbsoluteWmsCapabilitiesUrl,
+  buildLensBaseUrl,
+  buildWmsCapabilitiesUrl,
+} from '@/api/endpoints/lens'
 
 afterEach(() => {
   vi.unstubAllEnvs()
 })
 
 describe('buildLensBaseUrl', () => {
-  it('targets the backend host at the lens port when a backend base URL is set', () => {
-    vi.stubEnv('VITE_API_BASE_URL', 'http://backend.example:8000')
-    expect(buildLensBaseUrl(54321)).toBe('http://backend.example:54321')
+  it('builds a same-origin proxy path from the lens instance id', () => {
+    expect(buildLensBaseUrl('lens-42')).toBe('/api/v1/lens/proxy/lens-42')
   })
 
-  it('keeps the backend scheme', () => {
-    vi.stubEnv('VITE_API_BASE_URL', 'https://fiab.example')
-    expect(buildLensBaseUrl(54321)).toBe('https://fiab.example:54321')
-  })
-
-  it('falls back to the page origin host when no backend base URL is set', () => {
-    vi.stubEnv('VITE_API_BASE_URL', '')
-    const { protocol, hostname } = window.location
-    expect(buildLensBaseUrl(54321)).toBe(`${protocol}//${hostname}:54321`)
+  it('encodes the instance id', () => {
+    expect(buildLensBaseUrl('lens/weird id')).toBe(
+      '/api/v1/lens/proxy/lens%2Fweird%20id',
+    )
   })
 })
 
 describe('buildWmsCapabilitiesUrl', () => {
-  it('appends the WMS GetCapabilities query to the lens base URL', () => {
+  it('appends the WMS GetCapabilities query to the lens proxy base', () => {
+    expect(buildWmsCapabilitiesUrl('lens-42')).toBe(
+      '/api/v1/lens/proxy/lens-42/wms?service=WMS&version=1.3.0&request=GetCapabilities',
+    )
+  })
+})
+
+describe('buildAbsoluteWmsCapabilitiesUrl', () => {
+  it('resolves against the configured backend base URL', () => {
     vi.stubEnv('VITE_API_BASE_URL', 'http://backend.example:8000')
-    expect(buildWmsCapabilitiesUrl(54321)).toBe(
-      'http://backend.example:54321/wms?service=WMS&version=1.3.0&request=GetCapabilities',
+    expect(buildAbsoluteWmsCapabilitiesUrl('lens-42')).toBe(
+      'http://backend.example:8000/api/v1/lens/proxy/lens-42/wms?service=WMS&version=1.3.0&request=GetCapabilities',
+    )
+  })
+
+  it('falls back to the page origin when no backend base URL is set', () => {
+    vi.stubEnv('VITE_API_BASE_URL', '')
+    expect(buildAbsoluteWmsCapabilitiesUrl('lens-42')).toBe(
+      `${window.location.origin}/api/v1/lens/proxy/lens-42/wms?service=WMS&version=1.3.0&request=GetCapabilities`,
     )
   })
 })

@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 from forecastbox.domain.artifact.base import CompositeArtifactId
 from forecastbox.domain.notification.models import ClientNotification
+from forecastbox.utility.config import ROUTE_PREFIX
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -38,6 +39,6 @@ class ArtifactDownloadFinishedEvent:
                 "artifact_local_id": self.composite_id.artifact_local_id,
                 "success": self.is_success,
             },
-            detailRoute="api/v1/artifacts/model_details",
-            refreshRoutes=["api/v1/artifacts/list_models"],
+            detailRoute=f"{ROUTE_PREFIX}/artifacts/model_details",
+            refreshRoutes=[f"{ROUTE_PREFIX}/artifacts/list_models"],
         )

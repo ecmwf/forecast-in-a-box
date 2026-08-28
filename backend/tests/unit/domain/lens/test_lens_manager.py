@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pyrsistent import pmap
 
+from forecastbox.domain.lens.exceptions import NoLensFound
 from forecastbox.domain.lens.manager import (
     LensInstance,
     LensInstanceDetail,
@@ -82,8 +83,8 @@ class TestComputeStatus:
 
 
 class TestGetStatus:
-    def test_raises_key_error_for_unknown_id(self) -> None:
-        with pytest.raises(KeyError):
+    def test_raises_no_lens_found_for_unknown_id(self) -> None:
+        with pytest.raises(NoLensFound):
             get_status(LensInstanceId("no-such-id"))
 
     def test_returns_status_for_known_id(self) -> None:

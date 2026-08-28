@@ -284,11 +284,10 @@ export function useComparisonSource(
     }
   }
 
-  const port = detail?.status === 'running' ? detail.ports[0] : undefined
-  if (detail && port !== undefined) {
+  if (detail?.status === 'running') {
     return {
       phase: 'running',
-      baseUrl: buildLensBaseUrl(port),
+      baseUrl: buildLensBaseUrl(detail.lens_instance_id),
       lensId: detail.lens_instance_id,
       localPath,
     }

@@ -11,7 +11,10 @@
 /**
  * useLensSource capabilities retry ladder: the backend reports a lens
  * `running` when the process spawns, but SkinnyWMS serves its WMS port
- * seconds later — early 503s must be retried away, not parked on.
+ * seconds later — early 503s must be retried away, not parked on. Our own
+ * lens (reached via the proxy path) gets the patient ladder; an external
+ * WMS gets the snappy one — this asserts the patient ladder actually
+ * outlasts the snappy one, not just that some retrying happens.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -21,10 +24,11 @@ import {
   registerMockWmsServer,
   wmsCapabilitiesRequestCount,
 } from '@tests/../mocks/data/wms.data'
+import { buildLensBaseUrl } from '@/api/endpoints/lens'
 import { useLensSource } from '@/features/viewer/hooks/useLensSource'
 
-function Probe({ port }: { port: number }) {
-  const source = useLensSource(`http://localhost:${port}`)
+function Probe({ baseUrl }: { baseUrl: string }) {
+  const source = useLensSource(baseUrl)
   return (
     <output data-testid="state">
       {source.layers.length > 0
@@ -39,27 +43,28 @@ function Probe({ port }: { port: number }) {
 }
 
 describe('useLensSource cold-boot retry', () => {
-  it('retries early 503s away and serves the capabilities', async () => {
-    const port = 21900
-    // Two boot-race failures before the server responds (see
-    // MockWmsServerConfig.failuresBeforeSuccess) — the 300/600 ms rungs
-    // must absorb them without surfacing an error.
-    registerMockWmsServer(port, {
+  it('outlasts the snappy external ladder for our own lens proxy base', async () => {
+    const lensId = 'lens-cold-boot'
+    const baseUrl = buildLensBaseUrl(lensId)
+    // 6 boot-race failures before the server responds: the external ladder
+    // (5 retries, 6 attempts total) would give up before this succeeds —
+    // only the lens proxy's patient ladder (10 retries) absorbs it.
+    registerMockWmsServer(lensId, {
       layers: [{ name: '2t', title: '2 m temperature' }],
-      failuresBeforeSuccess: 2,
+      failuresBeforeSuccess: 6,
     })
     const queryClient = new QueryClient()
     const screen = await render(
       <QueryClientProvider client={queryClient}>
-        <Probe port={port} />
+        <Probe baseUrl={baseUrl} />
       </QueryClientProvider>,
     )
 
     await expect
       .poll(() => screen.getByTestId('state').element().textContent, {
-        timeout: 8000,
+        timeout: 20000,
       })
       .toBe('ready:2t')
-    expect(wmsCapabilitiesRequestCount(port)).toBe(3)
+    expect(wmsCapabilitiesRequestCount(lensId)).toBe(7)
   })
 })

@@ -28,6 +28,7 @@ from cascade.low.func import assert_never
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
+from forecastbox.domain.lens.exceptions import NoLensFound
 from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
 from forecastbox.utility.concurrency.shutdown import shutdown_popen
 from forecastbox.utility.concurrency.synchronization import timed_acquire
@@ -160,7 +161,7 @@ def get_status(instance_id: LensInstanceId) -> LensInstanceDetail:
     """Return the status of a lens instance. Raises KeyError if not found."""
     instance = LensInstanceManager.instances.get(instance_id)
     if instance is None:
-        raise KeyError(instance_id)
+        raise NoLensFound(instance_id)
     return _compute_status(instance)
 
 

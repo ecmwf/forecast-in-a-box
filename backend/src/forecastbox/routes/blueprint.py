@@ -68,12 +68,13 @@ from forecastbox.domain.plugin.status import catalogue_view, plugins_ready
 from forecastbox.schemata.blueprint import BlueprintSource
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
-PREFIX = "/api/v1/blueprint"
+PREFIX = f"{ROUTE_PREFIX}/blueprint"
 
 router = APIRouter(
     tags=["blueprint"],

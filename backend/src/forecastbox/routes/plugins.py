@@ -34,13 +34,13 @@ from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_s
 from forecastbox.domain.plugin.submit import submit_uninstall_single, submit_unload_single, submit_update_single
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.concurrency.manager import execution_manager
-from forecastbox.utility.config import PluginSettings, config
+from forecastbox.utility.config import ROUTE_PREFIX, PluginSettings, config
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
-PREFIX = "/api/v1/plugin"
+PREFIX = f"{ROUTE_PREFIX}/plugin"
 
 router = APIRouter(
     tags=["blueprint"],

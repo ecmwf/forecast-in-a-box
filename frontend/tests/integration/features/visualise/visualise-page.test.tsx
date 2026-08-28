@@ -47,6 +47,7 @@ import {
   stopMockLens,
 } from '@tests/../mocks/data/lens.data'
 import {
+  registerDefaultMockWmsServer,
   registerMockWmsServer,
   wmsCapabilitiesRequestCount,
 } from '@tests/../mocks/data/wms.data'
@@ -146,13 +147,12 @@ beforeEach(() => {
   injectMockExecution(secondGribRunExecution)
   resetLensState()
   viewerCrash.armed = false
-  // Mock lenses allocate ports from 54300 — serve WMS on the first few so
-  // panels that reach `running` can load capabilities.
-  for (let port = 54300; port < 54306; port++) {
-    registerMockWmsServer(port, {
-      layers: [{ name: '2t', title: '2 m temperature' }],
-    })
-  }
+  // Auto-started lenses get sequential ids (lens-1, lens-2, …) unknown to
+  // the test in advance — seed a default WMS config so any of them can
+  // load capabilities once running.
+  registerDefaultMockWmsServer({
+    layers: [{ name: '2t', title: '2 m temperature' }],
+  })
 })
 
 describe('VisualisePage', () => {

@@ -19,7 +19,7 @@ import {
   expandTimeSteps,
   fetchCapabilities,
   groupLayers,
-  isLoopbackUrl,
+  isLensProxyUrl,
   parseCapabilities,
   parseWmsTimestamp,
   partitionGroups,
@@ -412,7 +412,7 @@ describe('expandTimeSteps', () => {
 })
 
 describe('rebaseLensUrl', () => {
-  it('grafts the upstream path and query onto the base URL', () => {
+  it('grafts the upstream path and query onto a bare-origin external base', () => {
     expect(
       rebaseLensUrl(
         'http://0.0.0.0:54321/wms?service=WMS&request=GetMap',
@@ -439,6 +439,26 @@ describe('rebaseLensUrl', () => {
     expect(
       rebaseLensUrl(advertised, 'https://eccharts.ecmwf.int/wms/?token=public'),
     ).toBe(advertised)
+  })
+
+  it('grafts onto the lens proxy path regardless of its own pathname', () => {
+    // The proxy base is same-origin and non-root (`/api/v1/lens/proxy/<id>`)
+    // — unlike external bases, it must still rebase, not be used verbatim.
+    expect(
+      rebaseLensUrl(
+        'http://0.0.0.0:54321/wms?service=WMS&request=GetMap',
+        '/api/v1/lens/proxy/lens-1',
+      ),
+    ).toBe('/api/v1/lens/proxy/lens-1/wms?service=WMS&request=GetMap')
+  })
+
+  it('tolerates a trailing slash on the lens proxy base', () => {
+    expect(
+      rebaseLensUrl(
+        'http://0.0.0.0:54321/legend?layer=2t',
+        '/api/v1/lens/proxy/lens-1/',
+      ),
+    ).toBe('/api/v1/lens/proxy/lens-1/legend?layer=2t')
   })
 })
 
@@ -535,6 +555,15 @@ describe('toWmsEndpoint / appendWmsParams', () => {
     expect(toWmsEndpoint('not a url')).toBe('not a url')
   })
 
+  it('appends /wms to the lens proxy path despite its non-root pathname', () => {
+    expect(toWmsEndpoint('/api/v1/lens/proxy/lens-1')).toBe(
+      '/api/v1/lens/proxy/lens-1/wms',
+    )
+    expect(toWmsEndpoint('/api/v1/lens/proxy/lens-1/')).toBe(
+      '/api/v1/lens/proxy/lens-1/wms',
+    )
+  })
+
   it('joins params with the correct separator', () => {
     expect(appendWmsParams('http://h/wms', 'request=GetCapabilities')).toBe(
       'http://h/wms?request=GetCapabilities',
@@ -545,17 +574,16 @@ describe('toWmsEndpoint / appendWmsParams', () => {
   })
 })
 
-describe('isLoopbackUrl', () => {
-  it('recognises our lens hosts', () => {
-    expect(isLoopbackUrl('http://localhost:54301/wms')).toBe(true)
-    expect(isLoopbackUrl('http://127.0.0.1:8080')).toBe(true)
-    expect(isLoopbackUrl('http://[::1]:9000/x')).toBe(true)
+describe('isLensProxyUrl', () => {
+  it('recognises our lens proxy path', () => {
+    expect(isLensProxyUrl('/api/v1/lens/proxy/lens-1')).toBe(true)
+    expect(isLensProxyUrl('/api/v1/lens/proxy/lens-1/wms')).toBe(true)
   })
 
-  it('rejects external servers and junk', () => {
-    expect(isLoopbackUrl('https://maps.dwd.de/geoserver/ows?')).toBe(false)
-    expect(isLoopbackUrl('https://localhost.evil.example')).toBe(false)
-    expect(isLoopbackUrl('not a url')).toBe(false)
+  it('rejects external servers and unrelated paths', () => {
+    expect(isLensProxyUrl('https://maps.dwd.de/geoserver/ows?')).toBe(false)
+    expect(isLensProxyUrl('http://localhost:54301/wms')).toBe(false)
+    expect(isLensProxyUrl('/api/v1/lens/status')).toBe(false)
   })
 })
 
