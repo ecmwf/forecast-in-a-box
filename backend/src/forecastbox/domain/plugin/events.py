@@ -12,6 +12,7 @@
 from dataclasses import dataclass
 
 from forecastbox.domain.notification.models import ClientNotification
+from forecastbox.utility.config import ROUTE_PREFIX
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -31,8 +32,8 @@ class PluginGlobalErrorEvent:
             sourceDomainName="plugin",
             sourceDomainEvent="pluginGlobalError",
             context={"trigger": self.trigger, "error": self.error},
-            detailRoute="api/v1/plugin/list",
-            refreshRoutes=["api/v1/plugin/list"],
+            detailRoute=f"{ROUTE_PREFIX}/plugin/list",
+            refreshRoutes=[f"{ROUTE_PREFIX}/plugin/list"],
         )
 
 
@@ -49,8 +50,8 @@ class PluginInstalledEvent:
             sourceDomainName="plugin",
             sourceDomainEvent="pluginInstalled",
             context={"plugin_id": self.plugin_id},
-            detailRoute="api/v1/plugin/list",
-            refreshRoutes=["api/v1/plugin/list"],
+            detailRoute=f"{ROUTE_PREFIX}/plugin/list",
+            refreshRoutes=[f"{ROUTE_PREFIX}/plugin/list"],
         )
 
 
@@ -67,8 +68,8 @@ class PluginUpdatedEvent:
             sourceDomainName="plugin",
             sourceDomainEvent="pluginUpdated",
             context={"plugin_id": self.plugin_id},
-            detailRoute="api/v1/plugin/list",
-            refreshRoutes=["api/v1/plugin/list"],
+            detailRoute=f"{ROUTE_PREFIX}/plugin/list",
+            refreshRoutes=[f"{ROUTE_PREFIX}/plugin/list"],
         )
 
 
@@ -86,8 +87,8 @@ class PluginSettingsAppliedEvent:
             sourceDomainName="plugin",
             sourceDomainEvent="pluginSettingsApplied",
             context={"plugin_id": self.plugin_id},
-            detailRoute="api/v1/plugin/list",
-            refreshRoutes=["api/v1/plugin/list"],
+            detailRoute=f"{ROUTE_PREFIX}/plugin/list",
+            refreshRoutes=[f"{ROUTE_PREFIX}/plugin/list"],
         )
 
 
@@ -104,8 +105,8 @@ class PluginUnloadedEvent:
             sourceDomainName="plugin",
             sourceDomainEvent="pluginUnloaded",
             context={"plugin_id": self.plugin_id},
-            detailRoute="api/v1/plugin/list",
-            refreshRoutes=["api/v1/plugin/list"],
+            detailRoute=f"{ROUTE_PREFIX}/plugin/list",
+            refreshRoutes=[f"{ROUTE_PREFIX}/plugin/list"],
         )
 
 
@@ -122,8 +123,8 @@ class PluginUninstalledEvent:
             sourceDomainName="plugin",
             sourceDomainEvent="pluginUninstalled",
             context={"plugin_id": self.plugin_id},
-            detailRoute="api/v1/plugin/list",
-            refreshRoutes=["api/v1/plugin/list"],
+            detailRoute=f"{ROUTE_PREFIX}/plugin/list",
+            refreshRoutes=[f"{ROUTE_PREFIX}/plugin/list"],
         )
 
 

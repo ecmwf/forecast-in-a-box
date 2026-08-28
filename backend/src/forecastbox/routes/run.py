@@ -44,11 +44,12 @@ from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, Compil
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX
 from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 
-PREFIX = "/api/v1/run"
+PREFIX = f"{ROUTE_PREFIX}/run"
 
 logger = logging.getLogger(__name__)
 

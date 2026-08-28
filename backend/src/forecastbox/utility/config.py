@@ -27,6 +27,10 @@ from forecastbox.utility.pydantic import FiabBaseModel
 fiab_home = Path(os.environ["FIAB_ROOT"]) if "FIAB_ROOT" in os.environ else (Path.home() / ".fiab")
 logger = logging.getLogger(__name__)
 
+# NOTE not the best place for this to be, but better than spread adhoc all over. It is actually needed
+# inside various domains as well due to eg proxies and responses, its not just for routes
+ROUTE_PREFIX = "/api/v1"
+
 
 def _validate_url(url: str) -> bool:
     # TODO add DNS resolution attempt or something

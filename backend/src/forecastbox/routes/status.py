@@ -20,9 +20,9 @@ from forecastbox.domain.experiment.scheduling.background import status_scheduler
 from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.plugin.status import status_brief
 from forecastbox.utility.concurrency.manager import ExecutionStatus, execution_manager
-from forecastbox.utility.config import config
+from forecastbox.utility.config import ROUTE_PREFIX, config
 
-PREFIX = "/api/v1/status"
+PREFIX = f"{ROUTE_PREFIX}/status"
 
 logger = logging.getLogger(__name__)
 

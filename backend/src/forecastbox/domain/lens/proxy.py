@@ -79,11 +79,12 @@ from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from starlette.datastructures import Headers
 
+from forecastbox.domain.lens.core import PREFIX as PREFIX_ROOT
 from forecastbox.domain.lens.manager import LensInstanceId, get_status
 
 logger = logging.getLogger(__name__)
 
-PREFIX = "/api/v1/lens/proxy"
+PREFIX = f"{PREFIX_ROOT}/proxy"
 
 #: Headers that are meaningful only for a single hop and must not be forwarded
 #: verbatim in either direction (RFC 7230 section 6.1, plus Content-Length since

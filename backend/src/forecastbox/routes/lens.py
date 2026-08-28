@@ -34,6 +34,7 @@ from fastapi.responses import StreamingResponse
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.lens import metadata_db
 from forecastbox.domain.lens import proxy as lens_proxy
+from forecastbox.domain.lens.core import PREFIX
 from forecastbox.domain.lens.manager import (
     LensInstanceDetail,
     LensInstanceId,
@@ -50,8 +51,6 @@ from forecastbox.utility.concurrency.ports import NoFreePortsException
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
-
-PREFIX = "/api/v1/lens"
 
 logger = logging.getLogger(__name__)
 
