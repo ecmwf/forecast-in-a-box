@@ -34,7 +34,8 @@ export default defineConfig(({ mode }) => {
       }),
       viteReact(),
       tailwindcss(),
-      // CSP: the WMS lens lives on dynamic loopback ports in every build.
+      // Loopback is not for the lens (same-origin via the proxy) but for a
+      // user's own WMS — one bundle serves both a domain and localhost.
       // External WMS hosts: dev allows all; prod bakes in the curated list
       // plus FIAB_CSP_EXTRA_HOSTS (space-separated source expressions).
       {

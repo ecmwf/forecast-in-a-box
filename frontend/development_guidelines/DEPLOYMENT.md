@@ -42,7 +42,7 @@ Content-Security-Policy:
 
 ### Notes
 
-- If you serve the backend on a different origin (e.g. `https://api.example.com`), add it to `connect-src` — including `wss://api.example.com` for the notification WebSocket, since `'self'`'s scheme-upgrade leniency applies only to the page's own origin.
+- If you serve the backend on a different origin (e.g. `https://api.example.com`), add it to `connect-src` — including `wss://api.example.com` for the notification WebSocket, since `'self'`'s scheme-upgrade leniency applies only to the page's own origin. Note the geo viewer's lens sources do **not** support this: they are addressed by a relative path under `/api/v1/lens/proxy/`, so lens viewing requires the app and backend to share an origin.
 - Reverse proxies in front of the backend must forward WebSocket upgrades on `/api/v1/notification/ws` (nginx: `proxy_http_version 1.1` plus the `Upgrade`/`Connection` headers).
 - `'unsafe-inline'` in `style-src` is required because three.js and some UI libraries inject styles at runtime. If this is unacceptable, consider using a CSP nonce strategy.
 - `worker-src 'self'` can be removed in production if MSW is not used.
@@ -54,6 +54,7 @@ CSP must mirror the allowances the built `index.html` meta CSP carries, or
 those features silently fail:
 
 - **Basemap:** `https://basemaps.cartocdn.com` and `https://*.basemaps.cartocdn.com` in `img-src`, `connect-src`, `style-src`, and `font-src`.
-- **WMS lens servers** run on dynamic loopback ports next to the backend: `http://localhost:*` and `http://127.0.0.1:*` in `img-src` and `connect-src` (single-host deployments; a same-origin lens proxy needs only `'self'`).
+- **WMS lens servers** need no allowance of their own: the backend proxies them at `/api/v1/lens/proxy/<id>/`, so lens traffic is same-origin and covered by `'self'`.
+- **Loopback WMS servers** the user runs on their own machine and adds by URL: `http://localhost:*` and `http://127.0.0.1:*` in `img-src` and `connect-src`. A single production bundle is served both from a domain and from localhost, and the baked meta CSP cannot tell the two apart, so these stay allowed in both. A proxy-level CSP fronting a domain deployment may drop them.
 - **Curated WMS servers** (the built-in list in `src/features/visualise/curated-wms.ts`) are baked into production builds' `img-src`/`connect-src` automatically.
 - **Additional WMS hosts** users should be able to add by URL: set `FIAB_CSP_EXTRA_HOSTS` at build time (space-separated source expressions, e.g. `FIAB_CSP_EXTRA_HOSTS="https://my.wms.host https://other.example"`), and mirror them in the proxy CSP.
