@@ -31,7 +31,7 @@ import {
 import { API_ENDPOINTS } from '@/api/endpoints'
 
 // Translucent 1×1 PNGs (red / blue) — GetMap alternates the color by
-// port so two mock lenses are visually distinguishable and comparison
+// routing key so two mock lenses are visually distinguishable and comparison
 // partitions (swipe/spy) can be eyeballed in dev:mock: any red/blue
 // blending would mean a leaking clip.
 const PNG_RED = Uint8Array.from(
@@ -60,8 +60,11 @@ function wmsKeyFor(url: URL): string {
   return proxied ? decodeURIComponent(proxied[1]) : url.port
 }
 
+/** Keys may be non-numeric lens ids, so alternate on a char sum, not a port. */
 function pngResponse(key: string) {
-  const png = Number(key) % 2 === 0 ? PNG_RED : PNG_BLUE
+  let sum = 0
+  for (let i = 0; i < key.length; i++) sum += key.charCodeAt(i)
+  const png = sum % 2 === 0 ? PNG_RED : PNG_BLUE
   return new HttpResponse(png.slice().buffer, {
     headers: { ...CORS, 'Content-Type': 'image/png' },
   })
