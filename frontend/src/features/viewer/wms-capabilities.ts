@@ -774,10 +774,19 @@ export function uniquePressureLevels(
  */
 export function rebaseLensUrl(url: string, baseUrl: string): string {
   try {
-    const upstream = new URL(url)
     if (isLensProxyUrl(baseUrl)) {
-      return `${baseUrl.replace(/\/$/, '')}${upstream.pathname}${upstream.search}`
+      const lensBase = baseUrl.replace(/\/+$/, '')
+      // The lens may advertise an internal address, a host-less path, or one
+      // already under the proxy (X-Forwarded-Prefix). The fake host is never
+      // contacted — it only lets `new URL` parse a host-less path; we keep
+      // the path and query.
+      const upstream = new URL(url, 'http://lens.invalid')
+      const path = upstream.pathname.startsWith(`${lensBase}/`)
+        ? upstream.pathname
+        : `${lensBase}${upstream.pathname}`
+      return `${path}${upstream.search}`
     }
+    const upstream = new URL(url)
     // External endpoints carry a path and/or query in the base (e.g.
     // `…/wms/?token=…`) and advertise public URLs — grafting the base onto
     // those doubles the path/query, so use them verbatim.
