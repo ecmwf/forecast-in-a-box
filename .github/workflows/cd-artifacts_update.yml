@@ -63,11 +63,8 @@ jobs:
           fi
 
           VERSION="${BASE_TAG#c}"
-          uv run --no-project --with "fiab-core==${VERSION}" python backend/packages/fiab-core/scripts/parse_artifacts_catalog.py install/artifacts.json
-
-          # every checkpoint url must resolve and its disk_size_bytes must match the actual download
-          FIAB_ARTIFACT_STORE_REQUIRED=yes uv run --no-project --with "fiab-core==${VERSION}" --with pytest --with pytest-xdist \
-            pytest backend/packages/fiab-core/tests/test_artifacts_json.py
+          # catalog must parse, every checkpoint url must resolve and its disk_size_bytes must match the actual download
+          uv run --no-project --with "fiab-core==${VERSION}" python backend/packages/fiab-core/scripts/parse_test_artifacts_catalog.py install/artifacts.json
 
           IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "${HIGHEST_TAG#c}"
           NEW_TAG="c${MAJOR}.${MINOR}.${PATCH}.$((BUILD + 1))"

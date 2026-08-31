@@ -39,14 +39,6 @@ clean:
 val-cicd-scripts:
     bash scripts/cicd/test_scripts.sh
 
-# Validates install/artifacts.json: schema, plus every checkpoint url against the artifact store.
-# These checks also run as part of `just val`; here an unreachable store is a failure, not a skip.
-val-artifacts:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd backend/packages/fiab-core
-    FIAB_ARTIFACT_STORE_REQUIRED=yes uv run --isolated --with pytest --with pytest-xdist pytest tests/test_artifacts_json.py
-
 val:
     #!/usr/bin/env bash
     set -euo pipefail
