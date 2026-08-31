@@ -2879,7 +2879,7 @@
             }
           ],
           "nested_model": true,
-          "region_of_interest": "lam_0"
+          "region_of_interest": "source0"
         },
         "timestep": "6h"
       }
