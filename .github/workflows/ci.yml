@@ -11,6 +11,7 @@ on:
       - 'cli/**'
       - '.github/**'
       - 'scripts/cicd/**'
+      - 'install/**'
     tags-ignore:
       - '**'
 
@@ -22,6 +23,7 @@ on:
       - 'cli/**'
       - '.github/**'
       - 'scripts/cicd/**'
+      - 'install/**'
 
   # Trigger the workflow manually
   workflow_dispatch: ~
@@ -42,6 +44,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend || steps.all-true.outputs.frontend }}
       cli: ${{ steps.filter.outputs.cli || steps.all-true.outputs.cli }}
       cicd_scripts: ${{ steps.filter.outputs.cicd_scripts || steps.all-true.outputs.cicd_scripts }}
+      artifacts: ${{ steps.filter.outputs.artifacts || steps.all-true.outputs.artifacts }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -62,6 +65,10 @@ jobs:
             cicd_scripts:
               - '.github/**'
               - 'scripts/cicd/**'
+            artifacts:
+              - 'install/artifacts.json'
+              - 'backend/packages/fiab-core/**'
+              - '.github/workflows/ci.yml'
       # For workflow_dispatch and push events, set all outputs to true
       - name: Set outputs for non-PR events
         if: github.event_name != 'pull_request'
@@ -71,6 +78,7 @@ jobs:
           echo "frontend=true" >> "$GITHUB_OUTPUT"
           echo "cli=true" >> "$GITHUB_OUTPUT"
           echo "cicd_scripts=true" >> "$GITHUB_OUTPUT"
+          echo "artifacts=true" >> "$GITHUB_OUTPUT"
 
   macos:
     name: macos
@@ -218,3 +226,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v3
       - run: just val-cicd-scripts
+
+  artifacts-catalog:
+    name: Artifacts catalog
+    needs: changes
+    # NOTE: Run when the catalog or its schema changes. Hits the artifact store over the network, so
+    # it is deliberately a single job rather than part of the backend test matrix.
+    if: needs.changes.outputs.artifacts == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
+      - run: just val-artifacts
+
