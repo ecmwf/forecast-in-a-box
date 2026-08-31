@@ -603,7 +603,7 @@
         "display_name": "AIFS Single MSE 1.1",
         "display_author": "ECMWF",
         "display_description": "",
-        "disk_size_bytes": 993937386,
+        "disk_size_bytes": 1132347094,
         "supported_platforms": [
           "linux",
           "macos"
@@ -1219,7 +1219,7 @@
         "display_name": "AIFS ENS CRPS 1.0",
         "display_author": "ECMWF",
         "display_description": "",
-        "disk_size_bytes": 921584533,
+        "disk_size_bytes": 1109521399,
         "supported_platforms": [
           "linux",
           "macos"
@@ -1935,7 +1935,7 @@
     "BRIS-Malawi-2025.10": {
       "artifact_type": "AnemoiCheckpoint",
       "common": {
-        "url": "https://sites.ecmwf.int/repository/fiab/metnorway/checkpoints/bris-malawi-0.025-n320-20251017.ckpt",
+        "url": "https://sites.ecmwf.int/repository/fiab/metnorway/checkpoints/bris-metnorway-malawi-0.025-n320-20251017.ckpt",
         "display_name": "BRIS Malawi 2025/10",
         "display_author": "MetNorway",
         "display_description": "",
@@ -1943,7 +1943,7 @@
         "tags": {
             "status": "operational"
         },
-        "disk_size_bytes": 1449403913,
+        "disk_size_bytes": 1330651150,
         "supported_platforms": [
           "linux",
           "macos"
@@ -3204,7 +3204,7 @@
         "tags": {
             "status": "demo"
         },
-        "disk_size_bytes": 1028464312,
+        "disk_size_bytes": 1016336351,
         "supported_platforms": [
           "linux",
           "macos"
