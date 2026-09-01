@@ -767,17 +767,27 @@ export function uniquePressureLevels(
 }
 
 /**
- * Rewrite an absolute URL emitted by the lens (which embeds its internal
- * bind address, e.g. `http://0.0.0.0:54321/wms?...`) so it is fetched via
- * `baseUrl` (the browser-reachable lens proxy path): the upstream path +
- * query are grafted onto it. Returns the input unchanged on parse failure.
+ * Rewrite a URL advertised by the lens so it is fetched via `baseUrl`, the
+ * browser-reachable lens proxy path. The advertised form may be an internal
+ * bind address (`http://0.0.0.0:54321/wms?...`), a relative reference, or
+ * already proxied (X-Forwarded-Prefix); each resolves onto the proxy path.
+ * External bases are used verbatim, as is anything that fails to parse.
  */
 export function rebaseLensUrl(url: string, baseUrl: string): string {
   try {
-    const upstream = new URL(url)
     if (isLensProxyUrl(baseUrl)) {
-      return `${baseUrl.replace(/\/$/, '')}${upstream.pathname}${upstream.search}`
+      const lensBase = baseUrl.replace(/\/+$/, '')
+      // Relative refs resolve against the document that carried them — the
+      // WMS endpoint — so a query-only href keeps `/wms`. The fake host is
+      // never contacted; it only lets `new URL` parse a host-less ref.
+      const docBase = `http://lens.invalid${toWmsEndpoint(lensBase)}`
+      const upstream = new URL(url, docBase)
+      const path = upstream.pathname.startsWith(`${lensBase}/`)
+        ? upstream.pathname
+        : `${lensBase}${upstream.pathname}`
+      return `${path}${upstream.search}`
     }
+    const upstream = new URL(url)
     // External endpoints carry a path and/or query in the base (e.g.
     // `…/wms/?token=…`) and advertise public URLs — grafting the base onto
     // those doubles the path/query, so use them verbatim.

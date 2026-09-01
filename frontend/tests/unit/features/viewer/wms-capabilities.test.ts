@@ -460,6 +460,37 @@ describe('rebaseLensUrl', () => {
       ),
     ).toBe('/api/v1/lens/proxy/lens-1/legend?layer=2t')
   })
+
+  it('does not double the prefix on an already-proxied advertised URL', () => {
+    // A lens honouring X-Forwarded-Prefix advertises already-proxied URLs.
+    expect(
+      rebaseLensUrl(
+        'https://fiab.example/api/v1/lens/proxy/lens-1/wms?request=GetMap',
+        '/api/v1/lens/proxy/lens-1',
+      ),
+    ).toBe('/api/v1/lens/proxy/lens-1/wms?request=GetMap')
+  })
+
+  it('grafts a relative advertised URL onto the lens proxy base', () => {
+    // The proxy contract asks lenses to prefer relative self-URLs.
+    expect(
+      rebaseLensUrl('/wms?request=GetMap', '/api/v1/lens/proxy/lens-1'),
+    ).toBe('/api/v1/lens/proxy/lens-1/wms?request=GetMap')
+  })
+
+  it('keeps the WMS endpoint on a query-only advertised URL', () => {
+    // A query-only href is relative to the capabilities document itself, so
+    // it must resolve against `/wms` rather than the proxy root.
+    expect(rebaseLensUrl('?request=GetMap', '/api/v1/lens/proxy/lens-1')).toBe(
+      '/api/v1/lens/proxy/lens-1/wms?request=GetMap',
+    )
+  })
+
+  it('resolves a path-relative advertised URL as a sibling of /wms', () => {
+    expect(rebaseLensUrl('legend?layer=2t', '/api/v1/lens/proxy/lens-1')).toBe(
+      '/api/v1/lens/proxy/lens-1/legend?layer=2t',
+    )
+  })
 })
 
 describe('groupLayers', () => {
