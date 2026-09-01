@@ -43,7 +43,6 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
     in_qube = _expansion_qube(in_variables, variables_metadata, model_step, 6).remove_by_key("step")
     out_qube = _expansion_qube(out_variables, variables_metadata, model_step, 6).remove_by_key("step")
 
-
     return {"input_qube": in_qube.to_json(), "output_qube": out_qube.to_json()}
 
 
