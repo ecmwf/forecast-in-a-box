@@ -161,9 +161,10 @@ def submit_initialize_stores() -> None:
     )
 
 
-async def submit_install_single(plugin_composite_key: PluginCompositeId) -> None:
-    """Retrieves the information from the store, inserts the record of plugin being presents
-    into the config file, then submits the actual pip operation via `plugins.submit`"""
+def register_plugin_from_store(plugin_composite_key: PluginCompositeId) -> PluginSettings:
+    """Retrieves the plugin information from the store and inserts the record of the plugin being
+    present into the config file, unless already there. Returns the settings the plugin is configured
+    with. Synchronous and self-contained -- performs no pip operation, that is the caller's job"""
     # No lock needed for reads with pyrsistent immutable structures
     if not StoresManager.stores:
         raise ValueError("stores not initialized")
@@ -185,5 +186,11 @@ async def submit_install_single(plugin_composite_key: PluginCompositeId) -> None
                 update_strategy="manual",
             )
             config.save_to_file()
+    return config.external.plugins[plugin_composite_key]
 
+
+async def submit_install_single(plugin_composite_key: PluginCompositeId) -> None:
+    """Retrieves the information from the store, inserts the record of plugin being presents
+    into the config file, then submits the actual pip operation via `plugins.submit`"""
+    register_plugin_from_store(plugin_composite_key)
     await submit_update_single(plugin_composite_key, install=True, version=None)

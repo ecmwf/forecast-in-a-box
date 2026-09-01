@@ -14,6 +14,27 @@ chmod +x fiab.sh
 
 This handles uv, Python, dependencies, and launches both the backend and cascade automatically.
 
+## Preparing the environment ahead of time
+
+If you want to prepare a machine without launching the application -- for example to have everything
+downloaded and installed before a demo, or when provisioning an image -- run the launcher in the
+warmup mode:
+
+```bash
+./fiab.sh warmup
+```
+
+This creates the virtual environment and installs the default plugin into it. To install a different
+set of plugins, pass their composite ids (`store:plugin`) with `-p`, comma-separated:
+
+```bash
+./fiab.sh warmup -p ecmwf:ecmwf-base,mystore:myplugin
+```
+
+The warmup expects to run in isolation -- do not run it while a backend is running, as both mutate
+the same virtual environment, configuration file and database. Once a warmup has been executed, a
+subsequent regular launch does not attempt any plugin installation on its own.
+
 # Containerized Setup
 Consult the [docker example](../../deployment/ewc), albeit understand that the example is not necessarily up to date.
 

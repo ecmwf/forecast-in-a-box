@@ -32,8 +32,10 @@ This script by default:
 5. runs the fiab itself, launching a web browser window by default
 
 There are other commands available:
-- warmup -- executes just the uv/python/pylock/venv checks, but does not
-  launch fiab itself
+- warmup -- executes the uv/python/pylock/venv checks and installs plugins, but
+  does not launch fiab itself. By default the default plugin is installed; pass
+  '-p store:local' (comma-separate for multiple, eg '-p ecmwf:ecmwf-base,x:y')
+  to choose which plugins to install instead
 - service -- as the regular run, but assumed to be executed by the systemd
   at the system start time
 - full-reinstall -- deletes the ~/.fiab and replaces itself with the most
@@ -287,9 +289,12 @@ case "$COMMAND" in
         usage
         ;;
     "warmup")
-        # TODO see the `--offline` for how this should be extended. In the meantime we leave this
-        # option in place just to run the base venv install and update
-        ensureEnvironment
+        # NOTE the `check` inside `ensureEnvironment` touches the firstrun marker, hence a
+        # subsequent `run` will not attempt the default plugin installation again -- the plugin
+        # installation is the responsibility of the warmup command itself
+        shift
+        ensureEnvironment warmup "$@"
+        python -m forecastbox.entrypoint.warmup "$@"
         ;;
     "offline")
         # TODO we used to have FIAB_CACHE and FIAB_OFFLINE env vars in place, with the assumption
