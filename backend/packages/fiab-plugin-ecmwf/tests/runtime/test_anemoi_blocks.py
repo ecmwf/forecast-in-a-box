@@ -175,6 +175,10 @@ class TestAnemoiSourceValidate:
     def test_ensemble_preserves_param_axis(self, anemoi_source_ensemble_output: QubedOutput) -> None:
         assert contains(anemoi_source_ensemble_output, "param")
 
+    def test_has_basetime(self, anemoi_source_output: QubedOutput) -> None:
+        assert contains(anemoi_source_output, "base_time")
+        assert set(axes(anemoi_source_output)["base_time"]) == {datetime(2024, 1, 1)}
+
     def test_invalid_lead_time_not_a_digit(self, dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_raw_block(
             AnemoiSource,
@@ -304,7 +308,7 @@ class TestAnemoiTransformValidate:
     def test_valid_no_number_axis(self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput) -> None:
         output = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
-            inputs={"dataset": anemoi_input_source_output},
+            inputs={"initial conditions": anemoi_input_source_output},
             restrictions={},
         )
         assert isinstance(output, QubedOutput)
@@ -317,7 +321,7 @@ class TestAnemoiTransformValidate:
         input_with_number = expand(anemoi_input_source_output, {"number": [3]})
         output = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
-            inputs={"dataset": input_with_number},
+            inputs={"initial conditions": input_with_number},
             restrictions={},
         )
         assert isinstance(output, QubedOutput)
@@ -327,7 +331,7 @@ class TestAnemoiTransformValidate:
     def test_output_has_step_axis(self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput) -> None:
         output: QubedOutput = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
-            inputs={"dataset": anemoi_input_source_output},
+            inputs={"initial conditions": anemoi_input_source_output},
             restrictions={},
         )  # type: ignore[assignment]
         assert contains(output, "step")
@@ -335,58 +339,64 @@ class TestAnemoiTransformValidate:
     def test_output_has_param_axis(self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput) -> None:
         output: QubedOutput = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
-            inputs={"dataset": anemoi_input_source_output},
+            inputs={"initial conditions": anemoi_input_source_output},
             restrictions={},
         )  # type: ignore[assignment]
         assert contains(output, "param")
 
-    def test_invalid_lead_time_not_a_digit(self, dummy_checkpoint: CompositeArtifactId, dummy_qube: Qube) -> None:
-        input_dataset = QubedOutput(dataqube=dummy_qube)
+    def test_output_has_basetime(self, anemoi_transform_configuration: BlockInstance, anemoi_input_source_output: QubedOutput) -> None:
+        output: QubedOutput = AnemoiTransform().validate(
+            block=anemoi_transform_configuration,
+            inputs={"initial conditions": anemoi_input_source_output},
+            restrictions={},
+        )  # type: ignore[assignment]
+        assert set(axes(output)["base_time"]) == {datetime(2024, 1, 1)}
+
+    def test_invalid_lead_time_not_a_digit(self, dummy_checkpoint: CompositeArtifactId, anemoi_input_source_output: QubedOutput) -> None:
         block = _make_raw_block(
             AnemoiTransform,
             {"checkpoint": dummy_checkpoint, "lead_time": "abc"},
-            input_ids={"dataset": "src"},
+            input_ids={"initial conditions": "src"},
         )
         with pytest.raises(BlockInstanceConfigurationError, match="expected int"):
             AnemoiTransform().validate(
                 block=block,
-                inputs={"dataset": input_dataset},
+                inputs={"initial conditions": anemoi_input_source_output},
                 restrictions={},
             )
 
-    def test_invalid_lead_time_negative(self, dummy_checkpoint: CompositeArtifactId, dummy_qube: Qube) -> None:
-        input_dataset = QubedOutput(dataqube=dummy_qube)
+    def test_invalid_lead_time_negative(self, dummy_checkpoint: CompositeArtifactId, anemoi_input_source_output: QubedOutput) -> None:
         block = _make_block(
             AnemoiTransform,
             {"checkpoint": dummy_checkpoint, "lead_time": -1},
-            input_ids={"dataset": "src"},
+            input_ids={"initial conditions": "src"},
         )
         with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
             AnemoiTransform().validate(
                 block=block,
-                inputs={"dataset": input_dataset},
+                inputs={"initial conditions": anemoi_input_source_output},
                 restrictions={},
             )
 
-    def test_invalid_lead_time_not_a_timestep_multiple(self, six_hour_dummy_checkpoint: CompositeArtifactId, dummy_qube: Qube) -> None:
-        input_dataset = QubedOutput(dataqube=dummy_qube)
+    def test_invalid_lead_time_not_a_timestep_multiple(
+        self, six_hour_dummy_checkpoint: CompositeArtifactId, anemoi_input_source_output: QubedOutput
+    ) -> None:
         block = _make_block(
             AnemoiTransform,
             {"checkpoint": six_hour_dummy_checkpoint, "lead_time": 7},
-            input_ids={"dataset": "src"},
+            input_ids={"initial conditions": "src"},
         )
         with pytest.raises(Exception, match="must be a multiple of checkpoint timestep"):
-            AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}, restrictions={})
+            AnemoiTransform().validate(block=block, inputs={"initial conditions": anemoi_input_source_output}, restrictions={})
 
-    def test_unknown_checkpoint(self, registered_provider: None, dummy_qube: Qube) -> None:
-        input_dataset = QubedOutput(dataqube=dummy_qube)
+    def test_unknown_checkpoint(self, registered_provider: None, anemoi_input_source_output: QubedOutput) -> None:
         block = _make_block(
             AnemoiTransform,
             {"checkpoint": CompositeArtifactId.from_str("dummy_store:unknown"), "lead_time": 24},
-            input_ids={"dataset": "src"},
+            input_ids={"initial conditions": "src"},
         )
         with pytest.raises(Exception):
-            AnemoiTransform().validate(block=block, inputs={"dataset": input_dataset}, restrictions={})
+            AnemoiTransform().validate(block=block, inputs={"initial conditions": anemoi_input_source_output}, restrictions={})
 
     def test_incompatible_input_dataset(self, dummy_checkpoint: CompositeArtifactId) -> None:
         """If the input dataset does not contain the model's required input params, validate should error."""
@@ -394,10 +404,10 @@ class TestAnemoiTransformValidate:
         block = _make_block(
             AnemoiTransform,
             {"checkpoint": dummy_checkpoint, "lead_time": 24},
-            input_ids={"dataset": "src"},
+            input_ids={"initial conditions": "src"},
         )
         with pytest.raises(Exception, match="not compatible"):
-            AnemoiTransform().validate(block=block, inputs={"dataset": incompatible}, restrictions={})
+            AnemoiTransform().validate(block=block, inputs={"initial conditions": incompatible}, restrictions={})
 
 
 class TestAnemoiTransformIntersect:
@@ -431,7 +441,7 @@ class TestFlowAnemoiSourceToTransform:
         """The deterministic source output should be a valid input for the transform."""
         output = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
-            inputs={"dataset": anemoi_source_output},
+            inputs={"initial conditions": anemoi_source_output},
             restrictions={},
         )
         assert isinstance(output, QubedOutput)
@@ -445,7 +455,7 @@ class TestFlowAnemoiSourceToTransform:
     ) -> None:
         output: QubedOutput = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
-            inputs={"dataset": anemoi_source_ensemble_output},
+            inputs={"initial conditions": anemoi_source_ensemble_output},
             restrictions={},
         )  # type: ignore[assignment]
         assert contains(output, "number")
@@ -462,7 +472,7 @@ class TestFlowAnemoiInputSourceToTransform:
     ) -> None:
         output = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
-            inputs={"dataset": anemoi_input_source_output},
+            inputs={"initial conditions": anemoi_input_source_output},
             restrictions={},
         )
         assert isinstance(output, QubedOutput)
@@ -482,18 +492,18 @@ class TestFlowChainedTransforms:
     ) -> None:
         first_output: QubedOutput = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
-            inputs={"dataset": anemoi_input_source_output},
+            inputs={"initial conditions": anemoi_input_source_output},
             restrictions={},
         )  # type: ignore[assignment]
 
         second_config = _make_block(
             AnemoiTransform,
             {"checkpoint": dummy_checkpoint, "lead_time": 48},
-            input_ids={"dataset": "first_transform"},
+            input_ids={"initial conditions": "first_transform"},
         )
         second_output: QubedOutput = AnemoiTransform().validate(
             block=second_config,
-            inputs={"dataset": first_output},
+            inputs={"initial conditions": first_output},
             restrictions={},
         )  # type: ignore[assignment]
 
@@ -511,7 +521,7 @@ class TestFlowChainedTransforms:
 
         first_output: QubedOutput = AnemoiTransform().validate(
             block=anemoi_transform_configuration,
-            inputs={"dataset": input_with_number},
+            inputs={"initial conditions": input_with_number},
             restrictions={},
         )  # type: ignore[assignment]
         assert contains(first_output, "number")
@@ -519,11 +529,11 @@ class TestFlowChainedTransforms:
         second_config = _make_block(
             AnemoiTransform,
             {"checkpoint": dummy_checkpoint, "lead_time": 48},
-            input_ids={"dataset": "first_transform"},
+            input_ids={"initial conditions": "first_transform"},
         )
         second_output: QubedOutput = AnemoiTransform().validate(
             block=second_config,
-            inputs={"dataset": first_output},
+            inputs={"initial conditions": first_output},
             restrictions={},
         )  # type: ignore[assignment]
 
