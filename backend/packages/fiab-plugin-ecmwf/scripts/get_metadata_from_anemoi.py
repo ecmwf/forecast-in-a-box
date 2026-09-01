@@ -2,6 +2,7 @@
 # /// script
 # dependencies = [
 #    "earthkit-workflows-anemoi",
+#    "qubed",
 #    "anemoi-inference",
 #    "fire",
 # ]
@@ -17,6 +18,8 @@ Usage:
 
 from functools import lru_cache
 from typing import Any
+
+from qubed import Qube
 
 
 @lru_cache(maxsize=None)

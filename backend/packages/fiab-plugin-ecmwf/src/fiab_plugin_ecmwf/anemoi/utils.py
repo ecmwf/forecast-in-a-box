@@ -13,11 +13,10 @@ from copy import deepcopy
 from functools import reduce
 from operator import or_
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Iterable, Mapping, cast
 
 from earthkit.data.utils.dates import to_timedelta
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
-from fiab_core.fable import QubedOutput
 from fiab_core.tools.plugins import _detect_editable_install
 from fiab_core.types import ArtifactType, ClosedEnumType, FableType
 from qubed import Qube
@@ -55,6 +54,14 @@ def get_checkpoint_enum_type() -> FableType:
         return ArtifactType()
     values = [CompositeArtifactId.to_str(k) for k in available_checkpoints]
     return ClosedEnumType(values, subtype=ArtifactType())
+
+
+def _expand_qube(qube: Qube | dict[str, Qube], dim: Mapping[str, Iterable[Any]]) -> Qube | dict[str, Qube]:
+    """Expand the qube along the specified dimension(s), handling both single qube and multiple qube cases."""
+    if isinstance(qube, dict):
+        nested_qube = cast(dict[str, Qube], qube)
+        return {key: expand(q, dim) for key, q in nested_qube.items()}
+    return expand(qube, dim)
 
 
 class CheckpointArtifact:
@@ -122,12 +129,10 @@ class CheckpointArtifact:
 
         lead_time_seconds = lead_time * 3600
         model_step_seconds = _timestep_seconds(checkpoint.timestep)
+
         steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
-        if isinstance(qube, dict):
-            nested_qube = cast(dict[str, Qube], qube)
-            return {key: expand(q, {"step": steps}) for key, q in nested_qube.items()}
-        return expand(qube, {"step": steps})
+        return _expand_qube(qube, {"step": steps})
 
     def get_additional_kwargs(self) -> dict[str, Any]:
         """Get additional kwargs for the model inference from the checkpoint artifact, such as post processors and control options."""

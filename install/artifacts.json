@@ -169,6 +169,44 @@
           "metadata": {},
           "children": [
             {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -457,6 +495,44 @@
           },
           "metadata": {},
           "children": [
+            {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
             {
               "key": "levtype",
               "values": {
@@ -768,6 +844,44 @@
           "metadata": {},
           "children": [
             {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -1076,6 +1190,44 @@
           "metadata": {},
           "children": [
             {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -1382,6 +1534,44 @@
           },
           "metadata": {},
           "children": [
+            {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
             {
               "key": "levtype",
               "values": {
@@ -1738,6 +1928,44 @@
           },
           "metadata": {},
           "children": [
+            {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
             {
               "key": "levtype",
               "values": {
@@ -2104,6 +2332,44 @@
           "metadata": {},
           "children": [
             {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -2424,6 +2690,44 @@
           "metadata": {},
           "children": [
             {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -2736,6 +3040,44 @@
           },
           "metadata": {},
           "children": [
+            {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
             {
               "key": "levtype",
               "values": {
@@ -3052,6 +3394,44 @@
           "metadata": {},
           "children": [
             {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -3365,6 +3745,44 @@
           },
           "metadata": {},
           "children": [
+            {
+              "key": "class",
+              "values": {
+                "type": "enum",
+                "dtype": "str",
+                "values": [
+                  "ai"
+                ]
+              },
+              "metadata": {},
+              "children": [
+                {
+                  "key": "type",
+                  "values": {
+                    "type": "enum",
+                    "dtype": "str",
+                    "values": [
+                      "fc"
+                    ]
+                  },
+                  "metadata": {},
+                  "children": [
+                    {
+                      "key": "stream",
+                      "values": {
+                        "type": "enum",
+                        "dtype": "str",
+                        "values": [
+                          "oper"
+                        ]
+                      },
+                      "metadata": {},
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
             {
               "key": "levtype",
               "values": {
