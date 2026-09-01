@@ -477,6 +477,20 @@ describe('rebaseLensUrl', () => {
       rebaseLensUrl('/wms?request=GetMap', '/api/v1/lens/proxy/lens-1'),
     ).toBe('/api/v1/lens/proxy/lens-1/wms?request=GetMap')
   })
+
+  it('keeps the WMS endpoint on a query-only advertised URL', () => {
+    // A query-only href is relative to the capabilities document itself, so
+    // it must resolve against `/wms` rather than the proxy root.
+    expect(rebaseLensUrl('?request=GetMap', '/api/v1/lens/proxy/lens-1')).toBe(
+      '/api/v1/lens/proxy/lens-1/wms?request=GetMap',
+    )
+  })
+
+  it('resolves a path-relative advertised URL as a sibling of /wms', () => {
+    expect(rebaseLensUrl('legend?layer=2t', '/api/v1/lens/proxy/lens-1')).toBe(
+      '/api/v1/lens/proxy/lens-1/legend?layer=2t',
+    )
+  })
 })
 
 describe('groupLayers', () => {
