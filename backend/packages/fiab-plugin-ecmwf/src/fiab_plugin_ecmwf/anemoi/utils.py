@@ -23,7 +23,11 @@ from qubed import Qube
 
 from ..qubed_utils import expand
 
-INPUT_SOURCE_CONFIGURATION_OPTIONS = {"polytope": {"collection": "initial-conditions"}}
+INPUT_SOURCE_CONFIGURATION_OPTIONS = {
+    "polytope": {"collection": "initial-conditions"},
+    "opendata:google": {"source": "google"},
+    "opendata:aws": {"source": "aws"},
+}
 
 logger = logging.getLogger(__name__)
 
@@ -171,11 +175,15 @@ class CheckpointArtifact:
         elif len(input_source) != 1:
             raise ValueError(f"Input source must have exactly one key representing the source name, got {input_source}")
 
-        source_name = next(iter(input_source.keys()))
+        source_name: str = next(iter(input_source.keys()))
         input_source = deepcopy(input_source)  # Don't modify the original input source dict
 
         if source_name in INPUT_SOURCE_CONFIGURATION_OPTIONS:
             input_source[source_name].update(INPUT_SOURCE_CONFIGURATION_OPTIONS[source_name])
+
+        if ":" in source_name:
+            input_source[source_name.split(":")[0]] = input_source.pop(source_name)
+            source_name = source_name.split(":")[0]
 
         if configuration.pre_processors is not None:
             input_source[source_name].setdefault("pre_processors", []).extend(configuration.pre_processors)
