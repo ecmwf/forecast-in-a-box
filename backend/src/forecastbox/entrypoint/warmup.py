@@ -21,7 +21,10 @@ unused here. The one place where an event loop is needed is the database schema 
 users database is async; a short-lived `asyncio.run` covers just that.
 
 The plugins to install are given as `-p store:local[,store:local...]`; when omitted, the default
-plugins from the config are installed.
+plugins from the config are installed. The comma separated list is split by this module rather than
+by `fire` -- `fire` only auto-converts a comma separated value into a tuple when none of the
+elements contains a colon, which a plugin composite id always does. A repeated `-p` flag is not
+supported by `fire` either (the last occurrence would silently win).
 
 This is expected to run in isolation, on an otherwise vanilla environment -- there is no
 cross-process locking against a concurrently running backend mutating the same venv, config file
@@ -56,15 +59,15 @@ CATALOG_JOIN_TIMEOUT_SEC = 10
 """How long we wait for the artifact manager's executor to be joined at the very end"""
 
 
-def _parse_plugin_ids(plugin: str | tuple[str, ...] | list[str] | None) -> list[PluginCompositeId]:
-    """Convert the `-p` values into composite ids, defaulting to the configured default plugins.
-
-    A single `-p store:local` arrives as a string, a `-p store:local,store:other` as a tuple.
-    """
+def _parse_plugin_ids(plugin: str | None) -> list[PluginCompositeId]:
+    """Convert the comma separated `-p` value into composite ids, defaulting to the configured
+    default plugins when not given"""
     if plugin is None:
         return list(_default_plugins().keys())
-    raw = [plugin] if isinstance(plugin, str) else list(plugin)
-    return [PluginCompositeId.from_str(e) for e in raw]
+    entries = [e.strip() for e in plugin.split(",")]
+    if not all(entries):
+        raise ValueError(f"malformed plugin list: {plugin!r}")
+    return [PluginCompositeId.from_str(e) for e in entries]
 
 
 def _resolve_settings(plugin_id: PluginCompositeId) -> PluginSettings:
@@ -104,7 +107,7 @@ def _install_plugins(plugin_ids: list[PluginCompositeId]) -> dict[str, str]:
     return failures
 
 
-def warmup(plugin: str | tuple[str, ...] | list[str] | None = None) -> None:
+def warmup(plugin: str | None = None) -> None:
     """Install the requested (or, when none given, the default) plugins into the current venv"""
     setup_process()
     validate_runtime(config)

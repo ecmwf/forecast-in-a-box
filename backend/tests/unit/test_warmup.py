@@ -67,9 +67,8 @@ def test_defaults_to_configured_default_plugins(warmup_mocks: dict[str, MagicMoc
 
 def test_explicit_plugins_are_installed_in_order(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    warmup_module.warmup(plugin=("store:alpha", "store:beta"))
+    warmup_module.warmup(plugin="store:alpha, store:beta")
     assert [call.args[0] for call in parent.update_single.call_args_list] == [_ALPHA, _BETA]
-    # a single -p arrives as a plain string
     parent.update_single.reset_mock()
     warmup_module.warmup(plugin="store:beta")
     parent.update_single.assert_called_once_with(_BETA, _SETTINGS, install=True, version=None)
@@ -85,10 +84,11 @@ def test_preparation_precedes_installation(warmup_mocks: dict[str, MagicMock]) -
     assert ordering.index("update_single") < ordering.index("join_artifact_manager")
 
 
-def test_invalid_plugin_id_is_rejected(warmup_mocks: dict[str, MagicMock]) -> None:
+@pytest.mark.parametrize("raw", ["no-store-prefix", "store:alpha,", ""])
+def test_invalid_plugin_id_is_rejected(warmup_mocks: dict[str, MagicMock], raw: str) -> None:
     parent = warmup_mocks["parent"]
     with pytest.raises(ValueError):
-        warmup_module.warmup(plugin="no-store-prefix")
+        warmup_module.warmup(plugin=raw)
     parent.update_single.assert_not_called()
 
 
@@ -112,7 +112,7 @@ def test_recoverable_failure_continues_and_exits_nonzero(warmup_mocks: dict[str,
     parent = warmup_mocks["parent"]
     parent.update_single.side_effect = [RuntimeError("install failed for alpha"), None]
     with pytest.raises(SystemExit) as exit_info:
-        warmup_module.warmup(plugin=("store:alpha", "store:beta"))
+        warmup_module.warmup(plugin="store:alpha,store:beta")
     assert exit_info.value.code != 0
     assert [call.args[0] for call in parent.update_single.call_args_list] == [_ALPHA, _BETA]
     parent.join_artifact_manager.assert_called_once()
@@ -123,6 +123,6 @@ def test_environment_failure_aborts_immediately(warmup_mocks: dict[str, MagicMoc
     parent = warmup_mocks["parent"]
     parent.update_single.side_effect = error
     with pytest.raises(type(error)):
-        warmup_module.warmup(plugin=("store:alpha", "store:beta"))
+        warmup_module.warmup(plugin="store:alpha,store:beta")
     assert [call.args[0] for call in parent.update_single.call_args_list] == [_ALPHA]
     parent.join_artifact_manager.assert_called_once()
