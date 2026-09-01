@@ -32,6 +32,7 @@ dependencies = [
   "fastapi-users[oauth]",
   "fastapi-users-db-sqlalchemy",
   "fiab-core>=3,<4", # auto-updateable -- do not remove this comment
+  "fire",
   "httpx<1",
   "httpx-oauth",
   "jinja2",

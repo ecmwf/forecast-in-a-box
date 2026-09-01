@@ -54,7 +54,7 @@ from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 logger = logging.getLogger(__name__)
 
 
-async def _start_db_schema() -> None:
+async def start_db_schema() -> None:
     """Create db tables declared by every `forecastbox.schemata` submodule.
 
     Import every schemata submodule first, and only then call any discovered
@@ -137,7 +137,7 @@ def _start_artifact_stores() -> None:
     submit_initialize_stores()
 
 
-def _start_artifact_provider() -> None:
+def start_artifact_provider() -> None:
     ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
     ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path))
 
@@ -184,11 +184,11 @@ def build_initializers() -> Initializers:
     for the steps that actually started. See `forecastbox.utility.initializer.Initializers`.
     """
     initializers = [
-        Initializer("db_schema", start=_start_db_schema),
+        Initializer("db_schema", start=start_db_schema),
         Initializer("execution_runtime", start=_start_execution_runtime, stop=_stop_execution_runtime),
         Initializer("broadcaster", start=_start_broadcaster),
         Initializer("artifact_stores", start=_start_artifact_stores),
-        Initializer("artifact_provider", start=_start_artifact_provider),
+        Initializer("artifact_provider", start=start_artifact_provider),
         Initializer(
             "artifact_manager_plugin_catalog",
             start=_start_artifact_manager_plugin_catalog,
