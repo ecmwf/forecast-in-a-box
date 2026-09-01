@@ -24,7 +24,7 @@ from qubed import Qube
 from ..qubed_utils import expand
 
 INPUT_SOURCE_CONFIGURATION_OPTIONS = {
-    "polytope": {"collection": "initial-conditions"},
+    "polytope": {"collection": "ecmwf-mars"},
     "opendata:google": {"source": "google"},
     "opendata:aws": {"source": "aws"},
 }
