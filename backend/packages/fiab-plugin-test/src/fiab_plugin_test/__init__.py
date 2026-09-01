@@ -154,25 +154,25 @@ def _environment_spec() -> list[str]:
     very same version would get installed instead. Only a regular install falls back to
     the pinned release.
     """
-    local_root = pathlib.Path(__file__).parent.parent.parent
     self_version = importlib.metadata.version("fiab-plugin-test")
-    if self_version == "0.0.0" or _is_editable_install():
-        return [f"-e {local_root}"]
-    return [f"fiab-plugin-test=={self_version}"]
-
-
-def _is_editable_install() -> bool:
-    """Whether this distribution was installed editable, as recorded by PEP 610 metadata."""
+    regular = [f"fiab-plugin-test=={self_version}"]
+    local_root = pathlib.Path(__file__).parent.parent.parent
     try:
         direct_url = importlib.metadata.distribution("fiab-plugin-test").read_text("direct_url.json")
+        if not direct_url:
+            return regular
+        dist = json.loads(direct_url)
+        is_editable = dist["dir_info"]["editable"]
+        # NOTE git installs etc probably behave oddly here but they make no sense here anyway
+        is_local = dist["url"].startswith("file:")
+        if not is_local:
+            return regular
+        elif is_editable:
+            return [f"-e {local_root}"]
+        else:
+            return [f"{local_root}"]
     except Exception:
-        return False
-    if not direct_url:
-        return False
-    try:
-        return bool(json.loads(direct_url).get("dir_info", {}).get("editable", False))
-    except json.JSONDecodeError:
-        return False
+        return regular
 
 
 def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
