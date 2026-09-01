@@ -14,8 +14,10 @@ configured plugin when the stores do not know it, and the recoverable/non-recove
 distinction of the install loop.
 """
 
+import asyncio
 from collections.abc import Iterator
 from concurrent.futures import Future
+from typing import Awaitable, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -29,6 +31,29 @@ from forecastbox.utility.packages import PackagesError
 _ALPHA = PluginCompositeId(store=PluginStoreId("store"), local=PluginId("alpha"))
 _BETA = PluginCompositeId(store=PluginStoreId("store"), local=PluginId("beta"))
 _SETTINGS = PluginSettings(pip_source="fiab-plugin-alpha", module_name="fiab_plugin_alpha")
+
+
+def _run_coro_without_touching_global_loop(coro: Generator | Awaitable) -> None:
+    """Stand-in for `asyncio.run` used by the tests.
+
+    `asyncio.run` creates a fresh event loop and, on exit, resets the current event loop of
+    the thread to `None` (`asyncio.set_event_loop(None)`). That is harmless for the real
+    entrypoint, which runs in a dedicated process, but is disruptive here: this module's unit
+    tests run in-process together with the rest of the suite, and pytest-asyncio's fixtures
+    call `asyncio.get_event_loop()` to save/restore the "current" loop around each async test.
+    Once that loop is `None`, `get_event_loop()` transparently creates a brand new one to hand
+    back, which is never used and never closed, and only gets garbage collected at some later,
+    arbitrary point -- surfacing as an unclosed-event-loop `ResourceWarning`/unraisable exception
+    at session teardown, unrelated to whichever test happened to be running then.
+
+    Running the coroutine on a throwaway loop that never touches `asyncio.set_event_loop` avoids
+    that side effect while still exercising the same coroutine.
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 @pytest.fixture
@@ -47,6 +72,9 @@ def warmup_mocks() -> Iterator[dict[str, MagicMock]]:
         patch.object(warmup_module, "join_artifact_manager", parent.join_artifact_manager),
         patch.object(warmup_module, "register_plugin_from_store", parent.register_plugin_from_store),
         patch.object(warmup_module, "update_single", parent.update_single),
+        # NOTE see `_run_coro_without_touching_global_loop` for why we do not let the real
+        # `asyncio.run` execute here
+        patch.object(warmup_module.asyncio, "run", _run_coro_without_touching_global_loop),
     ):
         # NOTE start_db_schema is awaited by the warmup, hence it must return an awaitable
         async def _noop() -> None:
