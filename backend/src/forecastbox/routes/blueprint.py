@@ -179,7 +179,7 @@ class BlueprintValidationExpansionResponse(FiabBaseModel):
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[SerializedBlockExpansion]]
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
-    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str | None]]
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
     block_output_qubes: dict[BlockInstanceId, dict[str, Any]] = {}
 

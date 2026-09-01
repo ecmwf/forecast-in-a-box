@@ -21,7 +21,21 @@ from fiab_core.fable import (
 )
 
 from fiab_plugin_test import _get_checkpoint_enum_type, catalogue, compiler, validator
-from fiab_plugin_test.runtime import sink_file, sink_image, source_filesize
+from fiab_plugin_test.runtime import DEFAULT_TEXT, sink_file, sink_image, source_filesize, source_text
+
+# ---------------------------------------------------------------------------
+# runtime.source_text
+# ---------------------------------------------------------------------------
+
+
+def test_source_text_returns_input() -> None:
+    assert source_text("hello") == "hello"
+    assert source_text("") == ""
+
+
+def test_source_text_imputes_default_on_none() -> None:
+    assert source_text(None) == DEFAULT_TEXT
+
 
 # ---------------------------------------------------------------------------
 # runtime.source_filesize

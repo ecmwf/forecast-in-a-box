@@ -53,6 +53,9 @@ def extract_glyphs(blockInstance: BlockInstance) -> Either[ExtractedGlyphs, list
     glyphed_options: set[ConfigurationOptionId] = set()
     errors: list[str] = []
     for key, value in blockInstance.configuration_values.items():
+        if value is None:
+            # An explicit null carries no glyphs and needs no interpolation.
+            continue
         result = extract_glyph_names(value)
         if result.e is not None:
             errors.append(f"{key!r}: {result.e}")
@@ -73,10 +76,13 @@ def extract_glyphs_per_option(blockInstance: BlockInstance) -> dict[Configuratio
     """Return a mapping from each option id to the set of glyph names it references.
 
     Only includes options that contain at least one glyph reference.
+    Options with an explicit null value are skipped, as they carry no glyphs.
     Malformed expressions are silently skipped; use ``extract_glyphs`` for error detection.
     """
     result: dict[ConfigurationOptionId, set[str]] = {}
     for key, value in blockInstance.configuration_values.items():
+        if value is None:
+            continue
         if not isinstance(value, str):
             raise TypeError(f"expected {key=}'s value to be a string, gotten {type(value)}")
         r = extract_glyph_names(value)
@@ -93,8 +99,11 @@ def resolve_configurations(blockInstance: BlockInstance, glyph_values: dict[str,
     Supports the full Jinja2 expression language with custom date/string filters.
     All glyphs referenced must be present in glyph_values. Call extract_glyphs
     and validate the set against available glyphs before invoking this function.
+    Options with an explicit null value are left untouched.
     """
     for key, value in blockInstance.configuration_values.items():
+        if value is None:
+            continue
         blockInstance.configuration_values[key] = render_expression(value, glyph_values)
 
 

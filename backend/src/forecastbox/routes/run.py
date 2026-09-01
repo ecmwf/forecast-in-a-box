@@ -115,7 +115,7 @@ class RunDetailResponse(FiabBaseModel):
     outputs: RunOutputsResponse | None = None
     completed_block_ids: list[BlockInstanceId] | None = None
     planned_block_ids: list[BlockInstanceId] | None = None
-    resolution: dict[BlockInstanceId, dict[str, str]] | None = None
+    resolution: dict[BlockInstanceId, dict[str, str | None]] | None = None
 
 
 class RunListResponse(FiabBaseModel):

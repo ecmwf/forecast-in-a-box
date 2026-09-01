@@ -24,12 +24,14 @@ from fiab_core.types.definitions import (
     GeoDomainType,
     IntType,
     ListType,
+    NoneType,
     OpenEnumType,
     StringType,
     UnionType,
 )
 from fiab_core.types.exceptions import (
     NotFableType,
+    NotNoneInput,
     NotStringInput,
     WrongType,
 )
@@ -53,6 +55,47 @@ class TestStringType:
             t.validate_convert(None)
         with pytest.raises(NotStringInput):
             t.validate_convert(["hello"])
+
+
+class TestNoneType:
+    """Tests for NoneType"""
+
+    def test_convert_none(self) -> None:
+        assert NoneType().validate_convert(None) is None
+
+    def test_convert_non_none_raises_type_error(self) -> None:
+        t = NoneType()
+        with pytest.raises(NotNoneInput):
+            t.validate_convert("")
+        with pytest.raises(NotNoneInput):
+            t.validate_convert("None")
+        with pytest.raises(NotNoneInput):
+            t.validate_convert(123)
+
+    def test_serialize(self) -> None:
+        assert NoneType().serialize() == "none"
+
+    def test_parse_and_round_trip(self) -> None:
+        t = parse("none")
+        assert isinstance(t, NoneType)
+        assert t.serialize() == "none"
+
+
+class TestNullableUnion:
+    """Tests for unions containing NoneType"""
+
+    def test_convert_none_and_member(self) -> None:
+        t = parse("union[int,none]")
+        assert t.validate_convert("42") == 42
+        assert t.validate_convert(None) is None
+
+    def test_convert_invalid_string(self) -> None:
+        t = parse("union[int,none]")
+        with pytest.raises(WrongType):
+            t.validate_convert("not_an_int")
+
+    def test_serialize_round_trip(self) -> None:
+        assert parse("union[str,none]").serialize() == "union[str,none]"
 
 
 class TestIntType:

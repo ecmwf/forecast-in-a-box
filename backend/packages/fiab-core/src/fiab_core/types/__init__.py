@@ -12,6 +12,7 @@ FableType: Type system for Forecast As BLock Expression (Fable) configuration va
 
 Provides parsing, validation, and conversion for a small set of type expressions:
 - str, int, float, date, datetime (atomic types)
+- none (the type whose only value is an explicit null)
 - country (string subtype)
 - enumClosed[subtype](...), enumOpen[subtype](...) (enumeration types, e.g. enumClosed[int](1,2))
 - list[FableType] (container types)

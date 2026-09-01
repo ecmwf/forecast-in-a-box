@@ -115,13 +115,14 @@ class CompilationResult:
     ``resolved_configuration_options`` maps each block instance id to the subset of its
     configuration options that referenced at least one glyph, together with their final
     (post-resolution) string values. This is used to persist the resolution actually used
-    at execution time, for later inspection/reproducibility.
+    at execution time, for later inspection/reproducibility. Options with an explicit null
+    value carry no glyphs and are therefore not included.
     """
 
     execution_spec: ExecutionSpecification
     run_outputs: RunOutputs
     compilation_detail: CompilationDetail
-    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str | None]]
 
 
 def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -> CompilationResult:
@@ -139,7 +140,7 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
     # Maps sink block ids to mime type used in RunOutputs (only relevant for external outputs).
     block_to_mime: dict[BlockInstanceId, str] = {}
     sink_tasks: set[TaskId] = set()
-    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str | None]] = {}
 
     block_lookup = {b.instance_id: b for b in blueprint.blocks}
 

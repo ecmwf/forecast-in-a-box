@@ -1526,6 +1526,108 @@ def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_user: htt
     assert del_resp.is_success, del_resp.text
 
 
+def test_blueprint_nullable_option(tmpdir: Any, backend_client_user: httpx.Client) -> None:
+    """An option declared as ``union[str,none]`` accepts an explicit null, but not a missing value.
+
+    The ``source_text`` block declares its ``text`` option as nullable, and its runtime imputes
+    a default when the value is null. This test covers that:
+    - a *missing* value passes validation but fails compilation,
+    - an *explicit null* passes both, and the runtime default is applied.
+    """
+    fname = f"{tmpdir}/nullable_output_${{runId}}.txt"
+
+    def plugin_status() -> dict:
+        response = backend_client_user.get("/status", timeout=10)
+        assert response.is_success
+        return response.json()
+
+    retry_until(
+        plugin_status,
+        lambda data: data if data.get("plugins") == "ok" else None,
+        attempts=30,
+        sleep=1.0,
+        error_msg="Plugin loader did not reach 'ok' status",
+    )
+
+    def make_builder(configuration_values: dict[ConfigurationOptionId, Any]) -> BlueprintBuilder:
+        source_text = RoutableBlock(
+            instance_id=BlockInstanceId("source_text"),
+            plugin=testPluginId,
+            factory=BlockFactoryId("source_text"),
+            instance=BlockInstance(
+                configuration_values=configuration_values,
+                input_ids={},
+            ),
+        )
+        sink_file = RoutableBlock(
+            instance_id=BlockInstanceId("sink_file"),
+            plugin=testPluginId,
+            factory=BlockFactoryId("sink_file"),
+            instance=BlockInstance(
+                configuration_values=_config({"fname": fname}),
+                input_ids={"data": BlockInstanceId("source_text")},
+            ),
+        )
+        return BlueprintBuilder(blocks=[source_text, sink_file])
+
+    def submit(builder: BlueprintBuilder) -> str:
+        save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+        assert save_resp.is_success, save_resp.text
+        exec_resp = backend_client_user.post("/run/create", json={"blueprint_id": save_resp.json()["blueprint_id"]})
+        assert exec_resp.is_success, exec_resp.text
+        return exec_resp.json()["run_id"]
+
+    def poll_run(run_id: str) -> Any:
+        resp = backend_client_user.get("/run/get", params={"run_id": run_id}, timeout=10)
+        assert resp.is_success, resp.text
+        return resp.json()
+
+    def verify_failed(data: Any) -> bool | None:
+        if data["status"] == "failed":
+            return True
+        if data["status"] == "completed":
+            raise RuntimeError(f"Unexpected successful run: {data}")
+        return None
+
+    # --- Step 1: no value at all -- validation passes, compilation fails on the missing option ---
+    builder_missing = make_builder({})
+    expand_resp = backend_client_user.request(url="/blueprint/expand", method="put", json=builder_missing.model_dump())
+    assert expand_resp.is_success, expand_resp.text
+    assert not expand_resp.json()["block_errors"], expand_resp.text
+
+    run_id_missing = submit(builder_missing)
+    retry_until(
+        lambda: poll_run(run_id_missing),
+        verify_failed,
+        attempts=60,
+        sleep=1.0,
+        error_msg=f"Run {run_id_missing} never failed",
+    )
+    error = poll_run(run_id_missing)["error"]
+    assert "missing configuration options" in error and "text" in error, error
+
+    # --- Step 2: explicit null -- validation and compilation both pass ---
+    builder_null = make_builder({ConfigurationOptionId("text"): None})
+    expand_resp = backend_client_user.request(url="/blueprint/expand", method="put", json=builder_null.model_dump())
+    assert expand_resp.is_success, expand_resp.text
+    assert not expand_resp.json()["block_errors"], expand_resp.text
+    # the null value carries no glyphs, hence it is not part of the glyph resolution
+    assert expand_resp.json()["resolved_configuration_options"].get("source_text", {}).get("text") is None
+
+    run_id_null = submit(builder_null)
+    ensure_completed_v2(backend_client_user, run_id_null, sleep=1, attempts=120)
+
+    output = pathlib.Path(f"{tmpdir}/nullable_output_{run_id_null}.txt")
+    assert output.read_text() == "Hic Sunt Leones", output.read_text()
+    output.unlink()
+
+    # --- Step 3: the run detail reports the resolution, with no value for the nulled option ---
+    detail = poll_run(run_id_null)
+    resolution = detail["resolution"]
+    assert resolution["sink_file"]["fname"] == f"{tmpdir}/nullable_output_{run_id_null}.txt"
+    assert resolution.get("source_text", {}).get("text") is None
+
+
 # ---------------------------------------------------------------------------
 # Run delete and output-content tests
 # ---------------------------------------------------------------------------

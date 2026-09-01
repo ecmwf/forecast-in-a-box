@@ -1,4 +1,5 @@
 import importlib.metadata
+import json
 import pathlib
 
 from cascade.low.func import Either
@@ -23,7 +24,7 @@ from fiab_core.fable import (
     RawOutput,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
-from fiab_core.types import ArtifactType, ClosedEnumType, FableType, FloatType, IntType, StringType, parse
+from fiab_core.types import ArtifactType, ClosedEnumType, FableType, FloatType, IntType, NoneType, StringType, UnionType, parse
 
 TEXT = ConfigurationOptionId("text")
 DURATION = ConfigurationOptionId("duration")
@@ -50,8 +51,10 @@ catalogue = lambda: BlockFactoryCatalogue(
         BlockFactoryId("source_text"): BlockFactory(
             kind="source",
             title="Source Text",
-            description="Returns the input text",
-            configuration_options={TEXT: BlockConfigurationOption(title="", description="", value_type=StringType())},
+            description="Returns the input text, or a default when the text is an explicit null",
+            configuration_options={
+                TEXT: BlockConfigurationOption(title="", description="", value_type=UnionType([StringType(), NoneType()]))
+            },
             inputs=[],
         ),
         BlockFactoryId("source_sleep"): BlockFactory(
@@ -142,20 +145,47 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     return []
 
 
-def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
+def _environment_spec() -> list[str]:
+    """The worker environment specification for this plugin.
+
+    When the plugin is installed from its local source tree (an editable install, or an
+    unversioned dev checkout), workers must be given that very source tree -- otherwise
+    in-tree runtime changes would silently not be exercised, as the released wheel of the
+    very same version would get installed instead. Only a regular install falls back to
+    the pinned release.
+    """
+    local_root = pathlib.Path(__file__).parent.parent.parent
     self_version = importlib.metadata.version("fiab-plugin-test")
-    if self_version == "0.0.0":
-        spec = [f"-e {pathlib.Path(__file__).parent.parent.parent}"]
-    else:
-        spec = [f"fiab-plugin-test=={self_version}"]
+    if self_version == "0.0.0" or _is_editable_install():
+        return [f"-e {local_root}"]
+    return [f"fiab-plugin-test=={self_version}"]
+
+
+def _is_editable_install() -> bool:
+    """Whether this distribution was installed editable, as recorded by PEP 610 metadata."""
+    try:
+        direct_url = importlib.metadata.distribution("fiab-plugin-test").read_text("direct_url.json")
+    except Exception:
+        return False
+    if not direct_url:
+        return False
+    try:
+        return bool(json.loads(direct_url).get("dir_info", {}).get("editable", False))
+    except json.JSONDecodeError:
+        return False
+
+
+def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
+    spec = _environment_spec()
     with PayloadBuildingContext(environment=spec):
         # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
         if factory_id == "source_42":
             action = from_source(Payload("fiab_plugin_test.runtime.source_42"))
         elif factory_id == "source_text":
             text = instance.configuration_values[TEXT]
-            if not isinstance(text, str):
-                return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
+            # NOTE an explicit null is a valid value here -- the default is imputed at runtime
+            if text is not None and not isinstance(text, str):
+                return Either.error(f"Invalid type for {TEXT!r}: expected str or None, got {type(text).__name__}")
             action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))
         elif factory_id == "source_sleep":
             text = instance.configuration_values[TEXT]
