@@ -36,7 +36,9 @@ the same virtual environment, configuration file and database. Once a warmup has
 subsequent regular launch does not attempt any plugin installation on its own.
 
 # Containerized Setup
-Consult the [docker example](../../deployment/ewc), albeit understand that the example is not necessarily up to date.
+Consult the docker examples:
+1. [slim](../../deployment/v2) -- just "run fiab.sh warmup in a Dockerfile" which is sufficient for a demonstration,
+2. [ewc](../../deployment/ewc) -- a more involved setup, though may be a bit out of date.
 
 # Developer Setup
 

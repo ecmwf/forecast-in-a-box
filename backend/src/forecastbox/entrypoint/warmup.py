@@ -21,13 +21,15 @@ unused here. The one place where an event loop is needed is the database schema 
 users database is async; a short-lived `asyncio.run` covers just that.
 
 The plugins to install are given as `-p store:local[,store:local...]`; when omitted, the default
-plugins from the config are installed. Note that a repeated `-p` flag is not supported by `fire`
-(the last occurrence would silently win) -- use the comma separated form instead.
+plugins from the config are installed.
 
 This is expected to run in isolation, on an otherwise vanilla environment -- there is no
 cross-process locking against a concurrently running backend mutating the same venv, config file
 and database.
 """
+
+# TODO re-use the "kill other instances" here like we do with backend
+# TODO extend the "kill other instances" with some pid file lock?
 
 import asyncio
 import logging
@@ -115,6 +117,7 @@ def warmup(plugin: str | tuple[str, ...] | list[str] | None = None) -> None:
     initialize_stores(config.external.plugin_stores)
     catalog_refresh.result(timeout=CATALOG_TIMEOUT_SEC)
 
+    failures = None
     try:
         failures = _install_plugins(plugin_ids)
     finally:
