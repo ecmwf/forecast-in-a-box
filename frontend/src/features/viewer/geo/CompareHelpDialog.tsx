@@ -9,9 +9,9 @@
  */
 
 /**
- * Feature guide + shortcut reference for the compare viewer, opened from
- * the toolbar info icon or `?`. Content lives in the `compare` i18n
- * namespace under `help.*`.
+ * Feature guide + shortcut reference for the compare viewer (page help
+ * button or `H`); also the guided tour's second launch surface. Content
+ * lives in the `visualise` i18n namespace under `help.*`.
  */
 
 import { GraduationCap } from 'lucide-react'

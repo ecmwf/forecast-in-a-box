@@ -38,6 +38,7 @@ import {
 import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
+import { CompareHelpDialog } from '@/features/viewer/geo/CompareHelpDialog'
 import i18n from '@/lib/i18n'
 
 let nextPort = 19800
@@ -132,6 +133,8 @@ function ViewerRoute({
   const [mode, setMode] = useState<CompareMode>(initialMode)
   // Slot swap mirrors VisualisePage: a pure a↔b prop exchange.
   const [swapped, setSwapped] = useState(false)
+  // Help dialog is page-owned in production; the harness mirrors that.
+  const [helpOpen, setHelpOpen] = useState(false)
   const router = useRouter()
   const srcA = {
     id: `run:test-${portA}`,
@@ -155,9 +158,11 @@ function ViewerRoute({
         b={swapped ? srcA : srcB}
         mode={mode}
         onModeChange={setMode}
+        onHelp={() => setHelpOpen((v) => !v)}
         initialViewState={initialViewState}
         onViewStateChange={onViewStateChange}
       />
+      <CompareHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   )
 }
@@ -1126,6 +1131,7 @@ function ProgressiveViewerRoute({
   return (
     <div style={{ width: 1100, height: 700 }}>
       <GeoViewer
+        onHelp={() => {}}
         a={{
           id: `run:test-${portA}`,
           baseUrl: `http://localhost:${portA}`,

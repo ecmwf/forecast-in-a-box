@@ -21,7 +21,6 @@ import {
   Download,
   Eraser,
   Globe2,
-  HelpCircle,
   Layers,
   MessageSquarePlus,
   Ruler,
@@ -126,7 +125,6 @@ export function GeoToolbar({
   availableBasemaps,
   basemapOpacity,
   onBasemapOpacityChange,
-  onHelp,
 }: {
   /** Single-source: comparison modes + link toggle hidden. */
   solo?: boolean
@@ -161,7 +159,6 @@ export function GeoToolbar({
   availableBasemaps: ReadonlyArray<BasemapOption>
   basemapOpacity: number
   onBasemapOpacityChange: (opacity: number) => void
-  onHelp: () => void
 }) {
   const { t } = useTranslation('visualise')
   const annotationFileRef = useRef<HTMLInputElement>(null)
@@ -612,18 +609,6 @@ export function GeoToolbar({
               </PopoverContent>
             </Popover>
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-            onClick={onHelp}
-            title={`${t('help.open')} (${keyLabel(COMPARE_KEYS.help)})`}
-            aria-label={t('help.open')}
-            {...tourAttr(TOUR.visualise.help)}
-          >
-            <KeyBadge label={keyLabel(COMPARE_KEYS.help)} show={reveal} />
-            <HelpCircle className="h-4 w-4" />
-          </Button>
         </div>
       </div>
       {!solo && focusSlot === null && (

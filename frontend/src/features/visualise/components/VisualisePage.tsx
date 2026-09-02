@@ -29,7 +29,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { BrushCleaning, Loader2, Plus } from 'lucide-react'
+import { BrushCleaning, HelpCircle, Loader2, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
 import {
@@ -58,6 +58,8 @@ import {
   encodeViewerUrlState,
 } from '@/features/viewer/geo/view-url-state'
 import { GeoViewerSkeleton } from '@/features/viewer/geo/GeoViewerSkeleton'
+import { CompareHelpDialog } from '@/features/viewer/geo/CompareHelpDialog'
+import { COMPARE_KEYS, keyLabel } from '@/features/viewer/geo/useGeoShortcuts'
 import { readStorageJson, writeStorageJson } from '@/lib/storage'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { useOverlayCloseRequest } from '@/lib/overlay-requests'
@@ -308,6 +310,8 @@ export function VisualisePage() {
   }, [tourParam, navigate])
 
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+
   // The picker is this page's only closable overlay.
   useOverlayCloseRequest(useCallback(() => setPickerOpen(false), []))
   const [GeoViewer, setGeoViewer] = useState(() => makeGeoViewer())
@@ -419,8 +423,21 @@ export function VisualisePage() {
               </AlertDialogContent>
             </AlertDialog>
           )}
+          {/* Help lives at page level so the tour entry point never hides. */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setHelpOpen(true)}
+            title={`${t('help.open')} (${keyLabel(COMPARE_KEYS.help)})`}
+            aria-label={t('help.open')}
+            {...tourAttr(TOUR.visualise.help)}
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
+      <CompareHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
 
       {/* Link-borne sources need explicit consent; any close declines. */}
       <AlertDialog
@@ -528,6 +545,7 @@ export function VisualisePage() {
                 mode={mode}
                 onModeChange={onModeChange}
                 onRemoveB={clearSlotB}
+                onHelp={() => setHelpOpen((v) => !v)}
                 initialViewState={initialViewState}
                 onViewStateChange={onViewStateChange}
               />
