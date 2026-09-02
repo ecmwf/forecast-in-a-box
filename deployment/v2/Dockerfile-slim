@@ -8,6 +8,7 @@ FROM debian:stable-slim
 RUN : \
     && apt-get update \
     && apt-get install -y bash curl ca-certificates \
+    && apt-get install gdal-bin libgdal-dev libgfortran5 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --user-group --create-home --shell /bin/false fiab \
     && :
