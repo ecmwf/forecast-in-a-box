@@ -29,7 +29,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { BrushCleaning, Loader2, Plus } from 'lucide-react'
+import { BrushCleaning, HelpCircle, Loader2, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
 import {
@@ -52,13 +52,19 @@ import type { ComparisonEntry } from '../entry-ref'
 import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
+import type { TutorialId } from '@/stores/tutorialsStore'
 import {
   decodeViewerUrlState,
   encodeViewerUrlState,
 } from '@/features/viewer/geo/view-url-state'
 import { GeoViewerSkeleton } from '@/features/viewer/geo/GeoViewerSkeleton'
+import { CompareHelpDialog } from '@/features/viewer/geo/CompareHelpDialog'
+import { COMPARE_KEYS, keyLabel } from '@/features/viewer/geo/useGeoShortcuts'
 import { readStorageJson, writeStorageJson } from '@/lib/storage'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { useOverlayCloseRequest } from '@/lib/overlay-requests'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
+import { useTutorialsStore } from '@/stores/tutorialsStore'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
@@ -94,6 +100,11 @@ const makeGeoViewer = () =>
   )
 
 const route = getRouteApi('/_authenticated/visualise')
+
+/** `?tour=` values → tutorial ids (the route schema owns the enum). */
+const TOUR_PARAM: Record<'first-map', TutorialId> = {
+  'first-map': 'visualise-first-map',
+}
 
 export interface ActivePair {
   a: ComparisonEntry | null
@@ -160,6 +171,22 @@ function useActivePair(): ActivePair & {
       })
     }
   }, [entries, byRef, search.a, search.b, navigate])
+
+  // A source ADDED while B is off fills B (adding = starting a comparison).
+  // Growth only: the persisted basket and URL hydration never re-fill it.
+  const knownRefsRef = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const refs = entries.map((e) => entryRef(e))
+    const known = knownRefsRef.current
+    knownRefsRef.current = new Set(refs)
+    if (known === null || search.b !== SLOT_B_OFF) return
+    const added = refs.find((r) => !known.has(r) && r !== search.a)
+    if (added === undefined) return
+    void navigate({
+      search: (prev) => ({ ...prev, b: added }),
+      replace: true,
+    })
+  }, [entries, search.a, search.b, navigate])
 
   // Remember the resolved pair so a bare /visualise restores it.
   useEffect(() => {
@@ -287,7 +314,22 @@ export function VisualisePage() {
     [],
   )
 
+  // `?tour=` makes tour launches plain links; the param is one-shot.
+  const tourParam = search.tour
+  useEffect(() => {
+    if (tourParam === undefined) return
+    useTutorialsStore.getState().start(TOUR_PARAM[tourParam])
+    void navigate({
+      search: (prev) => ({ ...prev, tour: undefined }),
+      replace: true,
+    })
+  }, [tourParam, navigate])
+
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  // The picker is this page's only closable overlay.
+  useOverlayCloseRequest(useCallback(() => setPickerOpen(false), []))
   const [GeoViewer, setGeoViewer] = useState(() => makeGeoViewer())
   const stateA = useComparisonSource(a, { autoStart: true })
   const stateB = useComparisonSource(b, { autoStart: true })
@@ -331,7 +373,12 @@ export function VisualisePage() {
           <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
             <DialogTrigger
               render={
-                <Button variant="outline" size="sm" className="gap-1.5" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  {...tourAttr(TOUR.visualise.addSource)}
+                />
               }
             >
               <Plus className="h-3.5 w-3.5" />
@@ -392,8 +439,21 @@ export function VisualisePage() {
               </AlertDialogContent>
             </AlertDialog>
           )}
+          {/* Help lives at page level so the tour entry point never hides. */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setHelpOpen(true)}
+            title={`${t('help.open')} (${keyLabel(COMPARE_KEYS.help)})`}
+            aria-label={t('help.open')}
+            {...tourAttr(TOUR.visualise.help)}
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
+      <CompareHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
 
       {/* Link-borne sources need explicit consent; any close declines. */}
       <AlertDialog
@@ -501,6 +561,7 @@ export function VisualisePage() {
                 mode={mode}
                 onModeChange={onModeChange}
                 onRemoveB={clearSlotB}
+                onHelp={() => setHelpOpen((v) => !v)}
                 initialViewState={initialViewState}
                 onViewStateChange={onViewStateChange}
               />

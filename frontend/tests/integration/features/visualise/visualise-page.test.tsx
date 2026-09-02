@@ -720,6 +720,31 @@ describe('VisualisePage', () => {
     ).toHaveLength(0)
   })
 
+  it('a source added while B is off goes straight into B', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    registerMockWmsServer(54391, {
+      layers: [{ name: 'dwd:layer', title: 'DWD layer' }],
+    })
+    const screen = await renderVisualisePage()
+
+    const pickerB = screen.getByLabelText('Source for slot B')
+    await expect.element(pickerB).toHaveTextContent('Run B')
+    await screen
+      .getByRole('button', { name: 'Remove B from view — continue with A' })
+      .click()
+    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+
+    // Adding a NEW source is the intent to compare — B fills with it,
+    // even though the URL carried the deliberate `b=off`.
+    useComparisonStore.getState().addEntry({
+      kind: 'wms',
+      url: 'http://localhost:54391/wms?',
+      label: 'maps.dwd.de',
+    })
+    await expect.element(pickerB).toHaveTextContent('maps.dwd.de')
+  })
+
   it('the X ejects an external-WMS B (regression: fake Select items)', async () => {
     useComparisonStore.getState().addEntry(RUN_A)
     useComparisonStore.getState().addEntry({

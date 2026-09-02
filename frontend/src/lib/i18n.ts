@@ -33,6 +33,7 @@ import glyphsEN from '@/locales/en/glyphs.json'
 import journalEN from '@/locales/en/journal.json'
 import visualiseEN from '@/locales/en/visualise.json'
 import onboardingEN from '@/locales/en/onboarding.json'
+import tutorialsEN from '@/locales/en/tutorials.json'
 
 // Translation resources organized by namespace
 const resources = {
@@ -53,6 +54,7 @@ const resources = {
     journal: journalEN,
     visualise: visualiseEN,
     onboarding: onboardingEN,
+    tutorials: tutorialsEN,
   },
 }
 
@@ -82,6 +84,8 @@ i18n
       'glyphs',
       'journal',
       'visualise',
+      'onboarding',
+      'tutorials',
     ],
 
     // Interpolation options

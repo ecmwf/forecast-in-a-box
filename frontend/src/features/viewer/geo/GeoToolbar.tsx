@@ -21,7 +21,6 @@ import {
   Download,
   Eraser,
   Globe2,
-  HelpCircle,
   Layers,
   MessageSquarePlus,
   Ruler,
@@ -57,6 +56,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { P } from '@/components/base/typography'
+import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { showToast } from '@/lib/toast'
 import { createLogger } from '@/lib/logger'
 import { Slider } from '@/components/ui/slider'
@@ -125,7 +125,6 @@ export function GeoToolbar({
   availableBasemaps,
   basemapOpacity,
   onBasemapOpacityChange,
-  onHelp,
 }: {
   /** Single-source: comparison modes + link toggle hidden. */
   solo?: boolean
@@ -160,7 +159,6 @@ export function GeoToolbar({
   availableBasemaps: ReadonlyArray<BasemapOption>
   basemapOpacity: number
   onBasemapOpacityChange: (opacity: number) => void
-  onHelp: () => void
 }) {
   const { t } = useTranslation('visualise')
   const annotationFileRef = useRef<HTMLInputElement>(null)
@@ -225,6 +223,7 @@ export function GeoToolbar({
                 'flex shrink-0 items-center gap-0.5 rounded-lg bg-muted p-0.5 transition-opacity',
                 focusSlot !== null && 'opacity-40',
               )}
+              {...tourAttr(TOUR.visualise.modeSwitcher)}
             >
               {COMPARE_MODES.map((id, index) => (
                 <button
@@ -232,6 +231,8 @@ export function GeoToolbar({
                   type="button"
                   disabled={focusSlot !== null}
                   onClick={() => onModeChange(id)}
+                  {...tourActionAttr('mode')}
+                  data-mode={id}
                   aria-pressed={mode === id}
                   title={`(${keyLabel(COMPARE_KEYS.modes[index])})`}
                   className={cn(
@@ -608,17 +609,6 @@ export function GeoToolbar({
               </PopoverContent>
             </Popover>
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-            onClick={onHelp}
-            title={`${t('help.open')} (${keyLabel(COMPARE_KEYS.help)})`}
-            aria-label={t('help.open')}
-          >
-            <KeyBadge label={keyLabel(COMPARE_KEYS.help)} show={reveal} />
-            <HelpCircle className="h-4 w-4" />
-          </Button>
         </div>
       </div>
       {!solo && focusSlot === null && (

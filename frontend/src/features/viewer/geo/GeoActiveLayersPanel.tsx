@@ -64,6 +64,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { P } from '@/components/base/typography'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 const log = createLogger('GeoActiveLayersPanel')
@@ -223,6 +224,7 @@ export function GeoActiveLayersPanel({
   return (
     <aside
       data-geo-panel="left"
+      {...tourAttr(TOUR.visualise.activeLayers)}
       className="flex w-72 shrink-0 flex-col overflow-hidden rounded-md border border-border bg-background lg:w-[var(--geo-left-w,15rem)] xl:w-[var(--geo-left-w,18rem)]"
     >
       <div className="space-y-2.5 border-b border-border bg-muted/40 px-3 pt-2.5 pb-3">

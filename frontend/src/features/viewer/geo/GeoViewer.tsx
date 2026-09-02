@@ -53,7 +53,6 @@ import { useGetMapFailureLog } from './getmap-failures'
 import { GeoViewerSkeleton } from './GeoViewerSkeleton'
 import { GeoToolbar } from './GeoToolbar'
 import { GeoExportDialog } from './GeoExportDialog'
-import { CompareHelpDialog } from './CompareHelpDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
 import { useViewerAnnotations } from './useViewerAnnotations'
 import { useViewerUrlState } from './useViewerUrlState'
@@ -75,6 +74,7 @@ import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { ViewerUrlState } from './view-url-state'
 import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -102,6 +102,7 @@ export function GeoViewer({
   mode,
   onModeChange,
   onRemoveB,
+  onHelp,
   initialViewState,
   onViewStateChange,
 }: {
@@ -112,6 +113,8 @@ export function GeoViewer({
   onModeChange: (mode: CompareMode) => void
   /** Clear slot B (offered when B fails). */
   onRemoveB?: () => void
+  /** Toggle the page-owned help dialog (H, always-present page button). */
+  onHelp: () => void
   /** URL-restored view state, read once at mount (later changes ignored). */
   initialViewState?: ViewerUrlState
   /** Live view-state partials; the page debounces them into the URL. */
@@ -499,8 +502,6 @@ export function GeoViewer({
     setRightCollapsed(false)
     if (sheetViewport) setLeftCollapsed(true)
   }
-  const [helpOpen, setHelpOpen] = useState(false)
-
   // -------- Annotations: labeled findings pinned to the map ---------
   // Measure and annotate both consume map clicks — arming one disarms the other.
   const {
@@ -609,7 +610,7 @@ export function GeoViewer({
     onFit: fitAction,
     onCopy: () => copyView(null),
     onExport: () => setExportOpen(true),
-    onHelp: () => setHelpOpen((v) => !v),
+    onHelp,
     onAnnotate: toggleAnnotate,
     onAnnotateDisarm: {
       enabled:
@@ -789,9 +790,7 @@ export function GeoViewer({
         availableBasemaps={availableBasemaps}
         basemapOpacity={basemapOpacity}
         onBasemapOpacityChange={setBasemapOpacity}
-        onHelp={() => setHelpOpen(true)}
       />
-      <CompareHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
       <AlertDialog
         open={leaveBlocker.status === 'blocked'}
         onOpenChange={(open) => {
@@ -854,7 +853,11 @@ export function GeoViewer({
           />
         )}
         {leftCollapsed && (
-          <CollapsedSidebarHandle side="left" onExpand={expandLeft} />
+          <CollapsedSidebarHandle
+            side="left"
+            onExpand={expandLeft}
+            buttonAttrs={tourAttr(TOUR.visualise.expandLeft)}
+          />
         )}
         <div
           style={{ display: leftCollapsed ? 'none' : undefined }}
@@ -911,7 +914,10 @@ export function GeoViewer({
             onReset={() => setPanelWidth('left', null)}
           />
         )}
-        <div className="min-h-0 min-w-0 flex-1">
+        <div
+          className="min-h-0 min-w-0 flex-1"
+          {...tourAttr(TOUR.visualise.map)}
+        >
           {focusSlot === null && mode === 'side' && mapSourceB ? (
             <DualMapView
               view={viewRef.current}
@@ -992,7 +998,11 @@ export function GeoViewer({
           />
         </div>
         {rightCollapsed && (
-          <CollapsedSidebarHandle side="right" onExpand={expandRight} />
+          <CollapsedSidebarHandle
+            side="right"
+            onExpand={expandRight}
+            buttonAttrs={tourAttr(TOUR.visualise.expandRight)}
+          />
         )}
       </div>
       <GeoTimeSlider
