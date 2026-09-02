@@ -172,6 +172,22 @@ function useActivePair(): ActivePair & {
     }
   }, [entries, byRef, search.a, search.b, navigate])
 
+  // A source ADDED while B is off fills B (adding = starting a comparison).
+  // Growth only: the persisted basket and URL hydration never re-fill it.
+  const knownRefsRef = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const refs = entries.map((e) => entryRef(e))
+    const known = knownRefsRef.current
+    knownRefsRef.current = new Set(refs)
+    if (known === null || search.b !== SLOT_B_OFF) return
+    const added = refs.find((r) => !known.has(r) && r !== search.a)
+    if (added === undefined) return
+    void navigate({
+      search: (prev) => ({ ...prev, b: added }),
+      replace: true,
+    })
+  }, [entries, search.a, search.b, navigate])
+
   // Remember the resolved pair so a bare /visualise restores it.
   useEffect(() => {
     if (!aValid) return
