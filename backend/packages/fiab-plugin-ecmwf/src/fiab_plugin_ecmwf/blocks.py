@@ -160,9 +160,9 @@ class OperationalForecastSource(Source):
 
         source = block.config_as_str(SOURCE)
         if source == "ecmwf-opendata":
-            metadata = {"environment": ["earthkit-data[ecmwf-opendata]"]} 
+            metadata = {"environment": ["earthkit-data[ecmwf-opendata]"]}
         elif source == "mars":
-            metadata = {"environment": ["earthkit-data[mars]"]} 
+            metadata = {"environment": ["earthkit-data[mars]"]}
         else:
             metadata = {}
 
