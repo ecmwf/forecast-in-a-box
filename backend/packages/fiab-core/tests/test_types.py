@@ -9,7 +9,7 @@
 
 """Unit tests for FableType and its subclasses."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -27,6 +27,7 @@ from fiab_core.types.definitions import (
     NoneType,
     OpenEnumType,
     StringType,
+    TimeDeltaType,
     UnionType,
 )
 from fiab_core.types.exceptions import (
@@ -203,6 +204,123 @@ class TestDatetimeType:
             t.validate_convert(datetime.now())
         with pytest.raises(NotStringInput):
             t.validate_convert(None)
+
+
+class TestTimeDeltaType:
+    """Tests for TimeDeltaType"""
+
+    def test_serialize(self) -> None:
+        assert TimeDeltaType().serialize() == "timedelta"
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("P1D", timedelta(days=1)),
+            ("P3D", timedelta(days=3)),
+            ("P1W", timedelta(weeks=1)),
+            ("P2W3D", timedelta(weeks=2, days=3)),
+            ("PT12H", timedelta(hours=12)),
+            ("PT30M", timedelta(minutes=30)),
+            ("PT45S", timedelta(seconds=45)),
+            ("PT1.5S", timedelta(seconds=1.5)),
+            ("P3DT12H", timedelta(days=3, hours=12)),
+            ("P3DT1M", timedelta(days=3, minutes=1)),
+            ("PT1H30M15S", timedelta(hours=1, minutes=30, seconds=15)),
+            ("P0D", timedelta(0)),
+        ],
+    )
+    def test_convert_valid_iso8601_with_p_prefix(self, value: str, expected: timedelta) -> None:
+        assert TimeDeltaType().validate_convert(value) == expected
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("T12H", timedelta(hours=12)),
+            ("3DT1M", timedelta(days=3, minutes=1)),
+            ("1W", timedelta(weeks=1)),
+            ("3D", timedelta(days=3)),
+            ("T30M15S", timedelta(minutes=30, seconds=15)),
+        ],
+    )
+    def test_convert_valid_iso8601_without_p_prefix(self, value: str, expected: timedelta) -> None:
+        assert TimeDeltaType().validate_convert(value) == expected
+
+    def test_convert_empty_string_raises(self) -> None:
+        with pytest.raises(WrongType):
+            TimeDeltaType().validate_convert("")
+        with pytest.raises(WrongType):
+            TimeDeltaType().validate_convert("P")
+
+    def test_convert_no_components_raises(self) -> None:
+        # a bare 'T' (with or without the 'P') carries no actual duration
+        with pytest.raises(WrongType):
+            TimeDeltaType().validate_convert("PT")
+        with pytest.raises(WrongType):
+            TimeDeltaType().validate_convert("T")
+
+    def test_convert_unsupported_calendar_components_raises(self) -> None:
+        # years and months are deliberately unsupported: not a fixed duration
+        with pytest.raises(WrongType):
+            TimeDeltaType().validate_convert("P1Y")
+        with pytest.raises(WrongType):
+            TimeDeltaType().validate_convert("P1M")
+
+    def test_convert_garbage_raises(self) -> None:
+        with pytest.raises(WrongType):
+            TimeDeltaType().validate_convert("not_a_duration")
+        with pytest.raises(WrongType):
+            TimeDeltaType().validate_convert("P3Dfoo")
+
+    def test_convert_non_string_raises_type_error(self) -> None:
+        t = TimeDeltaType()
+        with pytest.raises(NotStringInput):
+            t.validate_convert(timedelta(days=1))
+        with pytest.raises(NotStringInput):
+            t.validate_convert(None)
+
+    def test_parse_and_round_trip(self) -> None:
+        t = parse("timedelta")
+        assert isinstance(t, TimeDeltaType)
+        assert t.validate_convert("P3DT12H") == timedelta(days=3, hours=12)
+        assert t.serialize() == "timedelta"
+
+
+class TestTimeDeltaCombinations:
+    """Tests combining TimeDeltaType with other types (list, union)."""
+
+    def test_list_of_timedelta(self) -> None:
+        t = parse("list[timedelta]")
+        assert isinstance(t, ListType)
+        assert isinstance(t.item_type, TimeDeltaType)
+        assert t.validate_convert("P1D,PT12H,T30M") == [
+            timedelta(days=1),
+            timedelta(hours=12),
+            timedelta(minutes=30),
+        ]
+
+    def test_union_timedelta_and_string(self) -> None:
+        t = parse("union[timedelta,str]")
+        assert isinstance(t, UnionType)
+        assert t.validate_convert("P1D") == timedelta(days=1)
+        assert t.validate_convert("hello") == "hello"
+
+    def test_union_timedelta_and_datetime(self) -> None:
+        t = parse("union[timedelta,datetime]")
+        assert isinstance(t, UnionType)
+        assert t.validate_convert("P1DT12H") == timedelta(days=1, hours=12)
+        assert t.validate_convert("2026-05-08T10:30:45") == datetime(2026, 5, 8, 10, 30, 45)
+
+    def test_union_datetime_and_timedelta(self) -> None:
+        t = parse("union[datetime,timedelta]")
+        assert isinstance(t, UnionType)
+        assert t.validate_convert("2026-05-08T10:30:45") == datetime(2026, 5, 8, 10, 30, 45)
+        assert t.validate_convert("P1DT12H") == timedelta(days=1, hours=12)
+
+    def test_serialize_round_trip(self) -> None:
+        assert parse("list[timedelta]").serialize() == "list[timedelta]"
+        assert parse("union[timedelta,str]").serialize() == "union[timedelta,str]"
+        assert parse("union[timedelta,datetime]").serialize() == "union[timedelta,datetime]"
+        assert parse("union[datetime,timedelta]").serialize() == "union[datetime,timedelta]"
 
 
 class TestClosedEnumType:
@@ -393,6 +511,7 @@ class TestFableTypeParse:
         assert isinstance(parse("float"), FloatType)
         assert isinstance(parse("date"), DateType)
         assert isinstance(parse("datetime"), DatetimeType)
+        assert isinstance(parse("timedelta"), TimeDeltaType)
 
     def test_parse_whitespace_handling(self) -> None:
         assert isinstance(parse("  str  "), StringType)
