@@ -11,6 +11,7 @@
 * `Library not loaded: /opt/homebrew/opt/fftw/lib/libfftw3.3.dylib` -- run `brew install fftw` (or wait for this getting fixed on Mac)
 * unpickle issue with `pathlib._local` -- use python3.12+
 * `zmq.error.ZMQError: Operation not supported by device` -- issue on Mac with incorrect self-host detection, should be covered by cascade's platform module
+* `CascadeUserError('host=h0; process on h0.w0 failed to terminate correctly: 1859 -> -7')` -- the `-7` stands for `SIGBUS`, which often (though not always) suggests lack of `/dev/shm` memory, which is used by both cascade itself and by particular libraries such as `torch`. If you would see `df -h /dev/shm` returning particularly low values (like megabytes), ramp it up significantly (see for example `deployment/v2/justfile` for how we execute docker with extra shm)
 
 # Model Checkpoints
 * `ValueError(TaskFailure(worker=h0.w1, task='run_as_earthkit:97b3503430ebbc42fec29533c043672907647970346c53cce4f4fa8d53f27fc0', detail='AttributeError("module \'torch.mps\' has no attribute \'current_device\'")'))` and similar -- model hardcodes CUDA. Make sure you have sufficiently high versions of the anemoi stack

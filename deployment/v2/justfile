@@ -20,7 +20,7 @@ build release_tag="":
     docker tag "fiab-slim:${tag}" fiab-slim:latest
 
 run:
-    docker run --rm -it -p 8000:8000 fiab-slim:latest
+    docker run --rm -it -p 8000:8000 --shm-size=6gb fiab-slim:latest
 
 publish release_tag="":
     #!/usr/bin/env bash
