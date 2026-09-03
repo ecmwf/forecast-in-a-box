@@ -183,6 +183,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.backend.data_path = f"file://{td_data.name}"
         config.backend.allow_scheduler = True
+        plugin_test_loc = pathlib.Path(__file__).parent.parent / "packages" / "fiab-plugin-test"
         config.external.artifact_stores = {
             ArtifactStoreId(fake_artifact_store_id): ArtifactStoreConfig(
                 url=f"http://localhost:{fake_artifact_registry_port}/artifacts.json",
@@ -191,13 +192,13 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         }
         config.external.plugin_stores = {
             PluginStoreId("localTest"): PluginStoreConfig(
-                url="file://../../packages/fiab-plugin-test",
+                url=f"file://{plugin_test_loc}",
                 method="localSingle",
             ),
         }
         config.external.plugins = {
             testPluginId: PluginSettings(
-                pip_source="-e file://../../packages/fiab-plugin-test",
+                pip_source=f"-e file://{plugin_test_loc}",
                 module_name="fiab_plugin_test",
             ),
         }
