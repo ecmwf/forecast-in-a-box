@@ -30,7 +30,12 @@ export const test = base.extend({
       window.localStorage.setItem(
         'fiab.store.tutorials',
         JSON.stringify({
-          state: { statuses: { 'visualise-first-map': 'dismissed' } },
+          state: {
+            statuses: {
+              'visualise-first-map': 'dismissed',
+              'configure-first-run': 'dismissed',
+            },
+          },
           version: 1,
         }),
       )
