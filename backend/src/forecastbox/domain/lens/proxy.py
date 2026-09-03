@@ -147,8 +147,27 @@ def _filtered_headers(headers: httpx.Headers | Headers, *, drop: frozenset[str] 
     return [(name, value) for name, value in headers.items() if name.lower() not in drop_names]
 
 
+#: Forwarding headers we (re)generate ourselves. Any inbound copies (set by an
+#: outer reverse proxy such as nginx) MUST be dropped before we append fresh ones:
+#: appending would leave the upstream with duplicate X-Forwarded-Proto values that
+#: disagree (nginx's "https" vs our internal "http"), which gunicorn rejects with
+#: "Contradictory scheme headers" (InvalidSchemeHeaders). We fold the inbound chain
+#: into our regenerated headers instead (X-Forwarded-For is extended, not dropped).
+_FORWARDING_HEADERS = frozenset(
+    {
+        "x-forwarded-for",
+        "x-forwarded-proto",
+        "x-forwarded-protocol",
+        "x-forwarded-ssl",
+        "x-forwarded-host",
+        "x-forwarded-prefix",
+        "forwarded",
+    }
+)
+
+
 def _build_upstream_headers(request: Request, port: int, lens_instance_id: LensInstanceId) -> list[tuple[str, str]]:
-    headers = _filtered_headers(request.headers, drop=frozenset({"host"}))
+    headers = _filtered_headers(request.headers, drop=frozenset({"host"}) | _FORWARDING_HEADERS)
 
     client_host = request.client.host if request.client is not None else None
     existing_xff = request.headers.get("x-forwarded-for")
