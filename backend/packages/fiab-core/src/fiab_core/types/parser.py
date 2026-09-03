@@ -63,7 +63,7 @@ def _parse(type_expr: str) -> tuple[FableType, str]:
     was consumed.
 
     Supports:
-    - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'none', 'country', 'bboxWSEN'
+    - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'timedelta', 'none', 'country', 'bboxWSEN'
     - Enumerations: "enumClosed[str]('item1','item2')", "enumOpen[int](1,2)"
     - Lists: 'list[int]', 'list[enumClosed[...](...)]', etc.
     - Union: 'union[int,str]', "union[enumClosed[str]('a','b'),date]", etc.
@@ -77,6 +77,7 @@ def _parse(type_expr: str) -> tuple[FableType, str]:
     _ATOMIC = [
         ("datetime", DatetimeType),
         ("date", DateType),
+        ("timedelta", TimeDeltaType),
         ("float", FloatType),
         ("int", IntType),
         ("none", NoneType),
@@ -139,7 +140,7 @@ def _parse(type_expr: str) -> tuple[FableType, str]:
 
     raise NotFableType(
         f"Invalid type expression: {type_expr!r}. "
-        "Expected one of: str, int, float, date, datetime, none, country, bboxWSEN, geodomain, "
+        "Expected one of: str, int, float, date, datetime, timedelta, none, country, bboxWSEN, geodomain, "
         "enumClosed[subtype](...), enumOpen[subtype](...), list[...], union[...]"
     )
 
