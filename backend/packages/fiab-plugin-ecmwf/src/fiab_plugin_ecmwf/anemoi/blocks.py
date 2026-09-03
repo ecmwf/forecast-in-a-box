@@ -71,6 +71,15 @@ class AnemoiBuilder:
         "Get local path to the checkpoint artifact, assumes it is already locally available, does not trigger download"
         return self.checkpoint.get_local_path()
 
+    def _add_supplementary_metadata(self, action: Action) -> Action:
+        """Add supplementary metadata from the checkpoint to the action.
+
+        Must be added to the action to ensure at compilation time that the metadata is available.
+        """
+        for key, values in self.checkpoint.supplementary_metadata.items():
+            action.set_scalar_coords({key: values})
+        return action
+
     def inference(self, lead_time: int, *, extra_environment: list[str] | None = None) -> Inference:
         """Build an Inference action for this checkpoint and lead time, with the appropriate environment for the input source if specified"""
         env = self.checkpoint.get_environment()
@@ -86,7 +95,7 @@ class AnemoiBuilder:
 
     def from_input(self, input_source: str, date: datetime, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
         input_configuration = self.checkpoint.get_input_configuration(input_source)
-        return self.inference(lead_time=lead_time, extra_environment=INPUT_SOURCE_EXTRAS.get(input_source)).from_input(
+        action = self.inference(lead_time=lead_time, extra_environment=INPUT_SOURCE_EXTRAS.get(input_source)).from_input(
             input=input_configuration,
             date=strip_timezone(date),
             lead_time=lead_time,
@@ -94,11 +103,13 @@ class AnemoiBuilder:
             **k,
             payload_metadata={"artifacts": [self.artifact_id]},
         )
+        return self._add_supplementary_metadata(action)
 
     def from_initial_conditions(self, initial_conditions: Any, lead_time: int, **k: Any) -> Action:
-        return self.inference(lead_time=lead_time).from_initial_conditions(
+        action = self.inference(lead_time=lead_time).from_initial_conditions(
             initial_conditions, **k, payload_metadata={"artifacts": [self.artifact_id]}
         )
+        return self._add_supplementary_metadata(action)
 
     def get_initial_conditions(self, input_source: str, date: datetime, ensemble: int = 1, **k: Any) -> Action:
         env = self.checkpoint.get_environment()
@@ -165,6 +176,10 @@ class AnemoiBaseBlock:
     ) -> QubedOutput:
         """Get the output qube for the given checkpoint, lead time, and ensemble members"""
         qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time))
+
+        # Ensure alignment in output qube and action metadata
+        qubed_output = expand(qubed_output, checkpoint.supplementary_metadata)
+
         if checkpoint.is_ensemble_model is False:
             return QubedOutput(dataqube=qubed_output)
 

@@ -14,7 +14,7 @@
           "macos"
         ],
         "tags": {
-            "status": "demo"
+          "status": "demo"
         }
       },
       "specific": {
@@ -169,44 +169,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -321,6 +283,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "timestep": "6h"
       }
     },
@@ -336,7 +309,7 @@
           "linux"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -496,44 +469,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -664,6 +599,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "timestep": "6h",
         "configuration": {
           "control_options": {
@@ -685,7 +631,7 @@
           "macos"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -844,44 +790,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -1012,6 +920,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "timestep": "6h",
         "configuration": {
           "control_options": {
@@ -1032,7 +951,7 @@
           "linux"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -1190,44 +1109,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -1356,6 +1237,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "timestep": "6h",
         "configuration": {
           "control_options": {
@@ -1377,7 +1269,7 @@
           "macos"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -1535,44 +1427,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -1701,6 +1555,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "timestep": "6h",
         "configuration": {
           "control_options": {
@@ -1721,7 +1586,7 @@
           "linux"
         ],
         "tags": {
-            "status": "operational"
+          "status": "operational"
         }
       },
       "specific": {
@@ -1929,44 +1794,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -2145,6 +1972,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "timestep": "6h",
         "configuration": {
           "pre_processors": [
@@ -2169,7 +2007,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "operational"
+          "status": "operational"
         },
         "disk_size_bytes": 1330651150,
         "supported_platforms": [
@@ -2332,44 +2170,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -2488,6 +2288,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "configuration": {
           "pre_processors": [],
           "post_processors": [],
@@ -2526,7 +2337,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "operational"
+          "status": "operational"
         },
         "disk_size_bytes": 993937386,
         "supported_platforms": [
@@ -2690,44 +2501,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -2858,6 +2631,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "configuration": {
           "pre_processors": [],
           "post_processors": [],
@@ -2878,7 +2662,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "operational"
+          "status": "operational"
         },
         "disk_size_bytes": 1449403913,
         "supported_platforms": [
@@ -3041,44 +2825,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -3197,6 +2943,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "configuration": {
           "pre_processors": [],
           "post_processors": [],
@@ -3235,7 +2992,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "operational"
+          "status": "operational"
         },
         "disk_size_bytes": 1891893167,
         "supported_platforms": [
@@ -3394,44 +3151,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -3544,6 +3263,17 @@
             }
           ]
         },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
+          ]
+        },
         "configuration": {
           "pre_processors": [],
           "post_processors": [],
@@ -3582,7 +3312,7 @@
         "display_description": "",
         "comment": "",
         "tags": {
-            "status": "demo"
+          "status": "demo"
         },
         "disk_size_bytes": 1016336351,
         "supported_platforms": [
@@ -3746,44 +3476,6 @@
           "metadata": {},
           "children": [
             {
-              "key": "class",
-              "values": {
-                "type": "enum",
-                "dtype": "str",
-                "values": [
-                  "ai"
-                ]
-              },
-              "metadata": {},
-              "children": [
-                {
-                  "key": "type",
-                  "values": {
-                    "type": "enum",
-                    "dtype": "str",
-                    "values": [
-                      "fc"
-                    ]
-                  },
-                  "metadata": {},
-                  "children": [
-                    {
-                      "key": "stream",
-                      "values": {
-                        "type": "enum",
-                        "dtype": "str",
-                        "values": [
-                          "oper"
-                        ]
-                      },
-                      "metadata": {},
-                      "children": []
-                    }
-                  ]
-                }
-              ]
-            },
-            {
               "key": "levtype",
               "values": {
                 "type": "enum",
@@ -3900,6 +3592,17 @@
                 }
               ]
             }
+          ]
+        },
+        "supplementary_metadata": {
+          "stream": [
+            "oper"
+          ],
+          "type": [
+            "fc"
+          ],
+          "class": [
+            "ai"
           ]
         },
         "configuration": {
