@@ -105,6 +105,35 @@ class TestBuildUpstreamHeaders:
         names = {name.lower() for name, _ in headers}
         assert "connection" not in names
 
+    def test_inbound_forwarding_headers_are_not_duplicated(self) -> None:
+        # An outer reverse proxy (nginx) already set X-Forwarded-Proto: https etc.
+        # We must regenerate a single, self-consistent set -- duplicate, disagreeing
+        # X-Forwarded-Proto values make gunicorn raise "Contradictory scheme headers".
+        request = _make_request(
+            headers=[
+                (b"host", b"example.com"),
+                (b"x-forwarded-proto", b"https"),
+                (b"x-forwarded-host", b"public.example.com"),
+                (b"x-forwarded-prefix", b"/outer"),
+                (b"forwarded", b"proto=https;host=public.example.com"),
+                (b"x-forwarded-for", b"203.0.113.9"),
+            ]
+        )
+        pairs = lens_proxy._build_upstream_headers(request, 19042, LensInstanceId("id-1"))
+        counts: dict[str, int] = {}
+        for name, _ in pairs:
+            counts[name.lower()] = counts.get(name.lower(), 0) + 1
+        assert counts["x-forwarded-proto"] == 1
+        assert counts["x-forwarded-host"] == 1
+        assert counts["x-forwarded-prefix"] == 1
+        assert counts["forwarded"] == 1
+        headers = dict(pairs)
+        # Our own values win; the inbound X-Forwarded-For chain is extended, not dropped.
+        assert headers["X-Forwarded-Proto"] == "http"
+        assert headers["X-Forwarded-Host"] == "example.com"
+        assert headers["X-Forwarded-Prefix"] == "/api/v1/lens/proxy/id-1"
+        assert headers["X-Forwarded-For"] == "203.0.113.9, 10.0.0.5"
+
 
 class TestForward:
     @pytest.mark.asyncio
