@@ -92,7 +92,7 @@ class RunDetail(FiabBaseModel):
     outputs: dict | None = None
     completed_block_ids: set[BlockInstanceId] | None = None
     planned_block_ids: set[BlockInstanceId] | None = None
-    resolution: dict[BlockInstanceId, dict[str, str]] | None = None
+    resolution: dict[BlockInstanceId, dict[str, str | None]] | None = None
 
 
 class ExecuteResult(FiabBaseModel):

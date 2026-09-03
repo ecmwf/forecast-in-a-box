@@ -49,9 +49,10 @@ class CompilerRuntimeContext(FiabBaseModel):
     """
 
     glyphs: dict[str, str] = Field(default_factory=dict)
-    resolution: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
+    resolution: dict[BlockInstanceId, dict[ConfigurationOptionId, str | None]] = Field(default_factory=dict)
     """Maps each block instance id to the configuration options that were resolved via
-    glyph substitution, together with their final (post-resolution) string values."""
+    glyph substitution, together with their final (post-resolution) values. A value is
+    ``None`` only for an option whose configured value is an explicit null."""
 
 
 @dataclass(frozen=True, eq=True, slots=True)

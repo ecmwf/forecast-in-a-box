@@ -15,7 +15,7 @@ from datetime import date, datetime
 from typing import Any, Iterable, Literal, get_args
 
 import fiab_core  # to satisfy the type checker for artifacts annotation
-from fiab_core.types.exceptions import NotStringInput, WrongType
+from fiab_core.types.exceptions import NotNoneInput, NotStringInput, WrongType
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,22 @@ class StringType(FableType):
 
     def serialize(self) -> str:
         return "str"
+
+
+class NoneType(FableType):
+    """The none type. The only accepted value is ``None``, which is returned as-is.
+
+    Meant to be used as a member of a union, eg ``union[int,none]``, to declare that
+    an option accepts an explicit null. Note that an explicit null is a different thing
+    than a missing value -- the latter is never passed to validate_convert at all."""
+
+    def validate_convert(self, value: Any) -> None:
+        if value is not None:
+            raise NotNoneInput(f"Expected None, got {type(value).__name__}")
+        return None
+
+    def serialize(self) -> str:
+        return "none"
 
 
 class IntType(FableType):
@@ -166,8 +182,8 @@ class ClosedEnumType(FableType):
         self._item_set = set(self.items)
 
     def validate_convert(self, value: Any) -> Any:
-        if not isinstance(value, str):
-            raise NotStringInput(f"Expected string, got {type(value).__name__}")
+        # NOTE no isinstance check here -- the subtype is responsible for rejecting
+        # inputs of a wrong shape, and it may well accept a non-string one (eg NoneType)
         converted = self.subtype.validate_convert(value)
         if converted not in self._item_set:
             options = ", ".join(str(item) for item in self.items)
@@ -190,8 +206,7 @@ class OpenEnumType(FableType):
         self.items = [self.subtype.validate_convert(item) for item in items]
 
     def validate_convert(self, value: Any) -> Any:
-        if not isinstance(value, str):
-            raise NotStringInput(f"Expected string, got {type(value).__name__}")
+        # NOTE see the comment in ClosedEnumType.validate_convert
         return self.subtype.validate_convert(value)
 
     def serialize(self) -> str:
@@ -221,7 +236,7 @@ class ListType(FableType):
         for i, item in enumerate(items):
             try:
                 result.append(self.item_type.validate_convert(item))
-            except (NotStringInput, WrongType) as e:
+            except (NotStringInput, NotNoneInput, WrongType) as e:
                 raise WrongType(f"Error converting list item at index {i} ({item!r}): {e}")
 
         return result
@@ -237,13 +252,18 @@ class UnionType(FableType):
         self.types = types
 
     def validate_convert(self, value: Any) -> Any:
-        if not isinstance(value, str):
-            raise NotStringInput(f"Expected string, got {type(value).__name__}")
+        # NOTE we deliberately try the member types *before* checking that the input is a
+        # string, because some members (notably NoneType) legitimately accept a non-string
+        # input. Only if no member accepted the value do we report the non-string input.
+        # This makes an input like a list against `union[none]` report NotStringInput, which
+        # is a bit misleading, but we accept that in exchange for a simpler implementation.
         for t in self.types:
             try:
                 return t.validate_convert(value)
-            except WrongType:
+            except (WrongType, NotStringInput, NotNoneInput):
                 continue
+        if not isinstance(value, str):
+            raise NotStringInput(f"Expected string, got {type(value).__name__}")
         raise WrongType(f"Cannot convert {value!r} to any of: {', '.join(t.serialize() for t in self.types)}")
 
     def serialize(self) -> str:

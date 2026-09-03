@@ -169,7 +169,7 @@ class BlueprintValidationExpansion(FiabBaseModel):
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[SerializedBlockExpansion]]
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
-    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = Field(default_factory=dict)
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str | None]] = Field(default_factory=dict)
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = Field(default_factory=dict)
     block_output_qubes: dict[BlockInstanceId, dict[str, Any]] = Field(default_factory=dict)
     """Per-block output qube serialized via ``Qube.to_json()`` (qubed node
@@ -228,7 +228,7 @@ def _validate_expand_with_buckets(
     )
     possible_expansions: dict[BlockInstanceId, list[SerializedBlockExpansion]] = {}
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
-    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str | None]] = {}
     block_errors: dict[BlockInstanceId, list[str]] = defaultdict(list)
     missing_glyphs_result: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
     block_output_qubes: dict[BlockInstanceId, dict[str, Any]] = {}
@@ -527,7 +527,8 @@ def remap_builder_glyphs(builder: BlueprintBuilder, mapping: dict[str, str]) -> 
     Applied in a single non-recursive pass to:
 
     * every configuration option value string in every block (``${name}``
-      references inside ``${...}`` expressions);
+      references inside ``${...}`` expressions); options with an explicit null
+      value are left untouched;
     * every local-glyph value string (same rename inside ``${...}``);
     * every local-glyph key: if the key itself is present in *mapping*, it is
       renamed to the mapped value.
@@ -539,7 +540,10 @@ def remap_builder_glyphs(builder: BlueprintBuilder, mapping: dict[str, str]) -> 
 
     new_blocks: list[RoutableBlock] = []
     for routable in builder.blocks:
-        new_config = {opt_id: remap_glyph_names(val, mapping) for opt_id, val in routable.instance.configuration_values.items()}
+        new_config = {
+            opt_id: (val if val is None else remap_glyph_names(val, mapping))
+            for opt_id, val in routable.instance.configuration_values.items()
+        }
         new_blocks.append(
             routable.model_copy(update={"instance": routable.instance.model_copy(update={"configuration_values": new_config})})
         )
