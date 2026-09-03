@@ -158,6 +158,14 @@ class OperationalForecastSource(Source):
         date = basetime.strftime("%Y%m%d")
         time = self._convert_time(basetime.time().hour)
 
+        source = block.config_as_str(SOURCE)
+        if source == "ecmwf-opendata":
+            metadata = {"environment": ["earthkit-data[ecmwf-opendata]"]}
+        elif source == "mars":
+            metadata = {"environment": ["earthkit-data[mars]"]}
+        else:
+            metadata = {}
+
         subqube = fc_qube.select({"time": time}).compress()
         actions = []
         for levtype in subqube.axes()[LEVTYPE]:
@@ -176,7 +184,7 @@ class OperationalForecastSource(Source):
                             [
                                 Payload(
                                     "fiab_plugin_ecmwf.runtime.source.earthkit_source",
-                                    [block.config_as_str(SOURCE)],
+                                    [source],
                                     {
                                         "requests": [
                                             dict(
@@ -186,6 +194,7 @@ class OperationalForecastSource(Source):
                                             )
                                         ],
                                     },
+                                    metadata=metadata,
                                 )
                                 for p in datacube[PARAM]
                             ]
