@@ -16,8 +16,10 @@
  *   picker dialog → give B a layer → switch comparison mode → done,
  *   recording `completed`
  * - "Show me" presses the canonical server's real Add button
+ * - rails: a different server in slot A keeps the step; Show me repairs it
  * - quitting records `dismissed`; the hub CTA stays as it was
- * - a mid-session launch still starts at step 1, reviewing satisfied steps
+ * - a mid-session launch still starts at step 1; a run in slot A is not
+ *   the tour server, so the add step asks for it instead of reviewing
  * - the compare step's Show me assigns an already-collected DWD to slot B
  *   (an earlier tour run left it in the basket; B was deliberately off)
  */
@@ -44,6 +46,7 @@ import { TutorialsController } from '@/features/tutorials/TutorialsController'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import { entryRef } from '@/features/visualise/entry-ref'
 import { useTutorialsStore } from '@/stores/tutorialsStore'
+import { requestOverlayClose } from '@/lib/overlay-requests'
 import i18n from '@/lib/i18n'
 
 const TIMES = '2026-07-06T00:00:00Z,2026-07-06T06:00:00Z'
@@ -288,6 +291,55 @@ describe('visualise first-map tutorial', () => {
       .toBeVisible()
   })
 
+  it(
+    'rails: another server in slot A keeps the step; Show me fixes it',
+    { timeout: 40000 },
+    async () => {
+      const screen = await renderVisualiseWithTours()
+      await screen
+        .getByRole('button', {
+          name: 'Take the "Visualise forecasts on a map" tour',
+        })
+        .click()
+      await screen.getByRole('button', { name: 'Start', exact: true }).click()
+
+      // DWD first: it takes slot A, which the tour reserves for ECMWF.
+      document
+        .querySelector<HTMLElement>(
+          '[data-tour-action="add"][data-server="DWD"]',
+        )
+        ?.click()
+      await expect
+        .element(screen.getByText(/the tour uses ECMWF in slot A/), {
+          timeout: 15000,
+        })
+        .toBeVisible()
+
+      // Show me adds ECMWF via the Manage-sources dialog (it lands in B);
+      // closing the dialog reveals the next hint, and Show me assigns A.
+      await screen.getByRole('button', { name: 'Show me', exact: true }).click()
+      await expect
+        .poll(
+          () =>
+            useComparisonStore
+              .getState()
+              .entries.some((e) => e.kind === 'wms' && e.label === 'ECMWF'),
+          { timeout: 15000 },
+        )
+        .toBe(true)
+      requestOverlayClose()
+      await expect
+        .element(screen.getByText(/pick ECMWF for slot A/), { timeout: 15000 })
+        .toBeVisible()
+      await screen.getByRole('button', { name: 'Show me', exact: true }).click()
+      await expect
+        .element(screen.getByRole('heading', { name: 'This is your map' }), {
+          timeout: 15000,
+        })
+        .toBeVisible()
+    },
+  )
+
   it('quitting records dismissed and keeps the CTA', async () => {
     const screen = await renderVisualiseWithTours()
 
@@ -337,20 +389,19 @@ describe('visualise first-map tutorial', () => {
       .toBeVisible()
     await screen.getByRole('button', { name: 'Start', exact: true }).click()
 
-    // The satisfied add step surfaces as review (centered — the hub is gone).
+    // Rails: the run in slot A is not the tour server, so no review mode —
+    // the card says what to do instead (centered: the hub is gone).
     await expect
       .element(
         screen.getByRole('heading', { name: 'Connect a live weather server' }),
       )
       .toBeVisible()
     await expect
-      .element(screen.getByText('Done — you can move on'))
+      .element(screen.getByText(/the tour uses ECMWF in slot A/))
       .toBeVisible()
-    await screen.getByRole('button', { name: 'Continue', exact: true }).click()
-
     await expect
-      .element(screen.getByRole('heading', { name: 'This is your map' }))
-      .toBeVisible()
+      .element(screen.getByText('Done — you can move on'))
+      .not.toBeInTheDocument()
   })
 
   it('compare Show me assigns an already-collected DWD to an off slot B', async () => {

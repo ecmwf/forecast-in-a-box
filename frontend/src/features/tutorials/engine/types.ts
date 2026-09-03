@@ -34,6 +34,7 @@ export type AdvanceWhen =
   | {
       kind: 'search'
       check: (search: SearchRecord, atEntry: SearchRecord) => boolean
+      explain?: (search: SearchRecord) => StepBlocker | null
     }
   /** External state; `check` at entry + each change; `explain` = why not. */
   | {

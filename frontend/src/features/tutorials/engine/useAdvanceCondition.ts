@@ -29,7 +29,7 @@ export function useAdvanceCondition({
   stepKey: string
   searchAtEntry: SearchRecord
   onMet: () => void
-  /** Latest `explain` result for signal steps (null once met/unknown). */
+  /** Latest `explain` result for signal/search steps (null once met). */
   onBlocker?: (blocker: StepBlocker | null) => void
 }): void {
   // Raw-string selector is structural-sharing-safe; parse off the router.
@@ -67,7 +67,12 @@ export function useAdvanceCondition({
   useEffect(() => {
     if (advance.kind !== 'search') return
     const search = router.state.location.search as SearchRecord
-    if (advance.check(search, searchAtEntry)) fireRef.current()
+    if (advance.check(search, searchAtEntry)) {
+      onBlockerRef.current?.(null)
+      fireRef.current()
+      return
+    }
+    onBlockerRef.current?.(advance.explain?.(search) ?? null)
   }, [advance, stepKey, router, searchStr, searchAtEntry])
 
   useEffect(() => {

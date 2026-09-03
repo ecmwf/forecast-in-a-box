@@ -25,6 +25,12 @@
   "firstMap": {
     "title": "Visualise forecasts on a map",
     "description": "Connect a live weather server, put a layer on the map, step it through time, and compare two forecast providers. About 3 minutes.",
+    "rails": {
+      "addA": "Not yet — the tour uses <v>{{server}}</v> in slot <slotA>A</slotA>. Press \"Add\" on it, or press Show me.",
+      "pickA": "Not yet — pick <v>{{server}}</v> for slot <slotA>A</slotA> in the bar above, or press Show me.",
+      "addB": "Not yet — <slotB>B</slotB> must be <v>{{compareServer}}</v>: add it under \"Manage sources\", or press Show me.",
+      "pickB": "Not yet — pick <v>{{compareServer}}</v> for slot <slotB>B</slotB> in the bar above, or press Show me."
+    },
     "steps": {
       "orient": {
         "title": "Visualise forecasts on a map",
@@ -34,15 +40,15 @@
       },
       "addServer": {
         "title": "Connect a live weather server",
-        "body": "These are public weather map services. Press \"Add\" on {{server}} — the map workspace opens with its live data. Forecasts you've run yourself appear under \"Recent runs with stored outputs\" — they go on the map the same way."
+        "body": "These are public weather map services. Press \"Add\" on <v>{{server}}</v> — the map workspace opens with its live data in slot <slotA>A</slotA>. Forecasts you've run yourself appear under \"Recent runs with stored outputs\" — they go on the map the same way."
       },
       "map": {
         "title": "This is your map",
-        "body": "Drag to pan, scroll to zoom — try it. The toolbar above holds the view tools; press \"F\" any time to fit the whole globe."
+        "body": "Drag to pan, scroll to zoom — try it. The toolbar above holds the view tools; press <v>F</v> any time to fit the whole globe."
       },
       "layer": {
         "title": "Put data on the map",
-        "body": "The panel on the right lists every layer the active source offers. Search for something familiar — try \"temperature\" — and click a row: it draws on the map."
+        "body": "The panel on the right lists every layer the active source offers. Search for something familiar — try <v>temperature</v> — and click a row: it draws on the map."
       },
       "active": {
         "title": "Your active layers live here",
@@ -56,19 +62,19 @@
       },
       "compare": {
         "title": "Add a second forecast",
-        "body": "Press \"Manage sources\" and add {{compareServer}} from the known servers — if it is already in your collection, pick it for slot B in the bar above instead. Either way B fills, and the map shows both forecasts side by side."
+        "body": "Press \"Manage sources\" and add <v>{{compareServer}}</v> from the known servers — if it is already in your collection, pick it for slot <slotB>B</slotB> in the bar above instead. Either way <slotB>B</slotB> fills, and the map shows both forecasts side by side."
       },
       "layerB": {
         "title": "Give B a layer too",
-        "body": "B's side stays empty until it has a layer of its own. In the layer browser, switch to \"B\" and click one of {{compareServer}}'s layers — it draws on B's half."
+        "body": "<slotB>B</slotB>'s side stays empty until it has a layer of its own. In the layer browser, switch to <slotB>B</slotB> and click one of <v>{{compareServer}}</v>'s layers — it draws on <slotB>B</slotB>'s half."
       },
       "modes": {
         "title": "Compare the two forecasts",
-        "body": "A and B are side by side right now. Try another mode up here — swipe, flicker, or spy — each one is a different way to spot where the forecasts disagree."
+        "body": "<slotA>A</slotA> and <slotB>B</slotB> are side by side right now. Try another mode up here — <v>swipe</v>, <v>flicker</v>, or <v>spy</v> — each one is a different way to spot where the forecasts disagree."
       },
       "done": {
         "title": "That's a live forecast comparison",
-        "body": "One more thing about time: with two sources the timeline only offers the timesteps A and B share — and some layers carry no time info at all. Everything you see lives in the page URL, so copying the address shares this exact view. Press \"H\" for help whenever you need it."
+        "body": "One more thing about time: with two sources the timeline only offers the timesteps <slotA>A</slotA> and <slotB>B</slotB> share — and some layers carry no time info at all. Everything you see lives in the page URL, so copying the address shares this exact view. Press <v>H</v> for help whenever you need it."
       }
     }
   },
