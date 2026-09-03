@@ -95,7 +95,10 @@ function sameRect(a: AnchorRect | null, b: AnchorRect | null): boolean {
   )
 }
 
-export function useTourAnchor(anchorId: string | undefined): {
+export function useTourAnchor(
+  anchorId: string | undefined,
+  match = '',
+): {
   element: Element | null
   rect: AnchorRect | null
 } {
@@ -109,7 +112,8 @@ export function useTourAnchor(anchorId: string | undefined): {
       return
     }
 
-    let current: Element | null = null
+    // Starts undefined so a re-subscription publishes even a null result.
+    let current: Element | null | undefined
     // Defer a frame: a synchronous setState trips the RO "undelivered" guard.
     let raf = 0
     const resizeObserver = new ResizeObserver(() => {
@@ -121,7 +125,7 @@ export function useTourAnchor(anchorId: string | undefined): {
     })
 
     const sync = () => {
-      const el = findTourElement(anchorId)
+      const el = findTourElement(anchorId, match)
       if (el !== current) {
         if (current) resizeObserver.disconnect()
         current = el
@@ -144,7 +148,7 @@ export function useTourAnchor(anchorId: string | undefined): {
       window.removeEventListener('resize', sync)
       document.removeEventListener('scroll', sync, { capture: true })
     }
-  }, [anchorId])
+  }, [anchorId, match])
 
   return { element, rect }
 }

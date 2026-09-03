@@ -16,19 +16,21 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, X } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { useRouter, useRouterState } from '@tanstack/react-router'
 import { TUTORIALS } from './registry'
-import { findTourElement } from './anchors'
+import { findTourElement, tourSelector } from './anchors'
 import { isPreSatisfied, stepProgress } from './engine/stepMachine'
 import { useAdvanceCondition } from './engine/useAdvanceCondition'
 import { useDomPresence, useTourAnchor } from './engine/useTourAnchor'
 import { CoachmarkCard } from './components/CoachmarkCard'
 import { SpotlightShade } from './components/SpotlightShade'
+import type { ReactElement } from 'react'
 import type {
   AdvanceWhen,
   SearchRecord,
   ShowMeAction,
+  StepBlocker,
   TutorialId,
 } from './engine/types'
 import { useTutorialsStore } from '@/stores/tutorialsStore'
@@ -38,15 +40,28 @@ import { showToast } from '@/lib/toast'
 
 const NEXT_CLICK: AdvanceWhen = { kind: 'next-click' }
 
-type PressAction = Exclude<ShowMeAction, { search: unknown }>
+/** Step keys are dynamic; the typed-key overloads cannot express them. */
+const TransDyn = Trans as unknown as (props: {
+  t: (key: string, opts?: Record<string, unknown>) => string
+  i18nKey: string
+  values?: Record<string, unknown>
+  components?: Record<string, ReactElement>
+}) => ReactElement
+
+/** `<v>…</v>` in any tour copy: a setting value the user must enter. */
+const VALUE_MARKUP = { v: <strong className="font-semibold text-foreground" /> }
+
+type PressAction = Extract<ShowMeAction, { within: string }>
 
 /** Our own modal dialogs (shadcn slots); the coachmark itself is non-modal. */
 const MODAL_SELECTOR =
   '[data-slot="dialog-content"], [data-slot="alert-dialog-content"]'
+/** Matches nothing — for steps without a `yieldTo` menu. */
+const NEVER_SELECTOR = '[data-tour-never]'
 
 /** Presses the first matching control in the anchor; false = none found. */
 function pressShowMe(action: PressAction): boolean {
-  const scope = findTourElement(action.within)
+  const scope = findTourElement(action.within, action.withinMatch)
   if (scope === null) return false
   const selectors =
     action.selector === undefined
@@ -104,27 +119,29 @@ function ActiveTutorial({
   const step = stepIndex < def.steps.length ? def.steps[stepIndex] : null
   const stepKeyBase = `${id}:${stepIndex}`
 
-  // Leaving the tour's page ends the run; the stored status stays as-is.
-  useEffect(() => {
-    if (pathname === def.route) return
-    showToast.info(t('common.endedToast'))
-    finish(null)
-  }, [pathname, def.route, finish, t])
-
   useEffect(() => {
     if (step === null) finish('completed')
   }, [step, finish])
 
   // Variant marker (e.g. the static-timeline notice).
-  const { element: variantMarker } = useTourAnchor(step?.variant?.whenPresent)
+  const { element: variantMarker } = useTourAnchor(
+    step?.variant?.whenPresent,
+    step?.variant?.whenPresentMatch,
+  )
   const variant =
     step?.variant !== undefined && variantMarker !== null
       ? step.variant
       : undefined
 
   const anchorId = variant?.anchor ?? step?.anchor
-  const { element, rect } = useTourAnchor(anchorId)
+  const { element, rect } = useTourAnchor(
+    anchorId,
+    variant?.anchor === undefined ? step?.anchorMatch : undefined,
+  )
   const modalOpen = useDomPresence(MODAL_SELECTOR)
+  const yielding = useDomPresence(
+    step?.yieldTo === undefined ? NEVER_SELECTOR : tourSelector(step.yieldTo),
+  )
 
   // Per-step-entry snapshots; satisfied-at-entry = review mode.
   const baseAdvance = variant?.advance ?? step?.advance ?? NEXT_CLICK
@@ -144,6 +161,14 @@ function ActiveTutorial({
   const advance = reviewing ? NEXT_CLICK : baseAdvance
   const stepKey = `${stepKeyBase}:${variant?.key ?? 'base'}`
 
+  // Route-leave ends the run — unless the step expects it (then completes).
+  useEffect(() => {
+    if (pathname === def.route) return
+    if (advance.kind === 'route' && advance.match(pathname)) return
+    showToast.info(t('common.endedToast'))
+    finish(null)
+  }, [pathname, def.route, advance, finish, t])
+
   const goNext = () => {
     if (stepIndex + 1 >= def.steps.length) finish('completed')
     else setStep(stepIndex + 1)
@@ -151,11 +176,21 @@ function ActiveTutorial({
   const goNextRef = useRef(goNext)
   goNextRef.current = goNext
 
+  // Why a signal step is still open; cleared on every step change.
+  const [blocker, setBlocker] = useState<StepBlocker | null>(null)
+  useEffect(() => setBlocker(null), [stepKey])
+
   useAdvanceCondition({
     advance,
     stepKey,
     searchAtEntry: entrySnapRef.current.search,
-    onMet: () => goNextRef.current(),
+    onBlocker: setBlocker,
+    onMet: () => {
+      // A route step is terminal: the card is gone, so say it out loud.
+      if (advance.kind === 'route')
+        showToast.success(t('common.completedToast'))
+      goNextRef.current()
+    },
   })
 
   // Anchor hidden inside a collapsed panel: press the real expand handle.
@@ -210,14 +245,14 @@ function ActiveTutorial({
   const progress = stepProgress(def.steps.length, stepIndex)
   const keyPrefix = `${def.i18nKey}.steps.${step.id}`
   const copyValues = def.copyValues?.(launch) ?? {}
+  const markup = { ...VALUE_MARKUP, ...def.markup }
   const title = tDyn(
     variant ? `${keyPrefix}.${variant.key}Title` : `${keyPrefix}.title`,
     copyValues,
   )
-  const body = tDyn(
-    variant ? `${keyPrefix}.${variant.key}Body` : `${keyPrefix}.body`,
-    copyValues,
-  )
+  const bodyKey = variant
+    ? `${keyPrefix}.${variant.key}Body`
+    : `${keyPrefix}.body`
 
   const quit = () => finish('dismissed')
   const goBack = () => setStep(stepIndex - 1)
@@ -235,12 +270,16 @@ function ActiveTutorial({
       } as never)
       return
     }
+    if ('apply' in action) {
+      if (!action.apply()) showToast.info(t('common.showMeUnavailable'))
+      return
+    }
     if (!pressShowMe(action)) {
       showToast.info(t('common.showMeUnavailable'))
       return
     }
     const followUp = action.then
-    if (followUp === undefined || 'search' in followUp) return
+    if (followUp === undefined || !('within' in followUp)) return
     // Poll briefly for the follow-up target (e.g. a dialog just opened).
     cancelFollowUp()
     let tries = 0
@@ -266,6 +305,7 @@ function ActiveTutorial({
   // Review steps show immediately even anchorless (their UI may be gone).
   const showCard =
     !modalOpen &&
+    !yielding &&
     (element !== null || anchorId === undefined || seeking || reviewing)
 
   return (
@@ -313,7 +353,24 @@ function ActiveTutorial({
             >
               {title}
             </h2>
-            <p className="text-sm text-muted-foreground">{body}</p>
+            <p className="text-sm text-muted-foreground">
+              <TransDyn
+                t={tDyn}
+                i18nKey={bodyKey}
+                values={copyValues}
+                components={markup}
+              />
+            </p>
+            {blocker !== null && !reviewing && (
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                <TransDyn
+                  t={tDyn}
+                  i18nKey={`${def.i18nKey}.${blocker.key}`}
+                  values={{ ...copyValues, ...blocker.values }}
+                  components={markup}
+                />
+              </p>
+            )}
             {element === null && anchorId !== undefined && !reviewing && (
               <p className="text-xs text-muted-foreground italic">
                 {t('common.waitingFor')}

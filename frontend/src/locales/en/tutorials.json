@@ -13,7 +13,8 @@
     "stepOf": "{{current}} of {{total}}",
     "stepDone": "Done — you can move on",
     "waitingFor": "Waiting for this part of the page…",
-    "endedToast": "Tour ended — restart it any time from the page's Help dialog"
+    "endedToast": "Tour ended — restart it any time from the page's Help dialog",
+    "completedToast": "Tour completed"
   },
   "launch": {
     "sectionTitle": "Guided tours",

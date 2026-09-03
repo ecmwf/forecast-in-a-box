@@ -28,6 +28,9 @@ export function isPreSatisfied(
       return advance.check(search, search)
     case 'signal':
       return advance.check()
+    case 'route':
+      // Entry happens on the tour route, which is never the destination.
+      return false
   }
 }
 

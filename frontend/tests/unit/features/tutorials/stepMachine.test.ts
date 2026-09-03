@@ -52,6 +52,10 @@ describe('isPreSatisfied', () => {
     count = 1
     expect(isPreSatisfied(advance, {})).toBe(true)
   })
+
+  it('route steps never pre-satisfy (entry is on the tour route)', () => {
+    expect(isPreSatisfied({ kind: 'route', match: () => true }, {})).toBe(false)
+  })
 })
 
 describe('stepProgress', () => {

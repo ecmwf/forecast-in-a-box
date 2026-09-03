@@ -49,9 +49,10 @@ export function tourActionSelector(action: string): string {
   return `[data-tour-action="${action}"]:not([disabled])`
 }
 
-/** First visible element carrying the anchor id (hidden matches skipped). */
-export function findTourElement(id: string): Element | null {
-  for (const el of document.querySelectorAll(tourSelector(id))) {
+/** First visible element carrying the anchor id (hidden matches skipped);
+ * `match` narrows ids stamped on several elements (e.g. per block kind). */
+export function findTourElement(id: string, match = ''): Element | null {
+  for (const el of document.querySelectorAll(tourSelector(id) + match)) {
     if (el.getClientRects().length > 0) return el
   }
   return null
