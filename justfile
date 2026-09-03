@@ -74,7 +74,10 @@ dev *args:
 
     frontend_build_marker=frontend/dist/.git-commit
     frontend_build_needed=false
-    if [[ ! -L backend/src/forecastbox/static ||
+    if [[ ! -e frontend ]] ; then
+        # exotic scenario during docker dev
+        frontend_build_needed=false
+    elif [[ ! -L backend/src/forecastbox/static ||
         ! -d backend/src/forecastbox/static ||
         ! -f "$frontend_build_marker" ]] ; then
         frontend_build_needed=true
