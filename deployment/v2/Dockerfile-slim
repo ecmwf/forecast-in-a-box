@@ -1,4 +1,7 @@
 # dockerfile with a plain fiab installation
+# - slim debian as a base
+# - packages (bash+curl) for basic executability + getting remote data at runtime
+# - packages (libgfortran & friends) for being able to load ecmwf atlas lib
 # - the most recent release, pulled in at the build time
 # - no config override, meaning all defaults
 # - not properly warmed up (a TODO in fiab.sh captures this -- we do *not* install the default plugin, and we do *not* cache any runtime deps)
@@ -8,6 +11,7 @@ FROM debian:stable-slim
 RUN : \
     && apt-get update \
     && apt-get install -y bash curl ca-certificates \
+    && apt-get install -y libgfortran5 libquadmath0 libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --user-group --create-home --shell /bin/false fiab \
     && :
