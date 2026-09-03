@@ -17,6 +17,10 @@ import {
   firstMapDefinition,
   useFirstMapLaunchContext,
 } from './tutorials/visualise-first-map'
+import {
+  firstRunDefinition,
+  useFirstRunLaunchContext,
+} from './tutorials/configure-first-run'
 import type { TutorialDefinition, TutorialId } from './engine/types'
 
 export interface TutorialEntry<TLaunch = unknown> {
@@ -34,5 +38,9 @@ export const TUTORIALS: Record<TutorialId, TutorialEntry> = {
   'visualise-first-map': defineTutorial({
     definition: firstMapDefinition,
     useLaunchContext: useFirstMapLaunchContext,
+  }),
+  'configure-first-run': defineTutorial({
+    definition: firstRunDefinition,
+    useLaunchContext: useFirstRunLaunchContext,
   }),
 }

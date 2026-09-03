@@ -16,22 +16,26 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter, useRouterState } from '@tanstack/react-router'
-import type { AdvanceWhen, SearchRecord } from './types'
+import type { AdvanceWhen, SearchRecord, StepBlocker } from './types'
 
 export function useAdvanceCondition({
   advance,
   stepKey,
   searchAtEntry,
   onMet,
+  onBlocker,
 }: {
   advance: AdvanceWhen
   stepKey: string
   searchAtEntry: SearchRecord
   onMet: () => void
+  /** Latest `explain` result for signal/search steps (null once met). */
+  onBlocker?: (blocker: StepBlocker | null) => void
 }): void {
   // Raw-string selector is structural-sharing-safe; parse off the router.
   const router = useRouter()
   const searchStr = useRouterState({ select: (s) => s.location.searchStr })
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
 
   const metForRef = useRef<string | null>(null)
   const onMetRef = useRef(onMet)
@@ -43,21 +47,36 @@ export function useAdvanceCondition({
   }
   const fireRef = useRef(fire)
   fireRef.current = fire
+  const onBlockerRef = useRef(onBlocker)
+  onBlockerRef.current = onBlocker
 
   useEffect(() => {
     if (advance.kind !== 'signal') return
-    if (advance.check()) {
-      fireRef.current()
-      return
+    const evaluate = () => {
+      if (advance.check()) {
+        onBlockerRef.current?.(null)
+        fireRef.current()
+        return
+      }
+      onBlockerRef.current?.(advance.explain?.() ?? null)
     }
-    return advance.subscribe(() => {
-      if (advance.check()) fireRef.current()
-    })
+    evaluate()
+    return advance.subscribe(evaluate)
   }, [advance, stepKey])
 
   useEffect(() => {
     if (advance.kind !== 'search') return
     const search = router.state.location.search as SearchRecord
-    if (advance.check(search, searchAtEntry)) fireRef.current()
+    if (advance.check(search, searchAtEntry)) {
+      onBlockerRef.current?.(null)
+      fireRef.current()
+      return
+    }
+    onBlockerRef.current?.(advance.explain?.(search) ?? null)
   }, [advance, stepKey, router, searchStr, searchAtEntry])
+
+  useEffect(() => {
+    if (advance.kind !== 'route') return
+    if (advance.match(pathname)) fireRef.current()
+  }, [advance, stepKey, pathname])
 }

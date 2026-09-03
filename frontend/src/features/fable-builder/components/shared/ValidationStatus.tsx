@@ -25,7 +25,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
+
+const anchor = tourAttr(TOUR.configure.validation)
 
 interface Issue {
   blockId: string | null
@@ -88,7 +91,7 @@ export function ValidationStatusBadge({
 
   if (isValidating) {
     return (
-      <Badge variant="secondary" className={cn('gap-1', className)}>
+      <Badge variant="secondary" className={cn('gap-1', className)} {...anchor}>
         <Loader2 className="h-3 w-3 animate-spin" />
         {t('validationStatus.validating')}
       </Badge>
@@ -104,6 +107,7 @@ export function ValidationStatusBadge({
       <Badge
         variant="outline"
         className={cn('gap-1 border-green-200 text-green-600', className)}
+        {...anchor}
       >
         <CheckCircle2 className="h-3 w-3" />
         {t('validationStatus.valid')}
@@ -119,6 +123,7 @@ export function ValidationStatusBadge({
             variant="destructive"
             render={<button type="button" />}
             className={cn('cursor-pointer gap-1', className)}
+            {...anchor}
           />
         }
       >

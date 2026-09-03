@@ -14,11 +14,18 @@
  * engine knows no page domain — tours bring their own launch type/signals.
  */
 
+import type { ReactElement } from 'react'
 import type { TutorialId } from '@/stores/tutorialsStore'
 
 export type { TutorialId }
 
 export type SearchRecord = Record<string, unknown>
+
+/** Why a step is still open: i18n key under the tour's subtree + values. */
+export interface StepBlocker {
+  key: string
+  values?: Record<string, unknown>
+}
 
 export type AdvanceWhen =
   | { kind: 'next-click' }
@@ -27,34 +34,44 @@ export type AdvanceWhen =
   | {
       kind: 'search'
       check: (search: SearchRecord, atEntry: SearchRecord) => boolean
+      explain?: (search: SearchRecord) => StepBlocker | null
     }
-  /** Any external state; `check` runs at entry and on each notification. */
+  /** External state; `check` at entry + each change; `explain` = why not. */
   | {
       kind: 'signal'
       subscribe: (onChange: () => void) => () => void
       check: () => boolean
+      explain?: () => StepBlocker | null
     }
+  /** Expected navigation away from the tour route (e.g. a submit). */
+  | { kind: 'route'; match: (pathname: string) => boolean }
 
 /** Alternate presentation while a marker anchor is present (e.g. the
  * static-timeline notice). */
 export interface StepVariant {
   whenPresent: string
+  /** Attribute filter on the marker (see `anchorMatch`). */
+  whenPresentMatch?: string
   /** i18n prefix: steps.<id>.<key>Title / <key>Body. */
   key: string
   anchor?: string
   advance?: AdvanceWhen
 }
 
-/** "Show me": the step's real action — press the control or apply its URL. */
+/** "Show me": the step's real action — press the control, apply its URL,
+ * or run a tour-supplied effect (false = nothing to do). */
 export type ShowMeAction =
   | {
       within: string
+      /** Attribute filter on the `within` anchor (see `anchorMatch`). */
+      withinMatch?: string
       /** Selector(s) in the anchor, by preference; omitted = the anchor. */
       selector?: string | ReadonlyArray<string>
       /** Follow-up press once its target appears (modals inert the page). */
       then?: ShowMeAction
     }
   | { search: (prev: SearchRecord) => SearchRecord }
+  | { apply: () => boolean }
 
 export interface RuntimeSnapshot<TLaunch> {
   /** Null while the launch signals resolve. */
@@ -66,6 +83,8 @@ export interface TutorialStep<TLaunch = unknown> {
   id: string
   /** `data-tour` id; absent = centered card. */
   anchor?: string
+  /** Extra attribute selector for ids stamped on several elements. */
+  anchorMatch?: string
   side?: 'top' | 'bottom' | 'left' | 'right'
   align?: 'start' | 'center' | 'end'
   advance: AdvanceWhen
@@ -75,6 +94,8 @@ export interface TutorialStep<TLaunch = unknown> {
   expandVia?: string
   /** On entry, ask the page once to close open overlays. */
   closeDialog?: boolean
+  /** Anchor id of a menu the step opens; the card hides while it shows. */
+  yieldTo?: string
   variant?: StepVariant
   /** Function form resolves against the live snapshot (dynamic targets). */
   showMe?: ShowMeAction | ((ctx: RuntimeSnapshot<TLaunch>) => ShowMeAction)
@@ -88,5 +109,7 @@ export interface TutorialDefinition<TLaunch = unknown> {
   i18nKey: string
   /** Interpolation values for every step's copy (e.g. the server name). */
   copyValues?: (launch: TLaunch) => Record<string, unknown>
+  /** Elements for `<tag>…</tag>` markup in step bodies (Trans components). */
+  markup?: Record<string, ReactElement>
   steps: ReadonlyArray<TutorialStep<TLaunch>>
 }

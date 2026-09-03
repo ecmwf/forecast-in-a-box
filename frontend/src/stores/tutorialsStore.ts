@@ -18,7 +18,7 @@ import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import { STORAGE_KEYS, STORE_VERSIONS } from '@/lib/storage-keys'
 
-export type TutorialId = 'visualise-first-map'
+export type TutorialId = 'visualise-first-map' | 'configure-first-run'
 
 export type TutorialOutcome = 'completed' | 'dismissed'
 

@@ -16,6 +16,7 @@ import {
   Check,
   ChevronDown,
   Download,
+  HelpCircle,
   MoreVertical,
   Play,
   Redo2,
@@ -30,6 +31,7 @@ import { ValidationStatusBadge } from './shared/ValidationStatus'
 import { DraftStatus } from './DraftStatus'
 import { GraphOptionsDropdown } from './graph-mode/GraphOptionsDropdown'
 import { SaveConfigPopover } from './SaveConfigPopover'
+import { ConfigureHelpDialog } from './ConfigureHelpDialog'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
@@ -50,6 +52,7 @@ import {
 import { H1 } from '@/components/base/typography'
 import { copyToClipboard } from '@/lib/utils'
 import { showToast } from '@/lib/toast'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import {
   Tooltip,
   TooltipContent,
@@ -73,6 +76,7 @@ export function FableBuilderHeader({
     t('header.share'),
   )
   const [savePopoverOpen, setSavePopoverOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const shareTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -307,6 +311,7 @@ export function FableBuilderHeader({
                         className="h-8 w-8"
                         onClick={handleNewConfiguration}
                         aria-label={t('header.newConfiguration')}
+                        {...tourAttr(TOUR.configure.newConfig)}
                       >
                         <BrushCleaning className="h-4 w-4" />
                       </Button>
@@ -376,6 +381,7 @@ export function FableBuilderHeader({
                           onClick={handleRunOnce}
                           disabled={!canReview}
                           className="gap-2"
+                          {...tourAttr(TOUR.configure.runOnce)}
                         >
                           <Play className="h-4 w-4" />
                           {t('header.runOnce')}
@@ -521,6 +527,18 @@ export function FableBuilderHeader({
                   open={savePopoverOpen}
                   onOpenChange={setSavePopoverOpen}
                 />
+
+                {/* Help lives in the header so the tour entry never hides. */}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setHelpOpen(true)}
+                  title={t('help.open')}
+                  aria-label={t('help.open')}
+                >
+                  <HelpCircle className="h-3.5 w-3.5" />
+                </Button>
               </>
             ) : (
               <>
@@ -552,6 +570,7 @@ export function FableBuilderHeader({
           </div>
         </div>
       </header>
+      <ConfigureHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </>
   )
 }

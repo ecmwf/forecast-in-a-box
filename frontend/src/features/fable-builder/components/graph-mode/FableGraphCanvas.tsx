@@ -39,6 +39,7 @@ import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuild
 import { useSidebarBlockDrop } from '@/features/fable-builder/hooks/useSidebarBlockDrop'
 import { useMedia } from '@/hooks/useMedia'
 import { useUiStore } from '@/stores/uiStore'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 interface FableGraphCanvasProps {
@@ -390,7 +391,11 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   // deselect, use the X button in the ConfigPanel header.
 
   return (
-    <div ref={containerRef} className="h-full w-full">
+    <div
+      ref={containerRef}
+      className="h-full w-full"
+      {...tourAttr(TOUR.configure.canvas)}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}

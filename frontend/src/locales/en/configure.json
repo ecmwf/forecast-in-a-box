@@ -312,5 +312,37 @@
     "hoursAgo_other": "{{count}} hours ago",
     "daysAgo_one": "{{count}} day ago",
     "daysAgo_other": "{{count}} days ago"
+  },
+  "help": {
+    "open": "Help & shortcuts",
+    "title": "Configuration canvas",
+    "intro": "A forecast configuration is a pipeline of blocks: data flows from a source through transforms and products into outputs. Build it on the canvas, configure each block on the right, and run it from the header.",
+    "sections": {
+      "canvas": {
+        "title": "Canvas",
+        "body": "Blocks are cards wired left to right. Drag to pan, scroll to zoom, and use the controls in the corner to fit the view. Click a card to select it; its + handle adds a connected block, or drag from the handle to wire by hand."
+      },
+      "palette": {
+        "title": "Block palette",
+        "body": "Every block you can use, grouped by kind: <sourceKind>Source</sourceKind> fetches data, <transformKind>Transform</transformKind> reshapes it, <productKind>Product</productKind> computes something new, <outputKind>Output</outputKind> stores or plots the result. Blocks come from installed plugins — the Plugins page adds more. Greyed rows cannot follow the currently selected block."
+      },
+      "configure": {
+        "title": "Configuring a block",
+        "body": "The panel on the right lists the selected block’s inputs and fields. Fields offer the values the upstream data actually has. Type ${…} to reference a variable — local variables and glyphs resolve at run time."
+      },
+      "validation": {
+        "title": "Validation",
+        "body": "Every edit is checked on the spot. A red ring marks a block with issues; the header badge counts them and lists them — each entry jumps to its block. The pipeline can be run once it reads “Valid”."
+      },
+      "run": {
+        "title": "Running and saving",
+        "body": "Run Once submits the pipeline and opens its run page; the caret next to it offers a review step and scheduling. Save Config keeps the pipeline as a preset; the more menu shares, exports, or loads a configuration file. Unsaved work is kept as a draft in this browser."
+      }
+    },
+    "shortcuts": {
+      "title": "Keyboard shortcuts",
+      "undo": "Undo",
+      "redo": "Redo"
+    }
   }
 }

@@ -13,7 +13,8 @@
     "stepOf": "{{current}} of {{total}}",
     "stepDone": "Done — you can move on",
     "waitingFor": "Waiting for this part of the page…",
-    "endedToast": "Tour ended — restart it any time from the page's Help dialog"
+    "endedToast": "Tour ended — restart it any time from the page's Help dialog",
+    "completedToast": "Tour completed"
   },
   "launch": {
     "sectionTitle": "Guided tours",
@@ -24,6 +25,12 @@
   "firstMap": {
     "title": "Visualise forecasts on a map",
     "description": "Connect a live weather server, put a layer on the map, step it through time, and compare two forecast providers. About 3 minutes.",
+    "rails": {
+      "addA": "Not yet — the tour uses <v>{{server}}</v> in slot <slotA>A</slotA>. Press \"Add\" on it, or press Show me.",
+      "pickA": "Not yet — pick <v>{{server}}</v> for slot <slotA>A</slotA> in the bar above, or press Show me.",
+      "addB": "Not yet — <slotB>B</slotB> must be <v>{{compareServer}}</v>: add it under \"Manage sources\", or press Show me.",
+      "pickB": "Not yet — pick <v>{{compareServer}}</v> for slot <slotB>B</slotB> in the bar above, or press Show me."
+    },
     "steps": {
       "orient": {
         "title": "Visualise forecasts on a map",
@@ -33,15 +40,15 @@
       },
       "addServer": {
         "title": "Connect a live weather server",
-        "body": "These are public weather map services. Press \"Add\" on {{server}} — the map workspace opens with its live data. Forecasts you've run yourself appear under \"Recent runs with stored outputs\" — they go on the map the same way."
+        "body": "These are public weather map services. Press \"Add\" on <v>{{server}}</v> — the map workspace opens with its live data in slot <slotA>A</slotA>. Forecasts you've run yourself appear under \"Recent runs with stored outputs\" — they go on the map the same way."
       },
       "map": {
         "title": "This is your map",
-        "body": "Drag to pan, scroll to zoom — try it. The toolbar above holds the view tools; press \"F\" any time to fit the whole globe."
+        "body": "Drag to pan, scroll to zoom — try it. The toolbar above holds the view tools; press <v>F</v> any time to fit the whole globe."
       },
       "layer": {
         "title": "Put data on the map",
-        "body": "The panel on the right lists every layer the active source offers. Search for something familiar — try \"temperature\" — and click a row: it draws on the map."
+        "body": "The panel on the right lists every layer the active source offers. Search for something familiar — try <v>temperature</v> — and click a row: it draws on the map."
       },
       "active": {
         "title": "Your active layers live here",
@@ -55,19 +62,104 @@
       },
       "compare": {
         "title": "Add a second forecast",
-        "body": "Press \"Manage sources\" and add {{compareServer}} from the known servers — if it is already in your collection, pick it for slot B in the bar above instead. Either way B fills, and the map shows both forecasts side by side."
+        "body": "Press \"Manage sources\" and add <v>{{compareServer}}</v> from the known servers — if it is already in your collection, pick it for slot <slotB>B</slotB> in the bar above instead. Either way <slotB>B</slotB> fills, and the map shows both forecasts side by side."
       },
       "layerB": {
         "title": "Give B a layer too",
-        "body": "B's side stays empty until it has a layer of its own. In the layer browser, switch to \"B\" and click one of {{compareServer}}'s layers — it draws on B's half."
+        "body": "<slotB>B</slotB>'s side stays empty until it has a layer of its own. In the layer browser, switch to <slotB>B</slotB> and click one of <v>{{compareServer}}</v>'s layers — it draws on <slotB>B</slotB>'s half."
       },
       "modes": {
         "title": "Compare the two forecasts",
-        "body": "A and B are side by side right now. Try another mode up here — swipe, flicker, or spy — each one is a different way to spot where the forecasts disagree."
+        "body": "<slotA>A</slotA> and <slotB>B</slotB> are side by side right now. Try another mode up here — <v>swipe</v>, <v>flicker</v>, or <v>spy</v> — each one is a different way to spot where the forecasts disagree."
       },
       "done": {
         "title": "That's a live forecast comparison",
-        "body": "One more thing about time: with two sources the timeline only offers the timesteps A and B share — and some layers carry no time info at all. Everything you see lives in the page URL, so copying the address shares this exact view. Press \"H\" for help whenever you need it."
+        "body": "One more thing about time: with two sources the timeline only offers the timesteps <slotA>A</slotA> and <slotB>B</slotB> share — and some layers carry no time info at all. Everything you see lives in the page URL, so copying the address shares this exact view. Press <v>H</v> for help whenever you need it."
+      }
+    }
+  },
+  "firstRun": {
+    "title": "Build and run your first forecast",
+    "description": "Assemble a four-block pipeline from a clean canvas — source, transform, product, output — fix its validation issues, and submit it as a run. About 5 minutes.",
+    "rails": {
+      "stray": "Not yet — remove <v>{{block}}</v>; it is not part of this tour's pipeline. Show me removes it.",
+      "unwired": "Not yet — connect <v>{{block}}</v> to <v>{{upstream}}</v>: drag from the + handle to its input, or press Show me.",
+      "invalid": "Values are right — the block still reports issues; see the badge.",
+      "source": {
+        "source": "Not yet — set Source to <v>ecmwf-open-data</v>.",
+        "forecast": "Not yet — set Forecast model to <v>ifs-ens</v>.",
+        "base_time": "Not yet — pick a Base time from <v>the last four days</v>."
+      },
+      "transform": {
+        "dimension": "Not yet — set Dimension to <v>step</v>.",
+        "values": "Not yet — set Values to <v>72</v>."
+      },
+      "product": {
+        "param": "Not yet — set Parameter to <v>2t</v>.",
+        "statistic": "Not yet — set Statistic to <v>mean</v>."
+      },
+      "sink": {
+        "param": "Not yet — set Parameters to <v>2t</v>.",
+        "domain": "Not yet — set Domain to <v>global</v>.",
+        "format": "Not yet — set Format to <v>png</v>.",
+        "groupby": "Not yet — set Group by to <v>none</v>.",
+        "splitby": "Not yet — set Split by to <v>none</v>."
+      }
+    },
+    "steps": {
+      "orient": {
+        "title": "Build and run your first forecast",
+        "body": "This canvas holds a forecast configuration: a pipeline of blocks that data flows through from left to right. In the next five minutes you'll build one from scratch — fetch a forecast, narrow it, compute a statistic, plot it — and submit it as a run.",
+        "midSessionTitle": "Take the tour from the top",
+        "midSessionBody": "There is already work on the canvas. The tour builds its pipeline from a clean canvas, so the next step parks what's here on the workbench shelf — nothing is lost, and you can bring it back any time."
+      },
+      "fresh": {
+        "title": "Start from a clean canvas",
+        "body": "Press \"New configuration\". Anything unsaved is parked on the workbench shelf — a banner offers to restore it — and you get an empty canvas to build on."
+      },
+      "palette": {
+        "title": "Blocks come in four kinds",
+        "body": "The palette lists every block you can use. <sourceKind>Source</sourceKind> fetches data. <transformKind>Transform</transformKind> reshapes it — selecting, cropping, regridding. <productKind>Product</productKind> computes something new from it. <outputKind>Output</outputKind> stores or plots the result. A pipeline starts with a source and ends with at least one output."
+      },
+      "plugins": {
+        "title": "Where blocks come from",
+        "body": "Every block here is provided by an installed plugin — these come with the ECMWF base plugin. Administrators install more on the Plugins page, including custom blocks written for your own models, data, and products."
+      },
+      "addSource": {
+        "title": "Add a source",
+        "body": "Click \"{{sourceBlock}}\" in the palette — or drag it onto the canvas. It appears as a card with a red ring: the block exists, but it isn't configured yet."
+      },
+      "validation": {
+        "title": "Red means \"not yet\"",
+        "body": "Every edit is checked on the spot. This badge counts the open issues — click it to list them; each entry jumps to its block. It turns \"Valid\" as soon as the whole pipeline checks out, and only then can you run it."
+      },
+      "configureSource": {
+        "title": "Configure the source",
+        "body": "A selected block is configured in the panel on the right. Set Source to <v>ecmwf-open-data</v>, Forecast model to <v>ifs-ens</v>, and Base time to <v>a day within the last four days, 00:00</v>. The tour moves on with exactly these values — they are the ones known to run — and the ring and badge clear as the last field lands."
+      },
+      "addTransform": {
+        "title": "Chain the next block",
+        "body": "A block's output handle is also its \"Add\" button. Click the + on the source and pick \"{{transformBlock}}\" — it lands on the canvas already wired. Prefer wiring by hand? Drag from the handle to any block's input."
+      },
+      "configureTransform": {
+        "title": "Narrow the data",
+        "body": "Transforms keep runs small: set Dimension to <v>step</v> and Values to <v>72</v> — only the 72-hour lead time goes downstream. The panel offers the choices the upstream data actually has; the tour moves on with these two values."
+      },
+      "product": {
+        "title": "Compute a product",
+        "body": "Now do it yourself: click the + on the Select block and pick \"{{productBlock}}\". It lands wired, unconfigured, and selected — the next half of this step fills it in.",
+        "fillTitle": "Configure the statistics",
+        "fillBody": "Set Parameter to <v>2t</v> (2-metre temperature) and Statistic to <v>mean</v> — the average over all ensemble members. The tour moves on with these values once the block validates."
+      },
+      "output": {
+        "title": "Finish with an output",
+        "body": "Same again: click the + on the statistics block and pick \"{{outputBlock}}\". It renders the result as an image.",
+        "fillTitle": "Configure the plot",
+        "fillBody": "Set Parameters to <v>2t</v>, Domain to <v>global</v>, Format to <v>png</v>, and both Group by and Split by to <v>none</v>. Once the badge says \"Valid\" with these values, the pipeline is complete."
+      },
+      "run": {
+        "title": "Run it",
+        "body": "Press \"Run Once\", give the run a name, and submit. You land on the run's page, where every block reports its progress and outputs appear as they finish. The caret next to the button repeats the same configuration on a schedule."
       }
     }
   }

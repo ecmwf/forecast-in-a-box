@@ -16,8 +16,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { TOUR, findTourElement, tourActionSelector } from '../anchors'
-import type { AdvanceWhen, TutorialDefinition } from '../engine/types'
+import type {
+  AdvanceWhen,
+  SearchRecord,
+  ShowMeAction,
+  StepBlocker,
+  TutorialDefinition,
+} from '../engine/types'
 import type { CuratedWmsServer } from '@/features/visualise/curated-wms'
+import type { ComparisonEntry } from '@/features/visualise/entry-ref'
 import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
 import { useCuratedWmsServers } from '@/features/visualise/curated-wms'
 import { probeWmsEndpoint } from '@/features/visualise/wms-probe'
@@ -34,8 +41,79 @@ const PREFERRED_SERVER_NAME = 'ECMWF'
 
 const hasEntries = () => useComparisonStore.getState().entries.length > 0
 
+/** Last launch seen by the hook — the rails need the server names. */
+let launchRef: FirstMapLaunch | null = null
+
+/** The named curated server's basket entry, if collected. */
+function wmsEntry(name: string): ComparisonEntry | undefined {
+  return useComparisonStore
+    .getState()
+    .entries.find((e) => e.kind === 'wms' && e.label === name)
+}
+
+/** Slot `param` shows the named server. */
+function slotIs(search: SearchRecord, param: 'a' | 'b', name: string) {
+  const entry = wmsEntry(name)
+  return entry !== undefined && search[param] === entryRef(entry)
+}
+
+const tourServerName = () => launchRef?.server.name ?? PREFERRED_SERVER_NAME
+const tourCompareName = () =>
+  launchRef === null ? 'DWD' : compareServerName(launchRef)
+
+/** Rails: A is the tour server; nothing else counts. */
+const SLOT_A_CANONICAL: AdvanceWhen = {
+  kind: 'search',
+  check: (search) => slotIs(search, 'a', tourServerName()),
+  explain: (search): StepBlocker | null => {
+    if (!hasEntries()) return null
+    if (wmsEntry(tourServerName()) === undefined) return { key: 'rails.addA' }
+    return search.a === undefined ? null : { key: 'rails.pickA' }
+  },
+}
+
+/** Rails: B is the comparison server. */
+const SLOT_B_CANONICAL: AdvanceWhen = {
+  kind: 'search',
+  check: (search) => slotIs(search, 'b', tourCompareName()),
+  explain: (search): StepBlocker | null => {
+    const set = typeof search.b === 'string' && search.b !== SLOT_B_OFF
+    if (wmsEntry(tourCompareName()) === undefined) {
+      return set ? { key: 'rails.addB' } : null
+    }
+    return { key: 'rails.pickB' }
+  },
+}
+
+/** Show me for slot A: assign the collected server, else press its Add. */
+function showMeSlotA(): ShowMeAction {
+  const name = tourServerName()
+  const entry = wmsEntry(name)
+  if (entry !== undefined) {
+    const ref = entryRef(entry)
+    return {
+      search: (prev) => ({
+        ...prev,
+        a: ref,
+        b: prev.b === ref ? SLOT_B_OFF : prev.b,
+      }),
+    }
+  }
+  const row = { within: TOUR.visualise.knownWms, selector: addSelector(name) }
+  // Mid-session the list sits in the Manage-sources dialog: open it first.
+  return findTourElement(TOUR.visualise.knownWms) !== null
+    ? row
+    : { within: TOUR.visualise.addSource, then: row }
+}
+
 /** Preferred server now, first reachable as probes land; frozen once added. */
 export function useFirstMapLaunchContext(): FirstMapLaunch | null {
+  const launch = useFirstMapLaunch()
+  launchRef = launch
+  return launch
+}
+
+function useFirstMapLaunch(): FirstMapLaunch | null {
   const servers = useCuratedWmsServers()
   const ordered = useMemo(
     () => [
@@ -66,12 +144,6 @@ export function useFirstMapLaunchContext(): FirstMapLaunch | null {
   return server === undefined ? null : { server }
 }
 
-const BASKET_NON_EMPTY: AdvanceWhen = {
-  kind: 'signal',
-  subscribe: (onChange) => useComparisonStore.subscribe(onChange),
-  check: hasEntries,
-}
-
 /** The named server's Add row in the curated list. */
 const addSelector = (name: string) =>
   `[data-server=${JSON.stringify(name)}]${tourActionSelector('add')}`
@@ -86,6 +158,12 @@ const layerRowSelector = (slot: 'a' | 'b') => [
 const compareServerName = (launch: FirstMapLaunch) =>
   launch.server.name === 'DWD' ? 'ECMWF' : 'DWD'
 
+/** Slot colours as the viewer paints them. */
+const SLOT_MARKUP = {
+  slotA: <span className="font-medium text-blue-700 dark:text-blue-300" />,
+  slotB: <span className="font-medium text-orange-700 dark:text-orange-300" />,
+}
+
 export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
   id: 'visualise-first-map',
   route: '/visualise',
@@ -94,6 +172,7 @@ export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
     server: launch.server.name,
     compareServer: compareServerName(launch),
   }),
+  markup: SLOT_MARKUP,
   steps: [
     {
       // Always first — the midSession variant re-anchors to the open map.
@@ -111,11 +190,8 @@ export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
       id: 'addServer',
       anchor: TOUR.visualise.knownWms,
       side: 'left',
-      advance: BASKET_NON_EMPTY,
-      showMe: (ctx) => ({
-        within: TOUR.visualise.knownWms,
-        selector: addSelector(ctx.launch?.server.name ?? ''),
-      }),
+      advance: SLOT_A_CANONICAL,
+      showMe: showMeSlotA,
     },
     {
       id: 'map',
@@ -175,17 +251,11 @@ export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
       id: 'compare',
       anchor: TOUR.visualise.addSource,
       side: 'bottom',
-      advance: {
-        kind: 'search',
-        check: (search) =>
-          typeof search.b === 'string' && search.b !== SLOT_B_OFF,
-      },
-      showMe: (ctx) => {
-        const name = ctx.launch === null ? 'DWD' : compareServerName(ctx.launch)
+      advance: SLOT_B_CANONICAL,
+      showMe: () => {
+        const name = tourCompareName()
         // Already collected (earlier run): Add is disabled; assign B directly.
-        const collected = useComparisonStore
-          .getState()
-          .entries.find((e) => e.kind === 'wms' && e.label === name)
+        const collected = wmsEntry(name)
         if (collected !== undefined) {
           return { search: (prev) => ({ ...prev, b: entryRef(collected) }) }
         }
