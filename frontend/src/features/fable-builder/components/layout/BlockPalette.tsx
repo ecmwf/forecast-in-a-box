@@ -41,6 +41,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 // Transparent image used to suppress the browser's default drag ghost.
@@ -170,7 +171,7 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" {...tourAttr(TOUR.configure.palette)}>
       <div className="border-b border-border p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <H2 className="text-sm font-semibold">{t('palette.title')}</H2>
@@ -245,6 +246,8 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
                     return (
                       <button
                         key={factoryIdToKey(id)}
+                        data-factory-key={factoryIdToKey(id)}
+                        {...tourActionAttr('add-block')}
                         draggable={canInteract}
                         onClick={() =>
                           canInteract && handleAddBlock(id, factory)

@@ -49,6 +49,7 @@ import { Badge } from '@/components/ui/badge'
 import { GlyphReferencePanel } from '@/features/fable-builder/components/shared/GlyphReferencePanel'
 import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 interface ConfigPanelProps {
@@ -180,7 +181,10 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
 
   if (!selectedBlock || !factory) {
     return (
-      <div className="relative flex h-full flex-col items-center justify-center p-6 text-center">
+      <div
+        className="relative flex h-full flex-col items-center justify-center p-6 text-center"
+        {...tourAttr(TOUR.configure.configPanel)}
+      >
         <Button
           variant="ghost"
           size="icon"
@@ -235,7 +239,10 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   const inputs = factory.inputs
 
   return (
-    <div className="flex h-full flex-col">
+    <div
+      className="flex h-full flex-col"
+      {...tourAttr(TOUR.configure.configPanel)}
+    >
       <div className="border-b border-border p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">

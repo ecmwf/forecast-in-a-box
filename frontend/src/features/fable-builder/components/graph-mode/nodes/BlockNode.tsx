@@ -38,6 +38,7 @@ import {
 import { BlockActionMenu } from '@/features/fable-builder/components/shared/BlockActionMenu'
 import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mode/nodes/BlockErrorOverlay'
 import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 export type FableNode = Node<FableNodeData>
@@ -124,6 +125,8 @@ export const BlockNode = memo(function ({
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+      data-block-kind={factory.kind}
+      {...tourAttr(TOUR.configure.block)}
       className={cn(
         'relative w-70 rounded-2xl border bg-card shadow-sm',
         'cursor-pointer transition-all duration-200',
@@ -304,6 +307,8 @@ export const BlockNode = memo(function ({
             id="output"
             title={t('blockNode.outputHandle')}
             onClick={(e) => e.stopPropagation()}
+            data-block-kind={factory.kind}
+            {...tourAttr(TOUR.configure.addDownstream)}
             className={cn(
               'flex! h-5! w-5! cursor-pointer! items-center justify-center rounded-full! border-4! bg-card!',
               'border-foreground/30! hover:border-primary!',

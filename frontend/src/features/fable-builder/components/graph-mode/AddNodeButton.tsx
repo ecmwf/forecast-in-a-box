@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 interface AddNodeButtonProps {
@@ -226,6 +227,7 @@ export const AddNodeButton = memo(function ({
         align="center"
         sideOffset={8}
         onClick={(e) => e.stopPropagation()}
+        {...tourAttr(TOUR.configure.addMenu)}
       >
         {canOfferInsert && (
           <div className="border-b p-2">
@@ -291,6 +293,8 @@ export const AddNodeButton = memo(function ({
                     return (
                       <button
                         key={factoryIdToKey(id)}
+                        data-factory-key={factoryIdToKey(id)}
+                        {...tourActionAttr('add-block')}
                         className={cn(
                           'flex w-full items-start gap-2 rounded-md p-2',
                           'text-left hover:bg-accent',

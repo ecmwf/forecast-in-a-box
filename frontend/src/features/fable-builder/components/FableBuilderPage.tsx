@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Package } from 'lucide-react'
 import { FableBuilderHeader } from './FableBuilderHeader'
@@ -35,6 +35,7 @@ import {
 } from '@/features/fable-builder/hooks/useDraftPersistence'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { useTutorialsStore } from '@/stores/tutorialsStore'
 import { shelveBenchIfDirty } from '@/features/fable-builder/stores/workbenchShelfStore'
 import { hasUnterminatedGlyph } from '@/features/fable-builder/utils/glyph-display'
 import { decodeFableFromURL } from '@/features/fable-builder/utils/url-state'
@@ -102,6 +103,8 @@ interface FableBuilderPageProps {
   templateName?: string
   /** Explicit blank-canvas intent; unsaved bench work parks on the shelf. */
   fresh?: boolean
+  /** One-shot `?tour=` launch; the param is stripped on start. */
+  tour?: 'first-run'
 }
 
 export function FableBuilderPage({
@@ -111,8 +114,19 @@ export function FableBuilderPage({
   templatePlugin,
   templateName,
   fresh = false,
+  tour,
 }: FableBuilderPageProps) {
   const { t } = useTranslation(['configure', 'common'])
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (tour === undefined) return
+    useTutorialsStore.getState().start('configure-first-run')
+    void navigate({
+      to: '/configure',
+      search: (prev) => ({ ...prev, tour: undefined }),
+      replace: true,
+    })
+  }, [tour, navigate])
   const canvasFill = useViewportFill(true, { insetPx: 0 })
   const fable = useFableBuilderStore((state) => state.fable)
   const setFable = useFableBuilderStore((state) => state.setFable)
