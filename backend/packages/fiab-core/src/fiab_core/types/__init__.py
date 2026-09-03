@@ -11,15 +11,17 @@
 FableType: Type system for Forecast As BLock Expression (Fable) configuration values.
 
 Provides parsing, validation, and conversion for a small set of type expressions:
-- str, int, float, date, datetime (atomic types)
-- timedelta (ISO 8601 duration, converted to datetime.timedelta)
-- none (the type whose only value is an explicit null)
-- country (string subtype)
-- enumClosed[subtype](...), enumOpen[subtype](...) (enumeration types, e.g. enumClosed[int](1,2))
-- list[FableType] (container types)
-- bboxWSEN (bounding box: exactly four integers, west-south-east-north, obeying constraints)
-- geodomain (bounding box or region/country names; the frontend renders a map/region picker)
-- union[FableType, ...] (union types)
+- str, int, float (common primitive types)
+- date, datetime, timedelta (ISO 8601 duration, converted to datetime.timedelta)
+- generic types and helpers:
+  - enumClosed[subtype](...), enumOpen[subtype](...) (enumeration types, e.g. enumClosed[int](1,2))
+  - list[FableType] (container type)
+  - union[FableType, ...] (union types)
+  - none (the type whose only value is an explicit null, to express optionality via union[?, none])
+- domain specific types:
+  - country (string subtype)
+  - bboxWSEN (bounding box: exactly four integers, west-south-east-north, obeying constraints)
+  - geodomain (bounding box or region/country names; the frontend renders a map/region picker)
 """
 
 from fiab_core.types.definitions import *
