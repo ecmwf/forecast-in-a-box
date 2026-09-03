@@ -38,7 +38,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
         run: |
-          just build "$RELEASE_TAG"
+          just buildRelease "$RELEASE_TAG"
 
       - name: Publish image
         if: ${{ github.event_name == 'release' || inputs.push }}

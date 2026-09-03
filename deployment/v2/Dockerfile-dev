@@ -1,0 +1,41 @@
+# dockerfile with the current state of the repo as the target
+# - installs just, uv
+# - installs vim, less, sqlite3
+# - copies the justfile and the whole backend directory
+# - uv sync correctly
+# - `just dev` as entrypoint
+
+FROM fiab-base:latest 
+
+USER root
+RUN apt-get update \
+    && apt install -y just \
+    && apt install -y less vim sqlite3 \
+    && : ;
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
+WORKDIR /home/fiab
+COPY justfile justfile
+COPY backend backend
+RUN rm -rf backend/.venv backend/.fiab backend/src/forecastbox/static && mkdir backend/.fiab
+COPY frontend/dist backend/src/forecastbox/static
+COPY install/artifacts.json install/artifacts.json
+# NOTE maybe allow for buildarg override?
+COPY deployment/v2/config.toml-dev backend/.fiab/config.toml
+# NOTE we need to still be root by now, COPY does *not* create files owned by USER
+RUN chown -R fiab:fiab /home/fiab
+
+# TODO this is slow and uncacheable -- instead run freeze to pylock in the outer just action, copy and venv install that first, and only then copy the rest of the backend
+# TODO for some reason ecmwf-base is also installed as a plugin -- eradicate! Null the store config?
+
+USER fiab
+ARG PYTHON_VERSION="3.13"
+ENV UV_PYTHON=$PYTHON_VERSION
+RUN : \
+     && cd backend && uv sync --extra runtime --all-packages && cd - \
+     && cd backend && mkdir .fiab/data_dir && echo "1761908420:d0.0.1" > .fiab/pylock.toml.timestamp && cd - \
+     && cd backend && FIAB_ROOT=.fiab uv run python -m forecastbox.entrypoint.warmup -p "localPluginTest:single,localPluginECMWF:single" && cd - \
+     && : ;
+
+
+ENTRYPOINT ["just", "dev"]

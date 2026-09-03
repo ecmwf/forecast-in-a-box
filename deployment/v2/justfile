@@ -6,30 +6,35 @@
 # that is guaranteed to be exec-able instead (the repo checkout itself).
 set tempdir := "."
 
-build release_tag="":
+buildRelease release_tag="":
     #!/usr/bin/env bash
-    cp ../../scripts/fiab.sh . # NOTE we could have context the repo root -- but too bulky and not needed
+    docker build -t fiab-base:latest -f Dockerfile-base .
     release_tag="{{release_tag}}"
     if [ -z "$release_tag" ]; then
         # NOTE that the backend version is not just for the tag, but also for invalidating the docker cache
-        backend_tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
-        release_tag="v$backend_tag"
+        tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
+        release_tag="v$tag"
+    else
+        tag="${release_tag#v}"
     fi
-    tag="${release_tag#v}"
-    docker build --build-arg FIAB_RELEASE="$release_tag" -t "fiab-slim:${tag}" -f Dockerfile-slim .
-    docker tag "fiab-slim:${tag}" fiab-slim:latest
+    docker build --build-arg FIAB_RELEASE="$release_tag" -t "fiab-slim:${tag}" -f Dockerfile-release .
+    docker tag "fiab-slim:${tag}" fiab-slim:release
 
-run:
-    docker run --rm -it -p 8000:8000 --shm-size=6gb fiab-slim:latest
-
-publish release_tag="":
+buildDev:
     #!/usr/bin/env bash
-    release_tag="{{release_tag}}"
-    if [ -z "$release_tag" ]; then
-        backend_tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
-        release_tag="v$backend_tag"
+    docker build -t fiab-base:latest -f Dockerfile-base .
+    PYTHON_VERSION=$(uv run python --version | sed 's/Python \([0-9]\+\).\([0-9]\+\).*/\1.\2/')
+    docker build --build-arg PYTHON_VERSION="$PYTHON_VERSION" -t "fiab-slim:dev" -f Dockerfile-dev ../..
+
+run tag="release":
+    docker run --rm -it -p 8000:8000 --shm-size=6gb fiab-slim:"{{tag}}"
+
+publish tag="":
+    #!/usr/bin/env bash
+    tag="{{tag}}"
+    if [ -z "$tag" ]; then
+        tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
     fi
-    tag="${release_tag#v}"
     registry="eccr.ecmwf.int/forecast-in-a-box/fiab-slim"
     docker tag "fiab-slim:${tag}" "${registry}:${tag}"
     docker tag "fiab-slim:${tag}" "${registry}:latest"

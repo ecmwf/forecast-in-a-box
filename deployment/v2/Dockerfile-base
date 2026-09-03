@@ -1,10 +1,9 @@
-# dockerfile with a plain fiab installation
+# dockerfile base for a fiab runtime
 # - slim debian as a base
 # - packages (bash+curl) for basic executability + getting remote data at runtime
 # - packages (libgfortran & friends) for being able to load ecmwf atlas lib
-# - the most recent release, pulled in at the build time
-# - no config override, meaning all defaults
-# - not properly warmed up (a TODO in fiab.sh captures this -- we do *not* install the default plugin, and we do *not* cache any runtime deps)
+# - packages (gdal) for that fiona unbuildable wheel required by ek plots < 1.0
+# - no fiab itself, thats in either Dockerfile-dev or Dockerfile-release
 
 FROM debian:stable-slim
 
@@ -12,13 +11,9 @@ RUN : \
     && apt-get update \
     && apt-get install -y bash curl ca-certificates \
     && apt-get install -y libgfortran5 libquadmath0 libgomp1 \
+    && apt-get install -y gdal-bin libgdal-dev g++ \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --user-group --create-home --shell /bin/false fiab \
-    && :
+    && : ;
 
 USER fiab
-ARG FIAB_RELEASE="v0.0.0"
-ENV FIAB_RELEASE=$FIAB_RELEASE
-COPY fiab.sh /home/fiab/fiab.sh
-RUN /home/fiab/fiab.sh warmup
-ENTRYPOINT ["/home/fiab/fiab.sh"]

@@ -1,0 +1,11 @@
+[external.plugin_stores.localPluginTest]
+url = "-e file://./packages/fiab-plugin-test"
+method = "localSingle"
+
+[external.plugin_stores.localPluginECMWF]
+url = "-e file://./packages/fiab-plugin-ecmwf"
+method = "localSingle"
+
+[external.artifact_stores.ecmwf]
+url = "file://./../install/artifacts.json"
+method = "file"
