@@ -2307,7 +2307,7 @@
           },
           "input_options": [
             {
-              "source0": {
+              "lam_0": {
                 "grid": "N320",
                 "pre_processors": [
                   {
@@ -2323,7 +2323,7 @@
             }
           ],
           "nested_model": true,
-          "region_of_interest": "source0"
+          "region_of_interest": "lam_0"
         },
         "timestep": "6h"
       }
@@ -2962,7 +2962,7 @@
           },
           "input_options": [
             {
-              "source0": {
+              "lam_0": {
                 "grid": "N320",
                 "pre_processors": [
                   {
@@ -2978,7 +2978,7 @@
             }
           ],
           "nested_model": true,
-          "region_of_interest": "source0"
+          "region_of_interest": "lam_0"
         },
         "timestep": "6h"
       }
@@ -3613,7 +3613,7 @@
           },
           "input_options": [
             {
-              "source0": {
+              "lam_0": {
                 "grid": "n320",
                 "pre_processors": [
                   {
@@ -3632,7 +3632,7 @@
             }
           ],
           "nested_model": true,
-          "region_of_interest": "source0"
+          "region_of_interest": "lam_0"
         },
         "timestep": "6h"
       }
