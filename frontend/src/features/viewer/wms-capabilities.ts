@@ -24,7 +24,12 @@ import { API_ENDPOINTS } from '@/api/endpoints'
 
 export interface ParsedStyle {
   name: string
+  /** Human title (`<Title>`); falls back to the name in UIs. */
+  title?: string
+  abstract?: string
   legendUrl?: string
+  /** Advertised LegendURL size, when given. */
+  legendSize?: { width: number; height: number }
 }
 
 export interface ParsedTime {
@@ -32,11 +37,22 @@ export interface ParsedTime {
   raw: string
 }
 
+/** A non-time dimension (e.g. `reference_time`, `elevation`). */
+export interface ParsedDimension {
+  name: string
+  /** Raw content: a list or `start/end/period`. */
+  raw: string
+  default?: string
+  units?: string
+}
+
 export interface ParsedLayer {
   name: string
   title: string
   styles: Array<ParsedStyle>
   time?: ParsedTime
+  /** Extra dimensions the layer takes (inherited), e.g. `reference_time`. */
+  dimensions?: Array<ParsedDimension>
   /** Resolution range the server serves this in (scale limits); absent = every zoom. */
   scale?: ScaleBand
   /** WGS84 footprint [W, S, E, N], inherited (WMS 1.3.0 §7.2.4.6.6). */
@@ -314,6 +330,7 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
 /** Properties child layers inherit from ancestors (WMS 1.3.0 §7.2.4.8). */
 interface LayerInheritance {
   time?: ParsedTime
+  dimensions?: Array<ParsedDimension>
   styles: ReadonlyArray<ParsedStyle>
   scale?: ScaleBand
   bbox?: [number, number, number, number]
@@ -339,6 +356,7 @@ function collectLayers(
   const merged: LayerInheritance = {
     // A redeclared dimension replaces the ancestor's; styles are additive.
     time: parseTime(el) ?? inherited.time,
+    dimensions: parseDimensions(el) ?? inherited.dimensions,
     styles: [
       ...ownStyles,
       ...inherited.styles.filter(
@@ -356,6 +374,7 @@ function collectLayers(
       title: textOf(el, 'Title') ?? name,
       styles: [...merged.styles],
       time: merged.time,
+      dimensions: merged.dimensions,
       scale: merged.scale,
       bbox: merged.bbox,
     })
@@ -370,12 +389,21 @@ function parseStyles(el: Element): Array<ParsedStyle> {
   for (const st of directChildren(el, 'Style')) {
     const styleName = textOf(st, 'Name')
     if (!styleName) continue
-    const online = st.querySelector('LegendURL > OnlineResource')
+    const legend = st.querySelector('LegendURL')
+    const online = legend?.querySelector('OnlineResource')
     const legendUrl =
       online?.getAttribute('xlink:href') ??
       online?.getAttributeNS(XLINK_NS, 'href') ??
       undefined
-    styles.push({ name: styleName, legendUrl: legendUrl || undefined })
+    const width = Number(legend?.getAttribute('width'))
+    const height = Number(legend?.getAttribute('height'))
+    styles.push({
+      name: styleName,
+      title: textOf(st, 'Title') ?? undefined,
+      abstract: textOf(st, 'Abstract')?.replace(/\s+/g, ' ') ?? undefined,
+      legendUrl: legendUrl || undefined,
+      legendSize: width > 0 && height > 0 ? { width, height } : undefined,
+    })
   }
   return styles
 }
@@ -391,6 +419,24 @@ function parseTime(el: Element): ParsedTime | undefined {
     timeChild('Dimension')?.textContent.trim() ||
     timeChild('Extent')?.textContent.trim()
   return raw ? { raw } : undefined
+}
+
+/** Non-time `<Dimension>`s declared on this element, if any. */
+function parseDimensions(el: Element): Array<ParsedDimension> | undefined {
+  const dims = directChildren(el, 'Dimension').flatMap((d) => {
+    const name = d.getAttribute('name')?.toLowerCase()
+    const raw = d.textContent.trim()
+    if (!name || name === 'time' || !raw) return []
+    return [
+      {
+        name,
+        raw,
+        default: d.getAttribute('default') ?? undefined,
+        units: d.getAttribute('units') ?? undefined,
+      },
+    ]
+  })
+  return dims.length > 0 ? dims : undefined
 }
 
 /** OGC rendering pixel size (0.28 mm): scaleDenominator = resolution / 0.00028. */
@@ -872,4 +918,73 @@ export function appendWmsParams(endpoint: string, query: string): string {
   return endpoint.includes('?')
     ? `${endpoint}&${query}`
     : `${endpoint}?${query}`
+}
+
+/** Requested style if advertised, else the first (= empty STYLES). */
+export function resolveStyle(
+  layer: ParsedLayer,
+  requested?: string | null,
+): ParsedStyle | undefined {
+  if (requested) {
+    const hit = layer.styles.find((s) => s.name === requested)
+    if (hit) return hit
+  }
+  return layer.styles[0]
+}
+
+/** Legend URL resized to a strip when the advertised URL carried a size. */
+export function legendStripUrl(
+  style: ParsedStyle,
+  width: number,
+): string | undefined {
+  if (!style.legendUrl) return undefined
+  if (!style.legendSize) return style.legendUrl
+  try {
+    const url = new URL(style.legendUrl, 'http://lens.invalid')
+    const wKey = [...url.searchParams.keys()].find(
+      (k) => k.toLowerCase() === 'width',
+    )
+    const hKey = [...url.searchParams.keys()].find(
+      (k) => k.toLowerCase() === 'height',
+    )
+    if (!wKey || !hKey) return style.legendUrl
+    const height = Math.max(
+      1,
+      Math.round((width * style.legendSize.height) / style.legendSize.width),
+    )
+    url.searchParams.set(wKey, String(width))
+    url.searchParams.set(hKey, String(height))
+    // Keep the advertised form (relative vs absolute).
+    return style.legendUrl.startsWith('http')
+      ? url.toString()
+      : `${url.pathname}${url.search}`
+  } catch {
+    return style.legendUrl
+  }
+}
+
+/** Per-layer request choices: style + extra dims (→ `DIM_<NAME>`). */
+export interface LayerRequestSettings {
+  style?: string
+  dims?: Readonly<Record<string, string>>
+}
+
+/** GetMap params for one layer — map, prefetch and preview share this. */
+export function layerRequestParams(
+  layer: ParsedLayer,
+  settings: LayerRequestSettings | undefined,
+  time: string | null,
+): Record<string, string> {
+  const params: Record<string, string> = {
+    LAYERS: layer.name,
+    // Some public servers advertise no <Style> → empty = server default.
+    STYLES: resolveStyle(layer, settings?.style)?.name ?? '',
+    FORMAT: 'image/png',
+    TRANSPARENT: 'TRUE',
+  }
+  if (time) params.TIME = time
+  for (const [name, value] of Object.entries(settings?.dims ?? {})) {
+    params[`DIM_${name.toUpperCase()}`] = value
+  }
+  return params
 }

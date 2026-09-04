@@ -20,10 +20,13 @@ import {
   fetchCapabilities,
   groupLayers,
   isLensProxyUrl,
+  layerRequestParams,
+  legendStripUrl,
   parseCapabilities,
   parseWmsTimestamp,
   partitionGroups,
   rebaseLensUrl,
+  resolveStyle,
   scaleBandState,
   scaleBandTargetResolution,
   skinnyWmsBasemap,
@@ -828,5 +831,86 @@ describe('parseCapabilities — per-layer bbox', () => {
     expect(byName.get('legacy')?.bbox).toEqual([19, 59, 32, 71])
     // The root box is still the server-wide fit target.
     expect(parsed.bbox).toEqual([-180, -90, 180, 90])
+  })
+})
+
+describe('styles, dimensions and request params', () => {
+  const xml = `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <Capability><Layer><Title>root</Title>
+    <Layer>
+      <Name>t2m</Name><Title>2 m temperature</Title>
+      <Dimension name="time" units="ISO8601">2026-09-03T05:00:00Z/2026-09-06T13:00:00Z/PT1H</Dimension>
+      <Dimension name="reference_time" units="ISO8601" default="2026-09-04T01:00:00Z">2026-09-03T04:00:00Z,2026-09-04T01:00:00Z</Dimension>
+      <Style>
+        <Name>sh_all</Name><Title>Contour shade</Title>
+        <Abstract>Method : Area fill
+   Level range : -48 to 56</Abstract>
+        <LegendURL width="1024" height="128"><Format>image/png</Format>
+          <OnlineResource xlink:href="http://0.0.0.0:19001/wms?request=GetLegendGraphic&amp;layer=t2m&amp;style=sh_all&amp;width=1024&amp;height=128"/>
+        </LegendURL>
+      </Style>
+      <Style><Name>ct_red</Name><Title>Contours</Title>
+        <LegendURL><OnlineResource xlink:href="https://example.org/legend?style=ct_red"/></LegendURL>
+      </Style>
+    </Layer>
+  </Layer></Capability>
+</WMS_Capabilities>`
+
+  it('parses style title, abstract and legend size, and extra dimensions', () => {
+    const layer = parseCapabilities(xml).layers[0]
+    expect(layer.styles[0]).toMatchObject({
+      name: 'sh_all',
+      title: 'Contour shade',
+      abstract: 'Method : Area fill Level range : -48 to 56',
+      legendSize: { width: 1024, height: 128 },
+    })
+    expect(layer.styles[1].legendSize).toBeUndefined()
+    expect(layer.dimensions).toEqual([
+      {
+        name: 'reference_time',
+        raw: '2026-09-03T04:00:00Z,2026-09-04T01:00:00Z',
+        default: '2026-09-04T01:00:00Z',
+        units: 'ISO8601',
+      },
+    ])
+    // TIME stays where the timeline reads it, not in `dimensions`.
+    expect(layer.time?.raw).toContain('PT1H')
+  })
+
+  it('resolveStyle falls back to the first advertised style', () => {
+    const layer = parseCapabilities(xml).layers[0]
+    expect(resolveStyle(layer, 'ct_red')?.name).toBe('ct_red')
+    expect(resolveStyle(layer, 'nope')?.name).toBe('sh_all')
+    expect(resolveStyle(layer, null)?.name).toBe('sh_all')
+  })
+
+  it('legendStripUrl resizes only URLs that carried a size', () => {
+    const [sized, unsized] = parseCapabilities(xml).layers[0].styles
+    const strip = legendStripUrl(sized, 256)!
+    expect(strip).toContain('width=256')
+    expect(strip).toContain('height=32')
+    expect(legendStripUrl(unsized, 256)).toBe(
+      'https://example.org/legend?style=ct_red',
+    )
+  })
+
+  it('layerRequestParams carries the style and DIM_ params', () => {
+    const layer = parseCapabilities(xml).layers[0]
+    expect(
+      layerRequestParams(
+        layer,
+        { style: 'ct_red', dims: { reference_time: '2026-09-04T01:00:00Z' } },
+        '2026-09-04T02:00:00Z',
+      ),
+    ).toEqual({
+      LAYERS: 't2m',
+      STYLES: 'ct_red',
+      FORMAT: 'image/png',
+      TRANSPARENT: 'TRUE',
+      TIME: '2026-09-04T02:00:00Z',
+      DIM_REFERENCE_TIME: '2026-09-04T01:00:00Z',
+    })
+    expect(layerRequestParams(layer, undefined, null).STYLES).toBe('sh_all')
   })
 })
