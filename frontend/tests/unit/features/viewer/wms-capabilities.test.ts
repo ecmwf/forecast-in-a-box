@@ -27,6 +27,7 @@ import {
   scaleBandState,
   scaleBandTargetResolution,
   skinnyWmsBasemap,
+  supportsCrs,
   toWmsEndpoint,
   uniquePressureLevels,
 } from '@/features/viewer/wms-capabilities'
@@ -744,5 +745,88 @@ describe('fetchCapabilities', () => {
     await expect(fetchCapabilities('http://localhost:9999')).rejects.toSatisfy(
       (err) => err instanceof CapabilitiesError && err.kind === 'interrupted',
     )
+  })
+})
+
+describe('parseCapabilities — CRS', () => {
+  const caps = (crsXml: string) => `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <Capability>
+    <Layer>
+      <Title>root</Title>
+      ${crsXml}
+      <Layer><Name>2t</Name><Title>2t</Title><CRS>EPSG:3035</CRS></Layer>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>`
+
+  it('collects CRS codes from the whole tree, 1.1.1 SRS lists included', () => {
+    const parsed = parseCapabilities(
+      caps(
+        '<CRS>EPSG:4326</CRS><CRS>EPSG:32661</CRS><SRS>EPSG:3857 EPSG:900913</SRS>',
+      ),
+    )
+    expect(parsed.crs).toEqual([
+      'EPSG:4326',
+      'EPSG:32661',
+      'EPSG:3857',
+      'EPSG:900913',
+      'EPSG:3035',
+    ])
+  })
+
+  it('supportsCrs: exact codes, aliases, and the empty-list default', () => {
+    const advertised = ['EPSG:4326', 'EPSG:32661', 'EPSG:32762', 'EPSG:900913']
+    expect(supportsCrs(advertised, 'EPSG:32661')).toBe(true)
+    // Magics advertises UPS South under a typo'd code — accept it.
+    expect(supportsCrs(advertised, 'EPSG:32761')).toBe(true)
+    expect(supportsCrs(advertised, 'EPSG:3857')).toBe(true)
+    expect(supportsCrs(advertised, 'EPSG:3035')).toBe(false)
+    expect(supportsCrs([], 'EPSG:3857')).toBe(true)
+    expect(supportsCrs([], 'EPSG:32661')).toBe(false)
+  })
+})
+
+describe('parseCapabilities — per-layer bbox', () => {
+  const xml = `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <Capability>
+    <Layer>
+      <Title>root</Title>
+      <EX_GeographicBoundingBox>
+        <westBoundLongitude>-180</westBoundLongitude>
+        <eastBoundLongitude>180</eastBoundLongitude>
+        <southBoundLatitude>-90</southBoundLatitude>
+        <northBoundLatitude>90</northBoundLatitude>
+      </EX_GeographicBoundingBox>
+      <Layer>
+        <Name>regional</Name><Title>Regional</Title>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-42.16</westBoundLongitude>
+          <eastBoundLongitude>38.83</eastBoundLongitude>
+          <southBoundLatitude>37.71</southBoundLatitude>
+          <northBoundLatitude>69.58</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <Layer><Name>child</Name><Title>Child</Title></Layer>
+      </Layer>
+      <Layer><Name>global</Name><Title>Global</Title></Layer>
+      <Layer>
+        <Name>legacy</Name><Title>Legacy</Title>
+        <LatLonBoundingBox minx="19" miny="59" maxx="32" maxy="71"/>
+      </Layer>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>`
+
+  it('keeps each layer own box, inherits the parent one, and reads 1.1.1 boxes', () => {
+    const parsed = parseCapabilities(xml)
+    const byName = new Map(parsed.layers.map((l) => [l.name, l]))
+    expect(byName.get('regional')?.bbox).toEqual([-42.16, 37.71, 38.83, 69.58])
+    // Inheritance: the child takes its parent's footprint, not the root's.
+    expect(byName.get('child')?.bbox).toEqual([-42.16, 37.71, 38.83, 69.58])
+    expect(byName.get('global')?.bbox).toEqual([-180, -90, 180, 90])
+    expect(byName.get('legacy')?.bbox).toEqual([19, 59, 32, 71])
+    // The root box is still the server-wide fit target.
+    expect(parsed.bbox).toEqual([-180, -90, 180, 90])
   })
 })

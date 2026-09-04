@@ -44,12 +44,15 @@ export function wmsCapabilitiesKey(baseUrl: string): ReadonlyArray<string> {
 }
 
 const NO_LAYERS: ReadonlyArray<ParsedLayer> = []
+const NO_CRS: ReadonlyArray<string> = []
 
 export interface LensSource {
   layers: ReadonlyArray<ParsedLayer>
   decorationLayers: ReadonlyArray<ParsedLayer>
   /** EPSG:4326 [west, south, east, north] advertised by the server. */
   bbox: [number, number, number, number] | null
+  /** Advertised CRS codes (empty until loaded — see `supportsCrs`). */
+  crs: ReadonlyArray<string>
   error: string | null
   loadingLayers: boolean
   /** True between failed attempts while the retry ladder is running. */
@@ -93,6 +96,7 @@ export function useLensSource(baseUrl: string | null): LensSource {
     layers,
     decorationLayers: query.data?.decorationLayers ?? NO_LAYERS,
     bbox: query.data?.bbox ?? null,
+    crs: query.data?.crs ?? NO_CRS,
     error: query.error ? query.error.message : null,
     loadingLayers: baseUrl !== null && query.isPending,
     retrying: query.isFetching && query.failureCount > 0,

@@ -39,6 +39,8 @@ export interface ParsedLayer {
   time?: ParsedTime
   /** Resolution range the server serves this in (scale limits); absent = every zoom. */
   scale?: ScaleBand
+  /** WGS84 footprint [W, S, E, N], inherited (WMS 1.3.0 §7.2.4.6.6). */
+  bbox?: [number, number, number, number]
 }
 
 /** Resolution range (m/px) a layer serves within; unbounded sides are 0 / Infinity. */
@@ -54,6 +56,29 @@ export interface ParsedCapabilities {
   decorationLayers: Array<ParsedLayer>
   /** [minLon, minLat, maxLon, maxLat] in WGS84 (EPSG:4326). */
   bbox: [number, number, number, number]
+  /** Every CRS/SRS code advertised anywhere in the layer tree. */
+  crs: ReadonlyArray<string>
+}
+
+/** Codes a server may advertise instead of the one we request. */
+const CRS_ALIASES: Record<string, ReadonlyArray<string>> = {
+  'EPSG:3857': ['EPSG:900913'],
+  // Magics advertises UPS South under a non-existent code (upstream typo).
+  'EPSG:32761': ['EPSG:32762'],
+}
+
+/** Can `code` be requested? An empty list means the two web defaults. */
+export function supportsCrs(
+  advertised: ReadonlyArray<string>,
+  code: string,
+): boolean {
+  if (advertised.length === 0) {
+    return code === 'EPSG:3857' || code === 'EPSG:4326'
+  }
+  return (
+    advertised.includes(code) ||
+    (CRS_ALIASES[code] ?? []).some((alias) => advertised.includes(alias))
+  )
 }
 
 /** True when `baseUrl` is our own lens proxy path (a same-origin, relative
@@ -275,14 +300,15 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
   const bbox = parseBbox(root) ?? DEFAULT_BBOX
 
   const collected: Array<ParsedLayer> = []
-  if (root) collectLayers(root, { styles: [] }, collected)
+  const crs = new Set<string>()
+  if (root) collectLayers(root, { styles: [] }, collected, crs)
   const layers: Array<ParsedLayer> = []
   const decorationLayers: Array<ParsedLayer> = []
   for (const layer of collected) {
     ;(isDecorationLayer(layer) ? decorationLayers : layers).push(layer)
   }
 
-  return { layers, decorationLayers, bbox }
+  return { layers, decorationLayers, bbox, crs: [...crs] }
 }
 
 /** Properties child layers inherit from ancestors (WMS 1.3.0 §7.2.4.8). */
@@ -290,6 +316,7 @@ interface LayerInheritance {
   time?: ParsedTime
   styles: ReadonlyArray<ParsedStyle>
   scale?: ScaleBand
+  bbox?: [number, number, number, number]
 }
 
 /** Every NAMED layer is requestable — including composite parents; real
@@ -298,7 +325,16 @@ function collectLayers(
   el: Element,
   inherited: LayerInheritance,
   out: Array<ParsedLayer>,
+  crs: Set<string>,
 ): void {
+  // 1.3.0 <CRS> one per element; 1.1.1 <SRS> may be space-separated.
+  for (const tag of ['CRS', 'SRS']) {
+    for (const node of directChildren(el, tag)) {
+      for (const code of node.textContent.trim().split(/\s+/)) {
+        if (code) crs.add(code)
+      }
+    }
+  }
   const ownStyles = parseStyles(el)
   const merged: LayerInheritance = {
     // A redeclared dimension replaces the ancestor's; styles are additive.
@@ -310,6 +346,7 @@ function collectLayers(
       ),
     ],
     scale: parseScaleBand(el) ?? inherited.scale,
+    bbox: parseBbox(el) ?? inherited.bbox,
   }
 
   const name = textOf(el, 'Name')
@@ -320,10 +357,11 @@ function collectLayers(
       styles: [...merged.styles],
       time: merged.time,
       scale: merged.scale,
+      bbox: merged.bbox,
     })
   }
   for (const child of directChildren(el, 'Layer')) {
-    collectLayers(child, merged, out)
+    collectLayers(child, merged, out, crs)
   }
 }
 
@@ -414,12 +452,22 @@ export function scaleBandTargetResolution(band: ScaleBand): number {
   return Number.isFinite(maxRes) ? maxRes / 2 : minRes * 2
 }
 
+/** Own WGS84 box: the 1.3.0 element, else 1.1.1 LatLonBoundingBox attrs. */
 function parseBbox(
   el: Element | null,
 ): [number, number, number, number] | null {
   if (!el) return null
-  const ex = el.querySelector('EX_GeographicBoundingBox')
-  if (!ex) return null
+  const ex = directChildren(el, 'EX_GeographicBoundingBox').at(0)
+  if (!ex) {
+    const ll = directChildren(el, 'LatLonBoundingBox').at(0)
+    if (!ll) return null
+    const box = ['minx', 'miny', 'maxx', 'maxy'].map((a) =>
+      Number(ll.getAttribute(a)),
+    )
+    return box.every(Number.isFinite)
+      ? (box as [number, number, number, number])
+      : null
+  }
   const minLon = numOf(ex, 'westBoundLongitude')
   const maxLon = numOf(ex, 'eastBoundLongitude')
   const minLat = numOf(ex, 'southBoundLatitude')
