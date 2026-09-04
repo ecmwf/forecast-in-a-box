@@ -1520,6 +1520,16 @@ describe('GeoViewer model runs', () => {
       expect(onViewStateChange).toHaveBeenCalledWith(
         expect.objectContaining({ runsB: ['2026-09-03T12:00:00Z'] }),
       )
+      // Steps before the pinned run are painted as not served up front.
+      await expect
+        .poll(
+          () =>
+            document.querySelectorAll(
+              '[title^="Advertised but not served: Mean sea level pressure"]',
+            ).length,
+          { timeout: 8000 },
+        )
+        .toBe(2)
     } finally {
       removeSizing()
     }

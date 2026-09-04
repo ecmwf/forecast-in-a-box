@@ -62,6 +62,7 @@ import {
   supportsCrs,
 } from '../wms-capabilities'
 import { StartupStatusPill } from '../components/StartupStatusPill'
+import { beforeRunLayers, mergeEpochLayers } from './run-window'
 import { GeoPanelResizeStrip } from './GeoPanelResizeStrip'
 import { useGeoPanelWidths } from './useGeoPanelWidths'
 import { buildPairs } from './layer-pairing'
@@ -340,6 +341,29 @@ export function GeoViewer({
     [retainFailureLayers, activeOrderB],
   )
   // -------- Valid-time alignment + link policy --------
+  // Steps before a pinned run are known failures.
+  const timelineFailures = useMemo(
+    () => ({
+      a: mergeEpochLayers(
+        failures.failedLayers.a,
+        beforeRunLayers(sourceA.layers, activeOrderA, settingsA),
+      ),
+      b: mergeEpochLayers(
+        failures.failedLayers.b,
+        beforeRunLayers(sourceB.layers, activeOrderB, settingsB),
+      ),
+    }),
+    [
+      failures.failedLayers,
+      sourceA.layers,
+      sourceB.layers,
+      activeOrderA,
+      activeOrderB,
+      settingsA,
+      settingsB,
+    ],
+  )
+
   const {
     timeIndexA,
     timeIndexB,
@@ -374,7 +398,7 @@ export function GeoViewer({
     activeOrderA,
     activeOrderB,
     initial: initialViewRef.current,
-    failedLayers: failures.failedLayers,
+    failedLayers: timelineFailures,
   })
 
   // -------- Fit plumbing (map components register their fit action) ----
