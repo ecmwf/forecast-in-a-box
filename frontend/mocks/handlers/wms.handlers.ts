@@ -141,6 +141,11 @@ const serveWms: HttpResponseResolver = async ({ request }) => {
       bbox: param('BBOX'),
       styles: param('STYLES'),
       layers: param('LAYERS'),
+      dims: Object.fromEntries(
+        [...url.searchParams.entries()]
+          .filter(([k]) => k.toUpperCase().startsWith('DIM_'))
+          .map(([k, v]) => [k.slice(4).toLowerCase(), v]),
+      ),
     })
     const delayMs = getMapDelayFor(key)
     if (delayMs > 0) await delay(delayMs)

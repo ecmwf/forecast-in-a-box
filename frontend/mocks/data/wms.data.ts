@@ -30,6 +30,8 @@ export interface MockWmsLayerConfig {
   time?: string
   /** Advertised styles (default: one `default`). */
   styles?: Array<{ name: string; title?: string; abstract?: string }>
+  /** Extra ISO8601 dimensions, e.g. reference_time. */
+  dimensions?: Array<{ name: string; values: string; default?: string }>
 }
 
 export interface MockWmsServerConfig {
@@ -121,6 +123,8 @@ export interface GetMapRequest {
   bbox: string | null
   styles: string | null
   layers: string | null
+  /** `DIM_*` params, lower-cased without the prefix. */
+  dims: Record<string, string>
 }
 
 /** Full GetMap params per key, parallel to `getMapLog`. */
@@ -210,6 +214,12 @@ function layerXml(internalPort: number, layer: MockWmsLayerConfig): string {
   const time = layer.time
     ? `<Dimension name="time" units="ISO8601">${layer.time}</Dimension>`
     : ''
+  const dims = (layer.dimensions ?? [])
+    .map(
+      (dim) =>
+        `<Dimension name="${dim.name}" units="ISO8601"${dim.default ? ` default="${dim.default}"` : ''}>${dim.values}</Dimension>`,
+    )
+    .join('\n')
   const styles = (layer.styles ?? [{ name: 'default' }])
     .map(
       (s) => `<Style>
@@ -226,6 +236,7 @@ function layerXml(internalPort: number, layer: MockWmsLayerConfig): string {
     <Name>${layer.name}</Name>
     <Title>${layer.title}</Title>
     ${time}
+    ${dims}
     ${styles}
   </Layer>`
 }
