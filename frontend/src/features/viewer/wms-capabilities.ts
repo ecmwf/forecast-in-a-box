@@ -504,29 +504,39 @@ function parseBbox(
 ): [number, number, number, number] | null {
   if (!el) return null
   const ex = directChildren(el, 'EX_GeographicBoundingBox').at(0)
-  if (!ex) {
-    const ll = directChildren(el, 'LatLonBoundingBox').at(0)
-    if (!ll) return null
-    const box = ['minx', 'miny', 'maxx', 'maxy'].map((a) =>
-      Number(ll.getAttribute(a)),
-    )
+  if (ex) {
+    const box = [
+      numOf(ex, 'westBoundLongitude'),
+      numOf(ex, 'southBoundLatitude'),
+      numOf(ex, 'eastBoundLongitude'),
+      numOf(ex, 'northBoundLatitude'),
+    ]
     return box.every(Number.isFinite)
       ? (box as [number, number, number, number])
       : null
   }
-  const minLon = numOf(ex, 'westBoundLongitude')
-  const maxLon = numOf(ex, 'eastBoundLongitude')
-  const minLat = numOf(ex, 'southBoundLatitude')
-  const maxLat = numOf(ex, 'northBoundLatitude')
-  if (
-    Number.isNaN(minLon) ||
-    Number.isNaN(minLat) ||
-    Number.isNaN(maxLon) ||
-    Number.isNaN(maxLat)
-  ) {
-    return null
-  }
-  return [minLon, minLat, maxLon, maxLat]
+  // GeoServer (DWD) gives per-layer coverage only as BoundingBox.
+  const ll = directChildren(el, 'LatLonBoundingBox').at(0)
+  const geo =
+    ll ??
+    directChildren(el, 'BoundingBox').find((b) =>
+      ['CRS:84', 'EPSG:4326'].includes(
+        b.getAttribute('CRS') ?? b.getAttribute('SRS') ?? '',
+      ),
+    )
+  if (!geo) return null
+  const box = ['minx', 'miny', 'maxx', 'maxy'].map((a) =>
+    Number(geo.getAttribute(a)),
+  )
+  if (!box.every(Number.isFinite)) return null
+  // 1.3.0 EPSG:4326 is latitude-first; a |lat| > 90 betrays lon-first.
+  const latFirst =
+    geo.getAttribute('CRS') === 'EPSG:4326' &&
+    Math.abs(box[0]) <= 90 &&
+    Math.abs(box[2]) <= 90
+  return latFirst
+    ? [box[1], box[0], box[3], box[2]]
+    : (box as [number, number, number, number])
 }
 
 function directChildren(el: Element, tagName: string): Array<Element> {

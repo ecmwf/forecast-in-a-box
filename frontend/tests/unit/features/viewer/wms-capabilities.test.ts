@@ -936,3 +936,33 @@ describe('dimensionValues', () => {
     expect(dimensionValues(layer, 'nope')).toEqual([])
   })
 })
+
+describe('parseBbox fallbacks', () => {
+  const caps = (layerXml: string) => `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0"><Capability><Layer><Title>root</Title>
+  <EX_GeographicBoundingBox><westBoundLongitude>-180</westBoundLongitude><eastBoundLongitude>180</eastBoundLongitude><southBoundLatitude>-90</southBoundLatitude><northBoundLatitude>90</northBoundLatitude></EX_GeographicBoundingBox>
+  ${layerXml}
+</Layer></Capability></WMS_Capabilities>`
+  it('reads a GeoServer 1.3.0 EPSG:4326 BoundingBox, latitude first', () => {
+    const layer = parseCapabilities(
+      caps(
+        '<Layer><Name>eu</Name><Title>eu</Title><CRS>EPSG:4326</CRS><BoundingBox CRS="EPSG:4326" minx="29.46875" miny="-23.53125" maxx="70.53125" maxy="62.53125"/><BoundingBox CRS="EPSG:3857" minx="-2.6e6" miny="3.4e6" maxx="7e6" maxy="1.1e7"/></Layer>',
+      ),
+    ).layers[0]
+    expect(layer.bbox).toEqual([-23.53125, 29.46875, 62.53125, 70.53125])
+  })
+  it('accepts CRS:84 and lon-first EPSG:4326 as written', () => {
+    const a = parseCapabilities(
+      caps(
+        '<Layer><Name>a</Name><Title>a</Title><BoundingBox CRS="CRS:84" minx="-10" miny="40" maxx="10" maxy="60"/></Layer>',
+      ),
+    ).layers[0]
+    expect(a.bbox).toEqual([-10, 40, 10, 60])
+    const b = parseCapabilities(
+      caps(
+        '<Layer><Name>b</Name><Title>b</Title><BoundingBox CRS="EPSG:4326" minx="-120" miny="20" maxx="-60" maxy="50"/></Layer>',
+      ),
+    ).layers[0]
+    expect(b.bbox).toEqual([-120, 20, -60, 50])
+  })
+})
