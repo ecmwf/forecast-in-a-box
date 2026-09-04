@@ -999,6 +999,37 @@ export function layerRequestParams(
   return params
 }
 
+export type Bbox = [number, number, number, number]
+
+/** Whole-globe bbox: nothing to clip. */
+export const isWorldBbox = (bbox: Bbox): boolean =>
+  bbox[0] <= -180 && bbox[1] <= -90 && bbox[2] >= 180 && bbox[3] >= 90
+
+/** Union of two bboxes; either may be absent. */
+export function unionBbox(a: Bbox | null, b: Bbox | null): Bbox | null {
+  if (!a || !b) return a ?? b
+  return [
+    Math.min(a[0], b[0]),
+    Math.min(a[1], b[1]),
+    Math.max(a[2], b[2]),
+    Math.max(a[3], b[3]),
+  ]
+}
+
+/** Union bbox of the active layers; null when any lacks one. */
+export function activeLayersBbox(
+  layers: ReadonlyArray<ParsedLayer>,
+  activeOrder: ReadonlyArray<string>,
+): Bbox | null {
+  let out: Bbox | null = null
+  for (const name of activeOrder) {
+    const bbox = layers.find((l) => l.name === name)?.bbox
+    if (!bbox) return null
+    out = unionBbox(out, bbox)
+  }
+  return out
+}
+
 /** Name of the model-run dimension (WMS convention, KNMI/DWD/ADAGUC). */
 export const RUN_DIMENSION = 'reference_time'
 

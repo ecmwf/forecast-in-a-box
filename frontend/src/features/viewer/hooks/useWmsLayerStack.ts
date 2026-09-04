@@ -30,11 +30,17 @@ import {
   loadWasAborted,
   makeDataLayerSource,
 } from '../ol-layers'
-import { bandResolution, requestProjection } from '../projections'
+import {
+  bandResolution,
+  layerExtentFor,
+  requestProjection,
+  viewerProjectionOf,
+} from '../projections'
 import { layerRequestParams, toWmsEndpoint } from '../wms-capabilities'
 import type { BboxAxisOrder } from '../projections'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
+import type { Extent } from 'ol/extent'
 import type ImageWMS from 'ol/source/ImageWMS'
 import type { ImageSourceEvent } from 'ol/source/Image'
 import type { LayerRequestSettings, ParsedLayer } from '../wms-capabilities'
@@ -67,6 +73,9 @@ function requestedTime(evt: ImageSourceEvent): string | null {
     return null
   }
 }
+
+const extentsEqual = (a: Extent | undefined, b: Extent): boolean =>
+  a !== undefined && a.every((v, i) => v === b[i])
 
 export interface WmsLayerStackConfig {
   /** z-index band base; data layers get `zBase + stackPosition`. */
@@ -165,8 +174,8 @@ export function useWmsLayerStack(
     }
     const managed = managedRef.current
     const view = map.getView()
-    // Clip to the projection's world; scale bands are metres → view units.
-    const extent = view.getProjection().getExtent()
+    // Scale bands are metres → view units.
+    const projection = viewerProjectionOf(view)
     const requestProj = requestProjection(view, bboxAxisOrder)
 
     const wantedNames = new Set<string>()
@@ -182,6 +191,8 @@ export function useWmsLayerStack(
         time,
       )
 
+      // Off-screen layers are culled by OL; on-screen requests are clipped.
+      const extent = layerExtentFor(projection, layer.bbox)
       const perLayer = layerOpacities.get(layerName) ?? DEFAULT_LAYER_OPACITY
       const effectiveOpacity = perLayer * masterOpacity
       const z = zBase + (activeOrder.length - idx) // index 0 → highest z
@@ -207,6 +218,9 @@ export function useWmsLayerStack(
         }
         existing.layer.setOpacity(effectiveOpacity)
         existing.layer.setZIndex(z)
+        if (!extentsEqual(existing.layer.getExtent(), extent)) {
+          existing.layer.setExtent(extent)
+        }
       } else {
         const source = makeDataLayerSource(baseUrl, params, requestProj)
         const olLayer = new ImageLayer({

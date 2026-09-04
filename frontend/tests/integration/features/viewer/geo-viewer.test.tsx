@@ -1567,6 +1567,56 @@ describe('GeoViewer model runs', () => {
   })
 })
 
+describe('GeoViewer layer extents', () => {
+  function registerRegionalPair() {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [
+        { name: '2t', title: '2 m temperature' },
+        { name: 'eu', title: 'Europe only', bbox: [-10, 35, 30, 70] },
+        { name: 'au', title: 'Australia only', bbox: [110, -45, 155, -10] },
+      ],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    return { portA, portB }
+  }
+  it('clips requests to a regional layer’s bbox', async () => {
+    const { portA, portB } = registerRegionalPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('Europe only').click()
+      await expect
+        .poll(
+          () => getMapRequestDetails(portA).some((r) => r.layers === 'eu'),
+          { timeout: 8000 },
+        )
+        .toBe(true)
+      // The global view is clipped to Europe’s extent (± a pixel at z0).
+      const bbox = getMapRequestDetails(portA)
+        .find((r) => r.layers === 'eu')!
+        .bbox!.split(',')
+        .map(Number)
+      expect(bbox[0]).toBeGreaterThanOrEqual(-1.4e6)
+      expect(bbox[2]).toBeLessThanOrEqual(3.6e6)
+      expect(bbox[1]).toBeGreaterThanOrEqual(3.9e6)
+      expect(bbox[3]).toBeLessThanOrEqual(11.3e6)
+    } finally {
+      removeSizing()
+    }
+  })
+})
+
 describe('GeoViewer projections', () => {
   const POLAR_CRS = ['EPSG:3857', 'EPSG:4326', 'EPSG:32661']
   function registerPolarPair(bCrs: Array<string> = POLAR_CRS) {

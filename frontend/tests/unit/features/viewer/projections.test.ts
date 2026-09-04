@@ -18,6 +18,7 @@ import {
   getViewerProjection,
   groundResolution,
   homeExtentFor,
+  layerExtentFor,
   registerViewerProjections,
   requestProjection,
   viewResolutionFor,
@@ -166,5 +167,28 @@ describe('homeExtentFor', () => {
     const extent = homeExtentFor(merc, [-10, 40, 10, 60])
     expect(extent[0]).toBeCloseTo(-1113194.9, 0)
     expect(homeExtentFor(merc, null)).toBe(merc.homeExtent)
+  })
+})
+
+describe('layerExtentFor', () => {
+  it('keeps the projection extent for global, dateline and pole cases', () => {
+    const merc = getViewerProjection('merc')
+    const npole = getViewerProjection('npole')
+    expect(layerExtentFor(merc, undefined)).toBe(merc.extent)
+    expect(layerExtentFor(merc, [-180, -90, 180, 90])).toBe(merc.extent)
+    expect(layerExtentFor(merc, [170, 40, -170, 60])).toBe(merc.extent)
+    expect(layerExtentFor(npole, [-180, -55, 180, 85])).toBe(npole.extent)
+  })
+
+  it('clips a regional bbox to the projection world', () => {
+    const merc = getViewerProjection('merc')
+    const extent = layerExtentFor(merc, [-10, 40, 10, 60])
+    expect(extent[0]).toBeCloseTo(-1113194.9, 0)
+    expect(extent[2]).toBeCloseTo(1113194.9, 0)
+    expect(containsExtent(merc.extent, extent)).toBe(true)
+    const npole = getViewerProjection('npole')
+    expect(
+      containsExtent(npole.extent, layerExtentFor(npole, [-10, 55, 40, 75])),
+    ).toBe(true)
   })
 })

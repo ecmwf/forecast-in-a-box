@@ -17,8 +17,13 @@
 
 import { useEffect } from 'react'
 import ImageLayer from 'ol/layer/Image'
+import { intersects } from 'ol/extent'
 import { makeDataLayerSource } from '../ol-layers'
-import { requestProjection } from '../projections'
+import {
+  layerExtentFor,
+  requestProjection,
+  viewerProjectionOf,
+} from '../projections'
 import { layerRequestParams } from '../wms-capabilities'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
@@ -63,6 +68,15 @@ export function useTimeStepPrefetch(
       .filter((l): l is ParsedLayer => !!l && !!l.time && l.styles.length > 0)
     if (timeAwareActive.length === 0) return
 
+    // Same clip as the visible stack (URLs match); off-screen never loads.
+    const projection = viewerProjectionOf(map.getView())
+    const viewExtent = map.getView().calculateExtent(map.getSize())
+    const clipOf = (layer: ParsedLayer) =>
+      layerExtentFor(projection, layer.bbox)
+    const onScreen = timeAwareActive.filter((l) =>
+      intersects(clipOf(l), viewExtent),
+    )
+    if (onScreen.length === 0) return
     // Object-wrapped so TS-ESLint sees mutability across the await below.
     const state = { cancelled: false }
     const hiddenLayers: Array<ImageLayer<ImageWMS>> = []
@@ -80,6 +94,7 @@ export function useTimeStepPrefetch(
           source,
           opacity: 0,
           zIndex: -1,
+          extent: clipOf(layer),
         })
         let settled = false
         let safetyTimer = 0
@@ -101,7 +116,7 @@ export function useTimeStepPrefetch(
       })
 
     ;(async () => {
-      for (const layer of timeAwareActive) {
+      for (const layer of onScreen) {
         for (const step of timeSteps) {
           if (state.cancelled) return
           await prefetchOne(layer, step)

@@ -26,11 +26,18 @@ import {
   transformExtent,
 } from 'ol/proj'
 import Projection from 'ol/proj/Projection'
-import { containsCoordinate, containsExtent, getCenter } from 'ol/extent'
+import {
+  containsCoordinate,
+  containsExtent,
+  getCenter,
+  getIntersection,
+} from 'ol/extent'
+import { isWorldBbox } from './wms-capabilities'
 import { DEFAULT_PROJECTION_ID, PROJECTION_IDS } from './projection-ids'
 import type { Extent } from 'ol/extent'
 import type View from 'ol/View'
 import type { ProjectionId } from './projection-ids'
+import type { Bbox } from './wms-capabilities'
 import type { PolarGraticule } from '@/lib/map/ol-outline'
 
 export type { ProjectionId }
@@ -283,23 +290,27 @@ export function carryCamera(
   to.setCenter(next)
 }
 
-const isWorld = (bbox: Extent) =>
-  bbox[0] <= -180 && bbox[1] <= -90 && bbox[2] >= 180 && bbox[3] >= 90
-
-/** Fit target for a WGS84 bbox; polar/LAEA reject pole-crossing or global. */
-export function homeExtentFor(
-  p: ViewerProjection,
-  bbox: Extent | null,
-): Extent {
-  if (!bbox) return p.homeExtent
+/** WGS84 bbox as a view extent; null when the projection cannot frame it. */
+export function bboxExtentFor(p: ViewerProjection, bbox: Bbox): Extent | null {
   if (p.mercator || p.id === 'geo') {
     return transformExtent(bbox, 'EPSG:4326', p.code)
   }
-  if (isWorld(bbox) || !containsExtent(p.worldExtent, bbox)) {
-    return p.homeExtent
-  }
+  if (isWorldBbox(bbox) || !containsExtent(p.worldExtent, bbox)) return null
   const extent = transformExtent(bbox, 'EPSG:4326', p.code, 8)
   return extent.every(Number.isFinite) && containsExtent(p.extent, extent)
     ? extent
-    : p.homeExtent
+    : null
+}
+
+/** Fit target for a WGS84 bbox; polar/LAEA reject pole-crossing or global. */
+export function homeExtentFor(p: ViewerProjection, bbox: Bbox | null): Extent {
+  return (bbox && bboxExtentFor(p, bbox)) ?? p.homeExtent
+}
+
+/** Clip extent for a layer: the projection's world, narrowed to its bbox. */
+export function layerExtentFor(p: ViewerProjection, bbox?: Bbox): Extent {
+  // Dateline-crossing boxes (west > east) are left unclipped.
+  if (!bbox || isWorldBbox(bbox) || bbox[0] > bbox[2]) return p.extent
+  const extent = bboxExtentFor(p, bbox)
+  return extent ? getIntersection(extent, p.extent) : p.extent
 }

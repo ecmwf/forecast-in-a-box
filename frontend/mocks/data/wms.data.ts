@@ -30,6 +30,8 @@ export interface MockWmsLayerConfig {
   time?: string
   /** Advertised styles (default: one `default`). */
   styles?: Array<{ name: string; title?: string; abstract?: string }>
+  /** Own EX_GeographicBoundingBox [west, south, east, north]. */
+  bbox?: [number, number, number, number]
   /** Extra ISO8601 dimensions, e.g. reference_time. */
   dimensions?: Array<{ name: string; values: string; default?: string }>
 }
@@ -232,9 +234,18 @@ function layerXml(internalPort: number, layer: MockWmsLayerConfig): string {
     </Style>`,
     )
     .join('\n')
+  const bbox = layer.bbox
+    ? `<EX_GeographicBoundingBox>
+      <westBoundLongitude>${layer.bbox[0]}</westBoundLongitude>
+      <eastBoundLongitude>${layer.bbox[2]}</eastBoundLongitude>
+      <southBoundLatitude>${layer.bbox[1]}</southBoundLatitude>
+      <northBoundLatitude>${layer.bbox[3]}</northBoundLatitude>
+    </EX_GeographicBoundingBox>`
+    : ''
   return `<Layer>
     <Name>${layer.name}</Name>
     <Title>${layer.title}</Title>
+    ${bbox}
     ${time}
     ${dims}
     ${styles}

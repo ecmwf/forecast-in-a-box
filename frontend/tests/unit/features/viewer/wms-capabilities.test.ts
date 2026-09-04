@@ -15,6 +15,7 @@ import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
   CapabilitiesError,
   RUN_DIMENSION,
+  activeLayersBbox,
   appendWmsParams,
   combineScaleBands,
   dimensionValues,
@@ -22,6 +23,7 @@ import {
   fetchCapabilities,
   groupLayers,
   isLensProxyUrl,
+  isWorldBbox,
   layerRequestParams,
   legendStripUrl,
   parseCapabilities,
@@ -934,6 +936,24 @@ describe('dimensionValues', () => {
     ])
     expect(dimensionValues(layer, 'elevation')).toEqual(['10', '50', '100'])
     expect(dimensionValues(layer, 'nope')).toEqual([])
+  })
+})
+
+describe('activeLayersBbox', () => {
+  const layer = (name: string, bbox?: [number, number, number, number]) =>
+    ({ name, title: name, styles: [], bbox }) as unknown as ParsedLayer
+  it('unions the active layers and gives up when one has no bbox', () => {
+    const layers = [
+      layer('a', [-10, 40, 10, 60]),
+      layer('b', [0, 30, 30, 50]),
+      layer('c'),
+    ]
+    expect(activeLayersBbox(layers, ['a', 'b'])).toEqual([-10, 30, 30, 60])
+    expect(activeLayersBbox(layers, ['a'])).toEqual([-10, 40, 10, 60])
+    expect(activeLayersBbox(layers, ['a', 'c'])).toBeNull()
+    expect(activeLayersBbox(layers, [])).toBeNull()
+    expect(isWorldBbox([-180, -90, 180, 90])).toBe(true)
+    expect(isWorldBbox([-10, 40, 10, 60])).toBe(false)
   })
 })
 
