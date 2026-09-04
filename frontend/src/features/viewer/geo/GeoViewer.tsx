@@ -57,6 +57,7 @@ import {
 import {
   isLensProxyUrl,
   rebaseLensUrl,
+  resolveStyle,
   skinnyWmsBasemap,
   supportsCrs,
 } from '../wms-capabilities'
@@ -222,6 +223,8 @@ export function GeoViewer({
 
   const activeOrderA = selection.activeOrderFor('a')
   const activeOrderB = selection.activeOrderFor('b')
+  const settingsA = selection.settingsFor('a')
+  const settingsB = selection.settingsFor('b')
 
   // Opacity hierarchy: global × per-source × per-layer (per-layer lives in
   // the selection; the product of the first two feeds the map stacks).
@@ -457,7 +460,10 @@ export function GeoViewer({
       const base = slot === 'a' ? a.baseUrl : bBaseUrl
       const activeOrder = slot === 'a' ? activeOrderA : activeOrderB
       const layer = source.layers.find((l) => l.name === name)
-      const legendUrl = layer?.styles[0]?.legendUrl
+      const legendUrl = layer
+        ? resolveStyle(layer, selection.settingsFor(slot).get(name)?.style)
+            ?.legendUrl
+        : undefined
       // Hide pins whose layer is no longer selected — restored if re-added.
       if (base === null || !layer || !legendUrl || !activeOrder.includes(name))
         return []
@@ -479,6 +485,8 @@ export function GeoViewer({
     hasB,
     activeOrderA,
     activeOrderB,
+    settingsA,
+    settingsB,
   ])
   const unpinLegend = useCallback(
     (key: string) =>
@@ -700,6 +708,8 @@ export function GeoViewer({
     sourceB,
     activeOrderA,
     activeOrderB,
+    settingsA,
+    settingsB,
     annotations,
     slotIds: { a: a.id, b: bId },
   })
@@ -771,6 +781,7 @@ export function GeoViewer({
     decorationLayers: sourceA.decorationLayers,
     activeOrder: activeOrderA,
     layerOpacities: selection.opacitiesFor('a'),
+    layerSettings: selection.settingsFor('a'),
     bboxAxisOrder: isLensProxyUrl(a.baseUrl)
       ? 'xy'
       : (a.bboxAxisOrder ?? 'epsg'),
@@ -797,6 +808,7 @@ export function GeoViewer({
         decorationLayers: sourceB.decorationLayers,
         activeOrder: activeOrderB,
         layerOpacities: selection.opacitiesFor('b'),
+        layerSettings: selection.settingsFor('b'),
         bboxAxisOrder: isLensProxyUrl(b.baseUrl)
           ? 'xy'
           : (b.bboxAxisOrder ?? 'epsg'),

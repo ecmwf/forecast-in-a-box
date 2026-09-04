@@ -31,13 +31,15 @@ import {
   makeDataLayerSource,
 } from '../ol-layers'
 import { bandResolution, requestProjection } from '../projections'
-import { toWmsEndpoint } from '../wms-capabilities'
+import { layerRequestParams, toWmsEndpoint } from '../wms-capabilities'
 import type { BboxAxisOrder } from '../projections'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
 import type { ImageSourceEvent } from 'ol/source/Image'
-import type { ParsedLayer } from '../wms-capabilities'
+import type { LayerRequestSettings, ParsedLayer } from '../wms-capabilities'
+
+const NO_SETTINGS: ReadonlyMap<string, LayerRequestSettings> = new Map()
 
 interface ManagedLayer {
   layer: ImageLayer<ImageWMS>
@@ -74,6 +76,8 @@ export interface WmsLayerStackConfig {
   /** Ordered active layer names, index 0 = top of stack. */
   activeOrder: ReadonlyArray<string>
   layerOpacities: ReadonlyMap<string, number>
+  /** Per-layer style + dimension choices; absent = server defaults. */
+  layerSettings?: ReadonlyMap<string, LayerRequestSettings>
   /** BBOX axis order this server expects in projected CRSs. */
   bboxAxisOrder?: BboxAxisOrder
   /**
@@ -118,6 +122,7 @@ export function useWmsLayerStack(
     masterOpacity,
     activeOrder,
     layerOpacities,
+    layerSettings = NO_SETTINGS,
     bboxAxisOrder = 'epsg',
     resolveTime,
     incLoading,
@@ -170,15 +175,12 @@ export function useWmsLayerStack(
       if (!layer) return
       wantedNames.add(layerName)
 
-      const params: Record<string, string> = {
-        LAYERS: layerName,
-        // Some public servers advertise no <Style> → empty = server default.
-        STYLES: layer.styles[0]?.name ?? '',
-        FORMAT: 'image/png',
-        TRANSPARENT: 'TRUE',
-      }
       const time = resolveTime(layer)
-      if (time) params.TIME = time
+      const params = layerRequestParams(
+        layer,
+        layerSettings.get(layerName),
+        time,
+      )
 
       const perLayer = layerOpacities.get(layerName) ?? DEFAULT_LAYER_OPACITY
       const effectiveOpacity = perLayer * masterOpacity
@@ -283,6 +285,7 @@ export function useWmsLayerStack(
     layers,
     activeOrder,
     layerOpacities,
+    layerSettings,
     bboxAxisOrder,
     masterOpacity,
     resolveTime,

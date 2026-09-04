@@ -19,11 +19,12 @@ import { useEffect } from 'react'
 import ImageLayer from 'ol/layer/Image'
 import { makeDataLayerSource } from '../ol-layers'
 import { requestProjection } from '../projections'
+import { layerRequestParams } from '../wms-capabilities'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
 import type { BboxAxisOrder } from '../projections'
-import type { ParsedLayer } from '../wms-capabilities'
+import type { LayerRequestSettings, ParsedLayer } from '../wms-capabilities'
 
 const PREFETCH_LOAD_TIMEOUT_MS = 30_000
 
@@ -34,6 +35,7 @@ export function useTimeStepPrefetch(
     baseUrl,
     layers,
     activeOrder,
+    layerSettings,
     bboxAxisOrder = 'epsg',
     timeSteps,
     mapVersion,
@@ -42,6 +44,8 @@ export function useTimeStepPrefetch(
     baseUrl: string
     layers: ReadonlyArray<ParsedLayer>
     activeOrder: ReadonlyArray<string>
+    /** Per-layer style + dimension choices; absent = server defaults. */
+    layerSettings?: ReadonlyMap<string, LayerRequestSettings>
     /** BBOX axis order this server expects in projected CRSs. */
     bboxAxisOrder?: BboxAxisOrder
     /** Raw TIME strings this server advertises. */
@@ -69,13 +73,7 @@ export function useTimeStepPrefetch(
         if (state.cancelled) return resolve()
         const source = makeDataLayerSource(
           baseUrl,
-          {
-            LAYERS: layer.name,
-            STYLES: layer.styles[0].name,
-            FORMAT: 'image/png',
-            TRANSPARENT: 'TRUE',
-            TIME: step,
-          },
+          layerRequestParams(layer, layerSettings?.get(layer.name), step),
           requestProjection(map.getView(), bboxAxisOrder),
         )
         const hidden = new ImageLayer({
@@ -120,6 +118,7 @@ export function useTimeStepPrefetch(
     enabled,
     baseUrl,
     activeOrder,
+    layerSettings,
     bboxAxisOrder,
     layers,
     timeSteps,

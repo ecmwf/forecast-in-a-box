@@ -17,10 +17,11 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { canvasToPngBlob, joinCanvasesHorizontally } from '../map-export'
-import { rebaseLensUrl } from '../wms-capabilities'
+import { rebaseLensUrl, resolveStyle } from '../wms-capabilities'
 import { composeCaptures } from './export-pipeline'
 import type { ExportSlotIds } from './export-pipeline'
 import type { LensSource } from '../hooks/useLensSource'
+import type { LayerRequestSettings } from '../wms-capabilities'
 import type { MapAnnotation } from './annotations'
 import type { SourceSlot } from './layer-pairing'
 import type { CaptureResult } from './types'
@@ -37,6 +38,8 @@ export function useViewerExport({
   sourceB,
   activeOrderA,
   activeOrderB,
+  settingsA,
+  settingsB,
   annotations,
   slotIds,
 }: {
@@ -46,6 +49,9 @@ export function useViewerExport({
   sourceB: LensSource
   activeOrderA: ReadonlyArray<string>
   activeOrderB: ReadonlyArray<string>
+  /** Per-layer style choices — legends follow the drawn style. */
+  settingsA: ReadonlyMap<string, LayerRequestSettings>
+  settingsB: ReadonlyMap<string, LayerRequestSettings>
   annotations: ReadonlyArray<MapAnnotation>
   slotIds: ExportSlotIds
 }) {
@@ -96,15 +102,23 @@ export function useViewerExport({
   const exportLegends = useMemo(() => {
     const specs: Array<{ slot: SourceSlot; title: string; url: string }> = []
     const slots: Array<
-      readonly [SourceSlot, typeof sourceA, string, ReadonlyArray<string>]
-    > = [['a', sourceA, aBaseUrl, activeOrderA]]
+      readonly [
+        SourceSlot,
+        typeof sourceA,
+        string,
+        ReadonlyArray<string>,
+        ReadonlyMap<string, LayerRequestSettings>,
+      ]
+    > = [['a', sourceA, aBaseUrl, activeOrderA, settingsA]]
     if (bBaseUrl !== null) {
-      slots.push(['b', sourceB, bBaseUrl, activeOrderB])
+      slots.push(['b', sourceB, bBaseUrl, activeOrderB, settingsB])
     }
-    for (const [slot, source, baseUrl, order] of slots) {
+    for (const [slot, source, baseUrl, order, settings] of slots) {
       for (const name of order) {
         const layer = source.layers.find((l) => l.name === name)
-        const legendUrl = layer?.styles[0]?.legendUrl
+        const legendUrl = layer
+          ? resolveStyle(layer, settings.get(name)?.style)?.legendUrl
+          : undefined
         if (!layer || !legendUrl) continue
         specs.push({
           slot,
@@ -114,7 +128,16 @@ export function useViewerExport({
       }
     }
     return specs
-  }, [sourceA, sourceB, aBaseUrl, bBaseUrl, activeOrderA, activeOrderB])
+  }, [
+    sourceA,
+    sourceB,
+    aBaseUrl,
+    bBaseUrl,
+    activeOrderA,
+    activeOrderB,
+    settingsA,
+    settingsB,
+  ])
 
   // Unawaited promise: the item must be built inside the gesture (Safari).
   // Combined view joins side-by-side maps into one image — the clipboard
