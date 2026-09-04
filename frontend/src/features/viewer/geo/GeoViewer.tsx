@@ -81,6 +81,7 @@ import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
+import type { LayerRequestSettings } from '../wms-capabilities'
 import type { GeoPanelSide } from './useGeoPanelWidths'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
@@ -122,6 +123,15 @@ export interface GeoViewerSource {
   label: string
   /** External server's BBOX axis order; lens sources are always 'xy'. */
   bboxAxisOrder?: BboxAxisOrder
+}
+
+/** Effect-dep key of a slot's dimension choices. */
+function runsKey(settings: ReadonlyMap<string, LayerRequestSettings>): string {
+  return [...settings]
+    .flatMap(([name, s]) =>
+      s.dims ? [`${name}=${JSON.stringify(s.dims)}`] : [],
+    )
+    .join(',')
 }
 
 export function GeoViewer({
@@ -307,13 +317,16 @@ export function GeoViewer({
   // source or its advertised content changes (a new model run). Layer
   // identity is content-tracked (TanStack structural sharing), so a
   // no-change background refetch keeps the marks.
+  // A run change serves different instants — same rule.
+  const runsKeyA = useMemo(() => runsKey(settingsA), [settingsA])
+  const runsKeyB = useMemo(() => runsKey(settingsB), [settingsB])
   useEffect(
     () => clearFailures('a'),
-    [clearFailures, a.baseUrl, sourceA.layers],
+    [clearFailures, a.baseUrl, sourceA.layers, runsKeyA],
   )
   useEffect(
     () => clearFailures('b'),
-    [clearFailures, b?.baseUrl, sourceB.layers],
+    [clearFailures, b?.baseUrl, sourceB.layers, runsKeyB],
   )
   // A deactivated layer's marks would otherwise linger until the TTL,
   // painting failures the display no longer contains.

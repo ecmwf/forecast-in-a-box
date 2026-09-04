@@ -253,3 +253,65 @@ describe('useCompareSelection default styles', () => {
     expect(latest.pairStyle('p@sfc')).toBe('y')
   })
 })
+
+describe('useCompareSelection dimensions', () => {
+  function DimProbe({
+    onRender,
+  }: {
+    onRender: (selection: CompareSelection) => void
+  }) {
+    const selection = useCompareSelection(PAIRS)
+    onRender(selection)
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => selection.togglePair('2 m temperature@sfc')}
+        >
+          toggle
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            selection.setLayerDim(
+              'b',
+              '2t',
+              'reference_time',
+              '2026-09-04T00:00:00Z',
+            )
+          }
+        >
+          run-b
+        </button>
+        <button type="button" onClick={() => selection.onSlotsSwapped()}>
+          swap
+        </button>
+      </>
+    )
+  }
+
+  it('keeps dimension values per side, in linked mode too, and follows a swap', async () => {
+    let latest!: CompareSelection
+    const screen = await render(
+      <DimProbe
+        onRender={(s) => {
+          latest = s
+        }}
+      />,
+    )
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    await screen.getByRole('button', { name: 'run-b' }).click()
+    expect(latest.settingsFor('b').get('2t')?.dims).toEqual({
+      reference_time: '2026-09-04T00:00:00Z',
+    })
+    expect(latest.settingsFor('a').get('2t')?.dims).toBeUndefined()
+    expect(latest.layerDim('b', '2t', 'reference_time')).toBe(
+      '2026-09-04T00:00:00Z',
+    )
+    await screen.getByRole('button', { name: 'swap' }).click()
+    expect(latest.layerDim('a', '2t', 'reference_time')).toBe(
+      '2026-09-04T00:00:00Z',
+    )
+    expect(latest.layerDim('b', '2t', 'reference_time')).toBeNull()
+  })
+})

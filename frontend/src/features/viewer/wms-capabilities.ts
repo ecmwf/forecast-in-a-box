@@ -988,3 +988,21 @@ export function layerRequestParams(
   }
   return params
 }
+
+/** Name of the model-run dimension (WMS convention, KNMI/DWD/ADAGUC). */
+export const RUN_DIMENSION = 'reference_time'
+
+/** Values a layer's extra dimension takes, in advertised order. */
+export function dimensionValues(
+  layer: ParsedLayer,
+  name: string,
+): Array<string> {
+  const dim = layer.dimensions?.find((d) => d.name === name)
+  if (!dim) return []
+  return dim.units === 'ISO8601'
+    ? expandTimeSteps(dim.raw)
+    : dim.raw
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean)
+}

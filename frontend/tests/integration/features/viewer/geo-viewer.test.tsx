@@ -1456,6 +1456,98 @@ describe('GeoViewer layer styles', () => {
   })
 })
 
+describe('GeoViewer model runs', () => {
+  const RUNS = '2026-09-03T00:00:00Z,2026-09-03T12:00:00Z,2026-09-04T00:00:00Z'
+  const RUN_TIMES = '2026-09-03T00:00:00Z/2026-09-04T12:00:00Z/PT6H'
+  function registerRunPair() {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [
+        {
+          name: 'msl',
+          title: 'Mean sea level pressure',
+          time: RUN_TIMES,
+          dimensions: [
+            {
+              name: 'reference_time',
+              values: RUNS,
+              default: '2026-09-04T00:00:00Z',
+            },
+          ],
+        },
+      ],
+    })
+    return { portA, portB }
+  }
+  const lastRun = (port: number) =>
+    getMapRequestDetails(port)
+      .filter((r) => r.layers === 'msl')
+      .at(-1)?.dims.reference_time
+
+  it('pins a run for the side that advertises runs and reports it', async () => {
+    const { portA, portB } = registerRunPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('Mean sea level pressure').first().click()
+      await expect
+        .poll(() => getMapRequestDetails(portB).length, { timeout: 8000 })
+        .toBeGreaterThan(0)
+      expect(lastRun(portB)).toBeUndefined()
+      // Only B advertises runs → one Run select, B's.
+      const runSelects = screen.getByRole('combobox', {
+        name: 'Run for Mean sea level pressure',
+      })
+      expect(runSelects.elements()).toHaveLength(1)
+      await runSelects.click()
+      await screen.getByRole('option', { name: '2026-09-03 12:00Z' }).click()
+      await expect
+        .poll(() => lastRun(portB), { timeout: 8000 })
+        .toBe('2026-09-03T12:00:00Z')
+      // A never gets a DIM_ it does not advertise.
+      expect(lastRun(portA)).toBeUndefined()
+      expect(onViewStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({ runsB: ['2026-09-03T12:00:00Z'] }),
+      )
+    } finally {
+      removeSizing()
+    }
+  })
+
+  it('restores a pinned run from the URL', async () => {
+    const { portA, portB } = registerRunPair()
+    const removeSizing = injectMapSizing()
+    try {
+      await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          initialViewState={{
+            layersB: ['msl'],
+            runsB: ['2026-09-03T00:00:00Z'],
+          }}
+        />,
+      )
+      await expect
+        .poll(() => lastRun(portB), { timeout: 8000 })
+        .toBe('2026-09-03T00:00:00Z')
+    } finally {
+      removeSizing()
+    }
+  })
+})
+
 describe('GeoViewer projections', () => {
   const POLAR_CRS = ['EPSG:3857', 'EPSG:4326', 'EPSG:32661']
   function registerPolarPair(bCrs: Array<string> = POLAR_CRS) {

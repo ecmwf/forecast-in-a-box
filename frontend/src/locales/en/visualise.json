@@ -271,6 +271,9 @@
     "stylePreview": "Preview of {{name}}",
     "stylePreviewLoading": "Rendering preview…",
     "stylePreviewUnavailable": "No preview from this server",
+    "run": "Run",
+    "runPicker": "Run for {{name}}",
+    "runLatest": "Latest ({{time}})",
     "stylePin": "Use as my default for this layer",
     "styleUnpin": "Stop using as my default",
     "stylePinned": "Your default",
@@ -339,7 +342,7 @@
       },
       "layers": {
         "title": "Layers & opacity",
-        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer. Layers advertising several styles get a Style button: the list shows each style with its legend, and the pane beside it previews the highlighted one on the current view before you pick. The pin in that pane makes a style your default for the layer on this server; a style in a shared link still wins."
+        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer. Layers advertising several styles get a Style button: the list shows each style with its legend, and the pane beside it previews the highlighted one on the current view before you pick. Layers advertising model runs (reference time) get a Run select per side — Latest follows the server, or hold one run while the timeline moves. The pin in that pane makes a style your default for the layer on this server; a style in a shared link still wins."
       },
       "time": {
         "title": "Valid time",

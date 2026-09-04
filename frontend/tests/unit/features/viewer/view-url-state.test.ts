@@ -147,3 +147,19 @@ describe('styles (sa/sb) aligned with the layer lists', () => {
     ])
   })
 })
+
+describe('runs (ra/rb) aligned with the layer lists', () => {
+  it('round-trips pinned runs independently of styles', () => {
+    const encoded = encodeViewerUrlState({
+      layersA: ['2t', 'msl'],
+      stylesA: ['ct_red', null],
+      runsA: [null, '2026-09-04T00:00:00Z'],
+    })
+    expect(encoded.sa).toBe('ct_red')
+    expect(encoded.ra).toBe(',2026-09-04T00:00:00Z')
+    const decoded = decodeViewerUrlState(encoded)
+    expect(decoded.stylesA).toEqual(['ct_red', null])
+    expect(decoded.runsA).toEqual([null, '2026-09-04T00:00:00Z'])
+    expect(decoded.runsB).toBeUndefined()
+  })
+})

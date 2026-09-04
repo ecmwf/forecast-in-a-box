@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 import { firstNumber } from '../format'
 import {
+  RUN_DIMENSION,
   combineScaleBands,
   isLensProxyUrl,
   legendStripUrl,
@@ -48,6 +49,7 @@ import {
 import { stylePreviewUrl } from '../style-preview'
 import { LegendImage } from '../components/LegendImage'
 import { LayerStylePicker } from './LayerStylePicker'
+import { LayerRunSelect } from './LayerRunSelect'
 import { SLOT_CHIP_CLASS } from './GeoLayerBrowser'
 import { parseGeojsonOverlay } from './overlays'
 import { ANNOTATION_COLORS, downloadAnnotationsGeojson } from './annotations'
@@ -141,6 +143,8 @@ function StylePickerFor({
     slot: SourceSlot
     layer: ParsedLayer
     source: PanelSlotSource
+    /** This side's dimension values, so previews match. */
+    dims?: Readonly<Record<string, string>>
   }>
   value: string | null
   onChange: (name: string | null) => void
@@ -179,7 +183,7 @@ function StylePickerFor({
         {
           baseUrl: entry.source.baseUrl,
           layer: entry.layer,
-          settings: { style: name },
+          settings: { style: name, dims: entry.dims },
           time: entry.source.resolveTime(entry.layer),
           bboxAxisOrder: entry.source.bboxAxisOrder,
         },
@@ -871,12 +875,31 @@ function ActivePairCard({
           }
         />
       </label>
+      {(['a', 'b'] as const).map((slot) => {
+        const layer = pair.perSource[slot]
+        if (!layer || !sources[slot]) return null
+        return (
+          <LayerRunSelect
+            key={slot}
+            slot={slot}
+            layer={layer}
+            title={title}
+            value={selection.layerDim(slot, layer.name, RUN_DIMENSION)}
+            onChange={(run) =>
+              selection.setLayerDim(slot, layer.name, RUN_DIMENSION, run)
+            }
+            showSlot={sources.b !== null}
+          />
+        )
+      })}
       <StylePickerFor
         title={title}
         entries={(['a', 'b'] as const).flatMap((slot) => {
           const layer = pair.perSource[slot]
           const source = sources[slot]
-          return layer && source ? [{ slot, layer, source }] : []
+          if (!layer || !source) return []
+          const dims = selection.settingsFor(slot).get(layer.name)?.dims
+          return [{ slot, layer, source, dims }]
         })}
         value={selection.pairStyle(pair.key)}
         onChange={(name) => selection.setPairStyle(pair.key, name)}
@@ -1071,9 +1094,28 @@ function ActiveSourceSection({
                   />
                 </label>
                 {layer && (
+                  <LayerRunSelect
+                    slot={slot}
+                    layer={layer}
+                    title={title}
+                    value={selection.layerDim(slot, name, RUN_DIMENSION)}
+                    onChange={(run) =>
+                      selection.setLayerDim(slot, name, RUN_DIMENSION, run)
+                    }
+                    showSlot={false}
+                  />
+                )}
+                {layer && (
                   <StylePickerFor
                     title={title}
-                    entries={[{ slot, layer, source }]}
+                    entries={[
+                      {
+                        slot,
+                        layer,
+                        source,
+                        dims: selection.settingsFor(slot).get(name)?.dims,
+                      },
+                    ]}
                     value={selection.layerStyle(slot, name)}
                     onChange={(s) => selection.setLayerStyle(slot, name, s)}
                     showSlots={false}

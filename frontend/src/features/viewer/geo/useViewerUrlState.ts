@@ -20,6 +20,7 @@ import { toLonLat } from 'ol/proj'
 import { unByKey } from 'ol/Observable'
 import { DEFAULT_BASEMAP_ID } from '../ol-layers'
 import { DEFAULT_PROJECTION_ID } from '../projection-ids'
+import { RUN_DIMENSION } from '../wms-capabilities'
 import type View from 'ol/View'
 import type { ProjectionId } from '../projection-ids'
 import type { LensSource } from '../hooks/useLensSource'
@@ -81,6 +82,8 @@ export function useViewerUrlState({
     /** Aligned with `a`/`b`; null = the server default. */
     stylesA: ReadonlyArray<string | null>
     stylesB: ReadonlyArray<string | null>
+    runsA: ReadonlyArray<string | null>
+    runsB: ReadonlyArray<string | null>
     unlinked: boolean
   } | null>(
     initial?.layersA?.length || initial?.layersB?.length
@@ -89,6 +92,8 @@ export function useViewerUrlState({
           b: initial.layersB ?? [],
           stylesA: initial.stylesA ?? [],
           stylesB: initial.stylesB ?? [],
+          runsA: initial.runsA ?? [],
+          runsB: initial.runsB ?? [],
           unlinked: initial.unlinkedLayers === true,
         }
       : null,
@@ -118,10 +123,14 @@ export function useViewerUrlState({
       if (slot === 'b' && !hasB) continue
       const available = new Set(source.layers.map((l) => l.name))
       const styles = slot === 'a' ? pending.stylesA : pending.stylesB
+      const runs = slot === 'a' ? pending.runsA : pending.runsB
       // Reverse: toggles prepend, so the first name ends up on top.
       for (const [i, name] of [...names.entries()].reverse()) {
         if (!available.has(name)) continue
         const style = styles[i] ?? null
+        const run = runs[i] ?? null
+        // Runs are per server: set on this side whatever the mode.
+        if (run) selection.setLayerDim(slot, name, RUN_DIMENSION, run)
         if (pending.unlinked) {
           if (!selection.isLayerActive(slot, name)) {
             selection.toggleLayer(slot, name)
@@ -186,6 +195,9 @@ export function useViewerUrlState({
       partial.stylesA = partial.layersA.map(
         (name) => settingsA.get(name)?.style ?? null,
       )
+      partial.runsA = partial.layersA.map(
+        (name) => settingsA.get(name)?.dims?.[RUN_DIMENSION] ?? null,
+      )
     }
     if (!restorePending.b) {
       partial.layersB = servedNames(
@@ -195,6 +207,9 @@ export function useViewerUrlState({
       )
       partial.stylesB = partial.layersB.map(
         (name) => settingsB.get(name)?.style ?? null,
+      )
+      partial.runsB = partial.layersB.map(
+        (name) => settingsB.get(name)?.dims?.[RUN_DIMENSION] ?? null,
       )
     }
     if (!restorePending.a && !restorePending.b) {

@@ -65,6 +65,19 @@ function withStyle(
   return next.style || next.dims ? next : undefined
 }
 
+/** Settings plus the slot's per-layer dimension values (run pins). */
+function mergeDims(
+  base: Map<string, LayerRequestSettings>,
+  dims: Map<string, Record<string, string>>,
+): Map<string, LayerRequestSettings> {
+  if (dims.size === 0) return base
+  const merged = new Map(base)
+  for (const [name, values] of dims) {
+    merged.set(name, { ...merged.get(name), dims: values })
+  }
+  return merged
+}
+
 export interface CompareSelection {
   linkMode: LinkMode
   /** True when unlinked was forced by zero overlap (shows the notice). */
@@ -93,6 +106,14 @@ export interface CompareSelection {
   layerOpacity: (slot: SourceSlot, name: string) => number
   layerStyle: (slot: SourceSlot, name: string) => string | null
   setLayerStyle: (slot: SourceSlot, name: string, style: string | null) => void
+  /** A layer's extra-dimension value on one side (null = server default). */
+  layerDim: (slot: SourceSlot, name: string, dim: string) => string | null
+  setLayerDim: (
+    slot: SourceSlot,
+    name: string,
+    dim: string,
+    value: string | null,
+  ) => void
   setLinkMode: (mode: LinkMode, options?: { auto?: boolean }) => void
   /** A slot swap exchanged the sources — the unlinked lists follow them. */
   onSlotsSwapped: () => void
@@ -122,6 +143,10 @@ export function useCompareSelection(
   const [perSource, setPerSource] = useState<
     Record<SourceSlot, PerSourceSelection>
   >({ a: emptySelection(), b: emptySelection() })
+  // Dimensions (runs) are per server: per slot in both modes.
+  const [dimsBySlot, setDimsBySlot] = useState<
+    Record<SourceSlot, Map<string, Record<string, string>>>
+  >({ a: new Map(), b: new Map() })
 
   const pairByKey = useMemo(
     () => new Map(pairs.map((p) => [p.key, p])),
@@ -179,9 +204,16 @@ export function useCompareSelection(
     (slot: SourceSlot) => current(slot).layerOpacities,
     [current],
   )
+  const settings = useMemo(
+    () => ({
+      a: mergeDims(current('a').layerSettings, dimsBySlot.a),
+      b: mergeDims(current('b').layerSettings, dimsBySlot.b),
+    }),
+    [current, dimsBySlot],
+  )
   const settingsFor = useCallback(
-    (slot: SourceSlot) => current(slot).layerSettings,
-    [current],
+    (slot: SourceSlot) => settings[slot],
+    [settings],
   )
 
   const togglePair = useCallback(
@@ -298,6 +330,21 @@ export function useCompareSelection(
     [defaultStyle],
   )
 
+  const setLayerDim = useCallback(
+    (slot: SourceSlot, name: string, dim: string, value: string | null) => {
+      setDimsBySlot((prev) => {
+        const layers = new Map(prev[slot])
+        const dims = { ...layers.get(name) }
+        if (value) dims[dim] = value
+        else delete dims[dim]
+        if (Object.keys(dims).length > 0) layers.set(name, dims)
+        else layers.delete(name)
+        return { ...prev, [slot]: layers }
+      })
+    },
+    [],
+  )
+
   const setLinkMode = useCallback(
     (mode: LinkMode, options?: { auto?: boolean }) => {
       if (mode !== linkMode) {
@@ -308,7 +355,7 @@ export function useCompareSelection(
           // Rebuild pair order from the union of both sides' active layers.
           const order: Array<string> = []
           const opacities = new Map<string, number>()
-          const settings = new Map<string, LayerRequestSettings>()
+          const pairSettings = new Map<string, LayerRequestSettings>()
           for (const pair of pairByKey.values()) {
             const aName = pair.perSource.a?.name
             const bName = pair.perSource.b?.name
@@ -334,11 +381,11 @@ export function useCompareSelection(
               (bName !== undefined
                 ? perSource.b.layerSettings.get(bName)
                 : undefined)
-            if (setting) settings.set(pair.key, setting)
+            if (setting) pairSettings.set(pair.key, setting)
           }
           setLinkedOrder(order)
           setLinkedOpacities(opacities)
-          setLinkedSettings(settings)
+          setLinkedSettings(pairSettings)
         }
         setLinkModeState(mode)
       }
@@ -350,6 +397,7 @@ export function useCompareSelection(
   // Pair keys are source-independent; only the per-source lists move.
   const onSlotsSwapped = useCallback(() => {
     setPerSource((prev) => ({ a: prev.b, b: prev.a }))
+    setDimsBySlot((prev) => ({ a: prev.b, b: prev.a }))
   }, [])
 
   const retainServable = useCallback(
@@ -369,6 +417,7 @@ export function useCompareSelection(
     setLinkedOpacities(new Map())
     setLinkedSettings(new Map())
     setPerSource({ a: emptySelection(), b: emptySelection() })
+    setDimsBySlot({ a: new Map(), b: new Map() })
   }, [])
 
   return {
@@ -394,6 +443,8 @@ export function useCompareSelection(
     layerStyle: (slot, name) =>
       perSource[slot].layerSettings.get(name)?.style ?? null,
     setLayerStyle,
+    layerDim: (slot, name, dim) => dimsBySlot[slot].get(name)?.[dim] ?? null,
+    setLayerDim,
     setLinkMode,
     onSlotsSwapped,
     retainServable,

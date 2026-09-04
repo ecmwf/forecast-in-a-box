@@ -33,6 +33,9 @@ export interface ViewerUrlState {
   /** Style per layer, aligned with `layersA`/`layersB`; null = default. */
   stylesA?: ReadonlyArray<string | null>
   stylesB?: ReadonlyArray<string | null>
+  /** Pinned model run (reference_time) per layer, aligned; null = latest. */
+  runsA?: ReadonlyArray<string | null>
+  runsB?: ReadonlyArray<string | null>
   /** True = per-side selection (unlinked). */
   unlinkedLayers?: boolean
   /** Shared-axis valid time, epoch ms. */
@@ -51,6 +54,8 @@ export interface ViewerSearchState {
   lb: string | undefined
   sa: string | undefined
   sb: string | undefined
+  ra: string | undefined
+  rb: string | undefined
   ul: true | undefined
   t: number | undefined
   tl: Exclude<TimeLinkMode, 'exact'> | undefined
@@ -146,11 +151,15 @@ export function encodeViewerUrlState(state: ViewerUrlState): ViewerSearchState {
       : undefined
   const a = encodeStack(state.layersA ?? [], state.stylesA)
   const b = encodeStack(state.layersB ?? [], state.stylesB)
+  const runA = encodeStack(state.layersA ?? [], state.runsA)
+  const runB = encodeStack(state.layersB ?? [], state.runsB)
   return {
     la: state.layersA ? a.names : undefined,
     lb: state.layersB ? b.names : undefined,
     sa: state.layersA ? a.styles : undefined,
     sb: state.layersB ? b.styles : undefined,
+    ra: state.layersA ? runA.styles : undefined,
+    rb: state.layersB ? runB.styles : undefined,
     ul: state.unlinkedLayers === true ? true : undefined,
     t: state.timeMs !== undefined ? Math.round(state.timeMs) : undefined,
     tl:
@@ -175,6 +184,8 @@ export function decodeViewerUrlState(
     layersB: b.names,
     stylesA: a.styles,
     stylesB: b.styles,
+    runsA: decodeStack(search.la, search.ra).styles,
+    runsB: decodeStack(search.lb, search.rb).styles,
     unlinkedLayers: search.ul === true ? true : undefined,
     timeMs: Number.isFinite(search.t) ? search.t : undefined,
     timeLink: search.tl,

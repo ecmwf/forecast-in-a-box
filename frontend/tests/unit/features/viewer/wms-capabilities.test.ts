@@ -14,8 +14,10 @@ import '@/lib/i18n'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
   CapabilitiesError,
+  RUN_DIMENSION,
   appendWmsParams,
   combineScaleBands,
+  dimensionValues,
   expandTimeSteps,
   fetchCapabilities,
   groupLayers,
@@ -912,5 +914,25 @@ describe('styles, dimensions and request params', () => {
       DIM_REFERENCE_TIME: '2026-09-04T01:00:00Z',
     })
     expect(layerRequestParams(layer, undefined, null).STYLES).toBe('sh_all')
+  })
+})
+
+describe('dimensionValues', () => {
+  const xml = `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0"><Capability><Layer><Title>root</Title>
+  <Layer><Name>t</Name><Title>t</Title>
+    <Dimension name="REFERENCE_TIME" units="ISO8601" default="2026-09-04T00:00:00Z">2026-09-03T00:00:00Z/2026-09-04T00:00:00Z/PT12H</Dimension>
+    <Dimension name="elevation" units="m">10, 50,100</Dimension>
+  </Layer>
+</Layer></Capability></WMS_Capabilities>`
+  it('expands ISO8601 intervals and splits plain lists', () => {
+    const layer = parseCapabilities(xml).layers[0]
+    expect(dimensionValues(layer, RUN_DIMENSION)).toEqual([
+      '2026-09-03T00:00:00.000Z',
+      '2026-09-03T12:00:00.000Z',
+      '2026-09-04T00:00:00.000Z',
+    ])
+    expect(dimensionValues(layer, 'elevation')).toEqual(['10', '50', '100'])
+    expect(dimensionValues(layer, 'nope')).toEqual([])
   })
 })
