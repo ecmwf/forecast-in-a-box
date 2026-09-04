@@ -368,6 +368,8 @@ describe('VisualisePage', () => {
   })
 
   it('surfaces a lens-registry outage with Retry instead of spinning', async () => {
+    // Park the list poll so only the Retry click can recover the page.
+    setPollIntervalsForTests({ lensList: 60_000 })
     setLensListOutage(true)
     useComparisonStore.getState().addEntry(RUN_A)
     const screen = await renderVisualisePage()

@@ -15,6 +15,7 @@
  */
 
 import { expect, test } from '@playwright/test'
+import { skipTour } from './fixtures'
 import type { Page } from '@playwright/test'
 
 const TUTORIALS_KEY = 'fiab.store.tutorials'
@@ -52,8 +53,7 @@ test.describe('Configure guided tour', () => {
       .click()
 
     await expect(page.getByRole('dialog', { name: TOUR_TITLE })).toBeVisible()
-    await page.getByRole('button', { name: 'Skip tour', exact: true }).click()
-    await expect(page.getByRole('dialog', { name: TOUR_TITLE })).toBeHidden()
+    await skipTour(page, TOUR_TITLE)
 
     const stored = await page.evaluate(
       (key) => window.localStorage.getItem(key),
