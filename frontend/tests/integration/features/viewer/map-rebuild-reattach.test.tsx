@@ -19,7 +19,6 @@ import { useRef } from 'react'
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import VectorLayer from 'ol/layer/Vector'
-import VectorSource from 'ol/source/Vector'
 import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
 import type OlMap from 'ol/Map'
@@ -40,7 +39,7 @@ const handlers = { onCreate: noop, onEdit: noop, onMove: noop }
 
 const ANNOTATION: MapAnnotation = {
   id: 'a1',
-  coordinate: [0, 0],
+  lonLat: [0, 0],
   label: '1',
   text: 'pin',
   color: 'slate',
@@ -52,9 +51,7 @@ function makeOverlay(): ContextOverlay {
   return {
     id: 'o1',
     name: 'probe.geojson',
-    source: new VectorSource({
-      features: [new Feature({ geometry: new Point([0, 0]) })],
-    }),
+    features: [new Feature({ geometry: new Point([0, 0]) })],
     visible: true,
     featureCount: 1,
     propertyKeys: [],

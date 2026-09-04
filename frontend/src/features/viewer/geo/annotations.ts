@@ -20,6 +20,7 @@ import Feature from 'ol/Feature'
 import GeoJSON from 'ol/format/GeoJSON'
 import Point from 'ol/geom/Point'
 import Translate from 'ol/interaction/Translate'
+import { fromLonLat, toLonLat } from 'ol/proj'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import { Fill, Stroke, Style, Text } from 'ol/style'
@@ -51,8 +52,8 @@ export const ANNOTATION_LABEL_MAX = 4
 
 export interface MapAnnotation {
   id: string
-  /** Web-Mercator coordinate the pin anchors to. */
-  coordinate: [number, number]
+  /** WGS84 lon/lat the pin anchors to (projection-independent). */
+  lonLat: [number, number]
   /** Badge text — sticky (never renumbered), editable, duplicates OK. */
   label: string
   text: string
@@ -155,9 +156,9 @@ export function useAnnotationLayer(
   armed: boolean,
   handlers: {
     /** Creation context (source binding) lives in the caller's closure. */
-    onCreate: (coordinate: [number, number]) => void
+    onCreate: (lonLat: [number, number]) => void
     onEdit: (id: string) => void
-    onMove: (id: string, coordinate: [number, number]) => void
+    onMove: (id: string, lonLat: [number, number]) => void
   },
   highlightId: string | null,
   /** useOlMapBase recreation counter — re-attach after a map rebuild. */
@@ -171,10 +172,13 @@ export function useAnnotationLayer(
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
+    const projection = map.getView().getProjection()
     const visible = annotations.filter((a) => annotationVisibleOn(a, shownIds))
     const source = new VectorSource({
       features: visible.map((a) => {
-        const feature = new Feature({ geometry: new Point(a.coordinate) })
+        const feature = new Feature({
+          geometry: new Point(fromLonLat(a.lonLat, projection)),
+        })
         feature.setId(a.id)
         feature.setStyle(
           pinStyles(a.label, a.text, a.color, a.id === highlightId),
@@ -199,7 +203,11 @@ export function useAnnotationLayer(
         return
       }
       if (armedRef.current) {
-        handlersRef.current.onCreate([evt.coordinate[0], evt.coordinate[1]])
+        const [lon, lat] = toLonLat(
+          [evt.coordinate[0], evt.coordinate[1]],
+          projection,
+        )
+        handlersRef.current.onCreate([lon, lat])
       }
     }
     map.on('singleclick', onClick)
@@ -214,8 +222,8 @@ export function useAnnotationLayer(
         const id = feature.getId()
         const geometry = feature.getGeometry()
         if (typeof id !== 'string' || !(geometry instanceof Point)) return
-        const [x, y] = geometry.getCoordinates()
-        handlersRef.current.onMove(id, [x, y])
+        const [lon, lat] = toLonLat(geometry.getCoordinates(), projection)
+        handlersRef.current.onMove(id, [lon, lat])
       })
       map.addInteraction(translate)
     }
@@ -239,7 +247,7 @@ export function annotationsToGeojson(
   annotations: ReadonlyArray<MapAnnotation>,
 ): string {
   const features = annotations.map((a) => {
-    const feature = new Feature({ geometry: new Point(a.coordinate) })
+    const feature = new Feature({ geometry: new Point(a.lonLat) })
     feature.setProperties({
       label: a.label,
       text: a.text,
@@ -248,8 +256,8 @@ export function annotationsToGeojson(
     })
     return feature
   })
+  // Pins are lon/lat already — no reprojection on the way out.
   const collection = new GeoJSON().writeFeaturesObject(features, {
-    featureProjection: 'EPSG:3857',
     decimals: 6,
   })
   return JSON.stringify({
@@ -281,9 +289,7 @@ export function parseAnnotationsGeojson(
   text: string,
   slotIds: { a?: string | null; b?: string | null } = {},
 ): Array<Omit<MapAnnotation, 'id'>> {
-  const features = new GeoJSON().readFeatures(JSON.parse(text), {
-    featureProjection: 'EPSG:3857',
-  })
+  const features = new GeoJSON().readFeatures(JSON.parse(text))
   const parsed = features.flatMap<Omit<MapAnnotation, 'id'>>((feature) => {
     const geometry = feature.getGeometry()
     const noteText: unknown = feature.get('text')
@@ -306,7 +312,7 @@ export function parseAnnotationsGeojson(
     if (!Number.isFinite(x) || !Number.isFinite(y)) return []
     return [
       {
-        coordinate: [x, y] as [number, number],
+        lonLat: [x, y] as [number, number],
         label:
           typeof labelRaw === 'string'
             ? labelRaw.trim().slice(0, ANNOTATION_LABEL_MAX)
