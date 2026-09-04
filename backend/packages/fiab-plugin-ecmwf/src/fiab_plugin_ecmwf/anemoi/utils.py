@@ -127,7 +127,7 @@ class CheckpointArtifact:
         return checkpoint.configuration.is_ensemble_model is True
 
     @property
-    def supplementary_metadata(self) -> dict[str, list[str]]:
+    def supplementary_metadata(self) -> dict[str, str]:
         """Additional metadata from the checkpoint artifact for use in actions and qubes.
 
         i.e. MARS metadata

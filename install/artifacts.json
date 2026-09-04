@@ -284,15 +284,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h"
       }
@@ -600,15 +594,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -921,15 +909,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -1238,15 +1220,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -1556,15 +1532,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -1973,15 +1943,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "timestep": "6h",
         "configuration": {
@@ -2289,15 +2253,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "configuration": {
           "pre_processors": [],
@@ -2632,15 +2590,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "configuration": {
           "pre_processors": [],
@@ -2944,15 +2896,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "configuration": {
           "pre_processors": [],
@@ -3264,15 +3210,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "configuration": {
           "pre_processors": [],
@@ -3595,15 +3535,9 @@
           ]
         },
         "supplementary_metadata": {
-          "stream": [
-            "oper"
-          ],
-          "type": [
-            "fc"
-          ],
-          "class": [
-            "ai"
-          ]
+          "stream": "oper",
+          "type": "fc",
+          "class": "ai"
         },
         "configuration": {
           "pre_processors": [],
