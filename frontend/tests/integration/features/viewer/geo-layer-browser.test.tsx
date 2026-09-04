@@ -136,13 +136,12 @@ describe('GeoLayerBrowser empty states', () => {
 })
 
 describe('GeoLayerBrowser time-aware filter', () => {
-  const layer = (name: string, time?: string): ParsedLayer =>
-    ({
-      name,
-      title: name,
-      styles: [],
-      time: time ? { raw: time } : undefined,
-    })
+  const layer = (name: string, time?: string): ParsedLayer => ({
+    name,
+    title: name,
+    styles: [],
+    time: time ? { raw: time } : undefined,
+  })
   const layers = [
     layer('2t', '2026-07-06T00:00:00Z,2026-07-06T06:00:00Z'),
     layer('coast'),
