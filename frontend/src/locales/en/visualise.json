@@ -251,6 +251,8 @@
     "both": "A∩B",
     "bothHint": "Only layers available in both sources",
     "groupToggle": "Group similar layers",
+    "timeAware": "Time-aware",
+    "timeAwareHint": "Show only layers with a time dimension",
     "layers_one": "{{count}} layer",
     "layers_other": "{{count}} layers"
   },
