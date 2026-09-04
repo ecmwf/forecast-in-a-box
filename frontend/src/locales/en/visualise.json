@@ -190,6 +190,15 @@
     "skinnywms": "SkinnyWMS (native)",
     "mercatorOnly": "Web Mercator only"
   },
+  "startup": {
+    "status": "{{step}} — step {{n}} of {{total}}",
+    "elapsed": "{{seconds}} s",
+    "server": "Starting the map server",
+    "files": "Reading the forecast files",
+    "connect": "Connecting to the server",
+    "catalogue": "Fetching the layer catalogue",
+    "firstStartHint": "A first start reads the run's files — usually 10–30 s."
+  },
   "projections": {
     "title": "Projection",
     "popover": "Projection & basemap",

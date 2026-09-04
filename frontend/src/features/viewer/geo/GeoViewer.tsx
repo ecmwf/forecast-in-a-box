@@ -60,12 +60,12 @@ import {
   skinnyWmsBasemap,
   supportsCrs,
 } from '../wms-capabilities'
+import { StartupStatusPill } from '../components/StartupStatusPill'
 import { GeoPanelResizeStrip } from './GeoPanelResizeStrip'
 import { useGeoPanelWidths } from './useGeoPanelWidths'
 import { buildPairs } from './layer-pairing'
 import { useCompareSelection } from './useCompareSelection'
 import { useGetMapFailureLog } from './getmap-failures'
-import { GeoViewerSkeleton } from './GeoViewerSkeleton'
 import { GeoToolbar } from './GeoToolbar'
 import { GeoExportDialog } from './GeoExportDialog'
 import { AnnotationEditorDialog } from './AnnotationEditorDialog'
@@ -837,9 +837,27 @@ export function GeoViewer({
       </div>
     )
   }
-  if (sourceA.loadingLayers) {
-    return <GeoViewerSkeleton label={tExec('lens.loadingLayers')} />
-  }
+  // While A's catalogue loads, render the real shell with a status pill.
+  const startup = sourceA.loadingLayers
+    ? isLensProxyUrl(a.baseUrl)
+      ? {
+          steps: [
+            { id: 'server', label: t('startup.server') },
+            { id: 'files', label: t('startup.files') },
+            { id: 'catalogue', label: t('startup.catalogue') },
+          ],
+          // Capabilities failing = SkinnyWMS still booting / reading GRIBs.
+          activeIndex: sourceA.retrying ? 1 : 2,
+          hint: t('startup.firstStartHint'),
+        }
+      : {
+          steps: [
+            { id: 'connect', label: t('startup.connect') },
+            { id: 'catalogue', label: t('startup.catalogue') },
+          ],
+          activeIndex: sourceA.retrying ? 0 : 1,
+        }
+    : null
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
@@ -1030,9 +1048,10 @@ export function GeoViewer({
           />
         )}
         <div
-          className="min-h-0 min-w-0 flex-1"
+          className="relative min-h-0 min-w-0 flex-1"
           {...tourAttr(TOUR.visualise.map)}
         >
+          {startup && <StartupStatusPill {...startup} />}
           {focusSlot === null && mode === 'side' && mapSourceB ? (
             <DualMapView
               view={view}

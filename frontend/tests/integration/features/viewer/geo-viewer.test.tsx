@@ -1268,6 +1268,43 @@ describe('GeoViewer preload', () => {
   })
 })
 
+describe('GeoViewer startup', () => {
+  it('renders the real shell with a status pill while the catalogue loads', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    // Two 503s first: the retry ladder runs → "connecting" step.
+    registerMockWmsServer(portA, {
+      failuresBeforeSuccess: 2,
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    const pill = screen.getByRole('status', {
+      name: /Connecting to the server/,
+    })
+    await expect.element(pill).toBeVisible()
+    // The chrome is already the real thing, not a skeleton.
+    await expect
+      .element(screen.getByRole('button', { name: 'Projection & basemap' }))
+      .toBeVisible()
+
+    // Capabilities land → pill gone, catalogue in the browser.
+    await expect
+      .element(screen.getByText('Mean sea level pressure').first())
+      .toBeVisible()
+    await expect
+      .poll(
+        () =>
+          screen.getByRole('status', { name: /step \d of/ }).elements().length,
+        { timeout: 8000 },
+      )
+      .toBe(0)
+  })
+})
+
 describe('GeoViewer projections', () => {
   const POLAR_CRS = ['EPSG:3857', 'EPSG:4326', 'EPSG:32661']
   function registerPolarPair(bCrs: Array<string> = POLAR_CRS) {
