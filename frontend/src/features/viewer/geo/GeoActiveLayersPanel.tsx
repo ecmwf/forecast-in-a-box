@@ -29,6 +29,7 @@ import {
   HelpCircle,
   Pencil,
   Pin,
+  Scan,
   TimerOff,
   Upload,
   X,
@@ -38,8 +39,10 @@ import {
 import { firstNumber } from '../format'
 import {
   RUN_DIMENSION,
+  activeLayersBbox,
   combineScaleBands,
   isLensProxyUrl,
+  isWorldBbox,
   legendStripUrl,
   rebaseLensUrl,
   resolveStyle,
@@ -54,10 +57,11 @@ import { SLOT_CHIP_CLASS } from './GeoLayerBrowser'
 import { parseGeojsonOverlay } from './overlays'
 import { ANNOTATION_COLORS, downloadAnnotationsGeojson } from './annotations'
 import { layerIsTimeAware, pairIsStatic } from './layer-pairing'
-import type { ParsedLayer, ScaleBand } from '../wms-capabilities'
+import type { Bbox, ParsedLayer, ScaleBand } from '../wms-capabilities'
 import type { ContextOverlay } from './overlays'
 import type { MapAnnotation } from './annotations'
 import type { PairedLayer, SourceSlot } from './layer-pairing'
+import type { FitBboxAction } from './types'
 import type { CompareSelection } from './useCompareSelection'
 import type { LensSource } from '../hooks/useLensSource'
 import type { BboxAxisOrder } from '../projections'
@@ -302,6 +306,7 @@ export function GeoActiveLayersPanel({
   stylePins,
   resolution,
   onZoomToResolution,
+  onZoomToBbox,
   previewView,
   focusSlot,
   onCollapse,
@@ -324,6 +329,8 @@ export function GeoActiveLayersPanel({
   resolution: number | null
   /** Animate the shared view to a resolution (jump into a layer's band). */
   onZoomToResolution: (res: number) => void
+  /** Zoom the map to a WGS84 bbox; null before mount. */
+  onZoomToBbox: FitBboxAction | null
   /** The live map View — style previews render its current extent. */
   previewView: View
   /** View only one source: hide the other's section and per-source tiers. */
@@ -420,6 +427,7 @@ export function GeoActiveLayersPanel({
             stylePins={stylePins}
             resolution={resolution}
             onZoomToResolution={onZoomToResolution}
+            onZoomToBbox={onZoomToBbox}
             view={previewView}
           />
         ) : selection.linkMode === 'linked' ? (
@@ -440,6 +448,7 @@ export function GeoActiveLayersPanel({
                   stylePins={stylePins}
                   resolution={resolution}
                   onZoomToResolution={onZoomToResolution}
+                  onZoomToBbox={onZoomToBbox}
                   view={previewView}
                 />
               ))}
@@ -455,6 +464,7 @@ export function GeoActiveLayersPanel({
               stylePins={stylePins}
               resolution={resolution}
               onZoomToResolution={onZoomToResolution}
+              onZoomToBbox={onZoomToBbox}
               view={previewView}
             />
             {sources.b !== null && (
@@ -466,6 +476,7 @@ export function GeoActiveLayersPanel({
                 stylePins={stylePins}
                 resolution={resolution}
                 onZoomToResolution={onZoomToResolution}
+                onZoomToBbox={onZoomToBbox}
                 view={previewView}
               />
             )}
@@ -749,6 +760,31 @@ function MoveButtons({
   )
 }
 
+/** Frames the layer's advertised extent; hidden for global layers. */
+function ZoomToLayerButton({
+  name,
+  bbox,
+  onZoomTo,
+}: {
+  name: string
+  bbox: Bbox | null
+  onZoomTo: FitBboxAction | null
+}) {
+  const { t } = useTranslation('visualise')
+  if (!bbox || !onZoomTo || isWorldBbox(bbox)) return null
+  return (
+    <button
+      type="button"
+      onClick={() => onZoomTo(bbox)}
+      aria-label={t('sidebar.zoomToLayer', { name })}
+      title={t('sidebar.zoomToLayer', { name })}
+      className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+    >
+      <Scan className="h-3.5 w-3.5" />
+    </button>
+  )
+}
+
 /** Linked mode: one card per active PAIR, with both sources' legends. */
 function ActivePairCard({
   pair,
@@ -761,6 +797,7 @@ function ActivePairCard({
   stylePins,
   resolution,
   onZoomToResolution,
+  onZoomToBbox,
   view,
 }: {
   pair: PairedLayer
@@ -773,9 +810,15 @@ function ActivePairCard({
   stylePins: StylePins
   resolution: number | null
   onZoomToResolution: (res: number) => void
+  /** Zoom the map to a WGS84 bbox; null before mount. */
+  onZoomToBbox: FitBboxAction | null
   view: View
 }) {
   const { t } = useTranslation('visualise')
+  const pairLayers = (['a', 'b'] as const).flatMap((slot) => {
+    const layer = pair.perSource[slot]
+    return layer && sources[slot] ? [layer] : []
+  })
   const { t: tExec } = useTranslation('executions')
   const [over, setOver] = useState(false)
   const title =
@@ -828,6 +871,14 @@ function ActivePairCard({
         >
           {title}
         </P>
+        <ZoomToLayerButton
+          name={title}
+          bbox={activeLayersBbox(
+            pairLayers,
+            pairLayers.map((l) => l.name),
+          )}
+          onZoomTo={onZoomToBbox}
+        />
         <MoveButtons
           name={title}
           index={index}
@@ -954,6 +1005,7 @@ function ActiveSourceSection({
   stylePins,
   resolution,
   onZoomToResolution,
+  onZoomToBbox,
   view,
 }: {
   slot: SourceSlot
@@ -963,6 +1015,8 @@ function ActiveSourceSection({
   stylePins: StylePins
   resolution: number | null
   onZoomToResolution: (res: number) => void
+  /** Zoom the map to a WGS84 bbox; null before mount. */
+  onZoomToBbox: FitBboxAction | null
   view: View
 }) {
   const { t } = useTranslation('visualise')
@@ -1041,6 +1095,11 @@ function ActiveSourceSection({
                   >
                     {title}
                   </P>
+                  <ZoomToLayerButton
+                    name={title}
+                    bbox={layer?.bbox ?? null}
+                    onZoomTo={onZoomToBbox}
+                  />
                   <MoveButtons
                     name={title}
                     index={index}

@@ -13,6 +13,9 @@ import type { LayerRequestSettings, ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
 
 /** Everything a compare map needs to render one source's stack. */
+/** Fit the shared view to a WGS84 bbox. */
+export type FitBboxAction = (bbox: [number, number, number, number]) => void
+
 export interface CompareMapSource {
   slot: SourceSlot
   /** Stable source identity (basket entry ref) — annotations bind to it. */

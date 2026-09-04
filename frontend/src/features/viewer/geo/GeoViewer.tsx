@@ -97,7 +97,12 @@ import type { ProjectionId } from '../projection-ids'
 import type { BboxAxisOrder } from '../projections'
 import type { ProjectionOption } from './GeoToolbar'
 import type { SourceSlot } from './layer-pairing'
-import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
+import type {
+  CompareMapSource,
+  CompareMode,
+  CompareModeOptions,
+  FitBboxAction,
+} from './types'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { ViewerUrlState } from './view-url-state'
 import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHandle'
@@ -411,6 +416,11 @@ export function GeoViewer({
   const [fitAction, setFitAction] = useState<(() => void) | null>(null)
   const onRegisterFit = useCallback(
     (fit: (() => void) | null) => setFitAction(() => fit),
+    [],
+  )
+  const [fitBboxAction, setFitBboxAction] = useState<FitBboxAction | null>(null)
+  const onRegisterFitBbox = useCallback(
+    (fit: FitBboxAction | null) => setFitBboxAction(() => fit),
     [],
   )
 
@@ -1179,6 +1189,7 @@ export function GeoViewer({
             }}
             resolution={viewResolution}
             onZoomToResolution={onZoomToResolution}
+            onZoomToBbox={fitBboxAction}
             previewView={view}
             focusSlot={focusSlot}
             onCollapse={() => setLeftCollapsed(true)}
@@ -1222,6 +1233,7 @@ export function GeoViewer({
               basemapId={effectiveBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
+              onRegisterFitBbox={onRegisterFitBbox}
               onRegisterCapture={onRegisterCapture}
             />
           ) : (
@@ -1250,6 +1262,7 @@ export function GeoViewer({
               basemapId={effectiveBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
+              onRegisterFitBbox={onRegisterFitBbox}
               onRegisterCapture={onRegisterCapture}
             />
           )}

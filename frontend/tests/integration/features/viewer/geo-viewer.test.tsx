@@ -1589,7 +1589,7 @@ describe('GeoViewer layer extents', () => {
       .map((c) => (c[0] as Partial<ViewerUrlState>).camera)
       .find((cam) => cam !== undefined)
 
-  it('clips requests to a regional layer’s bbox and fits to active layers', async () => {
+  it('clips requests to the bbox, frames active layers, zooms to one', async () => {
     const { portA, portB } = registerRegionalPair()
     const removeSizing = injectMapSizing()
     const onViewStateChange = vi.fn()
@@ -1622,6 +1622,22 @@ describe('GeoViewer layer extents', () => {
       await expect
         .poll(() => lastCamera(onViewStateChange)?.lon, { timeout: 8000 })
         .toBeCloseTo(10, 0)
+      // A global layer offers no zoom button; a regional one frames itself.
+      await screen.getByText('Australia only').click()
+      expect(
+        screen
+          .getByRole('button', { name: 'Zoom to 2 m temperature’s extent' })
+          .elements(),
+      ).toHaveLength(0)
+      await screen
+        .getByRole('button', { name: 'Zoom to Australia only’s extent' })
+        .click()
+      // The small test map cannot centre on 132.5°E at this zoom (the
+      // world-extent constraint shifts it) — check the direction only.
+      await expect
+        .poll(() => lastCamera(onViewStateChange)?.lon, { timeout: 8000 })
+        .toBeGreaterThan(90)
+      expect(lastCamera(onViewStateChange)?.lat).toBeLessThan(-10)
     } finally {
       removeSizing()
     }

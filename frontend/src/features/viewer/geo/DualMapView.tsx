@@ -40,7 +40,7 @@ import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type View from 'ol/View'
 import type { SourceSlot } from './layer-pairing'
-import type { CaptureResult, CompareMapSource } from './types'
+import type { CaptureResult, CompareMapSource, FitBboxAction } from './types'
 import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
@@ -74,6 +74,7 @@ export function DualMapView({
   onAnnotationEdit,
   onAnnotationMove,
   onRegisterFit,
+  onRegisterFitBbox,
   onRegisterCapture,
 }: {
   view: View
@@ -108,6 +109,7 @@ export function DualMapView({
   onAnnotationMove: (id: string, coordinate: [number, number]) => void
   /** Register this component's fit-to-bbox action with the toolbar. */
   onRegisterFit: (fit: (() => void) | null) => void
+  onRegisterFitBbox: (fit: FitBboxAction | null) => void
   onRegisterCapture: (
     capture: (() => Promise<Array<CaptureResult>>) | null,
   ) => void
@@ -136,6 +138,17 @@ export function DualMapView({
     [],
   )
 
+  // One shared View: any panel's zoom-to-bbox serves both.
+  const fitBboxesRef = useRef(new Map<string, FitBboxAction>())
+  const registerFitBbox = useCallback(
+    (slot: string, fit: FitBboxAction | null) => {
+      if (fit) fitBboxesRef.current.set(slot, fit)
+      else fitBboxesRef.current.delete(slot)
+      const first = fitBboxesRef.current.values().next().value
+      onRegisterFitBbox(first ?? null)
+    },
+    [onRegisterFitBbox],
+  )
   const registerFit = useCallback(
     (slot: string, fit: (() => void) | null) => {
       if (fit) fitsRef.current.set(slot, fit)
@@ -178,6 +191,7 @@ export function DualMapView({
           onAnnotationEdit={onAnnotationEdit}
           onAnnotationMove={onAnnotationMove}
           onRegisterFit={registerFit}
+          onRegisterFitBbox={registerFitBbox}
           onRegisterCapture={registerCapture}
         />
         <DualMapPanel
@@ -204,6 +218,7 @@ export function DualMapView({
           onAnnotationEdit={onAnnotationEdit}
           onAnnotationMove={onAnnotationMove}
           onRegisterFit={registerFit}
+          onRegisterFitBbox={registerFitBbox}
           onRegisterCapture={registerCapture}
         />
       </div>
@@ -235,6 +250,7 @@ function DualMapPanel({
   onAnnotationEdit,
   onAnnotationMove,
   onRegisterFit,
+  onRegisterFitBbox,
   onRegisterCapture,
 }: {
   source: CompareMapSource
@@ -264,6 +280,7 @@ function DualMapPanel({
   onAnnotationEdit: (id: string) => void
   onAnnotationMove: (id: string, coordinate: [number, number]) => void
   onRegisterFit: (slot: string, fit: (() => void) | null) => void
+  onRegisterFitBbox: (slot: string, fit: FitBboxAction | null) => void
   onRegisterCapture: (
     slot: string,
     capture: (() => Promise<CaptureResult | null>) | null,
@@ -278,7 +295,7 @@ function DualMapPanel({
     [],
   )
   const theme = useUiStore((s) => s.resolvedTheme)
-  const { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion } =
+  const { mapRef, basemapLayerRef, tryFit, fitBbox, setFitBbox, mapVersion } =
     useOlMapBase(containerRef, {
       view,
       // A projection switch swaps the View — rebuild around it.
@@ -358,6 +375,10 @@ function DualMapPanel({
     onRegisterFit(source.slot, () => tryFit(true))
     return () => onRegisterFit(source.slot, null)
   }, [source.slot, tryFit, onRegisterFit])
+  useEffect(() => {
+    onRegisterFitBbox(source.slot, fitBbox)
+    return () => onRegisterFitBbox(source.slot, null)
+  }, [source.slot, fitBbox, onRegisterFitBbox])
 
   useEffect(() => {
     onRegisterCapture(source.slot, () => {

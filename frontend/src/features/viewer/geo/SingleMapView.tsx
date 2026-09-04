@@ -60,6 +60,7 @@ import type {
   CaptureResult,
   CompareMapSource,
   CompareModeOptions,
+  FitBboxAction,
   SingleMapMode,
 } from './types'
 import { cn } from '@/lib/utils'
@@ -101,6 +102,7 @@ export function SingleMapView({
   onAnnotationEdit,
   onAnnotationMove,
   onRegisterFit,
+  onRegisterFitBbox,
   onRegisterCapture,
 }: {
   view: View
@@ -131,6 +133,8 @@ export function SingleMapView({
   onAnnotationEdit: (id: string) => void
   onAnnotationMove: (id: string, coordinate: [number, number]) => void
   onRegisterFit: (fit: (() => void) | null) => void
+  /** Register the zoom-to-bbox action. */
+  onRegisterFitBbox: (fit: FitBboxAction | null) => void
   onRegisterCapture: (
     capture: (() => Promise<Array<CaptureResult>>) | null,
   ) => void
@@ -158,7 +162,7 @@ export function SingleMapView({
   } = options
 
   const theme = useUiStore((s) => s.resolvedTheme)
-  const { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion } =
+  const { mapRef, basemapLayerRef, tryFit, fitBbox, setFitBbox, mapVersion } =
     useOlMapBase(containerRef, {
       view,
       // A projection switch swaps the View — rebuild around it.
@@ -351,6 +355,10 @@ export function SingleMapView({
     onRegisterFit(() => tryFit(true))
     return () => onRegisterFit(null)
   }, [tryFit, onRegisterFit])
+  useEffect(() => {
+    onRegisterFitBbox(fitBbox)
+    return () => onRegisterFitBbox(null)
+  }, [fitBbox, onRegisterFitBbox])
 
   // Export capture: composite all layer canvases (basemap, WMS stacks,
   // overlays) — the mode's clipping is baked into the WMS canvas, so the

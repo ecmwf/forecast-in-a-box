@@ -88,6 +88,8 @@ export interface OlMapBase {
    * home; forced = fit to the WMS bbox (falls back to the home).
    */
   tryFit: (force?: boolean) => void
+  /** Fit the view to a WGS84 bbox (home when unframeable). */
+  fitBbox: (bbox: [number, number, number, number]) => void
   /** Provide the WMS-advertised bbox used by forced fits; triggers the
    *  initial unforced fit attempt. */
   setFitBbox: (bbox: [number, number, number, number] | null) => void
@@ -128,6 +130,16 @@ export function useOlMapBase(
       force ? bboxRef.current : null,
     )
     olView.fit(extent, { padding: [40, 40, 40, 40] })
+  }, [])
+
+  const fitBbox = useCallback((bbox: [number, number, number, number]) => {
+    const map = mapRef.current
+    if (!map) return
+    const olView = map.getView()
+    olView.set(AUTOFIT_KEY, true, true)
+    olView.fit(homeExtentFor(viewerProjectionOf(olView), bbox), {
+      padding: [40, 40, 40, 40],
+    })
   }, [])
 
   const setFitBbox = useCallback(
@@ -192,5 +204,5 @@ export function useOlMapBase(
     }
   }, [containerRef, resetKey, tryFit, incLoading, decLoading])
 
-  return { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion }
+  return { mapRef, basemapLayerRef, tryFit, fitBbox, setFitBbox, mapVersion }
 }

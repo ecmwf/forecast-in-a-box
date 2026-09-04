@@ -259,6 +259,7 @@
     "globalOpacity": "Global opacity",
     "sourceOpacity": "All of {{slot}}",
     "removeLayer": "Remove {{name}}",
+    "zoomToLayer": "Zoom to {{name}}’s extent",
     "moveLayerUp": "Move {{name}} up",
     "moveLayerDown": "Move {{name}} down",
     "layerOpacity": "{{name}} opacity",
@@ -352,7 +353,7 @@
       },
       "layers": {
         "title": "Layers & opacity",
-        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer. Layers advertising several styles get a Style button: the list shows each style with its legend, and the pane beside it previews the highlighted one on the current view before you pick. Layers advertising model runs (reference time) get a Run select per side — Latest follows the server, or hold one run while the timeline moves. The pin in that pane makes a style your default for the layer on this server; a style in a shared link still wins."
+        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer. Layers advertising several styles get a Style button: the list shows each style with its legend, and the pane beside it previews the highlighted one on the current view before you pick. Layers advertising model runs (reference time) get a Run select per side — Latest follows the server, or hold one run while the timeline moves. Regional layers get a frame button that zooms to their extent, are only requested while on screen, and Fit to globe (F) frames the active layers together. The pin in that pane makes a style your default for the layer on this server; a style in a shared link still wins."
       },
       "time": {
         "title": "Valid time",
