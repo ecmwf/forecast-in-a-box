@@ -17,11 +17,15 @@
  * ordered layer-name list. Transitions are lossless linked→unlinked (the
  * derived per-source orders are copied) and union-rebuilding the other
  * way. Zero pair overlap forces unlinked — the caller surfaces the notice.
+ *
+ * Opacity and request settings (style, extra dimensions) ride along the
+ * same keys; a pair's style applies to each side that advertises it.
  */
 
 import { useCallback, useMemo, useState } from 'react'
 import { DEFAULT_LAYER_OPACITY } from '../ol-layers'
 import type { PairedLayer, SourceSlot } from './layer-pairing'
+import type { LayerRequestSettings } from '../wms-capabilities'
 
 export type LinkMode = 'linked' | 'unlinked'
 
@@ -41,6 +45,24 @@ function moveItem<T>(
 interface PerSourceSelection {
   activeOrder: Array<string>
   layerOpacities: Map<string, number>
+  layerSettings: Map<string, LayerRequestSettings>
+}
+
+const emptySelection = (): PerSourceSelection => ({
+  activeOrder: [],
+  layerOpacities: new Map(),
+  layerSettings: new Map(),
+})
+
+/** Merge a style into settings; null clears it (empty → undefined). */
+function withStyle(
+  prev: LayerRequestSettings | undefined,
+  style: string | null,
+): LayerRequestSettings | undefined {
+  const next: LayerRequestSettings = { ...prev }
+  if (style) next.style = style
+  else delete next.style
+  return next.style || next.dims ? next : undefined
 }
 
 export interface CompareSelection {
@@ -52,10 +74,15 @@ export interface CompareSelection {
   /** Layer NAMES + opacities for a source's stack, in stacking order. */
   activeOrderFor: (slot: SourceSlot) => Array<string>
   opacitiesFor: (slot: SourceSlot) => Map<string, number>
+  /** Per-layer request settings for a source's stack. */
+  settingsFor: (slot: SourceSlot) => Map<string, LayerRequestSettings>
   isPairActive: (key: string) => boolean
   togglePair: (key: string) => void
   setPairOpacity: (key: string, opacity: number) => void
   pairOpacity: (key: string) => number
+  /** A pair's chosen style (null = each side's default). */
+  pairStyle: (key: string) => string | null
+  setPairStyle: (key: string, style: string | null) => void
   /** Move an active pair within the stacking order (linked mode). */
   reorderPair: (from: number, to: number) => void
   /** Move an active layer within one source's order (unlinked mode). */
@@ -64,6 +91,8 @@ export interface CompareSelection {
   toggleLayer: (slot: SourceSlot, name: string) => void
   setLayerOpacity: (slot: SourceSlot, name: string, opacity: number) => void
   layerOpacity: (slot: SourceSlot, name: string) => number
+  layerStyle: (slot: SourceSlot, name: string) => string | null
+  setLayerStyle: (slot: SourceSlot, name: string, style: string | null) => void
   setLinkMode: (mode: LinkMode, options?: { auto?: boolean }) => void
   /** A slot swap exchanged the sources — the unlinked lists follow them. */
   onSlotsSwapped: () => void
@@ -72,8 +101,14 @@ export interface CompareSelection {
   clear: () => void
 }
 
+export interface CompareSelectionOptions {
+  /** Style to start a newly activated layer with (e.g. the user's pin). */
+  defaultStyle?: (slot: SourceSlot, layerName: string) => string | null
+}
+
 export function useCompareSelection(
   pairs: ReadonlyArray<PairedLayer>,
+  { defaultStyle }: CompareSelectionOptions = {},
 ): CompareSelection {
   const [linkMode, setLinkModeState] = useState<LinkMode>('linked')
   const [autoUnlinked, setAutoUnlinked] = useState(false)
@@ -81,12 +116,12 @@ export function useCompareSelection(
   const [linkedOpacities, setLinkedOpacities] = useState<Map<string, number>>(
     new Map(),
   )
+  const [linkedSettings, setLinkedSettings] = useState<
+    Map<string, LayerRequestSettings>
+  >(new Map())
   const [perSource, setPerSource] = useState<
     Record<SourceSlot, PerSourceSelection>
-  >({
-    a: { activeOrder: [], layerOpacities: new Map() },
-    b: { activeOrder: [], layerOpacities: new Map() },
-  })
+  >({ a: emptySelection(), b: emptySelection() })
 
   const pairByKey = useMemo(
     () => new Map(pairs.map((p) => [p.key, p])),
@@ -98,6 +133,7 @@ export function useCompareSelection(
     (slot: SourceSlot): PerSourceSelection => {
       const activeOrder: Array<string> = []
       const layerOpacities = new Map<string, number>()
+      const layerSettings = new Map<string, LayerRequestSettings>()
       for (const key of linkedOrder) {
         const layer = pairByKey.get(key)?.perSource[slot]
         if (!layer) continue
@@ -106,10 +142,21 @@ export function useCompareSelection(
           layer.name,
           linkedOpacities.get(key) ?? DEFAULT_LAYER_OPACITY,
         )
+        const settings = linkedSettings.get(key)
+        if (!settings) continue
+        // A pair style applies only where this side advertises it.
+        const style = layer.styles.some((s) => s.name === settings.style)
+          ? settings.style
+          : undefined
+        const projected = withStyle(
+          settings.dims ? { dims: settings.dims } : undefined,
+          style ?? null,
+        )
+        if (projected) layerSettings.set(layer.name, projected)
       }
-      return { activeOrder, layerOpacities }
+      return { activeOrder, layerOpacities, layerSettings }
     },
-    [linkedOrder, linkedOpacities, pairByKey],
+    [linkedOrder, linkedOpacities, linkedSettings, pairByKey],
   )
 
   // Memoized: consumers hang memos and effects off the returned identities
@@ -119,32 +166,52 @@ export function useCompareSelection(
     () => ({ a: deriveForSlot('a'), b: deriveForSlot('b') }),
     [deriveForSlot],
   )
-  const activeOrderFor = useCallback(
+  const current = useCallback(
     (slot: SourceSlot) =>
-      linkMode === 'linked'
-        ? derived[slot].activeOrder
-        : perSource[slot].activeOrder,
+      linkMode === 'linked' ? derived[slot] : perSource[slot],
     [linkMode, derived, perSource],
+  )
+  const activeOrderFor = useCallback(
+    (slot: SourceSlot) => current(slot).activeOrder,
+    [current],
   )
   const opacitiesFor = useCallback(
-    (slot: SourceSlot) =>
-      linkMode === 'linked'
-        ? derived[slot].layerOpacities
-        : perSource[slot].layerOpacities,
-    [linkMode, derived, perSource],
+    (slot: SourceSlot) => current(slot).layerOpacities,
+    [current],
+  )
+  const settingsFor = useCallback(
+    (slot: SourceSlot) => current(slot).layerSettings,
+    [current],
   )
 
-  const togglePair = useCallback((key: string) => {
-    setLinkedOrder((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [key, ...prev],
-    )
-    setLinkedOpacities((prev) => {
-      if (prev.has(key)) return prev
-      const next = new Map(prev)
-      next.set(key, DEFAULT_LAYER_OPACITY)
-      return next
-    })
-  }, [])
+  const togglePair = useCallback(
+    (key: string) => {
+      setLinkedOrder((prev) =>
+        prev.includes(key) ? prev.filter((k) => k !== key) : [key, ...prev],
+      )
+      setLinkedOpacities((prev) => {
+        if (prev.has(key)) return prev
+        const next = new Map(prev)
+        next.set(key, DEFAULT_LAYER_OPACITY)
+        return next
+      })
+      // First activation seeds the pinned default (A's side first).
+      const pair = pairByKey.get(key)
+      const seed =
+        (pair?.perSource.a && defaultStyle?.('a', pair.perSource.a.name)) ??
+        (pair?.perSource.b && defaultStyle?.('b', pair.perSource.b.name)) ??
+        null
+      if (seed) {
+        setLinkedSettings((prev) => {
+          if (prev.has(key)) return prev
+          const next = new Map(prev)
+          next.set(key, { style: seed })
+          return next
+        })
+      }
+    },
+    [pairByKey, defaultStyle],
+  )
 
   const reorderPair = useCallback((from: number, to: number) => {
     setLinkedOrder((prev) => moveItem(prev, from, to))
@@ -171,6 +238,16 @@ export function useCompareSelection(
     })
   }, [])
 
+  const setPairStyle = useCallback((key: string, style: string | null) => {
+    setLinkedSettings((prev) => {
+      const next = new Map(prev)
+      const merged = withStyle(prev.get(key), style)
+      if (merged) next.set(key, merged)
+      else next.delete(key)
+      return next
+    })
+  }, [])
+
   const setLayerOpacity = useCallback(
     (slot: SourceSlot, name: string, opacity: number) => {
       setPerSource((prev) => {
@@ -182,20 +259,44 @@ export function useCompareSelection(
     [],
   )
 
-  const toggleLayer = useCallback((slot: SourceSlot, name: string) => {
-    setPerSource((prev) => {
-      const current = prev[slot]
-      const active = current.activeOrder.includes(name)
-      const activeOrder = active
-        ? current.activeOrder.filter((n) => n !== name)
-        : [name, ...current.activeOrder]
-      const layerOpacities = new Map(current.layerOpacities)
-      if (!active && !layerOpacities.has(name)) {
-        layerOpacities.set(name, DEFAULT_LAYER_OPACITY)
-      }
-      return { ...prev, [slot]: { activeOrder, layerOpacities } }
-    })
-  }, [])
+  const setLayerStyle = useCallback(
+    (slot: SourceSlot, name: string, style: string | null) => {
+      setPerSource((prev) => {
+        const layerSettings = new Map(prev[slot].layerSettings)
+        const merged = withStyle(layerSettings.get(name), style)
+        if (merged) layerSettings.set(name, merged)
+        else layerSettings.delete(name)
+        return { ...prev, [slot]: { ...prev[slot], layerSettings } }
+      })
+    },
+    [],
+  )
+
+  const toggleLayer = useCallback(
+    (slot: SourceSlot, name: string) => {
+      setPerSource((prev) => {
+        const side = prev[slot]
+        const active = side.activeOrder.includes(name)
+        const activeOrder = active
+          ? side.activeOrder.filter((n) => n !== name)
+          : [name, ...side.activeOrder]
+        const layerOpacities = new Map(side.layerOpacities)
+        if (!active && !layerOpacities.has(name)) {
+          layerOpacities.set(name, DEFAULT_LAYER_OPACITY)
+        }
+        const layerSettings = new Map(side.layerSettings)
+        const seed = active ? null : defaultStyle?.(slot, name)
+        if (seed && !layerSettings.has(name)) {
+          layerSettings.set(name, { style: seed })
+        }
+        return {
+          ...prev,
+          [slot]: { ...side, activeOrder, layerOpacities, layerSettings },
+        }
+      })
+    },
+    [defaultStyle],
+  )
 
   const setLinkMode = useCallback(
     (mode: LinkMode, options?: { auto?: boolean }) => {
@@ -207,6 +308,7 @@ export function useCompareSelection(
           // Rebuild pair order from the union of both sides' active layers.
           const order: Array<string> = []
           const opacities = new Map<string, number>()
+          const settings = new Map<string, LayerRequestSettings>()
           for (const pair of pairByKey.values()) {
             const aName = pair.perSource.a?.name
             const bName = pair.perSource.b?.name
@@ -225,9 +327,18 @@ export function useCompareSelection(
                 : undefined) ??
               DEFAULT_LAYER_OPACITY
             opacities.set(pair.key, opacity)
+            const setting =
+              (aName !== undefined
+                ? perSource.a.layerSettings.get(aName)
+                : undefined) ??
+              (bName !== undefined
+                ? perSource.b.layerSettings.get(bName)
+                : undefined)
+            if (setting) settings.set(pair.key, setting)
           }
           setLinkedOrder(order)
           setLinkedOpacities(opacities)
+          setLinkedSettings(settings)
         }
         setLinkModeState(mode)
       }
@@ -244,10 +355,10 @@ export function useCompareSelection(
   const retainServable = useCallback(
     (slot: SourceSlot, names: ReadonlySet<string>) => {
       setPerSource((prev) => {
-        const current = prev[slot]
-        const activeOrder = current.activeOrder.filter((n) => names.has(n))
-        if (activeOrder.length === current.activeOrder.length) return prev
-        return { ...prev, [slot]: { ...current, activeOrder } }
+        const side = prev[slot]
+        const activeOrder = side.activeOrder.filter((n) => names.has(n))
+        if (activeOrder.length === side.activeOrder.length) return prev
+        return { ...prev, [slot]: { ...side, activeOrder } }
       })
     },
     [],
@@ -256,10 +367,8 @@ export function useCompareSelection(
   const clear = useCallback(() => {
     setLinkedOrder([])
     setLinkedOpacities(new Map())
-    setPerSource({
-      a: { activeOrder: [], layerOpacities: new Map() },
-      b: { activeOrder: [], layerOpacities: new Map() },
-    })
+    setLinkedSettings(new Map())
+    setPerSource({ a: emptySelection(), b: emptySelection() })
   }, [])
 
   return {
@@ -268,17 +377,23 @@ export function useCompareSelection(
     linkedOrder,
     activeOrderFor,
     opacitiesFor,
+    settingsFor,
     isPairActive: (key) => linkedOrder.includes(key),
     togglePair,
     reorderPair,
     reorderLayer,
     setPairOpacity,
     pairOpacity: (key) => linkedOpacities.get(key) ?? DEFAULT_LAYER_OPACITY,
+    pairStyle: (key) => linkedSettings.get(key)?.style ?? null,
+    setPairStyle,
     isLayerActive: (slot, name) => perSource[slot].activeOrder.includes(name),
     toggleLayer,
     setLayerOpacity,
     layerOpacity: (slot, name) =>
       perSource[slot].layerOpacities.get(name) ?? DEFAULT_LAYER_OPACITY,
+    layerStyle: (slot, name) =>
+      perSource[slot].layerSettings.get(name)?.style ?? null,
+    setLayerStyle,
     setLinkMode,
     onSlotsSwapped,
     retainServable,

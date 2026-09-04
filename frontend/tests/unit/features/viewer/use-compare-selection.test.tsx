@@ -112,3 +112,85 @@ describe('useCompareSelection identity stability', () => {
     expect(orders.at(-1)).toEqual(['2t'])
   })
 })
+
+describe('useCompareSelection styles', () => {
+  const styled = (name: string, styles: Array<string>) => ({
+    name,
+    title: name,
+    styles: styles.map((s) => ({ name: s })),
+  })
+  const PAIRS_WITH_STYLES: ReadonlyArray<PairedLayer> = [
+    {
+      key: 'p@sfc',
+      title: '2 m temperature',
+      subtitle: null,
+      level: null,
+      levelUnit: null,
+      perSource: {
+        a: styled('2t', ['sh_x', 'sh_y']),
+        b: styled('t2m', ['sh_x']),
+      },
+    },
+  ]
+  function StyleProbe({
+    onRender,
+  }: {
+    onRender: (selection: CompareSelection) => void
+  }) {
+    const selection = useCompareSelection(PAIRS_WITH_STYLES)
+    onRender(selection)
+    return (
+      <>
+        <button type="button" onClick={() => selection.togglePair('p@sfc')}>
+          toggle
+        </button>
+        <button
+          type="button"
+          onClick={() => selection.setPairStyle('p@sfc', 'sh_y')}
+        >
+          style-y
+        </button>
+        <button type="button" onClick={() => selection.setLinkMode('unlinked')}>
+          unlink
+        </button>
+        <button type="button" onClick={() => selection.setLinkMode('linked')}>
+          link
+        </button>
+        <button
+          type="button"
+          onClick={() => selection.setLayerStyle('b', 't2m', 'sh_x')}
+        >
+          b-style
+        </button>
+      </>
+    )
+  }
+
+  it('applies a pair style only to sides that advertise it, across modes', async () => {
+    let latest!: CompareSelection
+    const screen = await render(
+      <StyleProbe
+        onRender={(s) => {
+          latest = s
+        }}
+      />,
+    )
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    await screen.getByRole('button', { name: 'style-y' }).click()
+    expect(latest.pairStyle('p@sfc')).toBe('sh_y')
+    expect(latest.settingsFor('a').get('2t')?.style).toBe('sh_y')
+    // B lacks sh_y → keeps its default (no entry).
+    expect(latest.settingsFor('b').get('t2m')).toBeUndefined()
+
+    // Unlinked copies the projection; per-side edits then stay per side.
+    await screen.getByRole('button', { name: 'unlink' }).click()
+    expect(latest.layerStyle('a', '2t')).toBe('sh_y')
+    await screen.getByRole('button', { name: 'b-style' }).click()
+    expect(latest.layerStyle('b', 't2m')).toBe('sh_x')
+    expect(latest.settingsFor('a').get('2t')?.style).toBe('sh_y')
+
+    // Relinking keeps A's choice for the pair.
+    await screen.getByRole('button', { name: 'link', exact: true }).click()
+    expect(latest.pairStyle('p@sfc')).toBe('sh_y')
+  })
+})
