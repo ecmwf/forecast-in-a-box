@@ -47,6 +47,8 @@ export interface CompareMapSource {
   timeTag: string | null
   /** Human label of the instant this source displays ("06 Jul 12:00Z"). */
   timeLabel: string | null
+  /** Model run in effect ("run 2026-09-04 03:00Z"), null when none. */
+  runLabel: string | null
   bbox: [number, number, number, number] | null
 }
 

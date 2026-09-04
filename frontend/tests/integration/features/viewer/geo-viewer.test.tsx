@@ -1520,6 +1520,10 @@ describe('GeoViewer model runs', () => {
       expect(onViewStateChange).toHaveBeenCalledWith(
         expect.objectContaining({ runsB: ['2026-09-03T12:00:00Z'] }),
       )
+      // The map tag names the run in effect.
+      await expect
+        .element(screen.getByText('run 2026-09-03 12:00Z'))
+        .toBeInTheDocument()
       // Steps before the pinned run are painted as not served up front.
       await expect
         .poll(

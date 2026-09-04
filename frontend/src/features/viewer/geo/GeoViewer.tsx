@@ -62,7 +62,7 @@ import {
   supportsCrs,
 } from '../wms-capabilities'
 import { StartupStatusPill } from '../components/StartupStatusPill'
-import { beforeRunLayers, mergeEpochLayers } from './run-window'
+import { beforeRunLayers, effectiveRuns, mergeEpochLayers } from './run-window'
 import { GeoPanelResizeStrip } from './GeoPanelResizeStrip'
 import { useGeoPanelWidths } from './useGeoPanelWidths'
 import { buildPairs } from './layer-pairing'
@@ -82,7 +82,7 @@ import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
-import type { LayerRequestSettings } from '../wms-capabilities'
+import type { LayerRequestSettings, ParsedLayer } from '../wms-capabilities'
 import type { GeoPanelSide } from './useGeoPanelWidths'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
@@ -844,6 +844,18 @@ export function GeoViewer({
     [],
   )
 
+  const runLabelFor = (
+    layers: ReadonlyArray<ParsedLayer>,
+    order: ReadonlyArray<string>,
+    settings: ReadonlyMap<string, LayerRequestSettings>,
+  ): string | null => {
+    const runs = effectiveRuns(layers, order, settings)
+    if (runs.length === 0) return null
+    return runs.length === 1
+      ? t('slotTag.run', { time: formatStep(runs[0]) })
+      : t('slotTag.runCount', { count: runs.length })
+  }
+
   // -------- Source view-model for the map components --------
   const mapSourceA: CompareMapSource = {
     slot: 'a',
@@ -868,6 +880,7 @@ export function GeoViewer({
       resolvedA.epoch !== null
         ? formatStep(new Date(resolvedA.epoch).toISOString())
         : null,
+    runLabel: runLabelFor(sourceA.layers, activeOrderA, settingsA),
     masterOpacity: globalOpacity * sourceOpacity.a,
     bbox: sourceA.bbox,
   }
@@ -895,6 +908,7 @@ export function GeoViewer({
           resolvedB.epoch !== null
             ? formatStep(new Date(resolvedB.epoch).toISOString())
             : null,
+        runLabel: runLabelFor(sourceB.layers, activeOrderB, settingsB),
         masterOpacity: globalOpacity * sourceOpacity.b,
         bbox: sourceB.bbox,
       }

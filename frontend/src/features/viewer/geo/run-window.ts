@@ -56,3 +56,21 @@ export function mergeEpochLayers(a: EpochLayers, b: EpochLayers): EpochLayers {
   }
   return out
 }
+
+/** Distinct runs in effect: pinned value, else the advertised default. */
+export function effectiveRuns(
+  layers: ReadonlyArray<ParsedLayer>,
+  activeOrder: ReadonlyArray<string>,
+  settings: ReadonlyMap<string, LayerRequestSettings>,
+): Array<string> {
+  const runs: Array<string> = []
+  for (const name of activeOrder) {
+    const dim = layers
+      .find((l) => l.name === name)
+      ?.dimensions?.find((d) => d.name === RUN_DIMENSION)
+    if (!dim) continue
+    const run = settings.get(name)?.dims?.[RUN_DIMENSION] ?? dim.default
+    if (run && !runs.includes(run)) runs.push(run)
+  }
+  return runs
+}

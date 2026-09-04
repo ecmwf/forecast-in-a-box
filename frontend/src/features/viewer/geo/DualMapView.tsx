@@ -445,6 +445,7 @@ function DualMapPanel({
           label={source.label}
           loading={loadingCount > 0 || source.layersLoading}
           timeLabel={source.timeLabel}
+          runLabel={source.runLabel}
         />
       </div>
       {source.hiddenAtTime && (

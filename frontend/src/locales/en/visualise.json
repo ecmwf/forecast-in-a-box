@@ -284,6 +284,12 @@
     "styleCount_one": "{{count}} style",
     "styleCount_other": "{{count}} styles"
   },
+  "slotTag": {
+    "run": "run {{time}}",
+    "runCount_one": "{{count}} run",
+    "runCount_other": "{{count}} runs",
+    "runTitle": "Model run (reference time) the layers are drawn from"
+  },
   "slots": {
     "swap": "Swap A and B",
     "placeholder": "Pick a source…",

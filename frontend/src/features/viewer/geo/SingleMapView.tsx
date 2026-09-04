@@ -668,6 +668,7 @@ export function SingleMapView({
               side="left"
               loading={loadingCount.a > 0 || a.layersLoading}
               timeLabel={a.timeLabel}
+              runLabel={a.runLabel}
             />
           )}
           {showB && (
@@ -677,6 +678,7 @@ export function SingleMapView({
               side="right"
               loading={loadingCount.b > 0 || b.layersLoading}
               timeLabel={b.timeLabel}
+              runLabel={b.runLabel}
             />
           )}
         </div>
