@@ -25,11 +25,42 @@ import SimpleGeometry from 'ol/geom/SimpleGeometry'
 import { transform } from 'ol/proj'
 import VectorSource from 'ol/source/Vector'
 import { Fill, Stroke, Style, Text } from 'ol/style'
-import coastlines from './data/coastlines-low.json'
-import countries from './data/countries.geo.json'
 import type { Extent } from 'ol/extent'
 
 export type OutlineTheme = 'light' | 'dark'
+
+interface OutlineData {
+  coastlines: object
+  countries: object
+}
+
+let outlineData: OutlineData | null = null
+let outlineDataPromise: Promise<OutlineData> | null = null
+
+/** Natural Earth data, code-split; resolved once and then served sync. */
+export function loadOutlineData(): Promise<OutlineData> {
+  outlineDataPromise ??= Promise.all([
+    import('./data/coastlines-low.json'),
+    import('./data/countries.geo.json'),
+  ]).then(([coastlines, countries]) => {
+    outlineData = {
+      coastlines: coastlines.default,
+      countries: countries.default,
+    }
+    return outlineData
+  })
+  return outlineDataPromise
+}
+
+/** Warm the data cache off the critical path (a later switch is instant). */
+export function preloadOutlineData(): void {
+  const run = () => void loadOutlineData().catch(() => {})
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(run)
+    return
+  }
+  window.setTimeout(run, 500)
+}
 
 interface Palette {
   coast: string
@@ -71,6 +102,19 @@ function readFeatures(json: object, projection: string): Array<Feature> {
         geometry.getFlatCoordinates().every(Number.isFinite)
       )
     })
+}
+
+/** Source filled from the cache now, or when the lazy data resolves. */
+function dataSource(
+  projection: string,
+  pick: (data: OutlineData) => object,
+): VectorSource {
+  const source = new VectorSource()
+  const fill = (data: OutlineData) =>
+    source.addFeatures(readFeatures(pick(data), projection))
+  if (outlineData) fill(outlineData)
+  else void loadOutlineData().then(fill, () => {})
+  return source
 }
 
 /** Polar-stereographic graticule geometry: which pole, outer latitude. */
@@ -157,17 +201,13 @@ export function makeOutlineBasemapLayer(
     extent,
     layers: [
       new VectorLayer({
-        source: new VectorSource({
-          features: readFeatures(countries, projection),
-        }),
+        source: dataSource(projection, (d) => d.countries),
         style: new Style({
           stroke: new Stroke({ color: palette.border, width: 0.6 }),
         }),
       }),
       new VectorLayer({
-        source: new VectorSource({
-          features: readFeatures(coastlines, projection),
-        }),
+        source: dataSource(projection, (d) => d.coastlines),
         style: new Style({
           stroke: new Stroke({ color: palette.coast, width: 1 }),
         }),

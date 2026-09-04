@@ -107,6 +107,7 @@ import {
 import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
 import { showToast } from '@/lib/toast'
+import { preloadOutlineData } from '@/lib/map/ol-outline'
 
 export interface GeoViewerSource {
   /** Stable source identity (basket entry ref) — annotations bind to it. */
@@ -168,6 +169,8 @@ export function GeoViewer({
     }
     return next
   })
+  // Warm the Outline basemap data so a projection switch is instant.
+  useEffect(() => preloadOutlineData(), [])
   // Imperative users (pan, zoom, locate) read the live instance.
   const viewRef = useRef(view)
   viewRef.current = view

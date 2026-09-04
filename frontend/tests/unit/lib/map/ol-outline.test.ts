@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
 import Graticule from 'ol/layer/Graticule'
 import SimpleGeometry from 'ol/geom/SimpleGeometry'
 import type VectorLayer from 'ol/layer/Vector'
-import { makeOutlineBasemapLayer } from '@/lib/map/ol-outline'
+import { loadOutlineData, makeOutlineBasemapLayer } from '@/lib/map/ol-outline'
 import {
   getViewerProjection,
   polarGraticuleFor,
@@ -22,7 +22,15 @@ import {
 registerViewerProjections()
 
 describe('makeOutlineBasemapLayer', () => {
-  it('uses the OL graticule for cylindrical views', () => {
+  it('fills the coast and border sources once the lazy data resolves', async () => {
+    const group = makeOutlineBasemapLayer('EPSG:3857', undefined, 'light')
+    const coast = group.getLayers().getArray()[1] as VectorLayer
+    await loadOutlineData()
+    expect(coast.getSource()!.getFeatures().length).toBeGreaterThan(100)
+  })
+
+  it('uses the OL graticule for cylindrical views', async () => {
+    await loadOutlineData()
     const group = makeOutlineBasemapLayer('EPSG:3857', undefined, 'light')
     const layers = group.getLayers().getArray()
     expect(layers).toHaveLength(3)
