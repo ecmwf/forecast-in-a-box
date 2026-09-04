@@ -325,6 +325,7 @@ export function GeoTimeSlider({
           <TimeClipRow
             hasB={hasB && !focused}
             timeline={timeline}
+            failures={failures}
             clip={clip}
             rangeStart={rangeStart}
             rangeEnd={rangeEnd}
@@ -744,6 +745,7 @@ function SlotRunTrack({
 function TimeClipRow({
   hasB,
   timeline,
+  failures,
   clip,
   rangeStart,
   rangeEnd,
@@ -751,6 +753,8 @@ function TimeClipRow({
 }: {
   hasB: boolean
   timeline: CompareTimeline
+  /** Not-served marks per cell; presets trim the edges. */
+  failures: Record<SourceSlot, ReadonlyArray<ReadonlyArray<string>>>
   clip: [number, number] | null
   rangeStart: number
   rangeEnd: number
@@ -759,11 +763,13 @@ function TimeClipRow({
   const { t } = useTranslation('visualise')
   const last = timeline.epochs.length - 1
   if (last < 1) return null
-  const rangeA = availabilityRange(timeline.availability.a)
-  const rangeB = availabilityRange(timeline.availability.b)
+  const rangeA = availabilityRange(timeline.availability.a, failures.a)
+  const rangeB = availabilityRange(timeline.availability.b, failures.b)
   const rangeBoth = overlapRange(
     timeline.availability.a,
     timeline.availability.b,
+    failures.a,
+    failures.b,
   )
 
   const apply = (range: [number, number] | null) => {

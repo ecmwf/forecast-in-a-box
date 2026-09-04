@@ -1534,6 +1534,11 @@ describe('GeoViewer model runs', () => {
           { timeout: 8000 },
         )
         .toBe(2)
+      // Clipping to B skips the pre-run steps.
+      await screen.getByTitle('Clip to B’s time range').click()
+      await expect
+        .element(screen.getByText('2026-09-03 12:00Z – 2026-09-04 12:00Z'))
+        .toBeInTheDocument()
     } finally {
       removeSizing()
     }
