@@ -156,6 +156,8 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
   )
 
   useEffect(() => {
+    // Run lookups settle in link order so the basket keeps a-before-b.
+    let chain: Promise<void> = Promise.resolve()
     for (const ref of [search.a, search.b]) {
       if (!ref || ref === SLOT_B_OFF || processedRef.current.has(ref)) continue
       if (entries.some((e) => entryRef(e) === ref)) {
@@ -210,11 +212,13 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
       }
 
       // `run:` — validate the task is a stored-output marker of that run.
-      void queryClient
-        .ensureQueryData({
-          queryKey: jobKeys.status(decoded.jobId),
-          queryFn: () => getJobStatus(decoded.jobId),
-        })
+      chain = chain
+        .then(() =>
+          queryClient.ensureQueryData({
+            queryKey: jobKeys.status(decoded.jobId),
+            queryFn: () => getJobStatus(decoded.jobId),
+          }),
+        )
         .then((detail) => {
           const meta = detail.outputs?.[decoded.taskId]
           if (meta?.mime_type !== GRIB_DIR_MIME) {
