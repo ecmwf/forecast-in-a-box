@@ -28,6 +28,8 @@ export interface MockWmsLayerConfig {
   title: string
   /** Raw TIME dimension, e.g. '2026-07-06T00:00:00Z,2026-07-06T06:00:00Z'. */
   time?: string
+  /** Advertised styles (default: one `default`). */
+  styles?: Array<{ name: string; title?: string; abstract?: string }>
 }
 
 export interface MockWmsServerConfig {
@@ -65,6 +67,7 @@ export function resetWmsState(): void {
   internalPortCounter = 40000
   getMapLog.clear()
   getMapDetailLog.clear()
+  legendLog.clear()
 }
 
 export function hasMockWmsServer(key: string | number): boolean {
@@ -139,6 +142,25 @@ export function getMapRequests(
   return getMapLog.get(String(key)) ?? []
 }
 
+/** Legend requests seen per key. */
+const legendLog = new Map<string, Array<Record<string, string | null>>>()
+
+export function recordLegendRequest(
+  key: string | number,
+  params: Record<string, string | null>,
+): void {
+  const k = String(key)
+  const log = legendLog.get(k) ?? []
+  log.push(params)
+  legendLog.set(k, log)
+}
+
+export function legendRequests(
+  key: string | number,
+): ReadonlyArray<Record<string, string | null>> {
+  return legendLog.get(String(key)) ?? []
+}
+
 export function getMapRequestDetails(
   key: string | number,
 ): ReadonlyArray<GetMapRequest> {
@@ -188,16 +210,23 @@ function layerXml(internalPort: number, layer: MockWmsLayerConfig): string {
   const time = layer.time
     ? `<Dimension name="time" units="ISO8601">${layer.time}</Dimension>`
     : ''
+  const styles = (layer.styles ?? [{ name: 'default' }])
+    .map(
+      (s) => `<Style>
+      <Name>${s.name}</Name>
+      ${s.title ? `<Title>${s.title}</Title>` : ''}
+      ${s.abstract ? `<Abstract>${s.abstract}</Abstract>` : ''}
+      <LegendURL width="1024" height="128">
+        <OnlineResource xlink:href="http://0.0.0.0:${internalPort}/legend?layer=${encodeURIComponent(layer.name)}&amp;style=${encodeURIComponent(s.name)}&amp;width=1024&amp;height=128"/>
+      </LegendURL>
+    </Style>`,
+    )
+    .join('\n')
   return `<Layer>
     <Name>${layer.name}</Name>
     <Title>${layer.title}</Title>
     ${time}
-    <Style>
-      <Name>default</Name>
-      <LegendURL>
-        <OnlineResource xlink:href="http://0.0.0.0:${internalPort}/legend?layer=${encodeURIComponent(layer.name)}"/>
-      </LegendURL>
-    </Style>
+    ${styles}
   </Layer>`
 }
 

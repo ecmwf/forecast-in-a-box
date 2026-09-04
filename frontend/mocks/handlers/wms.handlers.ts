@@ -27,6 +27,7 @@ import {
   getMapFailsFor,
   hasMockWmsConfig,
   recordGetMap,
+  recordLegendRequest,
   serveCapabilities,
 } from '../data/wms.data'
 import type { HttpResponseResolver } from 'msw'
@@ -161,7 +162,15 @@ export const wmsHandlers = [
 
   // Legend images — capabilities advertise them on the lens's internal bind
   // address; the viewer rebases them onto the browser-reachable origin.
-  http.get('*/legend', () => pngResponse('0')),
+  http.get('*/legend', ({ request }) => {
+    const url = new URL(request.url)
+    recordLegendRequest(wmsKeyFor(url), {
+      layer: url.searchParams.get('layer'),
+      style: url.searchParams.get('style'),
+      width: url.searchParams.get('width'),
+    })
+    return pngResponse('0')
+  }),
 
   // Carto vector basemap style requested by the viewer on mount.
   http.get('https://basemaps.cartocdn.com/*', () =>
