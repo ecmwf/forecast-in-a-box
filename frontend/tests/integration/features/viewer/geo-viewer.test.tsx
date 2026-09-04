@@ -1583,7 +1583,13 @@ describe('GeoViewer layer extents', () => {
     })
     return { portA, portB }
   }
-  it('clips requests to a regional layer’s bbox', async () => {
+  const lastCamera = (fn: ReturnType<typeof vi.fn>) =>
+    [...fn.mock.calls]
+      .reverse()
+      .map((c) => (c[0] as Partial<ViewerUrlState>).camera)
+      .find((cam) => cam !== undefined)
+
+  it('clips requests to a regional layer’s bbox and fits to active layers', async () => {
     const { portA, portB } = registerRegionalPair()
     const removeSizing = injectMapSizing()
     const onViewStateChange = vi.fn()
@@ -1611,6 +1617,11 @@ describe('GeoViewer layer extents', () => {
       expect(bbox[2]).toBeLessThanOrEqual(3.6e6)
       expect(bbox[1]).toBeGreaterThanOrEqual(3.9e6)
       expect(bbox[3]).toBeLessThanOrEqual(11.3e6)
+      // Fit to globe frames the active layers, not the service bbox.
+      await screen.getByRole('button', { name: 'Fit to globe' }).click()
+      await expect
+        .poll(() => lastCamera(onViewStateChange)?.lon, { timeout: 8000 })
+        .toBeCloseTo(10, 0)
     } finally {
       removeSizing()
     }

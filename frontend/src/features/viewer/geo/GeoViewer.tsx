@@ -55,11 +55,13 @@ import {
   viewResolutionFor,
 } from '../projections'
 import {
+  activeLayersBbox,
   isLensProxyUrl,
   rebaseLensUrl,
   resolveStyle,
   skinnyWmsBasemap,
   supportsCrs,
+  unionBbox,
 } from '../wms-capabilities'
 import { StartupStatusPill } from '../components/StartupStatusPill'
 import { beforeRunLayers, effectiveRuns, mergeEpochLayers } from './run-window'
@@ -82,7 +84,11 @@ import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
-import type { LayerRequestSettings, ParsedLayer } from '../wms-capabilities'
+import type {
+  Bbox,
+  LayerRequestSettings,
+  ParsedLayer,
+} from '../wms-capabilities'
 import type { GeoPanelSide } from './useGeoPanelWidths'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
@@ -856,6 +862,29 @@ export function GeoViewer({
       : t('slotTag.runCount', { count: runs.length })
   }
 
+  // Fit target: active layers of both sides, else A's service coverage.
+  const fitBbox = useMemo(() => {
+    const sideBbox = (
+      layers: ReadonlyArray<ParsedLayer>,
+      order: ReadonlyArray<string>,
+      service: Bbox | null,
+    ) =>
+      order.length > 0 ? (activeLayersBbox(layers, order) ?? service) : null
+    return (
+      unionBbox(
+        sideBbox(sourceA.layers, activeOrderA, sourceA.bbox),
+        sideBbox(sourceB.layers, activeOrderB, sourceB.bbox),
+      ) ?? sourceA.bbox
+    )
+  }, [
+    sourceA.layers,
+    sourceA.bbox,
+    sourceB.layers,
+    sourceB.bbox,
+    activeOrderA,
+    activeOrderB,
+  ])
+
   // -------- Source view-model for the map components --------
   const mapSourceA: CompareMapSource = {
     slot: 'a',
@@ -882,7 +911,7 @@ export function GeoViewer({
         : null,
     runLabel: runLabelFor(sourceA.layers, activeOrderA, settingsA),
     masterOpacity: globalOpacity * sourceOpacity.a,
-    bbox: sourceA.bbox,
+    bbox: fitBbox,
   }
   const mapSourceB: CompareMapSource | null = b
     ? {
@@ -910,7 +939,7 @@ export function GeoViewer({
             : null,
         runLabel: runLabelFor(sourceB.layers, activeOrderB, settingsB),
         masterOpacity: globalOpacity * sourceOpacity.b,
-        bbox: sourceB.bbox,
+        bbox: fitBbox,
       }
     : null
 

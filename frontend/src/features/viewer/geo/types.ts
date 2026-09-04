@@ -49,6 +49,7 @@ export interface CompareMapSource {
   timeLabel: string | null
   /** Model run in effect ("run 2026-09-04 03:00Z"), null when none. */
   runLabel: string | null
+  /** Fit-to-globe target (WGS84), shared by both sides. */
   bbox: [number, number, number, number] | null
 }
 
