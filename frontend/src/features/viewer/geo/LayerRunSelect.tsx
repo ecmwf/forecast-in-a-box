@@ -10,10 +10,12 @@
 
 /** Model-run picker: Latest (server default) or one advertised run. */
 
+import { CalendarClock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { formatStep } from '../format'
 import { RUN_DIMENSION, dimensionValues } from '../wms-capabilities'
 import { SLOT_CHIP_CLASS } from './GeoLayerBrowser'
+import { LayerControlLabel } from './LayerControlLabel'
 import type { ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
 import {
@@ -62,6 +64,12 @@ export function LayerRunSelect({
           {slot.toUpperCase()}
         </span>
       )}
+      <LayerControlLabel
+        icon={CalendarClock}
+        label={t('sidebar.run')}
+        help={t('sidebar.runHelp')}
+        helpAria={t('sidebar.runHelpAria')}
+      />
       <Select
         value={value ?? LATEST}
         onValueChange={(run) =>

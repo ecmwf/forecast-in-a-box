@@ -22,6 +22,7 @@ import {
   useStylePreview,
 } from '../style-preview'
 import { SLOT_CHIP_CLASS } from './GeoLayerBrowser'
+import { LayerControlLabel } from './LayerControlLabel'
 import type { PreviewFrame } from '../style-preview'
 import type { SourceSlot } from './layer-pairing'
 import type View from 'ol/View'
@@ -121,182 +122,191 @@ export function LayerStylePicker({
   const activeOption = options.find((o) => o.name === active)
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            variant="outline"
-            size="xs"
-            className="mt-2 w-full justify-between gap-1.5 font-normal"
-            aria-label={t('sidebar.stylePicker', { name: layerTitle })}
-            title={t('sidebar.stylePicker', { name: layerTitle })}
-          />
-        }
-      >
-        {current && current.name === pinned ? (
-          <Pin className="size-3 shrink-0 text-primary" />
-        ) : (
-          <Palette className="size-3 shrink-0 text-muted-foreground" />
-        )}
-        <span className="min-w-0 flex-1 truncate text-left">
-          {current?.title ?? t('sidebar.styleDefault')}
-        </span>
-        <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
-      </PopoverTrigger>
-      <PopoverContent
-        side="right"
-        align="start"
-        sideOffset={8}
-        className="max-h-[min(80vh,48rem)] w-[36rem] max-w-[calc(100vw-2rem)] flex-row items-stretch gap-0 p-0"
-      >
-        <ul
-          ref={listRef}
-          role="listbox"
-          aria-label={t('sidebar.stylePicker', { name: layerTitle })}
-          className="min-h-0 w-60 shrink-0 self-stretch overflow-y-auto p-1"
-          onKeyDown={(e) => {
-            const buttons = listRef.current?.querySelectorAll('[role="option"]')
-            const index = buttons
-              ? Array.from(buttons).indexOf(document.activeElement as Element)
-              : -1
-            if (e.key === 'ArrowDown') focusOption(index + 1)
-            else if (e.key === 'ArrowUp') focusOption(index - 1)
-            else if (e.key === 'Home') focusOption(0)
-            else if (e.key === 'End') focusOption(-1)
-            else return
-            e.preventDefault()
-          }}
+    <div className="mt-2 flex items-center gap-1.5">
+      <LayerControlLabel
+        icon={Palette}
+        label={t('sidebar.style')}
+        help={t('sidebar.styleHelp')}
+        helpAria={t('sidebar.styleHelpAria')}
+      />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="outline"
+              size="xs"
+              className="min-w-0 flex-1 justify-between gap-1.5 font-normal"
+              aria-label={t('sidebar.stylePicker', { name: layerTitle })}
+              title={t('sidebar.stylePicker', { name: layerTitle })}
+            />
+          }
         >
-          {options.map((option) => {
-            const selected = option.name === (current?.name ?? defaultName)
-            const strip =
-              option.strip.a ?? option.strip.b ?? Object.values(option.strip)[0]
-            const missing = showSlots
-              ? (['a', 'b'] as const).filter((s) => !option.slots.includes(s))
-              : []
-            return (
-              <li key={option.name}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  onMouseEnter={() => setHighlight(option.name)}
-                  onFocus={() => setHighlight(option.name)}
-                  onClick={() => {
-                    onChange(option.name === defaultName ? null : option.name)
-                    setOpen(false)
-                  }}
-                  className={cn(
-                    'flex w-full flex-col gap-1 rounded px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent',
-                    selected && 'bg-accent font-medium',
-                    active === option.name && 'bg-accent',
-                  )}
-                >
-                  <span className="flex w-full items-center gap-1.5">
-                    <span
-                      className="line-clamp-2 min-w-0 flex-1 leading-tight break-words"
-                      title={option.title}
-                    >
-                      {option.title}
+          {current && current.name === pinned && (
+            <Pin className="size-3 shrink-0 text-primary" />
+          )}
+          <span className="min-w-0 flex-1 truncate text-left">
+            {current?.title ?? t('sidebar.styleDefault')}
+          </span>
+          <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+        </PopoverTrigger>
+        <PopoverContent
+          side="right"
+          align="start"
+          sideOffset={8}
+          className="max-h-[min(80vh,48rem)] w-[36rem] max-w-[calc(100vw-2rem)] flex-row items-stretch gap-0 p-0"
+        >
+          <ul
+            ref={listRef}
+            role="listbox"
+            aria-label={t('sidebar.stylePicker', { name: layerTitle })}
+            className="min-h-0 w-60 shrink-0 self-stretch overflow-y-auto p-1"
+            onKeyDown={(e) => {
+              const buttons =
+                listRef.current?.querySelectorAll('[role="option"]')
+              const index = buttons
+                ? Array.from(buttons).indexOf(document.activeElement as Element)
+                : -1
+              if (e.key === 'ArrowDown') focusOption(index + 1)
+              else if (e.key === 'ArrowUp') focusOption(index - 1)
+              else if (e.key === 'Home') focusOption(0)
+              else if (e.key === 'End') focusOption(-1)
+              else return
+              e.preventDefault()
+            }}
+          >
+            {options.map((option) => {
+              const selected = option.name === (current?.name ?? defaultName)
+              const strip =
+                option.strip.a ??
+                option.strip.b ??
+                Object.values(option.strip)[0]
+              const missing = showSlots
+                ? (['a', 'b'] as const).filter((s) => !option.slots.includes(s))
+                : []
+              return (
+                <li key={option.name}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onMouseEnter={() => setHighlight(option.name)}
+                    onFocus={() => setHighlight(option.name)}
+                    onClick={() => {
+                      onChange(option.name === defaultName ? null : option.name)
+                      setOpen(false)
+                    }}
+                    className={cn(
+                      'flex w-full flex-col gap-1 rounded px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent',
+                      selected && 'bg-accent font-medium',
+                      active === option.name && 'bg-accent',
+                    )}
+                  >
+                    <span className="flex w-full items-center gap-1.5">
+                      <span
+                        className="line-clamp-2 min-w-0 flex-1 leading-tight break-words"
+                        title={option.title}
+                      >
+                        {option.title}
+                      </span>
+                      {option.name === pinned && (
+                        <Pin
+                          className="size-3 shrink-0 text-primary"
+                          aria-label={t('sidebar.stylePinned')}
+                        />
+                      )}
+                      {option.slots.map((slot) =>
+                        missing.length > 0 ? (
+                          <span
+                            key={slot}
+                            className={cn(
+                              'flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
+                              SLOT_CHIP_CLASS[slot],
+                            )}
+                            title={t('sidebar.styleOnlyInHint', {
+                              slot: slot.toUpperCase(),
+                            })}
+                          >
+                            {slot.toUpperCase()}
+                          </span>
+                        ) : null,
+                      )}
                     </span>
-                    {option.name === pinned && (
-                      <Pin
-                        className="size-3 shrink-0 text-primary"
-                        aria-label={t('sidebar.stylePinned')}
+                    {strip && (
+                      <img
+                        src={strip}
+                        alt=""
+                        loading="lazy"
+                        className="h-5 w-full rounded bg-white object-contain object-left p-0.5"
                       />
                     )}
-                    {option.slots.map((slot) =>
-                      missing.length > 0 ? (
-                        <span
-                          key={slot}
-                          className={cn(
-                            'flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
-                            SLOT_CHIP_CLASS[slot],
-                          )}
-                          title={t('sidebar.styleOnlyInHint', {
-                            slot: slot.toUpperCase(),
-                          })}
-                        >
-                          {slot.toUpperCase()}
-                        </span>
-                      ) : null,
-                    )}
-                  </span>
-                  {strip && (
-                    <img
-                      src={strip}
-                      alt=""
-                      loading="lazy"
-                      className="h-5 w-full rounded bg-white object-contain object-left p-0.5"
-                    />
-                  )}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto border-l border-border p-3">
-          {activeOption && (
-            <>
-              <div className="flex items-start gap-2">
-                <P className="min-w-0 flex-1 text-sm font-medium">
-                  {activeOption.title}
-                </P>
-                <Button
-                  variant={activeOption.name === pinned ? 'default' : 'ghost'}
-                  size="icon-xs"
-                  aria-pressed={activeOption.name === pinned}
-                  title={
-                    activeOption.name === pinned
-                      ? t('sidebar.styleUnpin')
-                      : t('sidebar.stylePin')
-                  }
-                  aria-label={
-                    activeOption.name === pinned
-                      ? t('sidebar.styleUnpin')
-                      : t('sidebar.stylePin')
-                  }
-                  onClick={() => {
-                    if (activeOption.name === pinned) {
-                      onPin(null)
-                    } else {
-                      onPin(activeOption.name)
-                      onChange(
-                        activeOption.name === defaultName
-                          ? null
-                          : activeOption.name,
-                      )
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto border-l border-border p-3">
+            {activeOption && (
+              <>
+                <div className="flex items-start gap-2">
+                  <P className="min-w-0 flex-1 text-sm font-medium">
+                    {activeOption.title}
+                  </P>
+                  <Button
+                    variant={activeOption.name === pinned ? 'default' : 'ghost'}
+                    size="icon-xs"
+                    aria-pressed={activeOption.name === pinned}
+                    title={
+                      activeOption.name === pinned
+                        ? t('sidebar.styleUnpin')
+                        : t('sidebar.stylePin')
                     }
-                  }}
-                >
-                  <Pin className="size-3" />
-                </Button>
-              </div>
-              <P className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                {activeOption.name}
-              </P>
-              {activeOption.abstract && (
-                <P className="mt-1 line-clamp-4 text-xs text-muted-foreground">
-                  {activeOption.abstract}
+                    aria-label={
+                      activeOption.name === pinned
+                        ? t('sidebar.styleUnpin')
+                        : t('sidebar.stylePin')
+                    }
+                    onClick={() => {
+                      if (activeOption.name === pinned) {
+                        onPin(null)
+                      } else {
+                        onPin(activeOption.name)
+                        onChange(
+                          activeOption.name === defaultName
+                            ? null
+                            : activeOption.name,
+                        )
+                      }
+                    }}
+                  >
+                    <Pin className="size-3" />
+                  </Button>
+                </div>
+                <P className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                  {activeOption.name}
                 </P>
-              )}
-              <div className="mt-2 space-y-2">
-                {activeOption.slots.map((slot) => (
-                  <StylePreview
-                    key={slot}
-                    slot={slot}
-                    showSlot={showSlots}
-                    url={urlsFor.get(activeOption.name)?.[slot] ?? null}
-                    legend={activeOption.legend[slot]}
-                    title={activeOption.title}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+                {activeOption.abstract && (
+                  <P className="mt-1 line-clamp-4 text-xs text-muted-foreground">
+                    {activeOption.abstract}
+                  </P>
+                )}
+                <div className="mt-2 space-y-2">
+                  {activeOption.slots.map((slot) => (
+                    <StylePreview
+                      key={slot}
+                      slot={slot}
+                      showSlot={showSlots}
+                      url={urlsFor.get(activeOption.name)?.[slot] ?? null}
+                      legend={activeOption.legend[slot]}
+                      title={activeOption.title}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
   )
 }
 
