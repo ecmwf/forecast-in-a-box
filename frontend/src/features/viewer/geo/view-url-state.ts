@@ -30,6 +30,9 @@ export interface ViewerUrlState {
   /** Active layer NAMES per slot, top of the stack first. */
   layersA?: ReadonlyArray<string>
   layersB?: ReadonlyArray<string>
+  /** Style per layer, aligned with `layersA`/`layersB`; null = default. */
+  stylesA?: ReadonlyArray<string | null>
+  stylesB?: ReadonlyArray<string | null>
   /** True = per-side selection (unlinked). */
   unlinkedLayers?: boolean
   /** Shared-axis valid time, epoch ms. */
@@ -46,6 +49,8 @@ export interface ViewerUrlState {
 export interface ViewerSearchState {
   la: string | undefined
   lb: string | undefined
+  sa: string | undefined
+  sb: string | undefined
   ul: true | undefined
   t: number | undefined
   tl: Exclude<TimeLinkMode, 'exact'> | undefined
@@ -60,27 +65,58 @@ const MAX_URL_LAYERS = 12
 /** Per-param budget keeping the whole URL comfortably under ~2 KB. */
 const MAX_NAMES_CHARS = 1500
 
-/** WMS reserves the comma as separator — a name containing one is dropped. */
-function joinNames(names: ReadonlyArray<string>): string | undefined {
-  const kept: Array<string> = []
+/** Two aligned comma lists; a comma drops a name, defaults a style. */
+function encodeStack(
+  names: ReadonlyArray<string>,
+  styles: ReadonlyArray<string | null> | undefined,
+): { names: string | undefined; styles: string | undefined } {
+  const keptNames: Array<string> = []
+  const keptStyles: Array<string> = []
   let length = 0
-  for (const name of names) {
+  for (const [i, name] of names.entries()) {
     if (name.length === 0 || name.includes(',')) continue
-    if (kept.length >= MAX_URL_LAYERS || length + name.length > MAX_NAMES_CHARS)
+    if (
+      keptNames.length >= MAX_URL_LAYERS ||
+      length + name.length > MAX_NAMES_CHARS
+    )
       break
-    kept.push(name)
+    keptNames.push(name)
     length += name.length + 1
+    const style = styles?.[i]
+    keptStyles.push(style && !style.includes(',') ? style : '')
   }
-  return kept.length > 0 ? kept.join(',') : undefined
+  return {
+    names: keptNames.length > 0 ? keptNames.join(',') : undefined,
+    // Trailing defaults are dropped; all-default → absent.
+    styles: keptStyles.some(Boolean)
+      ? keptStyles.join(',').replace(/,+$/, '')
+      : undefined,
+  }
 }
 
-function splitNames(value: string | undefined): Array<string> | undefined {
-  if (!value) return undefined
-  // Deduped: restore toggles once per name.
-  const names = [
-    ...new Set(value.split(',').filter((n) => n.length > 0)),
-  ].slice(0, MAX_URL_LAYERS)
-  return names.length > 0 ? names : undefined
+function decodeStack(
+  names: string | undefined,
+  styles: string | undefined,
+): {
+  names: Array<string> | undefined
+  styles: Array<string | null> | undefined
+} {
+  if (!names) return { names: undefined, styles: undefined }
+  const rawStyles = (styles ?? '').split(',')
+  const seen = new Set<string>()
+  const outNames: Array<string> = []
+  const outStyles: Array<string | null> = []
+  // Deduped: restore toggles once per name (first occurrence wins).
+  for (const [i, name] of names.split(',').entries()) {
+    if (!name || seen.has(name) || outNames.length >= MAX_URL_LAYERS) continue
+    seen.add(name)
+    outNames.push(name)
+    outStyles.push(rawStyles[i] || null)
+  }
+  return {
+    names: outNames.length > 0 ? outNames : undefined,
+    styles: outStyles.some(Boolean) ? outStyles : undefined,
+  }
 }
 
 // In-range values pass through — the modulo smears them with float error.
@@ -108,9 +144,13 @@ export function encodeViewerUrlState(state: ViewerUrlState): ViewerSearchState {
     state.timeLink === 'offset' && state.offsetMs
       ? Math.round(state.offsetMs)
       : undefined
+  const a = encodeStack(state.layersA ?? [], state.stylesA)
+  const b = encodeStack(state.layersB ?? [], state.stylesB)
   return {
-    la: state.layersA ? joinNames(state.layersA) : undefined,
-    lb: state.layersB ? joinNames(state.layersB) : undefined,
+    la: state.layersA ? a.names : undefined,
+    lb: state.layersB ? b.names : undefined,
+    sa: state.layersA ? a.styles : undefined,
+    sb: state.layersB ? b.styles : undefined,
     ul: state.unlinkedLayers === true ? true : undefined,
     t: state.timeMs !== undefined ? Math.round(state.timeMs) : undefined,
     tl:
@@ -128,9 +168,13 @@ export function encodeViewerUrlState(state: ViewerUrlState): ViewerSearchState {
 export function decodeViewerUrlState(
   search: Partial<ViewerSearchState>,
 ): ViewerUrlState {
+  const a = decodeStack(search.la, search.sa)
+  const b = decodeStack(search.lb, search.sb)
   return {
-    layersA: splitNames(search.la),
-    layersB: splitNames(search.lb),
+    layersA: a.names,
+    layersB: b.names,
+    stylesA: a.styles,
+    stylesB: b.styles,
     unlinkedLayers: search.ul === true ? true : undefined,
     timeMs: Number.isFinite(search.t) ? search.t : undefined,
     timeLink: search.tl,

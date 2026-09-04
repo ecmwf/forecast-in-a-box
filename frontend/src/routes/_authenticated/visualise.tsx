@@ -27,7 +27,8 @@ import { PROJECTION_IDS } from '@/features/viewer/projection-ids'
  *
  * The slim view state rides along so the copied URL reproduces the view,
  * not just the pair (encode/decode in view-url-state.ts): `la`/`lb`
- * active layer stacks (comma-joined names, top-first), `ul` unlinked
+ * active layer stacks (comma-joined names, top-first), `sa`/`sb` their
+ * chosen styles (aligned, empty = default), `ul` unlinked
  * selection, `t` valid time (epoch ms), `tl`/`dt` time-link policy,
  * `cam` camera (lon,lat,zoom — zoom relative to `p`), `bm` basemap, `p`
  * map projection. Excluded by design:
@@ -44,6 +45,8 @@ const visualiseSearchSchema = z.object({
     .catch(undefined),
   la: z.string().max(2000).optional().catch(undefined),
   lb: z.string().max(2000).optional().catch(undefined),
+  sa: z.string().max(2000).optional().catch(undefined),
+  sb: z.string().max(2000).optional().catch(undefined),
   ul: z.literal(true).optional().catch(undefined),
   t: z.number().int().optional().catch(undefined),
   tl: z.enum(['nearest', 'offset', 'independent']).optional().catch(undefined),

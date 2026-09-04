@@ -78,12 +78,17 @@ export function useViewerUrlState({
   const pendingLayersRef = useRef<{
     a: ReadonlyArray<string>
     b: ReadonlyArray<string>
+    /** Aligned with `a`/`b`; null = the server default. */
+    stylesA: ReadonlyArray<string | null>
+    stylesB: ReadonlyArray<string | null>
     unlinked: boolean
   } | null>(
     initial?.layersA?.length || initial?.layersB?.length
       ? {
           a: initial.layersA ?? [],
           b: initial.layersB ?? [],
+          stylesA: initial.stylesA ?? [],
+          stylesB: initial.stylesB ?? [],
           unlinked: initial.unlinkedLayers === true,
         }
       : null,
@@ -112,13 +117,16 @@ export function useViewerUrlState({
       // B may still be starting; if it never runs the URL keeps the value.
       if (slot === 'b' && !hasB) continue
       const available = new Set(source.layers.map((l) => l.name))
+      const styles = slot === 'a' ? pending.stylesA : pending.stylesB
       // Reverse: toggles prepend, so the first name ends up on top.
-      for (const name of [...names].reverse()) {
+      for (const [i, name] of [...names.entries()].reverse()) {
         if (!available.has(name)) continue
+        const style = styles[i] ?? null
         if (pending.unlinked) {
           if (!selection.isLayerActive(slot, name)) {
             selection.toggleLayer(slot, name)
           }
+          if (style) selection.setLayerStyle(slot, name, style)
         } else {
           const pair = pairing.pairs.find(
             (p) => p.perSource[slot]?.name === name,
@@ -130,6 +138,8 @@ export function useViewerUrlState({
           ) {
             toggledNow.add(pair.key)
             selection.togglePair(pair.key)
+            // A's style wins for a pair listed on both sides.
+            if (style) selection.setPairStyle(pair.key, style)
           }
         }
       }
@@ -151,6 +161,8 @@ export function useViewerUrlState({
     selection.linkMode,
   ])
 
+  const settingsA = selection.settingsFor('a')
+  const settingsB = selection.settingsFor('b')
   // -------- Live report (page debounces into the URL) --------
   useEffect(() => {
     if (!onViewStateChange) return
@@ -171,12 +183,18 @@ export function useViewerUrlState({
         sourceA.layers,
         sourceA.loadingLayers || sourceA.error !== null,
       )
+      partial.stylesA = partial.layersA.map(
+        (name) => settingsA.get(name)?.style ?? null,
+      )
     }
     if (!restorePending.b) {
       partial.layersB = servedNames(
         activeOrderB,
         sourceB.layers,
         sourceB.loadingLayers || sourceB.error !== null,
+      )
+      partial.stylesB = partial.layersB.map(
+        (name) => settingsB.get(name)?.style ?? null,
       )
     }
     if (!restorePending.a && !restorePending.b) {
@@ -187,6 +205,8 @@ export function useViewerUrlState({
     onViewStateChange,
     activeOrderA,
     activeOrderB,
+    settingsA,
+    settingsB,
     sourceA.layers,
     sourceA.loadingLayers,
     sourceA.error,
