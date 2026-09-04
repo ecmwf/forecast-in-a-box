@@ -22,6 +22,9 @@ import type MapBrowserEvent from 'ol/MapBrowserEvent'
 export interface PointerReadout {
   lat: number
   lon: number
+  /** Map coordinate in the view projection's units. */
+  x: number
+  y: number
 }
 
 export function usePointerReadout(
@@ -36,8 +39,8 @@ export function usePointerReadout(
     if (!map) return
     const onMove = (evt: MapBrowserEvent) => {
       if (evt.dragging) return
-      const [lon, lat] = toLonLat(evt.coordinate)
-      setPointer({ lat, lon })
+      const [lon, lat] = toLonLat(evt.coordinate, map.getView().getProjection())
+      setPointer({ lat, lon, x: evt.coordinate[0], y: evt.coordinate[1] })
     }
     const onLeave = () => setPointer(null)
     map.on('pointermove', onMove)

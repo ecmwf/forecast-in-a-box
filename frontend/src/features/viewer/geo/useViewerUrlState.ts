@@ -19,8 +19,9 @@ import { useEffect, useRef, useState } from 'react'
 import { toLonLat } from 'ol/proj'
 import { unByKey } from 'ol/Observable'
 import { DEFAULT_BASEMAP_ID } from '../ol-layers'
-import type { RefObject } from 'react'
+import { DEFAULT_PROJECTION_ID } from '../projection-ids'
 import type View from 'ol/View'
+import type { ProjectionId } from '../projection-ids'
 import type { LensSource } from '../hooks/useLensSource'
 import type { PairedLayer } from './layer-pairing'
 import type { CompareSelection } from './useCompareSelection'
@@ -41,7 +42,7 @@ function servedNames(
 export function useViewerUrlState({
   initial,
   onViewStateChange,
-  viewRef,
+  view,
   selection,
   pairing,
   sourceA,
@@ -53,11 +54,13 @@ export function useViewerUrlState({
   timeLinkMode,
   offsetMs,
   basemapId,
+  projectionId,
 }: {
   /** Mount snapshot of the URL state; later changes are ignored. */
   initial: ViewerUrlState | null
   onViewStateChange?: (partial: Partial<ViewerUrlState>) => void
-  viewRef: RefObject<View | null>
+  /** The current View — a projection switch swaps in a new instance. */
+  view: View
   selection: CompareSelection
   pairing: { pairs: ReadonlyArray<PairedLayer> }
   sourceA: LensSource
@@ -69,6 +72,7 @@ export function useViewerUrlState({
   timeLinkMode: TimeLinkMode
   offsetMs: number
   basemapId: string
+  projectionId: ProjectionId
 }): void {
   // -------- One-shot layer restore (per slot) --------
   const pendingLayersRef = useRef<{
@@ -157,6 +161,8 @@ export function useViewerUrlState({
       timeLink: timeLinkMode,
       offsetMs,
       basemap: basemapId === DEFAULT_BASEMAP_ID ? undefined : basemapId,
+      projection:
+        projectionId === DEFAULT_PROJECTION_ID ? undefined : projectionId,
     }
     // Hold restored fields until slots settle — mid-load writes would strip them.
     if (!restorePending.a) {
@@ -194,22 +200,24 @@ export function useViewerUrlState({
     timeLinkMode,
     offsetMs,
     basemapId,
+    projectionId,
   ])
   useEffect(() => {
-    const view = viewRef.current
-    if (!onViewStateChange || !view) return
+    if (!onViewStateChange) return
     const report = () => {
       const center = view.getCenter()
       const zoom = view.getZoom()
       if (!center || zoom === undefined) return
-      const [lon, lat] = toLonLat(center)
+      const [lon, lat] = toLonLat(center, view.getProjection())
       if (![lon, lat, zoom].every(Number.isFinite)) return
       onViewStateChange({ camera: { lon, lat, zoom } })
     }
+    // A swapped-in View carries the camera over — report it at once.
+    report()
     const keys = [
       view.on('change:center', report),
       view.on('change:resolution', report),
     ]
     return () => unByKey(keys)
-  }, [onViewStateChange, viewRef])
+  }, [onViewStateChange, view])
 }

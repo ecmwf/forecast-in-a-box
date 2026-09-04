@@ -98,3 +98,15 @@ describe('decodeViewerUrlState', () => {
     expect(state.camera).toBeUndefined()
   })
 })
+
+describe('projection param', () => {
+  it('round-trips a known projection id and drops unknown ones', () => {
+    const encoded = encodeViewerUrlState({ projection: 'npole' })
+    expect(encoded.p).toBe('npole')
+    expect(decodeViewerUrlState(encoded).projection).toBe('npole')
+    expect(
+      decodeViewerUrlState({ p: 'EPSG:3857' as never }).projection,
+    ).toBeUndefined()
+    expect(encodeViewerUrlState({}).p).toBeUndefined()
+  })
+})

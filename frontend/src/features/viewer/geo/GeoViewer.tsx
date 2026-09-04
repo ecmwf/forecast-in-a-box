@@ -39,11 +39,26 @@ import { fromLonLat } from 'ol/proj'
 import { useLensSource } from '../hooks/useLensSource'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { formatStep } from '../format'
-import { BASEMAPS, DEFAULT_BASEMAP_ID, SKINNYWMS_BASEMAP } from '../ol-layers'
+import {
+  BASEMAPS,
+  DEFAULT_BASEMAP_ID,
+  OUTLINE_BASEMAP,
+  SKINNYWMS_BASEMAP,
+  basemapFitsProjection,
+} from '../ol-layers'
+import { DEFAULT_PROJECTION_ID } from '../projection-ids'
+import {
+  PROJECTIONS,
+  carryCamera,
+  getViewerProjection,
+  groundResolution,
+  viewResolutionFor,
+} from '../projections'
 import {
   isLensProxyUrl,
   rebaseLensUrl,
   skinnyWmsBasemap,
+  supportsCrs,
 } from '../wms-capabilities'
 import { GeoPanelResizeStrip } from './GeoPanelResizeStrip'
 import { useGeoPanelWidths } from './useGeoPanelWidths'
@@ -69,6 +84,9 @@ import type { GeoPanelSide } from './useGeoPanelWidths'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
+import type { ProjectionId } from '../projection-ids'
+import type { BboxAxisOrder } from '../projections'
+import type { ProjectionOption } from './GeoToolbar'
 import type { SourceSlot } from './layer-pairing'
 import type { CompareMapSource, CompareMode, CompareModeOptions } from './types'
 import type { MeasureMode } from '../hooks/useMeasure'
@@ -88,12 +106,15 @@ import {
 } from '@/components/ui/alert-dialog'
 import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
+import { showToast } from '@/lib/toast'
 
 export interface GeoViewerSource {
   /** Stable source identity (basket entry ref) — annotations bind to it. */
   id: string
   baseUrl: string
   label: string
+  /** External server's BBOX axis order; lens sources are always 'xy'. */
+  bboxAxisOrder?: BboxAxisOrder
 }
 
 export function GeoViewer({
@@ -131,19 +152,37 @@ export function GeoViewer({
   // Mount snapshot — restoration must not react to later URL rewrites.
   const initialViewRef = useRef(initialViewState ?? null)
 
-  // One View for the lifetime of the comparison: camera state survives
-  // mode switches and source swaps.
-  const viewRef = useRef<View | null>(null)
-  if (viewRef.current === null) {
-    viewRef.current = createViewerView()
+  // One View per projection; a switch swaps in a new View, camera carried.
+  const [projectionId, setProjectionId] = useState<ProjectionId>(
+    () => initialViewRef.current?.projection ?? DEFAULT_PROJECTION_ID,
+  )
+  const [view, setView] = useState<View>(() => {
+    const projection = getViewerProjection(projectionId)
+    const next = createViewerView(projection)
     const cam = initialViewRef.current?.camera
     if (cam) {
-      viewRef.current.setCenter(fromLonLat([cam.lon, cam.lat]))
-      viewRef.current.setZoom(cam.zoom)
+      next.setCenter(fromLonLat([cam.lon, cam.lat], projection.code))
+      next.setZoom(cam.zoom)
       // A restored camera outranks the initial auto-fit.
-      viewRef.current.set(AUTOFIT_KEY, true, true)
+      next.set(AUTOFIT_KEY, true, true)
     }
-  }
+    return next
+  })
+  // Imperative users (pan, zoom, locate) read the live instance.
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const projection = getViewerProjection(projectionId)
+  const changeProjection = useCallback((id: ProjectionId) => {
+    const current = viewRef.current
+    const target = getViewerProjection(id)
+    if (current.getProjection().getCode() === target.code) return
+    const next = createViewerView(target)
+    carryCamera(current, next, target)
+    next.set(AUTOFIT_KEY, true, true)
+    viewRef.current = next
+    setView(next)
+    setProjectionId(id)
+  }, [])
 
   // -------- Pairing + selection --------
   const pairing = useMemo(
@@ -302,7 +341,11 @@ export function GeoViewer({
     // single-map modes); dual panels fall back per-side when B lacks one.
     const hasSkinny =
       skinnyWmsBasemap(sourceA.decorationLayers).background !== null
-    return [...BASEMAPS, ...(hasSkinny ? [SKINNYWMS_BASEMAP] : [])]
+    return [
+      ...BASEMAPS,
+      OUTLINE_BASEMAP,
+      ...(hasSkinny ? [SKINNYWMS_BASEMAP] : []),
+    ]
   }, [sourceA.decorationLayers])
   // Snap back when a swap drops the option — after A settles (restored SkinnyWMS).
   useEffect(() => {
@@ -311,12 +354,70 @@ export function GeoViewer({
       setBasemapId(DEFAULT_BASEMAP_ID)
     }
   }, [availableBasemaps, basemapId, sourceA.loadingLayers])
+  // Off-Mercator the Outline stands in; the Carto choice is kept.
+  const effectiveBasemapId = useMemo(() => {
+    const opt = availableBasemaps.find((o) => o.id === basemapId)
+    return opt && !basemapFitsProjection(opt, projection)
+      ? OUTLINE_BASEMAP.id
+      : basemapId
+  }, [availableBasemaps, basemapId, projection])
+
+  // Offered only when every loaded source advertises the CRS.
+  const projectionOptions = useMemo<ReadonlyArray<ProjectionOption>>(() => {
+    const sources = [
+      { src: sourceA, label: `A · ${a.label}` },
+      ...(b ? [{ src: sourceB, label: `B · ${b.label}` }] : []),
+    ]
+    return PROJECTIONS.map((p) => ({
+      id: p.id,
+      labelKey: p.labelKey,
+      // Mercator is never blocked: every server answers it in practice.
+      blockedBy:
+        p.id === DEFAULT_PROJECTION_ID
+          ? null
+          : (sources.find(
+              ({ src }) =>
+                !src.loadingLayers &&
+                src.error === null &&
+                !supportsCrs(src.crs, p.code),
+            )?.label ?? null),
+    }))
+    // Keyed on the meaningful bits — the source objects churn every render.
+  }, [
+    sourceA.crs,
+    sourceA.loadingLayers,
+    sourceA.error,
+    sourceB.crs,
+    sourceB.loadingLayers,
+    sourceB.error,
+    a.label,
+    b,
+  ])
+  // A source that lacks the current CRS (e.g. B just added) → Mercator.
+  useEffect(() => {
+    const current = projectionOptions.find((p) => p.id === projectionId)
+    if (!current?.blockedBy) return
+    showToast.info(
+      t('projections.snappedBack', {
+        source: current.blockedBy,
+        projection: t(current.labelKey),
+      }),
+    )
+    changeProjection(DEFAULT_PROJECTION_ID)
+  }, [projectionOptions, projectionId, changeProjection, t])
+  const cycleProjection = useCallback(() => {
+    const open = projectionOptions.filter((p) => p.blockedBy === null)
+    const idx = open.findIndex((p) => p.id === projectionId)
+    const next = open.at((idx + 1) % open.length)
+    if (next) changeProjection(next.id)
+  }, [projectionOptions, projectionId, changeProjection])
 
   // -------- URL view-state restore + report --------
   useViewerUrlState({
     initial: initialViewRef.current,
     onViewStateChange,
-    viewRef,
+    view,
+    projectionId,
     selection,
     pairing,
     sourceA,
@@ -551,29 +652,33 @@ export function GeoViewer({
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
   const onPan = useCallback((dx: number, dy: number) => {
-    const view = viewRef.current
-    const center = view?.getCenter()
-    const resolution = view?.getResolution()
-    if (!view || !center || resolution === undefined) return
+    const current = viewRef.current
+    const center = current.getCenter()
+    const resolution = current.getResolution()
+    if (!center || resolution === undefined) return
     const target: [number, number] = [
       center[0] + dx * resolution,
       center[1] - dy * resolution,
     ]
-    view.setCenter(view.getConstrainedCenter(target, resolution) ?? target)
+    current.setCenter(
+      current.getConstrainedCenter(target, resolution) ?? target,
+    )
   }, [])
 
-  // Live resolution drives the panel's scale-band (zoom-range) hints.
+  // Live ground resolution (m/px) drives the panel's scale-band hints.
   const [viewResolution, setViewResolution] = useState<number | null>(null)
   useEffect(() => {
-    const view = viewRef.current
-    if (!view) return
-    const update = () => setViewResolution(view.getResolution() ?? null)
+    const update = () => setViewResolution(groundResolution(view))
     update()
     view.on('change:resolution', update)
     return () => view.un('change:resolution', update)
-  }, [])
+  }, [view])
   const onZoomToResolution = useCallback((res: number) => {
-    viewRef.current?.animate({ resolution: res, duration: 350 })
+    const current = viewRef.current
+    current.animate({
+      resolution: viewResolutionFor(current, res),
+      duration: 350,
+    })
   }, [])
 
   // -------- Export (map components register their capture action) ------
@@ -597,6 +702,7 @@ export function GeoViewer({
   })
 
   useGeoShortcuts({
+    onProjectionCycle: cycleProjection,
     // Any open → collapse both; else restore (one sheet only on phones).
     onToggleSidebars: () => {
       if (!(leftCollapsed && rightCollapsed)) return closeSheets()
@@ -662,6 +768,9 @@ export function GeoViewer({
     decorationLayers: sourceA.decorationLayers,
     activeOrder: activeOrderA,
     layerOpacities: selection.opacitiesFor('a'),
+    bboxAxisOrder: isLensProxyUrl(a.baseUrl)
+      ? 'xy'
+      : (a.bboxAxisOrder ?? 'epsg'),
     resolveTime: resolveTimeA,
     onLoadResult: onLoadResultA,
     timeSteps: rawStepsA,
@@ -685,6 +794,9 @@ export function GeoViewer({
         decorationLayers: sourceB.decorationLayers,
         activeOrder: activeOrderB,
         layerOpacities: selection.opacitiesFor('b'),
+        bboxAxisOrder: isLensProxyUrl(b.baseUrl)
+          ? 'xy'
+          : (b.bboxAxisOrder ?? 'epsg'),
         resolveTime: resolveTimeB,
         onLoadResult: onLoadResultB,
         timeSteps: rawStepsB,
@@ -785,9 +897,12 @@ export function GeoViewer({
         onExport={() => setExportOpen(true)}
         onCopy={copyView}
         copySlots={hasB}
-        basemapId={basemapId}
+        basemapId={effectiveBasemapId}
         onBasemapChange={setBasemapId}
         availableBasemaps={availableBasemaps}
+        projection={projection}
+        projections={projectionOptions}
+        onProjectionChange={changeProjection}
         basemapOpacity={basemapOpacity}
         onBasemapOpacityChange={setBasemapOpacity}
       />
@@ -920,7 +1035,7 @@ export function GeoViewer({
         >
           {focusSlot === null && mode === 'side' && mapSourceB ? (
             <DualMapView
-              view={viewRef.current}
+              view={view}
               a={mapSourceA}
               b={mapSourceB}
               loupeMirror={modeOptions.loupeMirror}
@@ -939,14 +1054,14 @@ export function GeoViewer({
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
               onAnnotationMove={moveAnnotation}
-              basemapId={basemapId}
+              basemapId={effectiveBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
               onRegisterCapture={onRegisterCapture}
             />
           ) : (
             <SingleMapView
-              view={viewRef.current}
+              view={view}
               a={mapSourceA}
               b={mapSourceB}
               // Focus masks the other source (via per-slot capture); export capture wins.
@@ -967,7 +1082,7 @@ export function GeoViewer({
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
               onAnnotationMove={moveAnnotation}
-              basemapId={basemapId}
+              basemapId={effectiveBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
               onRegisterCapture={onRegisterCapture}

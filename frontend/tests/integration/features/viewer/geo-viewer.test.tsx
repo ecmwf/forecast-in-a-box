@@ -32,6 +32,7 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import {
+  getMapRequestDetails,
   getMapRequests,
   registerMockWmsServer,
 } from '@tests/../mocks/data/wms.data'
@@ -447,7 +448,7 @@ describe('GeoViewer', () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
 
-    await screen.getByRole('button', { name: 'Basemap' }).click()
+    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
     await expect
       .element(screen.getByRole('button', { name: /Carto Positron/ }))
       .toBeVisible()
@@ -1261,6 +1262,116 @@ describe('GeoViewer preload', () => {
       await expect
         .poll(() => getMapRequests(portA), { timeout: 8000 })
         .toContain('2026-07-06T06:00:00Z')
+    } finally {
+      removeSizing()
+    }
+  })
+})
+
+describe('GeoViewer projections', () => {
+  const POLAR_CRS = ['EPSG:3857', 'EPSG:4326', 'EPSG:32661']
+  function registerPolarPair(bCrs: Array<string> = POLAR_CRS) {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      crs: POLAR_CRS,
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    registerMockWmsServer(portB, {
+      crs: bCrs,
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    return { portA, portB }
+  }
+  const lastCrs = (port: number) => getMapRequestDetails(port).at(-1)?.crs
+
+  it('switches to the Arctic projection: native GetMaps, Outline basemap, and back', async () => {
+    const { portA, portB } = registerPolarPair()
+    const removeSizing = injectMapSizing()
+    try {
+      const screen = await render(<Harness portA={portA} portB={portB} />)
+      await screen.getByText('Mean sea level pressure').first().click()
+      await expect
+        .poll(() => lastCrs(portA), { timeout: 8000 })
+        .toBe('EPSG:3857')
+
+      await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+      await screen
+        .getByRole('radio', {
+          name: 'Arctic — polar stereographic',
+          exact: true,
+        })
+        .click()
+      await expect
+        .poll(() => lastCrs(portA), { timeout: 8000 })
+        .toBe('EPSG:32661')
+      // BBOX in UPS metres, clipped to the layer extent (± a pixel).
+      const bbox = getMapRequestDetails(portA)
+        .at(-1)!
+        .bbox!.split(',')
+        .map(Number)
+      expect(bbox[0]).toBeGreaterThanOrEqual(-7.1e6)
+      expect(bbox[2]).toBeLessThanOrEqual(11.1e6)
+      // Carto is Mercator-only: disabled, the Outline stands in.
+      const carto = screen.getByRole('button', { name: /Carto Positron/ })
+      await expect.element(carto).toBeDisabled()
+      await expect
+        .element(screen.getByRole('button', { name: /Outline/ }))
+        .toHaveAttribute('aria-pressed', 'true')
+
+      await screen.getByRole('radio', { name: 'Web Mercator' }).click()
+      await expect
+        .poll(() => lastCrs(portA), { timeout: 8000 })
+        .toBe('EPSG:3857')
+      await expect.element(carto).toHaveAttribute('aria-pressed', 'true')
+    } finally {
+      removeSizing()
+    }
+  })
+
+  it('disables a projection a source does not serve, naming the source', async () => {
+    const { portA, portB } = registerPolarPair(['EPSG:3857', 'EPSG:4326'])
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await expect
+      .element(screen.getByText('Mean sea level pressure'))
+      .toBeVisible()
+
+    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    const arctic = screen.getByRole('radio', {
+      name: /Arctic — polar stereographic/,
+    })
+    await expect.element(arctic).toBeDisabled()
+    await expect
+      .element(screen.getByText('B · Run B does not serve this projection'))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('radio', { name: 'Web Mercator' }))
+      .toBeEnabled()
+  })
+
+  it('restores the projection from the URL and reports it', async () => {
+    const { portA, portB } = registerPolarPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          initialViewState={{ projection: 'npole' }}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('Mean sea level pressure').first().click()
+      await expect
+        .poll(() => lastCrs(portA), { timeout: 8000 })
+        .toBe('EPSG:32661')
+      expect(getMapRequestDetails(portA).map((r) => r.crs)).not.toContain(
+        'EPSG:3857',
+      )
+      expect(onViewStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({ projection: 'npole' }),
+      )
     } finally {
       removeSizing()
     }

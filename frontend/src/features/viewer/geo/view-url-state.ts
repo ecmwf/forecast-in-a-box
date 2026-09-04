@@ -16,6 +16,8 @@
  */
 
 // The page imports this statically — keep OpenLayers out of the main chunk.
+import { isProjectionId } from '../projection-ids'
+import type { ProjectionId } from '../projection-ids'
 import type { TimeLinkMode } from './time-link'
 
 export interface ViewerCamera {
@@ -34,8 +36,10 @@ export interface ViewerUrlState {
   timeMs?: number
   timeLink?: TimeLinkMode
   offsetMs?: number
+  /** Camera; `zoom` is relative to `projection`. */
   camera?: ViewerCamera
   basemap?: string
+  projection?: ProjectionId
 }
 
 /** Search-param projection; every key present so spreads strip stale values. */
@@ -48,6 +52,7 @@ export interface ViewerSearchState {
   dt: number | undefined
   cam: string | undefined
   bm: string | undefined
+  p: ProjectionId | undefined
 }
 
 /** Stack size cap — beyond this a URL stops being a view description. */
@@ -114,8 +119,9 @@ export function encodeViewerUrlState(state: ViewerUrlState): ViewerSearchState {
         : undefined,
     dt: offset === 0 ? undefined : offset,
     cam: state.camera ? encodeCamera(state.camera) : undefined,
-    // The default basemap is reported as undefined at the source.
+    // The default basemap/projection are reported as undefined at the source.
     bm: state.basemap,
+    p: state.projection,
   }
 }
 
@@ -134,5 +140,6 @@ export function decodeViewerUrlState(
         : undefined,
     camera: decodeCamera(search.cam),
     basemap: search.bm,
+    projection: isProjectionId(search.p) ? search.p : undefined,
   }
 }

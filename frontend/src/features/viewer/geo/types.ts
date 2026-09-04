@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import type { BboxAxisOrder } from '../projections'
 import type { ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
 
@@ -23,6 +24,8 @@ export interface CompareMapSource {
   decorationLayers: ReadonlyArray<ParsedLayer>
   activeOrder: ReadonlyArray<string>
   layerOpacities: ReadonlyMap<string, number>
+  /** How this server reads a 1.3.0 BBOX in projected CRSs. */
+  bboxAxisOrder: BboxAxisOrder
   /** Raw TIME string THIS server advertised for the current instant. */
   resolveTime: (layer: ParsedLayer) => string | null
   /** Per-request load outcomes (feeds the GetMap failure cache). */

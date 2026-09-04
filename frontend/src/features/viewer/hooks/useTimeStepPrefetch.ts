@@ -18,9 +18,11 @@
 import { useEffect } from 'react'
 import ImageLayer from 'ol/layer/Image'
 import { makeDataLayerSource } from '../ol-layers'
+import { requestProjection } from '../projections'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
+import type { BboxAxisOrder } from '../projections'
 import type { ParsedLayer } from '../wms-capabilities'
 
 const PREFETCH_LOAD_TIMEOUT_MS = 30_000
@@ -32,6 +34,7 @@ export function useTimeStepPrefetch(
     baseUrl,
     layers,
     activeOrder,
+    bboxAxisOrder = 'epsg',
     timeSteps,
     mapVersion,
   }: {
@@ -39,6 +42,8 @@ export function useTimeStepPrefetch(
     baseUrl: string
     layers: ReadonlyArray<ParsedLayer>
     activeOrder: ReadonlyArray<string>
+    /** BBOX axis order this server expects in projected CRSs. */
+    bboxAxisOrder?: BboxAxisOrder
     /** Raw TIME strings this server advertises. */
     timeSteps: ReadonlyArray<string>
     /** useOlMapBase recreation counter — restart after a map rebuild. */
@@ -62,13 +67,17 @@ export function useTimeStepPrefetch(
     const prefetchOne = (layer: ParsedLayer, step: string) =>
       new Promise<void>((resolve) => {
         if (state.cancelled) return resolve()
-        const source = makeDataLayerSource(baseUrl, {
-          LAYERS: layer.name,
-          STYLES: layer.styles[0].name,
-          FORMAT: 'image/png',
-          TRANSPARENT: 'TRUE',
-          TIME: step,
-        })
+        const source = makeDataLayerSource(
+          baseUrl,
+          {
+            LAYERS: layer.name,
+            STYLES: layer.styles[0].name,
+            FORMAT: 'image/png',
+            TRANSPARENT: 'TRUE',
+            TIME: step,
+          },
+          requestProjection(map.getView(), bboxAxisOrder),
+        )
         const hidden = new ImageLayer({
           source,
           opacity: 0,
@@ -107,5 +116,14 @@ export function useTimeStepPrefetch(
       // Best-effort cleanup of any still-attached hidden layers.
       for (const h of hiddenLayers) map.removeLayer(h)
     }
-  }, [enabled, baseUrl, activeOrder, layers, timeSteps, mapRef, mapVersion])
+  }, [
+    enabled,
+    baseUrl,
+    activeOrder,
+    bboxAxisOrder,
+    layers,
+    timeSteps,
+    mapRef,
+    mapVersion,
+  ])
 }

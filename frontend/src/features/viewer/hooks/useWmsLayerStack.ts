@@ -26,12 +26,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import ImageLayer from 'ol/layer/Image'
 import {
   DEFAULT_LAYER_OPACITY,
-  WEB_MERCATOR_EXTENT,
   loadRequestUrl,
   loadWasAborted,
   makeDataLayerSource,
 } from '../ol-layers'
+import { bandResolution, requestProjection } from '../projections'
 import { toWmsEndpoint } from '../wms-capabilities'
+import type { BboxAxisOrder } from '../projections'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
@@ -73,6 +74,8 @@ export interface WmsLayerStackConfig {
   /** Ordered active layer names, index 0 = top of stack. */
   activeOrder: ReadonlyArray<string>
   layerOpacities: ReadonlyMap<string, number>
+  /** BBOX axis order this server expects in projected CRSs. */
+  bboxAxisOrder?: BboxAxisOrder
   /**
    * Per-layer WMS TIME value (the raw string THIS server advertised), or
    * null to omit the param. Must be referentially stable (useCallback) —
@@ -115,6 +118,7 @@ export function useWmsLayerStack(
     masterOpacity,
     activeOrder,
     layerOpacities,
+    bboxAxisOrder = 'epsg',
     resolveTime,
     incLoading,
     decLoading,
@@ -155,6 +159,10 @@ export function useWmsLayerStack(
       attachedMapRef.current = map
     }
     const managed = managedRef.current
+    const view = map.getView()
+    // Clip to the projection's world; scale bands are metres → view units.
+    const extent = view.getProjection().getExtent()
+    const requestProj = requestProjection(view, bboxAxisOrder)
 
     const wantedNames = new Set<string>()
     activeOrder.forEach((layerName, idx) => {
@@ -198,16 +206,19 @@ export function useWmsLayerStack(
         existing.layer.setOpacity(effectiveOpacity)
         existing.layer.setZIndex(z)
       } else {
-        const source = makeDataLayerSource(baseUrl, params)
+        const source = makeDataLayerSource(baseUrl, params, requestProj)
         const olLayer = new ImageLayer({
           source,
           opacity: effectiveOpacity,
           zIndex: z,
-          // Clip to ±85° so a zoomed-out BBOX never goes out-of-bounds (→ stretched).
-          extent: WEB_MERCATOR_EXTENT,
+          extent,
           // Scale limits: OL skips out-of-range steps instead of a blank GetMap.
-          minResolution: layer.scale?.minRes,
-          maxResolution: layer.scale?.maxRes,
+          minResolution: layer.scale
+            ? bandResolution(view, layer.scale.minRes)
+            : undefined,
+          maxResolution: layer.scale
+            ? bandResolution(view, layer.scale.maxRes)
+            : undefined,
         })
         const entry: ManagedLayer = {
           layer: olLayer,
@@ -272,6 +283,7 @@ export function useWmsLayerStack(
     layers,
     activeOrder,
     layerOpacities,
+    bboxAxisOrder,
     masterOpacity,
     resolveTime,
     zBase,

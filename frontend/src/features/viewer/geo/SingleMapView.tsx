@@ -38,7 +38,8 @@ import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
 import { usePointerReadout } from '../hooks/usePointerReadout'
 import { useTimeStepPrefetch } from '../hooks/useTimeStepPrefetch'
-import { formatLatLon } from '../format'
+import { PointerReadoutBadge } from '../components/PointerReadoutBadge'
+import { viewerProjectionOf } from '../projections'
 import { compositeMapToCanvas } from '../map-export'
 import { MapLoadingBar } from '../components/MapLoadingBar'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
@@ -62,6 +63,7 @@ import type {
   SingleMapMode,
 } from './types'
 import { cn } from '@/lib/utils'
+import { useUiStore } from '@/stores/uiStore'
 
 const noop = () => {}
 /** Stable inert stand-ins for the B stack while running solo. */
@@ -155,10 +157,13 @@ export function SingleMapView({
     loupeZoom,
   } = options
 
+  const theme = useUiStore((s) => s.resolvedTheme)
   const { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion } =
     useOlMapBase(containerRef, {
       view,
-      resetKey: 'compare-single',
+      // A projection switch swaps the View — rebuild around it.
+      resetKey: `compare-single|${view.getProjection().getCode()}`,
+      theme,
       incLoading: noop,
       decLoading: noop,
     })
@@ -170,6 +175,7 @@ export function SingleMapView({
     decorationLayers: a.decorationLayers,
     basemapId,
     opacity: basemapOpacity,
+    theme,
     incLoading: noop,
     decLoading: noop,
     mapVersion,
@@ -224,6 +230,7 @@ export function SingleMapView({
     masterOpacity: masterA,
     activeOrder: a.activeOrder,
     layerOpacities: a.layerOpacities,
+    bboxAxisOrder: a.bboxAxisOrder,
     resolveTime: a.resolveTime,
     incLoading: incA,
     decLoading: decA,
@@ -242,6 +249,7 @@ export function SingleMapView({
       masterOpacity: masterB,
       activeOrder: b?.activeOrder ?? EMPTY_ORDER,
       layerOpacities: b?.layerOpacities ?? EMPTY_OPACITIES,
+      bboxAxisOrder: b?.bboxAxisOrder,
       resolveTime: b?.resolveTime ?? noTime,
       incLoading: incB,
       decLoading: decB,
@@ -263,6 +271,7 @@ export function SingleMapView({
     baseUrl: a.baseUrl,
     layers: a.layers,
     activeOrder: a.activeOrder,
+    bboxAxisOrder: a.bboxAxisOrder,
     timeSteps: a.timeSteps,
     mapVersion,
   })
@@ -271,6 +280,7 @@ export function SingleMapView({
     baseUrl: b?.baseUrl ?? a.baseUrl,
     layers: b?.layers ?? EMPTY_LAYERS,
     activeOrder: b?.activeOrder ?? EMPTY_ORDER,
+    bboxAxisOrder: b?.bboxAxisOrder,
     timeSteps: b?.timeSteps ?? EMPTY_ORDER,
     mapVersion,
   })
@@ -759,9 +769,11 @@ export function SingleMapView({
       <PinnedLegendsBar items={pinnedLegends} onUnpin={onUnpinLegend} />
 
       {pointer && (
-        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-border bg-background/90 px-2.5 py-1 font-mono text-xs tabular-nums shadow-sm backdrop-blur-sm">
-          {formatLatLon(pointer.lat, pointer.lon)}
-        </div>
+        <PointerReadoutBadge
+          pointer={pointer}
+          crs={view.getProjection().getCode()}
+          metres={viewerProjectionOf(view).gridReadout}
+        />
       )}
 
       {annotateArmed && (

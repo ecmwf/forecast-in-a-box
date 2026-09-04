@@ -25,6 +25,7 @@ function Harness({ onPan }: { onPan: (dx: number, dy: number) => void }) {
     onToggleSidebars: () => {},
     onMode: () => {},
     onFit: null,
+    onProjectionCycle: () => {},
     onCopy: () => {},
     onExport: () => {},
     onHelp: () => {},
