@@ -1042,13 +1042,27 @@ export function GeoViewer({
             }}
             pins={{ pinned: pinnedLegends, toggle: togglePinLegend }}
             sources={{
-              a: { label: a.label, baseUrl: a.baseUrl, lens: sourceA },
-              b: b
-                ? { label: b.label, baseUrl: b.baseUrl, lens: sourceB }
-                : null,
+              a: {
+                label: a.label,
+                baseUrl: a.baseUrl,
+                lens: sourceA,
+                resolveTime: resolveTimeA,
+                bboxAxisOrder: mapSourceA.bboxAxisOrder,
+              },
+              b:
+                b && mapSourceB
+                  ? {
+                      label: b.label,
+                      baseUrl: b.baseUrl,
+                      lens: sourceB,
+                      resolveTime: resolveTimeB,
+                      bboxAxisOrder: mapSourceB.bboxAxisOrder,
+                    }
+                  : null,
             }}
             resolution={viewResolution}
             onZoomToResolution={onZoomToResolution}
+            previewView={view}
             focusSlot={focusSlot}
             onCollapse={() => setLeftCollapsed(true)}
           />

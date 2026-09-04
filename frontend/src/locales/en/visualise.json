@@ -262,7 +262,17 @@
     "moveLayerUp": "Move {{name}} up",
     "moveLayerDown": "Move {{name}} down",
     "layerOpacity": "{{name}} opacity",
-    "empty": "Add layers from the browser on the right."
+    "empty": "Add layers from the browser on the right.",
+    "style": "Style",
+    "stylePicker": "Style for {{name}}",
+    "styleDefault": "Server default",
+    "styleOnlyIn": "{{slot}} only",
+    "styleOnlyInHint": "Only {{slot}} offers this style — the other side keeps its own",
+    "stylePreview": "Preview of {{name}}",
+    "stylePreviewLoading": "Rendering preview…",
+    "stylePreviewUnavailable": "No preview from this server",
+    "styleCount_one": "{{count}} style",
+    "styleCount_other": "{{count}} styles"
   },
   "slots": {
     "swap": "Swap A and B",
@@ -326,7 +336,7 @@
       },
       "layers": {
         "title": "Layers & opacity",
-        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer."
+        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer. Layers advertising several styles get a Style button: the list shows each style with its legend, and the pane beside it previews the highlighted one on the current view before you pick."
       },
       "time": {
         "title": "Valid time",

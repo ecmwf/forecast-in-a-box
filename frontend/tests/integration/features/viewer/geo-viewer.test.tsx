@@ -1305,6 +1305,114 @@ describe('GeoViewer startup', () => {
   })
 })
 
+describe('GeoViewer layer styles', () => {
+  function registerStyledPair() {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          styles: [
+            { name: 'sh_all', title: 'Contour shade' },
+            { name: 'ct_red', title: 'Red contours', abstract: 'Lines only' },
+          ],
+        },
+      ],
+    })
+    registerMockWmsServer(portB, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          styles: [{ name: 'sh_all', title: 'Contour shade' }],
+        },
+      ],
+    })
+    return { portA, portB }
+  }
+  const lastStyle = (port: number) =>
+    getMapRequestDetails(port)
+      .filter((r) => r.layers === '2t')
+      .at(-1)?.styles
+
+  it('picks a style per pair, applying it only where advertised', async () => {
+    const { portA, portB } = registerStyledPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('2 m temperature').first().click()
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('sh_all')
+
+      const trigger = screen.getByRole('button', {
+        name: 'Style for 2 m temperature',
+      })
+      await expect.element(trigger).toHaveTextContent('Contour shade')
+      await trigger.click()
+      const option = screen.getByRole('option', { name: /Red contours/ })
+      await expect.element(option).toBeVisible()
+      await option.hover()
+      // B lacks this style → the option carries A's chip; the pane shows
+      // the abstract and a live thumbnail from the mock GetMap.
+      await expect.element(screen.getByText('Lines only')).toBeVisible()
+      await expect
+        .element(screen.getByRole('img', { name: /Preview of Red contours/ }))
+        .toBeInTheDocument()
+      await option.click()
+
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('ct_red')
+      expect(lastStyle(portB)).toBe('sh_all')
+      await expect.element(trigger).toHaveTextContent('Red contours')
+      // The legend follows the drawn style and the URL carries the choice.
+      await expect
+        .poll(() =>
+          document
+            .querySelector<HTMLImageElement>(
+              'img[alt="2 m temperature (A) legend"]',
+            )
+            ?.getAttribute('src'),
+        )
+        .toContain('style=ct_red')
+      expect(onViewStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({ stylesA: ['ct_red'], stylesB: [null] }),
+      )
+    } finally {
+      removeSizing()
+    }
+  })
+
+  it('restores styles from the URL', async () => {
+    const { portA, portB } = registerStyledPair()
+    const removeSizing = injectMapSizing()
+    try {
+      await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          initialViewState={{ layersA: ['2t'], stylesA: ['ct_red'] }}
+        />,
+      )
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('ct_red')
+    } finally {
+      removeSizing()
+    }
+  })
+})
+
 describe('GeoViewer projections', () => {
   const POLAR_CRS = ['EPSG:3857', 'EPSG:4326', 'EPSG:32661']
   function registerPolarPair(bCrs: Array<string> = POLAR_CRS) {

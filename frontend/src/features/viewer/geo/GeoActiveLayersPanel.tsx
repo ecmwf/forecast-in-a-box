@@ -16,7 +16,7 @@
  * legends and removal.
  */
 
-import { useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
@@ -38,21 +38,30 @@ import {
 import { firstNumber } from '../format'
 import {
   combineScaleBands,
+  isLensProxyUrl,
+  legendStripUrl,
   rebaseLensUrl,
+  resolveStyle,
   scaleBandState,
   scaleBandTargetResolution,
 } from '../wms-capabilities'
+import { stylePreviewUrl } from '../style-preview'
 import { LegendImage } from '../components/LegendImage'
+import { LayerStylePicker } from './LayerStylePicker'
 import { SLOT_CHIP_CLASS } from './GeoLayerBrowser'
 import { parseGeojsonOverlay } from './overlays'
 import { ANNOTATION_COLORS, downloadAnnotationsGeojson } from './annotations'
 import { layerIsTimeAware, pairIsStatic } from './layer-pairing'
-import type { ScaleBand } from '../wms-capabilities'
+import type { ParsedLayer, ScaleBand } from '../wms-capabilities'
 import type { ContextOverlay } from './overlays'
 import type { MapAnnotation } from './annotations'
 import type { PairedLayer, SourceSlot } from './layer-pairing'
 import type { CompareSelection } from './useCompareSelection'
 import type { LensSource } from '../hooks/useLensSource'
+import type { BboxAxisOrder } from '../projections'
+import type { PreviewFrame } from '../style-preview'
+import type { StyleOption } from './LayerStylePicker'
+import type View from 'ol/View'
 import { Button } from '@/components/ui/button'
 import { showToast } from '@/lib/toast'
 import { createLogger } from '@/lib/logger'
@@ -100,12 +109,93 @@ export interface PanelSlotSource {
   label: string
   baseUrl: string
   lens: LensSource
+  /** Raw TIME string this server advertised for the current instant. */
+  resolveTime: (layer: ParsedLayer) => string | null
+  bboxAxisOrder: BboxAxisOrder
 }
 
 export interface LegendPins {
   /** Keys `${slot}:${layerName}`. */
   pinned: ReadonlySet<string>
   toggle: (slot: SourceSlot, name: string) => void
+}
+
+/** Style picker for one card: the union of the sides' styles by name. */
+function StylePickerFor({
+  title,
+  entries,
+  value,
+  onChange,
+  showSlots,
+  view,
+}: {
+  title: string
+  entries: ReadonlyArray<{
+    slot: SourceSlot
+    layer: ParsedLayer
+    source: PanelSlotSource
+  }>
+  value: string | null
+  onChange: (name: string | null) => void
+  showSlots: boolean
+  view: View
+}) {
+  const options = useMemo(() => {
+    const byName = new Map<string, StyleOption>()
+    for (const { slot, layer, source } of entries) {
+      for (const style of layer.styles) {
+        const option = byName.get(style.name) ?? {
+          name: style.name,
+          title: style.title ?? style.name,
+          abstract: style.abstract,
+          slots: [],
+          strip: {},
+          legend: {},
+        }
+        option.slots = [...option.slots, slot]
+        const strip = legendStripUrl(style, 256)
+        if (strip) option.strip[slot] = rebaseLensUrl(strip, source.baseUrl)
+        if (style.legendUrl) {
+          option.legend[slot] = rebaseLensUrl(style.legendUrl, source.baseUrl)
+        }
+        byName.set(style.name, option)
+      }
+    }
+    return [...byName.values()]
+  }, [entries])
+  const previewUrl = useCallback(
+    (name: string, slot: SourceSlot, frame: PreviewFrame) => {
+      const entry = entries.find((e) => e.slot === slot)
+      if (!entry) return null
+      return stylePreviewUrl(
+        {
+          baseUrl: entry.source.baseUrl,
+          layer: entry.layer,
+          settings: { style: name },
+          time: entry.source.resolveTime(entry.layer),
+          bboxAxisOrder: entry.source.bboxAxisOrder,
+        },
+        view,
+        frame,
+      )
+    },
+    [entries, view],
+  )
+  if (options.length < 2) return null
+  // The lens renders a thumbnail in ~0.1 s; public servers get gentler.
+  const lensOnly = entries.every((e) => isLensProxyUrl(e.source.baseUrl))
+  return (
+    <LayerStylePicker
+      layerTitle={title}
+      options={options}
+      value={value}
+      onChange={onChange}
+      showSlots={showSlots}
+      view={view}
+      previewUrl={previewUrl}
+      prefetchConcurrency={lensOnly ? 4 : 2}
+    />
+  )
 }
 
 /** Pin/unpin button next to a legend. */
@@ -187,6 +277,7 @@ export function GeoActiveLayersPanel({
   pins,
   resolution,
   onZoomToResolution,
+  previewView,
   focusSlot,
   onCollapse,
 }: {
@@ -207,6 +298,8 @@ export function GeoActiveLayersPanel({
   resolution: number | null
   /** Animate the shared view to a resolution (jump into a layer's band). */
   onZoomToResolution: (res: number) => void
+  /** The live map View — style previews render its current extent. */
+  previewView: View
   /** View only one source: hide the other's section and per-source tiers. */
   focusSlot: SourceSlot | null
   onCollapse: () => void
@@ -300,6 +393,7 @@ export function GeoActiveLayersPanel({
             pins={pins}
             resolution={resolution}
             onZoomToResolution={onZoomToResolution}
+            view={previewView}
           />
         ) : selection.linkMode === 'linked' ? (
           activePairs.length === 0 ? (
@@ -318,6 +412,7 @@ export function GeoActiveLayersPanel({
                   pins={pins}
                   resolution={resolution}
                   onZoomToResolution={onZoomToResolution}
+                  view={previewView}
                 />
               ))}
             </ul>
@@ -331,6 +426,7 @@ export function GeoActiveLayersPanel({
               pins={pins}
               resolution={resolution}
               onZoomToResolution={onZoomToResolution}
+              view={previewView}
             />
             {sources.b !== null && (
               <ActiveSourceSection
@@ -340,6 +436,7 @@ export function GeoActiveLayersPanel({
                 pins={pins}
                 resolution={resolution}
                 onZoomToResolution={onZoomToResolution}
+                view={previewView}
               />
             )}
           </>
@@ -633,6 +730,7 @@ function ActivePairCard({
   pins,
   resolution,
   onZoomToResolution,
+  view,
 }: {
   pair: PairedLayer
   index: number
@@ -643,6 +741,7 @@ function ActivePairCard({
   pins: LegendPins
   resolution: number | null
   onZoomToResolution: (res: number) => void
+  view: View
 }) {
   const { t } = useTranslation('visualise')
   const { t: tExec } = useTranslation('executions')
@@ -744,11 +843,28 @@ function ActivePairCard({
           }
         />
       </label>
+      <StylePickerFor
+        title={title}
+        entries={(['a', 'b'] as const).flatMap((slot) => {
+          const layer = pair.perSource[slot]
+          const source = sources[slot]
+          return layer && source ? [{ slot, layer, source }] : []
+        })}
+        value={selection.pairStyle(pair.key)}
+        onChange={(name) => selection.setPairStyle(pair.key, name)}
+        showSlots={sources.b !== null}
+        view={view}
+      />
       <div className="mt-2 space-y-1.5">
         {(['a', 'b'] as const).flatMap((slot) => {
           const slotSource = sources[slot]
           const layer = pair.perSource[slot]
-          const legendUrl = layer?.styles[0]?.legendUrl
+          const legendUrl = layer
+            ? resolveStyle(
+                layer,
+                selection.settingsFor(slot).get(layer.name)?.style,
+              )?.legendUrl
+            : undefined
           if (!slotSource || !layer || !legendUrl) return []
           return [
             <div key={slot} className="flex items-start gap-1.5">
@@ -785,6 +901,7 @@ function ActiveSourceSection({
   pins,
   resolution,
   onZoomToResolution,
+  view,
 }: {
   slot: SourceSlot
   selection: CompareSelection
@@ -792,6 +909,7 @@ function ActiveSourceSection({
   pins: LegendPins
   resolution: number | null
   onZoomToResolution: (res: number) => void
+  view: View
 }) {
   const { t } = useTranslation('visualise')
   const { t: tExec } = useTranslation('executions')
@@ -820,7 +938,9 @@ function ActiveSourceSection({
           {activeNames.map((name, index) => {
             const layer = lens.layers.find((l) => l.name === name)
             const title = layer?.title ?? name
-            const legendUrl = layer?.styles[0]?.legendUrl
+            const legendUrl = layer
+              ? resolveStyle(layer, selection.layerStyle(slot, name))?.legendUrl
+              : undefined
             return (
               <li
                 key={name}
@@ -919,6 +1039,16 @@ function ActiveSourceSection({
                     }
                   />
                 </label>
+                {layer && (
+                  <StylePickerFor
+                    title={title}
+                    entries={[{ slot, layer, source }]}
+                    value={selection.layerStyle(slot, name)}
+                    onChange={(s) => selection.setLayerStyle(slot, name, s)}
+                    showSlots={false}
+                    view={view}
+                  />
+                )}
                 {legendUrl && (
                   <div className="mt-2 flex items-start gap-1.5">
                     <div className="min-w-0 flex-1">
