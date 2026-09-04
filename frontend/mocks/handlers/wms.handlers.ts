@@ -134,7 +134,13 @@ const serveWms: HttpResponseResolver = async ({ request }) => {
   // GetMap and anything else image-like. Registered failure TIMEs get
   // a WMS service exception (stale-capabilities servers do this).
   if (req === 'getmap') {
-    recordGetMap(key, param('TIME'))
+    recordGetMap(key, {
+      time: param('TIME'),
+      crs: param('CRS') ?? param('SRS'),
+      bbox: param('BBOX'),
+      styles: param('STYLES'),
+      layers: param('LAYERS'),
+    })
     const delayMs = getMapDelayFor(key)
     if (delayMs > 0) await delay(delayMs)
   }

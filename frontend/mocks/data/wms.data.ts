@@ -36,6 +36,8 @@ export interface MockWmsServerConfig {
   decorations?: Array<string>
   /** EPSG:4326 [west, south, east, north]. */
   bbox?: [number, number, number, number]
+  /** Advertised root `<CRS>` codes (default: the two web projections). */
+  crs?: Array<string>
   /** Requests answered 503 before the server starts serving capabilities. */
   failuresBeforeSuccess?: number
   /** GetMap TIME values answered with a WMS service exception. */
@@ -62,6 +64,7 @@ export function resetWmsState(): void {
   defaultConfig = null
   internalPortCounter = 40000
   getMapLog.clear()
+  getMapDetailLog.clear()
 }
 
 export function hasMockWmsServer(key: string | number): boolean {
@@ -109,17 +112,37 @@ function serverFor(key: string): MockWmsServer | undefined {
 /** GetMap requests seen per key (TIME param values, in order). */
 const getMapLog = new Map<string, Array<string | null>>()
 
-export function recordGetMap(key: string | number, time: string | null): void {
+export interface GetMapRequest {
+  time: string | null
+  crs: string | null
+  bbox: string | null
+  styles: string | null
+  layers: string | null
+}
+
+/** Full GetMap params per key, parallel to `getMapLog`. */
+const getMapDetailLog = new Map<string, Array<GetMapRequest>>()
+
+export function recordGetMap(key: string | number, req: GetMapRequest): void {
   const k = String(key)
   const log = getMapLog.get(k) ?? []
-  log.push(time)
+  log.push(req.time)
   getMapLog.set(k, log)
+  const details = getMapDetailLog.get(k) ?? []
+  details.push(req)
+  getMapDetailLog.set(k, details)
 }
 
 export function getMapRequests(
   key: string | number,
 ): ReadonlyArray<string | null> {
   return getMapLog.get(String(key)) ?? []
+}
+
+export function getMapRequestDetails(
+  key: string | number,
+): ReadonlyArray<GetMapRequest> {
+  return getMapDetailLog.get(String(key)) ?? []
 }
 
 /** Should this key's GetMap fail for the given TIME? */
@@ -183,6 +206,9 @@ function capabilitiesXml(
   config: MockWmsServerConfig,
 ): string {
   const [west, south, east, north] = config.bbox ?? [-180, -90, 180, 90]
+  const crs = (config.crs ?? ['EPSG:3857', 'EPSG:4326'])
+    .map((code) => `<CRS>${code}</CRS>`)
+    .join('')
   const decorations = (config.decorations ?? ['background', 'foreground'])
     .map((name) => `<Layer><Name>${name}</Name><Title>${name}</Title></Layer>`)
     .join('\n')
@@ -194,6 +220,7 @@ function capabilitiesXml(
     </Request>
     <Layer>
       <Title>WMS server</Title>
+      ${crs}
       <EX_GeographicBoundingBox>
         <westBoundLongitude>${west}</westBoundLongitude>
         <eastBoundLongitude>${east}</eastBoundLongitude>
