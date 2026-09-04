@@ -194,3 +194,62 @@ describe('useCompareSelection styles', () => {
     expect(latest.pairStyle('p@sfc')).toBe('sh_y')
   })
 })
+
+describe('useCompareSelection default styles', () => {
+  const PAIR: ReadonlyArray<PairedLayer> = [
+    {
+      key: 'p@sfc',
+      title: '2 m temperature',
+      subtitle: null,
+      level: null,
+      levelUnit: null,
+      perSource: {
+        a: { name: '2t', title: '2t', styles: [{ name: 'x' }, { name: 'y' }] },
+      },
+    },
+  ]
+  function SeedProbe({
+    onRender,
+  }: {
+    onRender: (selection: CompareSelection) => void
+  }) {
+    const selection = useCompareSelection(PAIR, {
+      defaultStyle: (slot, name) =>
+        slot === 'a' && name === '2t' ? 'y' : null,
+    })
+    onRender(selection)
+    return (
+      <>
+        <button type="button" onClick={() => selection.togglePair('p@sfc')}>
+          toggle
+        </button>
+        <button
+          type="button"
+          onClick={() => selection.setPairStyle('p@sfc', null)}
+        >
+          reset
+        </button>
+      </>
+    )
+  }
+
+  it('seeds a newly activated pair with the pinned style, once', async () => {
+    let latest!: CompareSelection
+    const screen = await render(
+      <SeedProbe
+        onRender={(s) => {
+          latest = s
+        }}
+      />,
+    )
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    expect(latest.pairStyle('p@sfc')).toBe('y')
+    // An explicit "back to default" is respected while the pair stays on.
+    await screen.getByRole('button', { name: 'reset' }).click()
+    expect(latest.pairStyle('p@sfc')).toBeNull()
+    // Re-activating seeds again.
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    await screen.getByRole('button', { name: 'toggle' }).click()
+    expect(latest.pairStyle('p@sfc')).toBe('y')
+  })
+})

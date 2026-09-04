@@ -41,6 +41,7 @@ import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
 import { CompareHelpDialog } from '@/features/viewer/geo/CompareHelpDialog'
 import i18n from '@/lib/i18n'
+import { useStylePinsStore } from '@/stores/stylePinsStore'
 
 let nextPort = 19800
 
@@ -1389,6 +1390,48 @@ describe('GeoViewer layer styles', () => {
         expect.objectContaining({ stylesA: ['ct_red'], stylesB: [null] }),
       )
     } finally {
+      removeSizing()
+    }
+  })
+
+  it('pins a style as the default: applied now and on re-adding the layer', async () => {
+    const { portA, portB } = registerStyledPair()
+    const removeSizing = injectMapSizing()
+    try {
+      const screen = await render(<Harness portA={portA} portB={portB} />)
+      await screen.getByText('2 m temperature').first().click()
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('sh_all')
+
+      await screen
+        .getByRole('button', { name: 'Style for 2 m temperature' })
+        .click()
+      await screen.getByRole('option', { name: /Red contours/ }).hover()
+      await screen
+        .getByRole('button', { name: 'Use as my default for this layer' })
+        .click()
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('ct_red')
+      // Persisted per (server scope, layer).
+      expect(
+        useStylePinsStore.getState().pinned(`http://localhost:${portA}`, '2t'),
+      ).toBe('ct_red')
+
+      // Remove and re-add: the pinned style seeds the fresh activation.
+      await screen
+        .getByRole('button', { name: 'Remove 2 m temperature' })
+        .first()
+        .click()
+      await screen.getByText('2 m temperature').first().click()
+      await expect
+        .element(
+          screen.getByRole('button', { name: 'Style for 2 m temperature' }),
+        )
+        .toHaveTextContent('Red contours')
+    } finally {
+      useStylePinsStore.getState().reset()
       removeSizing()
     }
   })

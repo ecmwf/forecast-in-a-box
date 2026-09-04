@@ -108,6 +108,11 @@ import {
 import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
 import { showToast } from '@/lib/toast'
+import {
+  stylePinKey,
+  styleScope,
+  useStylePinsStore,
+} from '@/stores/stylePinsStore'
 import { preloadOutlineData } from '@/lib/map/ol-outline'
 
 export interface GeoViewerSource {
@@ -193,7 +198,38 @@ export function GeoViewer({
     () => buildPairs(sourceA.groups, sourceB.groups),
     [sourceA.groups, sourceB.groups],
   )
-  const selection = useCompareSelection(pairing.pairs)
+  // Pinned default styles: seed newly activated layers (URL styles win).
+  const stylePins = useStylePinsStore((s) => s.pins)
+  const pinStyle = useStylePinsStore((s) => s.pin)
+  const unpinStyle = useStylePinsStore((s) => s.unpin)
+  const bBase = b?.baseUrl ?? null
+  const scopeFor = useCallback(
+    (slot: SourceSlot) => {
+      const base = slot === 'a' ? a.baseUrl : bBase
+      return base === null ? null : styleScope(base)
+    },
+    [a.baseUrl, bBase],
+  )
+  const defaultStyle = useCallback(
+    (slot: SourceSlot, layerName: string) => {
+      const scope = scopeFor(slot)
+      return scope ? (stylePins[stylePinKey(scope, layerName)] ?? null) : null
+    },
+    [scopeFor, stylePins],
+  )
+  const selection = useCompareSelection(pairing.pairs, { defaultStyle })
+  const stylePinControls = useMemo(
+    () => ({
+      pinnedFor: defaultStyle,
+      setPin: (slot: SourceSlot, layerName: string, style: string | null) => {
+        const scope = scopeFor(slot)
+        if (!scope) return
+        if (style) pinStyle(scope, layerName, style)
+        else unpinStyle(scope, layerName)
+      },
+    }),
+    [defaultStyle, scopeFor, pinStyle, unpinStyle],
+  )
 
   const bothReady = !sourceA.loadingLayers && !sourceB.loadingLayers
   // Solo always has zero overlap — never auto-unlink there, it would
@@ -1041,6 +1077,7 @@ export function GeoViewer({
               available: timeline.epochs.length > 1,
             }}
             pins={{ pinned: pinnedLegends, toggle: togglePinLegend }}
+            stylePins={stylePinControls}
             sources={{
               a: {
                 label: a.label,

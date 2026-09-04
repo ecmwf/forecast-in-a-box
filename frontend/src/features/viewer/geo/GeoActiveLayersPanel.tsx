@@ -114,6 +114,12 @@ export interface PanelSlotSource {
   bboxAxisOrder: BboxAxisOrder
 }
 
+/** Pinned default style per side and layer (persisted). */
+export interface StylePins {
+  pinnedFor: (slot: SourceSlot, layerName: string) => string | null
+  setPin: (slot: SourceSlot, layerName: string, style: string | null) => void
+}
+
 export interface LegendPins {
   /** Keys `${slot}:${layerName}`. */
   pinned: ReadonlySet<string>
@@ -128,6 +134,7 @@ function StylePickerFor({
   onChange,
   showSlots,
   view,
+  stylePins,
 }: {
   title: string
   entries: ReadonlyArray<{
@@ -139,6 +146,7 @@ function StylePickerFor({
   onChange: (name: string | null) => void
   showSlots: boolean
   view: View
+  stylePins: StylePins
 }) {
   const options = useMemo(() => {
     const byName = new Map<string, StyleOption>()
@@ -184,6 +192,16 @@ function StylePickerFor({
   if (options.length < 2) return null
   // The lens renders a thumbnail in ~0.1 s; public servers get gentler.
   const lensOnly = entries.every((e) => isLensProxyUrl(e.source.baseUrl))
+  const pinned =
+    entries
+      .map((e) => stylePins.pinnedFor(e.slot, e.layer.name))
+      .find((p): p is string => p !== null) ?? null
+  const onPin = (name: string | null) => {
+    for (const e of entries) {
+      const has = name === null || e.layer.styles.some((s) => s.name === name)
+      if (has) stylePins.setPin(e.slot, e.layer.name, name)
+    }
+  }
   return (
     <LayerStylePicker
       layerTitle={title}
@@ -194,6 +212,8 @@ function StylePickerFor({
       view={view}
       previewUrl={previewUrl}
       prefetchConcurrency={lensOnly ? 4 : 2}
+      pinned={pinned}
+      onPin={onPin}
     />
   )
 }
@@ -275,6 +295,7 @@ export function GeoActiveLayersPanel({
   annotations,
   preload,
   pins,
+  stylePins,
   resolution,
   onZoomToResolution,
   previewView,
@@ -294,6 +315,7 @@ export function GeoActiveLayersPanel({
     available: boolean
   }
   pins: LegendPins
+  stylePins: StylePins
   /** Current view resolution (m/px) for scale-band hints; null until known. */
   resolution: number | null
   /** Animate the shared view to a resolution (jump into a layer's band). */
@@ -391,6 +413,7 @@ export function GeoActiveLayersPanel({
             selection={selection}
             source={focusedSource}
             pins={pins}
+            stylePins={stylePins}
             resolution={resolution}
             onZoomToResolution={onZoomToResolution}
             view={previewView}
@@ -410,6 +433,7 @@ export function GeoActiveLayersPanel({
                   selection={selection}
                   sources={sources}
                   pins={pins}
+                  stylePins={stylePins}
                   resolution={resolution}
                   onZoomToResolution={onZoomToResolution}
                   view={previewView}
@@ -424,6 +448,7 @@ export function GeoActiveLayersPanel({
               selection={selection}
               source={sources.a}
               pins={pins}
+              stylePins={stylePins}
               resolution={resolution}
               onZoomToResolution={onZoomToResolution}
               view={previewView}
@@ -434,6 +459,7 @@ export function GeoActiveLayersPanel({
                 selection={selection}
                 source={sources.b}
                 pins={pins}
+                stylePins={stylePins}
                 resolution={resolution}
                 onZoomToResolution={onZoomToResolution}
                 view={previewView}
@@ -728,6 +754,7 @@ function ActivePairCard({
   selection,
   sources,
   pins,
+  stylePins,
   resolution,
   onZoomToResolution,
   view,
@@ -739,6 +766,7 @@ function ActivePairCard({
   selection: CompareSelection
   sources: { a: PanelSlotSource; b: PanelSlotSource | null }
   pins: LegendPins
+  stylePins: StylePins
   resolution: number | null
   onZoomToResolution: (res: number) => void
   view: View
@@ -854,6 +882,7 @@ function ActivePairCard({
         onChange={(name) => selection.setPairStyle(pair.key, name)}
         showSlots={sources.b !== null}
         view={view}
+        stylePins={stylePins}
       />
       <div className="mt-2 space-y-1.5">
         {(['a', 'b'] as const).flatMap((slot) => {
@@ -899,6 +928,7 @@ function ActiveSourceSection({
   selection,
   source,
   pins,
+  stylePins,
   resolution,
   onZoomToResolution,
   view,
@@ -907,6 +937,7 @@ function ActiveSourceSection({
   selection: CompareSelection
   source: PanelSlotSource
   pins: LegendPins
+  stylePins: StylePins
   resolution: number | null
   onZoomToResolution: (res: number) => void
   view: View
@@ -1047,6 +1078,7 @@ function ActiveSourceSection({
                     onChange={(s) => selection.setLayerStyle(slot, name, s)}
                     showSlots={false}
                     view={view}
+                    stylePins={stylePins}
                   />
                 )}
                 {legendUrl && (

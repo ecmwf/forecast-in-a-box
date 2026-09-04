@@ -13,7 +13,7 @@
  * preview pane for the highlighted style — legend and live thumbnail per side.
  */
 
-import { ChevronDown, Palette } from 'lucide-react'
+import { ChevronDown, Palette, Pin } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -54,6 +54,8 @@ export function LayerStylePicker({
   view,
   previewUrl,
   prefetchConcurrency,
+  pinned,
+  onPin,
 }: {
   layerTitle: string
   options: ReadonlyArray<StyleOption>
@@ -70,6 +72,10 @@ export function LayerStylePicker({
     frame: PreviewFrame,
   ) => string | null
   prefetchConcurrency: number
+  /** The user's pinned default for this layer (persisted), if any. */
+  pinned: string | null
+  /** Pin a style as the default (null unpins); pinning also applies it. */
+  onPin: (name: string | null) => void
 }) {
   const { t } = useTranslation('visualise')
   const [open, setOpen] = useState(false)
@@ -127,7 +133,11 @@ export function LayerStylePicker({
           />
         }
       >
-        <Palette className="size-3 shrink-0 text-muted-foreground" />
+        {current && current.name === pinned ? (
+          <Pin className="size-3 shrink-0 text-primary" />
+        ) : (
+          <Palette className="size-3 shrink-0 text-muted-foreground" />
+        )}
         <span className="min-w-0 flex-1 truncate text-left">
           {current?.title ?? t('sidebar.styleDefault')}
         </span>
@@ -189,6 +199,12 @@ export function LayerStylePicker({
                     >
                       {option.title}
                     </span>
+                    {option.name === pinned && (
+                      <Pin
+                        className="size-3 shrink-0 text-primary"
+                        aria-label={t('sidebar.stylePinned')}
+                      />
+                    )}
                     {option.slots.map((slot) =>
                       missing.length > 0 ? (
                         <span
@@ -222,7 +238,40 @@ export function LayerStylePicker({
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto border-l border-border p-3">
           {activeOption && (
             <>
-              <P className="text-sm font-medium">{activeOption.title}</P>
+              <div className="flex items-start gap-2">
+                <P className="min-w-0 flex-1 text-sm font-medium">
+                  {activeOption.title}
+                </P>
+                <Button
+                  variant={activeOption.name === pinned ? 'default' : 'ghost'}
+                  size="icon-xs"
+                  aria-pressed={activeOption.name === pinned}
+                  title={
+                    activeOption.name === pinned
+                      ? t('sidebar.styleUnpin')
+                      : t('sidebar.stylePin')
+                  }
+                  aria-label={
+                    activeOption.name === pinned
+                      ? t('sidebar.styleUnpin')
+                      : t('sidebar.stylePin')
+                  }
+                  onClick={() => {
+                    if (activeOption.name === pinned) {
+                      onPin(null)
+                    } else {
+                      onPin(activeOption.name)
+                      onChange(
+                        activeOption.name === defaultName
+                          ? null
+                          : activeOption.name,
+                      )
+                    }
+                  }}
+                >
+                  <Pin className="size-3" />
+                </Button>
+              </div>
               <P className="mt-0.5 font-mono text-[10px] text-muted-foreground">
                 {activeOption.name}
               </P>
