@@ -41,7 +41,7 @@ from shapely.geometry import mapping
 DATA_DIR = Path(__file__).resolve().parents[1] / "src/components/base/fields/data"
 PRESETS_OUT = DATA_DIR / "preset-domains.json"
 LIST_OUT = DATA_DIR / "countries.json"
-GEOJSON_OUT = DATA_DIR / "countries.geo.json"
+GEOJSON_OUT = DATA_DIR.parents[3] / "lib/map/data/countries.geo.json"
 DOMAINS_YML = Path(earthkit.plots.__file__).parent / "data/geo/domains.yml"
 # Polar / uninhabited groupings that would each form a one-item continent group.
 DROP_CONTINENTS = {"Antarctica", "Seven seas (open ocean)"}
