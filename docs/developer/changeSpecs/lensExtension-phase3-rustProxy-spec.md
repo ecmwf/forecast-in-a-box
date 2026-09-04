@@ -1,19 +1,30 @@
-# Lens Proxy -- Offloading Traffic From the Main Worker
+# Phase 3 -- Offloading Lens Traffic From the Main Worker
 
 ## Status and audience
 
-Forward-looking, architect-oriented. Assumes the initial HTTP streaming proxy
-(`lensProxy-backend-initial.md`) and the frontend adaptation (`lensProxy-frontend.md`)
-are shipped, but that the codebase may have moved on for unrelated reasons. Names below
-are anchors, not guarantees.
+Forward-looking, architect-oriented. This is phase 3 of the effort described in
+`lensExtension-overview.md`; read that first. It assumes phases 1 and 2 are shipped --
+the HTTP streaming proxy and its frontend adaptation are long in place, lenses exist in
+both process and native kinds, and the WebDAV lens of
+`lensExtension-phase2-webdavLens-spec.md` serves output trees natively. The codebase may
+have moved on for unrelated reasons; names below are anchors, not guarantees.
+
+Companion document: `lensExtension-phase3-proxyProtocols-spec.md`, which catalogues
+transports beyond plain HTTP request/response.
 
 ## The problem
 
-The initial implementation runs the proxy **inside the FastAPI app on a single uvicorn
-worker** (`workers=1`, see `entrypoint/bootstrap/launchers.py`). Every lens byte --
-WMS tiles, which are many and can be large -- flows through that one async event loop,
-contending with all normal API traffic. We accepted this for the first milestone. This
-document is about what to do when that becomes a real bottleneck.
+The proxy runs **inside the FastAPI app on a single uvicorn worker** (`workers=1`, see
+`entrypoint/bootstrap/launchers.py`). Every lens byte flows through that one async event
+loop, contending with all normal API traffic. Two distinct loads do this:
+
+- **process lenses** -- WMS tiles, which are many and can be large, proxied to a
+  subprocess;
+- **the WebDAV lens** -- file bodies, which are few but very large, read from local disk
+  and streamed out. Phase 2 accepted this explicitly as a deferred concern.
+
+We accepted both for their respective milestones. This document is about what to do when
+it becomes a real bottleneck.
 
 Constraints that make this non-trivial, and rule out a naive "just put nginx in front":
 
@@ -25,6 +36,36 @@ Constraints that make this non-trivial, and rule out a naive "just put nginx in 
 - **The mapping id -> internal port is dynamic**, chosen at runtime by the backend's
   `FreePortsManager`. Whatever does the forwarding must learn that mapping from the
   backend.
+
+## The WebDAV lens: offload bodies, keep policy
+
+For the proxy the split is easy, because the proxy never interprets what it carries:
+policy in Python, opaque bytes in Rust. The WebDAV lens needs more care, and the obvious
+reading -- "move WebDAV into the sidecar" -- is the wrong one. It would relocate path
+resolution, containment enforcement, listing generation and the resource model itself
+into the other language, which means the entire security-critical surface changes
+language and, during migration, exists in two places at once.
+
+**Split by load profile instead, which happens to coincide with the policy boundary:**
+
+- **Python keeps deciding and describing.** Authorization, output-to-path resolution,
+  containment checks, directory listings and property queries stay where they are. These
+  responses are small and infrequent; they are also where all the policy lives.
+- **The sidecar streams file bodies only.** Once Python has authorized a request and
+  resolved it to a concrete, already-validated path, it delegates the body to the
+  sidecar and releases the worker immediately -- the internal-redirect pattern that
+  off-the-shelf reverse proxies expose for exactly this purpose.
+
+This captures essentially all of the throughput win, since the bytes are overwhelmingly
+file bodies, while keeping the Rust surface small and policy-free. It is available at all
+only because the files are local to the backend, which is a further argument for the
+native WebDAV lens over a proxied file-server process.
+
+Watch-outs specific to this path: the handoff must convey an already-resolved path and
+must not be forgeable or reachable from outside; range and conditional-request handling
+moves with the body and must remain correct; and the delegation must not become a way to
+name arbitrary files, which means the sidecar trusts Python's resolution and nothing
+else.
 
 ## Recommended option: a dedicated proxy process, backend as auth/validation authority
 
@@ -103,7 +144,12 @@ decision plus the target port. Design choices, roughly in order of preference:
 - **Forwarded headers / URL contract unchanged.** The contract in
   `domain/lens/proxy.py` (client rebasing, `X-Forwarded-*`, no body rewriting) must be
   honoured identically by the Rust proxy. Keep that docstring the single source of
-  truth; the Rust code implements the same contract.
+  truth; the Rust code implements the same contract. The same applies to the WebDAV
+  lens's own contract docstring.
+- **Credential positions.** Lens access may be authorized by a short-lived scoped token
+  presented as a header, a Basic password or a query parameter, as well as by an
+  ordinary session. Whatever the sidecar forwards to the authorization endpoint must
+  preserve all of these faithfully.
 - **Streaming semantics.** Preserve range requests, chunked responses, disconnect
   propagation, and backpressure -- the same properties the Python version had.
 - **Operational surface.** A second long-lived process to supervise, log, crash-restart
@@ -121,6 +167,11 @@ decision plus the target port. Design choices, roughly in order of preference:
   lenses.
 
 ## Alternatives considered
+
+- **Implementing the WebDAV lens itself in the sidecar.**
+  *Why not:* it moves path resolution, containment enforcement and the resource model
+  into Rust, i.e. the whole security-critical surface changes language and is duplicated
+  during migration, for a throughput gain that body-only delegation already captures.
 
 - **Off-the-shelf reverse proxy (nginx/traefik/envoy) doing the whole lens route.**
   *Why not:* it cannot make the auth / lens-id / user-lens decision, and cannot resolve
@@ -151,3 +202,7 @@ decision plus the target port. Design choices, roughly in order of preference:
   *Why not:* without a data-plane process you are back to the main worker doing the
   bytes; the token only removes the authz round-trip, not the load. Only meaningful in
   combination with the dedicated proxy above, as an optimisation of its authz interface.
+
+## What later phases expect from this task
+
+Nothing depends on this phase. It is an optimisation, and phase 4 is independent of it.

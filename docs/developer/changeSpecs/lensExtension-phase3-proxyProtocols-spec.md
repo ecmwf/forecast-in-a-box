@@ -1,16 +1,23 @@
-# Lens Proxy -- Extending Beyond HTTP Streaming
+# Phase 3 -- Extending the Lens Proxy Beyond HTTP Streaming
 
 ## Status and audience
 
-This is a forward-looking, architect-oriented note. It assumes the initial HTTP
-streaming proxy (`lensProxy-backend-initial.md`) and its frontend adaptation
-(`lensProxy-frontend.md`) are in place, but that the codebase may have evolved
-considerably in unrelated ways since. Treat file/function names below as anchors to
-re-locate, not as guarantees.
+This is a forward-looking, architect-oriented note, filed under phase 3 of the effort
+described in `lensExtension-overview.md` because it shares that phase's subject matter --
+the transport layer of the lens proxy -- though it is independent of the offloading work
+in `lensExtension-phase3-rustProxy-spec.md` and may never be needed at all.
+
+It assumes the HTTP streaming proxy and its frontend adaptation are in place, but that
+the codebase may have evolved considerably in unrelated ways since. Treat file/function
+names below as anchors to re-locate, not as guarantees.
 
 Nothing here may ever be needed. It exists so that, when a lens type or a client shows
 up that needs more than plain HTTP request/response, the person doing it has a map of
 the terrain and of the decisions already baked into the contract.
+
+Note that the native lens kind introduced in phase 2 sidesteps this document entirely:
+a protocol the backend speaks itself needs no tunnelling. This note concerns process
+lenses, which are reached only through the proxy.
 
 ## The framing that still holds
 
@@ -46,7 +53,7 @@ Most tractable extension; browsers speak it natively.
 - Watch-outs: backpressure (don't let one side outrun the other unboundedly),
   half-close semantics, ping/pong keepalive, and the fact that every open socket pins
   an event-loop task on the single worker -- reinforces the sidecar discussion
-  (`lensProxy-backend-sidecar.md`).
+  (`lensExtension-phase3-rustProxy-spec.md`).
 
 ## Server-Sent Events (SSE) and long-lived streaming HTTP
 
@@ -93,7 +100,7 @@ but the cost jumps.
   bypass.
 - **Worker pressure.** WebSocket and long-lived streams multiply the "single worker"
   concern. If any of these ship at scale, the sidecar/offload design becomes a
-  prerequisite, not an optimisation -- see `lensProxy-backend-sidecar.md`.
+  prerequisite, not an optimisation -- see `lensExtension-phase3-rustProxy-spec.md`.
 - **Client symmetry.** Each transport needs matching support in every client that will
   use it. HTTP is free (any HTTP client); WebSocket needs a WS client; raw tunnelling
   needs a bespoke client library. Budget for the client side, not just the backend.

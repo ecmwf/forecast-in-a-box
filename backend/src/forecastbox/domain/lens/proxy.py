@@ -30,8 +30,8 @@ Supported traffic
 - NOT supported (at the time of writing): WebSocket upgrades, Server-Sent Events kept
   open indefinitely (they will "work" but hold a worker), HTTP/2-only features, and
   any non-HTTP protocol. A lens that a client must reach through this proxy MUST speak
-  plain HTTP request/response. See lensProxy-backend-extension.md for how these could
-  be added later.
+  plain HTTP request/response. See lensExtension-phase3-proxyProtocols-spec.md for how
+  these could be added later.
 
 Authentication
 --------------
