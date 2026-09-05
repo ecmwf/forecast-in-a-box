@@ -68,9 +68,10 @@ export const JobExecutionDetailSchema = z.object({
   outputs: RunOutputsSchema.nullable(),
   completed_block_ids: z.array(z.string()).nullable().optional(),
   planned_block_ids: z.array(z.string()).nullable().optional(),
-  /** As-run values of glyphed options, by block then option; absent pre-#640. */
+  /** As-run values of glyphed options, by block then option; absent pre-#640.
+   * A value is null only for an explicitly null option (#691). */
   resolution: z
-    .record(z.string(), z.record(z.string(), z.string()))
+    .record(z.string(), z.record(z.string(), z.string().nullable()))
     .nullable()
     .optional(),
 })

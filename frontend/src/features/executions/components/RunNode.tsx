@@ -198,7 +198,8 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
           <div className="border-t border-border px-2 py-1">
             {configEntries.map(([key, value]) => {
               // Show what the run used; the template stays reachable on hover.
-              const asRun = resolved?.[key]
+              // A null as-run value has nothing to show over the template.
+              const asRun = resolved?.[key] ?? undefined
               const display = asRun ?? value
               const fromTemplate = asRun !== undefined && asRun !== value
               // The column truncates early, so anything longer needs the hover.

@@ -80,6 +80,15 @@ describe('JobExecutionDetailSchema', () => {
     })
   })
 
+  it('accepts a null as-run value for an explicitly null option (ecmwf#691)', () => {
+    const result = JobExecutionDetailSchema.parse({
+      ...baseDetail,
+      status: 'completed',
+      resolution: { block_source_1: { text: null } },
+    })
+    expect(result.resolution).toEqual({ block_source_1: { text: null } })
+  })
+
   it('accepts absent and null resolution (pre-#640 backends and old runs)', () => {
     expect(
       JobExecutionDetailSchema.parse(baseDetail).resolution,
