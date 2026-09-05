@@ -32,7 +32,7 @@ export default mergeConfig(
         '@tanstack/charts/scales/band',
         '@tanstack/charts/scales/linear',
         '@tanstack/charts/tooltip',
-        '@tanstack/react-charts/tooltip',
+        '@tanstack/charts/react/tooltip',
         '@base-ui/react/checkbox',
       ],
     },

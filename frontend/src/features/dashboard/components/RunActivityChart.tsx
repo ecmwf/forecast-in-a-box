@@ -19,7 +19,7 @@ import { motion } from '@tanstack/charts/motion'
 import { scaleBand } from '@tanstack/charts/scales/band'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { tooltip } from '@tanstack/charts/tooltip'
-import { RendererChart } from '@tanstack/react-charts/tooltip'
+import { RendererChart } from '@tanstack/charts/react/tooltip'
 
 /** One bucket per month: `month` label and forecast `count`. */
 interface MonthBucket {
