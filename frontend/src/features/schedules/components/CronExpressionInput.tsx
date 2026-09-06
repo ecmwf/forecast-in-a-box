@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CronFrequency } from '@/features/schedules/utils/cron'
 import {
@@ -20,7 +20,11 @@ import {
   utcHourMinuteToLocal,
 } from '@/features/schedules/utils/cron'
 
-import { timeZoneOffsetLabel, useAppTimeZone } from '@/lib/datetime'
+import {
+  formatInZone,
+  timeZoneOffsetLabel,
+  useAppTimeZone,
+} from '@/lib/datetime'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
@@ -66,6 +70,13 @@ export function CronExpressionInput({
   )
   const [dayOfWeek, setDayOfWeek] = useState(parsed?.dayOfWeek ?? 1)
   const [showRaw, setShowRaw] = useState(false)
+
+  // Live clock in the schedule zone, so the entered hour has a reference.
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   // Displayed hour/minute derive from the cron expression (UTC) each render.
   const localTime = utcHourMinuteToLocal(
@@ -165,6 +176,12 @@ export function CronExpressionInput({
               />
               <span className="text-sm text-muted-foreground">
                 {timeZoneOffsetLabel(timeZone)}
+              </span>
+              <span className="ml-auto text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+                {t('cron.now', {
+                  time: formatInZone(now, timeZone, 'HH:mm'),
+                  zone: timeZoneOffsetLabel(timeZone),
+                })}
               </span>
             </>
           )}

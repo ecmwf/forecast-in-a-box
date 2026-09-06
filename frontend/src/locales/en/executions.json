@@ -123,7 +123,8 @@
       "everyHourAtMinute": "Every hour at minute {{minute}}",
       "everyDayAt": "Every day at {{time}} {{zone}}",
       "everyDayOfWeekAt": "Every {{day}} at {{time}} {{zone}}"
-    }
+    },
+    "now": "Time now: {{time}} {{zone}}"
   },
   "outputs": {
     "generated": "Generated",
