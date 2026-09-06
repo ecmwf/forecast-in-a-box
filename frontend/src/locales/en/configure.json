@@ -81,9 +81,9 @@
   },
   "validationStatus": {
     "validating": "Validating",
-    "valid": "Valid",
-    "issues_one": "{{count}} issue",
-    "issues_other": "{{count}} issues",
+    "valid": "Ready to run",
+    "issues_one": "{{count}} issue to fix",
+    "issues_other": "{{count}} issues to fix",
     "globalIssueLabel": "Configuration",
     "validatingConfiguration": "Validating configuration...",
     "configurationIssues": "Configuration Issues",

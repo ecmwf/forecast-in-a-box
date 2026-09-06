@@ -270,7 +270,7 @@ describe('configure first-run tutorial', () => {
       })
       .toBeVisible()
     await expect
-      .element(screen.getByText('Valid', { exact: true }))
+      .element(screen.getByText('Ready to run', { exact: true }))
       .toBeVisible()
     await screen.getByRole('button', { name: 'Show me', exact: true }).click()
     await expect
