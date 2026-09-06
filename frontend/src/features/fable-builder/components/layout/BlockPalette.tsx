@@ -279,7 +279,7 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
                           <P className="truncate font-medium">
                             {factory.title}
                           </P>
-                          <P className="truncate text-muted-foreground">
+                          <P className="line-clamp-2 text-muted-foreground">
                             {factory.description}
                           </P>
                         </div>
