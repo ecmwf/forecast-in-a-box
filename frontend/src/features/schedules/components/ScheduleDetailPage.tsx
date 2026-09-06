@@ -52,7 +52,7 @@ import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
 import { ForecastRunSearchHeader } from '@/features/journal/components/ForecastRunSearchHeader'
 import { useRunFavourites } from '@/features/journal/hooks/useRunFavourites'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { H2, P } from '@/components/base/typography'
+import { H1, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -175,7 +175,7 @@ export function ScheduleDetailPage() {
 
       <div>
         <div className="flex items-center gap-2">
-          <H2 className="text-xl font-semibold">{displayName}</H2>
+          <H1 className="text-2xl">{displayName}</H1>
           <Button
             variant="ghost"
             size="icon"

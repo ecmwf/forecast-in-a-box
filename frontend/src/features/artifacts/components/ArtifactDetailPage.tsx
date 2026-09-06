@@ -88,7 +88,7 @@ export function ArtifactDetailPage({
       {/* Header */}
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <H1 className="text-2xl font-bold">{detail.display_name}</H1>
+          <H1 className="text-2xl">{detail.display_name}</H1>
           <P className="mt-1 text-muted-foreground">{detail.display_author}</P>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <ArtifactStatusBadge

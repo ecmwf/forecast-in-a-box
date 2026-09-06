@@ -49,7 +49,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { H2, P } from '@/components/base/typography'
+import { H1, P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
 interface RunStatusHeaderProps {
@@ -187,7 +187,7 @@ export function RunStatusHeader({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <H2 className="text-2xl font-bold">{name}</H2>
+            <H1 className="text-2xl">{name}</H1>
             {onEditMetadata && (
               <Button
                 variant="ghost"
