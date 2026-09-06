@@ -13,13 +13,10 @@ import {
   cronToHumanReadable,
   formatLocalDateTime,
   frequencyToCron,
-  localHourMinuteToServer,
+  localHourMinuteToUtc,
   parseCronForUI,
-  serverHourMinuteToLocal,
+  utcHourMinuteToLocal,
 } from '@/features/schedules/utils/cron'
-import { timeZoneOffsetLabel } from '@/lib/datetime'
-
-const MIN = 60_000
 
 describe('parseCronForUI', () => {
   it('parses hourly expressions', () => {
@@ -71,68 +68,75 @@ describe('cronToHumanReadable', () => {
   })
 
   it('describes hourly schedules without timezone conversion', () => {
-    expect(cronToHumanReadable('0 * * * *', 0, 'UTC')).toBe('Every hour')
-    expect(cronToHumanReadable('30 * * * *', 0, 'UTC')).toBe(
+    expect(cronToHumanReadable('0 * * * *', 'UTC')).toBe('Every hour')
+    expect(cronToHumanReadable('30 * * * *', 'UTC')).toBe(
       'Every hour at minute 30',
     )
   })
 
-  it('falls back to "(server time)" when the offset is unknown', () => {
-    expect(cronToHumanReadable('0 14 * * *', null, 'UTC')).toBe(
-      'Every day at 14:00 (server time)',
-    )
-    expect(cronToHumanReadable('30 9 * * 1', null, 'UTC')).toBe(
-      'Every Monday at 09:30 (server time)',
-    )
-  })
-
-  it('renders a converted daily cron with the app-timezone label', () => {
+  it('renders a UTC cron in the app timezone with its offset label', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-15T12:00:00Z'))
-    const result = cronToHumanReadable('0 14 * * *', 120 * MIN, 'Europe/Berlin')
-    expect(result).toMatch(/^Every day at \d{2}:\d{2} /)
-    expect(result).toContain(timeZoneOffsetLabel('Europe/Berlin'))
+    expect(cronToHumanReadable('0 14 * * *', 'Europe/Berlin')).toBe(
+      'Every day at 16:00 UTC+2',
+    )
+    expect(cronToHumanReadable('30 1 * * 1', 'Asia/Kolkata')).toBe(
+      'Every Monday at 07:00 UTC+5:30',
+    )
   })
 
   it('returns the raw expression for unrecognized patterns', () => {
-    expect(cronToHumanReadable('0 0 1 * *', 0, 'UTC')).toBe('0 0 1 * *')
+    expect(cronToHumanReadable('0 0 1 * *', 'UTC')).toBe('0 0 1 * *')
   })
 })
 
-describe('cron time round-trip', () => {
+describe('cron time conversion', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  it('round-trips local <-> server hour:minute across zones, offsets and DST', () => {
+  // The scheduler evaluates cron in UTC; the browser zone must not leak in.
+  it('maps UTC cron hours into the app timezone', () => {
+    expect(utcHourMinuteToLocal(8, 0, 'UTC')).toEqual({ hour: 8, minute: 0 })
+    expect(utcHourMinuteToLocal(8, 0, 'Asia/Bangkok')).toEqual({
+      hour: 15,
+      minute: 0,
+    })
+    expect(utcHourMinuteToLocal(23, 30, 'Asia/Kolkata')).toEqual({
+      hour: 5,
+      minute: 0,
+    })
+  })
+
+  it('maps app-timezone hours back to UTC', () => {
+    expect(localHourMinuteToUtc(8, 0, 'UTC')).toEqual({ hour: 8, minute: 0 })
+    expect(localHourMinuteToUtc(15, 0, 'Asia/Bangkok')).toEqual({
+      hour: 8,
+      minute: 0,
+    })
+    expect(localHourMinuteToUtc(5, 0, 'Asia/Kolkata')).toEqual({
+      hour: 23,
+      minute: 30,
+    })
+  })
+
+  it('round-trips across zones on both sides of DST', () => {
     const cases = [
       { h: 10, m: 0 },
       { h: 0, m: 30 },
       { h: 23, m: 45 },
     ]
-    const offsets = [0, 120 * MIN, -300 * MIN, 90 * MIN]
-    const zones = ['UTC', 'Europe/Berlin', 'Asia/Kolkata']
-    // Winter and summer pins exercise both sides of a DST transition.
-    const dates = ['2026-01-15T12:00:00Z', '2026-07-15T12:00:00Z']
-
-    for (const date of dates) {
+    const zones = ['UTC', 'Europe/Berlin', 'Asia/Kolkata', 'America/New_York']
+    for (const date of ['2026-01-15T12:00:00Z', '2026-07-15T12:00:00Z']) {
       vi.useFakeTimers()
       vi.setSystemTime(new Date(date))
       for (const zone of zones) {
-        for (const offset of offsets) {
-          for (const { h, m } of cases) {
-            const server = localHourMinuteToServer(h, m, offset, zone)
-            const back = serverHourMinuteToLocal(
-              server.hour,
-              server.minute,
-              offset,
-              zone,
-            )
-            expect(
-              back,
-              `h=${h} m=${m} zone=${zone} offset=${offset} date=${date}`,
-            ).toEqual({ hour: h, minute: m })
-          }
+        for (const { h, m } of cases) {
+          const utc = localHourMinuteToUtc(h, m, zone)
+          expect(
+            utcHourMinuteToLocal(utc.hour, utc.minute, zone),
+            `h=${h} m=${m} zone=${zone} date=${date}`,
+          ).toEqual({ hour: h, minute: m })
         }
       }
       vi.useRealTimers()

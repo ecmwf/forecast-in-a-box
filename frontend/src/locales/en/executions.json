@@ -122,9 +122,7 @@
       "everyHour": "Every hour",
       "everyHourAtMinute": "Every hour at minute {{minute}}",
       "everyDayAt": "Every day at {{time}} {{zone}}",
-      "everyDayAtServerTime": "Every day at {{time}} (server time)",
-      "everyDayOfWeekAt": "Every {{day}} at {{time}} {{zone}}",
-      "everyDayOfWeekAtServerTime": "Every {{day}} at {{time}} (server time)"
+      "everyDayOfWeekAt": "Every {{day}} at {{time}} {{zone}}"
     }
   },
   "outputs": {

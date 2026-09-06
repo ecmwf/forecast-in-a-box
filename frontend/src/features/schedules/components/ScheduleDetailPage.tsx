@@ -86,7 +86,7 @@ export function ScheduleDetailPage() {
   const updateSchedule = useUpdateSchedule()
   const { data: catalogue } = useBlockCatalogue()
   const { data: blueprint } = useFableRetrieve(schedule?.blueprint_id)
-  const { offsetMs, serverTimeToLocal, timeZone } = useServerTime()
+  const { serverTimeToLocal, timeZone } = useServerTime()
   const { isBookmarked, toggleBookmark } = useRunFavourites()
 
   const containerClass = cn(
@@ -125,7 +125,7 @@ export function ScheduleDetailPage() {
     `${t('detail.untitledSchedule')} ${scheduleId.slice(0, 8)}`
 
   const cronDescription = schedule.cron_expr
-    ? cronToHumanReadable(schedule.cron_expr, offsetMs, timeZone)
+    ? cronToHumanReadable(schedule.cron_expr, timeZone)
     : null
 
   async function handleToggleEnabled(newEnabled?: boolean) {
