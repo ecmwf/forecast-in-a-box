@@ -57,7 +57,7 @@ export function LayerRunSelect({
       {showSlot && (
         <span
           className={cn(
-            'flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
+            'flex h-4 w-4 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-bold',
             SLOT_CHIP_CLASS[slot],
           )}
         >

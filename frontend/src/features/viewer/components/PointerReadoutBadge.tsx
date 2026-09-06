@@ -28,7 +28,7 @@ export function PointerReadoutBadge({
   metres: boolean
 }) {
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-10 grid gap-0.5 rounded-md border border-border bg-background/90 px-2.5 py-1 font-mono text-xs tabular-nums shadow-sm backdrop-blur-sm">
+    <div className="pointer-events-none absolute bottom-3 left-3 z-10 grid gap-0.5 rounded-md border border-border bg-background/90 px-2.5 py-1 font-mono text-xs tabular-nums backdrop-blur-sm">
       {metres ? (
         <span>
           <span className="text-muted-foreground">{crs}: </span>

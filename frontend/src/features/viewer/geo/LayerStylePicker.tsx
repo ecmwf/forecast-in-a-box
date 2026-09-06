@@ -196,7 +196,7 @@ export function LayerStylePicker({
                       setOpen(false)
                     }}
                     className={cn(
-                      'flex w-full flex-col gap-1 rounded px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent',
+                      'flex w-full flex-col gap-1 rounded-md px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent',
                       selected && 'bg-accent font-medium',
                       active === option.name && 'bg-accent',
                     )}
@@ -219,7 +219,7 @@ export function LayerStylePicker({
                           <span
                             key={slot}
                             className={cn(
-                              'flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
+                              'flex h-4 w-4 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-bold',
                               SLOT_CHIP_CLASS[slot],
                             )}
                             title={t('sidebar.styleOnlyInHint', {
@@ -236,7 +236,7 @@ export function LayerStylePicker({
                         src={strip}
                         alt=""
                         loading="lazy"
-                        className="h-5 w-full rounded bg-white object-contain object-left p-0.5"
+                        className="h-5 w-full rounded-md bg-white object-contain object-left p-0.5"
                       />
                     )}
                   </button>
@@ -330,7 +330,7 @@ function StylePreview({
       {showSlot && (
         <span
           className={cn(
-            'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
+            'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-bold',
             SLOT_CHIP_CLASS[slot],
           )}
         >
@@ -341,7 +341,7 @@ function StylePreview({
         <div
           role="img"
           aria-label={t('sidebar.stylePreview', { name: title })}
-          className="flex min-h-24 items-center justify-center overflow-hidden rounded border border-border bg-[repeating-conic-gradient(var(--color-muted)_0_25%,transparent_0_50%)] bg-[length:12px_12px]"
+          className="flex min-h-24 items-center justify-center overflow-hidden rounded-md border border-border bg-[repeating-conic-gradient(var(--color-muted)_0_25%,transparent_0_50%)] bg-[length:12px_12px]"
         >
           {preview.src ? (
             <img src={preview.src} alt="" className="block w-full" />
@@ -358,7 +358,7 @@ function StylePreview({
             src={legend}
             alt=""
             loading="lazy"
-            className="max-h-24 max-w-full rounded bg-white object-contain p-0.5"
+            className="max-h-24 max-w-full rounded-md bg-white object-contain p-0.5"
           />
         )}
       </div>

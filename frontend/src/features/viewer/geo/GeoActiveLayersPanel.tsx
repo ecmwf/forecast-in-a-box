@@ -778,7 +778,7 @@ function ZoomToLayerButton({
       onClick={() => onZoomTo(bbox)}
       aria-label={t('sidebar.zoomToLayer', { name })}
       title={t('sidebar.zoomToLayer', { name })}
-      className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+      className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
     >
       <Scan className="h-3.5 w-3.5" />
     </button>
