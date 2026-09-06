@@ -94,6 +94,14 @@ export function ScheduleDetailPage() {
     'space-y-6 px-4 py-8 sm:px-6 lg:px-8',
   )
 
+  // App-TZ date — keeps the facet aligned with the row in any client TZ.
+  // Declared before the early returns so the hook order never changes.
+  const displayDateFor = useCallback(
+    (run: ForecastRunViewModel) =>
+      formatInZone(serverTimeToLocal(run.createdAt), timeZone, 'yyyy-MM-dd'),
+    [serverTimeToLocal, timeZone],
+  )
+
   if (isLoading) {
     return (
       <div className={containerClass}>
@@ -144,12 +152,6 @@ export function ScheduleDetailPage() {
       catalogue,
       isBookmarked: isBookmarked(run.run_id),
     }),
-  )
-  // App-TZ date — keeps the facet aligned with the row in any client TZ.
-  const displayDateFor = useCallback(
-    (run: ForecastRunViewModel) =>
-      formatInZone(serverTimeToLocal(run.createdAt), timeZone, 'yyyy-MM-dd'),
-    [serverTimeToLocal, timeZone],
   )
   const filteredRuns = filterRuns(
     runViewModels,
