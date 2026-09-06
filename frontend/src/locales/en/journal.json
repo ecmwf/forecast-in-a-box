@@ -1,8 +1,8 @@
 {
-  "title": "Forecast Journal",
+  "title": "Recent runs",
   "searchPlaceholder": "Search or filter, e.g. tag:production",
   "empty": "No forecasts found matching your criteria.",
-  "viewAll": "View all",
+  "viewAll": "View all runs",
   "clearFilters": "Clear filters",
   "flowToggle": "Flow preview",
   "filters": {
