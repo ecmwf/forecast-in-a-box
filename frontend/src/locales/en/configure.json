@@ -63,7 +63,7 @@
     "runOnSchedule": "Run on Schedule",
     "submitOptions": "More submit options",
     "backToEdit": "Back to Edit",
-    "submitJob": "Submit Job",
+    "submitJob": "Start Run",
     "reviewTooltipNoBlocks": "Add blocks to your configuration",
     "reviewTooltipNoSink": "Add at least one output block",
     "reviewTooltipInvalid": "Fix validation errors before submitting",
@@ -215,7 +215,7 @@
     "summaryDescription_one": "{{count}} block configured",
     "summaryDescription_other": "{{count}} blocks configured",
     "backToEdit": "Back to Edit",
-    "submitJob": "Submit Job",
+    "submitJob": "Start Run",
     "kindHeading": "{{label}}s"
   },
   "configSummary": {

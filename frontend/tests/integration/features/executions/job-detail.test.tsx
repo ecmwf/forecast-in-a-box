@@ -124,9 +124,9 @@ describe('RunDetailPage Integration', () => {
         .toBeVisible()
     })
 
-    it('renders Untitled Job when fable lookup fails', async () => {
+    it('renders Untitled run when fable lookup fails', async () => {
       const screen = await renderDetailPage('job-completed-001')
-      await expect.element(screen.getByText('Untitled Job')).toBeVisible()
+      await expect.element(screen.getByText('Untitled run')).toBeVisible()
     })
   })
 
@@ -169,7 +169,7 @@ describe('RunDetailPage Integration', () => {
     it('shows error message for nonexistent job', async () => {
       const screen = await renderDetailPage('nonexistent-job-id')
       await expect
-        .element(screen.getByText('The requested job could not be found.'))
+        .element(screen.getByText('The requested run could not be found.'))
         .toBeVisible()
     })
 

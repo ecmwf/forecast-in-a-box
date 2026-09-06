@@ -531,7 +531,7 @@ test.describe('Fable Builder - Review & Validation', () => {
     }
   })
 
-  test('submit job button visible on review step', async ({ page }) => {
+  test('start run button visible on review step', async ({ page }) => {
     if (!(await openTemplateConfig(page))) {
       test.skip(true, 'no plugin templates in this environment')
     }
@@ -543,9 +543,9 @@ test.describe('Fable Builder - Review & Validation', () => {
         await reviewButton.click()
         await page.waitForTimeout(2000)
 
-        // Submit Job button should be visible
+        // Start Run button should be visible
         const submitButton = page.getByRole('button', {
-          name: /submit job/i,
+          name: /start run/i,
         })
         if (
           await submitButton.isVisible({ timeout: 5000 }).catch(() => false)

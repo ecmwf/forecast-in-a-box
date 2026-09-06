@@ -6,15 +6,15 @@
   },
   "detail": {
     "backLink": "Runs",
-    "untitledJob": "Untitled Job",
+    "untitledJob": "Untitled run",
     "showParameters": "Show parameters",
     "hideParameters": "Hide parameters",
     "maximizeCanvas": "Maximize canvas",
     "restoreCanvas": "Exit full screen (Esc)",
     "graphUnavailable": "Graph visualisation unavailable",
-    "graphUnavailableDescription": "The pipeline graph is not available for this job.",
+    "graphUnavailableDescription": "The pipeline graph is not available for this run.",
     "specUnavailable": "Specification not available",
-    "specUnavailableDescription": "The original configuration was not stored for this job.",
+    "specUnavailableDescription": "The original configuration was not stored for this run.",
     "copySpec": "Copy",
     "copied": "Copied",
     "copyValue": "Copy value",
@@ -43,20 +43,20 @@
   },
   "actions": {
     "restart": "Restart",
-    "restartJob": "Restart Job",
+    "restartJob": "Restart Run",
     "delete": "Delete",
-    "deleteJob": "Delete Job",
+    "deleteJob": "Delete Run",
     "edit": "Edit",
     "editDetails": "Edit Details",
     "save": "Save",
     "editConfiguration": "Edit Configuration",
     "downloadLogs": "Download Full Logs",
     "downloadLogsFailed": "Failed to download logs",
-    "confirmRestart": "This will re-execute the job with the same specification. Continue?",
-    "confirmDelete": "This will permanently delete this job and its results. This action cannot be undone."
+    "confirmRestart": "This will run the forecast again with the same specification. Continue?",
+    "confirmDelete": "This will permanently delete this run and its results. This action cannot be undone."
   },
   "activity": {
-    "jobFallbackLabel": "Job {{id}}",
+    "jobFallbackLabel": "Run {{id}}",
     "submitted": "Submitted",
     "restarting": "Restarting (attempt {{attempt}})"
   },
@@ -64,17 +64,17 @@
     "run": "Run"
   },
   "submit": {
-    "title": "Submit Forecast Job",
+    "title": "Run Forecast",
     "name": "Name",
-    "namePlaceholder": "Enter a name for this job",
+    "namePlaceholder": "Enter a name for this run",
     "namePlaceholderOptional": "Name this run to find it later (optional)",
     "description": "Description",
-    "descriptionPlaceholder": "Optional notes about this execution",
+    "descriptionPlaceholder": "Optional notes about this run",
     "descriptionPlaceholderOptional": "Add notes about this run (optional)",
     "tags": "Tags",
     "tagsPlaceholder": "Add a tag",
     "tagsPlaceholderOptional": "Tag this run for easy filtering (optional)",
-    "advancedTitle": "Advanced: Execution Environment",
+    "advancedTitle": "Advanced: Run Environment",
     "hosts": "Hosts",
     "hostsPlaceholder": "Default (auto)",
     "workersPerHost": "Workers per host",
@@ -84,7 +84,7 @@
     "envValuePlaceholder": "Value",
     "addVariable": "Add variable",
     "cancel": "Cancel",
-    "submit": "Submit Job",
+    "submit": "Start Run",
     "submitting": "Submitting...",
     "modeRunNow": "Run Once",
     "modeSchedule": "Run on Schedule",
@@ -94,9 +94,7 @@
     "maxDelay": "Skip if delayed by (hours)",
     "maxDelayHelp": "If a scheduled run is delayed longer than this, it will be skipped instead of running late.",
     "scheduleCreated": "Schedule created successfully",
-    "compilingSpec": "Compiling specification...",
-    "serverTime": "(server time)",
-    "localEquivalent": "→ {{time}}"
+    "compilingSpec": "Compiling specification..."
   },
   "cron": {
     "frequency": {
@@ -285,14 +283,14 @@
     "executionEnded": "Run ended"
   },
   "errors": {
-    "executionFailed": "Execution Failed",
+    "executionFailed": "Run Failed",
     "copy": "Copy",
     "copied": "Copied",
     "copyFailed": "Couldn't copy the error message",
     "showFull": "Show full error",
     "showLess": "Show less",
-    "jobNotFound": "Job not found",
-    "jobNotFoundDescription": "The requested job could not be found.",
+    "jobNotFound": "Run not found",
+    "jobNotFoundDescription": "The requested run could not be found.",
     "backToExecutions": "Back to runs"
   },
   "empty": {

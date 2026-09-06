@@ -143,7 +143,7 @@ function SubmitRunForm({
     setError(null)
 
     // Fall back to the config-derived name when the user didn't enter one,
-    // so submitted jobs are never titled "Untitled Job".
+    // so submitted runs are never titled "Untitled run".
     const trimmedName = name.trim() || generatedName
     const trimmedDescription = description.trim() || null
 
