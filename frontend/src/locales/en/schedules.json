@@ -1,7 +1,7 @@
 {
   "page": {
-    "title": "Scheduled Forecasts",
-    "description": "Manage your scheduled forecast jobs"
+    "title": "Scheduled runs",
+    "description": "Manage your scheduled forecast runs"
   },
   "detail": {
     "backLink": "Schedules",
@@ -15,8 +15,8 @@
     "maxDelay": "Max delay",
     "maxDelayValue": "{{hours}} hours",
     "cronExpression": "Schedule",
-    "runsTitle": "Execution Journal",
-    "noRuns": "No executions yet",
+    "runsTitle": "Runs",
+    "noRuns": "No runs yet",
     "scheduledAt": "Scheduled at",
     "trigger": "Trigger",
     "status": "Status",
@@ -44,8 +44,8 @@
     "scheduleUpdated": "Schedule updated successfully"
   },
   "empty": {
-    "title": "No scheduled forecasts",
-    "description": "You haven't created any scheduled forecasts yet. Create one from the forecast builder."
+    "title": "No scheduled runs",
+    "description": "You haven't scheduled any runs yet. Create one from the forecast builder."
   },
   "list": {
     "loading": "Loading schedules..."

@@ -116,7 +116,7 @@ describe('RunListPage Integration', () => {
     it('renders the page header', async () => {
       const screen = await renderJobList()
       await expect
-        .element(screen.getByRole('heading', { level: 1, name: 'Executions' }))
+        .element(screen.getByRole('heading', { level: 1, name: 'Runs' }))
         .toBeVisible()
     })
 

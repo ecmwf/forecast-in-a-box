@@ -1,7 +1,7 @@
 {
   "title": "Recent runs",
   "searchPlaceholder": "Search or filter, e.g. tag:production",
-  "empty": "No forecasts found matching your criteria.",
+  "empty": "No runs match your filters.",
   "viewAll": "View all runs",
   "clearFilters": "Clear filters",
   "flowToggle": "Flow preview",

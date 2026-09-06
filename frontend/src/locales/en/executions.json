@@ -1,10 +1,10 @@
 {
   "page": {
-    "title": "Forecast Job Executions",
-    "description": "Monitor and manage your forecast job executions"
+    "title": "Runs",
+    "description": "Monitor and manage your forecast runs"
   },
   "detail": {
-    "backLink": "Executions",
+    "backLink": "Runs",
     "untitledJob": "Untitled Job",
     "showParameters": "Show parameters",
     "hideParameters": "Hide parameters",
@@ -282,7 +282,7 @@
     "connected": "Connected",
     "connecting": "Connecting...",
     "disconnected": "Disconnected",
-    "executionEnded": "Job execution ended"
+    "executionEnded": "Run ended"
   },
   "errors": {
     "executionFailed": "Execution Failed",
@@ -293,11 +293,11 @@
     "showLess": "Show less",
     "jobNotFound": "Job not found",
     "jobNotFoundDescription": "The requested job could not be found.",
-    "backToExecutions": "Back to Executions"
+    "backToExecutions": "Back to runs"
   },
   "empty": {
-    "title": "No executions",
-    "description": "You haven't run any forecast jobs yet. Start by creating a new forecast configuration.",
+    "title": "No runs",
+    "description": "You haven't run a forecast yet. Start by creating a forecast configuration.",
     "action": "Create Forecast"
   },
   "filter": {
@@ -308,11 +308,11 @@
     "running": "Running",
     "completed": "Completed",
     "failed": "Failed",
-    "searchPlaceholder": "Search executions..."
+    "searchPlaceholder": "Search runs..."
   },
   "list": {
-    "loading": "Loading executions...",
-    "error": "Failed to load executions"
+    "loading": "Loading runs...",
+    "error": "Failed to load runs"
   },
   "pagination": {
     "previous": "Previous",

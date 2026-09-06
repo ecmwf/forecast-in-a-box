@@ -175,7 +175,7 @@ describe('RunDetailPage Integration', () => {
 
     it('shows back to executions button on error', async () => {
       const screen = await renderDetailPage('nonexistent-job-id')
-      await expect.element(screen.getByText('Back to Executions')).toBeVisible()
+      await expect.element(screen.getByText('Back to runs')).toBeVisible()
     })
   })
 

@@ -30,7 +30,7 @@
   "activity": {
     "label": "Notification Center",
     "title": "Notification Center",
-    "help": "Shows long-running tasks such as model downloads, plugin installations, and forecast job executions. Completed items stay here until you dismiss them.",
+    "help": "Shows long-running tasks such as model downloads, plugin installations, and forecast runs. Completed items stay here until you dismiss them.",
     "clear": "Clear",
     "clearAll": "Clear all",
     "empty": "No notifications",
@@ -41,7 +41,7 @@
     "filterPlaceholder": "Filter notifications…",
     "noMatches": "No matches",
     "dismiss": "Dismiss",
-    "viewAll": "Open executions",
+    "viewAll": "Open runs",
     "downloadStarting": "Starting download...",
     "downloadProgress": "Downloading {{progress}}%",
     "downloadComplete": "Download complete",
@@ -157,7 +157,7 @@
     },
     "executions": {
       "label": "Execute",
-      "description": "Monitor forecast job executions"
+      "description": "Monitor forecast runs"
     },
     "admin": {
       "label": "Admin",
