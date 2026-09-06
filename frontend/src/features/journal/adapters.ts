@@ -18,6 +18,7 @@ import type {
 import type { ForecastRunViewModel } from '@/features/journal/types'
 import { getBlocksByKind, getFactory } from '@/api/types/fable.types'
 import { stripSystemTags } from '@/lib/system-tags'
+import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
 
 /** Title of the run's first source block. */
 export function deriveModelLabel(
@@ -71,6 +72,7 @@ interface RunViewModelCore {
   producedOutputs: number
   /** Of the produced outputs, how many are no longer retrievable. */
   lostOutputs: number
+  hasComparableOutput: boolean | null
   errorMessage: string | null
 }
 
@@ -94,6 +96,7 @@ function buildRunViewModel(core: RunViewModelCore): ForecastRunViewModel {
     modelLabel: canDeriveBlocks ? deriveModelLabel(builder, catalogue) : null,
     outputCount: core.producedOutputs || sinkCount,
     lostOutputCount: core.lostOutputs,
+    hasComparableOutput: core.hasComparableOutput,
     errorMessage: core.errorMessage,
     outputKinds: canDeriveBlocks ? deriveSinkKinds(builder, catalogue) : [],
     tags: stripSystemTags(core.blueprint?.tags),
@@ -133,6 +136,10 @@ export function runDetailToViewModel({
     isBookmarked,
     producedOutputs: run.outputs ? Object.keys(run.outputs).length : 0,
     lostOutputs: Object.keys(run.lost_task_ids).length,
+    hasComparableOutput: Object.entries(run.outputs ?? {}).some(
+      ([taskId, meta]) =>
+        meta.mime_type === GRIB_DIR_MIME && !(taskId in run.lost_task_ids),
+    ),
     errorMessage: run.status === 'failed' ? run.error : null,
   })
 }
@@ -169,6 +176,8 @@ export function scheduleRunToViewModel({
     isBookmarked,
     producedOutputs: 0,
     lostOutputs: 0,
+    // The schedule endpoint carries no outputs; the pairing step decides.
+    hasComparableOutput: null,
     errorMessage: null,
   })
 }

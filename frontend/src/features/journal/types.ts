@@ -46,6 +46,8 @@ export interface ForecastRunViewModel {
   scheduleName: string | null
   /** Id of that schedule, for linking to its page. */
   scheduleId: string | null
+  /** Has a retained GRIB output the map can show; null when the source cannot tell. */
+  hasComparableOutput: boolean | null
   isBookmarked: boolean
 }
 

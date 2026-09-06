@@ -33,6 +33,7 @@ function run(overrides: Partial<ForecastRunViewModel>): ForecastRunViewModel {
     fromPreset: false,
     scheduleName: null,
     scheduleId: null,
+    hasComparableOutput: null,
     isBookmarked: false,
     ...overrides,
   }

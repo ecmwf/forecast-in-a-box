@@ -82,6 +82,11 @@ export const ForecastRunRow = memo(function ({
             disabled={selectDisabled}
             onCheckedChange={() => onToggleSelect(run.runId)}
             aria-label={t('item.select', { name: title })}
+            title={
+              run.hasComparableOutput === false
+                ? t('item.notComparable')
+                : undefined
+            }
             className="mt-1 sm:mt-0"
           />
         )}

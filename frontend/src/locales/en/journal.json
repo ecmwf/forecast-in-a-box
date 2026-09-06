@@ -76,7 +76,8 @@
     "openSchedule": "Open schedule",
     "filterBySchedule": "Show runs of schedule {{name}}",
     "compareWithPrevious": "Compare with previous run",
-    "select": "Select {{name}}"
+    "select": "Select {{name}}",
+    "notComparable": "No stored GRIB output to show on the map"
   },
   "metadata": {
     "title": "Edit run details",

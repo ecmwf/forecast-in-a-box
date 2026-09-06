@@ -69,6 +69,7 @@ export function ForecastRunList({
         selectDisabled={
           onToggleSelect !== undefined &&
           (run.status !== 'completed' ||
+            run.hasComparableOutput === false ||
             (selectionCap !== undefined &&
               selectedIds !== undefined &&
               selectedIds.size >= selectionCap &&
