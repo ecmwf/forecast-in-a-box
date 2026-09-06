@@ -44,6 +44,8 @@ export interface ForecastRunViewModel {
   fromPreset: boolean
   /** Name of the schedule that produced this run, or null for one-off runs. */
   scheduleName: string | null
+  /** Id of that schedule, for linking to its page. */
+  scheduleId: string | null
   isBookmarked: boolean
 }
 

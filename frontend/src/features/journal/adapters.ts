@@ -101,6 +101,7 @@ function buildRunViewModel(core: RunViewModelCore): ForecastRunViewModel {
     // useForecastRuns overrides these once the schedule/preset lists resolve.
     fromPreset: false,
     scheduleName: null,
+    scheduleId: null,
     isBookmarked: core.isBookmarked,
   }
 }

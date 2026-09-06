@@ -9,13 +9,14 @@
  */
 
 /** Facet keys usable as `key:value` tokens in the journal search bar. */
-export type FacetKey = 'model' | 'output' | 'tag' | 'date'
+export type FacetKey = 'model' | 'output' | 'tag' | 'date' | 'schedule'
 
 export const FACET_KEYS: ReadonlyArray<FacetKey> = [
   'model',
   'output',
   'tag',
   'date',
+  'schedule',
 ]
 
 /** A parsed `key:value` filter token. */

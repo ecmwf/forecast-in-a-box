@@ -32,6 +32,7 @@ function run(overrides: Partial<ForecastRunViewModel>): ForecastRunViewModel {
     blueprintId: 'bp',
     fromPreset: false,
     scheduleName: null,
+    scheduleId: null,
     isBookmarked: false,
     ...overrides,
   }

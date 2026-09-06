@@ -72,7 +72,9 @@
     "delete": "Delete",
     "preset": "Preset",
     "scheduled": "Scheduled",
-    "moreOptions": "More options"
+    "moreOptions": "More options",
+    "openSchedule": "Open schedule",
+    "filterBySchedule": "Show runs of schedule {{name}}"
   },
   "metadata": {
     "title": "Edit run details",

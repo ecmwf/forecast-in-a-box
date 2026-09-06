@@ -132,12 +132,31 @@ export const ForecastRunRow = memo(function ({
             </p>
           )}
           <div className="flex flex-wrap items-start gap-2">
-            {run.scheduleName && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-indigo-500/10 px-2 py-0.5 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                <CalendarClock className="h-3 w-3" />
-                {t('item.scheduled')}
-              </span>
-            )}
+            {run.scheduleName &&
+              (onAddFacet ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onAddFacet({ key: 'schedule', value: run.scheduleName! })
+                  }
+                  title={run.scheduleName}
+                  aria-label={t('item.filterBySchedule', {
+                    name: run.scheduleName,
+                  })}
+                  className="inline-flex items-center gap-1 rounded-md bg-indigo-500/10 px-2 py-0.5 text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-500/20 dark:text-indigo-400"
+                >
+                  <CalendarClock className="h-3 w-3" />
+                  {t('item.scheduled')}
+                </button>
+              ) : (
+                <span
+                  title={run.scheduleName}
+                  className="inline-flex items-center gap-1 rounded-md bg-indigo-500/10 px-2 py-0.5 text-sm font-medium text-indigo-600 dark:text-indigo-400"
+                >
+                  <CalendarClock className="h-3 w-3" />
+                  {t('item.scheduled')}
+                </span>
+              ))}
             {run.fromPreset && (
               <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary">
                 <Bookmark className="h-3 w-3" />

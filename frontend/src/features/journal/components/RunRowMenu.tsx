@@ -14,6 +14,7 @@ import { useState } from 'react'
 import {
   BookmarkMinus,
   BookmarkPlus,
+  CalendarClock,
   MoreVertical,
   Pencil,
   Trash2,
@@ -130,6 +131,19 @@ export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
             <Pencil className="h-4 w-4" />
             {t('item.editConfig')}
           </DropdownMenuItem>
+          {run.scheduleId && (
+            <DropdownMenuItem
+              onClick={() =>
+                navigate({
+                  to: '/schedules/$scheduleId',
+                  params: { scheduleId: run.scheduleId! },
+                })
+              }
+            >
+              <CalendarClock className="h-4 w-4" />
+              {t('item.openSchedule')}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={handleTogglePreset}
             disabled={!blueprint || upsertFable.isPending}

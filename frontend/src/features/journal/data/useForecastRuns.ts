@@ -58,16 +58,17 @@ export function useForecastRuns(runs: ReadonlyArray<JobExecutionDetail>): {
   // A schedule's runs all carry its blueprint id, so map blueprint → schedule
   // name for the "Scheduled" chip and group-by-schedule. (/run/list carries no
   // experiment id; backend enrichment would make this exact.)
-  const scheduleNameByBlueprint = useMemo(() => {
-    const byBlueprint = new Map<string, string>()
+  const scheduleByBlueprint = useMemo(() => {
+    const byBlueprint = new Map<string, { id: string; name: string }>()
     for (const schedule of scheduleList?.experiments ?? []) {
-      byBlueprint.set(
-        schedule.blueprint_id,
-        schedule.display_name?.trim() ||
+      byBlueprint.set(schedule.blueprint_id, {
+        id: schedule.experiment_id,
+        name:
+          schedule.display_name?.trim() ||
           t('scheduleFallback', {
             id: schedule.experiment_id.slice(0, 8),
           }),
-      )
+      })
     }
     return byBlueprint
   }, [scheduleList, t])
@@ -120,10 +121,12 @@ export function useForecastRuns(runs: ReadonlyArray<JobExecutionDetail>): {
           isBookmarked: run.run_id in bookmarks,
         })
         const parentId = blueprint?.parent_id
+        const schedule = scheduleByBlueprint.get(run.blueprint_id)
         return {
           ...vm,
           fromPreset: parentId != null && presetIds.has(parentId),
-          scheduleName: scheduleNameByBlueprint.get(run.blueprint_id) ?? null,
+          scheduleName: schedule?.name ?? null,
+          scheduleId: schedule?.id ?? null,
         }
       }),
     [
@@ -132,7 +135,7 @@ export function useForecastRuns(runs: ReadonlyArray<JobExecutionDetail>): {
       catalogue,
       bookmarks,
       presetIds,
-      scheduleNameByBlueprint,
+      scheduleByBlueprint,
     ],
   )
 
