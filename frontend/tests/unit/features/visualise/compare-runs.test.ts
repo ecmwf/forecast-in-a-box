@@ -11,7 +11,10 @@
 import { describe, expect, it } from 'vitest'
 import type { JobExecutionDetail } from '@/api/types/job.types'
 import type { ScheduleRunsResponse } from '@/api/types/schedule.types'
-import { buildPreviousRunComparison } from '@/features/visualise/compare-runs'
+import {
+  buildPreviousRunComparison,
+  buildRunPairComparison,
+} from '@/features/visualise/compare-runs'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
 
 const run = {
@@ -79,6 +82,27 @@ describe('buildPreviousRunComparison', () => {
     })
   })
 
+  it('falls back to timestamps when the run is beyond the history page', async () => {
+    const jobs: Record<string, JobExecutionDetail> = {
+      'run-3': detail({ t9: { block: 'grib' } }),
+      'run-0': detail({ t2: { block: 'grib' } }),
+    }
+    const result = await buildPreviousRunComparison(run, {
+      scheduleRuns: () =>
+        Promise.resolve(
+          history([
+            { id: 'run-9', at: '2026-09-06 12:00:00.000123+00:00' },
+            { id: 'run-0', at: '2026-09-06 07:00:00.000123+00:00' },
+          ]),
+        ),
+      jobStatus: (id) => Promise.resolve(jobs[id]),
+    })
+    expect(result).toEqual({
+      ok: true,
+      search: { a: 'run:run-0~t2', b: 'run:run-3~t9' },
+    })
+  })
+
   it('reports when the schedule has no earlier completed run', async () => {
     const result = await buildPreviousRunComparison(run, {
       scheduleRuns: () =>
@@ -106,5 +130,32 @@ describe('buildPreviousRunComparison', () => {
       jobStatus: (id) => Promise.resolve(jobs[id]),
     })
     expect(result).toEqual({ ok: false, reason: 'noOutput' })
+  })
+})
+
+describe('buildRunPairComparison', () => {
+  it('orders any two runs earlier-first regardless of pick order', async () => {
+    const jobs: Record<string, JobExecutionDetail> = {
+      'run-a': detail({ t1: { block: 'grib' } }),
+      'run-b': detail({ t2: { block: 'grib' } }),
+    }
+    const later = {
+      runId: 'run-b',
+      createdAt: '2026-09-06T10:00:00+00:00',
+      displayName: 'Daily',
+    }
+    const earlier = {
+      runId: 'run-a',
+      createdAt: '2026-09-06T09:00:00+00:00',
+      displayName: 'Daily',
+    }
+    const result = await buildRunPairComparison(later, earlier, {
+      scheduleRuns: () => Promise.reject(new Error('not needed')),
+      jobStatus: (id) => Promise.resolve(jobs[id]),
+    })
+    expect(result).toEqual({
+      ok: true,
+      search: { a: 'run:run-a~t1', b: 'run:run-b~t2' },
+    })
   })
 })

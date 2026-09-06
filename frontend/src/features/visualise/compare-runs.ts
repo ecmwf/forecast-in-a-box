@@ -20,14 +20,16 @@ const HISTORY_PAGE_SIZE = 50
 
 export interface ComparableRun {
   runId: string
-  scheduleId: string
   createdAt: string
   displayName: string
 }
 
-export type PreviousRunComparison =
+export type RunPairComparison =
   | { ok: true; search: { a: string; b: string } }
-  | { ok: false; reason: 'noPrevious' | 'noOutput' }
+  | { ok: false; reason: 'noOutput' }
+
+export type PreviousRunComparison =
+  RunPairComparison | { ok: false; reason: 'noPrevious' }
 
 interface Fetchers {
   scheduleRuns: (scheduleId: string) => Promise<ScheduleRunsResponse>
@@ -37,6 +39,16 @@ interface Fetchers {
 const defaultFetchers: Fetchers = {
   scheduleRuns: (id) => getScheduleRuns(id, 1, HISTORY_PAGE_SIZE),
   jobStatus: getJobStatus,
+}
+
+/** Backend timestamps vary in separator and precision; both parse as UTC. */
+function serverInstant(value: string): number {
+  return Date.parse(
+    value
+      .trim()
+      .replace(' ', 'T')
+      .replace(/(\.\d{3})\d+/, '$1'),
+  )
 }
 
 /** Stored GRIB outputs still on disk, keyed by task id. */
@@ -50,58 +62,77 @@ function gribOutputs(detail: JobExecutionDetail) {
 }
 
 /**
- * Pair a scheduled run with the completed run of the same schedule issued
- * just before it: same output block on both sides, earlier issue in slot A.
- * Linked layers and exact time-link then compare the two issues by valid time.
+ * Put two runs of one configuration side by side: the same output block on
+ * both sides, the earlier issue in slot A. Linked layers and the exact
+ * time-link then compare the issues by valid time.
  */
-export async function buildPreviousRunComparison(
-  run: ComparableRun,
+export async function buildRunPairComparison(
+  first: ComparableRun,
+  second: ComparableRun,
   fetchers: Fetchers = defaultFetchers,
-): Promise<PreviousRunComparison> {
-  const history = await fetchers.scheduleRuns(run.scheduleId)
-  const issuedAt = Date.parse(run.createdAt)
-  const previous = history.runs
-    .filter(
-      (r) =>
-        r.run_id !== run.runId &&
-        r.status === 'completed' &&
-        Date.parse(r.created_at) < issuedAt,
-    )
-    .sort((x, y) => Date.parse(y.created_at) - Date.parse(x.created_at))
-    .at(0)
-  if (!previous) return { ok: false, reason: 'noPrevious' }
-
-  const [current, earlier] = await Promise.all([
-    fetchers.jobStatus(run.runId),
-    fetchers.jobStatus(previous.run_id),
+): Promise<RunPairComparison> {
+  const [earlier, later] =
+    serverInstant(first.createdAt) <= serverInstant(second.createdAt)
+      ? [first, second]
+      : [second, first]
+  const [laterDetail, earlierDetail] = await Promise.all([
+    fetchers.jobStatus(later.runId),
+    fetchers.jobStatus(earlier.runId),
   ])
-  const currentOutput = gribOutputs(current).at(0)
-  if (!currentOutput) return { ok: false, reason: 'noOutput' }
-  const earlierOutputs = gribOutputs(earlier)
+  const laterOutput = gribOutputs(laterDetail).at(0)
+  if (!laterOutput) return { ok: false, reason: 'noOutput' }
+  const earlierOutputs = gribOutputs(earlierDetail)
   const earlierOutput =
-    earlierOutputs.find((o) => o.blockId === currentOutput.blockId) ??
+    earlierOutputs.find((o) => o.blockId === laterOutput.blockId) ??
     earlierOutputs.at(0)
   if (!earlierOutput) return { ok: false, reason: 'noOutput' }
 
   const ref = (
-    jobId: string,
+    run: ComparableRun,
     output: { taskId: string; blockId: string },
-    createdAt: string,
   ) =>
     entryRef({
       kind: 'output',
-      jobId,
+      jobId: run.runId,
       taskId: output.taskId,
       blockId: output.blockId,
       runName: run.displayName,
       blockTitle: output.blockId,
-      runCreatedAt: createdAt,
+      runCreatedAt: run.createdAt,
     })
   return {
     ok: true,
-    search: {
-      a: ref(previous.run_id, earlierOutput, previous.created_at),
-      b: ref(run.runId, currentOutput, run.createdAt),
-    },
+    search: { a: ref(earlier, earlierOutput), b: ref(later, laterOutput) },
   }
+}
+
+/**
+ * Pair a scheduled run with the completed run of the same schedule issued
+ * just before it. The history endpoint lists newest first, so the partner is
+ * the next completed entry; timestamps only decide when the run is not on
+ * the first page.
+ */
+export async function buildPreviousRunComparison(
+  run: ComparableRun & { scheduleId: string },
+  fetchers: Fetchers = defaultFetchers,
+): Promise<PreviousRunComparison> {
+  const history = (await fetchers.scheduleRuns(run.scheduleId)).runs
+  const index = history.findIndex((r) => r.run_id === run.runId)
+  const candidates =
+    index >= 0
+      ? history.slice(index + 1)
+      : history.filter(
+          (r) => serverInstant(r.created_at) < serverInstant(run.createdAt),
+        )
+  const previous = candidates.find((r) => r.status === 'completed')
+  if (!previous) return { ok: false, reason: 'noPrevious' }
+  return buildRunPairComparison(
+    run,
+    {
+      runId: previous.run_id,
+      createdAt: previous.created_at,
+      displayName: run.displayName,
+    },
+    fetchers,
+  )
 }
