@@ -114,7 +114,7 @@ export function PdfThumbnail({ item }: ThumbnailProps) {
         <FileText className="absolute h-8 w-8 text-muted-foreground" />
       )}
       {pageCount !== null && (
-        <span className="absolute right-1 bottom-1 rounded-md bg-black/50 px-1.5 py-0.5 font-mono text-xs text-white">
+        <span className="absolute right-1 bottom-1 rounded-md bg-black/50 px-1.5 py-0.5 font-mono text-sm text-white">
           {t('outputs.viewer.pdfPageCount', { count: pageCount })}
         </span>
       )}

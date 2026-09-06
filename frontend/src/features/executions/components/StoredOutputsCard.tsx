@@ -270,7 +270,7 @@ function StoredOutputRowItem({
     <li className="flex items-start gap-3 py-2.5">
       <span
         className={cn(
-          'mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-xs font-semibold',
+          'mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-sm font-semibold',
           GRIB_CHIP_CLASS,
         )}
       >
@@ -280,7 +280,7 @@ function StoredOutputRowItem({
         <div className="flex items-baseline gap-2">
           <P className="truncate text-sm font-medium">{row.title}</P>
           {row.count > 1 && (
-            <span className="shrink-0 text-xs text-muted-foreground">
+            <span className="shrink-0 text-sm text-muted-foreground">
               {t('storedOutputs.fileCount', { n: row.count })}
             </span>
           )}
@@ -289,7 +289,7 @@ function StoredOutputRowItem({
           <button
             type="button"
             onClick={() => copyPath(dirPath)}
-            className="group/path flex w-full min-w-0 items-center gap-1 text-left font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="group/path flex w-full min-w-0 items-center gap-1 text-left font-mono text-sm text-muted-foreground transition-colors hover:text-foreground"
             title={t('storedOutputs.copyPath')}
           >
             <span className="truncate">
@@ -299,10 +299,10 @@ function StoredOutputRowItem({
             <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover/path:opacity-70" />
           </button>
         ) : row.isAvailable ? (
-          <P className="font-mono text-xs text-muted-foreground">…</P>
+          <P className="font-mono text-sm text-muted-foreground">…</P>
         ) : (
           <P
-            className="text-xs text-muted-foreground italic"
+            className="text-sm text-muted-foreground italic"
             title={row.lostReason}
           >
             {row.lostReason ?? t('storedOutputs.fileMissing')}
@@ -310,7 +310,7 @@ function StoredOutputRowItem({
         )}
         {/* Inline note: disabled buttons can't surface a title/tooltip. */}
         {wmsUnavailable && (
-          <P className="text-xs text-muted-foreground italic">
+          <P className="text-sm text-muted-foreground italic">
             {t('storedOutputs.wmsUnavailable')}
           </P>
         )}
@@ -355,7 +355,7 @@ function StoredOutputRowItem({
                 {t('storedOutputs.copy')}
               </TooltipTrigger>
               <TooltipContent>
-                <P className="max-w-xs text-xs text-inherit">
+                <P className="max-w-xs text-sm text-inherit">
                   <span className="font-medium">
                     {t('storedOutputs.externalTitle')}
                   </span>

@@ -238,7 +238,7 @@ export default function ImageViewer({
               <SkipBack className="h-4 w-4" />
               <kbd className={kbdBadge}>←</kbd>
             </button>
-            <span className="min-w-10 text-center font-mono text-xs tabular-nums">
+            <span className="min-w-10 text-center font-mono text-sm tabular-nums">
               {navIndex.current} / {navIndex.total}
             </span>
             <button
@@ -265,7 +265,7 @@ export default function ImageViewer({
           >
             <ZoomOut className="h-4 w-4" />
           </button>
-          <span className="min-w-12 text-center font-mono text-xs tabular-nums">
+          <span className="min-w-12 text-center font-mono text-sm tabular-nums">
             {Math.round(scale * 100)}%
           </span>
           <button
@@ -348,7 +348,7 @@ export default function ImageViewer({
           />
         )}
 
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-black/40 px-2 py-1 text-xs text-white/70">
+        <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-black/40 px-2 py-1 text-sm text-white/70">
           {t('outputs.viewer.zoomHint')}
         </div>
       </div>

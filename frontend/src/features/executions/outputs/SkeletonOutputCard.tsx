@@ -42,7 +42,7 @@ export function SkeletonOutputCard({
       <div className="space-y-1">
         <Skeleton className={cn('h-4 w-3/4', pulse)} />
         <P
-          className="truncate font-mono text-xs text-muted-foreground/70"
+          className="truncate font-mono text-sm text-muted-foreground/70"
           title={originalBlock}
         >
           {originalBlock}
