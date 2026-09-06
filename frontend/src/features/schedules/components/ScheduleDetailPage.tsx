@@ -160,6 +160,9 @@ export function ScheduleDetailPage() {
     displayDateFor,
   )
   const totalRunPages = runsData?.total_pages ?? 1
+  const nextRunDate = nextRun
+    ? serverTimeToLocal(nextRun, { roundMinute: true })
+    : null
 
   return (
     <div className={containerClass}>
@@ -227,14 +230,18 @@ export function ScheduleDetailPage() {
           label={t('detail.nextRun')}
           icon={<Calendar className="h-4 w-4" />}
           value={
-            <span className="text-lg font-semibold">
-              {nextRun
-                ? formatLocalDateTime(
-                    serverTimeToLocal(nextRun, { roundMinute: true }),
-                    timeZone,
-                  )
-                : '-'}
-            </span>
+            nextRunDate ? (
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-lg font-semibold">
+                  {formatLocalDateTime(nextRunDate, timeZone)}
+                </span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {formatDistanceToNow(nextRunDate, { addSuffix: true })}
+                </span>
+              </span>
+            ) : (
+              <span className="text-lg font-semibold">-</span>
+            )
           }
         />
         <StatCard
