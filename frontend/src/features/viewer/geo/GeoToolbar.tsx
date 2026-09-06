@@ -514,14 +514,15 @@ export function GeoToolbar({
           </span>
           <Button
             variant="ghost"
-            size="icon"
-            className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+            size="sm"
+            className="relative h-7 gap-1.5 px-2 pointer-coarse:h-11"
             onClick={onExport}
             title={`${t('export.open')} (${keyLabel(COMPARE_KEYS.export)})`}
             aria-label={t('export.open')}
           >
             <KeyBadge label={keyLabel(COMPARE_KEYS.export)} show={reveal} />
             <Download className="h-4 w-4" />
+            {t('export.label')}
           </Button>
           {/* Magnifier split-button: click latches, chevron opens settings. */}
           <span className="flex items-center">
