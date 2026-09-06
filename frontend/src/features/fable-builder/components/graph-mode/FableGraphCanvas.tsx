@@ -26,6 +26,7 @@ import { FableEdgeComponent } from './FableEdge'
 import { BlockNode } from './nodes/BlockNode'
 import { BlockDragPreview } from './BlockDragPreview'
 import { AddSourcePopover } from './AddSourcePopover'
+import { CanvasStatus } from './CanvasStatus'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type { Connection, Edge, EdgeTypes, NodeTypes } from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
@@ -434,6 +435,9 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           position="bottom-left"
           className="bottom-2! left-2!"
         />
+        {isDesktop && (
+          <CanvasStatus nodeCount={nodes.length} edgeCount={edges.length} />
+        )}
         {isMiniMapOpen && isDesktop && (
           <MiniMap
             nodeStrokeWidth={3}

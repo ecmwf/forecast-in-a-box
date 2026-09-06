@@ -157,6 +157,11 @@
     "topToBottom": "↓ Top to Bottom",
     "leftToRight": "→ Left to Right"
   },
+  "canvasStatus": {
+    "zoom": "{{value}}%",
+    "edgeCount_one": "{{count}} connection",
+    "edgeCount_other": "{{count}} connections"
+  },
   "addNode": {
     "searchPlaceholder": "Search blocks...",
     "noBlocksFound": "No blocks found",

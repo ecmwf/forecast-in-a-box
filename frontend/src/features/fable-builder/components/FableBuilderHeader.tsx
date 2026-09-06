@@ -94,9 +94,8 @@ export function FableBuilderHeader({
   // the review step is read-only, undo there would be misleading.
   useUndoRedoShortcuts(step === 'edit')
 
-  const blockCount = Object.keys(fable.blocks).length
   const isValid = validationState?.isValid ?? false
-  const hasBlocks = blockCount > 0
+  const hasBlocks = Object.keys(fable.blocks).length > 0
   const isExistingConfig = !!(fableId || storeFableId)
   const hasSinkBlock = getBlocksByKind(fable, catalogue, 'sink').length > 0
   const canReview = isValid && hasSinkBlock
@@ -233,7 +232,6 @@ export function FableBuilderHeader({
                 </H1>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{t('blockCount', { count: blockCount })}</span>
                 {hasBlocks && <ValidationStatusBadge catalogue={catalogue} />}
                 <DraftStatus className="hidden sm:inline-flex" />
               </div>
