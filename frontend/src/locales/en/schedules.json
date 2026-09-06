@@ -49,7 +49,8 @@
     "description": "You haven't scheduled any runs yet. Create one from the forecast builder."
   },
   "list": {
-    "loading": "Loading schedules..."
+    "loading": "Loading schedules...",
+    "nextRun": "next {{when}}"
   },
   "errors": {
     "scheduleNotFound": "Schedule not found"
