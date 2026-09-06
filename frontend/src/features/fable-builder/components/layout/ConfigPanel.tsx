@@ -9,8 +9,17 @@
  */
 
 import { useCallback, useMemo, useRef } from 'react'
-import { AlertCircle, ChevronRight, Link2, Trash2, X } from 'lucide-react'
+import {
+  Bookmark,
+  ChevronRight,
+  Link2,
+  MousePointerClick,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { definableGlyphs } from '@/features/fable-builder/utils/definable-glyphs'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
@@ -83,6 +92,9 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   const selectBlock = useFableBuilderStore((state) => state.selectBlock)
   const toggleConfigPanel = useFableBuilderStore(
     (state) => state.toggleConfigPanel,
+  )
+  const setAddSourceMenuOpen = useFableBuilderStore(
+    (state) => state.setAddSourceMenuOpen,
   )
   const updateBlockConfig = useFableBuilderStore(
     (state) => state.updateBlockConfig,
@@ -195,9 +207,33 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
-        <div className="text-muted-foreground">
-          <AlertCircle className="mx-auto mb-3 h-10 w-10 opacity-50" />
-          <P>{t('configPanel.selectBlock')}</P>
+        <div className="flex flex-col items-center gap-4 text-muted-foreground">
+          <MousePointerClick className="h-10 w-10 opacity-50" />
+          <div className="space-y-1">
+            <P className="font-medium text-foreground">
+              {t('configPanel.emptyTitle')}
+            </P>
+            <P>{t('configPanel.emptyDescription')}</P>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddSourceMenuOpen(true)}
+            >
+              <Plus />
+              {t('configPanel.addSource')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link to="/presets" />}
+            >
+              <Bookmark />
+              {t('configPanel.startFromPreset')}
+            </Button>
+          </div>
         </div>
       </div>
     )

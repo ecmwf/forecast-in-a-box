@@ -370,7 +370,7 @@ describe('Graph Mode - Builder Integration', () => {
     await expect.element(screen.getByLabelText('Base time')).toBeVisible()
   })
 
-  it('shows "Select a block to configure" when no block is selected', async () => {
+  it('shows the empty configuration panel when no block is selected', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
@@ -380,9 +380,27 @@ describe('Graph Mode - Builder Integration', () => {
     store.setFable(createMultiBlockFable())
 
     // The config panel should show the placeholder
+    await expect.element(screen.getByText('Nothing selected')).toBeVisible()
+  })
+
+  it('"Add a source" opens a canvas picker that adds and selects a source', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Nothing selected')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Add a source' }).click()
+    const picker = screen.getByRole('dialog', { name: 'Add a source' })
+    await expect.element(picker).toBeVisible()
     await expect
-      .element(screen.getByText('Select a block to configure'))
+      .element(picker.getByPlaceholder('Search blocks...'))
       .toBeVisible()
+
+    await picker.getByRole('button').first().click()
+
+    await expect.element(picker).not.toBeInTheDocument()
+    expect(
+      Object.keys(useFableBuilderStore.getState().fable.blocks),
+    ).toHaveLength(1)
+    expect(useFableBuilderStore.getState().selectedBlockId).not.toBeNull()
   })
 
   it('shows input connections section for blocks with inputs', async () => {

@@ -268,7 +268,7 @@ test.describe('Fable Builder - Graph Mode', () => {
           await closeButton.click()
           await page.waitForTimeout(300)
 
-          // Panel should show "Select a block to configure" or similar
+          // Panel should show the empty-panel placeholder or similar
           const emptyState = page.getByText(/select a block/i)
           if (
             await emptyState

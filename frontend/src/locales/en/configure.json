@@ -109,7 +109,10 @@
     "blockConfiguration": "Block Configuration"
   },
   "configPanel": {
-    "selectBlock": "Select a block to configure",
+    "emptyTitle": "Nothing selected",
+    "emptyDescription": "Pick a block on the canvas to configure it, or start here.",
+    "addSource": "Add a source",
+    "startFromPreset": "Start from a preset",
     "inputConnections": "Input Connections",
     "configuration": "Configuration",
     "noConfigOptions": "No configuration options",

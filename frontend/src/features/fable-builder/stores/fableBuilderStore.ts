@@ -634,7 +634,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             set({
               selectedBlockId: blockId,
               // Sidebar stays open even on deselect (blockId === null) —
-              // it shows a "Select a block to configure" placeholder.
+              // it shows the empty-panel placeholder.
               // User closes it explicitly via toggleConfigPanel.
               isConfigPanelOpen: true,
             }),

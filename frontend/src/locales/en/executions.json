@@ -298,7 +298,9 @@
   "empty": {
     "title": "No runs",
     "description": "You haven't run a forecast yet. Start by creating a forecast configuration.",
-    "action": "Create Forecast"
+    "action": "Configure a forecast",
+    "filtered": "No runs match your filters.",
+    "clearFilters": "Clear filters"
   },
   "filter": {
     "allStatuses": "All statuses",

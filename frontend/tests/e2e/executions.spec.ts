@@ -88,7 +88,7 @@ test.describe('Executions List Page', () => {
 
   test('empty state shows when no executions', async ({ page }) => {
     // If no jobs exist, an empty message should appear
-    const emptyMessage = page.getByText(/haven't run any forecast/i)
+    const emptyMessage = page.getByText(/haven't run a forecast/i)
     const jobItems = page.locator('.font-mono')
 
     const hasJobs = await jobItems

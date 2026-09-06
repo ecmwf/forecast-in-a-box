@@ -12,9 +12,10 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getRouteApi } from '@tanstack/react-router'
+import { Link, getRouteApi } from '@tanstack/react-router'
 import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
+import { Button } from '@/components/ui/button'
 import { useJobsStatus } from '@/api/hooks/useJobs'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
@@ -84,6 +85,7 @@ export function RunListPage() {
     [serverTimeToLocal, timeZone],
   )
 
+  const noRunsYet = !isLoading && runs.length === 0
   const filtered = useMemo(
     () => filterRuns(runs, activeFilter, parseQuery(query), displayDateFor),
     [runs, activeFilter, query, displayDateFor],
@@ -108,7 +110,30 @@ export function RunListPage() {
       <ForecastRunList
         runs={filtered}
         isLoading={isLoading}
-        emptyText={t('empty.description')}
+        emptyText={noRunsYet ? t('empty.description') : t('empty.filtered')}
+        emptyAction={
+          noRunsYet ? (
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link to="/configure" />}
+            >
+              {t('empty.action')}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setQuery('')
+                setActiveFilter('all')
+              }}
+            >
+              {t('empty.clearFilters')}
+            </Button>
+          )
+        }
         groupBy={groupBy}
         onToggleBookmark={toggleBookmark}
         onAddFacet={(token) => setQuery(addToken(query, token))}

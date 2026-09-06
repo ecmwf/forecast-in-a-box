@@ -100,5 +100,7 @@
     "presetFailed": "Could not update preset",
     "runDeleted": "Run deleted",
     "deleteFailed": "Could not delete run"
-  }
+  },
+  "noRunsYet": "No runs yet",
+  "configureForecast": "Configure a forecast"
 }

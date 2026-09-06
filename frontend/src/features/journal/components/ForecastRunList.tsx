@@ -21,11 +21,14 @@ import { ForecastRunRow } from '@/features/journal/components/ForecastRunRow'
 import { JournalGroup } from '@/features/journal/components/JournalGroup'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Card } from '@/components/ui/card'
+import { P } from '@/components/base/typography'
 
 interface ForecastRunListProps {
   runs: Array<ForecastRunViewModel>
   isLoading?: boolean
   emptyText?: string
+  /** Next step offered under the empty text. */
+  emptyAction?: ReactNode
   groupBy?: GroupBy
   onToggleBookmark: (runId: string) => void
   onAddFacet?: (token: FacetToken) => void
@@ -37,6 +40,7 @@ export function ForecastRunList({
   runs,
   isLoading,
   emptyText,
+  emptyAction,
   groupBy = 'none',
   onToggleBookmark,
   onAddFacet,
@@ -66,8 +70,9 @@ export function ForecastRunList({
     )
   } else if (runs.length === 0) {
     body = (
-      <div className="p-12 text-center text-muted-foreground">
-        {emptyText ?? t('empty')}
+      <div className="flex flex-col items-center gap-4 p-12 text-center text-muted-foreground">
+        <P>{emptyText ?? t('empty')}</P>
+        {emptyAction}
       </div>
     )
   } else if (groupBy === 'none') {

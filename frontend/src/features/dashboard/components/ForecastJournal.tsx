@@ -15,6 +15,7 @@ import { useJobsStatus } from '@/api/hooks/useJobs'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
 import { H2 } from '@/components/base/typography'
+import { Button } from '@/components/ui/button'
 
 /** Overview shows the latest runs and hands off to Execute for the rest. */
 const RECENT_RUN_COUNT = 5
@@ -29,6 +30,17 @@ export function ForecastJournal() {
       runs={runs}
       isLoading={isLoading}
       onToggleBookmark={toggleBookmark}
+      emptyText={t('noRunsYet')}
+      emptyAction={
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link to="/configure" />}
+        >
+          {t('configureForecast')}
+        </Button>
+      }
       header={
         <div className="flex items-center justify-between gap-4 px-4 py-4">
           <H2 className="text-xl font-semibold">{t('title')}</H2>
