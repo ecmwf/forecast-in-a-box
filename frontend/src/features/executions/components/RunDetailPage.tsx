@@ -30,6 +30,7 @@ import { CompilationForceGraph } from './CompilationForceGraph'
 import { CompilationPanel } from './CompilationPanel'
 import { RunErrorBanner } from './RunErrorBanner'
 import { RunStatusHeader } from './RunStatusHeader'
+import { RunAttemptTimeline } from './RunAttemptTimeline'
 import { LogsPanel } from './LogsPanel'
 import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
@@ -273,6 +274,8 @@ export function RunDetailPage() {
         completedBlockCount={jobData.completed_block_ids?.length ?? null}
         plannedBlockCount={jobData.planned_block_ids?.length ?? null}
       />
+
+      <RunAttemptTimeline jobId={jobId} attemptCount={jobData.attempt_count} />
 
       {fableData?.coreVersionMismatch && (
         <CoreVersionMismatchBadge detail={fableData.coreVersionMismatch} />

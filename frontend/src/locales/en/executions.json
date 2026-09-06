@@ -321,5 +321,9 @@
     "previous": "Previous",
     "next": "Next",
     "page": "Page {{current}} of {{total}}"
+  },
+  "attempts": {
+    "title": "Attempts",
+    "attempt": "Attempt {{number}}"
   }
 }
