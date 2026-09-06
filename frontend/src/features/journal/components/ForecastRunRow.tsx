@@ -121,6 +121,15 @@ export const ForecastRunRow = memo(function ({
               </>
             )}
           </div>
+          {run.errorMessage && (
+            // First line only; the detail page has the full text.
+            <p
+              className="mb-2 truncate text-sm text-red-600 dark:text-red-400"
+              title={run.errorMessage}
+            >
+              {run.errorMessage.split('\n')[0]}
+            </p>
+          )}
           <div className="flex flex-wrap items-start gap-2">
             {run.scheduleName && (
               <span className="inline-flex items-center gap-1 rounded-md bg-indigo-500/10 px-2 py-0.5 text-sm font-medium text-indigo-600 dark:text-indigo-400">

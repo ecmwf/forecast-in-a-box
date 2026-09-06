@@ -26,6 +26,7 @@ function run(overrides: Partial<ForecastRunViewModel>): ForecastRunViewModel {
     modelLabel: 'AIFS',
     outputCount: 1,
     lostOutputCount: 0,
+    errorMessage: null,
     outputKinds: [],
     tags: [],
     blueprintId: 'bp',

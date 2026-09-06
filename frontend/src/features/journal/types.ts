@@ -33,6 +33,8 @@ export interface ForecastRunViewModel {
   outputCount: number
   /** Produced outputs no longer retrievable; subset of {@link outputCount}. */
   lostOutputCount: number
+  /** Backend error text; set only for failed runs. */
+  errorMessage: string | null
   /** Sink-block titles — the kinds of output the configuration produces. */
   outputKinds: Array<string>
   /** User tags, system markers stripped. */
