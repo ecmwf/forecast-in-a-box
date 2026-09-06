@@ -59,12 +59,13 @@ export const ForecastRunRow = memo(function ({
     formatInZone(startedInstant, timeZone, 'yyyy-MM-dd HH:mm') +
     ` ${timeZoneOffsetLabel(timeZone, startedInstant)}`
   const startedDate = formatInZone(startedInstant, timeZone, 'yyyy-MM-dd')
-  const runIdLabel =
-    run.runId.length > 12 ? `${run.runId.slice(0, 12)}...` : run.runId
   const modelLabel = run.modelLabel
 
   return (
-    <div className="group/row p-6 transition-colors hover:bg-muted/50">
+    <div
+      className="group/row p-6 transition-colors hover:bg-muted/50"
+      data-testid={`run-row-${run.runId}`}
+    >
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         {/* Status */}
         <div className="mt-1 shrink-0 sm:mt-0">
@@ -143,9 +144,6 @@ export const ForecastRunRow = memo(function ({
                 {t('item.preset')}
               </span>
             )}
-            <span className="rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
-              #{runIdLabel}
-            </span>
             {/* Derived (system) facets, then user tags. */}
             {modelLabel && (
               <JournalChip

@@ -54,8 +54,12 @@ describe('ForecastJournal Integration', () => {
 
     it('renders runs from the API', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
     })
 
     it('hands off to the runs page', async () => {
@@ -84,7 +88,9 @@ describe('ForecastJournal Integration', () => {
   describe('bookmarking', () => {
     it('toggles a bookmark from the row', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
       await screen.getByLabelText('Bookmark').first().click()
       await expect
         .element(screen.getByLabelText('Remove bookmark').first())

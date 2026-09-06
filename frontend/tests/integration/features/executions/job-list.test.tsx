@@ -140,10 +140,18 @@ describe('RunListPage Integration', () => {
 
     it('renders runs from the API', async () => {
       const screen = await renderJobList()
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-      await expect.element(screen.getByText('#job-errored-...')).toBeVisible()
-      await expect.element(screen.getByText('#job-submitte...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-errored-003'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-submitted-004'))
+        .toBeVisible()
     })
 
     it('falls back to "Untitled forecast" when the blueprint is unavailable', async () => {
@@ -176,8 +184,10 @@ describe('RunListPage Integration', () => {
       const screen = await renderJobList()
       await screen.getByRole('button', { name: 'Running', exact: true }).click()
 
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-      expect(screen.getByText('#job-complete...').query()).toBeNull()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
+      expect(screen.getByTestId('run-row-job-completed-001').query()).toBeNull()
     })
 
     it('filters to completed runs', async () => {
@@ -186,18 +196,26 @@ describe('RunListPage Integration', () => {
         .getByRole('button', { name: 'Completed', exact: true })
         .click()
 
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      expect(screen.getByText('#job-running-...').query()).toBeNull()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
+      expect(screen.getByTestId('run-row-job-running-002').query()).toBeNull()
     })
 
     it('returns to all runs when All is clicked', async () => {
       const screen = await renderJobList()
       await screen.getByRole('button', { name: 'Running', exact: true }).click()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
 
       await screen.getByRole('button', { name: 'All', exact: true }).click()
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
     })
   })
 
@@ -210,8 +228,10 @@ describe('RunListPage Integration', () => {
       await search.fill('completed')
       await userEvent.keyboard('{Enter}')
 
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      expect(screen.getByText('#job-running-...').query()).toBeNull()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
+      expect(screen.getByTestId('run-row-job-running-002').query()).toBeNull()
     })
   })
 })
