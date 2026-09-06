@@ -15,6 +15,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
   Blocks,
+  CalendarClock,
   Cloud,
   FileText,
   Globe,
@@ -270,6 +271,10 @@ export function AuthenticatedHeader() {
                     <DropdownMenuLabel>
                       {t('userMenu.administration')}
                     </DropdownMenuLabel>
+                    <DropdownMenuItem render={<Link to="/schedules" />}>
+                      <CalendarClock className="mr-2 h-4 w-4" />
+                      {t('userMenu.schedules')}
+                    </DropdownMenuItem>
                     <DropdownMenuItem render={<Link to="/admin/plugins" />}>
                       <Blocks className="mr-2 h-4 w-4" />
                       {t('userMenu.plugins')}

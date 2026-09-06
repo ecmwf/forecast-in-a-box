@@ -11,6 +11,7 @@
 /** The /executions page — the full, paginated Forecast Journal. */
 
 import { useCallback, useMemo, useState } from 'react'
+import { CalendarClock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
@@ -117,7 +118,20 @@ export function RunListPage() {
 
   return (
     <ListPageContainer>
-      <PageHeader title={t('page.title')} description={t('page.description')} />
+      <PageHeader
+        title={t('page.title')}
+        description={t('page.description')}
+        actions={
+          <Button
+            variant="outline"
+            nativeButton={false}
+            render={<Link to="/schedules" />}
+          >
+            <CalendarClock />
+            {t('page.scheduledRuns')}
+          </Button>
+        }
+      />
 
       <ForecastRunList
         runs={filtered}

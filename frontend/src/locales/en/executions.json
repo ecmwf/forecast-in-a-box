@@ -1,7 +1,8 @@
 {
   "page": {
     "title": "Runs",
-    "description": "Monitor and manage your forecast runs"
+    "description": "Monitor and manage your forecast runs",
+    "scheduledRuns": "Scheduled runs"
   },
   "detail": {
     "backLink": "Runs",
