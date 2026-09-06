@@ -77,6 +77,7 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
   const navigate = route.useNavigate()
   const queryClient = useQueryClient()
   const addEntry = useComparisonStore((s) => s.addEntry)
+  const makeRoom = useComparisonStore((s) => s.makeRoom)
   const entries = useComparisonStore((s) => s.entries)
   // Refs already handled this mount — failures must not retry in a loop.
   const processedRef = useRef<Set<string>>(new Set())
@@ -120,6 +121,8 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
                 path: pending.path,
                 label: pathLabel(pending.path),
               }
+        // A link the user chose to open outranks stale basket entries.
+        makeRoom([search.a, search.b])
         const result = addEntry(entry)
         if (result === 'full') {
           showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
@@ -152,7 +155,7 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
       }
       setPendingUnverified([])
     },
-    [pendingUnverified, addEntry, navigate, t],
+    [pendingUnverified, addEntry, makeRoom, search.a, search.b, navigate, t],
   )
 
   useEffect(() => {
@@ -230,6 +233,7 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
             strip(ref)
             return
           }
+          makeRoom([search.a, search.b])
           const result = addEntry({
             kind: 'output',
             jobId: decoded.jobId,

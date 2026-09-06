@@ -32,6 +32,8 @@ interface ComparisonState {
   entries: Array<ComparisonEntry>
   addEntry: (entry: NewComparisonEntry) => AddEntryResult
   removeEntry: (ref: string) => void
+  /** Evict the oldest entries not in `keepRefs` until one more fits. */
+  makeRoom: (keepRefs: ReadonlyArray<string | undefined>) => void
   /** Fill in lazily-resolved display metadata for an `output` entry. */
   updateOutputMeta: (
     ref: string,
@@ -65,6 +67,23 @@ export const useComparisonStore = create<ComparisonState>()(
           return 'added'
         },
 
+        makeRoom: (keepRefs) =>
+          set(
+            (state) => {
+              const keep = new Set(keepRefs.filter((r) => r !== undefined))
+              const entries = [...state.entries]
+              while (entries.length >= MAX_COMPARISON_ENTRIES) {
+                const idx = entries.findIndex((e) => !keep.has(entryRef(e)))
+                if (idx < 0) break
+                entries.splice(idx, 1)
+              }
+              return entries.length === state.entries.length
+                ? state
+                : { entries }
+            },
+            undefined,
+            'compare/makeRoom',
+          ),
         removeEntry: (ref) =>
           set(
             (state) => ({
