@@ -37,6 +37,9 @@ import type {
 } from '@/api/types/fable.types'
 import { getBlocksByKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { useFableRetrieve } from '@/api/hooks/useFable'
+import { stripSystemTags } from '@/lib/system-tags'
+import { Badge } from '@/components/ui/badge'
 import { shelveBenchIfDirty } from '@/features/fable-builder/stores/workbenchShelfStore'
 import { downloadFableJson } from '@/features/fable-builder/utils/export-config'
 import { useUndoRedoShortcuts } from '@/features/fable-builder/hooks/useUndoRedoShortcuts'
@@ -63,6 +66,9 @@ interface FableBuilderHeaderProps {
   /** Fired after a config file was parsed and applied to the store */
   onConfigLoaded?: () => void
 }
+
+/** Tags shown in the header before folding the rest into a +N. */
+const VISIBLE_TAG_COUNT = 3
 
 export function FableBuilderHeader({
   fableId,
@@ -97,6 +103,9 @@ export function FableBuilderHeader({
   const isValid = validationState?.isValid ?? false
   const hasBlocks = Object.keys(fable.blocks).length > 0
   const isExistingConfig = !!(fableId || storeFableId)
+  const { data: blueprint } = useFableRetrieve(fableId ?? storeFableId)
+  const tags = stripSystemTags(blueprint?.tags)
+  const hiddenTagCount = Math.max(0, tags.length - VISIBLE_TAG_COUNT)
   const hasSinkBlock = getBlocksByKind(fable, catalogue, 'sink').length > 0
   const canReview = isValid && hasSinkBlock
 
@@ -234,6 +243,27 @@ export function FableBuilderHeader({
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {hasBlocks && <ValidationStatusBadge catalogue={catalogue} />}
                 <DraftStatus className="hidden sm:inline-flex" />
+                {tags.length > 0 && (
+                  <span className="hidden min-w-0 items-center gap-1 sm:flex">
+                    {tags.slice(0, VISIBLE_TAG_COUNT).map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="max-w-32 truncate font-normal text-muted-foreground"
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                    {hiddenTagCount > 0 && (
+                      <span
+                        className="text-xs"
+                        title={tags.slice(VISIBLE_TAG_COUNT).join(', ')}
+                      >
+                        {t('header.moreTags', { count: hiddenTagCount })}
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
             </div>
           </div>

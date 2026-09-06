@@ -69,7 +69,8 @@
     "reviewTooltipInvalid": "Fix validation errors before submitting",
     "undo": "Undo",
     "redo": "Redo",
-    "file": "File"
+    "file": "File",
+    "moreTags": "+{{count}}"
   },
   "blockCount_one": "{{count}} block",
   "blockCount_other": "{{count}} blocks",
