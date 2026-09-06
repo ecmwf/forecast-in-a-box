@@ -144,7 +144,7 @@ export function CronExpressionInput({
 
       {/* Time/day inputs — displayed in local time */}
       {frequency !== 'custom' && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {frequency === 'weekly' && (
             <select
               value={dayOfWeek}
