@@ -86,9 +86,9 @@ export const ForecastRunRow = memo(function ({
               type="button"
               onClick={() => setMetadataOpen(true)}
               aria-label={t('item.editMetadata')}
-              className="hit-target-y shrink-0 text-muted-foreground opacity-0 transition-[color,opacity] group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:text-primary [@media(hover:none)]:opacity-100"
+              className="hit-target-y flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[color,opacity] group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:text-primary [@media(hover:none)]:opacity-100"
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Pencil className="h-4 w-4" />
             </button>
           </div>
           {run.displayDescription && (
@@ -103,7 +103,7 @@ export const ForecastRunRow = memo(function ({
                 type="button"
                 onClick={() => onAddFacet({ key: 'date', value: startedDate })}
                 aria-label={t('item.filterByDate')}
-                className="rounded-md transition-colors hover:text-foreground"
+                className="hit-target-y rounded-md transition-colors hover:text-foreground"
               >
                 {startedAt}
               </button>
@@ -190,7 +190,7 @@ export const ForecastRunRow = memo(function ({
               type="button"
               onClick={() => onToggleBookmark(run.runId)}
               className={cn(
-                'hit-target-y transition-colors hover:text-yellow-500',
+                'hit-target-y flex size-6 items-center justify-center rounded-md transition-colors hover:text-yellow-500',
                 run.isBookmarked && 'text-yellow-500',
               )}
               aria-label={
@@ -261,7 +261,10 @@ function RunAction({ run }: { run: ForecastRunViewModel }) {
     <Link
       to="/execute/$jobId"
       params={{ jobId: run.runId }}
-      className={cn('text-sm font-semibold hover:underline', variant.className)}
+      className={cn(
+        'hit-target-y text-sm font-semibold hover:underline',
+        variant.className,
+      )}
     >
       {variant.label}
     </Link>

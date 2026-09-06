@@ -148,7 +148,7 @@ export function GeoLayerBrowser({
             onClick={onCollapse}
             title={tExec('lens.collapseSidebar')}
             aria-label={tExec('lens.collapseSidebar')}
-            className="rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
@@ -162,7 +162,7 @@ export function GeoLayerBrowser({
             title={t('browser.groupToggle')}
             aria-label={t('browser.groupToggle')}
             className={cn(
-              'ml-auto rounded-md p-0.5 hover:bg-accent hover:text-foreground',
+              'ml-auto flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-foreground',
               grouped ? 'text-foreground' : 'text-muted-foreground',
             )}
           >

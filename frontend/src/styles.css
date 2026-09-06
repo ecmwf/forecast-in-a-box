@@ -404,3 +404,10 @@
   padding: 0.375rem 0.5rem;
   box-shadow: 0 4px 8px -1px rgb(0 0 0 / 0.1);
 }
+
+/* OpenLayers controls: 24px targets on the shared radius (outranks ol.css, which loads later). */
+.ol-overlaycontainer-stopevent .ol-control button {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-sm);
+}

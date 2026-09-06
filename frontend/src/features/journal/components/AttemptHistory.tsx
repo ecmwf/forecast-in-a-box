@@ -34,7 +34,7 @@ export function AttemptHistory({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+      <CollapsibleTrigger className="hit-target-y flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
         <ChevronDown
           className={cn('h-3 w-3 transition-transform', !open && '-rotate-90')}
         />

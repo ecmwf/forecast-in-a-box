@@ -393,7 +393,7 @@ export function GeoToolbar({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="-ml-1 h-7 w-4"
+                    className="-ml-1 h-7 w-6"
                     title={t('measure.shapeMenu')}
                     aria-label={t('measure.shapeMenu')}
                   />
@@ -440,7 +440,7 @@ export function GeoToolbar({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="-ml-1 h-7 w-4"
+                    className="-ml-1 h-7 w-6"
                     title={t('annotations.options')}
                     aria-label={t('annotations.options')}
                   />
@@ -493,7 +493,7 @@ export function GeoToolbar({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="-ml-1 h-7 w-4"
+                      className="-ml-1 h-7 w-6"
                       title={t('toolbar.copyOptions')}
                       aria-label={t('toolbar.copyOptions')}
                     />
@@ -545,7 +545,7 @@ export function GeoToolbar({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="-ml-1 h-7 w-4"
+                    className="-ml-1 h-7 w-6"
                     title={t('modes.loupeOptions')}
                     aria-label={t('modes.loupeOptions')}
                   />

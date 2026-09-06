@@ -110,7 +110,7 @@ export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
           render={
             <button
               type="button"
-              className="hit-target-y transition-colors hover:text-primary"
+              className="hit-target-y flex size-6 items-center justify-center rounded-md transition-colors hover:text-primary"
               aria-label={t('item.moreOptions')}
             />
           }
