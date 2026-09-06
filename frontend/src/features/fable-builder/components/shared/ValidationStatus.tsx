@@ -34,6 +34,20 @@ interface Issue {
   blockId: string | null
   label: string
   message: string
+  /** Next step for the error shapes we recognise. */
+  hint: string | null
+}
+
+type HintKey = 'invalidValue' | 'missingConfig' | 'noOutput'
+
+/** Recognised error shapes → the hint that fixes them. */
+function hintKeyFor(message: string): HintKey | null {
+  if (/^Invalid value for configuration option/.test(message)) {
+    return 'invalidValue'
+  }
+  if (/missing config/i.test(message)) return 'missingConfig'
+  if (/no (sink|output)/i.test(message)) return 'noOutput'
+  return null
 }
 
 export function ValidationStatusBadge({
@@ -52,12 +66,17 @@ export function ValidationStatusBadge({
 
   const issues = useMemo<Array<Issue>>(() => {
     if (!validationState) return []
+    const hintFrom = (message: string): string | null => {
+      const key = hintKeyFor(message)
+      return key ? t(`validationStatus.hints.${key}`) : null
+    }
     const list: Array<Issue> = []
     for (const message of validationState.globalErrors) {
       list.push({
         blockId: null,
         label: t('validationStatus.globalIssueLabel'),
         message,
+        hint: hintFrom(message),
       })
     }
     for (const [blockId, state] of Object.entries(
@@ -74,7 +93,7 @@ export function ValidationStatusBadge({
         label = factoryTitle ?? block.factory_id.factory
       }
       for (const message of state.errors) {
-        list.push({ blockId, label, message })
+        list.push({ blockId, label, message, hint: hintFrom(message) })
       }
       for (const names of Object.values(state.missingGlyphs)) {
         for (const name of names) {
@@ -82,6 +101,7 @@ export function ValidationStatusBadge({
             blockId,
             label,
             message: t('fieldErrors.unknownGlyph', { glyph: `\${${name}}` }),
+            hint: t('validationStatus.hints.unknownGlyph'),
           })
         }
       }
@@ -148,9 +168,17 @@ export function ValidationStatusBadge({
               className="min-w-0 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
             >
               <span className="block font-medium">{issue.label}</span>
-              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+              <span
+                className="mt-0.5 block truncate text-xs text-muted-foreground"
+                title={issue.message}
+              >
                 {issue.message}
               </span>
+              {issue.hint && (
+                <span className="mt-0.5 block text-xs text-foreground/80">
+                  {issue.hint}
+                </span>
+              )}
             </button>
           ))}
         </div>

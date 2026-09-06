@@ -86,7 +86,13 @@
     "issues_other": "{{count}} issues",
     "globalIssueLabel": "Configuration",
     "validatingConfiguration": "Validating configuration...",
-    "configurationIssues": "Configuration Issues"
+    "configurationIssues": "Configuration Issues",
+    "hints": {
+      "invalidValue": "Open the block and pick a valid value for this option.",
+      "missingConfig": "Fill in the required options in the configuration panel.",
+      "noOutput": "Add an output block, for example a GRIB sink or a map plot.",
+      "unknownGlyph": "Define the variable under Variables, or replace it with a value."
+    }
   },
   "blockActions": {
     "duplicate": "Duplicate",
