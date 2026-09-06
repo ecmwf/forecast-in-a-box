@@ -16,6 +16,8 @@ import { useTranslation } from 'react-i18next'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
+import { useRunSelection } from '@/features/journal/hooks/useRunSelection'
+import { CompareSelectionBar } from '@/features/journal/components/CompareSelectionBar'
 import { Button } from '@/components/ui/button'
 import { useJobsStatus } from '@/api/hooks/useJobs'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
@@ -47,6 +49,7 @@ const route = getRouteApi('/_authenticated/execute/')
 export function RunListPage() {
   const { t } = useTranslation('executions')
   const [page, setPage] = useState(1)
+  const selection = useRunSelection(2)
   const search = route.useSearch()
   const navigate = route.useNavigate()
 
@@ -163,20 +166,30 @@ export function RunListPage() {
         groupBy={groupBy}
         onToggleBookmark={toggleBookmark}
         onAddFacet={(token) => setQuery(addToken(query, token))}
+        selectedIds={selection.selectedIds}
+        selectionCap={selection.cap}
+        onToggleSelect={selection.toggle}
         header={
-          <ForecastRunSearchHeader
-            counts={filterCounts}
-            query={query}
-            onQueryChange={setQuery}
-            activeFilter={activeFilter}
-            onFilterChange={(filter) => {
-              setActiveFilter(filter)
-              setPage(1)
-            }}
-            filters={EXECUTIONS_FILTERS}
-            groupBy={groupBy}
-            onGroupByChange={setGroupBy}
-          />
+          <>
+            <ForecastRunSearchHeader
+              counts={filterCounts}
+              query={query}
+              onQueryChange={setQuery}
+              activeFilter={activeFilter}
+              onFilterChange={(filter) => {
+                setActiveFilter(filter)
+                setPage(1)
+              }}
+              filters={EXECUTIONS_FILTERS}
+              groupBy={groupBy}
+              onGroupByChange={setGroupBy}
+            />
+            <CompareSelectionBar
+              runs={runs}
+              selectedIds={selection.selectedIds}
+              onClear={selection.clear}
+            />
+          </>
         }
         footer={
           <Pagination

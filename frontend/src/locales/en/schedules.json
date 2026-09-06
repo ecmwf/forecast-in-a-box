@@ -24,13 +24,7 @@
     "jobId": "Job ID",
     "attempts": "Attempts",
     "rerun": "Re-run",
-    "configuration": "Configuration",
-    "selectTwoHint": "Tick two completed runs to compare them on the map",
-    "selectedCount_one": "{{count}} run selected",
-    "selectedCount_other": "{{count}} runs selected",
-    "compareSelected": "Compare selected",
-    "clearSelection": "Clear",
-    "compareNoOutput": "Neither run has a stored GRIB output to show on the map"
+    "configuration": "Configuration"
   },
   "filter": {
     "all": "All",

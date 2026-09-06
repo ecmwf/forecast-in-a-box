@@ -109,5 +109,13 @@
     "compareFailed": "Could not prepare the comparison"
   },
   "noRunsYet": "No runs yet",
-  "configureForecast": "Configure a forecast"
+  "configureForecast": "Configure a forecast",
+  "compare": {
+    "selectTwoHint": "Tick two completed runs to compare them on the map",
+    "selectedCount_one": "{{count}} run selected",
+    "selectedCount_other": "{{count}} runs selected",
+    "compareSelected": "Compare selected",
+    "clear": "Clear",
+    "noOutput": "Neither run has a stored GRIB output to show on the map"
+  }
 }
