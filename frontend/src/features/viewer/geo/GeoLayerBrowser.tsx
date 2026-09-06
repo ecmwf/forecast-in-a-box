@@ -48,6 +48,9 @@ export const SLOT_CHIP_CLASS: Record<SourceSlot, string> = {
   b: 'bg-slot-b/15 text-orange-700 dark:bg-slot-b/20 dark:text-orange-300',
 }
 
+/** Catalogs at least this large may open grouped. */
+const AUTO_GROUP_MIN_LAYERS = 12
+
 /** groupByTitlePrefix, or one flat pass-through cluster when toggled off. */
 function titleClusters<T>(
   items: ReadonlyArray<T>,
@@ -98,8 +101,18 @@ export function GeoLayerBrowser({
   const [search, setSearch] = useState('')
   const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
   const [selectedLevels, setSelectedLevels] = useState<Set<number>>(new Set())
-  // Flat by default — prefix grouping fragments mixed catalogs; opt in via the toggle.
-  const [grouped, setGrouped] = useState(false)
+  // Grouped by default only when the catalog clearly clusters (e.g. one
+  // run stamp per layer batch); mixed catalogs stay flat. Toggle overrides.
+  const [groupedOverride, setGroupedOverride] = useState<boolean | null>(null)
+  const autoGrouped = useMemo(() => {
+    if (pairs.length < AUTO_GROUP_MIN_LAYERS) return false
+    const clustered = groupByTitlePrefix(pairs, (pair) => pair.title)
+      .filter((group) => group.prefix !== null)
+      .reduce((n, group) => n + group.items.length, 0)
+    return clustered * 2 >= pairs.length
+  }, [pairs])
+  const grouped = groupedOverride ?? autoGrouped
+  const setGrouped = (next: boolean) => setGroupedOverride(next)
   const query = search.trim().toLowerCase()
 
   // Per-panel selection browses one catalog at a time: "All" would
@@ -157,7 +170,7 @@ export function GeoLayerBrowser({
           </P>
           <button
             type="button"
-            onClick={() => setGrouped((v) => !v)}
+            onClick={() => setGrouped(!grouped)}
             aria-pressed={grouped}
             title={t('browser.groupToggle')}
             aria-label={t('browser.groupToggle')}
