@@ -15,6 +15,7 @@ import {
   BookmarkMinus,
   BookmarkPlus,
   CalendarClock,
+  Columns2,
   MoreVertical,
   Pencil,
   Trash2,
@@ -25,6 +26,7 @@ import type { FableRetrieveResponse } from '@/api/types/fable.types'
 import type { ForecastRunViewModel } from '@/features/journal/types'
 import { useUpsertFable } from '@/api/hooks/useFable'
 import { useDeleteJob } from '@/api/hooks/useJobs'
+import { buildPreviousRunComparison } from '@/features/visualise/compare-runs'
 import {
   isOneoffBlueprint,
   withOneoffTag,
@@ -60,6 +62,35 @@ export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
   const upsertFable = useUpsertFable()
   const deleteJob = useDeleteJob()
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [comparing, setComparing] = useState(false)
+
+  async function handleCompareWithPrevious() {
+    if (!run.scheduleId) return
+    setComparing(true)
+    try {
+      const result = await buildPreviousRunComparison({
+        runId: run.runId,
+        scheduleId: run.scheduleId,
+        createdAt: run.createdAt,
+        displayName: run.displayName,
+      })
+      if (!result.ok) {
+        showToast.error(
+          result.reason === 'noPrevious'
+            ? t('toast.noPreviousRun')
+            : t('toast.noGribOutput'),
+        )
+        return
+      }
+      void navigate({ to: '/visualise', search: result.search })
+    } catch (err) {
+      showToast.error(
+        err instanceof Error ? err.message : t('toast.compareFailed'),
+      )
+    } finally {
+      setComparing(false)
+    }
+  }
 
   // No one-off marker means the blueprint is already a saved preset.
   const isPreset = blueprint != null && !isOneoffBlueprint(blueprint.tags)
@@ -142,6 +173,15 @@ export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
             >
               <CalendarClock className="h-4 w-4" />
               {t('item.openSchedule')}
+            </DropdownMenuItem>
+          )}
+          {run.scheduleId && run.status === 'completed' && (
+            <DropdownMenuItem
+              disabled={comparing}
+              onClick={() => void handleCompareWithPrevious()}
+            >
+              <Columns2 className="h-4 w-4" />
+              {t('item.compareWithPrevious')}
             </DropdownMenuItem>
           )}
           <DropdownMenuItem

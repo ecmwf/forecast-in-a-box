@@ -74,7 +74,8 @@
     "scheduled": "Scheduled",
     "moreOptions": "More options",
     "openSchedule": "Open schedule",
-    "filterBySchedule": "Show runs of schedule {{name}}"
+    "filterBySchedule": "Show runs of schedule {{name}}",
+    "compareWithPrevious": "Compare with previous run"
   },
   "metadata": {
     "title": "Edit run details",
@@ -101,7 +102,10 @@
     "removedFromPreset": "Removed from configuration presets",
     "presetFailed": "Could not update preset",
     "runDeleted": "Run deleted",
-    "deleteFailed": "Could not delete run"
+    "deleteFailed": "Could not delete run",
+    "noPreviousRun": "No earlier completed run of this schedule to compare with",
+    "noGribOutput": "Neither run has a stored GRIB output to show on the map",
+    "compareFailed": "Could not prepare the comparison"
   },
   "noRunsYet": "No runs yet",
   "configureForecast": "Configure a forecast"
