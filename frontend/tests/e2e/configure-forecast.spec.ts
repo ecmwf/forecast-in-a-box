@@ -67,8 +67,8 @@ test.describe('Fable Builder - Page', () => {
       await expect(searchInput).toBeVisible()
     }
 
-    // The graph-options dropdown
-    const optionsButton = page.getByRole('button', { name: /graph options/i })
+    // The View menu
+    const optionsButton = page.getByRole('button', { name: /^view$/i })
     if (await optionsButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await expect(optionsButton).toBeVisible()
     }
@@ -483,7 +483,7 @@ test.describe('Fable Builder - Review & Validation', () => {
 
           // Should show the graph-options button again (edit step)
           const optionsButton = page.getByRole('button', {
-            name: /graph options/i,
+            name: /^view$/i,
           })
           if (
             await optionsButton.isVisible({ timeout: 3000 }).catch(() => false)

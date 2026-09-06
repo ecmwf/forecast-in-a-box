@@ -44,9 +44,6 @@
     "untitledConfiguration": "Untitled Configuration"
   },
   "header": {
-    "share": "Share",
-    "shareCopied": "Copied!",
-    "shareFailed": "Could not copy link to clipboard",
     "graph": "Graph",
     "form": "Form",
     "exportConfig": "Export Config",
@@ -71,7 +68,8 @@
     "reviewTooltipNoSink": "Add at least one output block",
     "reviewTooltipInvalid": "Fix validation errors before submitting",
     "undo": "Undo",
-    "redo": "Redo"
+    "redo": "Redo",
+    "file": "File"
   },
   "blockCount_one": "{{count}} block",
   "blockCount_other": "{{count}} blocks",
@@ -143,7 +141,6 @@
     "directionDownstream": "downstream"
   },
   "graphOptions": {
-    "ariaLabel": "Graph options",
     "view": "View",
     "tidyUp": "Tidy up configuration",
     "unlockNodes": "Unlock nodes",
