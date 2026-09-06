@@ -145,7 +145,7 @@ export function StoredOutputsCard({
   if (rows.length === 0) return null
 
   return (
-    <Card shadow="none" className="gap-3 p-4">
+    <Card className="gap-3 p-4">
       <div className="flex items-center gap-2">
         <FolderOpen className="h-4 w-4 text-muted-foreground" />
         <P className="font-medium">{t('storedOutputs.title')}</P>

@@ -23,7 +23,6 @@ import {
   TemplateStarterCardSkeleton,
 } from './TemplateStarterCard'
 import type { ReactNode } from 'react'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import {
   STARTER_TEMPLATE_LIMIT,
   useStarterTemplates,
@@ -31,11 +30,6 @@ import {
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-
-interface GettingStartedSectionProps {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
-}
 
 /** Informational filler for the tracks the template cards would have taken. */
 function StarterPanel({
@@ -56,10 +50,7 @@ function StarterPanel({
   )
 }
 
-export function GettingStartedSection({
-  variant,
-  shadow,
-}: GettingStartedSectionProps) {
+export function GettingStartedSection() {
   const { t } = useTranslation(['dashboard', 'common'])
   const navigate = useNavigate()
   const { starters, hasStarters, isLoading, isError, refetch } =
@@ -147,14 +138,5 @@ export function GettingStartedSection({
     </>
   )
 
-  // Modern variant: no card wrapper, content floats on page background
-  if (variant === 'modern') {
-    return <div className="space-y-6">{content}</div>
-  }
-
-  return (
-    <Card className="p-8" variant={variant} shadow={shadow}>
-      {content}
-    </Card>
-  )
+  return <Card className="p-8">{content}</Card>
 }

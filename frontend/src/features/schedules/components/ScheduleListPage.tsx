@@ -28,7 +28,6 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { Pagination } from '@/components/common/Pagination'
 import { H2 } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
-import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 10
@@ -61,8 +60,6 @@ function filterSchedules(
 
 export function ScheduleListPage() {
   const { t } = useTranslation('schedules')
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const [page, setPage] = useState(1)
   const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all')
   const [query, setQuery] = useState('')
@@ -113,11 +110,7 @@ export function ScheduleListPage() {
     <ListPageContainer>
       <PageHeader title={t('page.title')} description={t('page.description')} />
 
-      <Card
-        className="overflow-hidden"
-        variant={dashboardVariant}
-        shadow={panelShadow}
-      >
+      <Card className="overflow-hidden">
         <div className="flex flex-col items-start justify-between gap-4 border-b border-border p-6 sm:flex-row sm:items-center">
           <H2 className="text-xl font-semibold">{t('page.title')}</H2>
 

@@ -335,8 +335,6 @@ function filterPresets(
 
 export function PresetsPage() {
   const { t } = useTranslation(['dashboard', 'journal'])
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const showFlow = useUiStore((state) => state.journalShowFlow)
   const setShowFlow = useUiStore((state) => state.setJournalShowFlow)
 
@@ -388,11 +386,7 @@ export function PresetsPage() {
         description={t('presets.page.description')}
       />
 
-      <Card
-        className="overflow-hidden"
-        variant={dashboardVariant}
-        shadow={panelShadow}
-      >
+      <Card className="overflow-hidden">
         {/* Header bar */}
         <div className="flex flex-col items-start justify-between gap-4 border-b border-border p-6 sm:flex-row sm:items-center">
           {/* Title + flow-preview toggles */}

@@ -16,22 +16,16 @@
 
 import { ChevronRight, MessageSquare, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { mockForumTopics, mockModels } from '@/features/dashboard/data/mockData'
 import { H2, H3, H4, P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
-interface CommunityNewsCardProps {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
-}
-
-export function CommunityNewsCard({ variant, shadow }: CommunityNewsCardProps) {
+export function CommunityNewsCard() {
   const { t } = useTranslation('dashboard')
 
   return (
-    <Card className="flex flex-col p-6" variant={variant} shadow={shadow}>
+    <Card className="flex flex-col p-6">
       <H2 className="mb-6 text-xl font-semibold">{t('community.title')}</H2>
 
       <div className="grid flex-1 grid-cols-1 gap-8 sm:grid-cols-2">

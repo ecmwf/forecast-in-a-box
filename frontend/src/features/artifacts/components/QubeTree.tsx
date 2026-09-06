@@ -112,7 +112,7 @@ function AifsMatrixView({
   const hasMatrixSection = sections.some((s) => s.levels !== null)
 
   return (
-    <Card shadow="none" className={cn('space-y-2 p-5', className)}>
+    <Card className={cn('space-y-2 p-5', className)}>
       <header className="flex items-center justify-between gap-4">
         <P className="font-mono text-xs font-semibold tracking-wider text-foreground uppercase">
           {t('detail.qubeMatrixTitle')}
@@ -157,7 +157,7 @@ function GenericTreeView({
 }) {
   const { t } = useTranslation('artifacts')
   return (
-    <Card shadow="none" className={cn('space-y-2 p-5', className)}>
+    <Card className={cn('space-y-2 p-5', className)}>
       <P className="font-mono text-xs font-semibold tracking-wider text-foreground uppercase">
         {t('detail.qubeTreeTitle')}
       </P>

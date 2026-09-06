@@ -24,7 +24,6 @@ import { PluginDiagnostics } from './PluginDiagnostics'
 import { PluginIcon } from './PluginIcon'
 import { PluginStatusBadge } from './PluginStatusBadge'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -49,8 +48,6 @@ interface PluginCardProps {
   onUpdate: (compositeId: PluginCompositeId) => void
   onViewDetails?: (plugin: PluginInfo) => void
   isInstalling?: boolean
-  variant?: DashboardVariant
-  shadow?: PanelShadow
 }
 
 export function PluginCard({
@@ -62,8 +59,6 @@ export function PluginCard({
   onUpdate,
   onViewDetails,
   isInstalling,
-  variant,
-  shadow,
 }: PluginCardProps) {
   const { t } = useTranslation('plugins')
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
@@ -95,8 +90,6 @@ export function PluginCard({
             ? 'border-amber-200 dark:border-amber-800'
             : 'border-red-200 dark:border-red-800'),
       )}
-      variant={variant}
-      shadow={shadow}
     >
       {/* Header */}
       <div

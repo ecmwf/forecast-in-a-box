@@ -19,7 +19,6 @@ import { Package, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { PluginCard } from './PluginCard'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { H3, P } from '@/components/base/typography'
 import { Input } from '@/components/ui/input'
 
@@ -28,8 +27,6 @@ interface UninstalledPluginsSectionProps {
   onInstall: (compositeId: PluginCompositeId) => void
   onViewDetails?: (plugin: PluginInfo) => void
   installingId?: PluginCompositeId
-  variant?: DashboardVariant
-  shadow?: PanelShadow
 }
 
 export function UninstalledPluginsSection({
@@ -37,8 +34,6 @@ export function UninstalledPluginsSection({
   onInstall,
   onViewDetails,
   installingId,
-  variant,
-  shadow,
 }: UninstalledPluginsSectionProps) {
   const { t } = useTranslation('plugins')
   const [searchQuery, setSearchQuery] = useState('')
@@ -128,8 +123,6 @@ export function UninstalledPluginsSection({
                 installingId.store === plugin.id.store &&
                 installingId.local === plugin.id.local
               }
-              variant={variant}
-              shadow={shadow}
             />
           ))}
         </div>

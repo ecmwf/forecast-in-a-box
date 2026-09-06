@@ -11,7 +11,6 @@
 /** Page shell for list/detail pages — honours the boxed/full layout setting. */
 
 import type { ReactNode } from 'react'
-import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
 interface ListPageContainerProps {
@@ -23,14 +22,9 @@ export function ListPageContainer({
   children,
   className,
 }: ListPageContainerProps) {
-  const layoutMode = useUiStore((state) => state.layoutMode)
   return (
     <div
-      className={cn(
-        'mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8',
-        layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
-        className,
-      )}
+      className={cn('mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8', className)}
     >
       {children}
     </div>

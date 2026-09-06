@@ -46,8 +46,6 @@ export const Route = createFileRoute('/_authenticated/admin/artifacts/')({
 function ArtifactsPage() {
   const { t } = useTranslation('artifacts')
   const navigate = useNavigate()
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const artifactsViewMode = useUiStore((state) => state.artifactsViewMode)
 
   // Filter state
@@ -148,8 +146,6 @@ function ArtifactsPage() {
           }}
           onViewDetails={handleViewDetails}
           deletingId={deleteModel.isPending ? deleteModel.variables : undefined}
-          variant={dashboardVariant}
-          shadow={panelShadow}
         />
       </div>
 
@@ -170,8 +166,6 @@ function ArtifactsPage() {
         onViewDetails={handleViewDetails}
         isDownloading={downloadModel.isDownloading}
         getDownloadProgress={downloadModel.getProgress}
-        variant={dashboardVariant}
-        shadow={panelShadow}
       />
     </ListPageContainer>
   )

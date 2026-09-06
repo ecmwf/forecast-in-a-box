@@ -12,21 +12,12 @@ import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { useConfigPresets } from '../hooks/useConfigPresets'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { PresetCard } from '@/features/dashboard/components/PresetCard'
 import { H2, P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
 
-interface ConfigPresetsSectionProps {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
-}
-
 /** "My Configuration Presets" — a card grid of saved configs, each mirroring a Forecast Journal row. */
-export function ConfigPresetsSection({
-  variant,
-  shadow,
-}: ConfigPresetsSectionProps) {
+export function ConfigPresetsSection() {
   const { t } = useTranslation('dashboard')
   const { presets, hasPresets, isLoading, toggleFavourite } = useConfigPresets()
 
@@ -62,13 +53,5 @@ export function ConfigPresetsSection({
     </>
   )
 
-  if (variant === 'modern') {
-    return <div className="space-y-6">{content}</div>
-  }
-
-  return (
-    <Card className="p-8" variant={variant} shadow={shadow}>
-      {content}
-    </Card>
-  )
+  return <Card className="p-8">{content}</Card>
 }

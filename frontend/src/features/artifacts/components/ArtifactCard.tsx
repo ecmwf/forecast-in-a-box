@@ -23,7 +23,6 @@ import type {
   ArtifactInfo,
   CompositeArtifactId,
 } from '@/api/types/artifacts.types'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -41,8 +40,6 @@ interface ArtifactCardProps {
   /** Download progress 0-100, only meaningful when isDownloading is true */
   downloadProgress?: number
   isDeleting?: boolean
-  variant?: DashboardVariant
-  shadow?: PanelShadow
 }
 
 export function ArtifactCard({
@@ -54,8 +51,6 @@ export function ArtifactCard({
   isDownloading,
   downloadProgress,
   isDeleting,
-  variant,
-  shadow,
 }: ArtifactCardProps) {
   const { t } = useTranslation('artifacts')
 
@@ -64,8 +59,6 @@ export function ArtifactCard({
       className={cn(
         'group relative flex flex-col p-4 transition-all duration-300 hover:border-primary/50 sm:p-5',
       )}
-      variant={variant}
-      shadow={shadow}
     >
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-2 sm:mb-4">

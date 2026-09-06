@@ -51,7 +51,6 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useActivityStore } from '@/stores/activityStore'
-import { useUiStore } from '@/stores/uiStore'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
@@ -127,7 +126,6 @@ export function RunDetailPage() {
     return () => resetExecutionSelection()
   }, [jobId, resetExecutionSelection])
 
-  const layoutMode = useUiStore((state) => state.layoutMode)
   const columnsFill = useViewportFill(true, { insetPx: 32 })
   const isWide = useMedia('(min-width: 1280px)')
   const { defaultLayout: splitLayout, onLayoutChanged: onSplitLayoutChanged } =
@@ -212,7 +210,6 @@ export function RunDetailPage() {
       <div
         className={cn(
           'mx-auto flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8',
-          layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
         )}
       >
         <LoadingSpinner />
@@ -255,7 +252,6 @@ export function RunDetailPage() {
         // Underscores in arbitrary values emit spaces; `calc(100vh-15rem)`
         // (no spaces) is invalid CSS and silently discarded.
         'mx-auto flex min-h-[calc(100vh_-_15rem)] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8',
-        layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
       )}
     >
       <RunStatusHeader

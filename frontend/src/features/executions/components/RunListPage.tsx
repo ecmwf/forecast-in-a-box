@@ -26,7 +26,6 @@ import { ErrorPanel } from '@/components/common/ErrorPanel'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Pagination } from '@/components/common/Pagination'
-import { useUiStore } from '@/stores/uiStore'
 import { formatInZone } from '@/lib/datetime'
 
 const PAGE_SIZE = 10
@@ -44,8 +43,6 @@ const route = getRouteApi('/_authenticated/execute/')
 
 export function RunListPage() {
   const { t } = useTranslation('executions')
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const [page, setPage] = useState(1)
   const search = route.useSearch()
   const navigate = route.useNavigate()
@@ -115,8 +112,6 @@ export function RunListPage() {
         groupBy={groupBy}
         onToggleBookmark={toggleBookmark}
         onAddFacet={(token) => setQuery(addToken(query, token))}
-        variant={dashboardVariant}
-        shadow={panelShadow}
         header={
           <ForecastRunSearchHeader
             title={t('page.title')}

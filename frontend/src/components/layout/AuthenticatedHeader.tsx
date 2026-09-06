@@ -19,10 +19,7 @@ import {
   FileText,
   Globe,
   HelpCircle,
-  Layout,
   LogOut,
-  Maximize2,
-  Minimize2,
   Monitor,
   Moon,
   Settings,
@@ -75,10 +72,6 @@ export function AuthenticatedHeader() {
   const { authType, signOut } = useAuth()
   const theme = useUiStore((state) => state.theme)
   const setTheme = useUiStore((state) => state.setTheme)
-  const layoutMode = useUiStore((state) => state.layoutMode)
-  const setLayoutMode = useUiStore((state) => state.setLayoutMode)
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const setDashboardVariant = useUiStore((state) => state.setDashboardVariant)
   const setTimeZone = useUiStore((state) => state.setTimeZone)
   const timeZone = useAppTimeZone()
   const [tzDialogOpen, setTzDialogOpen] = useState(false)
@@ -105,7 +98,6 @@ export function AuthenticatedHeader() {
       <div
         className={cn(
           'flex h-16 items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8',
-          layoutMode === 'boxed' && 'mx-auto max-w-7xl',
         )}
       >
         {/* Logo — flex-1 balances the actions so the nav stays centred. */}
@@ -192,23 +184,6 @@ export function AuthenticatedHeader() {
               {/* View Group */}
               <DropdownMenuGroup>
                 <DropdownMenuLabel>{t('userMenu.view')}</DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() =>
-                    setLayoutMode(layoutMode === 'boxed' ? 'fluid' : 'boxed')
-                  }
-                >
-                  {layoutMode === 'boxed' ? (
-                    <>
-                      <Maximize2 className="mr-2 h-4 w-4" />
-                      {t('userMenu.fluidLayout')}
-                    </>
-                  ) : (
-                    <>
-                      <Minimize2 className="mr-2 h-4 w-4" />
-                      {t('userMenu.boxedLayout')}
-                    </>
-                  )}
-                </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
                     <Sun className="mr-2 h-4 w-4" />
@@ -233,37 +208,6 @@ export function AuthenticatedHeader() {
                         <DropdownMenuRadioItem value="system">
                           <Monitor className="mr-2 h-4 w-4" />
                           {t('userMenu.themeSystem')}
-                        </DropdownMenuRadioItem>
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <Layout className="mr-2 h-4 w-4" />
-                    {t('userMenu.cardStyle')}
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent>
-                      <DropdownMenuRadioGroup
-                        value={dashboardVariant}
-                        onValueChange={(value) =>
-                          setDashboardVariant(
-                            value as 'default' | 'flat' | 'modern' | 'gradient',
-                          )
-                        }
-                      >
-                        <DropdownMenuRadioItem value="default">
-                          {t('userMenu.cardDefault')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="flat">
-                          {t('userMenu.cardFlat')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="modern">
-                          {t('userMenu.cardModern')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="gradient">
-                          {t('userMenu.cardGradient')}
                         </DropdownMenuRadioItem>
                       </DropdownMenuRadioGroup>
                     </DropdownMenuSubContent>

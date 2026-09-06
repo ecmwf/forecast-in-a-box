@@ -14,7 +14,6 @@ import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import type { FacetToken } from '@/features/journal/facets/facet-types'
@@ -27,11 +26,6 @@ import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
 import { ForecastRunSearchHeader } from '@/features/journal/components/ForecastRunSearchHeader'
 import { formatInZone } from '@/lib/datetime'
 
-interface ForecastJournalProps {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
-}
-
 /** Recent runs shown before "View all". */
 const DASHBOARD_RUN_COUNT = 6
 
@@ -43,7 +37,7 @@ const DASHBOARD_FILTERS: ReadonlyArray<RunFilter> = [
   'bookmarked',
 ]
 
-export function ForecastJournal({ variant, shadow }: ForecastJournalProps) {
+export function ForecastJournal() {
   const { t } = useTranslation('journal')
   const [query, setQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<RunFilter>('all')
@@ -80,8 +74,6 @@ export function ForecastJournal({ variant, shadow }: ForecastJournalProps) {
       groupBy={groupBy}
       onToggleBookmark={toggleBookmark}
       onAddFacet={handleAddFacet}
-      variant={variant}
-      shadow={shadow}
       header={
         <ForecastRunSearchHeader
           title={t('title')}

@@ -13,7 +13,6 @@
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import type { ForecastRunViewModel } from '@/features/journal/types'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import type { FacetToken } from '@/features/journal/facets/facet-types'
 import { useServerTime } from '@/api/hooks/useSchedules'
@@ -32,8 +31,6 @@ interface ForecastRunListProps {
   onAddFacet?: (token: FacetToken) => void
   header?: ReactNode
   footer?: ReactNode
-  variant?: DashboardVariant
-  shadow?: PanelShadow
 }
 
 export function ForecastRunList({
@@ -45,8 +42,6 @@ export function ForecastRunList({
   onAddFacet,
   header,
   footer,
-  variant,
-  shadow,
 }: ForecastRunListProps) {
   const { t } = useTranslation('journal')
   const { serverTimeToLocal } = useServerTime()
@@ -107,7 +102,7 @@ export function ForecastRunList({
   }
 
   return (
-    <Card className="overflow-hidden" variant={variant} shadow={shadow}>
+    <Card className="overflow-hidden">
       {header}
       {body}
       {footer}

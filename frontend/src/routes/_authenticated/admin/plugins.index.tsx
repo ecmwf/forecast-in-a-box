@@ -58,8 +58,6 @@ export const Route = createFileRoute('/_authenticated/admin/plugins/')({
 function PluginsPage() {
   const { t } = useTranslation('plugins')
   const navigate = useNavigate()
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const pluginsViewMode = useUiStore((state) => state.pluginsViewMode)
 
   // Filter state
@@ -346,8 +344,6 @@ function PluginsPage() {
             onUninstall={handleUninstall}
             onUpdate={handleUpdate}
             onViewDetails={handleViewDetails}
-            variant={dashboardVariant}
-            shadow={panelShadow}
           />
         </div>
       )}
@@ -360,8 +356,6 @@ function PluginsPage() {
         installingId={
           installPlugin.isPending ? installPlugin.variables : undefined
         }
-        variant={dashboardVariant}
-        shadow={panelShadow}
       />
     </ListPageContainer>
   )

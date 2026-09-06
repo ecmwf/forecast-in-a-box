@@ -32,7 +32,6 @@ import { RunStatusDetailsPopover } from './RunStatusDetailsPopover'
 import { ModelSummaryPopover } from './ModelSummaryPopover'
 import type { ReactNode } from 'react'
 import type { TrafficLightStatus } from '@/types/status.types'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { useArtifacts } from '@/api/hooks/useArtifacts'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
@@ -89,12 +88,10 @@ const statusIcons: Record<TrafficLightStatus, ReactNode> = {
 }
 
 interface WelcomeCardProps {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
   className?: string
 }
 
-export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
+export function WelcomeCard({ className }: WelcomeCardProps) {
   const { data: user } = useUser()
   const { t } = useTranslation('dashboard')
   const { trafficLightStatus } = useStatus()
@@ -166,7 +163,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
   }
 
   return (
-    <Card className={cn('p-6', className)} variant={variant} shadow={shadow}>
+    <Card className={cn('p-6', className)}>
       <H2 className="mb-6 text-xl font-semibold">
         {isAnonymous
           ? t('welcome.titleAnonymous')

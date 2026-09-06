@@ -55,7 +55,6 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 10
@@ -74,9 +73,6 @@ export function ScheduleDetailPage() {
   const { scheduleId } = useParams({
     from: '/_authenticated/schedules/$scheduleId',
   })
-  const layoutMode = useUiStore((state) => state.layoutMode)
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const [runsPage, setRunsPage] = useState(1)
   const [runFilter, setRunFilter] = useState<RunFilter>('all')
   const [runQuery, setRunQuery] = useState('')
@@ -92,10 +88,7 @@ export function ScheduleDetailPage() {
   const { offsetMs, serverTimeToLocal, timeZone } = useServerTime()
   const { isBookmarked, toggleBookmark } = useRunFavourites()
 
-  const containerClass = cn(
-    'mx-auto space-y-6 px-4 py-8 sm:px-6 lg:px-8',
-    layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
-  )
+  const containerClass = cn('mx-auto space-y-6 px-4 py-8 sm:px-6 lg:px-8')
 
   if (isLoading) {
     return (
@@ -259,8 +252,6 @@ export function ScheduleDetailPage() {
         emptyText={t('detail.noRuns')}
         onToggleBookmark={toggleBookmark}
         onAddFacet={(token) => setRunQuery((prev) => addToken(prev, token))}
-        variant={dashboardVariant}
-        shadow={panelShadow}
         header={
           <ForecastRunSearchHeader
             title={t('schedules:detail.runsTitle')}

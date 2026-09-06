@@ -14,7 +14,6 @@ import { useStatus } from '@/api/hooks/useStatus'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { StatusIndicator } from '@/components/common/StatusIndicator'
 import { cn, isExternalUrl } from '@/lib/utils'
-import { useUiStore } from '@/stores/uiStore'
 
 // Partner logos for the footer band. The SVGs are white-fill, so the footer
 // keeps a fixed navy background regardless of theme.
@@ -46,7 +45,6 @@ const links = [
 
 export function Footer() {
   const { trafficLightStatus, isLoading } = useStatus()
-  const layoutMode = useUiStore((state) => state.layoutMode)
   const { t } = useTranslation('common')
 
   return (
@@ -64,12 +62,7 @@ export function Footer() {
         aria-hidden
         className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0e1f44] via-[#0e1f44]/85 to-transparent dark:from-[#0c1730] dark:via-[#0c1730]/85"
       />
-      <div
-        className={cn(
-          'px-6',
-          layoutMode === 'boxed' ? 'mx-auto max-w-5xl' : 'mx-auto max-w-7xl',
-        )}
-      >
+      <div className={cn('px-6', 'mx-auto max-w-7xl')}>
         <div className="flex flex-wrap items-center justify-center gap-x-24 gap-y-8 py-10">
           {partnerLogos.map((logo) => (
             <a

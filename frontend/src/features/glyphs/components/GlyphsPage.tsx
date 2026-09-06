@@ -31,14 +31,11 @@ import { H2 } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useUiStore } from '@/stores/uiStore'
 
 const PAGE_SIZE = 10
 
 export function GlyphsPage() {
   const { t } = useTranslation('glyphs')
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -113,11 +110,7 @@ export function GlyphsPage() {
         }
       />
 
-      <Card
-        className="overflow-hidden"
-        variant={dashboardVariant}
-        shadow={panelShadow}
-      >
+      <Card className="overflow-hidden">
         <div className="flex flex-col items-start justify-between gap-4 border-b border-border p-6 sm:flex-row sm:items-center">
           <H2 className="text-xl font-semibold">{t('page.title')}</H2>
 

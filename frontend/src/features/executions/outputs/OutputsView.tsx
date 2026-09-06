@@ -313,11 +313,7 @@ export function OutputsView({
     // GRIB-only run — the Stored outputs card covers it; render nothing.
     if (hasStoredOutputs) return null
     return (
-      <Card
-        variant="flat"
-        shadow="none"
-        className="gap-0 overflow-hidden bg-transparent py-0"
-      >
+      <Card className="gap-0 overflow-hidden border-0 bg-transparent bg-none py-0">
         <div className="flex flex-col items-center justify-center gap-2 px-3 py-10 text-center">
           <Package className="h-10 w-10 text-muted-foreground" />
           <P className="font-medium text-muted-foreground">
@@ -380,10 +376,8 @@ export function OutputsView({
 
   return (
     <Card
-      variant="flat"
-      shadow="none"
       // overflow-visible: the Card base would clip the first row's outer corners.
-      className="gap-0 overflow-visible bg-transparent py-0"
+      className="gap-0 overflow-visible border-0 bg-transparent bg-none py-0"
     >
       {toolbarSlot ? createPortal(toolbar, toolbarSlot) : null}
       {/* No top padding — the parent's space-y-4 sets the gap above the grid. */}
