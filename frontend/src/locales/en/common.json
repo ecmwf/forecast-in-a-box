@@ -134,12 +134,13 @@
   "commandPalette": {
     "title": "Command Palette",
     "description": "Search for a command to run...",
-    "placeholder": "Type a command or search...",
+    "placeholder": "Search pages, presets, runs and blocks...",
     "empty": "No results found.",
     "navigate": "navigate",
     "select": "select",
     "close": "close",
-    "esc": "Esc"
+    "esc": "Esc",
+    "open": "Search and commands"
   },
   "commands": {
     "newConfiguration": {
@@ -167,6 +168,21 @@
     "visualise": {
       "label": "Visualise",
       "description": "View and compare geo outputs on a map"
+    },
+    "categoryPresets": "Presets",
+    "categoryRuns": "Recent runs",
+    "categoryBlocks": "Blocks",
+    "preset": {
+      "description": "Open in Configure"
+    },
+    "template": {
+      "description": "Plugin template"
+    },
+    "run": {
+      "untitled": "Untitled run"
+    },
+    "addBlock": {
+      "description": "Add to the canvas"
     }
   },
   "timezone": {

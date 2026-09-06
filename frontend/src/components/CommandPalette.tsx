@@ -16,13 +16,18 @@
  * presets and navigation.
  */
 
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { Command, CommandCategory } from '@/commands/registry'
 import { groupCommandsByCategory } from '@/commands/registry'
 import { navigationCommands } from '@/commands/navigationCommands'
+import {
+  useBlockCommands,
+  usePresetCommands,
+  useRunCommands,
+} from '@/commands/dataCommands'
 import {
   CommandCollection,
   CommandDialog,
@@ -64,30 +69,7 @@ function commandFilter(command: Command, query: string): boolean {
 }
 
 export function CommandPalette() {
-  const navigate = useNavigate()
   const { isOpen, setOpen } = useCommandStore()
-  const { t } = useTranslation('common')
-
-  // Category headings are union values used for grouping; map them to labels.
-  const categoryLabels: Record<CommandCategory, string> = {
-    'Getting Started': t('commands.categoryGettingStarted'),
-    Navigation: t('commands.categoryNavigation'),
-  }
-
-  // Tracks the highlighted command so Tab can confirm it, mirroring Enter.
-  const highlightedCommand = useRef<Command | undefined>(undefined)
-
-  // Build commands with the router navigate function, then shape them into
-  // Base UI's grouped-items format.
-  const commands = useMemo(() => navigationCommands(navigate), [navigate])
-  const groups = useMemo<Array<CommandPaletteGroup>>(
-    () =>
-      groupCommandsByCategory(commands).map((group) => ({
-        value: group.category,
-        items: group.commands,
-      })),
-    [commands],
-  )
 
   // Listen for ⌘K / Ctrl+K. Mod+K covers ⌘ on Mac and Ctrl elsewhere;
   // Control+K ensures Ctrl+K also works on Mac for consistency.
@@ -95,73 +77,115 @@ export function CommandPalette() {
   useHotkey('Mod+K', toggle)
   useHotkey('Control+K', toggle)
 
+  return (
+    <CommandDialog open={isOpen} onOpenChange={setOpen}>
+      {isOpen && <CommandPaletteContent />}
+    </CommandDialog>
+  )
+}
+
+/** Mounted only while open, so the preset and run queries stay idle otherwise. */
+function CommandPaletteContent() {
+  const navigate = useNavigate()
+  const setOpen = useCommandStore((state) => state.setOpen)
+  const { t } = useTranslation('common')
+  const onConfigure = useRouterState({
+    select: (state) => state.location.pathname.startsWith('/configure'),
+  })
+
+  // Category headings are union values used for grouping; map them to labels.
+  const categoryLabels: Record<CommandCategory, string> = {
+    'Getting Started': t('commands.categoryGettingStarted'),
+    Navigation: t('commands.categoryNavigation'),
+    Presets: t('commands.categoryPresets'),
+    Runs: t('commands.categoryRuns'),
+    Blocks: t('commands.categoryBlocks'),
+  }
+
+  // Tracks the highlighted command so Tab can confirm it, mirroring Enter.
+  const highlightedCommand = useRef<Command | undefined>(undefined)
+
+  // Base UI skips the filter on an empty query, so search-only commands are
+  // dropped from the item list itself until the user types.
+  const [query, setQuery] = useState('')
+  const pages = useMemo(() => navigationCommands(navigate), [navigate])
+  const presets = usePresetCommands(navigate)
+  const runs = useRunCommands(navigate)
+  const blocks = useBlockCommands(onConfigure)
+  const groups = useMemo<Array<CommandPaletteGroup>>(() => {
+    const all = [...pages, ...presets, ...runs, ...blocks]
+    const listed = query.trim()
+      ? all
+      : all.filter((command) => !command.searchOnly)
+    return groupCommandsByCategory(listed).map((group) => ({
+      value: group.category,
+      items: group.commands,
+    }))
+  }, [pages, presets, runs, blocks, query])
+
   const handleSelect = (command: Command) => {
     setOpen(false)
     command.action()
   }
 
   return (
-    <CommandDialog open={isOpen} onOpenChange={setOpen}>
-      <CommandRoot
-        open
-        inline
-        items={groups}
-        autoHighlight="always"
-        keepHighlight
-        filter={commandFilter}
-        itemToStringValue={(command: Command) => command.label}
-        onItemHighlighted={(command) => {
-          highlightedCommand.current = command
+    <CommandRoot
+      open
+      inline
+      items={groups}
+      value={query}
+      onValueChange={setQuery}
+      autoHighlight="always"
+      keepHighlight
+      filter={commandFilter}
+      itemToStringValue={(command: Command) => command.label}
+      onItemHighlighted={(command) => {
+        highlightedCommand.current = command
+      }}
+    >
+      <CommandInput
+        placeholder={t('commandPalette.placeholder')}
+        onKeyDown={(event) => {
+          // Tab confirms the highlighted command, mirroring Enter.
+          if (event.key === 'Tab' && highlightedCommand.current) {
+            event.preventDefault()
+            handleSelect(highlightedCommand.current)
+          }
         }}
-      >
-        <CommandInput
-          placeholder={t('commandPalette.placeholder')}
-          onKeyDown={(event) => {
-            // Tab confirms the highlighted command, mirroring Enter.
-            if (event.key === 'Tab' && highlightedCommand.current) {
-              event.preventDefault()
-              handleSelect(highlightedCommand.current)
-            }
-          }}
-        />
-        <CommandEmpty>{t('commandPalette.empty')}</CommandEmpty>
-        <CommandList>
-          {(group: CommandPaletteGroup) => (
-            <CommandGroup key={group.value} items={group.items}>
-              <CommandGroupLabel>
-                {categoryLabels[group.value]}
-              </CommandGroupLabel>
-              <CommandCollection>
-                {(command: Command) => (
-                  <CommandItem
-                    key={command.id}
-                    value={command}
-                    onClick={() => handleSelect(command)}
-                  >
-                    {command.icon}
-                    <div className="flex flex-col gap-0.5">
-                      <span>{command.label}</span>
-                      {command.description && (
-                        <span className="text-xs text-muted-foreground">
-                          {command.description}
-                        </span>
-                      )}
-                    </div>
-                    {command.hotkey && (
-                      <CommandShortcut
-                        keys={command.hotkey.map((key) =>
-                          formatForDisplay(key),
-                        )}
-                      />
+      />
+      <CommandEmpty>{t('commandPalette.empty')}</CommandEmpty>
+      <CommandList>
+        {(group: CommandPaletteGroup) => (
+          <CommandGroup key={group.value} items={group.items}>
+            <CommandGroupLabel>{categoryLabels[group.value]}</CommandGroupLabel>
+            <CommandCollection>
+              {(command: Command) => (
+                <CommandItem
+                  key={command.id}
+                  value={command}
+                  onClick={() => handleSelect(command)}
+                >
+                  {command.icon}
+                  <div className="flex flex-col gap-0.5">
+                    <span>{command.label}</span>
+                    {command.description && (
+                      <span className="text-xs text-muted-foreground">
+                        {command.description}
+                      </span>
                     )}
-                  </CommandItem>
-                )}
-              </CommandCollection>
-            </CommandGroup>
-          )}
-        </CommandList>
-        <CommandFooter />
-      </CommandRoot>
-    </CommandDialog>
+                  </div>
+                  {command.hotkey && (
+                    <CommandShortcut
+                      keys={command.hotkey.map((key) => formatForDisplay(key))}
+                    />
+                  )}
+                </CommandItem>
+              )}
+            </CommandCollection>
+          </CommandGroup>
+        )}
+      </CommandList>
+      <CommandFooter />
+    </CommandRoot>
   )
 }

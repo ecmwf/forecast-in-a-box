@@ -23,6 +23,7 @@ import {
   LogOut,
   Monitor,
   Moon,
+  Search,
   Settings,
   Sparkles,
   Sun,
@@ -65,6 +66,7 @@ import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 import { useUser } from '@/hooks/useUser'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useUiStore } from '@/stores/uiStore'
+import { useCommandStore } from '@/stores/commandStore'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 import { timeZoneOffsetLabel, useAppTimeZone } from '@/lib/datetime'
 
@@ -78,6 +80,7 @@ export function AuthenticatedHeader() {
   const timeZone = useAppTimeZone()
   const [tzDialogOpen, setTzDialogOpen] = useState(false)
   const { t } = useTranslation('common')
+  const setCommandOpen = useCommandStore((state) => state.setOpen)
   const navigate = useNavigate()
 
   const isAuthenticated = authType === 'authenticated'
@@ -137,6 +140,18 @@ export function AuthenticatedHeader() {
 
           {/* Activity Monitor */}
           <ActivityMonitor />
+
+          {/* Command palette (also ⌘K / Ctrl+K) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden text-muted-foreground sm:inline-flex"
+            aria-label={t('commandPalette.open')}
+            title={t('commandPalette.open')}
+            onClick={() => setCommandOpen(true)}
+          >
+            <Search className="h-5 w-5" />
+          </Button>
 
           {/* Help Button */}
           <Button
