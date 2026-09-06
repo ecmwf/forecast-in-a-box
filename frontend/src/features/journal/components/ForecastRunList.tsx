@@ -34,6 +34,10 @@ interface ForecastRunListProps {
   onAddFacet?: (token: FacetToken) => void
   header?: ReactNode
   footer?: ReactNode
+  /** Multi-select mode: rows show a checkbox; only completed runs select. */
+  selectedIds?: ReadonlySet<string>
+  selectionCap?: number
+  onToggleSelect?: (runId: string) => void
 }
 
 export function ForecastRunList({
@@ -46,6 +50,9 @@ export function ForecastRunList({
   onAddFacet,
   header,
   footer,
+  selectedIds,
+  selectionCap,
+  onToggleSelect,
 }: ForecastRunListProps) {
   const { t } = useTranslation('journal')
   const { serverTimeToLocal } = useServerTime()
@@ -57,6 +64,16 @@ export function ForecastRunList({
         run={run}
         onToggleBookmark={onToggleBookmark}
         onAddFacet={onAddFacet}
+        onToggleSelect={onToggleSelect}
+        selected={selectedIds?.has(run.runId)}
+        selectDisabled={
+          onToggleSelect !== undefined &&
+          (run.status !== 'completed' ||
+            (selectionCap !== undefined &&
+              selectedIds !== undefined &&
+              selectedIds.size >= selectionCap &&
+              !selectedIds.has(run.runId)))
+        }
       />
     ))
   }

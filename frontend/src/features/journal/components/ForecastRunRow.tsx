@@ -25,6 +25,7 @@ import { FableMiniFlow } from '@/features/journal/components/FableMiniFlow'
 import { JournalChip } from '@/features/journal/components/JournalChip'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { RunRowMenu } from '@/features/journal/components/RunRowMenu'
+import { Checkbox } from '@/components/ui/checkbox'
 import { formatInZone, timeZoneOffsetLabel } from '@/lib/datetime'
 import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
@@ -34,6 +35,11 @@ interface ForecastRunRowProps {
   onToggleBookmark: (runId: string) => void
   /** Clicking a model/output/tag chip adds it to the journal search. */
   onAddFacet?: (token: FacetToken) => void
+  /** Present when the list is in multi-select mode. */
+  selected?: boolean
+  /** Unselectable while a selection cap is reached elsewhere. */
+  selectDisabled?: boolean
+  onToggleSelect?: (runId: string) => void
 }
 
 /**
@@ -44,6 +50,9 @@ export const ForecastRunRow = memo(function ({
   run,
   onToggleBookmark,
   onAddFacet,
+  selected,
+  selectDisabled,
+  onToggleSelect,
 }: ForecastRunRowProps) {
   const { t } = useTranslation('journal')
   const { serverTimeToLocal, timeZone } = useServerTime()
@@ -67,6 +76,15 @@ export const ForecastRunRow = memo(function ({
       data-testid={`run-row-${run.runId}`}
     >
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+        {onToggleSelect && (
+          <Checkbox
+            checked={selected === true}
+            disabled={selectDisabled}
+            onCheckedChange={() => onToggleSelect(run.runId)}
+            aria-label={t('item.select', { name: title })}
+            className="mt-1 sm:mt-0"
+          />
+        )}
         {/* Status */}
         <div className="mt-1 shrink-0 sm:mt-0">
           <RunStatusIcon status={run.status} />

@@ -75,7 +75,8 @@
     "moreOptions": "More options",
     "openSchedule": "Open schedule",
     "filterBySchedule": "Show runs of schedule {{name}}",
-    "compareWithPrevious": "Compare with previous run"
+    "compareWithPrevious": "Compare with previous run",
+    "select": "Select {{name}}"
   },
   "metadata": {
     "title": "Edit run details",

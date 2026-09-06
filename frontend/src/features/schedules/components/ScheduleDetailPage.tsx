@@ -21,15 +21,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Columns2,
   Pencil,
   User,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import { formatInZone } from '@/lib/datetime'
 import { showToast } from '@/lib/toast'
+import { buildRunPairComparison } from '@/features/visualise/compare-runs'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import {
   useSchedule,
@@ -79,6 +81,11 @@ export function ScheduleDetailPage() {
   const [runQuery, setRunQuery] = useState('')
   const [runGroupBy, setRunGroupBy] = useState<GroupBy>('date')
   const [editScheduleOpen, setEditScheduleOpen] = useState(false)
+  const [selectedRunIds, setSelectedRunIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
+  const [comparing, setComparing] = useState(false)
+  const navigate = useNavigate()
 
   const { data: schedule, isLoading, isError } = useSchedule(scheduleId)
   const { data: nextRun } = useScheduleNextRun(scheduleId)
@@ -160,6 +167,31 @@ export function ScheduleDetailPage() {
     displayDateFor,
   )
   const totalRunPages = runsData?.total_pages ?? 1
+  function toggleSelectedRun(runId: string) {
+    setSelectedRunIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(runId)) next.delete(runId)
+      else next.add(runId)
+      return next
+    })
+  }
+
+  async function compareSelectedRuns() {
+    const picked = runViewModels.filter((run) => selectedRunIds.has(run.runId))
+    if (picked.length !== 2) return
+    setComparing(true)
+    try {
+      const result = await buildRunPairComparison(picked[0], picked[1])
+      if (!result.ok) {
+        showToast.error(t('schedules:detail.compareNoOutput'))
+        return
+      }
+      void navigate({ to: '/visualise', search: result.search })
+    } finally {
+      setComparing(false)
+    }
+  }
+
   const nextRunDate = nextRun
     ? serverTimeToLocal(nextRun, { roundMinute: true })
     : null
@@ -265,20 +297,53 @@ export function ScheduleDetailPage() {
         emptyText={t('detail.noRuns')}
         onToggleBookmark={toggleBookmark}
         onAddFacet={(token) => setRunQuery((prev) => addToken(prev, token))}
+        selectedIds={selectedRunIds}
+        selectionCap={2}
+        onToggleSelect={toggleSelectedRun}
         header={
-          <ForecastRunSearchHeader
-            title={t('schedules:detail.runsTitle')}
-            query={runQuery}
-            onQueryChange={setRunQuery}
-            activeFilter={runFilter}
-            onFilterChange={(filter) => {
-              setRunFilter(filter)
-              setRunsPage(1)
-            }}
-            filters={SCHEDULE_RUN_FILTERS}
-            groupBy={runGroupBy}
-            onGroupByChange={setRunGroupBy}
-          />
+          <>
+            <ForecastRunSearchHeader
+              title={t('schedules:detail.runsTitle')}
+              query={runQuery}
+              onQueryChange={setRunQuery}
+              activeFilter={runFilter}
+              onFilterChange={(filter) => {
+                setRunFilter(filter)
+                setRunsPage(1)
+              }}
+              filters={SCHEDULE_RUN_FILTERS}
+              groupBy={runGroupBy}
+              onGroupByChange={setRunGroupBy}
+            />
+            {/* Selection bar: pick two completed runs to compare in Visualise. */}
+            <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-2 text-sm text-muted-foreground">
+              <span>
+                {selectedRunIds.size > 0
+                  ? t('schedules:detail.selectedCount', {
+                      count: selectedRunIds.size,
+                    })
+                  : t('schedules:detail.selectTwoHint')}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={selectedRunIds.size !== 2 || comparing}
+                onClick={() => void compareSelectedRuns()}
+              >
+                <Columns2 className="mr-1.5 h-4 w-4" />
+                {t('schedules:detail.compareSelected')}
+              </Button>
+              {selectedRunIds.size > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedRunIds(new Set())}
+                >
+                  {t('schedules:detail.clearSelection')}
+                </Button>
+              )}
+            </div>
+          </>
         }
         footer={
           totalRunPages > 1 ? (
