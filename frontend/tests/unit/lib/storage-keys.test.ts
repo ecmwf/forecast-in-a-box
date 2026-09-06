@@ -69,7 +69,7 @@ describe('STORE_VERSIONS', () => {
   })
 
   it('has fable builder store version', () => {
-    expect(STORE_VERSIONS.fableBuilder).toBe(2)
+    expect(STORE_VERSIONS.fableBuilder).toBe(3)
   })
 })
 

@@ -89,10 +89,6 @@ describe('useFableBuilderStore', () => {
       expect(useFableBuilderStore.getState().fableName).toBe('')
     })
 
-    it('has graph mode by default', () => {
-      expect(useFableBuilderStore.getState().mode).toBe('graph')
-    })
-
     it('has edit step by default', () => {
       expect(useFableBuilderStore.getState().step).toBe('edit')
     })
@@ -190,12 +186,6 @@ describe('useFableBuilderStore', () => {
       act(() => useFableBuilderStore.getState().setFable(mockFable))
       act(() => useFableBuilderStore.getState().newFable())
       expect(useFableBuilderStore.getState().fable).toEqual(createEmptyFable())
-    })
-
-    it('preserves mode setting', () => {
-      act(() => useFableBuilderStore.getState().setMode('form'))
-      act(() => useFableBuilderStore.getState().newFable())
-      expect(useFableBuilderStore.getState().mode).toBe('form')
     })
   })
 
@@ -814,12 +804,7 @@ describe('useFableBuilderStore', () => {
     })
   })
 
-  describe('mode controls', () => {
-    it('sets mode', () => {
-      act(() => useFableBuilderStore.getState().setMode('form'))
-      expect(useFableBuilderStore.getState().mode).toBe('form')
-    })
-
+  describe('step controls', () => {
     it('sets step', () => {
       act(() => useFableBuilderStore.getState().setStep('review'))
       expect(useFableBuilderStore.getState().step).toBe('review')
@@ -924,13 +909,11 @@ describe('useFableBuilderStore', () => {
       act(() =>
         useFableBuilderStore.getState().setFable(mockFable, 'fable-123'),
       )
-      act(() => useFableBuilderStore.getState().setMode('form'))
       act(() => useFableBuilderStore.getState().reset())
 
       const state = useFableBuilderStore.getState()
       expect(state.fable).toEqual(createEmptyFable())
       expect(state.fableId).toBeNull()
-      expect(state.mode).toBe('graph')
       expect(state.isDirty).toBe(false)
     })
   })

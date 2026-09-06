@@ -421,20 +421,6 @@ describe('Graph Mode - Store State', () => {
     useFableBuilderStore.getState().reset()
   })
 
-  it('defaults to graph mode', () => {
-    const state = useFableBuilderStore.getState()
-    expect(state.mode).toBe('graph')
-  })
-
-  it('can switch between graph and form modes', () => {
-    const store = useFableBuilderStore.getState()
-    store.setMode('form')
-    expect(useFableBuilderStore.getState().mode).toBe('form')
-
-    useFableBuilderStore.getState().setMode('graph')
-    expect(useFableBuilderStore.getState().mode).toBe('graph')
-  })
-
   it('preserves layout direction preference', () => {
     const store = useFableBuilderStore.getState()
     store.setLayoutDirection('LR')

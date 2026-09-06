@@ -130,42 +130,6 @@
     "clickSourceToStart": "Click or drag a source to get started",
     "clickToAdd": "Click or drag blocks onto the canvas"
   },
-  "pipeline": {
-    "structure": "Pipeline Structure",
-    "topologyPlaceholder": "Add blocks to see the pipeline topology"
-  },
-  "formCanvas": {
-    "previousStep": "Previous Step",
-    "nextStep": "Next Step",
-    "stepHeading": "{{label}}s",
-    "selectToStart": "Select a {{kind}} to get started:",
-    "addAnother": "Add another {{kind}}:",
-    "loadingSources": "Loading available sources...",
-    "completePreviousStep": "Complete the previous step to see available {{kind}}s."
-  },
-  "connections": {
-    "pipelineFlow": "Pipeline Flow",
-    "inputCount_one": "{{count}} input",
-    "inputCount_other": "{{count}} inputs",
-    "outputCount_one": "{{count}} output",
-    "outputCount_other": "{{count}} outputs",
-    "noConnections": "No connections",
-    "notConnectedDownstream": "Not connected to any downstream block",
-    "inputConnections": "Input Connections",
-    "noCompatibleSourcesAvailable": "No compatible sources available",
-    "noConfigOptions": "No configuration options",
-    "selectSource": "Select source..."
-  },
-  "blockInstance": {
-    "hasErrors": "Has errors",
-    "deleteBlock": "Delete Block",
-    "deleteConfirm": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone.",
-    "cancel": "Cancel",
-    "delete": "Delete"
-  },
-  "blockTabs": {
-    "fallbackTitle": "Block"
-  },
   "addBlockNode": {
     "addKind": "Add {{label}}"
   },
@@ -191,9 +155,7 @@
     "style": "Style",
     "curved": "Curved",
     "rounded": "Rounded",
-    "orthogonal": "Orthogonal",
-    "switchToForm": "Switch to form layout",
-    "switchToGraph": "Switch to graph layout"
+    "orthogonal": "Orthogonal"
   },
   "addNode": {
     "searchPlaceholder": "Search blocks...",

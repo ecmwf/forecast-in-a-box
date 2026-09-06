@@ -12,7 +12,6 @@
  * Configure Forecast E2E Tests (Full Stack)
  *
  * Tests the full forecast configuration flow including:
- * - Form mode: adding blocks, configuring fields, step navigation
  * - Graph mode: adding blocks, selecting nodes, config panel
  * - Save & load configuration flow
  * - Review & validation
@@ -56,24 +55,7 @@ async function openTemplateConfig(page: Page): Promise<boolean> {
   return true
 }
 
-/** Switch fable-builder layout via the graph-options dropdown. Form layout is
- * reachable only from that menu now; no-ops if it isn't present. */
-async function switchLayout(page: Page, to: 'form' | 'graph') {
-  const options = page.getByRole('button', { name: /graph options/i })
-  if (!(await options.isVisible({ timeout: 5000 }).catch(() => false))) return
-  await options.click()
-  const item = page.getByRole('menuitem', {
-    name: new RegExp(`switch to ${to}`, 'i'),
-  })
-  if (await item.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await item.click()
-    await page.waitForTimeout(500)
-  } else {
-    await page.keyboard.press('Escape')
-  }
-}
-
-test.describe('Fable Builder - Form Mode', () => {
+test.describe('Fable Builder - Page', () => {
   test.beforeEach(async ({ page }) => {
     await navigateTo(page, '/configure')
   })
@@ -85,132 +67,10 @@ test.describe('Fable Builder - Form Mode', () => {
       await expect(searchInput).toBeVisible()
     }
 
-    // The graph-options dropdown (form layout is reachable from there)
+    // The graph-options dropdown
     const optionsButton = page.getByRole('button', { name: /graph options/i })
     if (await optionsButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await expect(optionsButton).toBeVisible()
-    }
-  })
-
-  test('switches to Form mode via graph-options menu', async ({ page }) => {
-    await switchLayout(page, 'form')
-
-    // Form mode should show step navigation (source, transform, product, sink)
-    const sourceStep = page.getByRole('button', { name: /source/i })
-    if (await sourceStep.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(sourceStep).toBeVisible()
-    }
-  })
-
-  test('adds a source block from the palette in form mode', async ({
-    page,
-  }) => {
-    // Switch to form mode
-    await switchLayout(page, 'form')
-
-    // Look for add block buttons in the form canvas area
-    // In form mode, available block factories appear as "Add" buttons
-    const addButtons = page.getByRole('button', {
-      name: /operational forecast|ensemble|temporal|zarr/i,
-    })
-    const addCount = await addButtons.count()
-
-    if (addCount > 0) {
-      await addButtons.first().click()
-      await page.waitForTimeout(1000)
-
-      // After adding, block count badge should update in header
-      const blocksBadge = page.getByText(/\d+ blocks?/)
-      if (
-        await blocksBadge
-          .first()
-          .isVisible({ timeout: 3000 })
-          .catch(() => false)
-      ) {
-        await expect(blocksBadge.first()).toBeVisible()
-      }
-    }
-  })
-
-  test('block instance card appears with config fields after adding block', async ({
-    page,
-  }) => {
-    // Switch to form mode
-    await switchLayout(page, 'form')
-
-    // Add a block
-    const addButtons = page.getByRole('button', {
-      name: /operational forecast|ensemble|temporal|zarr/i,
-    })
-    if ((await addButtons.count()) > 0) {
-      await addButtons.first().click()
-      await page.waitForTimeout(1000)
-
-      // Check for configuration fields (inputs/selects in the card)
-      const inputs = page.locator(
-        'input[type="text"], input[type="number"], select',
-      )
-      const inputCount = await inputs.count()
-      // Should have at least one config field
-      if (inputCount > 0) {
-        await expect(inputs.first()).toBeVisible()
-      }
-    }
-  })
-
-  test('fills in configuration fields', async ({ page }) => {
-    // Switch to form mode
-    await switchLayout(page, 'form')
-
-    // Add a source block
-    const addButtons = page.getByRole('button', {
-      name: /operational forecast|ensemble|temporal|zarr/i,
-    })
-    if ((await addButtons.count()) > 0) {
-      await addButtons.first().click()
-      await page.waitForTimeout(1000)
-
-      // Find text and number inputs and fill them
-      const textInputs = page.locator(
-        'input[type="text"]:not([placeholder="Search blocks..."])',
-      )
-      if ((await textInputs.count()) > 0) {
-        await textInputs.first().fill('test-value')
-        await expect(textInputs.first()).toHaveValue('test-value')
-      }
-
-      const numberInputs = page.locator('input[type="number"]')
-      if ((await numberInputs.count()) > 0) {
-        await numberInputs.first().fill('48')
-        await expect(numberInputs.first()).toHaveValue('48')
-      }
-    }
-  })
-
-  test('navigates between form steps', async ({ page }) => {
-    // Switch to form mode
-    await switchLayout(page, 'form')
-
-    // Look for step navigation buttons
-    const nextButton = page.getByRole('button', { name: /next step/i })
-    if (await nextButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Add a source block first so we can navigate
-      const addButtons = page.getByRole('button', {
-        name: /operational forecast|ensemble|temporal|zarr/i,
-      })
-      if ((await addButtons.count()) > 0) {
-        await addButtons.first().click()
-        await page.waitForTimeout(500)
-      }
-
-      await nextButton.click()
-      await page.waitForTimeout(500)
-
-      // Should advance to next step (transform or product)
-      const prevButton = page.getByRole('button', { name: /previous step/i })
-      if (await prevButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(prevButton).toBeVisible()
-      }
     }
   })
 
@@ -389,55 +249,6 @@ test.describe('Fable Builder - Graph Mode', () => {
     await expect(page.locator('.react-flow__node')).toHaveCount(3, {
       timeout: 15000,
     })
-  })
-
-  test('switches between graph and form mode preserving state', async ({
-    page,
-  }) => {
-    // Add a block in graph mode
-    const paletteButtons = page.locator('button[title^="Add "]')
-    if ((await paletteButtons.count()) > 0) {
-      await paletteButtons.first().click()
-      await page.waitForTimeout(1000)
-
-      // Check block count in header
-      const blocksBadge = page.getByText(/\d+ blocks?/)
-      const initialText = await blocksBadge
-        .first()
-        .textContent()
-        .catch(() => null)
-
-      // Switch to form mode
-      await switchLayout(page, 'form')
-
-      // Block count should persist
-      if (initialText) {
-        const newBlocksBadge = page.getByText(/\d+ blocks?/)
-        if (
-          await newBlocksBadge
-            .first()
-            .isVisible({ timeout: 3000 })
-            .catch(() => false)
-        ) {
-          const newText = await newBlocksBadge.first().textContent()
-          expect(newText).toBe(initialText)
-        }
-      }
-
-      // Switch back to graph mode
-      await switchLayout(page, 'graph')
-
-      // Node should still be there
-      const nodes = page.locator('.react-flow__node')
-      if (
-        await nodes
-          .first()
-          .isVisible({ timeout: 3000 })
-          .catch(() => false)
-      ) {
-        await expect(nodes.first()).toBeVisible()
-      }
-    }
   })
 
   test('closes config panel with close button', async ({ page }) => {

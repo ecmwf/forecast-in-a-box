@@ -27,7 +27,6 @@ import {
   generateBlockInstanceId,
 } from '@/api/types/fable.types'
 
-export type BuilderMode = 'graph' | 'form'
 export type BuilderStep = 'edit' | 'review'
 /** Which tab the submit dialog opens on. */
 export type SubmitDialogMode = 'run' | 'schedule'
@@ -106,7 +105,6 @@ interface FableBuilderState {
    *  passed as parent_id when saving creates a new blueprint. */
   forkParentId: string | null
   fableName: string
-  mode: BuilderMode
   step: BuilderStep
   selectedBlockId: BlockInstanceId | null
   /** Edge currently hovered on the canvas; drives the qube-lens handle's
@@ -185,7 +183,6 @@ interface FableBuilderState {
   disconnectBlock: (targetBlockId: BlockInstanceId, inputName: string) => void
   selectBlock: (blockId: BlockInstanceId | null) => void
   setHoveredEdge: (edgeId: string | null) => void
-  setMode: (mode: BuilderMode) => void
   setStep: (step: BuilderStep) => void
   togglePalette: () => void
   toggleConfigPanel: () => void
@@ -238,7 +235,6 @@ function createInitialState() {
     forkParentId: null as string | null,
     // Blank by default; FableBuilderHeader renders a translated placeholder.
     fableName: '',
-    mode: 'graph' as BuilderMode,
     step: 'edit' as BuilderStep,
     selectedBlockId: null,
     hoveredEdgeId: null as string | null,
@@ -367,7 +363,6 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           newFable: () =>
             set({
               ...createInitialState(),
-              mode: get().mode,
               isPaletteOpen: get().isPaletteOpen,
               isConfigPanelOpen: get().isConfigPanelOpen,
             }),
@@ -647,7 +642,6 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           // Pure ephemeral UI: no history, no dirty flag, no validation reset.
           setHoveredEdge: (edgeId) => set({ hoveredEdgeId: edgeId }),
 
-          setMode: (mode) => set({ mode }),
           setStep: (step) => set({ step }),
           togglePalette: () =>
             set((state) => ({ isPaletteOpen: !state.isPaletteOpen })),
@@ -796,13 +790,17 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         version: STORE_VERSIONS.fableBuilder,
         migrate: (persistedState, version) => {
           // v2: Removed configDisplayMode, added isMiniMapOpen
+          let state = persistedState as Record<string, unknown>
           if (version < 2) {
-            const { configDisplayMode: _removed, ...rest } =
-              persistedState as Record<string, unknown>
-            return { ...rest, isMiniMapOpen: true }
+            const { configDisplayMode: _removed, ...rest } = state
+            state = { ...rest, isMiniMapOpen: true }
           }
-          return persistedState as {
-            mode: BuilderMode
+          // v3: form layout removed.
+          if (version < 3) {
+            const { mode: _mode, ...rest } = state
+            state = rest
+          }
+          return state as {
             isPaletteOpen: boolean
             isConfigPanelOpen: boolean
             isMiniMapOpen: boolean
@@ -813,7 +811,6 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           }
         },
         partialize: (state) => ({
-          mode: state.mode,
           isPaletteOpen: state.isPaletteOpen,
           isConfigPanelOpen: state.isConfigPanelOpen,
           isMiniMapOpen: state.isMiniMapOpen,
