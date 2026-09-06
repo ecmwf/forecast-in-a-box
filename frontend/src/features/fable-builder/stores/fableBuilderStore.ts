@@ -114,6 +114,8 @@ interface FableBuilderState {
   isMobilePaletteOpen: boolean
   isMobileConfigOpen: boolean
   isMiniMapOpen: boolean
+  /** Canvas-anchored source picker (empty-panel action); ephemeral. */
+  addSourceMenuOpen: boolean
   fitViewTrigger: number
   /** Bumped by Tidy up; the canvas re-lays out every node on change. */
   layoutTrigger: number
@@ -192,6 +194,7 @@ interface FableBuilderState {
   openMobileConfig: (blockId: BlockInstanceId) => void
   setMiniMapOpen: (open: boolean) => void
   toggleMiniMap: () => void
+  setAddSourceMenuOpen: (open: boolean) => void
   triggerFitView: () => void
   triggerLayout: () => void
   setLayoutDirection: (direction: LayoutDirection) => void
@@ -241,6 +244,7 @@ function createInitialState() {
     isMobilePaletteOpen: false,
     isMobileConfigOpen: false,
     isMiniMapOpen: true,
+    addSourceMenuOpen: false,
     fitViewTrigger: 0,
     layoutTrigger: 0,
     layoutDirection: getDefaultLayoutDirection(),
@@ -652,6 +656,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           setMiniMapOpen: (open) => set({ isMiniMapOpen: open }),
           toggleMiniMap: () =>
             set((state) => ({ isMiniMapOpen: !state.isMiniMapOpen })),
+          setAddSourceMenuOpen: (open) => set({ addSourceMenuOpen: open }),
           triggerFitView: () =>
             set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 })),
           triggerLayout: () =>

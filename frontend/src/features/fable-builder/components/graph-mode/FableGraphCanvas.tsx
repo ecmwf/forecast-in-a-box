@@ -25,6 +25,7 @@ import '@xyflow/react/dist/style.css'
 import { FableEdgeComponent } from './FableEdge'
 import { BlockNode } from './nodes/BlockNode'
 import { BlockDragPreview } from './BlockDragPreview'
+import { AddSourcePopover } from './AddSourcePopover'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type { Connection, Edge, EdgeTypes, NodeTypes } from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
@@ -82,6 +83,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const [sourceAnchor, setSourceAnchor] = useState<HTMLDivElement | null>(null)
   // Current selection mirrored into a ref so the layout effect can re-apply
   // it on a block-driven rebuild without depending on it (which would force a
   // full re-layout on every selection change).
@@ -387,9 +389,16 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   return (
     <div
       ref={containerRef}
-      className="h-full w-full"
+      className="relative h-full w-full"
       {...tourAttr(TOUR.configure.canvas)}
     >
+      {/* Hangs the source picker off the upper third of the canvas. */}
+      <div
+        ref={setSourceAnchor}
+        aria-hidden
+        className="pointer-events-none absolute top-1/3 left-1/2 h-px w-px"
+      />
+      <AddSourcePopover anchor={sourceAnchor} catalogue={catalogue} />
       <ReactFlow
         nodes={nodes}
         edges={edges}
