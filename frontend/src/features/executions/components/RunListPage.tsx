@@ -17,6 +17,7 @@ import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import { Button } from '@/components/ui/button'
 import { useJobsStatus } from '@/api/hooks/useJobs'
+import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
 import { filterRuns } from '@/features/journal/utils/filter-runs'
@@ -86,6 +87,17 @@ export function RunListPage() {
   )
 
   const noRunsYet = !isLoading && runs.length === 0
+  const { counts: statusCounts, total: totalRuns } = useJobStatusCounts()
+  const filterCounts = useMemo(
+    () => ({
+      all: totalRuns,
+      submitted: statusCounts.submitted + statusCounts.preparing,
+      running: statusCounts.running,
+      completed: statusCounts.completed,
+      failed: statusCounts.failed,
+    }),
+    [statusCounts, totalRuns],
+  )
   const filtered = useMemo(
     () => filterRuns(runs, activeFilter, parseQuery(query), displayDateFor),
     [runs, activeFilter, query, displayDateFor],
@@ -139,7 +151,7 @@ export function RunListPage() {
         onAddFacet={(token) => setQuery(addToken(query, token))}
         header={
           <ForecastRunSearchHeader
-            title={t('page.title')}
+            counts={filterCounts}
             query={query}
             onQueryChange={setQuery}
             activeFilter={activeFilter}
