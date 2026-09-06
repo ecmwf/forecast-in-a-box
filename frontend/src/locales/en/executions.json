@@ -137,8 +137,6 @@
     "failedNotProduced_one": "{{count}} expected output was not produced — the run failed.",
     "failedNotProduced_other": "{{count}} expected outputs were not produced — the run failed.",
     "viewLogs": "View logs",
-    "lost": "Not retained",
-    "lostTitle": "No longer available",
     "noOutputs": "No outputs available yet",
     "noOutputsRunning": "Outputs will appear here as they are generated.",
     "view": "View",
@@ -199,7 +197,9 @@
       "grib-stored": {
         "label": "GRIB"
       }
-    }
+    },
+    "lostNotice_one": "{{count}} output was not retained",
+    "lostNotice_other": "{{count}} outputs were not retained"
   },
   "compilation": {
     "fullDescription": "Task-level graph compiled from this run. Click a block on the left to focus its cluster; click a task to focus its block.",

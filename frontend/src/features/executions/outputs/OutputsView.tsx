@@ -11,7 +11,7 @@
 /** Outputs grid with MIME filter, group-by toggle, skeletons for pending
  * items, and a lazy viewer for the active selection. */
 
-import { AlertTriangle, Package } from 'lucide-react'
+import { AlertTriangle, CloudOff, Package } from 'lucide-react'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
@@ -23,7 +23,6 @@ import { MimeFilterChips } from './MimeFilterChips'
 import { OutputCard } from './OutputCard'
 import { resolveAdapter } from './registry'
 import { SkeletonOutputCard } from './SkeletonOutputCard'
-import { LostOutputCard } from './LostOutputCard'
 import { needsSniff, useResolvedMimes } from './useResolvedMimes'
 import { classifyOutput } from './availability'
 import type { LostTaskIds } from './availability'
@@ -279,9 +278,13 @@ export function OutputsView({
       ) {
         continue
       }
+      // Unretained outputs are summarised in one notice, not shown as cards.
+      if (item.lostReason !== undefined) {
+        lost += 1
+        continue
+      }
       visible.push(item)
       if (item.isAvailable) available += 1
-      else if (item.lostReason !== undefined) lost += 1
       else pending += 1
     }
     return {
@@ -339,6 +342,11 @@ export function OutputsView({
   const totalAvailable = availableCount + storedStats.available
   const shownPending = visiblePendingCount + storedStats.pending
   const shownLost = visibleLostCount + storedStats.lost
+  /** Distinct backend reasons behind the unretained outputs. */
+  const lostReasons = useMemo(
+    () => Array.from(new Set(Object.values(lostTaskIds))),
+    [lostTaskIds],
+  )
 
   const toolbar = (
     <div className="flex w-full flex-wrap items-center justify-between gap-3">
@@ -349,11 +357,6 @@ export function OutputsView({
           <span className="ml-2">
             · {t(failed ? 'outputs.notProduced' : 'outputs.pending')}:{' '}
             {shownPending}
-          </span>
-        )}
-        {shownLost > 0 && (
-          <span className="ml-2">
-            · {t('outputs.lost')}: {shownLost}
           </span>
         )}
       </P>
@@ -384,8 +387,19 @@ export function OutputsView({
       <div className="space-y-3 pb-3">
         {!toolbarSlot && toolbar}
 
+        {shownLost > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
+            <CloudOff className="h-4 w-4 shrink-0" />
+            <span>{t('outputs.lostNotice', { count: shownLost })}</span>
+            {lostReasons.length > 0 && (
+              <span className="italic">— {lostReasons.join(' · ')}</span>
+            )}
+          </div>
+        )}
+
         {visibleItems.length === 0 ? (
-          failed && shownPending > 0 ? (
+          shownLost > 0 && shownPending === 0 ? null : failed &&
+            shownPending > 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 px-3 py-10 text-center">
               <AlertTriangle className="h-10 w-10 text-muted-foreground" />
               <P className="font-medium text-muted-foreground">
@@ -694,11 +708,6 @@ function FlexGridItem({
           item={item}
           adapter={resolveAdapter(effectiveMime(item))}
           onOpenViewer={onOpenViewer}
-        />
-      ) : item.lostReason !== undefined ? (
-        <LostOutputCard
-          originalBlock={item.originalBlock}
-          reason={item.lostReason}
         />
       ) : (
         <SkeletonOutputCard
