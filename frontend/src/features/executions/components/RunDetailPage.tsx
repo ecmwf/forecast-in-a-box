@@ -53,6 +53,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useActivityStore } from '@/stores/activityStore'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
+import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('RunDetailPage')
@@ -209,7 +210,8 @@ export function RunDetailPage() {
     return (
       <div
         className={cn(
-          'mx-auto flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8',
+          PAGE_WIDTH_CLASS,
+          'flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8',
         )}
       >
         <LoadingSpinner />
@@ -251,7 +253,8 @@ export function RunDetailPage() {
       className={cn(
         // Underscores in arbitrary values emit spaces; `calc(100vh-15rem)`
         // (no spaces) is invalid CSS and silently discarded.
-        'mx-auto flex min-h-[calc(100vh_-_15rem)] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8',
+        PAGE_WIDTH_CLASS,
+        'flex min-h-[calc(100vh_-_15rem)] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8',
       )}
     >
       <RunStatusHeader

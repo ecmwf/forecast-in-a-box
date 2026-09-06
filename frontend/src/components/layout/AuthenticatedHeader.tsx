@@ -60,6 +60,7 @@ import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { StatusIndicator } from '@/components/common/StatusIndicator'
 import { useAuth } from '@/features/auth/AuthContext'
 import { cn } from '@/lib/utils'
+import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 import { useUser } from '@/hooks/useUser'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useUiStore } from '@/stores/uiStore'
@@ -97,6 +98,7 @@ export function AuthenticatedHeader() {
     <header className="sticky top-0 z-30 border-b border-border bg-card">
       <div
         className={cn(
+          PAGE_WIDTH_CLASS,
           'flex h-16 items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8',
         )}
       >

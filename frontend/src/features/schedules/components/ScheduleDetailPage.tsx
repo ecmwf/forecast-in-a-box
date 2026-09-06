@@ -56,6 +56,7 @@ import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
+import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 
 const PAGE_SIZE = 10
 
@@ -88,7 +89,10 @@ export function ScheduleDetailPage() {
   const { offsetMs, serverTimeToLocal, timeZone } = useServerTime()
   const { isBookmarked, toggleBookmark } = useRunFavourites()
 
-  const containerClass = cn('mx-auto space-y-6 px-4 py-8 sm:px-6 lg:px-8')
+  const containerClass = cn(
+    PAGE_WIDTH_CLASS,
+    'space-y-6 px-4 py-8 sm:px-6 lg:px-8',
+  )
 
   if (isLoading) {
     return (

@@ -12,6 +12,7 @@
 
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 
 interface ListPageContainerProps {
   children: ReactNode
@@ -24,7 +25,11 @@ export function ListPageContainer({
 }: ListPageContainerProps) {
   return (
     <div
-      className={cn('mx-auto space-y-8 px-4 py-8 sm:px-6 lg:px-8', className)}
+      className={cn(
+        PAGE_WIDTH_CLASS,
+        'space-y-8 px-4 py-8 sm:px-6 lg:px-8',
+        className,
+      )}
     >
       {children}
     </div>
