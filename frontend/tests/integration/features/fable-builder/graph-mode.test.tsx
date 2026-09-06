@@ -430,32 +430,12 @@ describe('Graph Mode - Store State', () => {
     expect(useFableBuilderStore.getState().layoutDirection).toBe('TB')
   })
 
-  it('supports toggling auto-layout', () => {
-    const store = useFableBuilderStore.getState()
-    expect(store.autoLayout).toBe(true) // default
-
-    store.setAutoLayout(false)
-    expect(useFableBuilderStore.getState().autoLayout).toBe(false)
-
-    useFableBuilderStore.getState().setAutoLayout(true)
-    expect(useFableBuilderStore.getState().autoLayout).toBe(true)
-  })
-
   it('supports toggling nodes locked', () => {
     const store = useFableBuilderStore.getState()
     expect(store.nodesLocked).toBe(true) // default
 
     store.setNodesLocked(false)
     expect(useFableBuilderStore.getState().nodesLocked).toBe(false)
-  })
-
-  it('supports edge style changes', () => {
-    const store = useFableBuilderStore.getState()
-    store.setEdgeStyle('smoothstep')
-    expect(useFableBuilderStore.getState().edgeStyle).toBe('smoothstep')
-
-    useFableBuilderStore.getState().setEdgeStyle('step')
-    expect(useFableBuilderStore.getState().edgeStyle).toBe('step')
   })
 
   it('increments fitViewTrigger when triggerFitView is called', () => {

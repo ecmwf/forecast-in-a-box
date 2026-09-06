@@ -8,19 +8,9 @@
  * does it submit to any jurisdiction.
  */
 
-import {
-  Lock,
-  LockOpen,
-  Map,
-  MoreHorizontal,
-  Sparkles,
-  Workflow,
-} from 'lucide-react'
+import { Lock, LockOpen, Map, MoreHorizontal, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type {
-  EdgeStyle,
-  LayoutDirection,
-} from '@/features/fable-builder/stores/fableBuilderStore'
+import type { LayoutDirection } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { Button } from '@/components/ui/button'
 import {
@@ -41,17 +31,13 @@ import {
 
 export function GraphOptionsDropdown() {
   const { t } = useTranslation('configure')
-  const edgeStyle = useFableBuilderStore((s) => s.edgeStyle)
-  const autoLayout = useFableBuilderStore((s) => s.autoLayout)
   const layoutDirection = useFableBuilderStore((s) => s.layoutDirection)
   const nodesLocked = useFableBuilderStore((s) => s.nodesLocked)
   const isMiniMapOpen = useFableBuilderStore((s) => s.isMiniMapOpen)
-
-  const setEdgeStyle = useFableBuilderStore((s) => s.setEdgeStyle)
-  const setAutoLayout = useFableBuilderStore((s) => s.setAutoLayout)
   const setLayoutDirection = useFableBuilderStore((s) => s.setLayoutDirection)
   const setNodesLocked = useFableBuilderStore((s) => s.setNodesLocked)
   const toggleMiniMap = useFableBuilderStore((s) => s.toggleMiniMap)
+  const triggerLayout = useFableBuilderStore((s) => s.triggerLayout)
   const triggerFitView = useFableBuilderStore((s) => s.triggerFitView)
 
   return (
@@ -73,11 +59,8 @@ export function GraphOptionsDropdown() {
           <DropdownMenuLabel>{t('graphOptions.view')}</DropdownMenuLabel>
           <DropdownMenuItem
             onClick={() => {
-              // Force layout recalculation by enabling auto-layout if needed
-              if (!autoLayout) {
-                setAutoLayout(true)
-              }
-              // Trigger fit view with a slight delay to allow layout to recalculate
+              triggerLayout()
+              // Fit after the layout pass has committed.
               setTimeout(triggerFitView, 50)
             }}
           >
@@ -98,64 +81,25 @@ export function GraphOptionsDropdown() {
             {t('graphOptions.showMinimap')}
           </DropdownMenuCheckboxItem>
         </DropdownMenuGroup>
-
         <DropdownMenuSeparator />
-
         <DropdownMenuGroup>
           <DropdownMenuLabel>{t('graphOptions.layout')}</DropdownMenuLabel>
-          <DropdownMenuCheckboxItem
-            checked={autoLayout}
-            onCheckedChange={setAutoLayout}
-          >
-            <Workflow />
-            {t('graphOptions.autoLayout')}
-          </DropdownMenuCheckboxItem>
-
-          {autoLayout && (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                {t('graphOptions.direction')}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuRadioGroup
-                  value={layoutDirection}
-                  onValueChange={(value) =>
-                    setLayoutDirection(value as LayoutDirection)
-                  }
-                >
-                  <DropdownMenuRadioItem value="TB">
-                    {t('graphOptions.topToBottom')}
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="LR">
-                    {t('graphOptions.leftToRight')}
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          )}
-        </DropdownMenuGroup>
-
-        <DropdownMenuSeparator />
-
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{t('graphOptions.edges')}</DropdownMenuLabel>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              {t('graphOptions.style')}
+              {t('graphOptions.direction')}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               <DropdownMenuRadioGroup
-                value={edgeStyle}
-                onValueChange={(value) => setEdgeStyle(value as EdgeStyle)}
+                value={layoutDirection}
+                onValueChange={(value) =>
+                  setLayoutDirection(value as LayoutDirection)
+                }
               >
-                <DropdownMenuRadioItem value="bezier">
-                  {t('graphOptions.curved')}
+                <DropdownMenuRadioItem value="TB">
+                  {t('graphOptions.topToBottom')}
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="smoothstep">
-                  {t('graphOptions.rounded')}
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="step">
-                  {t('graphOptions.orthogonal')}
+                <DropdownMenuRadioItem value="LR">
+                  {t('graphOptions.leftToRight')}
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuSubContent>

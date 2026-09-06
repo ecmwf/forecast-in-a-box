@@ -30,7 +30,6 @@ import {
 export type BuilderStep = 'edit' | 'review'
 /** Which tab the submit dialog opens on. */
 export type SubmitDialogMode = 'run' | 'schedule'
-export type EdgeStyle = 'bezier' | 'smoothstep' | 'step'
 export type { LayoutDirection } from '@/features/fable-builder/utils/layout-blocks'
 
 /** Max number of `fable` snapshots retained on the undo stack. Oldest entries
@@ -116,8 +115,8 @@ interface FableBuilderState {
   isMobileConfigOpen: boolean
   isMiniMapOpen: boolean
   fitViewTrigger: number
-  edgeStyle: EdgeStyle
-  autoLayout: boolean
+  /** Bumped by Tidy up; the canvas re-lays out every node on change. */
+  layoutTrigger: number
   layoutDirection: LayoutDirection
   nodesLocked: boolean
   validationState: FableValidationState | null
@@ -194,8 +193,7 @@ interface FableBuilderState {
   setMiniMapOpen: (open: boolean) => void
   toggleMiniMap: () => void
   triggerFitView: () => void
-  setEdgeStyle: (style: EdgeStyle) => void
-  setAutoLayout: (enabled: boolean) => void
+  triggerLayout: () => void
   setLayoutDirection: (direction: LayoutDirection) => void
   setNodesLocked: (locked: boolean) => void
   setLocalGlyph: (key: string, value: string) => void
@@ -244,9 +242,7 @@ function createInitialState() {
     isMobileConfigOpen: false,
     isMiniMapOpen: true,
     fitViewTrigger: 0,
-    // Orthogonal by default, matching the execution details page.
-    edgeStyle: 'smoothstep' as EdgeStyle,
-    autoLayout: true,
+    layoutTrigger: 0,
     layoutDirection: getDefaultLayoutDirection(),
     nodesLocked: true,
     validationState: null,
@@ -658,8 +654,8 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             set((state) => ({ isMiniMapOpen: !state.isMiniMapOpen })),
           triggerFitView: () =>
             set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 })),
-          setEdgeStyle: (style) => set({ edgeStyle: style }),
-          setAutoLayout: (enabled) => set({ autoLayout: enabled }),
+          triggerLayout: () =>
+            set((state) => ({ layoutTrigger: state.layoutTrigger + 1 })),
           setLayoutDirection: (direction) =>
             set({ layoutDirection: direction }),
           setNodesLocked: (locked) => set({ nodesLocked: locked }),
@@ -795,17 +791,20 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             const { configDisplayMode: _removed, ...rest } = state
             state = { ...rest, isMiniMapOpen: true }
           }
-          // v3: form layout removed.
+          // v3: form layout, edge styles and the auto-layout toggle removed.
           if (version < 3) {
-            const { mode: _mode, ...rest } = state
+            const {
+              mode: _mode,
+              edgeStyle: _edgeStyle,
+              autoLayout: _autoLayout,
+              ...rest
+            } = state
             state = rest
           }
           return state as {
             isPaletteOpen: boolean
             isConfigPanelOpen: boolean
             isMiniMapOpen: boolean
-            edgeStyle: EdgeStyle
-            autoLayout: boolean
             layoutDirection: LayoutDirection
             nodesLocked: boolean
           }
@@ -814,8 +813,6 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           isPaletteOpen: state.isPaletteOpen,
           isConfigPanelOpen: state.isConfigPanelOpen,
           isMiniMapOpen: state.isMiniMapOpen,
-          edgeStyle: state.edgeStyle,
-          autoLayout: state.autoLayout,
           layoutDirection: state.layoutDirection,
           nodesLocked: state.nodesLocked,
         }),

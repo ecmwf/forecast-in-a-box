@@ -147,15 +147,9 @@
     "lockNodes": "Lock nodes",
     "showMinimap": "Show minimap",
     "layout": "Layout",
-    "autoLayout": "Auto-layout",
     "direction": "Direction",
     "topToBottom": "↓ Top to Bottom",
-    "leftToRight": "→ Left to Right",
-    "edges": "Edges",
-    "style": "Style",
-    "curved": "Curved",
-    "rounded": "Rounded",
-    "orthogonal": "Orthogonal"
+    "leftToRight": "→ Left to Right"
   },
   "addNode": {
     "searchPlaceholder": "Search blocks...",

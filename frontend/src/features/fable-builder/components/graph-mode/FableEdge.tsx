@@ -13,14 +13,12 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   Position,
-  getBezierPath,
   getSmoothStepPath,
   useStore,
 } from '@xyflow/react'
 import { EdgeQubeLens } from './EdgeQubeLens'
 import type { Edge, EdgeProps } from '@xyflow/react'
 
-import type { EdgeStyle } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 
 export interface FableEdgeData extends Record<string, unknown> {
@@ -39,10 +37,9 @@ const STRAIGHT_THRESHOLD = 24
 // still appears on hover (hovering the wire forces it visible).
 const LENS_ZOOM_THRESHOLD = 0.5
 
-/** SVG path for the active edge style. Orthogonal styles collapse to a straight
- *  line when the endpoints are nearly aligned (see STRAIGHT_THRESHOLD). */
+/** Rounded orthogonal path; collapses to a straight line when the endpoints
+ *  are nearly aligned (see STRAIGHT_THRESHOLD). */
 function getEdgePath({
-  type,
   sourceX,
   sourceY,
   targetX,
@@ -50,7 +47,6 @@ function getEdgePath({
   sourcePosition,
   targetPosition,
 }: {
-  type: EdgeStyle
   sourceX: number
   sourceY: number
   targetX: number
@@ -65,11 +61,6 @@ function getEdgePath({
     targetY,
     sourcePosition,
     targetPosition,
-  }
-
-  if (type === 'bezier') {
-    const [path, labelX, labelY] = getBezierPath(params)
-    return [path, labelX, labelY]
   }
 
   // Horizontal flow (Left/Right handles) → cross-axis is Y; vertical flow → X.
@@ -87,10 +78,7 @@ function getEdgePath({
     ]
   }
 
-  const [path, labelX, labelY] =
-    type === 'step'
-      ? getSmoothStepPath({ ...params, borderRadius: 0 })
-      : getSmoothStepPath(params)
+  const [path, labelX, labelY] = getSmoothStepPath(params)
   return [path, labelX, labelY]
 }
 
@@ -107,7 +95,6 @@ export const FableEdgeComponent = memo(function ({
   data,
   selected,
 }: EdgeProps<FableEdge>) {
-  const edgeStyle = useFableBuilderStore((state) => state.edgeStyle)
   // Per-edge boolean selectors keep re-renders scoped to the edge whose state
   // actually flips (a raw hoveredEdgeId/zoom subscription would re-render all).
   const isHovered = useFableBuilderStore((state) => state.hoveredEdgeId === id)
@@ -116,7 +103,6 @@ export const FableEdgeComponent = memo(function ({
   )
 
   const [edgePath, labelX, labelY] = getEdgePath({
-    type: edgeStyle,
     sourceX,
     sourceY,
     sourcePosition,
