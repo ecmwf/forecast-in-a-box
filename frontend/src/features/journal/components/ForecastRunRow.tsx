@@ -103,7 +103,7 @@ export const ForecastRunRow = memo(function ({
                 type="button"
                 onClick={() => onAddFacet({ key: 'date', value: startedDate })}
                 aria-label={t('item.filterByDate')}
-                className="rounded transition-colors hover:text-foreground"
+                className="rounded-md transition-colors hover:text-foreground"
               >
                 {startedAt}
               </button>
@@ -123,18 +123,18 @@ export const ForecastRunRow = memo(function ({
           </div>
           <div className="flex flex-wrap items-start gap-2">
             {run.scheduleName && (
-              <span className="inline-flex items-center gap-1 rounded bg-indigo-500/10 px-2 py-0.5 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+              <span className="inline-flex items-center gap-1 rounded-md bg-indigo-500/10 px-2 py-0.5 text-sm font-medium text-indigo-600 dark:text-indigo-400">
                 <CalendarClock className="h-3 w-3" />
                 {t('item.scheduled')}
               </span>
             )}
             {run.fromPreset && (
-              <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary">
+              <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary">
                 <Bookmark className="h-3 w-3" />
                 {t('item.preset')}
               </span>
             )}
-            <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
+            <span className="rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
               #{runIdLabel}
             </span>
             {/* Derived (system) facets, then user tags. */}

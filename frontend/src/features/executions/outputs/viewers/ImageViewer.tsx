@@ -348,7 +348,7 @@ export default function ImageViewer({
           />
         )}
 
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded bg-black/40 px-2 py-1 text-xs text-white/70">
+        <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-black/40 px-2 py-1 text-xs text-white/70">
           {t('outputs.viewer.zoomHint')}
         </div>
       </div>

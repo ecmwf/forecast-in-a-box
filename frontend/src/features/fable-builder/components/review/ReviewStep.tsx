@@ -153,7 +153,7 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
               return (
                 <div key={kind}>
                   <div className="mb-3 flex items-center gap-2">
-                    <div className={cn('rounded p-1.5', metadata.bgColor)}>
+                    <div className={cn('rounded-md p-1.5', metadata.bgColor)}>
                       <IconComponent
                         className={cn('h-4 w-4', metadata.color)}
                       />
@@ -161,7 +161,7 @@ export function ReviewStep({ catalogue }: ReviewStepProps) {
                     <span className="font-medium">
                       {t('review.kindHeading', { label: metadata.label })}
                     </span>
-                    <span className="rounded border border-border bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
+                    <span className="rounded-md border border-border bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
                       {blocks.length}
                     </span>
                   </div>

@@ -164,7 +164,7 @@ function DateAndTimeInputs({
             render={
               <span
                 data-testid="datetime-tz-badge"
-                className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
+                className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
               />
             }
           >

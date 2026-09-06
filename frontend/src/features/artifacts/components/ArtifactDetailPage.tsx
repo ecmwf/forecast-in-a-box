@@ -95,14 +95,14 @@ export function ArtifactDetailPage({
               isAvailable={detail.is_available}
               downloadProgress={isDownloading ? downloadProgress : undefined}
             />
-            <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
               <HardDrive className="h-3.5 w-3.5" />
               {formatBytes(detail.disk_size_bytes)}
             </span>
             {detail.supported_platforms.map((platform) => (
               <span
                 key={platform}
-                className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground"
+                className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground"
               >
                 {platform}
               </span>
@@ -272,7 +272,7 @@ function ConstraintChip({ value }: { value: string }) {
   return (
     <span
       title={value}
-      className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded bg-muted px-2.5 py-1 font-mono text-sm text-muted-foreground"
+      className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 font-mono text-sm text-muted-foreground"
     >
       <span className="truncate">{value}</span>
       {showCopy && (
@@ -280,7 +280,7 @@ function ConstraintChip({ value }: { value: string }) {
           type="button"
           onClick={handleCopy}
           aria-label={t('detail.copyConstraint')}
-          className="shrink-0 rounded p-0.5 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="shrink-0 rounded-md p-0.5 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {copied ? (
             <Check className="h-3.5 w-3.5" />
@@ -314,7 +314,7 @@ function CharacteristicsCard({
         {data.map((item) => (
           <span
             key={item}
-            className="rounded bg-muted px-2.5 py-1 font-mono text-sm text-muted-foreground"
+            className="rounded-md bg-muted px-2.5 py-1 font-mono text-sm text-muted-foreground"
           >
             {item}
           </span>

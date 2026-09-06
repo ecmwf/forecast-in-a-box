@@ -37,7 +37,7 @@ export function SkeletonOutputCard({
       aria-live="polite"
       className="w-full space-y-2 overflow-hidden rounded-lg border bg-card p-3"
     >
-      <Skeleton className={cn('aspect-video w-full rounded', pulse)} />
+      <Skeleton className={cn('aspect-video w-full rounded-md', pulse)} />
 
       <div className="space-y-1">
         <Skeleton className={cn('h-4 w-3/4', pulse)} />

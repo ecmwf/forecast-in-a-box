@@ -145,7 +145,7 @@ export function CompareHelpDialog({
                               …
                             </span>
                           ) : (
-                            <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
+                            <kbd className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
                               {k}
                             </kbd>
                           )}

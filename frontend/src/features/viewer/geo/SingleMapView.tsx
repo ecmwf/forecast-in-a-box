@@ -795,7 +795,7 @@ export function SingleMapView({
                 slotBadge: (
                   <span
                     className={cn(
-                      'rounded px-1',
+                      'rounded-md px-1',
                       SLOT_BADGE_CLASS[flickerFrame],
                     )}
                   />
@@ -803,7 +803,7 @@ export function SingleMapView({
               }}
             />
           </button>
-          <p className="rounded bg-background/75 px-2 py-0.5 text-xs text-muted-foreground">
+          <p className="rounded-md bg-background/75 px-2 py-0.5 text-xs text-muted-foreground">
             {t('modes.flickerHint')}
           </p>
         </div>

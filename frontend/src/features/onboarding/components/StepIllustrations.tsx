@@ -197,7 +197,7 @@ function Thumb({
       <div className="relative h-[46px]">
         {children}
         <span
-          className={`absolute top-1 left-1 rounded px-1 font-mono text-[8px] font-bold ${badgeClass}`}
+          className={`absolute top-1 left-1 rounded-md px-1 font-mono text-[8px] font-bold ${badgeClass}`}
         >
           {badge}
         </span>
@@ -327,7 +327,7 @@ function SlotChip({ slot, label }: { slot: 'a' | 'b'; label: string }) {
   return (
     <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-[5px] rounded-[5px] bg-white/90 px-[7px] py-0.5">
       <span
-        className={`inline-flex size-[13px] items-center justify-center rounded text-[8.5px] font-bold text-white ${
+        className={`inline-flex size-[13px] items-center justify-center rounded-md text-[8.5px] font-bold text-white ${
           slot === 'a' ? 'bg-slot-a' : 'bg-slot-b'
         }`}
       >

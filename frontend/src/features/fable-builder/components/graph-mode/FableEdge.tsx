@@ -148,7 +148,7 @@ export const FableEdgeComponent = memo(function ({
             }}
             className="nodrag nopan"
           >
-            <span className="rounded border border-border bg-background px-1.5 py-0.5 text-sm text-muted-foreground">
+            <span className="rounded-md border border-border bg-background px-1.5 py-0.5 text-sm text-muted-foreground">
               {inputName}
             </span>
           </div>

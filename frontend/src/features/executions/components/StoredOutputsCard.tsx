@@ -270,7 +270,7 @@ function StoredOutputRowItem({
     <li className="flex items-start gap-3 py-2.5">
       <span
         className={cn(
-          'mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-xs font-semibold',
+          'mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-xs font-semibold',
           GRIB_CHIP_CLASS,
         )}
       >

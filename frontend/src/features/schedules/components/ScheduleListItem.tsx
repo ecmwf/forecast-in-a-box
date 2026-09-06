@@ -146,7 +146,7 @@ export function ScheduleListItem({
             {createdAt}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
+            <span className="rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
               #{truncatedId}
             </span>
             {schedule.tags?.map((tag) => (

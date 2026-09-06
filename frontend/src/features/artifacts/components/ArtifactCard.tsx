@@ -80,7 +80,7 @@ export function ArtifactCard({
       {/* Meta */}
       <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-6">
         {artifact.diskSize !== '-' && (
-          <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
             <HardDrive className="h-3.5 w-3.5" />
             {artifact.diskSize}
           </span>
@@ -88,7 +88,7 @@ export function ArtifactCard({
         {artifact.platforms.map((platform) => (
           <span
             key={platform}
-            className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground"
+            className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground"
           >
             {platform}
           </span>

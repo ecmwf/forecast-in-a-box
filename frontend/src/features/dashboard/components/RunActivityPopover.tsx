@@ -99,7 +99,7 @@ export function RunActivityPopover({
 
       <Suspense
         fallback={
-          <div className="h-36 w-full animate-pulse rounded bg-muted" />
+          <div className="h-36 w-full animate-pulse rounded-md bg-muted" />
         }
       >
         <RunActivityChart

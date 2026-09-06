@@ -66,7 +66,7 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
         {Thumbnail ? (
           <Thumbnail item={item} adapter={adapter} />
         ) : (
-          <div className="flex aspect-video items-center justify-center rounded bg-muted">
+          <div className="flex aspect-video items-center justify-center rounded-md bg-muted">
             <Icon className="h-8 w-8 text-muted-foreground" />
           </div>
         )}
@@ -75,7 +75,7 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
             per adapter so users can scan formats at a glance. */}
         <span
           className={cn(
-            'pointer-events-none absolute top-2 left-2 rounded px-1.5 py-0.5 font-mono text-xs font-semibold',
+            'pointer-events-none absolute top-2 left-2 rounded-md px-1.5 py-0.5 font-mono text-xs font-semibold',
             adapter.chipClass,
           )}
         >

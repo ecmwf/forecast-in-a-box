@@ -131,7 +131,7 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
                   type="button"
                   aria-label={t('panel.addGlobal')}
                   onClick={() => setCreateGlobalOpen(true)}
-                  className="shrink-0 rounded p-1 text-primary hover:bg-primary/10"
+                  className="shrink-0 rounded-md p-1 text-primary hover:bg-primary/10"
                 />
               }
             >
@@ -147,7 +147,7 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
                 <Link
                   to="/admin/variables"
                   aria-label={t('panel.manageAll')}
-                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                 />
               }
             >
@@ -187,7 +187,7 @@ export function GlyphReferencePanel({ className }: { className?: string }) {
                     setGlobalOpen(true)
                     setCreateGlobalOpen(true)
                   }}
-                  className="shrink-0 rounded p-1 text-primary hover:bg-primary/10"
+                  className="shrink-0 rounded-md p-1 text-primary hover:bg-primary/10"
                 />
               }
             >
@@ -337,18 +337,18 @@ function HelperRow({
             type="button"
             onClick={() => onCopy(fn)}
             className={cn(
-              'group flex w-full items-center gap-2 rounded px-3 py-1 text-left text-sm',
+              'group flex w-full items-center gap-2 rounded-md px-3 py-1 text-left text-sm',
               'transition-colors hover:bg-muted/80',
             )}
           />
         }
       >
-        <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+        <code className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">
           {snippet}
         </code>
         <span
           className={cn(
-            'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase',
+            'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium uppercase',
             fn.kind === 'filter'
               ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
               : 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
@@ -537,7 +537,7 @@ function LocalGlyphSection({
                   if (!open) onToggle()
                   setIsAdding(true)
                 }}
-                className="ml-auto shrink-0 rounded p-1 text-primary hover:bg-primary/10"
+                className="ml-auto shrink-0 rounded-md p-1 text-primary hover:bg-primary/10"
               />
             }
           >
@@ -555,7 +555,7 @@ function LocalGlyphSection({
                     key={g.name}
                     className="flex items-center gap-1.5 px-3 py-1"
                   >
-                    <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-sm">
+                    <code className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm">
                       {'${' + g.name + '}'}
                     </code>
                     <input
@@ -566,7 +566,7 @@ function LocalGlyphSection({
                         if (e.key === 'Enter') handleSaveEdit()
                         if (e.key === 'Escape') handleCancelEdit()
                       }}
-                      className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                      className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                       autoFocus
                     />
                     <button
@@ -611,7 +611,7 @@ function LocalGlyphSection({
                   placeholder={t('panel.localKeyPlaceholder')}
                   aria-invalid={newKeyInvalid || undefined}
                   className={cn(
-                    'w-20 shrink-0 rounded border bg-background px-1.5 py-0.5 font-mono text-sm focus:ring-1 focus:outline-none',
+                    'w-20 shrink-0 rounded-md border bg-background px-1.5 py-0.5 font-mono text-sm focus:ring-1 focus:outline-none',
                     newKeyInvalid
                       ? 'border-destructive focus:ring-destructive'
                       : 'border-border focus:ring-ring',
@@ -627,7 +627,7 @@ function LocalGlyphSection({
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
                   placeholder={t('panel.localValuePlaceholder')}
-                  className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                  className="min-w-0 flex-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleAdd()
                     if (e.key === 'Escape') handleCancelAdd()
@@ -681,7 +681,7 @@ function LocalGlyphRow({
         render={
           <div
             className={cn(
-              'group flex w-full items-center gap-2 rounded px-3 py-1 text-left text-sm',
+              'group flex w-full items-center gap-2 rounded-md px-3 py-1 text-left text-sm',
               'transition-colors hover:bg-muted/80',
             )}
           />
@@ -692,7 +692,7 @@ function LocalGlyphRow({
           onClick={() => onCopy(glyph.name)}
           className="flex min-w-0 flex-1 items-center gap-2"
         >
-          <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-sm">
+          <code className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm">
             {'${' + glyph.name + '}'}
           </code>
           <P className="min-w-0 truncate text-sm text-muted-foreground">
@@ -752,13 +752,13 @@ function GlyphRow({
             type="button"
             onClick={() => onCopy(glyph.name)}
             className={cn(
-              'group flex w-full items-center gap-2 rounded px-3 py-1 text-left text-sm',
+              'group flex w-full items-center gap-2 rounded-md px-3 py-1 text-left text-sm',
               'transition-colors hover:bg-muted/80',
             )}
           />
         }
       >
-        <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-sm">
+        <code className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm">
           {'${' + glyph.name + '}'}
         </code>
         <P className="min-w-0 truncate text-sm text-muted-foreground">

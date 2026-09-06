@@ -476,7 +476,7 @@ export function VisualisePage() {
                   title={detail}
                   className="flex min-w-0 items-baseline gap-2"
                 >
-                  <span className="rounded border border-border px-1 font-mono text-[10px] tracking-wide text-muted-foreground">
+                  <span className="rounded-md border border-border px-1 font-mono text-[10px] tracking-wide text-muted-foreground">
                     {t(p.kind === 'wms' ? 'basket.kindWms' : 'basket.kindPath')}
                   </span>
                   <span className="truncate font-mono text-xs">{detail}</span>
@@ -585,7 +585,7 @@ function SlotBStatusChip({ state }: { state: ComparisonSourceState }) {
   if (state.phase === 'running' || state.phase === 'idle') return null
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <span className="flex h-4 w-4 items-center justify-center rounded bg-slot-b font-mono text-[10px] font-bold text-white">
+      <span className="flex h-4 w-4 items-center justify-center rounded-md bg-slot-b font-mono text-[10px] font-bold text-white">
         B
       </span>
       {state.phase === 'failed' || state.phase === 'dirError' ? (

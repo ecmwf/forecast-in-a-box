@@ -340,7 +340,7 @@ export function CompilationPanel({
               maskColor="rgba(0, 0, 0, 0.06)"
               pannable
               zoomable
-              className="right-2! bottom-2! h-[80px]! w-[120px]! rounded border border-border bg-background/80 shadow-sm"
+              className="right-2! bottom-2! h-[80px]! w-[120px]! rounded-md border border-border bg-background/80 shadow-sm"
             />
             <Controls
               showInteractive={false}
@@ -435,7 +435,7 @@ function TaskInlineDetails({
       </div>
       <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
         <Field label={t('compilation.fields.taskId')}>
-          <code className="block rounded bg-muted px-1.5 py-1 font-mono text-[11px] break-all">
+          <code className="block rounded-md bg-muted px-1.5 py-1 font-mono text-[11px] break-all">
             {task.task_id}
           </code>
         </Field>

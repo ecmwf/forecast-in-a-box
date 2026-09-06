@@ -78,7 +78,7 @@ export function LegendImage({ url, title }: { url: string; title: string }) {
             type="button"
             onMouseEnter={enter}
             onMouseLeave={leave}
-            className="block w-full cursor-zoom-in rounded outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="block w-full cursor-zoom-in rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         }
       >

@@ -25,7 +25,7 @@ export function LostOutputCard({ originalBlock, reason }: LostOutputCardProps) {
   const { t } = useTranslation('executions')
   return (
     <div className="w-full space-y-2 overflow-hidden rounded-lg border border-dashed bg-muted/30 p-3">
-      <div className="flex aspect-video w-full items-center justify-center rounded bg-muted/40">
+      <div className="flex aspect-video w-full items-center justify-center rounded-md bg-muted/40">
         <CloudOff className="h-8 w-8 text-muted-foreground/60" />
       </div>
       <div className="space-y-1">

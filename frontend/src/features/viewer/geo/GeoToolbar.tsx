@@ -69,7 +69,7 @@ const log = createLogger('GeoToolbar')
 function KeyBadge({ label, show }: { label: string; show: boolean }) {
   if (!show) return null
   return (
-    <kbd className="absolute -top-1.5 -right-1.5 z-10 rounded border border-border bg-foreground px-1 font-mono text-[9px] leading-4 text-background shadow-sm">
+    <kbd className="absolute -top-1.5 -right-1.5 z-10 rounded-md border border-border bg-foreground px-1 font-mono text-[9px] leading-4 text-background shadow-sm">
       {label}
     </kbd>
   )
@@ -320,7 +320,7 @@ export function GeoToolbar({
                     onClick={() => onBasemapChange(b.id)}
                     aria-pressed={b.id === basemapId}
                     className={cn(
-                      'flex items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent',
+                      'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent',
                       b.id === basemapId && 'bg-accent font-medium',
                     )}
                   >

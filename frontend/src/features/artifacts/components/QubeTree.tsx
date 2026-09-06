@@ -413,7 +413,7 @@ function Cell({ present }: { present: boolean }) {
     <span
       aria-hidden="true"
       className={cn(
-        'inline-block h-2 w-2 rounded-[2px]',
+        'inline-block h-2 w-2 rounded-xs',
         present
           ? 'bg-primary shadow-[0_0_0_2px_var(--color-primary)]/10'
           : 'border border-muted-foreground/25 bg-transparent',
