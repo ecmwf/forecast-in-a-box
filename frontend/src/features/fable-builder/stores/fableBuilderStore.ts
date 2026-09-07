@@ -27,11 +27,9 @@ import {
   generateBlockInstanceId,
 } from '@/api/types/fable.types'
 
-export type BuilderMode = 'graph' | 'form'
 export type BuilderStep = 'edit' | 'review'
 /** Which tab the submit dialog opens on. */
 export type SubmitDialogMode = 'run' | 'schedule'
-export type EdgeStyle = 'bezier' | 'smoothstep' | 'step'
 export type { LayoutDirection } from '@/features/fable-builder/utils/layout-blocks'
 
 /** Max number of `fable` snapshots retained on the undo stack. Oldest entries
@@ -106,7 +104,6 @@ interface FableBuilderState {
    *  passed as parent_id when saving creates a new blueprint. */
   forkParentId: string | null
   fableName: string
-  mode: BuilderMode
   step: BuilderStep
   selectedBlockId: BlockInstanceId | null
   /** Edge currently hovered on the canvas; drives the qube-lens handle's
@@ -117,9 +114,11 @@ interface FableBuilderState {
   isMobilePaletteOpen: boolean
   isMobileConfigOpen: boolean
   isMiniMapOpen: boolean
+  /** Canvas-anchored source picker (empty-panel action); ephemeral. */
+  addSourceMenuOpen: boolean
   fitViewTrigger: number
-  edgeStyle: EdgeStyle
-  autoLayout: boolean
+  /** Bumped by Tidy up; the canvas re-lays out every node on change. */
+  layoutTrigger: number
   layoutDirection: LayoutDirection
   nodesLocked: boolean
   validationState: FableValidationState | null
@@ -185,7 +184,6 @@ interface FableBuilderState {
   disconnectBlock: (targetBlockId: BlockInstanceId, inputName: string) => void
   selectBlock: (blockId: BlockInstanceId | null) => void
   setHoveredEdge: (edgeId: string | null) => void
-  setMode: (mode: BuilderMode) => void
   setStep: (step: BuilderStep) => void
   togglePalette: () => void
   toggleConfigPanel: () => void
@@ -196,9 +194,9 @@ interface FableBuilderState {
   openMobileConfig: (blockId: BlockInstanceId) => void
   setMiniMapOpen: (open: boolean) => void
   toggleMiniMap: () => void
+  setAddSourceMenuOpen: (open: boolean) => void
   triggerFitView: () => void
-  setEdgeStyle: (style: EdgeStyle) => void
-  setAutoLayout: (enabled: boolean) => void
+  triggerLayout: () => void
   setLayoutDirection: (direction: LayoutDirection) => void
   setNodesLocked: (locked: boolean) => void
   setLocalGlyph: (key: string, value: string) => void
@@ -238,7 +236,6 @@ function createInitialState() {
     forkParentId: null as string | null,
     // Blank by default; FableBuilderHeader renders a translated placeholder.
     fableName: '',
-    mode: 'graph' as BuilderMode,
     step: 'edit' as BuilderStep,
     selectedBlockId: null,
     hoveredEdgeId: null as string | null,
@@ -247,10 +244,9 @@ function createInitialState() {
     isMobilePaletteOpen: false,
     isMobileConfigOpen: false,
     isMiniMapOpen: true,
+    addSourceMenuOpen: false,
     fitViewTrigger: 0,
-    // Orthogonal by default, matching the execution details page.
-    edgeStyle: 'smoothstep' as EdgeStyle,
-    autoLayout: true,
+    layoutTrigger: 0,
     layoutDirection: getDefaultLayoutDirection(),
     nodesLocked: true,
     validationState: null,
@@ -367,7 +363,6 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           newFable: () =>
             set({
               ...createInitialState(),
-              mode: get().mode,
               isPaletteOpen: get().isPaletteOpen,
               isConfigPanelOpen: get().isConfigPanelOpen,
             }),
@@ -639,7 +634,7 @@ export const useFableBuilderStore = create<FableBuilderState>()(
             set({
               selectedBlockId: blockId,
               // Sidebar stays open even on deselect (blockId === null) —
-              // it shows a "Select a block to configure" placeholder.
+              // it shows the empty-panel placeholder.
               // User closes it explicitly via toggleConfigPanel.
               isConfigPanelOpen: true,
             }),
@@ -647,7 +642,6 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           // Pure ephemeral UI: no history, no dirty flag, no validation reset.
           setHoveredEdge: (edgeId) => set({ hoveredEdgeId: edgeId }),
 
-          setMode: (mode) => set({ mode }),
           setStep: (step) => set({ step }),
           togglePalette: () =>
             set((state) => ({ isPaletteOpen: !state.isPaletteOpen })),
@@ -662,10 +656,11 @@ export const useFableBuilderStore = create<FableBuilderState>()(
           setMiniMapOpen: (open) => set({ isMiniMapOpen: open }),
           toggleMiniMap: () =>
             set((state) => ({ isMiniMapOpen: !state.isMiniMapOpen })),
+          setAddSourceMenuOpen: (open) => set({ addSourceMenuOpen: open }),
           triggerFitView: () =>
             set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 })),
-          setEdgeStyle: (style) => set({ edgeStyle: style }),
-          setAutoLayout: (enabled) => set({ autoLayout: enabled }),
+          triggerLayout: () =>
+            set((state) => ({ layoutTrigger: state.layoutTrigger + 1 })),
           setLayoutDirection: (direction) =>
             set({ layoutDirection: direction }),
           setNodesLocked: (locked) => set({ nodesLocked: locked }),
@@ -796,29 +791,33 @@ export const useFableBuilderStore = create<FableBuilderState>()(
         version: STORE_VERSIONS.fableBuilder,
         migrate: (persistedState, version) => {
           // v2: Removed configDisplayMode, added isMiniMapOpen
+          let state = persistedState as Record<string, unknown>
           if (version < 2) {
-            const { configDisplayMode: _removed, ...rest } =
-              persistedState as Record<string, unknown>
-            return { ...rest, isMiniMapOpen: true }
+            const { configDisplayMode: _removed, ...rest } = state
+            state = { ...rest, isMiniMapOpen: true }
           }
-          return persistedState as {
-            mode: BuilderMode
+          // v3: form layout, edge styles and the auto-layout toggle removed.
+          if (version < 3) {
+            const {
+              mode: _mode,
+              edgeStyle: _edgeStyle,
+              autoLayout: _autoLayout,
+              ...rest
+            } = state
+            state = rest
+          }
+          return state as {
             isPaletteOpen: boolean
             isConfigPanelOpen: boolean
             isMiniMapOpen: boolean
-            edgeStyle: EdgeStyle
-            autoLayout: boolean
             layoutDirection: LayoutDirection
             nodesLocked: boolean
           }
         },
         partialize: (state) => ({
-          mode: state.mode,
           isPaletteOpen: state.isPaletteOpen,
           isConfigPanelOpen: state.isConfigPanelOpen,
           isMiniMapOpen: state.isMiniMapOpen,
-          edgeStyle: state.edgeStyle,
-          autoLayout: state.autoLayout,
           layoutDirection: state.layoutDirection,
           nodesLocked: state.nodesLocked,
         }),

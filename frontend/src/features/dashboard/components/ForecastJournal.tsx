@@ -8,97 +8,45 @@
  * does it submit to any jurisdiction.
  */
 
-/** Dashboard widget: the most recent runs. The full list lives at /execute. */
-
-import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
-import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
-import type { GroupBy } from '@/features/journal/grouping/group-runs'
-import type { FacetToken } from '@/features/journal/facets/facet-types'
 import { useJobsStatus } from '@/api/hooks/useJobs'
-import { useServerTime } from '@/api/hooks/useSchedules'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
-import { filterRuns } from '@/features/journal/utils/filter-runs'
-import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
-import { ForecastRunSearchHeader } from '@/features/journal/components/ForecastRunSearchHeader'
-import { formatInZone } from '@/lib/datetime'
+import { H2 } from '@/components/base/typography'
+import { Button } from '@/components/ui/button'
 
-interface ForecastJournalProps {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
-}
+/** Overview shows the latest runs and hands off to Execute for the rest. */
+const RECENT_RUN_COUNT = 5
 
-/** Recent runs shown before "View all". */
-const DASHBOARD_RUN_COUNT = 6
-
-const DASHBOARD_FILTERS: ReadonlyArray<RunFilter> = [
-  'all',
-  'running',
-  'completed',
-  'failed',
-  'bookmarked',
-]
-
-export function ForecastJournal({ variant, shadow }: ForecastJournalProps) {
+export function ForecastJournal() {
   const { t } = useTranslation('journal')
-  const [query, setQuery] = useState('')
-  const [activeFilter, setActiveFilter] = useState<RunFilter>('all')
-  const [groupBy, setGroupBy] = useState<GroupBy>('date')
-
-  const { data, isLoading } = useJobsStatus(1, DASHBOARD_RUN_COUNT)
+  const { data, isLoading } = useJobsStatus(1, RECENT_RUN_COUNT)
   const { runs, toggleBookmark } = useForecastRuns(data?.runs ?? [])
-
-  // App-TZ date — keeps the facet aligned with the row in any client TZ.
-  const { serverTimeToLocal, timeZone } = useServerTime()
-  const displayDateFor = useCallback(
-    (run: ForecastRunViewModel) =>
-      formatInZone(serverTimeToLocal(run.createdAt), timeZone, 'yyyy-MM-dd'),
-    [serverTimeToLocal, timeZone],
-  )
-
-  // Defer filtering so typing in the search box stays responsive on long lists.
-  const deferredQuery = useDeferredValue(query)
-  const filtered = useMemo(
-    () =>
-      filterRuns(runs, activeFilter, parseQuery(deferredQuery), displayDateFor),
-    [runs, activeFilter, deferredQuery, displayDateFor],
-  )
-
-  const handleAddFacet = useCallback(
-    (token: FacetToken) => setQuery((prev) => addToken(prev, token)),
-    [],
-  )
 
   return (
     <ForecastRunList
-      runs={filtered}
+      runs={runs}
       isLoading={isLoading}
-      groupBy={groupBy}
       onToggleBookmark={toggleBookmark}
-      onAddFacet={handleAddFacet}
-      variant={variant}
-      shadow={shadow}
-      header={
-        <ForecastRunSearchHeader
-          title={t('title')}
-          query={query}
-          onQueryChange={setQuery}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          filters={DASHBOARD_FILTERS}
-          groupBy={groupBy}
-          onGroupByChange={setGroupBy}
-        />
+      emptyText={t('noRunsYet')}
+      emptyAction={
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link to="/configure" />}
+        >
+          {t('configureForecast')}
+        </Button>
       }
-      footer={
-        <div className="border-t border-border p-4 text-center">
+      header={
+        <div className="flex items-center justify-between gap-4 px-4 py-4">
+          <H2 className="text-xl font-semibold">{t('title')}</H2>
           <Link
             to="/execute"
-            className="inline-flex items-center text-sm font-medium text-primary hover:underline"
+            className="hit-target-y inline-flex shrink-0 items-center text-sm font-medium text-primary hover:underline"
           >
             {t('viewAll')}
             <ChevronRight className="ml-0.5 h-3 w-3" />

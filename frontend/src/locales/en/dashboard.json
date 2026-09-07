@@ -18,20 +18,21 @@
         "preparing": "Currently Preparing",
         "submitted": "Currently Submitted"
       },
-      "activeForecasts": "Active forecasts",
+      "activeForecasts": "Active runs",
       "availableModels": "Available Models",
       "of": "of {{total}}",
       "downloadedModels": "Downloaded models",
-      "totalForecasts": "Total Forecasts",
+      "totalForecasts": "Total runs",
       "thisMonth": "Executed this month",
-      "executionStatus": "Execution Status",
+      "executionStatus": "Run status",
       "totalJobs": "Total",
-      "noActiveJobs": "No active jobs"
+      "noActiveJobs": "No active runs"
     },
     "activity": {
-      "title": "Forecast activity",
-      "summary_one": "{{count}} forecast in the last 6 months",
-      "summary_other": "{{count}} forecasts in the last 6 months"
+      "title": "Run activity",
+      "summary_one": "{{count}} run in the last 6 months",
+      "summary_other": "{{count}} runs in the last 6 months",
+      "openRuns": "Open runs"
     },
     "models": {
       "readyToUse": "Ready to use",
@@ -42,10 +43,9 @@
     },
     "actions": {
       "managePlugins": "Manage Plugins",
-      "manageSources": "Manage Sources",
-      "manageExecutions": "Manage Job Executions",
+      "manageExecutions": "Manage Runs",
       "myPresets": "Manage Configuration Presets",
-      "scheduledForecasts": "Manage Scheduled Forecasts"
+      "scheduledForecasts": "Manage Scheduled Runs"
     }
   },
   "community": {
@@ -77,27 +77,6 @@
       "managePlugins": "Manage plugins",
       "errorTitle": "Couldn't load templates",
       "errorDescription": "The template list is temporarily unavailable."
-    }
-  },
-  "journal": {
-    "title": "Forecast Journal",
-    "searchPlaceholder": "Search or add filters...",
-    "noResults": "No forecasts found matching your criteria.",
-    "loadMore": "Load more history",
-    "filters": {
-      "all": "All",
-      "running": "Running",
-      "completed": "Completed",
-      "failed": "Failed",
-      "bookmarked": "Bookmarked"
-    },
-    "item": {
-      "model": "Model: {{model}}",
-      "started": "Started: {{time}}",
-      "products": "{{count}} products",
-      "scheduled": "Scheduled",
-      "viewResults": "View Results",
-      "viewError": "View Error"
     }
   },
   "presets": {

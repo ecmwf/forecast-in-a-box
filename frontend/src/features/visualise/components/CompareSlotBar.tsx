@@ -156,7 +156,7 @@ function SlotPicker({
     <div className="flex max-w-full min-w-0 items-center gap-1.5">
       <span
         className={cn(
-          'flex h-6 w-6 shrink-0 items-center justify-center rounded font-mono text-xs font-bold',
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-mono text-xs font-bold',
           SLOT_BADGE[slot],
         )}
       >
@@ -220,7 +220,7 @@ function SlotPicker({
                         key={s}
                         title={t('slots.inSlot', { slot: s.toUpperCase() })}
                         className={cn(
-                          'shrink-0 rounded px-1 font-mono text-[10px] font-bold',
+                          'shrink-0 rounded-md px-1 font-mono text-[10px] font-bold',
                           SLOT_BADGE[s],
                         )}
                       >
@@ -229,7 +229,7 @@ function SlotPicker({
                     ))}
                   </div>
                   <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="shrink-0 rounded bg-muted px-1 font-mono text-[10px] uppercase">
+                    <span className="shrink-0 rounded-md bg-muted px-1 font-mono text-[10px] uppercase">
                       {t(`slots.kind.${kind}`)}
                     </span>
                     <span className="min-w-0 truncate font-mono">{detail}</span>

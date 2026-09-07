@@ -36,7 +36,7 @@ vi.mock('@tanstack/react-router', async () => {
   }
 })
 
-const PLACEHOLDER = 'Type a command or search...'
+const PLACEHOLDER = 'Search pages, presets, runs and blocks...'
 
 /** Every command label, grouped, for exhaustive presence checks. */
 const ALL_COMMANDS = [
@@ -213,6 +213,26 @@ describe('CommandPalette', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/admin' })
     expect(useCommandStore.getState().isOpen).toBe(false)
+  })
+
+  it('lists plugin templates under Presets once loaded', async () => {
+    useCommandStore.getState().setOpen(true)
+    const screen = await renderPalette()
+
+    // The mock list marks only its templates with a source; saved presets
+    // need `user_defined`, which the seeded fables do not carry.
+    await expect.element(screen.getByText('Presets')).toBeVisible()
+    await expect
+      .element(screen.getByRole('option', { name: /testBasic/ }))
+      .toBeVisible()
+  })
+
+  it('keeps block commands out of the idle list off the Configure page', async () => {
+    useCommandStore.getState().setOpen(true)
+    const screen = await renderPalette()
+
+    await expect.element(screen.getByPlaceholder(PLACEHOLDER)).toBeVisible()
+    await expect.element(screen.getByText('Blocks')).not.toBeInTheDocument()
   })
 
   it('opens the palette when the Ctrl+K shortcut is pressed', async () => {

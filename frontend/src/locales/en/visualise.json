@@ -271,7 +271,8 @@
     "titleLabel": "Title",
     "png": "Download PNG",
     "failed": "Could not capture the map view",
-    "open": "Export"
+    "open": "Export",
+    "label": "Export"
   },
   "scale": {
     "dependent": "Zoom-dependent",

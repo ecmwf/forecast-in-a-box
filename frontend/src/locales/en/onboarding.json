@@ -16,7 +16,7 @@
     },
     "dashboard": {
       "title": "Your dashboard, at a glance",
-      "body": "The Overview page surfaces system status, downloaded models, and a journal of recent and scheduled forecasts — plus ready-made starting points for your first run."
+      "body": "The Overview page surfaces system status, downloaded models, and your recent and scheduled runs — plus ready-made starting points for your first run."
     },
     "blocks": {
       "title": "Compose forecasts from blocks",

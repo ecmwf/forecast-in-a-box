@@ -132,7 +132,7 @@ describe('RunStatusDetailsPopover', () => {
 
     await screen.getByTestId('trigger').click()
 
-    await expect.element(screen.getByText('Execution Status')).toBeVisible()
+    await expect.element(screen.getByText('Run status')).toBeVisible()
     await expect.element(screen.getByText('Running')).toBeVisible()
     await expect.element(screen.getByText('Submitted')).toBeVisible()
     await expect.element(screen.getByText('Completed')).toBeVisible()
@@ -148,7 +148,7 @@ describe('RunStatusDetailsPopover', () => {
 
     await screen.getByTestId('trigger').click()
 
-    await expect.element(screen.getByText('Execution Status')).toBeVisible()
+    await expect.element(screen.getByText('Run status')).toBeVisible()
 
     // Verify total in footer
     await expect.element(screen.getByText('Total')).toBeVisible()
@@ -164,7 +164,7 @@ describe('RunStatusDetailsPopover', () => {
 
     await screen.getByTestId('trigger').click()
 
-    await expect.element(screen.getByText('Execution Status')).toBeVisible()
+    await expect.element(screen.getByText('Run status')).toBeVisible()
 
     // Refresh button should be present (ghost icon button)
     const refreshButton = screen.getByRole('button', { name: '' }).first()

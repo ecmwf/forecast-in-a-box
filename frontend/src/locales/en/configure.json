@@ -44,9 +44,6 @@
     "untitledConfiguration": "Untitled Configuration"
   },
   "header": {
-    "share": "Share",
-    "shareCopied": "Copied!",
-    "shareFailed": "Could not copy link to clipboard",
     "graph": "Graph",
     "form": "Form",
     "exportConfig": "Export Config",
@@ -66,12 +63,14 @@
     "runOnSchedule": "Run on Schedule",
     "submitOptions": "More submit options",
     "backToEdit": "Back to Edit",
-    "submitJob": "Submit Job",
+    "submitJob": "Start Run",
     "reviewTooltipNoBlocks": "Add blocks to your configuration",
     "reviewTooltipNoSink": "Add at least one output block",
     "reviewTooltipInvalid": "Fix validation errors before submitting",
     "undo": "Undo",
-    "redo": "Redo"
+    "redo": "Redo",
+    "file": "File",
+    "moreTags": "+{{count}}"
   },
   "blockCount_one": "{{count}} block",
   "blockCount_other": "{{count}} blocks",
@@ -83,12 +82,18 @@
   },
   "validationStatus": {
     "validating": "Validating",
-    "valid": "Valid",
-    "issues_one": "{{count}} issue",
-    "issues_other": "{{count}} issues",
+    "valid": "Ready to run",
+    "issues_one": "{{count}} issue to fix",
+    "issues_other": "{{count}} issues to fix",
     "globalIssueLabel": "Configuration",
     "validatingConfiguration": "Validating configuration...",
-    "configurationIssues": "Configuration Issues"
+    "configurationIssues": "Configuration Issues",
+    "hints": {
+      "invalidValue": "Open the block and pick a valid value for this option.",
+      "missingConfig": "Fill in the required options in the configuration panel.",
+      "noOutput": "Add an output block, for example a GRIB sink or a map plot.",
+      "unknownGlyph": "Define the variable under Variables, or replace it with a value."
+    }
   },
   "blockActions": {
     "duplicate": "Duplicate",
@@ -109,7 +114,10 @@
     "blockConfiguration": "Block Configuration"
   },
   "configPanel": {
-    "selectBlock": "Select a block to configure",
+    "emptyTitle": "Nothing selected",
+    "emptyDescription": "Pick a block on the canvas to configure it, or start here.",
+    "addSource": "Add a source",
+    "startFromPreset": "Start from a preset",
     "inputConnections": "Input Connections",
     "configuration": "Configuration",
     "noConfigOptions": "No configuration options",
@@ -130,42 +138,6 @@
     "clickSourceToStart": "Click or drag a source to get started",
     "clickToAdd": "Click or drag blocks onto the canvas"
   },
-  "pipeline": {
-    "structure": "Pipeline Structure",
-    "topologyPlaceholder": "Add blocks to see the pipeline topology"
-  },
-  "formCanvas": {
-    "previousStep": "Previous Step",
-    "nextStep": "Next Step",
-    "stepHeading": "{{label}}s",
-    "selectToStart": "Select a {{kind}} to get started:",
-    "addAnother": "Add another {{kind}}:",
-    "loadingSources": "Loading available sources...",
-    "completePreviousStep": "Complete the previous step to see available {{kind}}s."
-  },
-  "connections": {
-    "pipelineFlow": "Pipeline Flow",
-    "inputCount_one": "{{count}} input",
-    "inputCount_other": "{{count}} inputs",
-    "outputCount_one": "{{count}} output",
-    "outputCount_other": "{{count}} outputs",
-    "noConnections": "No connections",
-    "notConnectedDownstream": "Not connected to any downstream block",
-    "inputConnections": "Input Connections",
-    "noCompatibleSourcesAvailable": "No compatible sources available",
-    "noConfigOptions": "No configuration options",
-    "selectSource": "Select source..."
-  },
-  "blockInstance": {
-    "hasErrors": "Has errors",
-    "deleteBlock": "Delete Block",
-    "deleteConfirm": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone.",
-    "cancel": "Cancel",
-    "delete": "Delete"
-  },
-  "blockTabs": {
-    "fallbackTitle": "Block"
-  },
   "addBlockNode": {
     "addKind": "Add {{label}}"
   },
@@ -176,24 +148,20 @@
     "directionDownstream": "downstream"
   },
   "graphOptions": {
-    "ariaLabel": "Graph options",
     "view": "View",
     "tidyUp": "Tidy up configuration",
     "unlockNodes": "Unlock nodes",
     "lockNodes": "Lock nodes",
     "showMinimap": "Show minimap",
     "layout": "Layout",
-    "autoLayout": "Auto-layout",
     "direction": "Direction",
     "topToBottom": "↓ Top to Bottom",
-    "leftToRight": "→ Left to Right",
-    "edges": "Edges",
-    "style": "Style",
-    "curved": "Curved",
-    "rounded": "Rounded",
-    "orthogonal": "Orthogonal",
-    "switchToForm": "Switch to form layout",
-    "switchToGraph": "Switch to graph layout"
+    "leftToRight": "→ Left to Right"
+  },
+  "canvasStatus": {
+    "zoom": "{{value}}%",
+    "edgeCount_one": "{{count}} connection",
+    "edgeCount_other": "{{count}} connections"
   },
   "addNode": {
     "searchPlaceholder": "Search blocks...",
@@ -247,7 +215,7 @@
     "summaryDescription_one": "{{count}} block configured",
     "summaryDescription_other": "{{count}} blocks configured",
     "backToEdit": "Back to Edit",
-    "submitJob": "Submit Job",
+    "submitJob": "Start Run",
     "kindHeading": "{{label}}s"
   },
   "configSummary": {

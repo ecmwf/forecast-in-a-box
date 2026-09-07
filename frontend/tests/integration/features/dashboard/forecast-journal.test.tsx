@@ -10,7 +10,7 @@
 
 /**
  * ForecastJournal Integration Tests — the dashboard journal widget against the
- * /run/list API: rendering, status filtering, bookmarking, "View all".
+ * /run/list API: rendering, bookmarking, the hand-off to the runs page.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -47,38 +47,24 @@ describe('ForecastJournal Integration', () => {
   })
 
   describe('rendering', () => {
-    it('renders the journal title', async () => {
+    it('renders the recent-runs title', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('Forecast Journal')).toBeVisible()
-    })
-
-    it('renders the search input', async () => {
-      const screen = await renderJournal()
-      await expect
-        .element(
-          screen.getByPlaceholder('Search or filter, e.g. tag:production'),
-        )
-        .toBeVisible()
-    })
-
-    it('renders the status filter buttons', async () => {
-      const screen = await renderJournal()
-      for (const name of ['All', 'Running', 'Completed', 'Failed']) {
-        await expect
-          .element(screen.getByRole('button', { name, exact: true }))
-          .toBeVisible()
-      }
+      await expect.element(screen.getByText('Recent runs')).toBeVisible()
     })
 
     it('renders runs from the API', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
     })
 
-    it('shows a "View all" link to the executions page', async () => {
+    it('hands off to the runs page', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('View all')).toBeVisible()
+      await expect.element(screen.getByText('View all runs')).toBeVisible()
     })
   })
 
@@ -99,50 +85,16 @@ describe('ForecastJournal Integration', () => {
     })
   })
 
-  describe('filtering', () => {
-    it('filters to running runs only', async () => {
-      const screen = await renderJournal()
-      await screen.getByRole('button', { name: 'Running', exact: true }).click()
-
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-      expect(screen.getByText('#job-complete...').query()).toBeNull()
-    })
-
-    it('filters to completed runs only', async () => {
-      const screen = await renderJournal()
-      await screen
-        .getByRole('button', { name: 'Completed', exact: true })
-        .click()
-
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      expect(screen.getByText('#job-running-...').query()).toBeNull()
-    })
-
-    it('shows the empty state when no runs are bookmarked', async () => {
-      const screen = await renderJournal()
-      await screen
-        .getByRole('button', { name: 'Bookmarked', exact: true })
-        .click()
-
-      await expect
-        .element(screen.getByText('No forecasts found matching your criteria.'))
-        .toBeVisible()
-    })
-  })
-
   describe('bookmarking', () => {
-    it('bookmarks a run so it appears under the Bookmarked filter', async () => {
+    it('toggles a bookmark from the row', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
       await screen.getByLabelText('Bookmark').first().click()
-      await screen
-        .getByRole('button', { name: 'Bookmarked', exact: true })
-        .click()
-
-      expect(
-        screen.getByText('No forecasts found matching your criteria.').query(),
-      ).toBeNull()
+      await expect
+        .element(screen.getByLabelText('Remove bookmark').first())
+        .toBeVisible()
     })
   })
 })

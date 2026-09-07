@@ -58,8 +58,6 @@ export const STORAGE_KEYS = {
     shelf: 'fiab.fable.shelf',
     /** Legacy per-target draft map — read once for migration into `draft` */
     drafts: 'fiab.fable.drafts',
-    /** Pipeline (form-mode) sidebar open/closed flag */
-    pipelineSidebarOpen: 'fiab.fable.pipeline-sidebar-open',
   },
 
   /**
@@ -136,9 +134,9 @@ export const STORAGE_KEYS = {
  * ```
  */
 export const STORE_VERSIONS = {
-  ui: 6, // v6: Add application timezone preference
+  ui: 7, // v7: Removed layoutMode, dashboardVariant, panelShadow
   config: 1,
-  fableBuilder: 2, // v2: Removed configDisplayMode, added isMiniMapOpen
+  fableBuilder: 3, // v3: Removed mode, edgeStyle, autoLayout
   activity: 2, // v2: navigateTo rewritten for /executions→/execute, /dashboard→/overview
   comparison: 1,
   onboarding: 2, // v2: Removed pluginStepNeeded

@@ -380,7 +380,7 @@ export function CompilationForceGraph({
               value="layered"
               variant="outline"
               aria-label={t('compilation.layoutLayered')}
-              className="text-xs"
+              className="text-sm"
             >
               {t('compilation.layoutLayered')}
             </ToggleGroupItem>
@@ -388,7 +388,7 @@ export function CompilationForceGraph({
               value="organic"
               variant="outline"
               aria-label={t('compilation.layoutOrganic')}
-              className="text-xs"
+              className="text-sm"
             >
               {t('compilation.layoutOrganic')}
             </ToggleGroupItem>
@@ -576,7 +576,7 @@ function BlockLegend({
   labelFor: (blockId: string) => string
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
       {blocks.map((blockId) => (
         <div key={blockId} className="flex items-center gap-1.5">
           <span
@@ -612,10 +612,10 @@ function FocusedTaskCard({
           style={{ backgroundColor: TASK_KIND_FILL[kind] }}
         />
         <span className="font-medium">{humanised.headline}</span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-sm text-muted-foreground">
           · {t(`compilation.taskKind.${kind}`)}
         </span>
-        <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+        <span className="ml-auto flex items-center gap-1 text-sm text-muted-foreground">
           <span
             className="inline-block h-2 w-2 rounded-full"
             style={{ backgroundColor: blockColor }}
@@ -624,7 +624,7 @@ function FocusedTaskCard({
         </span>
       </div>
       {humanised.modulePath && (
-        <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+        <p className="mt-0.5 font-mono text-sm text-muted-foreground">
           {humanised.modulePath}
         </p>
       )}

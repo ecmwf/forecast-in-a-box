@@ -13,7 +13,6 @@
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import type { ForecastRunViewModel } from '@/features/journal/types'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import type { FacetToken } from '@/features/journal/facets/facet-types'
 import { useServerTime } from '@/api/hooks/useSchedules'
@@ -22,31 +21,38 @@ import { ForecastRunRow } from '@/features/journal/components/ForecastRunRow'
 import { JournalGroup } from '@/features/journal/components/JournalGroup'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Card } from '@/components/ui/card'
+import { P } from '@/components/base/typography'
 
 interface ForecastRunListProps {
   runs: Array<ForecastRunViewModel>
   isLoading?: boolean
   emptyText?: string
+  /** Next step offered under the empty text. */
+  emptyAction?: ReactNode
   groupBy?: GroupBy
   onToggleBookmark: (runId: string) => void
   onAddFacet?: (token: FacetToken) => void
   header?: ReactNode
   footer?: ReactNode
-  variant?: DashboardVariant
-  shadow?: PanelShadow
+  /** Multi-select mode: rows show a checkbox; only completed runs select. */
+  selectedIds?: ReadonlySet<string>
+  selectionCap?: number
+  onToggleSelect?: (runId: string) => void
 }
 
 export function ForecastRunList({
   runs,
   isLoading,
   emptyText,
+  emptyAction,
   groupBy = 'none',
   onToggleBookmark,
   onAddFacet,
   header,
   footer,
-  variant,
-  shadow,
+  selectedIds,
+  selectionCap,
+  onToggleSelect,
 }: ForecastRunListProps) {
   const { t } = useTranslation('journal')
   const { serverTimeToLocal } = useServerTime()
@@ -58,6 +64,17 @@ export function ForecastRunList({
         run={run}
         onToggleBookmark={onToggleBookmark}
         onAddFacet={onAddFacet}
+        onToggleSelect={onToggleSelect}
+        selected={selectedIds?.has(run.runId)}
+        selectDisabled={
+          onToggleSelect !== undefined &&
+          (run.status !== 'completed' ||
+            run.hasComparableOutput === false ||
+            (selectionCap !== undefined &&
+              selectedIds !== undefined &&
+              selectedIds.size >= selectionCap &&
+              !selectedIds.has(run.runId)))
+        }
       />
     ))
   }
@@ -71,8 +88,9 @@ export function ForecastRunList({
     )
   } else if (runs.length === 0) {
     body = (
-      <div className="p-12 text-center text-muted-foreground">
-        {emptyText ?? t('empty')}
+      <div className="flex flex-col items-center gap-4 p-12 text-center text-muted-foreground">
+        <P>{emptyText ?? t('empty')}</P>
+        {emptyAction}
       </div>
     )
   } else if (groupBy === 'none') {
@@ -107,7 +125,7 @@ export function ForecastRunList({
   }
 
   return (
-    <Card className="overflow-hidden" variant={variant} shadow={shadow}>
+    <Card className="overflow-hidden">
       {header}
       {body}
       {footer}

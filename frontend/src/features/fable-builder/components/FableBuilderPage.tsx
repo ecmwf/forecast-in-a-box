@@ -19,7 +19,6 @@ import { ConfigPanel } from './layout/ConfigPanel'
 import { MobileLayout } from './layout/MobileLayout'
 import { ThreeColumnLayout } from './layout/ThreeColumnLayout'
 import { FableGraphCanvas } from './graph-mode/FableGraphCanvas'
-import { FableFormCanvas } from './form-mode/FableFormCanvas'
 import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
 import { TemplateParamsDialog } from './TemplateParamsDialog'
 import type { TFunction } from 'i18next'
@@ -136,7 +135,6 @@ export function FableBuilderPage({
     (state) => state.updateBlockConfigBatch,
   )
   const setLocalGlyph = useFableBuilderStore((state) => state.setLocalGlyph)
-  const mode = useFableBuilderStore((state) => state.mode)
   const step = useFableBuilderStore((state) => state.step)
   const storeFableId = useFableBuilderStore((state) => state.fableId)
   const submitDialogOpen = useFableBuilderStore(
@@ -560,7 +558,7 @@ export function FableBuilderPage({
             </Alert>
           )}
           {step === 'edit' ? (
-            <EditStep catalogue={catalogue} isDesktop={isDesktop} mode={mode} />
+            <EditStep catalogue={catalogue} isDesktop={isDesktop} />
           ) : (
             <ReviewStepComponent catalogue={catalogue} />
           )}
@@ -610,14 +608,9 @@ export function FableBuilderPage({
 interface EditStepProps {
   catalogue: BlockFactoryCatalogue
   isDesktop: boolean
-  mode: 'graph' | 'form'
 }
 
-function EditStep({
-  catalogue,
-  isDesktop,
-  mode,
-}: EditStepProps): React.ReactNode {
+function EditStep({ catalogue, isDesktop }: EditStepProps): React.ReactNode {
   const { t } = useTranslation('configure')
   const { authType } = useAuth()
   const { data: user } = useUser()
@@ -647,13 +640,6 @@ function EditStep({
     )
   }
 
-  // Form mode: Render full-width without sidebars
-  // Form mode has its own built-in UI for adding, configuring, and deleting blocks
-  if (mode === 'form') {
-    return <FableFormCanvas catalogue={catalogue} />
-  }
-
-  // Graph mode: Use three-column layout with sidebars
   const canvas = <FableGraphCanvas catalogue={catalogue} />
 
   if (!isDesktop) {

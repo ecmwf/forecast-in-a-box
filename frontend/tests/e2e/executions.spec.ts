@@ -38,12 +38,12 @@ test.describe('Executions List Page', () => {
   })
 
   test('executions page loads with heading', async ({ page }) => {
-    const heading = page.getByRole('heading', { name: /executions/i })
+    const heading = page.getByRole('heading', { name: /^runs$/i })
     await expect(heading.first()).toBeVisible({ timeout: 10000 })
   })
 
   test('search input is visible', async ({ page }) => {
-    const searchInput = page.getByPlaceholder(/search executions/i)
+    const searchInput = page.getByPlaceholder(/search runs/i)
     if (await searchInput.isVisible({ timeout: 5000 }).catch(() => false)) {
       await expect(searchInput).toBeVisible()
     }
@@ -88,7 +88,7 @@ test.describe('Executions List Page', () => {
 
   test('empty state shows when no executions', async ({ page }) => {
     // If no jobs exist, an empty message should appear
-    const emptyMessage = page.getByText(/haven't run any forecast/i)
+    const emptyMessage = page.getByText(/haven't run a forecast/i)
     const jobItems = page.locator('.font-mono')
 
     const hasJobs = await jobItems
@@ -128,7 +128,7 @@ test.describe('Executions Status Filtering', () => {
   })
 
   test('search filters the list', async ({ page }) => {
-    const searchInput = page.getByPlaceholder(/search executions/i)
+    const searchInput = page.getByPlaceholder(/search runs/i)
     if (await searchInput.isVisible({ timeout: 5000 }).catch(() => false)) {
       await searchInput.fill('test')
       await page.waitForTimeout(500)
@@ -276,7 +276,7 @@ test.describe('Execution Detail Page', () => {
       await page.waitForTimeout(1000)
 
       // Click back link
-      const backLink = page.getByRole('link', { name: /executions/i })
+      const backLink = page.getByRole('link', { name: /runs/i })
       if (
         await backLink
           .first()

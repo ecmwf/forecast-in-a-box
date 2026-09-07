@@ -370,7 +370,7 @@ describe('Graph Mode - Builder Integration', () => {
     await expect.element(screen.getByLabelText('Base time')).toBeVisible()
   })
 
-  it('shows "Select a block to configure" when no block is selected', async () => {
+  it('shows the empty configuration panel when no block is selected', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
@@ -380,9 +380,27 @@ describe('Graph Mode - Builder Integration', () => {
     store.setFable(createMultiBlockFable())
 
     // The config panel should show the placeholder
+    await expect.element(screen.getByText('Nothing selected')).toBeVisible()
+  })
+
+  it('"Add a source" opens a canvas picker that adds and selects a source', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Nothing selected')).toBeVisible()
+
+    await screen.getByRole('button', { name: 'Add a source' }).click()
+    const picker = screen.getByRole('dialog', { name: 'Add a source' })
+    await expect.element(picker).toBeVisible()
     await expect
-      .element(screen.getByText('Select a block to configure'))
+      .element(picker.getByPlaceholder('Search blocks...'))
       .toBeVisible()
+
+    await picker.getByRole('button').first().click()
+
+    await expect.element(picker).not.toBeInTheDocument()
+    expect(
+      Object.keys(useFableBuilderStore.getState().fable.blocks),
+    ).toHaveLength(1)
+    expect(useFableBuilderStore.getState().selectedBlockId).not.toBeNull()
   })
 
   it('shows input connections section for blocks with inputs', async () => {
@@ -421,20 +439,6 @@ describe('Graph Mode - Store State', () => {
     useFableBuilderStore.getState().reset()
   })
 
-  it('defaults to graph mode', () => {
-    const state = useFableBuilderStore.getState()
-    expect(state.mode).toBe('graph')
-  })
-
-  it('can switch between graph and form modes', () => {
-    const store = useFableBuilderStore.getState()
-    store.setMode('form')
-    expect(useFableBuilderStore.getState().mode).toBe('form')
-
-    useFableBuilderStore.getState().setMode('graph')
-    expect(useFableBuilderStore.getState().mode).toBe('graph')
-  })
-
   it('preserves layout direction preference', () => {
     const store = useFableBuilderStore.getState()
     store.setLayoutDirection('LR')
@@ -444,32 +448,12 @@ describe('Graph Mode - Store State', () => {
     expect(useFableBuilderStore.getState().layoutDirection).toBe('TB')
   })
 
-  it('supports toggling auto-layout', () => {
-    const store = useFableBuilderStore.getState()
-    expect(store.autoLayout).toBe(true) // default
-
-    store.setAutoLayout(false)
-    expect(useFableBuilderStore.getState().autoLayout).toBe(false)
-
-    useFableBuilderStore.getState().setAutoLayout(true)
-    expect(useFableBuilderStore.getState().autoLayout).toBe(true)
-  })
-
   it('supports toggling nodes locked', () => {
     const store = useFableBuilderStore.getState()
     expect(store.nodesLocked).toBe(true) // default
 
     store.setNodesLocked(false)
     expect(useFableBuilderStore.getState().nodesLocked).toBe(false)
-  })
-
-  it('supports edge style changes', () => {
-    const store = useFableBuilderStore.getState()
-    store.setEdgeStyle('smoothstep')
-    expect(useFableBuilderStore.getState().edgeStyle).toBe('smoothstep')
-
-    useFableBuilderStore.getState().setEdgeStyle('step')
-    expect(useFableBuilderStore.getState().edgeStyle).toBe('step')
   })
 
   it('increments fitViewTrigger when triggerFitView is called', () => {

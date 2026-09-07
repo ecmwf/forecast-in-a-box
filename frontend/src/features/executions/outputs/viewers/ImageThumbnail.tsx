@@ -42,14 +42,14 @@ export function ImageThumbnail({ item, adapter }: ThumbnailProps) {
 
   if (isError) {
     return (
-      <div className="flex aspect-video items-center justify-center rounded bg-muted">
+      <div className="flex aspect-video items-center justify-center rounded-md bg-muted">
         <ImageOff className="h-8 w-8 text-muted-foreground" />
       </div>
     )
   }
 
   return (
-    <div className="aspect-video overflow-hidden rounded bg-muted">
+    <div className="aspect-video overflow-hidden rounded-md bg-muted">
       {url ? (
         <img
           src={url}

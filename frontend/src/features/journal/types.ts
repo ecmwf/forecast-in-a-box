@@ -33,6 +33,8 @@ export interface ForecastRunViewModel {
   outputCount: number
   /** Produced outputs no longer retrievable; subset of {@link outputCount}. */
   lostOutputCount: number
+  /** Backend error text; set only for failed runs. */
+  errorMessage: string | null
   /** Sink-block titles — the kinds of output the configuration produces. */
   outputKinds: Array<string>
   /** User tags, system markers stripped. */
@@ -42,6 +44,10 @@ export interface ForecastRunViewModel {
   fromPreset: boolean
   /** Name of the schedule that produced this run, or null for one-off runs. */
   scheduleName: string | null
+  /** Id of that schedule, for linking to its page. */
+  scheduleId: string | null
+  /** Has a retained GRIB output the map can show; null when the source cannot tell. */
+  hasComparableOutput: boolean | null
   isBookmarked: boolean
 }
 

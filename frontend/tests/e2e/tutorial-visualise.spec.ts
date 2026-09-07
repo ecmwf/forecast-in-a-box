@@ -16,6 +16,7 @@
  */
 
 import { expect, test } from '@playwright/test'
+import { skipTour } from './fixtures'
 import type { Page } from '@playwright/test'
 
 const TUTORIALS_KEY = 'fiab.store.tutorials'
@@ -55,10 +56,7 @@ test.describe('Visualise guided tour', () => {
       page.getByRole('dialog', { name: 'Visualise forecasts on a map' }),
     ).toBeVisible()
 
-    await page.getByRole('button', { name: 'Skip tour', exact: true }).click()
-    await expect(
-      page.getByRole('dialog', { name: 'Visualise forecasts on a map' }),
-    ).toBeHidden()
+    await skipTour(page, 'Visualise forecasts on a map')
     // The entry point survives the dismissal, label unchanged.
     await expect(cta).toBeVisible()
 

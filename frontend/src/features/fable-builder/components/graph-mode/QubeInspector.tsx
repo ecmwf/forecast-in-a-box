@@ -90,12 +90,12 @@ function DimensionRow({
   }, [highlighted])
 
   return (
-    <li ref={ref} className={cn('rounded', highlighted && 'bg-primary/5')}>
+    <li ref={ref} className={cn('rounded-md', highlighted && 'bg-primary/5')}>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          'flex w-full items-center gap-2 rounded px-1 py-1.5 text-left transition-colors hover:bg-muted/50',
+          'flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left transition-colors hover:bg-muted/50',
           highlighted && 'ring-2 ring-primary/40',
         )}
       >
@@ -229,7 +229,7 @@ export function QubeInspector({
             type="button"
             onClick={onClose}
             aria-label={t('qubeLens.close')}
-            className="-mt-1 -mr-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="-mt-1 -mr-1 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <X className="size-4" />
           </button>
@@ -288,7 +288,7 @@ export function QubeInspector({
             type="button"
             onClick={() => setTab(option)}
             className={cn(
-              'flex-1 rounded px-2 py-1 transition-colors',
+              'flex-1 rounded-md px-2 py-1 transition-colors',
               tab === option
                 ? 'bg-background font-medium text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',

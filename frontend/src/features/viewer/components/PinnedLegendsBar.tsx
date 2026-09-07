@@ -59,7 +59,7 @@ export function PinnedLegendsBar({
           {shown.map(({ key, title, url }) => (
             <div
               key={key}
-              className="flex items-start gap-2 rounded border border-border bg-card px-2 py-2"
+              className="flex items-start gap-2 rounded-md border border-border bg-card px-2 py-2"
             >
               <div className="min-w-0 flex-1">
                 <P className="truncate text-xs font-medium" title={title}>

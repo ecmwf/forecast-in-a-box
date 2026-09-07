@@ -83,14 +83,12 @@ describe('Dashboard', () => {
       )
 
       await expect.element(screen.getByText('Manage Plugins')).toBeVisible()
-      await expect
-        .element(screen.getByText('Manage Job Executions'))
-        .toBeVisible()
+      await expect.element(screen.getByText('Manage Runs')).toBeVisible()
       await expect
         .element(screen.getByText('Manage Configuration Presets'))
         .toBeVisible()
       await expect
-        .element(screen.getByText('Manage Scheduled Forecasts'))
+        .element(screen.getByText('Manage Scheduled Runs'))
         .toBeVisible()
     })
 

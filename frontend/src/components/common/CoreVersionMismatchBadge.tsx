@@ -52,7 +52,7 @@ export function CoreVersionMismatchBadge({
       <TooltipTrigger className={cn('w-fit', className)}>
         <span
           className={cn(
-            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium',
+            'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium',
             'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
           )}
         >

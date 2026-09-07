@@ -89,7 +89,7 @@ export default defineConfig(({ mode }) => {
               // not duplicated into / bundled with individual route chunks.
               {
                 name: 'charts',
-                test: /node_modules[\\/](@tanstack[\\/](?:charts|react-charts)|d3-[^\\/]+)[\\/]/,
+                test: /node_modules[\\/](@tanstack[\\/]charts|d3-[^\\/]+)[\\/]/,
               },
               {
                 name: 'flow',

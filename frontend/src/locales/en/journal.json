@@ -1,8 +1,8 @@
 {
-  "title": "Forecast Journal",
+  "title": "Recent runs",
   "searchPlaceholder": "Search or filter, e.g. tag:production",
-  "empty": "No forecasts found matching your criteria.",
-  "viewAll": "View all",
+  "empty": "No runs match your filters.",
+  "viewAll": "View all runs",
   "clearFilters": "Clear filters",
   "flowToggle": "Flow preview",
   "filters": {
@@ -72,7 +72,12 @@
     "delete": "Delete",
     "preset": "Preset",
     "scheduled": "Scheduled",
-    "moreOptions": "More options"
+    "moreOptions": "More options",
+    "openSchedule": "Open schedule",
+    "filterBySchedule": "Show runs of schedule {{name}}",
+    "compareWithPrevious": "Compare with previous run",
+    "select": "Select {{name}}",
+    "notComparable": "No stored GRIB output to show on the map"
   },
   "metadata": {
     "title": "Edit run details",
@@ -99,6 +104,19 @@
     "removedFromPreset": "Removed from configuration presets",
     "presetFailed": "Could not update preset",
     "runDeleted": "Run deleted",
-    "deleteFailed": "Could not delete run"
+    "deleteFailed": "Could not delete run",
+    "noPreviousRun": "No earlier completed run of this schedule to compare with",
+    "noGribOutput": "Neither run has a stored GRIB output to show on the map",
+    "compareFailed": "Could not prepare the comparison"
+  },
+  "noRunsYet": "No runs yet",
+  "configureForecast": "Configure a forecast",
+  "compare": {
+    "selectTwoHint": "Tick two completed runs to compare them on the map",
+    "selectedCount_one": "{{count}} run selected",
+    "selectedCount_other": "{{count}} runs selected",
+    "compareSelected": "Compare selected",
+    "clear": "Clear",
+    "noOutput": "Neither run has a stored GRIB output to show on the map"
   }
 }

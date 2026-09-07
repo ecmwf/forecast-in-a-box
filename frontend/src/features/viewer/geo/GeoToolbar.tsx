@@ -69,7 +69,7 @@ const log = createLogger('GeoToolbar')
 function KeyBadge({ label, show }: { label: string; show: boolean }) {
   if (!show) return null
   return (
-    <kbd className="absolute -top-1.5 -right-1.5 z-10 rounded border border-border bg-foreground px-1 font-mono text-[9px] leading-4 text-background shadow-sm">
+    <kbd className="absolute -top-1.5 -right-1.5 z-10 rounded-md border border-border bg-foreground px-1 font-mono text-[9px] leading-4 text-background shadow-sm">
       {label}
     </kbd>
   )
@@ -320,7 +320,7 @@ export function GeoToolbar({
                     onClick={() => onBasemapChange(b.id)}
                     aria-pressed={b.id === basemapId}
                     className={cn(
-                      'flex items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent',
+                      'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent',
                       b.id === basemapId && 'bg-accent font-medium',
                     )}
                   >
@@ -393,7 +393,7 @@ export function GeoToolbar({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="-ml-1 h-7 w-4"
+                    className="-ml-1 h-7 w-6"
                     title={t('measure.shapeMenu')}
                     aria-label={t('measure.shapeMenu')}
                   />
@@ -440,7 +440,7 @@ export function GeoToolbar({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="-ml-1 h-7 w-4"
+                    className="-ml-1 h-7 w-6"
                     title={t('annotations.options')}
                     aria-label={t('annotations.options')}
                   />
@@ -493,7 +493,7 @@ export function GeoToolbar({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="-ml-1 h-7 w-4"
+                      className="-ml-1 h-7 w-6"
                       title={t('toolbar.copyOptions')}
                       aria-label={t('toolbar.copyOptions')}
                     />
@@ -514,14 +514,15 @@ export function GeoToolbar({
           </span>
           <Button
             variant="ghost"
-            size="icon"
-            className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+            size="sm"
+            className="relative h-7 gap-1.5 px-2 pointer-coarse:h-11"
             onClick={onExport}
             title={`${t('export.open')} (${keyLabel(COMPARE_KEYS.export)})`}
             aria-label={t('export.open')}
           >
             <KeyBadge label={keyLabel(COMPARE_KEYS.export)} show={reveal} />
             <Download className="h-4 w-4" />
+            {t('export.label')}
           </Button>
           {/* Magnifier split-button: click latches, chevron opens settings. */}
           <span className="flex items-center">
@@ -545,7 +546,7 @@ export function GeoToolbar({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="-ml-1 h-7 w-4"
+                    className="-ml-1 h-7 w-6"
                     title={t('modes.loupeOptions')}
                     aria-label={t('modes.loupeOptions')}
                   />

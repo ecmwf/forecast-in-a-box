@@ -19,7 +19,7 @@ import { motion } from '@tanstack/charts/motion'
 import { scaleBand } from '@tanstack/charts/scales/band'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { tooltip } from '@tanstack/charts/tooltip'
-import { RendererChart } from '@tanstack/react-charts/tooltip'
+import { RendererChart } from '@tanstack/charts/react/tooltip'
 
 /** One bucket per month: `month` label and forecast `count`. */
 interface MonthBucket {
@@ -88,16 +88,19 @@ export default function RunActivityChart({
             motion: { transition: SPRING },
           }),
         ],
-        x: {
-          scale: () => scaleBand<string>().paddingInner(0.25).paddingOuter(0.1),
-          // No axis line, no tick stubs — month labels only.
-          axis: {
-            line: false,
-            ticks: { size: 0, padding: 6 },
-            tickLabels: { fontSize: 11, opacity: 0.7 },
+        scales: {
+          x: {
+            scale: () =>
+              scaleBand<string>().paddingInner(0.25).paddingOuter(0.1),
+            // No axis line, no tick stubs — month labels only.
+            axis: {
+              line: false,
+              ticks: { size: 0, padding: 6 },
+              tickLabels: { fontSize: 11, opacity: 0.7 },
+            },
           },
+          y: { scale: scaleLinear, grid: true, axis: false },
         },
-        y: { scale: scaleLinear, grid: true, axis: false },
         gradients: [
           {
             id: 'activity-bars',

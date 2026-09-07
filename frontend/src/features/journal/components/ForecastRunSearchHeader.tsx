@@ -18,10 +18,14 @@ import { GroupBySelect } from '@/features/journal/grouping/GroupBySelect'
 import { useUiStore } from '@/stores/uiStore'
 import { H2 } from '@/components/base/typography'
 import { Switch } from '@/components/ui/switch'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 
 interface ForecastRunSearchHeaderProps {
-  title: string
+  /** Omit when the page header already names the list. */
+  title?: string
+  /** Per-filter counts shown beside the labels. */
+  counts?: Partial<Record<RunFilter, number>>
   query: string
   onQueryChange: (query: string) => void
   activeFilter: RunFilter
@@ -39,6 +43,7 @@ export function ForecastRunSearchHeader({
   activeFilter,
   onFilterChange,
   filters,
+  counts,
   groupBy,
   onGroupByChange,
 }: ForecastRunSearchHeaderProps) {
@@ -47,10 +52,16 @@ export function ForecastRunSearchHeader({
   const setShowFlow = useUiStore((state) => state.setJournalShowFlow)
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border p-4 sm:p-6">
-      {/* Title + flow-preview toggle */}
-      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
-        <H2 className="text-xl font-semibold">{title}</H2>
+    <div
+      className={cn(
+        'flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border p-4 sm:p-6',
+        title ? 'justify-between' : 'justify-end',
+      )}
+    >
+      {title && <H2 className="shrink-0 text-xl font-semibold">{title}</H2>}
+
+      {/* Controls — flow toggle, search, status filters, group-by. Filters wrap rather than hide. */}
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:w-auto sm:justify-end">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <span>{t('flowToggle')}</span>
           <Switch
@@ -59,34 +70,42 @@ export function ForecastRunSearchHeader({
             aria-label={t('flowToggle')}
           />
         </div>
-      </div>
-
-      {/* Controls — search, status filters, group-by. Filters wrap rather than hide. */}
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:w-auto sm:justify-end">
         <FacetSearchBar value={query} onChange={onQueryChange} />
 
-        <div
-          role="group"
+        <ToggleGroup
+          value={[activeFilter]}
+          onValueChange={(values) => {
+            // Base UI single-select is still string[]; ignore empty (re-click).
+            const next = values[0]
+            if (next) onFilterChange(next as RunFilter)
+          }}
+          variant="outline"
+          size="sm"
           aria-label={t('filters.label')}
-          className="flex min-w-0 flex-wrap items-center gap-1 text-sm font-medium text-muted-foreground"
         >
-          {filters.map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              aria-pressed={activeFilter === filter}
-              onClick={() => onFilterChange(filter)}
-              className={cn(
-                'rounded-md px-3 py-1.5 whitespace-nowrap transition-colors',
-                activeFilter === filter
-                  ? 'bg-primary/10 text-primary'
-                  : 'hover:bg-muted',
-              )}
-            >
-              {t(`filters.${filter}`)}
-            </button>
-          ))}
-        </div>
+          {filters.map((filter) => {
+            const count = counts?.[filter]
+            return (
+              <ToggleGroupItem
+                key={filter}
+                value={filter}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 whitespace-nowrap"
+              >
+                {t(`filters.${filter}`)}
+                {count !== undefined && (
+                  <span
+                    aria-hidden
+                    className="font-mono text-xs text-muted-foreground tabular-nums"
+                  >
+                    {count}
+                  </span>
+                )}
+              </ToggleGroupItem>
+            )
+          })}
+        </ToggleGroup>
 
         {groupBy !== undefined && onGroupByChange && (
           <div className="hidden lg:flex">

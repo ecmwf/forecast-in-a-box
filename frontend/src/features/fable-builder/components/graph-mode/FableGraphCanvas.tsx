@@ -25,15 +25,14 @@ import '@xyflow/react/dist/style.css'
 import { FableEdgeComponent } from './FableEdge'
 import { BlockNode } from './nodes/BlockNode'
 import { BlockDragPreview } from './BlockDragPreview'
+import { AddSourcePopover } from './AddSourcePopover'
+import { CanvasStatus } from './CanvasStatus'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type { Connection, Edge, EdgeTypes, NodeTypes } from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
 import type { FableNode } from './nodes/BlockNode'
 import { getFactory } from '@/api/types/fable.types'
-import {
-  layoutNodes,
-  needsLayout,
-} from '@/features/fable-builder/utils/layout-blocks'
+import { layoutNodes } from '@/features/fable-builder/utils/layout-blocks'
 import { fableToGraph } from '@/features/fable-builder/utils/fable-to-graph'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useSidebarBlockDrop } from '@/features/fable-builder/hooks/useSidebarBlockDrop'
@@ -65,7 +64,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
   // Use individual selectors to avoid creating new objects on every render
   const fable = useFableBuilderStore((state) => state.fable)
-  const autoLayout = useFableBuilderStore((state) => state.autoLayout)
+  const layoutTrigger = useFableBuilderStore((state) => state.layoutTrigger)
   const layoutDirection = useFableBuilderStore((state) => state.layoutDirection)
   const nodesLocked = useFableBuilderStore((state) => state.nodesLocked)
   const isMiniMapOpen = useFableBuilderStore((state) => state.isMiniMapOpen)
@@ -85,13 +84,14 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const [sourceAnchor, setSourceAnchor] = useState<HTMLDivElement | null>(null)
   // Current selection mirrored into a ref so the layout effect can re-apply
   // it on a block-driven rebuild without depending on it (which would force a
   // full re-layout on every selection change).
   const selectedBlockIdRef = useRef(selectedBlockId)
   selectedBlockIdRef.current = selectedBlockId
   const prevBlocksRef = useRef<typeof fable.blocks | null>(null)
-  const prevAutoLayoutRef = useRef(autoLayout)
+  const prevLayoutTriggerRef = useRef(layoutTrigger)
   const prevLayoutDirectionRef = useRef(layoutDirection)
   const hasInitializedViewportRef = useRef<boolean>(false)
   const lastBlockCountRef = useRef<number>(0)
@@ -158,27 +158,24 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     // changes if and only if the blocks content changes.
     const blocksChanged = fable.blocks !== prevBlocksRef.current
     const layoutChanged =
-      autoLayout !== prevAutoLayoutRef.current ||
+      layoutTrigger !== prevLayoutTriggerRef.current ||
       layoutDirection !== prevLayoutDirectionRef.current
 
     if (!blocksChanged && !layoutChanged) return
 
     prevBlocksRef.current = fable.blocks
-    prevAutoLayoutRef.current = autoLayout
+    prevLayoutTriggerRef.current = layoutTrigger
     prevLayoutDirectionRef.current = layoutDirection
 
     const { nodes: newNodes, edges: newEdges } = fableToGraph(fable, catalogue)
 
     const dimensions = measuredDimensions()
-    const shouldLayout = autoLayout || needsLayout(newNodes)
-    const layouted = shouldLayout
-      ? layoutNodes(
-          newNodes,
-          newEdges,
-          { direction: layoutDirection },
-          dimensions,
-        )
-      : newNodes
+    const layouted = layoutNodes(
+      newNodes,
+      newEdges,
+      { direction: layoutDirection },
+      dimensions,
+    )
 
     // Detect preset load: going from 0 blocks to multiple blocks
     // In this case, reset the viewport initialization to reposition the graph
@@ -191,7 +188,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
     // Unmeasured nodes → post-mount relayout; full replacements also hide.
     const unmeasured = layouted.filter((node) => !(node.id in dimensions))
-    const anyNew = shouldLayout && unmeasured.length > 0
+    const anyNew = unmeasured.length > 0
     setMeasurePending(anyNew)
     setSettling(anyNew && unmeasured.length === layouted.length)
 
@@ -208,7 +205,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   }, [
     fable,
     catalogue,
-    autoLayout,
+    layoutTrigger,
     layoutDirection,
     measuredDimensions,
     setNodes,
@@ -393,9 +390,16 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   return (
     <div
       ref={containerRef}
-      className="h-full w-full"
+      className="relative h-full w-full"
       {...tourAttr(TOUR.configure.canvas)}
     >
+      {/* Hangs the source picker off the upper third of the canvas. */}
+      <div
+        ref={setSourceAnchor}
+        aria-hidden
+        className="pointer-events-none absolute top-1/3 left-1/2 h-px w-px"
+      />
+      <AddSourcePopover anchor={sourceAnchor} catalogue={catalogue} />
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -431,6 +435,9 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           position="bottom-left"
           className="bottom-2! left-2!"
         />
+        {isDesktop && (
+          <CanvasStatus nodeCount={nodes.length} edgeCount={edges.length} />
+        )}
         {isMiniMapOpen && isDesktop && (
           <MiniMap
             nodeStrokeWidth={3}

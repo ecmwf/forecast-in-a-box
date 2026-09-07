@@ -198,13 +198,14 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
           <div className="border-t border-border px-2 py-1">
             {configEntries.map(([key, value]) => {
               // Show what the run used; the template stays reachable on hover.
-              const asRun = resolved?.[key]
+              // A null as-run value has nothing to show over the template.
+              const asRun = resolved?.[key] ?? undefined
               const display = asRun ?? value
               const fromTemplate = asRun !== undefined && asRun !== value
               // The column truncates early, so anything longer needs the hover.
               const needsHover = fromTemplate || display.length > 12
               const valueClass = cn(
-                'max-w-[100px] truncate text-right font-mono text-xs',
+                'max-w-[100px] truncate text-right font-mono text-sm',
                 // Marks a value that came from a variable; costs no width in a
                 // column that already truncates.
                 fromTemplate &&
@@ -215,7 +216,7 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
                   key={key}
                   className="flex items-baseline justify-between gap-1 py-px"
                 >
-                  <span className="shrink-0 text-xs text-muted-foreground">
+                  <span className="shrink-0 text-sm text-muted-foreground">
                     {configOptions[key].title}
                   </span>
                   {needsHover ? (

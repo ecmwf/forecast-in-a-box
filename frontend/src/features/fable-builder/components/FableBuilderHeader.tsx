@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   ArrowLeft,
   BrushCleaning,
@@ -21,7 +21,6 @@ import {
   Play,
   Redo2,
   Save,
-  Share2,
   Undo2,
   Upload,
 } from 'lucide-react'
@@ -38,6 +37,9 @@ import type {
 } from '@/api/types/fable.types'
 import { getBlocksByKind } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import { useFableRetrieve } from '@/api/hooks/useFable'
+import { stripSystemTags } from '@/lib/system-tags'
+import { Badge } from '@/components/ui/badge'
 import { shelveBenchIfDirty } from '@/features/fable-builder/stores/workbenchShelfStore'
 import { downloadFableJson } from '@/features/fable-builder/utils/export-config'
 import { useUndoRedoShortcuts } from '@/features/fable-builder/hooks/useUndoRedoShortcuts'
@@ -50,7 +52,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { H1 } from '@/components/base/typography'
-import { copyToClipboard } from '@/lib/utils'
 import { showToast } from '@/lib/toast'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import {
@@ -66,21 +67,18 @@ interface FableBuilderHeaderProps {
   onConfigLoaded?: () => void
 }
 
+/** Tags shown in the header before folding the rest into a +N. */
+const VISIBLE_TAG_COUNT = 3
+
 export function FableBuilderHeader({
   fableId,
   catalogue,
   onConfigLoaded,
 }: FableBuilderHeaderProps) {
   const { t } = useTranslation('configure')
-  const [shareButtonText, setShareButtonText] = useState(() =>
-    t('header.share'),
-  )
   const [savePopoverOpen, setSavePopoverOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const shareTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  useEffect(() => () => clearTimeout(shareTimeoutRef.current), [])
 
   const step = useFableBuilderStore((s) => s.step)
   const fableName = useFableBuilderStore((s) => s.fableName)
@@ -102,10 +100,12 @@ export function FableBuilderHeader({
   // the review step is read-only, undo there would be misleading.
   useUndoRedoShortcuts(step === 'edit')
 
-  const blockCount = Object.keys(fable.blocks).length
   const isValid = validationState?.isValid ?? false
-  const hasBlocks = blockCount > 0
+  const hasBlocks = Object.keys(fable.blocks).length > 0
   const isExistingConfig = !!(fableId || storeFableId)
+  const { data: blueprint } = useFableRetrieve(fableId ?? storeFableId)
+  const tags = stripSystemTags(blueprint?.tags)
+  const hiddenTagCount = Math.max(0, tags.length - VISIBLE_TAG_COUNT)
   const hasSinkBlock = getBlocksByKind(fable, catalogue, 'sink').length > 0
   const canReview = isValid && hasSinkBlock
 
@@ -121,20 +121,6 @@ export function FableBuilderHeader({
   // Routes through the fresh intent — dirty bench work parks on the shelf.
   function handleNewConfiguration(): void {
     void navigate({ to: '/configure', search: { fresh: true } })
-  }
-
-  async function handleShare(): Promise<void> {
-    const ok = await copyToClipboard(window.location.href)
-    if (!ok) {
-      showToast.error(t('header.shareFailed'))
-      return
-    }
-    setShareButtonText(t('header.shareCopied'))
-    clearTimeout(shareTimeoutRef.current)
-    shareTimeoutRef.current = setTimeout(
-      () => setShareButtonText(t('header.share')),
-      2000,
-    )
   }
 
   function handleReview(): void {
@@ -255,9 +241,29 @@ export function FableBuilderHeader({
                 </H1>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{t('blockCount', { count: blockCount })}</span>
                 {hasBlocks && <ValidationStatusBadge catalogue={catalogue} />}
                 <DraftStatus className="hidden sm:inline-flex" />
+                {tags.length > 0 && (
+                  <span className="hidden min-w-0 items-center gap-1 sm:flex">
+                    {tags.slice(0, VISIBLE_TAG_COUNT).map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="max-w-32 truncate font-normal text-muted-foreground"
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                    {hiddenTagCount > 0 && (
+                      <span
+                        className="text-xs"
+                        title={tags.slice(VISIBLE_TAG_COUNT).join(', ')}
+                      >
+                        {t('header.moreTags', { count: hiddenTagCount })}
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -321,53 +327,44 @@ export function FableBuilderHeader({
                     </TooltipContent>
                   </Tooltip>
 
-                  {/* Save Config with dropdown for more actions */}
-                  <ButtonGroup>
-                    <SaveConfigPopover
-                      fableId={fableId}
-                      catalogue={catalogue}
-                      disabled={!hasBlocks}
-                    />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 border-l-0"
-                          />
-                        }
+                  {/* File: share, export, load. */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1"
+                        />
+                      }
+                    >
+                      {t('header.file')}
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-37.5">
+                      <DropdownMenuItem
+                        onClick={handleExportConfig}
+                        disabled={!hasBlocks}
                       >
-                        <MoreVertical className="h-4 w-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-37.5">
-                        <DropdownMenuItem
-                          onClick={handleShare}
-                          disabled={!hasBlocks}
-                        >
-                          <Share2 className="mr-2 h-4 w-4 shrink-0" />
-                          <span className="whitespace-nowrap">
-                            {shareButtonText}
-                          </span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={handleExportConfig}
-                          disabled={!hasBlocks}
-                        >
-                          <Download className="mr-2 h-4 w-4 shrink-0" />
-                          <span className="whitespace-nowrap">
-                            {t('header.exportConfig')}
-                          </span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleLoadConfig}>
-                          <Upload className="mr-2 h-4 w-4 shrink-0" />
-                          <span className="whitespace-nowrap">
-                            {t('header.loadConfig')}
-                          </span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </ButtonGroup>
+                        <Download className="mr-2 h-4 w-4 shrink-0" />
+                        <span className="whitespace-nowrap">
+                          {t('header.exportConfig')}
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleLoadConfig}>
+                        <Upload className="mr-2 h-4 w-4 shrink-0" />
+                        <span className="whitespace-nowrap">
+                          {t('header.loadConfig')}
+                        </span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <SaveConfigPopover
+                    fableId={fableId}
+                    catalogue={catalogue}
+                    disabled={!hasBlocks}
+                  />
 
                   {/* Primary runs once (skipping review); caret holds the
                       review/schedule paths. Tooltip wraps the whole group, not
@@ -446,15 +443,6 @@ export function FableBuilderHeader({
                       <Redo2 className="mr-2 h-4 w-4 shrink-0" />
                       <span className="whitespace-nowrap">
                         {t('header.redo')}
-                      </span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handleShare}
-                      disabled={!hasBlocks}
-                    >
-                      <Share2 className="mr-2 h-4 w-4 shrink-0" />
-                      <span className="whitespace-nowrap">
-                        {shareButtonText}
                       </span>
                     </DropdownMenuItem>
                     <DropdownMenuItem

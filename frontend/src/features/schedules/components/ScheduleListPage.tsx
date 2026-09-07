@@ -11,11 +11,13 @@
 /** The schedules list — enabled/disabled tabs, faceted search and pagination. */
 
 import { useState } from 'react'
-import { Clock } from 'lucide-react'
+import { Clock, Play } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 import { ScheduleListItem } from './ScheduleListItem'
 import type { ScheduleDefinitionResponse } from '@/api/types/schedule.types'
 import type { ParsedQuery } from '@/features/journal/facets/facet-types'
+import { Button } from '@/components/ui/button'
 import { useSchedules } from '@/api/hooks/useSchedules'
 import { FacetSearchBar } from '@/features/journal/facets/FacetSearchBar'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
@@ -26,9 +28,7 @@ import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Pagination } from '@/components/common/Pagination'
-import { H2 } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
-import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 10
@@ -61,8 +61,6 @@ function filterSchedules(
 
 export function ScheduleListPage() {
   const { t } = useTranslation('schedules')
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const [page, setPage] = useState(1)
   const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all')
   const [query, setQuery] = useState('')
@@ -111,16 +109,23 @@ export function ScheduleListPage() {
 
   return (
     <ListPageContainer>
-      <PageHeader title={t('page.title')} description={t('page.description')} />
+      <PageHeader
+        title={t('page.title')}
+        description={t('page.description')}
+        actions={
+          <Button
+            variant="outline"
+            nativeButton={false}
+            render={<Link to="/execute" />}
+          >
+            <Play />
+            {t('page.runsLink')}
+          </Button>
+        }
+      />
 
-      <Card
-        className="overflow-hidden"
-        variant={dashboardVariant}
-        shadow={panelShadow}
-      >
-        <div className="flex flex-col items-start justify-between gap-4 border-b border-border p-6 sm:flex-row sm:items-center">
-          <H2 className="text-xl font-semibold">{t('page.title')}</H2>
-
+      <Card className="overflow-hidden">
+        <div className="flex flex-col items-start justify-end gap-4 border-b border-border p-6 sm:flex-row sm:items-center">
           {/* Faceted search — shared with the Forecast Journal — plus tabs. */}
           <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:w-auto sm:justify-end">
             <FacetSearchBar value={query} onChange={setQuery} />

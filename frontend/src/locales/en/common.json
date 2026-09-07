@@ -30,7 +30,7 @@
   "activity": {
     "label": "Notification Center",
     "title": "Notification Center",
-    "help": "Shows long-running tasks such as model downloads, plugin installations, and forecast job executions. Completed items stay here until you dismiss them.",
+    "help": "Shows long-running tasks such as model downloads, plugin installations, and forecast runs. Completed items stay here until you dismiss them.",
     "clear": "Clear",
     "clearAll": "Clear all",
     "empty": "No notifications",
@@ -41,7 +41,7 @@
     "filterPlaceholder": "Filter notifications…",
     "noMatches": "No matches",
     "dismiss": "Dismiss",
-    "viewAll": "Open executions",
+    "viewAll": "Open runs",
     "downloadStarting": "Starting download...",
     "downloadProgress": "Downloading {{progress}}%",
     "downloadComplete": "Download complete",
@@ -111,17 +111,10 @@
     "help": "Help",
     "settings": "Settings",
     "view": "View",
-    "fluidLayout": "Fluid Layout",
-    "boxedLayout": "Boxed Layout",
     "theme": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
     "themeSystem": "System",
-    "cardStyle": "Card Style",
-    "cardDefault": "Default",
-    "cardFlat": "Flat",
-    "cardModern": "Modern",
-    "cardGradient": "Gradient",
     "timezone": "Timezone",
     "welcomeTour": "Show welcome tour",
     "helpSupport": "Help & Support",
@@ -135,17 +128,19 @@
     "globalVariables": "Global Variables",
     "signOut": "Sign Out",
     "timezoneDialogTitle": "Application timezone",
-    "timezoneDialogDescription": "All dates and times — including forecast base times — are shown and entered in this timezone. Defaults to UTC."
+    "timezoneDialogDescription": "All dates and times — including forecast base times — are shown and entered in this timezone. Defaults to UTC.",
+    "schedules": "Scheduled runs"
   },
   "commandPalette": {
     "title": "Command Palette",
     "description": "Search for a command to run...",
-    "placeholder": "Type a command or search...",
+    "placeholder": "Search pages, presets, runs and blocks...",
     "empty": "No results found.",
     "navigate": "navigate",
     "select": "select",
     "close": "close",
-    "esc": "Esc"
+    "esc": "Esc",
+    "open": "Search and commands"
   },
   "commands": {
     "newConfiguration": {
@@ -164,7 +159,7 @@
     },
     "executions": {
       "label": "Execute",
-      "description": "Monitor forecast job executions"
+      "description": "Monitor forecast runs"
     },
     "admin": {
       "label": "Admin",
@@ -173,6 +168,21 @@
     "visualise": {
       "label": "Visualise",
       "description": "View and compare geo outputs on a map"
+    },
+    "categoryPresets": "Presets",
+    "categoryRuns": "Recent runs",
+    "categoryBlocks": "Blocks",
+    "preset": {
+      "description": "Open in Configure"
+    },
+    "template": {
+      "description": "Plugin template"
+    },
+    "run": {
+      "untitled": "Untitled run"
+    },
+    "addBlock": {
+      "description": "Add to the canvas"
     }
   },
   "timezone": {

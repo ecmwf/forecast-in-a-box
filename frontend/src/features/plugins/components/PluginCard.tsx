@@ -24,7 +24,6 @@ import { PluginDiagnostics } from './PluginDiagnostics'
 import { PluginIcon } from './PluginIcon'
 import { PluginStatusBadge } from './PluginStatusBadge'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -49,8 +48,6 @@ interface PluginCardProps {
   onUpdate: (compositeId: PluginCompositeId) => void
   onViewDetails?: (plugin: PluginInfo) => void
   isInstalling?: boolean
-  variant?: DashboardVariant
-  shadow?: PanelShadow
 }
 
 export function PluginCard({
@@ -62,8 +59,6 @@ export function PluginCard({
   onUpdate,
   onViewDetails,
   isInstalling,
-  variant,
-  shadow,
 }: PluginCardProps) {
   const { t } = useTranslation('plugins')
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
@@ -95,8 +90,6 @@ export function PluginCard({
             ? 'border-amber-200 dark:border-amber-800'
             : 'border-red-200 dark:border-red-800'),
       )}
-      variant={variant}
-      shadow={shadow}
     >
       {/* Header */}
       <div
@@ -176,14 +169,14 @@ export function PluginCard({
       >
         {plugin.version ? (
           // Installed plugin: show installed version
-          <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
             {t('item.version', { version: plugin.version })}
           </span>
         ) : (
           // Available plugin: show latest version (hide if unknown)
           plugin.latestVersion &&
           plugin.latestVersion !== 'unknown' && (
-            <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
               {t('item.version', { version: plugin.latestVersion })}
             </span>
           )
@@ -191,7 +184,7 @@ export function PluginCard({
         {plugin.latestVersion &&
           plugin.version &&
           plugin.latestVersion !== plugin.version && (
-            <span className="inline-flex items-center gap-1.5 rounded bg-amber-100 px-2 py-0.5 font-mono text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-100 px-2 py-0.5 font-mono text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
               {t('card.versionArrow', { version: plugin.latestVersion })}
             </span>
           )}

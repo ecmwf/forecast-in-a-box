@@ -340,7 +340,7 @@ export function CompilationPanel({
               maskColor="rgba(0, 0, 0, 0.06)"
               pannable
               zoomable
-              className="right-2! bottom-2! h-[80px]! w-[120px]! rounded border border-border bg-background/80 shadow-sm"
+              className="right-2! bottom-2! h-[80px]! w-[120px]! rounded-md border border-border bg-background/80 shadow-sm"
             />
             <Controls
               showInteractive={false}
@@ -415,12 +415,12 @@ function TaskInlineDetails({
             <span className="truncate text-sm font-medium">
               {humanised.headline}
             </span>
-            <span className="ml-1 text-xs text-muted-foreground">
+            <span className="ml-1 text-sm text-muted-foreground">
               · {t(`compilation.taskKind.${meta.labelKey}`)}
             </span>
           </div>
           {humanised.modulePath && (
-            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+            <p className="mt-0.5 font-mono text-sm text-muted-foreground">
               {humanised.modulePath}
             </p>
           )}
@@ -428,14 +428,14 @@ function TaskInlineDetails({
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+          className="shrink-0 text-sm text-muted-foreground hover:text-foreground"
         >
           {t('compilation.close')}
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
         <Field label={t('compilation.fields.taskId')}>
-          <code className="block rounded bg-muted px-1.5 py-1 font-mono text-[11px] break-all">
+          <code className="block rounded-md bg-muted px-1.5 py-1 font-mono text-xs break-all">
             {task.task_id}
           </code>
         </Field>
@@ -450,7 +450,7 @@ function TaskInlineDetails({
                   <li key={parent} className="truncate" title={parent}>
                     {p.headline}
                     {p.hashChip && (
-                      <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                      <span className="ml-1 font-mono text-xs text-muted-foreground">
                         · {p.hashChip}
                       </span>
                     )}
@@ -474,7 +474,7 @@ function Field({
 }) {
   return (
     <div>
-      <div className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+      <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </div>
       <div className="mt-0.5">{children}</div>

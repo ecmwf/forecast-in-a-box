@@ -48,6 +48,9 @@ export const SLOT_CHIP_CLASS: Record<SourceSlot, string> = {
   b: 'bg-slot-b/15 text-orange-700 dark:bg-slot-b/20 dark:text-orange-300',
 }
 
+/** Catalogs at least this large may open grouped. */
+const AUTO_GROUP_MIN_LAYERS = 12
+
 /** groupByTitlePrefix, or one flat pass-through cluster when toggled off. */
 function titleClusters<T>(
   items: ReadonlyArray<T>,
@@ -98,8 +101,18 @@ export function GeoLayerBrowser({
   const [search, setSearch] = useState('')
   const [slotFilter, setSlotFilter] = useState<SlotFilter>('all')
   const [selectedLevels, setSelectedLevels] = useState<Set<number>>(new Set())
-  // Flat by default — prefix grouping fragments mixed catalogs; opt in via the toggle.
-  const [grouped, setGrouped] = useState(false)
+  // Grouped by default only when the catalog clearly clusters (e.g. one
+  // run stamp per layer batch); mixed catalogs stay flat. Toggle overrides.
+  const [groupedOverride, setGroupedOverride] = useState<boolean | null>(null)
+  const autoGrouped = useMemo(() => {
+    if (pairs.length < AUTO_GROUP_MIN_LAYERS) return false
+    const clustered = groupByTitlePrefix(pairs, (pair) => pair.title)
+      .filter((group) => group.prefix !== null)
+      .reduce((n, group) => n + group.items.length, 0)
+    return clustered * 2 >= pairs.length
+  }, [pairs])
+  const grouped = groupedOverride ?? autoGrouped
+  const setGrouped = (next: boolean) => setGroupedOverride(next)
   const query = search.trim().toLowerCase()
 
   // Per-panel selection browses one catalog at a time: "All" would
@@ -148,7 +161,7 @@ export function GeoLayerBrowser({
             onClick={onCollapse}
             title={tExec('lens.collapseSidebar')}
             aria-label={tExec('lens.collapseSidebar')}
-            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
@@ -157,12 +170,12 @@ export function GeoLayerBrowser({
           </P>
           <button
             type="button"
-            onClick={() => setGrouped((v) => !v)}
+            onClick={() => setGrouped(!grouped)}
             aria-pressed={grouped}
             title={t('browser.groupToggle')}
             aria-label={t('browser.groupToggle')}
             className={cn(
-              'ml-auto rounded p-0.5 hover:bg-accent hover:text-foreground',
+              'ml-auto flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-foreground',
               grouped ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
@@ -229,7 +242,7 @@ export function GeoLayerBrowser({
                   onClick={() => toggleLevel(level)}
                   aria-pressed={active}
                   className={cn(
-                    'rounded border px-1.5 py-0.5 font-mono text-xs',
+                    'rounded-md border px-1.5 py-0.5 font-mono text-xs',
                     active
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-border hover:bg-accent',
@@ -483,7 +496,7 @@ function PairGroupRow({
         </div>
         <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           {activeCount > 0 && (
-            <span className="rounded bg-primary/10 px-1 font-mono text-primary">
+            <span className="rounded-md bg-primary/10 px-1 font-mono text-primary">
               {activeCount}
             </span>
           )}
@@ -537,7 +550,7 @@ function PairRow({
       data-source-slots={`${pair.perSource.a ? 'a' : ''}${pair.perSource.b ? 'b' : ''}`}
       data-time-aware={pairIsStatic(pair) ? undefined : ''}
       className={cn(
-        'flex w-full items-center gap-2 rounded text-left transition-colors hover:bg-accent',
+        'flex w-full items-center gap-2 rounded-md text-left transition-colors hover:bg-accent',
         compact ? 'px-1.5 py-1' : 'px-2 py-1.5',
         active && 'bg-primary/10 hover:bg-primary/15',
       )}
@@ -577,7 +590,7 @@ function PairRow({
                 : t('link.notAvailableIn', { slot: slot.toUpperCase() })
             }
             className={cn(
-              'flex h-4 w-4 items-center justify-center rounded font-mono text-[10px] font-bold',
+              'flex h-4 w-4 items-center justify-center rounded-md font-mono text-[10px] font-bold',
               chipPair.perSource[slot]
                 ? SLOT_CHIP_CLASS[slot]
                 : 'border border-dashed border-border text-muted-foreground/60',
@@ -632,7 +645,7 @@ function UnlinkedSourceSection({
       <SectionHeading>
         <span
           className={cn(
-            'mr-1.5 inline-flex h-4 w-4 items-center justify-center rounded font-mono text-[10px] font-bold',
+            'mr-1.5 inline-flex h-4 w-4 items-center justify-center rounded-md font-mono text-[10px] font-bold',
             SLOT_CHIP_CLASS[slot],
           )}
         >
@@ -669,7 +682,7 @@ function UnlinkedSourceSection({
                   data-source-slots={slot}
                   data-time-aware={layerIsTimeAware(layer) ? '' : undefined}
                   className={cn(
-                    'flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-accent',
+                    'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-accent',
                     active && 'bg-primary/10',
                   )}
                 >
@@ -785,7 +798,7 @@ function TitlePrefixGroup({
         </P>
         <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           {activeCount > 0 && (
-            <span className="rounded bg-primary/10 px-1 font-mono text-primary">
+            <span className="rounded-md bg-primary/10 px-1 font-mono text-primary">
               {activeCount}
             </span>
           )}

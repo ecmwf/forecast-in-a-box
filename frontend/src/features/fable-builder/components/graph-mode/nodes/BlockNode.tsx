@@ -243,7 +243,7 @@ export const BlockNode = memo(function ({
                         seg.isGlyph ? (
                           <span
                             key={i}
-                            className="rounded bg-primary/15 px-0.5 font-mono text-primary"
+                            className="rounded-md bg-primary/15 px-0.5 font-mono text-primary"
                           >
                             {seg.text}
                           </span>

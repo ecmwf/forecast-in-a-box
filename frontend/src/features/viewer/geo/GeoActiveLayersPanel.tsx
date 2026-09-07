@@ -166,7 +166,7 @@ function ScaleHint({
       type="button"
       onClick={() => onZoomTo(scaleBandTargetResolution(band))}
       title={t('scale.outOfRangeHint')}
-      className="mt-1.5 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/25"
+      className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/25"
     >
       <Icon className="h-3 w-3" />
       {state === 'zoom-in'
@@ -237,7 +237,7 @@ export function GeoActiveLayersPanel({
             onClick={onCollapse}
             title={tExec('lens.collapseSidebar')}
             aria-label={tExec('lens.collapseSidebar')}
-            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
@@ -396,7 +396,7 @@ function AnnotationsSection({
             <button
               type="button"
               onClick={() => annotations.locate(annotation.id)}
-              className="min-w-0 flex-1 rounded text-left text-xs leading-snug hover:bg-accent"
+              className="min-w-0 flex-1 rounded-md text-left text-xs leading-snug hover:bg-accent"
               title={t('annotations.locate', { label: annotation.label })}
             >
               <span className="line-clamp-2">{annotation.text}</span>
@@ -406,7 +406,7 @@ function AnnotationsSection({
               onClick={() => annotations.edit(annotation.id)}
               aria-label={t('annotations.edit', { label: annotation.label })}
               title={t('annotations.edit', { label: annotation.label })}
-              className="rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100"
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100"
             >
               <Pencil className="h-3 w-3" />
             </button>
@@ -414,7 +414,7 @@ function AnnotationsSection({
               type="button"
               onClick={() => annotations.remove(annotation.id)}
               aria-label={t('annotations.remove', { label: annotation.label })}
-              className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <X className="h-3 w-3" />
             </button>
@@ -480,7 +480,7 @@ function OverlaysSection({ overlays }: { overlays: OverlayControls }) {
                     ? t('overlays.hide', { name: overlay.name })
                     : t('overlays.show', { name: overlay.name })
                 }
-                className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
               >
                 {overlay.visible ? (
                   <Eye className="h-3.5 w-3.5" />
@@ -505,7 +505,7 @@ function OverlaysSection({ overlays }: { overlays: OverlayControls }) {
                   onChange={(e) =>
                     overlays.setLabel(overlay.id, e.target.value || null)
                   }
-                  className="h-5 max-w-24 shrink-0 rounded border border-border bg-background text-[10px] text-muted-foreground"
+                  className="h-5 max-w-24 shrink-0 rounded-md border border-border bg-background text-[10px] text-muted-foreground"
                 >
                   <option value="">{t('overlays.labelNone')}</option>
                   {overlay.propertyKeys.map((key) => (
@@ -519,7 +519,7 @@ function OverlaysSection({ overlays }: { overlays: OverlayControls }) {
                 type="button"
                 onClick={() => overlays.remove(overlay.id)}
                 aria-label={t('overlays.remove', { name: overlay.name })}
-                className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -559,7 +559,7 @@ function OpacityRow({
           {slot && (
             <span
               className={cn(
-                'flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
+                'flex h-4 w-4 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-bold',
                 SLOT_CHIP_CLASS[slot],
               )}
             >
@@ -604,7 +604,7 @@ function MoveButtons({
         onClick={() => onMove(index, index - 1)}
         aria-label={t('sidebar.moveLayerUp', { name })}
         title={t('sidebar.moveLayerUp', { name })}
-        className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+        className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
       >
         <ChevronUp className="h-3.5 w-3.5" />
       </button>
@@ -614,7 +614,7 @@ function MoveButtons({
         onClick={() => onMove(index, index + 1)}
         aria-label={t('sidebar.moveLayerDown', { name })}
         title={t('sidebar.moveLayerDown', { name })}
-        className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+        className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
       >
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
@@ -708,7 +708,7 @@ function ActivePairCard({
           onClick={() => selection.togglePair(pair.key)}
           aria-label={t('sidebar.removeLayer', { name: title })}
           title={t('sidebar.removeLayer', { name: title })}
-          className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -755,7 +755,7 @@ function ActivePairCard({
               {sources.b !== null && (
                 <span
                   className={cn(
-                    'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
+                    'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-bold',
                     SLOT_CHIP_CLASS[slot],
                   )}
                 >
@@ -805,7 +805,7 @@ function ActiveSourceSection({
       <P className="flex items-center gap-1.5 px-1 pb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
         <span
           className={cn(
-            'flex h-4 w-4 items-center justify-center rounded font-mono text-[10px] font-bold',
+            'flex h-4 w-4 items-center justify-center rounded-md font-mono text-[10px] font-bold',
             SLOT_CHIP_CLASS[slot],
           )}
         >
@@ -880,7 +880,7 @@ function ActiveSourceSection({
                     onClick={() => selection.toggleLayer(slot, name)}
                     aria-label={t('sidebar.removeLayer', { name: title })}
                     title={t('sidebar.removeLayer', { name: title })}
-                    className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

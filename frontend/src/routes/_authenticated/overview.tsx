@@ -26,28 +26,24 @@ import { ForecastJournal } from '@/features/dashboard/components/ForecastJournal
 import { GettingStartedSection } from '@/features/dashboard/components/GettingStartedSection'
 import { WelcomeCard } from '@/features/dashboard/components/WelcomeCard'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
-import { useUiStore } from '@/stores/uiStore'
 
 function DashboardPage() {
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
-
   return (
     <ListPageContainer>
       {/* Row 1: Welcome + Community News */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <WelcomeCard variant={dashboardVariant} shadow={panelShadow} />
-        <CommunityNewsCard variant={dashboardVariant} shadow={panelShadow} />
+        <WelcomeCard />
+        <CommunityNewsCard />
       </div>
 
       {/* Row 2: Getting Started */}
-      <GettingStartedSection variant={dashboardVariant} shadow={panelShadow} />
+      <GettingStartedSection />
 
       {/* Row 3: My Configuration Presets */}
-      <ConfigPresetsSection variant={dashboardVariant} shadow={panelShadow} />
+      <ConfigPresetsSection />
 
       {/* Row 4: Forecast Journal */}
-      <ForecastJournal variant={dashboardVariant} shadow={panelShadow} />
+      <ForecastJournal />
     </ListPageContainer>
   )
 }

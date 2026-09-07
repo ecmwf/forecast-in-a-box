@@ -1,19 +1,20 @@
 {
   "page": {
-    "title": "Forecast Job Executions",
-    "description": "Monitor and manage your forecast job executions"
+    "title": "Runs",
+    "description": "Monitor and manage your forecast runs",
+    "scheduledRuns": "Scheduled runs"
   },
   "detail": {
-    "backLink": "Executions",
-    "untitledJob": "Untitled Job",
+    "backLink": "Runs",
+    "untitledJob": "Untitled run",
     "showParameters": "Show parameters",
     "hideParameters": "Hide parameters",
     "maximizeCanvas": "Maximize canvas",
     "restoreCanvas": "Exit full screen (Esc)",
     "graphUnavailable": "Graph visualisation unavailable",
-    "graphUnavailableDescription": "The pipeline graph is not available for this job.",
+    "graphUnavailableDescription": "The pipeline graph is not available for this run.",
     "specUnavailable": "Specification not available",
-    "specUnavailableDescription": "The original configuration was not stored for this job.",
+    "specUnavailableDescription": "The original configuration was not stored for this run.",
     "copySpec": "Copy",
     "copied": "Copied",
     "copyValue": "Copy value",
@@ -42,20 +43,20 @@
   },
   "actions": {
     "restart": "Restart",
-    "restartJob": "Restart Job",
+    "restartJob": "Restart Run",
     "delete": "Delete",
-    "deleteJob": "Delete Job",
+    "deleteJob": "Delete Run",
     "edit": "Edit",
     "editDetails": "Edit Details",
     "save": "Save",
     "editConfiguration": "Edit Configuration",
     "downloadLogs": "Download Full Logs",
     "downloadLogsFailed": "Failed to download logs",
-    "confirmRestart": "This will re-execute the job with the same specification. Continue?",
-    "confirmDelete": "This will permanently delete this job and its results. This action cannot be undone."
+    "confirmRestart": "This will run the forecast again with the same specification. Continue?",
+    "confirmDelete": "This will permanently delete this run and its results. This action cannot be undone."
   },
   "activity": {
-    "jobFallbackLabel": "Job {{id}}",
+    "jobFallbackLabel": "Run {{id}}",
     "submitted": "Submitted",
     "restarting": "Restarting (attempt {{attempt}})"
   },
@@ -63,17 +64,17 @@
     "run": "Run"
   },
   "submit": {
-    "title": "Submit Forecast Job",
+    "title": "Run Forecast",
     "name": "Name",
-    "namePlaceholder": "Enter a name for this job",
+    "namePlaceholder": "Enter a name for this run",
     "namePlaceholderOptional": "Name this run to find it later (optional)",
     "description": "Description",
-    "descriptionPlaceholder": "Optional notes about this execution",
+    "descriptionPlaceholder": "Optional notes about this run",
     "descriptionPlaceholderOptional": "Add notes about this run (optional)",
     "tags": "Tags",
     "tagsPlaceholder": "Add a tag",
     "tagsPlaceholderOptional": "Tag this run for easy filtering (optional)",
-    "advancedTitle": "Advanced: Execution Environment",
+    "advancedTitle": "Advanced: Run Environment",
     "hosts": "Hosts",
     "hostsPlaceholder": "Default (auto)",
     "workersPerHost": "Workers per host",
@@ -83,7 +84,7 @@
     "envValuePlaceholder": "Value",
     "addVariable": "Add variable",
     "cancel": "Cancel",
-    "submit": "Submit Job",
+    "submit": "Start Run",
     "submitting": "Submitting...",
     "modeRunNow": "Run Once",
     "modeSchedule": "Run on Schedule",
@@ -93,9 +94,7 @@
     "maxDelay": "Skip if delayed by (hours)",
     "maxDelayHelp": "If a scheduled run is delayed longer than this, it will be skipped instead of running late.",
     "scheduleCreated": "Schedule created successfully",
-    "compilingSpec": "Compiling specification...",
-    "serverTime": "(server time)",
-    "localEquivalent": "→ {{time}}"
+    "compilingSpec": "Compiling specification..."
   },
   "cron": {
     "frequency": {
@@ -121,10 +120,9 @@
       "everyHour": "Every hour",
       "everyHourAtMinute": "Every hour at minute {{minute}}",
       "everyDayAt": "Every day at {{time}} {{zone}}",
-      "everyDayAtServerTime": "Every day at {{time}} (server time)",
-      "everyDayOfWeekAt": "Every {{day}} at {{time}} {{zone}}",
-      "everyDayOfWeekAtServerTime": "Every {{day}} at {{time}} (server time)"
-    }
+      "everyDayOfWeekAt": "Every {{day}} at {{time}} {{zone}}"
+    },
+    "now": "Time now: {{time}} {{zone}}"
   },
   "outputs": {
     "generated": "Generated",
@@ -136,8 +134,6 @@
     "failedNotProduced_one": "{{count}} expected output was not produced — the run failed.",
     "failedNotProduced_other": "{{count}} expected outputs were not produced — the run failed.",
     "viewLogs": "View logs",
-    "lost": "Not retained",
-    "lostTitle": "No longer available",
     "noOutputs": "No outputs available yet",
     "noOutputsRunning": "Outputs will appear here as they are generated.",
     "view": "View",
@@ -198,7 +194,9 @@
       "grib-stored": {
         "label": "GRIB"
       }
-    }
+    },
+    "lostNotice_one": "{{count}} output was not retained",
+    "lostNotice_other": "{{count}} outputs were not retained"
   },
   "compilation": {
     "fullDescription": "Task-level graph compiled from this run. Click a block on the left to focus its cluster; click a task to focus its block.",
@@ -282,23 +280,25 @@
     "connected": "Connected",
     "connecting": "Connecting...",
     "disconnected": "Disconnected",
-    "executionEnded": "Job execution ended"
+    "executionEnded": "Run ended"
   },
   "errors": {
-    "executionFailed": "Execution Failed",
+    "executionFailed": "Run Failed",
     "copy": "Copy",
     "copied": "Copied",
     "copyFailed": "Couldn't copy the error message",
     "showFull": "Show full error",
     "showLess": "Show less",
-    "jobNotFound": "Job not found",
-    "jobNotFoundDescription": "The requested job could not be found.",
-    "backToExecutions": "Back to Executions"
+    "jobNotFound": "Run not found",
+    "jobNotFoundDescription": "The requested run could not be found.",
+    "backToExecutions": "Back to runs"
   },
   "empty": {
-    "title": "No executions",
-    "description": "You haven't run any forecast jobs yet. Start by creating a new forecast configuration.",
-    "action": "Create Forecast"
+    "title": "No runs",
+    "description": "You haven't run a forecast yet. Start by creating a forecast configuration.",
+    "action": "Configure a forecast",
+    "filtered": "No runs match your filters.",
+    "clearFilters": "Clear filters"
   },
   "filter": {
     "allStatuses": "All statuses",
@@ -308,15 +308,19 @@
     "running": "Running",
     "completed": "Completed",
     "failed": "Failed",
-    "searchPlaceholder": "Search executions..."
+    "searchPlaceholder": "Search runs..."
   },
   "list": {
-    "loading": "Loading executions...",
-    "error": "Failed to load executions"
+    "loading": "Loading runs...",
+    "error": "Failed to load runs"
   },
   "pagination": {
     "previous": "Previous",
     "next": "Next",
     "page": "Page {{current}} of {{total}}"
+  },
+  "attempts": {
+    "title": "Attempts",
+    "attempt": "Attempt {{number}}"
   }
 }

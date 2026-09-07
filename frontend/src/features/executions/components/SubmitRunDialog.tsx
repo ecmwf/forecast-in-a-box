@@ -74,7 +74,10 @@ export function SubmitRunDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent initialFocus={nameRef}>
+      <AlertDialogContent
+        initialFocus={nameRef}
+        className="data-[size=default]:sm:max-w-xl"
+      >
         {open && (
           <SubmitRunForm
             onOpenChange={onOpenChange}
@@ -143,7 +146,7 @@ function SubmitRunForm({
     setError(null)
 
     // Fall back to the config-derived name when the user didn't enter one,
-    // so submitted jobs are never titled "Untitled Job".
+    // so submitted runs are never titled "Untitled run".
     const trimmedName = name.trim() || generatedName
     const trimmedDescription = description.trim() || null
 
@@ -235,7 +238,7 @@ function SubmitRunForm({
         <AlertDialogTitle>{t('submit.title')}</AlertDialogTitle>
       </AlertDialogHeader>
 
-      <form className="space-y-4" onSubmit={handleFormSubmit}>
+      <form className="min-w-0 space-y-4" onSubmit={handleFormSubmit}>
         {/* Mode toggle */}
         <div className="flex gap-1 rounded-md bg-muted p-1">
           <button

@@ -53,12 +53,12 @@ export function useShowConfig() {
 
 /** As-run values keyed by block, then option; empty until they resolve. */
 const ResolvedConfigContext = createContext<
-  Record<string, Record<string, string>>
+  Record<string, Record<string, string | null>>
 >({})
 
 export function useResolvedConfigFor(
   blockId: string,
-): Record<string, string> | undefined {
+): Record<string, string | null> | undefined {
   return useContext(ResolvedConfigContext)[blockId]
 }
 
@@ -89,7 +89,7 @@ interface RunCanvasProps {
   completedBlockIds?: ReadonlyArray<BlockInstanceId> | null
   plannedBlockIds?: ReadonlyArray<BlockInstanceId> | null
   /** As-run values by block then option; absent while loading or unrecorded. */
-  resolvedConfig?: Record<string, Record<string, string>>
+  resolvedConfig?: Record<string, Record<string, string | null>>
 }
 
 /** Fit never zooms past 1:1 — a tiny graph stays natural-sized, not blown up. */

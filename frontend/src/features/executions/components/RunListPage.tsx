@@ -11,11 +11,16 @@
 /** The /executions page — the full, paginated Forecast Journal. */
 
 import { useCallback, useMemo, useState } from 'react'
+import { CalendarClock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { getRouteApi } from '@tanstack/react-router'
+import { Link, getRouteApi } from '@tanstack/react-router'
 import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
+import { useRunSelection } from '@/features/journal/hooks/useRunSelection'
+import { CompareSelectionBar } from '@/features/journal/components/CompareSelectionBar'
+import { Button } from '@/components/ui/button'
 import { useJobsStatus } from '@/api/hooks/useJobs'
+import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
 import { filterRuns } from '@/features/journal/utils/filter-runs'
@@ -26,7 +31,6 @@ import { ErrorPanel } from '@/components/common/ErrorPanel'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { PageHeader } from '@/components/common/PageHeader'
 import { Pagination } from '@/components/common/Pagination'
-import { useUiStore } from '@/stores/uiStore'
 import { formatInZone } from '@/lib/datetime'
 
 const PAGE_SIZE = 10
@@ -44,9 +48,8 @@ const route = getRouteApi('/_authenticated/execute/')
 
 export function RunListPage() {
   const { t } = useTranslation('executions')
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const [page, setPage] = useState(1)
+  const selection = useRunSelection(2)
   const search = route.useSearch()
   const navigate = route.useNavigate()
 
@@ -87,6 +90,18 @@ export function RunListPage() {
     [serverTimeToLocal, timeZone],
   )
 
+  const noRunsYet = !isLoading && runs.length === 0
+  const { counts: statusCounts, total: totalRuns } = useJobStatusCounts()
+  const filterCounts = useMemo(
+    () => ({
+      all: totalRuns,
+      submitted: statusCounts.submitted + statusCounts.preparing,
+      running: statusCounts.running,
+      completed: statusCounts.completed,
+      failed: statusCounts.failed,
+    }),
+    [statusCounts, totalRuns],
+  )
   const filtered = useMemo(
     () => filterRuns(runs, activeFilter, parseQuery(query), displayDateFor),
     [runs, activeFilter, query, displayDateFor],
@@ -106,31 +121,75 @@ export function RunListPage() {
 
   return (
     <ListPageContainer>
-      <PageHeader title={t('page.title')} description={t('page.description')} />
+      <PageHeader
+        title={t('page.title')}
+        description={t('page.description')}
+        actions={
+          <Button
+            variant="outline"
+            nativeButton={false}
+            render={<Link to="/schedules" />}
+          >
+            <CalendarClock />
+            {t('page.scheduledRuns')}
+          </Button>
+        }
+      />
 
       <ForecastRunList
         runs={filtered}
         isLoading={isLoading}
-        emptyText={t('empty.description')}
+        emptyText={noRunsYet ? t('empty.description') : t('empty.filtered')}
+        emptyAction={
+          noRunsYet ? (
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link to="/configure" />}
+            >
+              {t('empty.action')}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setQuery('')
+                setActiveFilter('all')
+              }}
+            >
+              {t('empty.clearFilters')}
+            </Button>
+          )
+        }
         groupBy={groupBy}
         onToggleBookmark={toggleBookmark}
         onAddFacet={(token) => setQuery(addToken(query, token))}
-        variant={dashboardVariant}
-        shadow={panelShadow}
+        selectedIds={selection.selectedIds}
+        selectionCap={selection.cap}
+        onToggleSelect={selection.toggle}
         header={
-          <ForecastRunSearchHeader
-            title={t('page.title')}
-            query={query}
-            onQueryChange={setQuery}
-            activeFilter={activeFilter}
-            onFilterChange={(filter) => {
-              setActiveFilter(filter)
-              setPage(1)
-            }}
-            filters={EXECUTIONS_FILTERS}
-            groupBy={groupBy}
-            onGroupByChange={setGroupBy}
-          />
+          <>
+            <ForecastRunSearchHeader
+              counts={filterCounts}
+              query={query}
+              onQueryChange={setQuery}
+              activeFilter={activeFilter}
+              onFilterChange={(filter) => {
+                setActiveFilter(filter)
+                setPage(1)
+              }}
+              filters={EXECUTIONS_FILTERS}
+              groupBy={groupBy}
+              onGroupByChange={setGroupBy}
+            />
+            <CompareSelectionBar
+              runs={runs}
+              selectedIds={selection.selectedIds}
+              onClear={selection.clear}
+            />
+          </>
         }
         footer={
           <Pagination
