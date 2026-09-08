@@ -21,7 +21,7 @@ from typing import Any
 
 from qubed import Qube
 
-SUPPLEMENTARY_METADATA = {"class": ["ai"], "type": ["fc"], "stream": ["oper"]}
+extra_output_keys = {"class": ["ai"], "type": ["fc"], "stream": ["oper"]}
 
 
 @lru_cache(maxsize=None)
@@ -118,7 +118,7 @@ def generate_artifact_entry(
             "input_characteristics": [c.strip() for c in input_characteristics.split(",") if c.strip()],
             "input_qube": qubes["input_qube"],
             "output_qube": qubes["output_qube"],
-            "supplementary_metadata": SUPPLEMENTARY_METADATA,
+            "extra_output_keys": extra_output_keys,
             "input_options": {},
             "timestep": get_timestep(checkpoint_path),
         },

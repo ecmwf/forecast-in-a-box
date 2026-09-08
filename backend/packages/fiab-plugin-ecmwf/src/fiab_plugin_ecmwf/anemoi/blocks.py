@@ -71,12 +71,12 @@ class AnemoiBuilder:
         "Get local path to the checkpoint artifact, assumes it is already locally available, does not trigger download"
         return self.checkpoint.get_local_path()
 
-    def _add_supplementary_metadata(self, action: Action) -> Action:
+    def _add_extra_output_keys(self, action: Action) -> Action:
         """Add supplementary metadata from the checkpoint to the action.
 
         Must be added to the action to ensure at compilation time that the metadata is available.
         """
-        for key, values in self.checkpoint.supplementary_metadata.items():
+        for key, values in self.checkpoint.extra_output_keys.items():
             action.set_scalar_coords({key: values})
         return action
 
@@ -103,13 +103,13 @@ class AnemoiBuilder:
             **k,
             payload_metadata={"artifacts": [self.artifact_id]},
         )
-        return self._add_supplementary_metadata(action)
+        return self._add_extra_output_keys(action)
 
     def from_initial_conditions(self, initial_conditions: Any, lead_time: int, **k: Any) -> Action:
         action = self.inference(lead_time=lead_time).from_initial_conditions(
             initial_conditions, **k, payload_metadata={"artifacts": [self.artifact_id]}
         )
-        return self._add_supplementary_metadata(action)
+        return self._add_extra_output_keys(action)
 
     def get_initial_conditions(self, input_source: str, date: datetime, ensemble: int = 1, **k: Any) -> Action:
         env = self.checkpoint.get_environment()
@@ -178,7 +178,7 @@ class AnemoiBaseBlock:
         qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time))
 
         # Ensure alignment in output qube and action metadata
-        qubed_output = expand(qubed_output, checkpoint.supplementary_metadata)
+        qubed_output = expand(qubed_output, checkpoint.extra_output_keys)
 
         if checkpoint.is_ensemble_model is False:
             return QubedOutput(dataqube=qubed_output)

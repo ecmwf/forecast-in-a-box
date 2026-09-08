@@ -283,7 +283,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -593,7 +593,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -908,7 +908,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -1219,7 +1219,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -1531,7 +1531,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -1942,7 +1942,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -2252,7 +2252,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -2589,7 +2589,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -2895,7 +2895,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -3209,7 +3209,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
@@ -3534,7 +3534,7 @@
             }
           ]
         },
-        "supplementary_metadata": {
+        "extra_output_keys": {
           "stream": "oper",
           "type": "fc",
           "class": "ai"
