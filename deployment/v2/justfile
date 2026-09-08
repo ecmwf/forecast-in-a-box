@@ -34,6 +34,8 @@ publish tag="":
     tag="{{tag}}"
     if [ -z "$tag" ]; then
         tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
+    else
+        tag="${tag#v}"
     fi
     registry="eccr.ecmwf.int/forecast-in-a-box/fiab-slim"
     docker tag "fiab-slim:${tag}" "${registry}:${tag}"
