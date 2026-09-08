@@ -26,10 +26,10 @@ QubedOutput(dataqube=Qube(...), datatype='netcdf')
 """
 
 import functools
+import warnings
 from collections.abc import Mapping
 from typing import Any, Callable, Concatenate, Iterable, ParamSpec, TypeVar, overload
 
-import numpy as np
 from fiab_core.fable import QubedOutput
 from qubed import Qube
 
@@ -87,36 +87,43 @@ def collapse(qube: Qube, axis: str | list[str]) -> Qube:
     False
     """
     dims = dimensions(qube)
-    axes = [axis] if isinstance(axis, str) else axis
-    if not all(ax in dims for ax in axes):
-        raise ValueError(f"Dimension '{', '.join(set(axes) - dims)}' not in dataqube dimensions {dims}")
+    axes_to_drop = [axis] if isinstance(axis, str) else axis
+    if not all(ax in dims for ax in axes_to_drop):
+        raise ValueError(f"Dimension '{', '.join(set(axes_to_drop) - dims)}' not in dataqube dimensions {dims}")
 
-    return qube.remove_by_key(axes)
+    result = qube.drop(axes_to_drop)
+    result.compress()
+    return result
 
 
-def _broadcast_array_over_new_axis(value: np.ndarray, size: int) -> np.ndarray:
+def _broadcast_array_over_new_axis(value: "np.ndarray", size: int) -> "np.ndarray":
+    """Broadcast an existing metadata array over a new axis dimension.
+
+    .. warning::
+        Metadata support is not yet available in the new Rust-backed Qube.
+        This helper is kept so that ``expand()`` can be updated to propagate
+        metadata once the Qube API supports it.
+
+    TODO: Re-enable metadata propagation in ``expand()`` once the Rust Qube
+    exposes ``.metadata`` and ``.children`` attributes.
+    """
+    import numpy as np
+
+    warnings.warn(
+        "Qube metadata propagation is not yet supported in the Rust-backed Qube. Metadata will not be broadcast across new dimensions.",
+        stacklevel=2,
+    )
     value = value.reshape((1,)) if value.ndim == 0 else value
     expanded = np.expand_dims(value, axis=1)
     return np.broadcast_to(expanded, (expanded.shape[0], size, *expanded.shape[2:]))
 
 
-def _broadcast_new_axis_metadata(qube: Qube, size: int) -> Qube:
-    metadata = {key: _broadcast_array_over_new_axis(value, size) for key, value in qube.metadata.items()}
-    children = tuple(_broadcast_new_axis_metadata(child, size) for child in qube.children)
-    return qube.replace(metadata=metadata, children=children)
-
-
-def _expand_axis(qube: Qube, key: str, values: Iterable[Any]) -> Qube:
-    axis_values = list(values)
-    value_group = Qube.from_datacube({key: axis_values}).children[0].values if axis_values else [None]
-    axis_size = len(axis_values) or 1
-    children = tuple(_broadcast_new_axis_metadata(child, axis_size) for child in qube.children)
-    return Qube.make_root([Qube.make_node(key, value_group, children)])
-
-
 @support_qubed_output
 def expand(qube: Qube, dimension: Mapping[str, Iterable[Any]]) -> Qube:
     """Return a new Qube with the dataqube expanded by adding the specified dimension(s).
+
+    Each existing datacube is combined with the new dimension values to produce
+    a cross-product expansion.
 
     Parameters
     ----------
@@ -125,8 +132,8 @@ def expand(qube: Qube, dimension: Mapping[str, Iterable[Any]]) -> Qube:
 
     Returns
     -------
-    Self
-        A new QubedOutput with the expanded dataqube.
+    Qube
+        A new Qube with the expanded dataqube.
 
     Usage
     -----
@@ -140,7 +147,22 @@ def expand(qube: Qube, dimension: Mapping[str, Iterable[Any]]) -> Qube:
     >>> axes(expanded)
     {'ensemble': {'ens1', 'ens2'}, 'param': {'2t', 'tp'}, 'time': {0, 1, 2}}
     """
-    return functools.reduce(lambda q, kv: _expand_axis(q, kv[0], kv[1]), dimension.items(), qube)
+    # Get existing datacubes and add the new dimensions to each
+    datacubes = list(qube.to_datacubes())
+    new_dims = {k: list(v) if v else [None] for k, v in dimension.items()}
+
+    result = Qube.empty()
+    for dc in datacubes:
+        # Ensure all values are lists
+        expanded_dc = {k: v if isinstance(v, list) else [v] for k, v in dc.items()}
+        expanded_dc.update(new_dims)
+        expanded_dc.pop("root", None)
+        result = result | Qube.from_datacube(expanded_dc)
+
+    result.compress()
+    # TODO: Once Qube supports metadata, use _broadcast_array_over_new_axis
+    # to propagate existing metadata across the new dimension(s).
+    return result
 
 
 @support_qubed_output
@@ -164,13 +186,14 @@ def axes(qube: Qube) -> dict[str, set[Any]]:
     ...     'param': ['2t', 'tp'],
     ...     'time': [0, 1, 2],
     ... }))
-    >>> axes = output.axes()
-    >>> axes['param']
+    >>> ax = axes(output)
+    >>> ax['param']
     {'2t', 'tp'}
-    >>> axes['time']
+    >>> ax['time']
     {0, 1, 2}
     """
-    return qube.axes()
+    raw = qube.axes()
+    return {k: set(v) if isinstance(v, list) else {v} for k, v in raw.items()}
 
 
 @support_qubed_output
@@ -188,10 +211,10 @@ def dimensions(qube: Qube) -> set[str]:
     ...     'param': ['2t', 'tp'],
     ...     'time': [0, 1, 2],
     ... }))
-    >>> output.dimensions()
+    >>> dimensions(output)
     {'param', 'time'}
     """
-    return set(qube.axes().keys())
+    return qube.dimensions()
 
 
 @support_qubed_output
@@ -216,7 +239,10 @@ def common_dimensions(qube: Qube) -> set[str]:
     >>> common_dimensions(output)
     {'param'}
     """
-    return set.intersection(*[set(datacube.keys()) for datacube in qube.datacubes()])
+    datacubes = list(qube.to_datacubes())
+    if not datacubes:
+        return set()
+    return set.intersection(*(set(k for k in dc if k != "root") for dc in datacubes))
 
 
 @support_qubed_output
@@ -250,7 +276,7 @@ def contains(qube: Qube, item: Qube | str | dict) -> bool:
     if isinstance(item, str):
         return item in dimensions(qube)
 
-    lookup: dict = item.axes() if isinstance(item, Qube) else item
+    lookup: dict = axes(item) if isinstance(item, Qube) else item
     dict_cast_to_list = {k: list(v) if isinstance(v, (set, tuple, list)) else [v] for k, v in lookup.items()}
     current_axes = axes(qube)
 
@@ -276,4 +302,20 @@ def select(
     >>> axes(selection)
     {'param': {'2t'}, 'time': {0, 1, 2}}
     """
-    return QubedOutput(dataqube=qube.dataqube.select(selection))
+    # TODO: Once Qube.select supports callable predicates, pass them through
+    # directly instead of requiring pre-filtered lists.
+
+    # Normalise selection values to lists for the Rust API
+    normalised: dict[str, list[Any]] = {}
+    for k, v in selection.items():
+        if callable(v) and not isinstance(v, (str, bytes)):
+            warnings.warn(
+                f"Callable selection predicates are not yet supported by the Rust Qube. Dimension '{k}' predicate will be ignored.",
+                stacklevel=2,
+            )
+            continue
+        if isinstance(v, (list, tuple, set)):
+            normalised[k] = list(v)
+        else:
+            normalised[k] = [v]
+    return QubedOutput(dataqube=qube.dataqube.select(normalised))
