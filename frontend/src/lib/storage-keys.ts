@@ -114,6 +114,8 @@ export const STORAGE_KEYS = {
     onboarding: 'fiab.store.onboarding',
     /** Per-tutorial guided-tour outcomes */
     tutorials: 'fiab.store.tutorials',
+    /** Pinned default WMS style per server and layer */
+    stylePins: 'fiab.store.style-pins',
   },
 } as const
 
@@ -141,6 +143,7 @@ export const STORE_VERSIONS = {
   comparison: 1,
   onboarding: 2, // v2: Removed pluginStepNeeded
   tutorials: 1,
+  stylePins: 1,
 } as const
 
 /**

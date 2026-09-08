@@ -20,9 +20,7 @@
  */
 
 import { formatStep } from './format'
-import { rebaseLensUrl } from './wms-capabilities'
 import type OlMap from 'ol/Map'
-import type { ParsedLayer } from './wms-capabilities'
 
 const CANVAS_MATRIX_RE = /^matrix\(([^)]*)\)$/
 
@@ -336,38 +334,6 @@ export async function exportMapPng(
     })
     map.renderSync()
   })
-}
-
-/**
- * Pre-load pinned legend images (cross-origin, anonymous) so they're ready
- * to draw onto the export canvas — if the map render raced ahead we'd draw
- * an empty box. Failed loads are dropped silently.
- */
-export async function loadLegendImages(
-  layers: ReadonlyArray<ParsedLayer>,
-  pinned: ReadonlySet<string>,
-  baseUrl: string,
-): Promise<ReadonlyArray<LegendExportItem>> {
-  const items: Array<{ title: string; url: string }> = []
-  for (const name of pinned) {
-    const layer = layers.find((l) => l.name === name)
-    const url = layer?.styles[0]?.legendUrl
-    if (!layer || !url) continue
-    items.push({ title: layer.title, url: rebaseLensUrl(url, baseUrl) })
-  }
-  const loaded = await Promise.all(
-    items.map(
-      (it) =>
-        new Promise<LegendExportItem | null>((resolve) => {
-          const img = new Image()
-          img.crossOrigin = 'anonymous'
-          img.onload = () => resolve({ title: it.title, image: img })
-          img.onerror = () => resolve(null)
-          img.src = it.url
-        }),
-    ),
-  )
-  return loaded.filter((x): x is LegendExportItem => x !== null)
 }
 
 /**

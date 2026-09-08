@@ -30,6 +30,7 @@ export function CompareSlotTag({
   side = 'left',
   loading = false,
   timeLabel = null,
+  runLabel = null,
 }: {
   slot: SourceSlot
   label: string
@@ -38,6 +39,8 @@ export function CompareSlotTag({
   loading?: boolean
   /** Valid time this side currently displays. */
   timeLabel?: string | null
+  /** Model run in effect, shown muted after the valid time. */
+  runLabel?: string | null
 }) {
   const { t } = useTranslation('visualise')
   return (
@@ -55,6 +58,14 @@ export function CompareSlotTag({
       {timeLabel && (
         <span className="shrink-0 font-mono text-muted-foreground tabular-nums">
           {timeLabel}
+        </span>
+      )}
+      {runLabel && (
+        <span
+          className="shrink-0 font-mono text-[10px] text-muted-foreground/70 tabular-nums"
+          title={t('slotTag.runTitle')}
+        >
+          {runLabel}
         </span>
       )}
       {loading && (

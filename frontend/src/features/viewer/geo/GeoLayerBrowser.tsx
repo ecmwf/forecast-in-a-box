@@ -20,6 +20,7 @@ import { useMemo, useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
+  Clock,
   List,
   ListTree,
   Loader2,
@@ -113,6 +114,7 @@ export function GeoLayerBrowser({
   }, [pairs])
   const grouped = groupedOverride ?? autoGrouped
   const setGrouped = (next: boolean) => setGroupedOverride(next)
+  const [timeAwareOnly, setTimeAwareOnly] = useState(false)
   const query = search.trim().toLowerCase()
 
   // Per-panel selection browses one catalog at a time: "All" would
@@ -130,8 +132,13 @@ export function GeoLayerBrowser({
         : slotFilter)
 
   const filteredPairs = useMemo(
-    () => pairs.filter((pair) => pairMatchesSearch(pair, query)),
-    [pairs, query],
+    () =>
+      pairs.filter(
+        (pair) =>
+          pairMatchesSearch(pair, query) &&
+          (!timeAwareOnly || !pairIsStatic(pair)),
+      ),
+    [pairs, query, timeAwareOnly],
   )
   const partitioned = useMemo(
     () => groupPairs(filteredPairs, effectiveFilter),
@@ -170,12 +177,25 @@ export function GeoLayerBrowser({
           </P>
           <button
             type="button"
+            onClick={() => setTimeAwareOnly((v) => !v)}
+            aria-pressed={timeAwareOnly}
+            title={t('browser.timeAwareHint')}
+            aria-label={t('browser.timeAware')}
+            className={cn(
+              'ml-auto flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-foreground',
+              timeAwareOnly ? 'text-primary' : 'text-muted-foreground',
+            )}
+          >
+            <Clock className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={() => setGrouped(!grouped)}
             aria-pressed={grouped}
             title={t('browser.groupToggle')}
             aria-label={t('browser.groupToggle')}
             className={cn(
-              'ml-auto flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-foreground',
+              'flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-foreground',
               grouped ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
@@ -271,6 +291,7 @@ export function GeoLayerBrowser({
             slotFilter={effectiveFilter}
             selectedLevels={selectedLevels}
             grouped={grouped}
+            timeAwareOnly={timeAwareOnly}
           />
         ) : selection.linkMode === 'linked' ? (
           <LinkedSections
@@ -297,6 +318,7 @@ export function GeoLayerBrowser({
               slotFilter={effectiveFilter}
               selectedLevels={selectedLevels}
               grouped={grouped}
+              timeAwareOnly={timeAwareOnly}
             />
             {hasB && (
               <UnlinkedSourceSection
@@ -307,6 +329,7 @@ export function GeoLayerBrowser({
                 slotFilter={effectiveFilter}
                 selectedLevels={selectedLevels}
                 grouped={grouped}
+                timeAwareOnly={timeAwareOnly}
               />
             )}
           </>
@@ -616,6 +639,7 @@ function UnlinkedSourceSection({
   slotFilter,
   selectedLevels,
   grouped,
+  timeAwareOnly,
 }: {
   slot: SourceSlot
   source: LensSource
@@ -624,6 +648,7 @@ function UnlinkedSourceSection({
   slotFilter: SlotFilter
   selectedLevels: ReadonlySet<number>
   grouped: boolean
+  timeAwareOnly: boolean
 }) {
   const { t } = useTranslation('visualise')
   const { t: tExec } = useTranslation('executions')
@@ -632,13 +657,20 @@ function UnlinkedSourceSection({
     if (slotFilter !== slot) return null
   }
 
-  const groups = source.groups.filter(
-    (g) =>
-      !query ||
-      g.title.toLowerCase().includes(query) ||
-      (g.subtitle?.toLowerCase().includes(query) ?? false) ||
-      g.entries.some((e) => e.layer.name.toLowerCase().includes(query)),
-  )
+  const groups = source.groups
+    .map((g) =>
+      timeAwareOnly
+        ? { ...g, entries: g.entries.filter((e) => layerIsTimeAware(e.layer)) }
+        : g,
+    )
+    .filter(
+      (g) =>
+        g.entries.length > 0 &&
+        (!query ||
+          g.title.toLowerCase().includes(query) ||
+          (g.subtitle?.toLowerCase().includes(query) ?? false) ||
+          g.entries.some((e) => e.layer.name.toLowerCase().includes(query))),
+    )
 
   return (
     <section>

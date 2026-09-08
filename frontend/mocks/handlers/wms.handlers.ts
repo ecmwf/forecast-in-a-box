@@ -27,6 +27,7 @@ import {
   getMapFailsFor,
   hasMockWmsConfig,
   recordGetMap,
+  recordLegendRequest,
   serveCapabilities,
 } from '../data/wms.data'
 import type { HttpResponseResolver } from 'msw'
@@ -134,7 +135,18 @@ const serveWms: HttpResponseResolver = async ({ request }) => {
   // GetMap and anything else image-like. Registered failure TIMEs get
   // a WMS service exception (stale-capabilities servers do this).
   if (req === 'getmap') {
-    recordGetMap(key, param('TIME'))
+    recordGetMap(key, {
+      time: param('TIME'),
+      crs: param('CRS') ?? param('SRS'),
+      bbox: param('BBOX'),
+      styles: param('STYLES'),
+      layers: param('LAYERS'),
+      dims: Object.fromEntries(
+        [...url.searchParams.entries()]
+          .filter(([k]) => k.toUpperCase().startsWith('DIM_'))
+          .map(([k, v]) => [k.slice(4).toLowerCase(), v]),
+      ),
+    })
     const delayMs = getMapDelayFor(key)
     if (delayMs > 0) await delay(delayMs)
   }
@@ -155,7 +167,15 @@ export const wmsHandlers = [
 
   // Legend images — capabilities advertise them on the lens's internal bind
   // address; the viewer rebases them onto the browser-reachable origin.
-  http.get('*/legend', () => pngResponse('0')),
+  http.get('*/legend', ({ request }) => {
+    const url = new URL(request.url)
+    recordLegendRequest(wmsKeyFor(url), {
+      layer: url.searchParams.get('layer'),
+      style: url.searchParams.get('style'),
+      width: url.searchParams.get('width'),
+    })
+    return pngResponse('0')
+  }),
 
   // Carto vector basemap style requested by the viewer on mount.
   http.get('https://basemaps.cartocdn.com/*', () =>

@@ -44,6 +44,7 @@ import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
 import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
 
+import { curatedBboxAxisOrder } from '../curated-wms'
 import { CompareSlotBar } from './CompareSlotBar'
 import { ComparePanel } from './ComparePanel'
 import { SourcePicker } from './SourcePicker'
@@ -548,6 +549,7 @@ export function VisualisePage() {
                   id: entryRef(a),
                   baseUrl: stateA.baseUrl,
                   label: entryDisplayName(a),
+                  bboxAxisOrder: entryBboxAxisOrder(a),
                 }}
                 b={
                   b && stateB.phase === 'running'
@@ -555,6 +557,7 @@ export function VisualisePage() {
                         id: entryRef(b),
                         baseUrl: stateB.baseUrl,
                         label: entryDisplayName(b),
+                        bboxAxisOrder: entryBboxAxisOrder(b),
                       }
                     : null
                 }
@@ -577,6 +580,11 @@ export function VisualisePage() {
       )}
     </ListPageContainer>
   )
+}
+
+/** Curated external servers may need an easting-first WMS BBOX. */
+function entryBboxAxisOrder(entry: ComparisonEntry): 'xy' | undefined {
+  return entry.kind === 'wms' ? curatedBboxAxisOrder(entry.url) : undefined
 }
 
 /** Compact B lifecycle indicator shown while the viewer runs solo. */

@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import type { LensSource } from '@/features/viewer/hooks/useLensSource'
+import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import { GeoLayerBrowser } from '@/features/viewer/geo/GeoLayerBrowser'
 import { buildPairs } from '@/features/viewer/geo/layer-pairing'
 import { groupLayers } from '@/features/viewer/wms-capabilities'
@@ -27,6 +28,7 @@ function lensSource(overrides: Partial<LensSource> = {}): LensSource {
     layers: [],
     decorationLayers: [],
     bbox: null,
+    crs: [],
     error: null,
     loadingLayers: false,
     retrying: false,
@@ -130,5 +132,39 @@ describe('GeoLayerBrowser empty states', () => {
     await expect
       .element(empty.getByText('Nothing matches the search.'))
       .toBeVisible()
+  })
+})
+
+describe('GeoLayerBrowser time-aware filter', () => {
+  const layer = (name: string, time?: string): ParsedLayer => ({
+    name,
+    title: name,
+    styles: [],
+    time: time ? { raw: time } : undefined,
+  })
+  const layers = [
+    layer('2t', '2026-07-06T00:00:00Z,2026-07-06T06:00:00Z'),
+    layer('coast'),
+  ]
+  const withLayers = () => lensSource({ layers, groups: groupLayers(layers) })
+
+  it('hides static layers while pressed, in linked and per-source views', async () => {
+    const screen = await render(<Harness sourceA={withLayers()} />)
+    await expect.element(screen.getByText('coast')).toBeVisible()
+    const chip = screen.getByRole('button', { name: 'Time-aware' })
+    await chip.click()
+    await expect.element(chip).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('coast').elements()).toHaveLength(0)
+    await expect.element(screen.getByText('2t')).toBeVisible()
+    await chip.click()
+    await expect.element(screen.getByText('coast')).toBeVisible()
+    await screen.unmount()
+
+    const focused = await render(
+      <Harness sourceA={withLayers()} focusSlot="a" />,
+    )
+    await focused.getByRole('button', { name: 'Time-aware' }).click()
+    expect(focused.getByText('coast').elements()).toHaveLength(0)
+    await expect.element(focused.getByText('2t')).toBeVisible()
   })
 })

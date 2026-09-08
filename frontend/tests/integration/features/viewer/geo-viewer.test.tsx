@@ -32,6 +32,7 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import {
+  getMapRequestDetails,
   getMapRequests,
   registerMockWmsServer,
 } from '@tests/../mocks/data/wms.data'
@@ -40,6 +41,7 @@ import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
 import { CompareHelpDialog } from '@/features/viewer/geo/CompareHelpDialog'
 import i18n from '@/lib/i18n'
+import { useStylePinsStore } from '@/stores/stylePinsStore'
 
 let nextPort = 19800
 
@@ -447,7 +449,7 @@ describe('GeoViewer', () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
 
-    await screen.getByRole('button', { name: 'Basemap' }).click()
+    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
     await expect
       .element(screen.getByRole('button', { name: /Carto Positron/ }))
       .toBeVisible()
@@ -1261,6 +1263,491 @@ describe('GeoViewer preload', () => {
       await expect
         .poll(() => getMapRequests(portA), { timeout: 8000 })
         .toContain('2026-07-06T06:00:00Z')
+    } finally {
+      removeSizing()
+    }
+  })
+})
+
+describe('GeoViewer startup', () => {
+  it('renders the real shell with a status pill while the catalogue loads', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    // Two 503s first: the retry ladder runs → "connecting" step.
+    registerMockWmsServer(portA, {
+      failuresBeforeSuccess: 2,
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+
+    const pill = screen.getByRole('status', {
+      name: /Connecting to the server/,
+    })
+    await expect.element(pill).toBeVisible()
+    // The chrome is already the real thing, not a skeleton.
+    await expect
+      .element(screen.getByRole('button', { name: 'Projection & basemap' }))
+      .toBeVisible()
+
+    // Capabilities land → pill gone, catalogue in the browser.
+    await expect
+      .element(screen.getByText('Mean sea level pressure').first())
+      .toBeVisible()
+    await expect
+      .poll(
+        () =>
+          screen.getByRole('status', { name: /step \d of/ }).elements().length,
+        { timeout: 8000 },
+      )
+      .toBe(0)
+  })
+})
+
+describe('GeoViewer layer styles', () => {
+  function registerStyledPair() {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          styles: [
+            { name: 'sh_all', title: 'Contour shade' },
+            { name: 'ct_red', title: 'Red contours', abstract: 'Lines only' },
+          ],
+        },
+      ],
+    })
+    registerMockWmsServer(portB, {
+      layers: [
+        {
+          name: '2t',
+          title: '2 m temperature',
+          styles: [{ name: 'sh_all', title: 'Contour shade' }],
+        },
+      ],
+    })
+    return { portA, portB }
+  }
+  const lastStyle = (port: number) =>
+    getMapRequestDetails(port)
+      .filter((r) => r.layers === '2t')
+      .at(-1)?.styles
+
+  it('picks a style per pair, applying it only where advertised', async () => {
+    const { portA, portB } = registerStyledPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('2 m temperature').first().click()
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('sh_all')
+
+      const trigger = screen.getByRole('button', {
+        name: 'Style for 2 m temperature',
+      })
+      await expect.element(trigger).toHaveTextContent('Contour shade')
+      await trigger.click()
+      const option = screen.getByRole('option', { name: /Red contours/ })
+      await expect.element(option).toBeVisible()
+      await option.hover()
+      // B lacks this style → the option carries A's chip; the pane shows
+      // the abstract and a live thumbnail from the mock GetMap.
+      await expect.element(screen.getByText('Lines only')).toBeVisible()
+      await expect
+        .element(screen.getByRole('img', { name: /Preview of Red contours/ }))
+        .toBeInTheDocument()
+      await option.click()
+
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('ct_red')
+      expect(lastStyle(portB)).toBe('sh_all')
+      await expect.element(trigger).toHaveTextContent('Red contours')
+      // The legend follows the drawn style and the URL carries the choice.
+      await expect
+        .poll(() =>
+          document
+            .querySelector<HTMLImageElement>(
+              'img[alt="2 m temperature (A) legend"]',
+            )
+            ?.getAttribute('src'),
+        )
+        .toContain('style=ct_red')
+      expect(onViewStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({ stylesA: ['ct_red'], stylesB: [null] }),
+      )
+    } finally {
+      removeSizing()
+    }
+  })
+
+  it('pins a style as the default: applied now and on re-adding the layer', async () => {
+    const { portA, portB } = registerStyledPair()
+    const removeSizing = injectMapSizing()
+    try {
+      const screen = await render(<Harness portA={portA} portB={portB} />)
+      await screen.getByText('2 m temperature').first().click()
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('sh_all')
+
+      await screen
+        .getByRole('button', { name: 'Style for 2 m temperature' })
+        .click()
+      await screen.getByRole('option', { name: /Red contours/ }).hover()
+      await screen
+        .getByRole('button', { name: 'Use as my default for this layer' })
+        .click()
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('ct_red')
+      // Persisted per (server scope, layer).
+      expect(
+        useStylePinsStore.getState().pinned(`http://localhost:${portA}`, '2t'),
+      ).toBe('ct_red')
+
+      // Remove and re-add: the pinned style seeds the fresh activation.
+      await screen
+        .getByRole('button', { name: 'Remove 2 m temperature' })
+        .first()
+        .click()
+      await screen.getByText('2 m temperature').first().click()
+      await expect
+        .element(
+          screen.getByRole('button', { name: 'Style for 2 m temperature' }),
+        )
+        .toHaveTextContent('Red contours')
+    } finally {
+      useStylePinsStore.getState().reset()
+      removeSizing()
+    }
+  })
+
+  it('restores styles from the URL', async () => {
+    const { portA, portB } = registerStyledPair()
+    const removeSizing = injectMapSizing()
+    try {
+      await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          initialViewState={{ layersA: ['2t'], stylesA: ['ct_red'] }}
+        />,
+      )
+      await expect
+        .poll(() => lastStyle(portA), { timeout: 8000 })
+        .toBe('ct_red')
+    } finally {
+      removeSizing()
+    }
+  })
+})
+
+describe('GeoViewer model runs', () => {
+  const RUNS = '2026-09-03T00:00:00Z,2026-09-03T12:00:00Z,2026-09-04T00:00:00Z'
+  const RUN_TIMES = '2026-09-03T00:00:00Z/2026-09-04T12:00:00Z/PT6H'
+  function registerRunPair() {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    registerMockWmsServer(portB, {
+      layers: [
+        {
+          name: 'msl',
+          title: 'Mean sea level pressure',
+          time: RUN_TIMES,
+          dimensions: [
+            {
+              name: 'reference_time',
+              values: RUNS,
+              default: '2026-09-04T00:00:00Z',
+            },
+          ],
+        },
+      ],
+    })
+    return { portA, portB }
+  }
+  const lastRun = (port: number) =>
+    getMapRequestDetails(port)
+      .filter((r) => r.layers === 'msl')
+      .at(-1)?.dims.reference_time
+
+  it('pins a run for the side that advertises runs and reports it', async () => {
+    const { portA, portB } = registerRunPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('Mean sea level pressure').first().click()
+      await expect
+        .poll(() => getMapRequestDetails(portB).length, { timeout: 8000 })
+        .toBeGreaterThan(0)
+      expect(lastRun(portB)).toBeUndefined()
+      // Only B advertises runs → one Run select, B's.
+      const runSelects = screen.getByRole('combobox', {
+        name: 'Run for Mean sea level pressure',
+      })
+      expect(runSelects.elements()).toHaveLength(1)
+      await runSelects.click()
+      await screen.getByRole('option', { name: '2026-09-03 12:00Z' }).click()
+      await expect
+        .poll(() => lastRun(portB), { timeout: 8000 })
+        .toBe('2026-09-03T12:00:00Z')
+      // A never gets a DIM_ it does not advertise.
+      expect(lastRun(portA)).toBeUndefined()
+      expect(onViewStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({ runsB: ['2026-09-03T12:00:00Z'] }),
+      )
+      // The map tag names the run in effect.
+      await expect
+        .element(screen.getByText('run 2026-09-03 12:00Z'))
+        .toBeInTheDocument()
+      // Steps before the pinned run are painted as not served up front.
+      await expect
+        .poll(
+          () =>
+            document.querySelectorAll(
+              '[title^="Advertised but not served: Mean sea level pressure"]',
+            ).length,
+          { timeout: 8000 },
+        )
+        .toBe(2)
+      // Clipping to B skips the pre-run steps.
+      await screen.getByTitle('Clip to B’s time range').click()
+      await expect
+        .element(screen.getByText('2026-09-03 12:00Z – 2026-09-04 12:00Z'))
+        .toBeInTheDocument()
+    } finally {
+      removeSizing()
+    }
+  })
+
+  it('restores a pinned run from the URL', async () => {
+    const { portA, portB } = registerRunPair()
+    const removeSizing = injectMapSizing()
+    try {
+      await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          initialViewState={{
+            layersB: ['msl'],
+            runsB: ['2026-09-03T00:00:00Z'],
+          }}
+        />,
+      )
+      await expect
+        .poll(() => lastRun(portB), { timeout: 8000 })
+        .toBe('2026-09-03T00:00:00Z')
+    } finally {
+      removeSizing()
+    }
+  })
+})
+
+describe('GeoViewer layer extents', () => {
+  function registerRegionalPair() {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      layers: [
+        { name: '2t', title: '2 m temperature' },
+        { name: 'eu', title: 'Europe only', bbox: [-10, 35, 30, 70] },
+        { name: 'au', title: 'Australia only', bbox: [110, -45, 155, -10] },
+      ],
+    })
+    registerMockWmsServer(portB, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+    })
+    return { portA, portB }
+  }
+  const lastCamera = (fn: ReturnType<typeof vi.fn>) =>
+    [...fn.mock.calls]
+      .reverse()
+      .map((c) => (c[0] as Partial<ViewerUrlState>).camera)
+      .find((cam) => cam !== undefined)
+
+  it('clips requests to the bbox, frames active layers, zooms to one', async () => {
+    const { portA, portB } = registerRegionalPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('Europe only').click()
+      await expect
+        .poll(
+          () => getMapRequestDetails(portA).some((r) => r.layers === 'eu'),
+          { timeout: 8000 },
+        )
+        .toBe(true)
+      // The global view is clipped to Europe’s extent (± a pixel at z0).
+      const bbox = getMapRequestDetails(portA)
+        .find((r) => r.layers === 'eu')!
+        .bbox!.split(',')
+        .map(Number)
+      expect(bbox[0]).toBeGreaterThanOrEqual(-1.4e6)
+      expect(bbox[2]).toBeLessThanOrEqual(3.6e6)
+      expect(bbox[1]).toBeGreaterThanOrEqual(3.9e6)
+      expect(bbox[3]).toBeLessThanOrEqual(11.3e6)
+      // Fit to globe frames the active layers, not the service bbox.
+      await screen.getByRole('button', { name: 'Fit to globe' }).click()
+      await expect
+        .poll(() => lastCamera(onViewStateChange)?.lon, { timeout: 8000 })
+        .toBeCloseTo(10, 0)
+      // A global layer offers no zoom button; a regional one frames itself.
+      await screen.getByText('Australia only').click()
+      expect(
+        screen
+          .getByRole('button', { name: 'Zoom to 2 m temperature’s extent' })
+          .elements(),
+      ).toHaveLength(0)
+      await screen
+        .getByRole('button', { name: 'Zoom to Australia only’s extent' })
+        .click()
+      // The small test map cannot centre on 132.5°E at this zoom (the
+      // world-extent constraint shifts it) — check the direction only.
+      await expect
+        .poll(() => lastCamera(onViewStateChange)?.lon, { timeout: 8000 })
+        .toBeGreaterThan(90)
+      expect(lastCamera(onViewStateChange)?.lat).toBeLessThan(-10)
+    } finally {
+      removeSizing()
+    }
+  })
+})
+
+describe('GeoViewer projections', () => {
+  const POLAR_CRS = ['EPSG:3857', 'EPSG:4326', 'EPSG:32661']
+  function registerPolarPair(bCrs: Array<string> = POLAR_CRS) {
+    const portA = nextPort++
+    const portB = nextPort++
+    registerMockWmsServer(portA, {
+      crs: POLAR_CRS,
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    registerMockWmsServer(portB, {
+      crs: bCrs,
+      layers: [{ name: 'msl', title: 'Mean sea level pressure' }],
+    })
+    return { portA, portB }
+  }
+  const lastCrs = (port: number) => getMapRequestDetails(port).at(-1)?.crs
+
+  it('switches to the Arctic projection: native GetMaps, Outline basemap, and back', async () => {
+    const { portA, portB } = registerPolarPair()
+    const removeSizing = injectMapSizing()
+    try {
+      const screen = await render(<Harness portA={portA} portB={portB} />)
+      await screen.getByText('Mean sea level pressure').first().click()
+      await expect
+        .poll(() => lastCrs(portA), { timeout: 8000 })
+        .toBe('EPSG:3857')
+
+      await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+      await screen
+        .getByRole('radio', {
+          name: 'Arctic — polar stereographic',
+          exact: true,
+        })
+        .click()
+      await expect
+        .poll(() => lastCrs(portA), { timeout: 8000 })
+        .toBe('EPSG:32661')
+      // BBOX in UPS metres, clipped to the layer extent (± a pixel).
+      const bbox = getMapRequestDetails(portA)
+        .at(-1)!
+        .bbox!.split(',')
+        .map(Number)
+      expect(bbox[0]).toBeGreaterThanOrEqual(-7.1e6)
+      expect(bbox[2]).toBeLessThanOrEqual(11.1e6)
+      // Carto is Mercator-only: disabled, the Outline stands in.
+      const carto = screen.getByRole('button', { name: /Carto Positron/ })
+      await expect.element(carto).toBeDisabled()
+      await expect
+        .element(screen.getByRole('button', { name: /Outline/ }))
+        .toHaveAttribute('aria-pressed', 'true')
+
+      await screen.getByRole('radio', { name: 'Web Mercator' }).click()
+      await expect
+        .poll(() => lastCrs(portA), { timeout: 8000 })
+        .toBe('EPSG:3857')
+      await expect.element(carto).toHaveAttribute('aria-pressed', 'true')
+    } finally {
+      removeSizing()
+    }
+  })
+
+  it('disables a projection a source does not serve, naming the source', async () => {
+    const { portA, portB } = registerPolarPair(['EPSG:3857', 'EPSG:4326'])
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    await expect
+      .element(screen.getByText('Mean sea level pressure'))
+      .toBeVisible()
+
+    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    const arctic = screen.getByRole('radio', {
+      name: /Arctic — polar stereographic/,
+    })
+    await expect.element(arctic).toBeDisabled()
+    await expect
+      .element(screen.getByText('B · Run B does not serve this projection'))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('radio', { name: 'Web Mercator' }))
+      .toBeEnabled()
+  })
+
+  it('restores the projection from the URL and reports it', async () => {
+    const { portA, portB } = registerPolarPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          initialViewState={{ projection: 'npole' }}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('Mean sea level pressure').first().click()
+      await expect
+        .poll(() => lastCrs(portA), { timeout: 8000 })
+        .toBe('EPSG:32661')
+      expect(getMapRequestDetails(portA).map((r) => r.crs)).not.toContain(
+        'EPSG:3857',
+      )
+      expect(onViewStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({ projection: 'npole' }),
+      )
     } finally {
       removeSizing()
     }

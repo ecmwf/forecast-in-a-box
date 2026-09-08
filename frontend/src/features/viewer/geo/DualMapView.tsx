@@ -23,7 +23,8 @@ import { useWmsLayerStack } from '../hooks/useWmsLayerStack'
 import { useMeasure } from '../hooks/useMeasure'
 import { usePointerReadout } from '../hooks/usePointerReadout'
 import { useTimeStepPrefetch } from '../hooks/useTimeStepPrefetch'
-import { formatLatLon } from '../format'
+import { PointerReadoutBadge } from '../components/PointerReadoutBadge'
+import { viewerProjectionOf } from '../projections'
 import { compositeMapToCanvas } from '../map-export'
 import { MapLoadingBar } from '../components/MapLoadingBar'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
@@ -39,7 +40,8 @@ import type { ContextOverlay } from './overlays'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type View from 'ol/View'
 import type { SourceSlot } from './layer-pairing'
-import type { CaptureResult, CompareMapSource } from './types'
+import type { CaptureResult, CompareMapSource, FitBboxAction } from './types'
+import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
 
 const noop = () => {}
@@ -72,6 +74,7 @@ export function DualMapView({
   onAnnotationEdit,
   onAnnotationMove,
   onRegisterFit,
+  onRegisterFitBbox,
   onRegisterCapture,
 }: {
   view: View
@@ -106,6 +109,7 @@ export function DualMapView({
   onAnnotationMove: (id: string, coordinate: [number, number]) => void
   /** Register this component's fit-to-bbox action with the toolbar. */
   onRegisterFit: (fit: (() => void) | null) => void
+  onRegisterFitBbox: (fit: FitBboxAction | null) => void
   onRegisterCapture: (
     capture: (() => Promise<Array<CaptureResult>>) | null,
   ) => void
@@ -134,6 +138,17 @@ export function DualMapView({
     [],
   )
 
+  // One shared View: any panel's zoom-to-bbox serves both.
+  const fitBboxesRef = useRef(new Map<string, FitBboxAction>())
+  const registerFitBbox = useCallback(
+    (slot: string, fit: FitBboxAction | null) => {
+      if (fit) fitBboxesRef.current.set(slot, fit)
+      else fitBboxesRef.current.delete(slot)
+      const first = fitBboxesRef.current.values().next().value
+      onRegisterFitBbox(first ?? null)
+    },
+    [onRegisterFitBbox],
+  )
   const registerFit = useCallback(
     (slot: string, fit: (() => void) | null) => {
       if (fit) fitsRef.current.set(slot, fit)
@@ -176,6 +191,7 @@ export function DualMapView({
           onAnnotationEdit={onAnnotationEdit}
           onAnnotationMove={onAnnotationMove}
           onRegisterFit={registerFit}
+          onRegisterFitBbox={registerFitBbox}
           onRegisterCapture={registerCapture}
         />
         <DualMapPanel
@@ -202,6 +218,7 @@ export function DualMapView({
           onAnnotationEdit={onAnnotationEdit}
           onAnnotationMove={onAnnotationMove}
           onRegisterFit={registerFit}
+          onRegisterFitBbox={registerFitBbox}
           onRegisterCapture={registerCapture}
         />
       </div>
@@ -233,6 +250,7 @@ function DualMapPanel({
   onAnnotationEdit,
   onAnnotationMove,
   onRegisterFit,
+  onRegisterFitBbox,
   onRegisterCapture,
 }: {
   source: CompareMapSource
@@ -262,6 +280,7 @@ function DualMapPanel({
   onAnnotationEdit: (id: string) => void
   onAnnotationMove: (id: string, coordinate: [number, number]) => void
   onRegisterFit: (slot: string, fit: (() => void) | null) => void
+  onRegisterFitBbox: (slot: string, fit: FitBboxAction | null) => void
   onRegisterCapture: (
     slot: string,
     capture: (() => Promise<CaptureResult | null>) | null,
@@ -275,10 +294,13 @@ function DualMapPanel({
     () => setLoadingCount((c) => Math.max(0, c - 1)),
     [],
   )
-  const { mapRef, basemapLayerRef, tryFit, setFitBbox, mapVersion } =
+  const theme = useUiStore((s) => s.resolvedTheme)
+  const { mapRef, basemapLayerRef, tryFit, fitBbox, setFitBbox, mapVersion } =
     useOlMapBase(containerRef, {
       view,
-      resetKey: `${source.slot}:${source.baseUrl}`,
+      // A projection switch swaps the View — rebuild around it.
+      resetKey: `${source.slot}:${source.baseUrl}|${view.getProjection().getCode()}`,
+      theme,
       incLoading: noop,
       decLoading: noop,
     })
@@ -289,6 +311,7 @@ function DualMapPanel({
     decorationLayers: source.decorationLayers,
     basemapId,
     opacity: basemapOpacity,
+    theme,
     incLoading,
     decLoading,
     mapVersion,
@@ -298,6 +321,8 @@ function DualMapPanel({
     masterOpacity: source.hiddenAtTime ? 0 : source.masterOpacity,
     activeOrder: source.activeOrder,
     layerOpacities: source.layerOpacities,
+    layerSettings: source.layerSettings,
+    bboxAxisOrder: source.bboxAxisOrder,
     resolveTime: source.resolveTime,
     incLoading,
     decLoading,
@@ -317,6 +342,8 @@ function DualMapPanel({
     baseUrl: source.baseUrl,
     layers: source.layers,
     activeOrder: source.activeOrder,
+    layerSettings: source.layerSettings,
+    bboxAxisOrder: source.bboxAxisOrder,
     timeSteps: source.timeSteps,
     mapVersion,
   })
@@ -348,6 +375,10 @@ function DualMapPanel({
     onRegisterFit(source.slot, () => tryFit(true))
     return () => onRegisterFit(source.slot, null)
   }, [source.slot, tryFit, onRegisterFit])
+  useEffect(() => {
+    onRegisterFitBbox(source.slot, fitBbox)
+    return () => onRegisterFitBbox(source.slot, null)
+  }, [source.slot, fitBbox, onRegisterFitBbox])
 
   useEffect(() => {
     onRegisterCapture(source.slot, () => {
@@ -408,9 +439,11 @@ function DualMapPanel({
         onUnpin={onUnpinLegend}
       />
       {pointer && (
-        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-md border border-border bg-background/90 px-2.5 py-1 font-mono text-xs tabular-nums shadow-sm backdrop-blur-sm">
-          {formatLatLon(pointer.lat, pointer.lon)}
-        </div>
+        <PointerReadoutBadge
+          pointer={pointer}
+          crs={view.getProjection().getCode()}
+          metres={viewerProjectionOf(view).gridReadout}
+        />
       )}
       {annotateArmed && (
         <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border bg-background/90 px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm">
@@ -433,6 +466,7 @@ function DualMapPanel({
           label={source.label}
           loading={loadingCount > 0 || source.layersLoading}
           timeLabel={source.timeLabel}
+          runLabel={source.runLabel}
         />
       </div>
       {source.hiddenAtTime && (

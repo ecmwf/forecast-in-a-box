@@ -24,7 +24,12 @@ import { API_ENDPOINTS } from '@/api/endpoints'
 
 export interface ParsedStyle {
   name: string
+  /** Human title (`<Title>`); falls back to the name in UIs. */
+  title?: string
+  abstract?: string
   legendUrl?: string
+  /** Advertised LegendURL size, when given. */
+  legendSize?: { width: number; height: number }
 }
 
 export interface ParsedTime {
@@ -32,13 +37,26 @@ export interface ParsedTime {
   raw: string
 }
 
+/** A non-time dimension (e.g. `reference_time`, `elevation`). */
+export interface ParsedDimension {
+  name: string
+  /** Raw content: a list or `start/end/period`. */
+  raw: string
+  default?: string
+  units?: string
+}
+
 export interface ParsedLayer {
   name: string
   title: string
   styles: Array<ParsedStyle>
   time?: ParsedTime
+  /** Extra dimensions the layer takes (inherited), e.g. `reference_time`. */
+  dimensions?: Array<ParsedDimension>
   /** Resolution range the server serves this in (scale limits); absent = every zoom. */
   scale?: ScaleBand
+  /** WGS84 footprint [W, S, E, N], inherited (WMS 1.3.0 §7.2.4.6.6). */
+  bbox?: [number, number, number, number]
 }
 
 /** Resolution range (m/px) a layer serves within; unbounded sides are 0 / Infinity. */
@@ -54,6 +72,29 @@ export interface ParsedCapabilities {
   decorationLayers: Array<ParsedLayer>
   /** [minLon, minLat, maxLon, maxLat] in WGS84 (EPSG:4326). */
   bbox: [number, number, number, number]
+  /** Every CRS/SRS code advertised anywhere in the layer tree. */
+  crs: ReadonlyArray<string>
+}
+
+/** Codes a server may advertise instead of the one we request. */
+const CRS_ALIASES: Record<string, ReadonlyArray<string>> = {
+  'EPSG:3857': ['EPSG:900913'],
+  // Magics advertises UPS South under a non-existent code (upstream typo).
+  'EPSG:32761': ['EPSG:32762'],
+}
+
+/** Can `code` be requested? An empty list means the two web defaults. */
+export function supportsCrs(
+  advertised: ReadonlyArray<string>,
+  code: string,
+): boolean {
+  if (advertised.length === 0) {
+    return code === 'EPSG:3857' || code === 'EPSG:4326'
+  }
+  return (
+    advertised.includes(code) ||
+    (CRS_ALIASES[code] ?? []).some((alias) => advertised.includes(alias))
+  )
 }
 
 /** True when `baseUrl` is our own lens proxy path (a same-origin, relative
@@ -275,21 +316,24 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
   const bbox = parseBbox(root) ?? DEFAULT_BBOX
 
   const collected: Array<ParsedLayer> = []
-  if (root) collectLayers(root, { styles: [] }, collected)
+  const crs = new Set<string>()
+  if (root) collectLayers(root, { styles: [] }, collected, crs)
   const layers: Array<ParsedLayer> = []
   const decorationLayers: Array<ParsedLayer> = []
   for (const layer of collected) {
     ;(isDecorationLayer(layer) ? decorationLayers : layers).push(layer)
   }
 
-  return { layers, decorationLayers, bbox }
+  return { layers, decorationLayers, bbox, crs: [...crs] }
 }
 
 /** Properties child layers inherit from ancestors (WMS 1.3.0 §7.2.4.8). */
 interface LayerInheritance {
   time?: ParsedTime
+  dimensions?: Array<ParsedDimension>
   styles: ReadonlyArray<ParsedStyle>
   scale?: ScaleBand
+  bbox?: [number, number, number, number]
 }
 
 /** Every NAMED layer is requestable — including composite parents; real
@@ -298,11 +342,21 @@ function collectLayers(
   el: Element,
   inherited: LayerInheritance,
   out: Array<ParsedLayer>,
+  crs: Set<string>,
 ): void {
+  // 1.3.0 <CRS> one per element; 1.1.1 <SRS> may be space-separated.
+  for (const tag of ['CRS', 'SRS']) {
+    for (const node of directChildren(el, tag)) {
+      for (const code of node.textContent.trim().split(/\s+/)) {
+        if (code) crs.add(code)
+      }
+    }
+  }
   const ownStyles = parseStyles(el)
   const merged: LayerInheritance = {
     // A redeclared dimension replaces the ancestor's; styles are additive.
     time: parseTime(el) ?? inherited.time,
+    dimensions: parseDimensions(el) ?? inherited.dimensions,
     styles: [
       ...ownStyles,
       ...inherited.styles.filter(
@@ -310,6 +364,7 @@ function collectLayers(
       ),
     ],
     scale: parseScaleBand(el) ?? inherited.scale,
+    bbox: parseBbox(el) ?? inherited.bbox,
   }
 
   const name = textOf(el, 'Name')
@@ -319,11 +374,13 @@ function collectLayers(
       title: textOf(el, 'Title') ?? name,
       styles: [...merged.styles],
       time: merged.time,
+      dimensions: merged.dimensions,
       scale: merged.scale,
+      bbox: merged.bbox,
     })
   }
   for (const child of directChildren(el, 'Layer')) {
-    collectLayers(child, merged, out)
+    collectLayers(child, merged, out, crs)
   }
 }
 
@@ -332,12 +389,21 @@ function parseStyles(el: Element): Array<ParsedStyle> {
   for (const st of directChildren(el, 'Style')) {
     const styleName = textOf(st, 'Name')
     if (!styleName) continue
-    const online = st.querySelector('LegendURL > OnlineResource')
+    const legend = st.querySelector('LegendURL')
+    const online = legend?.querySelector('OnlineResource')
     const legendUrl =
       online?.getAttribute('xlink:href') ??
       online?.getAttributeNS(XLINK_NS, 'href') ??
       undefined
-    styles.push({ name: styleName, legendUrl: legendUrl || undefined })
+    const width = Number(legend?.getAttribute('width'))
+    const height = Number(legend?.getAttribute('height'))
+    styles.push({
+      name: styleName,
+      title: textOf(st, 'Title') ?? undefined,
+      abstract: textOf(st, 'Abstract')?.replace(/\s+/g, ' ') ?? undefined,
+      legendUrl: legendUrl || undefined,
+      legendSize: width > 0 && height > 0 ? { width, height } : undefined,
+    })
   }
   return styles
 }
@@ -353,6 +419,24 @@ function parseTime(el: Element): ParsedTime | undefined {
     timeChild('Dimension')?.textContent.trim() ||
     timeChild('Extent')?.textContent.trim()
   return raw ? { raw } : undefined
+}
+
+/** Non-time `<Dimension>`s declared on this element, if any. */
+function parseDimensions(el: Element): Array<ParsedDimension> | undefined {
+  const dims = directChildren(el, 'Dimension').flatMap((d) => {
+    const name = d.getAttribute('name')?.toLowerCase()
+    const raw = d.textContent.trim()
+    if (!name || name === 'time' || !raw) return []
+    return [
+      {
+        name,
+        raw,
+        default: d.getAttribute('default') ?? undefined,
+        units: d.getAttribute('units') ?? undefined,
+      },
+    ]
+  })
+  return dims.length > 0 ? dims : undefined
 }
 
 /** OGC rendering pixel size (0.28 mm): scaleDenominator = resolution / 0.00028. */
@@ -414,25 +498,45 @@ export function scaleBandTargetResolution(band: ScaleBand): number {
   return Number.isFinite(maxRes) ? maxRes / 2 : minRes * 2
 }
 
+/** Own WGS84 box: the 1.3.0 element, else 1.1.1 LatLonBoundingBox attrs. */
 function parseBbox(
   el: Element | null,
 ): [number, number, number, number] | null {
   if (!el) return null
-  const ex = el.querySelector('EX_GeographicBoundingBox')
-  if (!ex) return null
-  const minLon = numOf(ex, 'westBoundLongitude')
-  const maxLon = numOf(ex, 'eastBoundLongitude')
-  const minLat = numOf(ex, 'southBoundLatitude')
-  const maxLat = numOf(ex, 'northBoundLatitude')
-  if (
-    Number.isNaN(minLon) ||
-    Number.isNaN(minLat) ||
-    Number.isNaN(maxLon) ||
-    Number.isNaN(maxLat)
-  ) {
-    return null
+  const ex = directChildren(el, 'EX_GeographicBoundingBox').at(0)
+  if (ex) {
+    const box = [
+      numOf(ex, 'westBoundLongitude'),
+      numOf(ex, 'southBoundLatitude'),
+      numOf(ex, 'eastBoundLongitude'),
+      numOf(ex, 'northBoundLatitude'),
+    ]
+    return box.every(Number.isFinite)
+      ? (box as [number, number, number, number])
+      : null
   }
-  return [minLon, minLat, maxLon, maxLat]
+  // GeoServer (DWD) gives per-layer coverage only as BoundingBox.
+  const ll = directChildren(el, 'LatLonBoundingBox').at(0)
+  const geo =
+    ll ??
+    directChildren(el, 'BoundingBox').find((b) =>
+      ['CRS:84', 'EPSG:4326'].includes(
+        b.getAttribute('CRS') ?? b.getAttribute('SRS') ?? '',
+      ),
+    )
+  if (!geo) return null
+  const box = ['minx', 'miny', 'maxx', 'maxy'].map((a) =>
+    Number(geo.getAttribute(a)),
+  )
+  if (!box.every(Number.isFinite)) return null
+  // 1.3.0 EPSG:4326 is latitude-first; a |lat| > 90 betrays lon-first.
+  const latFirst =
+    geo.getAttribute('CRS') === 'EPSG:4326' &&
+    Math.abs(box[0]) <= 90 &&
+    Math.abs(box[2]) <= 90
+  return latFirst
+    ? [box[1], box[0], box[3], box[2]]
+    : (box as [number, number, number, number])
 }
 
 function directChildren(el: Element, tagName: string): Array<Element> {
@@ -824,4 +928,122 @@ export function appendWmsParams(endpoint: string, query: string): string {
   return endpoint.includes('?')
     ? `${endpoint}&${query}`
     : `${endpoint}?${query}`
+}
+
+/** Requested style if advertised, else the first (= empty STYLES). */
+export function resolveStyle(
+  layer: ParsedLayer,
+  requested?: string | null,
+): ParsedStyle | undefined {
+  if (requested) {
+    const hit = layer.styles.find((s) => s.name === requested)
+    if (hit) return hit
+  }
+  return layer.styles[0]
+}
+
+/** Legend URL resized to a strip when the advertised URL carried a size. */
+export function legendStripUrl(
+  style: ParsedStyle,
+  width: number,
+): string | undefined {
+  if (!style.legendUrl) return undefined
+  if (!style.legendSize) return style.legendUrl
+  try {
+    const url = new URL(style.legendUrl, 'http://lens.invalid')
+    const wKey = [...url.searchParams.keys()].find(
+      (k) => k.toLowerCase() === 'width',
+    )
+    const hKey = [...url.searchParams.keys()].find(
+      (k) => k.toLowerCase() === 'height',
+    )
+    if (!wKey || !hKey) return style.legendUrl
+    const height = Math.max(
+      1,
+      Math.round((width * style.legendSize.height) / style.legendSize.width),
+    )
+    url.searchParams.set(wKey, String(width))
+    url.searchParams.set(hKey, String(height))
+    // Keep the advertised form (relative vs absolute).
+    return style.legendUrl.startsWith('http')
+      ? url.toString()
+      : `${url.pathname}${url.search}`
+  } catch {
+    return style.legendUrl
+  }
+}
+
+/** Per-layer request choices: style + extra dims (→ `DIM_<NAME>`). */
+export interface LayerRequestSettings {
+  style?: string
+  dims?: Readonly<Record<string, string>>
+}
+
+/** GetMap params for one layer — map, prefetch and preview share this. */
+export function layerRequestParams(
+  layer: ParsedLayer,
+  settings: LayerRequestSettings | undefined,
+  time: string | null,
+): Record<string, string> {
+  const params: Record<string, string> = {
+    LAYERS: layer.name,
+    // Some public servers advertise no <Style> → empty = server default.
+    STYLES: resolveStyle(layer, settings?.style)?.name ?? '',
+    FORMAT: 'image/png',
+    TRANSPARENT: 'TRUE',
+  }
+  if (time) params.TIME = time
+  for (const [name, value] of Object.entries(settings?.dims ?? {})) {
+    params[`DIM_${name.toUpperCase()}`] = value
+  }
+  return params
+}
+
+export type Bbox = [number, number, number, number]
+
+/** Whole-globe bbox: nothing to clip. */
+export const isWorldBbox = (bbox: Bbox): boolean =>
+  bbox[0] <= -180 && bbox[1] <= -90 && bbox[2] >= 180 && bbox[3] >= 90
+
+/** Union of two bboxes; either may be absent. */
+export function unionBbox(a: Bbox | null, b: Bbox | null): Bbox | null {
+  if (!a || !b) return a ?? b
+  return [
+    Math.min(a[0], b[0]),
+    Math.min(a[1], b[1]),
+    Math.max(a[2], b[2]),
+    Math.max(a[3], b[3]),
+  ]
+}
+
+/** Union bbox of the active layers; null when any lacks one. */
+export function activeLayersBbox(
+  layers: ReadonlyArray<ParsedLayer>,
+  activeOrder: ReadonlyArray<string>,
+): Bbox | null {
+  let out: Bbox | null = null
+  for (const name of activeOrder) {
+    const bbox = layers.find((l) => l.name === name)?.bbox
+    if (!bbox) return null
+    out = unionBbox(out, bbox)
+  }
+  return out
+}
+
+/** Name of the model-run dimension (WMS convention, KNMI/DWD/ADAGUC). */
+export const RUN_DIMENSION = 'reference_time'
+
+/** Values a layer's extra dimension takes, in advertised order. */
+export function dimensionValues(
+  layer: ParsedLayer,
+  name: string,
+): Array<string> {
+  const dim = layer.dimensions?.find((d) => d.name === name)
+  if (!dim) return []
+  return dim.units === 'ISO8601'
+    ? expandTimeSteps(dim.raw)
+    : dim.raw
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean)
 }

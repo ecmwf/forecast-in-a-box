@@ -8,10 +8,14 @@
  * does it submit to any jurisdiction.
  */
 
-import type { ParsedLayer } from '../wms-capabilities'
+import type { BboxAxisOrder } from '../projections'
+import type { LayerRequestSettings, ParsedLayer } from '../wms-capabilities'
 import type { SourceSlot } from './layer-pairing'
 
 /** Everything a compare map needs to render one source's stack. */
+/** Fit the shared view to a WGS84 bbox. */
+export type FitBboxAction = (bbox: [number, number, number, number]) => void
+
 export interface CompareMapSource {
   slot: SourceSlot
   /** Stable source identity (basket entry ref) — annotations bind to it. */
@@ -23,6 +27,10 @@ export interface CompareMapSource {
   decorationLayers: ReadonlyArray<ParsedLayer>
   activeOrder: ReadonlyArray<string>
   layerOpacities: ReadonlyMap<string, number>
+  /** Per-layer style and dimension choices; absent = server defaults. */
+  layerSettings: ReadonlyMap<string, LayerRequestSettings>
+  /** How this server reads a 1.3.0 BBOX in projected CRSs. */
+  bboxAxisOrder: BboxAxisOrder
   /** Raw TIME string THIS server advertised for the current instant. */
   resolveTime: (layer: ParsedLayer) => string | null
   /** Per-request load outcomes (feeds the GetMap failure cache). */
@@ -42,6 +50,9 @@ export interface CompareMapSource {
   timeTag: string | null
   /** Human label of the instant this source displays ("06 Jul 12:00Z"). */
   timeLabel: string | null
+  /** Model run in effect ("run 2026-09-04 03:00Z"), null when none. */
+  runLabel: string | null
+  /** Fit-to-globe target (WGS84), shared by both sides. */
   bbox: [number, number, number, number] | null
 }
 

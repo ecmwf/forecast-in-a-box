@@ -186,7 +186,29 @@
   },
   "basemaps": {
     "cartoPositron": "Carto Positron",
-    "skinnywms": "SkinnyWMS (native)"
+    "outline": "Outline (coastlines, borders, graticule)",
+    "skinnywms": "SkinnyWMS (native)",
+    "mercatorOnly": "Web Mercator only"
+  },
+  "startup": {
+    "status": "{{step}} — step {{n}} of {{total}}",
+    "elapsed": "{{seconds}} s",
+    "server": "Starting the map server",
+    "files": "Reading the forecast files",
+    "connect": "Connecting to the server",
+    "catalogue": "Fetching the layer catalogue",
+    "firstStartHint": "A first start reads the run's files — usually 10–30 s."
+  },
+  "projections": {
+    "title": "Projection",
+    "popover": "Projection & basemap",
+    "merc": "Web Mercator",
+    "geo": "Equirectangular (whole globe)",
+    "npole": "Arctic — polar stereographic",
+    "spole": "Antarctic — polar stereographic",
+    "laea": "Europe — equal-area (LAEA)",
+    "blockedBy": "{{source}} does not serve this projection",
+    "snappedBack": "{{source}} does not serve the {{projection}} projection — back to Web Mercator"
   },
   "wmsParams": {
     "t": "Temperature",
@@ -229,6 +251,8 @@
     "both": "A∩B",
     "bothHint": "Only layers available in both sources",
     "groupToggle": "Group similar layers",
+    "timeAware": "Time-aware",
+    "timeAwareHint": "Show only layers with a time dimension",
     "layers_one": "{{count}} layer",
     "layers_other": "{{count}} layers"
   },
@@ -237,10 +261,37 @@
     "globalOpacity": "Global opacity",
     "sourceOpacity": "All of {{slot}}",
     "removeLayer": "Remove {{name}}",
+    "zoomToLayer": "Zoom to {{name}}’s extent",
     "moveLayerUp": "Move {{name}} up",
     "moveLayerDown": "Move {{name}} down",
     "layerOpacity": "{{name}} opacity",
-    "empty": "Add layers from the browser on the right."
+    "empty": "Add layers from the browser on the right.",
+    "style": "Style",
+    "stylePicker": "Style for {{name}}",
+    "styleDefault": "Server default",
+    "styleHelpAria": "About layer styles",
+    "styleHelp": "How this layer is drawn — the server's style variants (fills, contours, thresholds). Hover an entry to preview it on the current view; pin one to make it your default for this layer.",
+    "styleOnlyIn": "{{slot}} only",
+    "styleOnlyInHint": "Only {{slot}} offers this style — the other side keeps its own",
+    "stylePreview": "Preview of {{name}}",
+    "stylePreviewLoading": "Rendering preview…",
+    "stylePreviewUnavailable": "No preview from this server",
+    "run": "Run",
+    "runPicker": "Run for {{name}}",
+    "runLatest": "Latest ({{time}})",
+    "runHelpAria": "About model runs",
+    "runHelp": "The forecast cycle this layer is drawn from (its reference time). Latest follows the server's newest run as it updates; pick an older run to hold it while you move through the timeline or to compare runs.",
+    "stylePin": "Use as my default for this layer",
+    "styleUnpin": "Stop using as my default",
+    "stylePinned": "Your default",
+    "styleCount_one": "{{count}} style",
+    "styleCount_other": "{{count}} styles"
+  },
+  "slotTag": {
+    "run": "run {{time}}",
+    "runCount_one": "{{count}} run",
+    "runCount_other": "{{count}} runs",
+    "runTitle": "Model run (reference time) the layers are drawn from"
   },
   "slots": {
     "swap": "Swap A and B",
@@ -304,7 +355,7 @@
       },
       "layers": {
         "title": "Layers & opacity",
-        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer."
+        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer. Layers advertising several styles get a Style button: the list shows each style with its legend, and the pane beside it previews the highlighted one on the current view before you pick. Layers advertising model runs (reference time) get a Run select per side — Latest follows the server, or hold one run while the timeline moves. Regional layers get a frame button that zooms to their extent, are only requested while on screen, and Fit to globe (F) frames the active layers together. The pin in that pane makes a style your default for the layer on this server; a style in a shared link still wins."
       },
       "time": {
         "title": "Valid time",
@@ -312,7 +363,7 @@
       },
       "tools": {
         "title": "Tools",
-        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The annotate tool (N) records numbered findings pinned to the map — per panel in side-by-side — and they are baked into exports. The layers icon switches the basemap and its opacity. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
+        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The annotate tool (N) records numbered findings pinned to the map — per panel in side-by-side — and they are baked into exports. The layers icon (P) switches the map projection — Web Mercator, an equirectangular globe, Arctic and Antarctic polar views, or an equal-area Europe — and the basemap and its opacity. Data is rendered natively by each server, so a projection is offered only when every active source supports it; web basemaps need Web Mercator, elsewhere the built-in outline map takes over. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
       },
       "export": {
         "title": "Export",
@@ -325,6 +376,7 @@
       "sidebars": "Toggle both sidebars",
       "modes": "Switch comparison mode",
       "fit": "Fit to globe",
+      "projection": "Cycle the map projection",
       "copy": "Copy the view to the clipboard",
       "export": "Export / report",
       "flicker": "Toggle flicker frame (flicker mode)",

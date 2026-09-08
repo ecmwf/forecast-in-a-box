@@ -26,17 +26,26 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import ImageLayer from 'ol/layer/Image'
 import {
   DEFAULT_LAYER_OPACITY,
-  WEB_MERCATOR_EXTENT,
   loadRequestUrl,
   loadWasAborted,
   makeDataLayerSource,
 } from '../ol-layers'
-import { toWmsEndpoint } from '../wms-capabilities'
+import {
+  bandResolution,
+  layerExtentFor,
+  requestProjection,
+  viewerProjectionOf,
+} from '../projections'
+import { layerRequestParams, toWmsEndpoint } from '../wms-capabilities'
+import type { BboxAxisOrder } from '../projections'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
+import type { Extent } from 'ol/extent'
 import type ImageWMS from 'ol/source/ImageWMS'
 import type { ImageSourceEvent } from 'ol/source/Image'
-import type { ParsedLayer } from '../wms-capabilities'
+import type { LayerRequestSettings, ParsedLayer } from '../wms-capabilities'
+
+const NO_SETTINGS: ReadonlyMap<string, LayerRequestSettings> = new Map()
 
 interface ManagedLayer {
   layer: ImageLayer<ImageWMS>
@@ -65,6 +74,9 @@ function requestedTime(evt: ImageSourceEvent): string | null {
   }
 }
 
+const extentsEqual = (a: Extent | undefined, b: Extent): boolean =>
+  a !== undefined && a.every((v, i) => v === b[i])
+
 export interface WmsLayerStackConfig {
   /** z-index band base; data layers get `zBase + stackPosition`. */
   zBase?: number
@@ -73,6 +85,10 @@ export interface WmsLayerStackConfig {
   /** Ordered active layer names, index 0 = top of stack. */
   activeOrder: ReadonlyArray<string>
   layerOpacities: ReadonlyMap<string, number>
+  /** Per-layer style + dimension choices; absent = server defaults. */
+  layerSettings?: ReadonlyMap<string, LayerRequestSettings>
+  /** BBOX axis order this server expects in projected CRSs. */
+  bboxAxisOrder?: BboxAxisOrder
   /**
    * Per-layer WMS TIME value (the raw string THIS server advertised), or
    * null to omit the param. Must be referentially stable (useCallback) —
@@ -115,6 +131,8 @@ export function useWmsLayerStack(
     masterOpacity,
     activeOrder,
     layerOpacities,
+    layerSettings = NO_SETTINGS,
+    bboxAxisOrder = 'epsg',
     resolveTime,
     incLoading,
     decLoading,
@@ -155,6 +173,10 @@ export function useWmsLayerStack(
       attachedMapRef.current = map
     }
     const managed = managedRef.current
+    const view = map.getView()
+    // Scale bands are metres → view units.
+    const projection = viewerProjectionOf(view)
+    const requestProj = requestProjection(view, bboxAxisOrder)
 
     const wantedNames = new Set<string>()
     activeOrder.forEach((layerName, idx) => {
@@ -162,16 +184,15 @@ export function useWmsLayerStack(
       if (!layer) return
       wantedNames.add(layerName)
 
-      const params: Record<string, string> = {
-        LAYERS: layerName,
-        // Some public servers advertise no <Style> → empty = server default.
-        STYLES: layer.styles[0]?.name ?? '',
-        FORMAT: 'image/png',
-        TRANSPARENT: 'TRUE',
-      }
       const time = resolveTime(layer)
-      if (time) params.TIME = time
+      const params = layerRequestParams(
+        layer,
+        layerSettings.get(layerName),
+        time,
+      )
 
+      // Off-screen layers are culled by OL; on-screen requests are clipped.
+      const extent = layerExtentFor(projection, layer.bbox)
       const perLayer = layerOpacities.get(layerName) ?? DEFAULT_LAYER_OPACITY
       const effectiveOpacity = perLayer * masterOpacity
       const z = zBase + (activeOrder.length - idx) // index 0 → highest z
@@ -197,17 +218,23 @@ export function useWmsLayerStack(
         }
         existing.layer.setOpacity(effectiveOpacity)
         existing.layer.setZIndex(z)
+        if (!extentsEqual(existing.layer.getExtent(), extent)) {
+          existing.layer.setExtent(extent)
+        }
       } else {
-        const source = makeDataLayerSource(baseUrl, params)
+        const source = makeDataLayerSource(baseUrl, params, requestProj)
         const olLayer = new ImageLayer({
           source,
           opacity: effectiveOpacity,
           zIndex: z,
-          // Clip to ±85° so a zoomed-out BBOX never goes out-of-bounds (→ stretched).
-          extent: WEB_MERCATOR_EXTENT,
+          extent,
           // Scale limits: OL skips out-of-range steps instead of a blank GetMap.
-          minResolution: layer.scale?.minRes,
-          maxResolution: layer.scale?.maxRes,
+          minResolution: layer.scale
+            ? bandResolution(view, layer.scale.minRes)
+            : undefined,
+          maxResolution: layer.scale
+            ? bandResolution(view, layer.scale.maxRes)
+            : undefined,
         })
         const entry: ManagedLayer = {
           layer: olLayer,
@@ -272,6 +299,8 @@ export function useWmsLayerStack(
     layers,
     activeOrder,
     layerOpacities,
+    layerSettings,
+    bboxAxisOrder,
     masterOpacity,
     resolveTime,
     zBase,
