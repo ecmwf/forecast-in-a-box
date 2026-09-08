@@ -31,7 +31,7 @@ dependencies = [
   "fastapi",
   "fastapi-users[oauth]",
   "fastapi-users-db-sqlalchemy",
-  "fiab-core>=3,<4", # auto-updateable -- do not remove this comment
+  "fiab-core>=4,<5", # auto-updateable -- do not remove this comment
   "fire",
   "httpx<1",
   "httpx-oauth",
@@ -70,7 +70,7 @@ __version__ = "{version}"
 '''
 local_scheme = "no-local-version"
 root = ".."
-fallback_version = "3.0.0" # auto-updateable -- do not remove this comment
+fallback_version = "4.0.0" # auto-updateable -- do not remove this comment
 tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 
 [tool.ruff]
