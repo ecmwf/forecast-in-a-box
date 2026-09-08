@@ -126,6 +126,14 @@ class CheckpointArtifact:
             return None
         return checkpoint.configuration.is_ensemble_model is True
 
+    @property
+    def extra_output_keys(self) -> dict[str, str]:
+        """Additional metadata from the checkpoint artifact for use in actions and qubes.
+
+        i.e. MARS metadata
+        """
+        return self.checkpoint().extra_output_keys
+
     def get_model_output(self, lead_time: int) -> Qube | dict[str, Qube]:
         """Get the model output qube from the checkpoint artifact"""
         checkpoint = self.checkpoint()

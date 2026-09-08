@@ -21,6 +21,8 @@ from typing import Any
 
 from qubed import Qube
 
+extra_output_keys = {"class": ["ai"], "type": ["fc"], "stream": ["oper"]}
+
 
 @lru_cache(maxsize=None)
 def open_checkpoint(checkpoint_path: str) -> "Checkpoint":  # type: ignore
@@ -116,6 +118,7 @@ def generate_artifact_entry(
             "input_characteristics": [c.strip() for c in input_characteristics.split(",") if c.strip()],
             "input_qube": qubes["input_qube"],
             "output_qube": qubes["output_qube"],
+            "extra_output_keys": extra_output_keys,
             "input_options": {},
             "timestep": get_timestep(checkpoint_path),
         },

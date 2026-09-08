@@ -109,6 +109,10 @@ class AnemoiCheckpoint(FiabCoreBaseModel):
     input_qube: dict[str, Any] = Field(description="Json Dump of the input qube structure, including variables, levels")
     output_qube: dict[str, Any] = Field(description="Json Dump of the output qube structure, including variables, levels, but not step")
 
+    extra_output_keys: dict[str, str] = Field(
+        default_factory=dict, description="Additional keys for output of a model, stored as key-value pairs"
+    )
+
     configuration: AnemoiCheckpointConfiguration = Field(
         default_factory=AnemoiCheckpointConfiguration,
         description="Additional configuration for the checkpoint such as pre and post processors and control options",
