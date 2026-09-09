@@ -161,7 +161,7 @@ class OperationalForecastSource(Source):
         time = self._convert_time(basetime.time().hour)
 
         source = block.config_as_str(SOURCE)
-        if source == "ecmwf-opendata":
+        if source == "ecmwf-open-data":
             metadata = {"environment": opendata_dependencies}
         elif source == "mars":
             metadata = {"environment": mars_dependencies}
