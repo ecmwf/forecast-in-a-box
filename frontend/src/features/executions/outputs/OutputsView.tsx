@@ -312,6 +312,12 @@ export function OutputsView({
   const ActiveViewer = activeViewer?.adapter.Viewer ?? null
 
   /** True empty: no outputs payload AND no planned blocks. */
+  /** Distinct lost-output reasons; hook stays above the early return. */
+  const lostReasons = useMemo(
+    () => Array.from(new Set(Object.values(lostTaskIds))),
+    [lostTaskIds],
+  )
+
   if (items.length === 0 && blockSkeletons.length === 0) {
     // GRIB-only run — the Stored outputs card covers it; render nothing.
     if (hasStoredOutputs) return null
@@ -342,12 +348,6 @@ export function OutputsView({
   const totalAvailable = availableCount + storedStats.available
   const shownPending = visiblePendingCount + storedStats.pending
   const shownLost = visibleLostCount + storedStats.lost
-  /** Distinct backend reasons behind the unretained outputs. */
-  const lostReasons = useMemo(
-    () => Array.from(new Set(Object.values(lostTaskIds))),
-    [lostTaskIds],
-  )
-
   const toolbar = (
     <div className="flex w-full flex-wrap items-center justify-between gap-3">
       <P className="text-muted-foreground">
