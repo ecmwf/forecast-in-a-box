@@ -16,7 +16,6 @@ import urllib.parse
 import uuid
 from dataclasses import dataclass
 from multiprocessing.process import BaseProcess
-from tempfile import TemporaryDirectory
 
 from cascade.deployment.logging import LoggingConfig
 from cascade.executor import platform
@@ -30,6 +29,7 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayNotRunning,
     GatewayNotStarted,
 )
+from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility import tunnel
 from forecastbox.utility.config import LocalGateway, RemoteGateway, StatusMessage, UnmanagedGateway, config
 
@@ -37,8 +37,13 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, eq=True, slots=True)
+class LogDirectory:
+    name: str
+
+
+@dataclass(frozen=True, eq=True, slots=True)
 class LocalProcess:
-    logs_directory: TemporaryDirectory
+    logs_directory: LogDirectory
     process: BaseProcess
     gateway_url: str
 
@@ -98,9 +103,11 @@ def launch_gateway() -> None:
         if isinstance(gateway, LocalGateway):
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
-            cascade_logging_base = startup_params.cascade_logging_base
             shared_path = startup_params.shared_path
-            logs_directory = TemporaryDirectory(prefix="fiabLogs", dir=cascade_logging_base)
+            # NOTE we dont use gateway.startup_params logging base, because backend used to derive
+            # the directory already. And we must not modify config live as we dont want to persist
+            # that value later
+            logs_directory = LogDirectory(os.environ[BACKEND_LOG_DIRECTORY_ENV])
             logger.debug(f"logging base is at {logs_directory.name}")
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
@@ -169,7 +176,7 @@ def get_gateway_url() -> str:
         assert_never(gateway_connection)
 
 
-def get_logs_directory() -> Either[TemporaryDirectory, str]:  # ty: ignore[invalid-type-arguments]
+def get_logs_directory() -> Either[LogDirectory, str]:  # ty: ignore[invalid-type-arguments]
     gateway_connection = GatewayConnectionManager.gateway_connection
     if gateway_connection is None:
         return Either.error("gateway connection not initialized")

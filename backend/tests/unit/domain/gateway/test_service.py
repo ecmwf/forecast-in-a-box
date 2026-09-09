@@ -57,7 +57,7 @@ def test_launch_gateway_local_forwards_shared_path_to_process_args(monkeypatch: 
             startup_params=GatewayStartupParams(shared_path="/mnt/shared"),
         ),
     )
-    monkeypatch.setattr(gateway_service, "TemporaryDirectory", lambda *a, **k: type("TD", (), {"name": "/tmp/fiab"})())
+    monkeypatch.setenv("FIAB_BACKEND_LOG_DIRECTORY", "/tmp/fiab")
     monkeypatch.setattr(gateway_service.tunnel, "claim_free_port", lambda: 45678)
     monkeypatch.setattr(gateway_service.platform, "get_mp_ctx", lambda _: _FakeCtx())
     monkeypatch.setattr(gateway_service.GatewayConnectionManager, "gateway_connection", None)

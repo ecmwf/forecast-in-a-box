@@ -250,7 +250,7 @@ async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) ->
                     try:
                         for f in os.listdir(p):
                             j_pref = f"job_{cascade_job_id}"
-                            if f.startswith("gateway") or f.startswith(j_pref):
+                            if f == "backend.logs.txt" or f.startswith("gateway") or f.startswith(j_pref):
                                 zf.write(f"{p / f}", arcname=f)
                     except Exception as e:
                         zf.writestr("logs_directory.error.txt", f"{f} => {repr(e)}")

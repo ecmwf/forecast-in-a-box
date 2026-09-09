@@ -19,11 +19,12 @@ entrypoint/app.py, as it is coupled to FastAPI's API
 
 import asyncio
 import logging
+import os
 import sys
 
 import uvicorn
 
-from forecastbox.entrypoint.bootstrap.config import setup_process
+from forecastbox.entrypoint.bootstrap.config import init_logging_base, setup_process
 from forecastbox.utility.config import FIABConfig
 
 logger = logging.getLogger(__name__)
@@ -54,10 +55,13 @@ async def _uvicorn_run(app_name: str, host: str, port: int) -> bool:
 
 def launch_backend() -> None:
     config = FIABConfig()
-    # TODO something imported by this module reconfigures the logging -- find and remove!
+    log_base = init_logging_base(config)
+
+    # TODO something imported by this module reconfigures the logging -- find and remove! Probably inside uvicorn
     import forecastbox.entrypoint.app  # import inside function justified due to side effects
 
-    setup_process()
+    log_path = os.path.join(log_base, "backend.logs.txt")
+    setup_process(stdout=True, log_path=log_path)
     logger.debug(f"logging initialized post-{forecastbox.entrypoint.app.__name__} import")
     port = config.backend.uvicorn_port
     host = config.backend.uvicorn_host
