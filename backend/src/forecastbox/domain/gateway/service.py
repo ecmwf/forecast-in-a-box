@@ -128,8 +128,7 @@ def launch_gateway() -> None:
             log_base = f"{cascade_logging_base or '/tmp/'}fiabLogs{uuid.uuid4()}."
             logger.debug(f"logging base for tunnel gateway is {log_base}")
             remote_gateway_url = f"tcp://localhost:{handle.remote_port}"
-            logging_to_file = os.getenv("FIAB_LOGSTDOUT", "nay") != "yea"
-            logging_config = LoggingConfig(path_base=log_base if logging_to_file else None, formatter="line")
+            logging_config = LoggingConfig(path_base=log_base, formatter="line")
             cmd = [
                 "uv",
                 "run",
@@ -147,11 +146,8 @@ def launch_gateway() -> None:
                 cmd.extend(["--max_concurrent_jobs", str(max_concurrent_jobs)])
             if shared_path is not None:
                 cmd.extend(["--shared_path", shared_path])
-            if logging_to_file:
-                tunnel.execute(handle, ["mkdir", "-p", log_base])
-                tunnel.execute(handle, cmd, output_path=log_base + "gwstdouterr")
-            else:
-                tunnel.execute(handle, cmd)
+            tunnel.execute(handle, ["mkdir", "-p", log_base])
+            tunnel.execute(handle, cmd, output_path=log_base + "gwstdouterr")
             GatewayConnectionManager.gateway_connection = RemoteTunnel(handle=handle)
         elif isinstance(gateway, UnmanagedGateway):
             raise NotImplementedError("RemoteUrl gateway cannot be launched by backend")

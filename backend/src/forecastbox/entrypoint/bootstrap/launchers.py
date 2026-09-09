@@ -21,6 +21,7 @@ import asyncio
 import logging
 import os
 import sys
+from datetime import datetime
 from tempfile import TemporaryDirectory
 
 import uvicorn
@@ -60,7 +61,11 @@ def launch_backend() -> None:
     config = FIABConfig()
     startup_params = getattr(config.cascade.gateway, "startup_params", None)
     cascade_logging_base = None if startup_params is None else startup_params.cascade_logging_base
-    log_directory = TemporaryDirectory(prefix="fiabLogs", dir=cascade_logging_base)
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H")
+    if cascade_logging_base is None:
+        log_directory = TemporaryDirectory(prefix=f"fiabLogs-{timestamp}")
+    else:
+        log_directory = TemporaryDirectory(prefix=timestamp, dir=cascade_logging_base)
     os.environ[_BACKEND_LOG_DIRECTORY_ENV] = log_directory.name
 
     # TODO something imported by this module reconfigures the logging -- find and remove!
