@@ -54,6 +54,10 @@
         "title": "Your active layers live here",
         "body": "Every layer on the map is listed here with its legend and an opacity slider — reorder them to change drawing order. This panel is mission control for what's on the map."
       },
+      "projection": {
+        "title": "Change the map projection",
+        "body": "This button names the projection the map is drawn in. Open it to switch to a polar or equal-area view for high latitudes, and to pick the basemap that goes with it. Only projections every source can serve are offered."
+      },
       "time": {
         "title": "Step through time",
         "body": "This timeline is the forecast's \"Valid time\" axis, one mark per timestep. Click one step further along — or use the arrow buttons — and the map redraws for that moment.",
