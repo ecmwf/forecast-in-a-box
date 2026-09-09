@@ -30,6 +30,8 @@ from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanc
 from fiab_core.types import ClosedEnumType, DatetimeType, GeoDomainType, ListType, ParameterType, StringType
 from qubed import Qube
 
+from fiab_plugin_ecmwf.environments import mars_dependencies, opendata_dependencies
+
 from .datasets import load_datasets
 from .qubed_utils import axes, common_dimensions, contains, coxpand, dimensions, select
 
@@ -160,9 +162,9 @@ class OperationalForecastSource(Source):
 
         source = block.config_as_str(SOURCE)
         if source == "ecmwf-opendata":
-            metadata = {"environment": ["earthkit-data[ecmwf-opendata]"]}
+            metadata = {"environment": opendata_dependencies}
         elif source == "mars":
-            metadata = {"environment": ["earthkit-data[mars]"]}
+            metadata = {"environment": mars_dependencies}
         else:
             metadata = {}
 
