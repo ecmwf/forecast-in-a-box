@@ -73,7 +73,8 @@
       "managePlugins": "Manage plugins",
       "errorTitle": "Couldn't load templates",
       "errorDescription": "The template list is temporarily unavailable."
-    }
+    },
+    "viewAllTemplates": "View all templates"
   },
   "presets": {
     "title": "My Configuration Presets",

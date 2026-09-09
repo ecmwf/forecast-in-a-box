@@ -96,6 +96,8 @@ export function useStarterTemplates() {
   return {
     starters,
     hasStarters: starters.length > 0,
+    /** Every plugin template, not just the starters shown. */
+    templateCount: templates.length,
     isLoading: isLoading || pluginsLoading,
     // Only a missing template list is fatal; a missing plugin list just costs ordering.
     isError,
