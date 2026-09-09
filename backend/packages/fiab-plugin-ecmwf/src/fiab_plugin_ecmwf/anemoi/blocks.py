@@ -29,6 +29,7 @@ from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
 from fiab_core.tools.validators import positive
 from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
 
+from fiab_plugin_ecmwf.environments import mars_dependencies
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
 from .utils import (
@@ -42,7 +43,7 @@ INPUT_SOURCE_EXTRAS: dict[str, list[str]] = {
     "opendata:google": [opendata_dep],
     "opendata:aws": [opendata_dep],
     "polytope": ["anemoi-plugins-ecmwf-inference[polytope]"],
-    "mars": ["earthkit-data[mars]"],
+    "mars": mars_dependencies,
     "dummy": [],
 }
 

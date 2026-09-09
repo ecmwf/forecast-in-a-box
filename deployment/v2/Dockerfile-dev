@@ -25,7 +25,7 @@ COPY deployment/v2/config.toml-dev backend/.fiab/config.toml
 # NOTE we need to still be root by now, COPY does *not* create files owned by USER
 RUN chown -R fiab:fiab /home/fiab
 
-# TODO this is slow and uncacheable -- instead run freeze to pylock in the outer just action, copy and venv install that first, and only then copy the rest of the backend
+# TODO this is slow and uncacheable -- instead run freeze to pylock in the outer just action, copy and venv install that first, and only then copy the rest of the backend. Do *NOT* use run mount cache, because while that would speed the build time and create a legit venv, it would *not* populate the actual cache on the container, hence subsequent venv creations during job execution would suffer instead
 # TODO for some reason ecmwf-base is also installed as a plugin -- eradicate! Null the store config?
 
 USER fiab
