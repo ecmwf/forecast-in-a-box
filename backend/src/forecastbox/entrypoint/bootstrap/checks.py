@@ -31,6 +31,33 @@ def _call_succ(response: CallResult, url: str) -> bool:
         assert_never(response)
 
 
+def _plugins_ready(response: CallResult, url: str) -> bool:
+    """Condition for `_wait_for` -- succeeds once the `/status` endpoint reports the plugin
+    subsystem as `ok`. Retries on `initializing`/`running` (plugin stores are populated
+    asynchronously in a background task submitted at startup, and a plugin operation may also
+    be legitimately in progress). Unlike `_call_succ`, a `ConnectError` is treated as a hard
+    failure rather than something to retry on: this condition is only ever used after
+    `check_backend_ready` has already confirmed the backend accepts connections, so losing the
+    connection at this point means the backend went down, not that it hasn't started yet. A
+    `ReadTimeout` is still tolerated, as the backend may simply be busy while starting up."""
+    if isinstance(response, httpx.Response):
+        if response.status_code != 200:
+            raise ValueError(f"failure on {url}: {response}")
+        plugins_status = response.json().get("plugins")
+        if plugins_status == "ok":
+            return True
+        elif plugins_status in ("initializing", "running"):
+            return False
+        else:
+            raise ValueError(f"plugins failure on {url}: {plugins_status}")
+    elif isinstance(response, httpx.ReadTimeout):
+        return False
+    elif isinstance(response, httpx.HTTPError):
+        raise ValueError(f"failure on {url}: {repr(response)}")
+    else:
+        assert_never(response)
+
+
 class StartupError(ValueError):
     pass
 
@@ -69,10 +96,15 @@ def check_backend_ready(
         raise
 
 
-def install_default_plugins(config: FIABConfig) -> None:
-    """Installs default plugins as specified by configs. Log-swallows all exceptions"""
+def install_default_plugins(config: FIABConfig, attempts: int = 20) -> None:
+    """Installs default plugins as specified by configs. Log-swallows all exceptions.
+
+    Plugin installation relies on the plugin stores, which are populated asynchronously in a
+    background task submitted at backend startup and may not be ready yet by the time this is
+    called -- wait for the `/status` endpoint to report the plugin subsystem as ready first."""
     try:
         with httpx.Client(follow_redirects=True) as client:
+            _wait_for(client, config.backend.local_url() + f"{ROUTE_PREFIX}/status", attempts, _plugins_ready)
             for pluginId in _default_plugins().keys():
                 url = config.backend.local_url() + f"{ROUTE_PREFIX}/plugin/install"
                 try:
