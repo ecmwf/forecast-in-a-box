@@ -16,21 +16,43 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 WORKDIR /home/fiab
 COPY justfile justfile
-COPY backend backend
-RUN rm -rf backend/.venv backend/.fiab backend/src/forecastbox/static && mkdir backend/.fiab
-COPY frontend/dist backend/src/forecastbox/static
-COPY install/artifacts.json install/artifacts.json
-# NOTE maybe allow for buildarg override?
-COPY deployment/v2/config.toml-dev backend/.fiab/config.toml
-# NOTE we need to still be root by now, COPY does *not* create files owned by USER
-RUN chown -R fiab:fiab /home/fiab
 
-# TODO this is slow and uncacheable -- instead run freeze to pylock in the outer just action, copy and venv install that first, and only then copy the rest of the backend. Do *NOT* use run mount cache, because while that would speed the build time and create a legit venv, it would *not* populate the actual cache on the container, hence subsequent venv creations during job execution would suffer instead
+USER fiab
+
+# NOTE we copy just the dependency manifests first (uv.lock plus every
+# pyproject.toml in the workspace) and run `uv sync --no-install-workspace`
+# against them below. That step resolves and installs *only* third-party
+# dependencies -- no local/editable package is installed yet, since its
+# source is not present in the image at this point. This forms its own
+# docker layer, cached as long as none of these manifest files change.
+# The full backend source is only copied afterwards, at which point the
+# second `uv sync` merely has to install the local workspace packages
+# (editable, from disk, no network involved), which is fast. This avoids
+# the previous behaviour where any source change invalidated the docker
+# cache for the (slow, network-heavy) dependency install as well.
+COPY --chown=fiab:fiab backend/pyproject.toml backend/pyproject.toml
+COPY --chown=fiab:fiab backend/uv.lock backend/uv.lock
+COPY --chown=fiab:fiab backend/packages/fiab-core/pyproject.toml backend/packages/fiab-core/pyproject.toml
+COPY --chown=fiab:fiab backend/packages/fiab-mcp-server/pyproject.toml backend/packages/fiab-mcp-server/pyproject.toml
+COPY --chown=fiab:fiab backend/packages/fiab-plugin-demo/pyproject.toml backend/packages/fiab-plugin-demo/pyproject.toml
+COPY --chown=fiab:fiab backend/packages/fiab-plugin-ecmwf/pyproject.toml backend/packages/fiab-plugin-ecmwf/pyproject.toml
+COPY --chown=fiab:fiab backend/packages/fiab-plugin-test/pyproject.toml backend/packages/fiab-plugin-test/pyproject.toml
+
+ARG PYTHON_VERSION="3.13"
+ENV UV_PYTHON=$PYTHON_VERSION
+RUN cd backend && uv sync --extra runtime --all-packages --no-install-workspace --frozen && cd -
+
+COPY --chown=fiab:fiab backend backend
+RUN rm -rf backend/.fiab backend/src/forecastbox/static && mkdir backend/.fiab
+COPY --chown=fiab:fiab frontend/dist backend/src/forecastbox/static
+COPY --chown=fiab:fiab install/artifacts.json install/artifacts.json
+# NOTE maybe allow for buildarg override?
+COPY --chown=fiab:fiab deployment/v2/config.toml-dev backend/.fiab/config.toml
+
 # TODO for some reason ecmwf-base is also installed as a plugin -- eradicate! Null the store config?
 
 USER fiab
-ARG PYTHON_VERSION="3.13"
-ENV UV_PYTHON=$PYTHON_VERSION
+# NOTE add `--offline` to the sync, but that misbehaved on setuptools-scm which were for some reason not synced correctly above
 RUN : \
      && cd backend && uv sync --extra runtime --all-packages && cd - \
      && cd backend && mkdir .fiab/data_dir && echo "1761908420:d0.0.1" > .fiab/pylock.toml.timestamp && cd - \
