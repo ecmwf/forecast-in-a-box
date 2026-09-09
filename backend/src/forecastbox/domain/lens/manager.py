@@ -30,6 +30,7 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from forecastbox.domain.lens.exceptions import NoLensFound
+from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
 from forecastbox.utility.concurrency.shutdown import shutdown_popen
 from forecastbox.utility.concurrency.synchronization import timed_acquire
@@ -141,13 +142,17 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             # use the backend-wide default tz
             "TZ": default_tz_fallback(),
         }
-        process: subprocess.Popen[bytes] = subprocess.Popen(
-            cmd,
-            env=env,
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        log_directory = os.environ[BACKEND_LOG_DIRECTORY_ENV]
+        stdout_path = os.path.join(log_directory, f"lens.{instance_id}.stdout.txt")
+        stderr_path = os.path.join(log_directory, f"lens.{instance_id}.stderr.txt")
+        with open(stdout_path, "ab") as stdout_file, open(stderr_path, "ab") as stderr_file:
+            process: subprocess.Popen[bytes] = subprocess.Popen(
+                cmd,
+                env=env,
+                start_new_session=True,
+                stdout=stdout_file,
+                stderr=stderr_file,
+            )
     except Exception as e:
         failed = repr(e)
         logger.error(f"failed to start skinny wms: {failed}")
