@@ -69,7 +69,7 @@
     "templates": {
       "loading": "Loading templates",
       "emptyTitle": "No plugin templates available",
-      "emptyDescription": "Install and enable the ECMWF plugin to see ready-made starting points.",
+      "emptyDescription": "Install a plugin that ships templates, such as the ECMWF plugin, to see ready-made starting points.",
       "managePlugins": "Manage plugins",
       "errorTitle": "Couldn't load templates",
       "errorDescription": "The template list is temporarily unavailable."
