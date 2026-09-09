@@ -37,8 +37,16 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, eq=True, slots=True)
+class ExistingLogDirectory:
+    name: str
+
+
+LogDirectory = TemporaryDirectory | ExistingLogDirectory
+
+
+@dataclass(frozen=True, eq=True, slots=True)
 class LocalProcess:
-    logs_directory: TemporaryDirectory
+    logs_directory: LogDirectory
     process: BaseProcess
     gateway_url: str
 
@@ -100,7 +108,12 @@ def launch_gateway() -> None:
             max_concurrent_jobs = startup_params.max_concurrent_jobs
             cascade_logging_base = startup_params.cascade_logging_base
             shared_path = startup_params.shared_path
-            logs_directory = TemporaryDirectory(prefix="fiabLogs", dir=cascade_logging_base)
+            backend_log_directory = os.getenv("FIAB_BACKEND_LOG_DIRECTORY")
+            logs_directory: LogDirectory = (
+                ExistingLogDirectory(backend_log_directory)
+                if backend_log_directory is not None
+                else TemporaryDirectory(prefix="fiabLogs", dir=cascade_logging_base)
+            )
             logger.debug(f"logging base is at {logs_directory.name}")
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
@@ -169,7 +182,7 @@ def get_gateway_url() -> str:
         assert_never(gateway_connection)
 
 
-def get_logs_directory() -> Either[TemporaryDirectory, str]:  # ty: ignore[invalid-type-arguments]
+def get_logs_directory() -> Either[LogDirectory, str]:  # ty: ignore[invalid-type-arguments]
     gateway_connection = GatewayConnectionManager.gateway_connection
     if gateway_connection is None:
         return Either.error("gateway connection not initialized")

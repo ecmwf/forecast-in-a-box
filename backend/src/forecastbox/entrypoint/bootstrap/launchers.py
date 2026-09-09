@@ -19,12 +19,16 @@ entrypoint/app.py, as it is coupled to FastAPI's API
 
 import asyncio
 import logging
+import os
 import sys
+from tempfile import TemporaryDirectory
 
 import uvicorn
 
 from forecastbox.entrypoint.bootstrap.config import setup_process
-from forecastbox.utility.config import FIABConfig
+from forecastbox.utility.config import FIABConfig, LocalGateway
+
+_BACKEND_LOG_DIRECTORY_ENV = "FIAB_BACKEND_LOG_DIRECTORY"
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +58,16 @@ async def _uvicorn_run(app_name: str, host: str, port: int) -> bool:
 
 def launch_backend() -> None:
     config = FIABConfig()
+    log_directory = None
+    if isinstance(config.cascade.gateway, LocalGateway) and os.getenv("FIAB_LOGSTDOUT", "nay") != "yea":
+        log_directory = TemporaryDirectory(prefix="fiabLogs", dir=config.cascade.gateway.startup_params.cascade_logging_base)
+        os.environ[_BACKEND_LOG_DIRECTORY_ENV] = log_directory.name
+
     # TODO something imported by this module reconfigures the logging -- find and remove!
     import forecastbox.entrypoint.app  # import inside function justified due to side effects
 
-    setup_process()
+    log_path = None if log_directory is None else os.path.join(log_directory.name, "backend.logs.txt")
+    setup_process(stdout=True, log_path=log_path)
     logger.debug(f"logging initialized post-{forecastbox.entrypoint.app.__name__} import")
     port = config.backend.uvicorn_port
     host = config.backend.uvicorn_host
