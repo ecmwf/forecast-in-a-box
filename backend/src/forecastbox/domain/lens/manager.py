@@ -18,6 +18,7 @@ Pyrsistent immutable structures allow safe lock-free reads.
 
 import logging
 import os
+import socket
 import subprocess
 import threading
 import uuid
@@ -68,17 +69,34 @@ class LensInstanceManager:
     instances: PMap[LensInstanceId, LensInstance] = pmap()
 
 
+def check_server_ready(host: str = "127.0.0.1", port: int = 8000, timeout: float = 0.1) -> bool:
+    """Ultra-fast check to see if the lens process has successfully bound to the port.
+
+    Returns True if the port is open and accepting connections, False otherwise.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        try:
+            # connect_ex returns 0 on success, or an error code on failure
+            return s.connect_ex((host, port)) == 0
+        except Exception:
+            return False
+
+
 def _compute_status(instance: LensInstance) -> LensInstanceDetail:
     status: LensStatus
     if instance.lens_name == "skinnyWMS":
         if instance.process is None:
+            # process not spawned yet at all
             status = "starting"
-        elif instance.process.poll() is None:
+        elif instance.process.poll() is not None:
+            status = "terminated" if instance.process.returncode == 0 else "failed"
+        elif all(check_server_ready(port=port) for port in instance.ports):
+            # process alive and its port(s) are bound -- guvicorn/gunicorn finished starting
             status = "running"
-        elif instance.process.returncode == 0:
-            status = "terminated"
         else:
-            status = "failed"
+            # process alive but not yet listening -- still starting up
+            status = "starting"
     else:
         assert_never(instance.lens_name)
 

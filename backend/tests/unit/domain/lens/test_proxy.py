@@ -19,7 +19,7 @@ from fastapi import HTTPException, Request
 from pyrsistent import pmap
 
 from forecastbox.domain.lens import proxy as lens_proxy
-from forecastbox.domain.lens.exceptions import NoLensFound, UnproxyableLens
+from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, NoLensFound, UnproxyableLens
 from forecastbox.domain.lens.manager import LensInstance, LensInstanceId, LensInstanceManager
 
 
@@ -44,6 +44,13 @@ def reset_lens_manager() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
+def assume_ports_bound() -> Iterator[None]:
+    """By default, pretend every lens port is bound, so a mocked alive process is `running`."""
+    with patch("forecastbox.domain.lens.manager.check_server_ready", return_value=True):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def reset_proxy_client() -> Iterator[None]:
     yield
     lens_proxy._client = None
@@ -55,10 +62,19 @@ class TestResolvePort:
         with pytest.raises(NoLensFound):
             lens_proxy._resolve_port(LensInstanceId("ghost"))
 
-    def test_not_running_instance_raises_unproxyable(self) -> None:
+    def test_not_running_instance_raises_lens_starting(self) -> None:
         iid = LensInstanceId("starting-id")
         LensInstanceManager.instances = pmap({iid: LensInstance(process=None, lens_params={}, lens_name="skinnyWMS", ports={19000})})
-        with pytest.raises(UnproxyableLens):
+        with pytest.raises(LensStarting):
+            lens_proxy._resolve_port(iid)
+
+    def test_failed_instance_raises_lens_failure(self) -> None:
+        iid = LensInstanceId("failed-id")
+        mock_proc = MagicMock(spec=subprocess.Popen)
+        mock_proc.poll.return_value = 1
+        mock_proc.returncode = 1
+        LensInstanceManager.instances = pmap({iid: LensInstance(process=mock_proc, lens_params={}, lens_name="skinnyWMS", ports={19000})})
+        with pytest.raises(LensFailure):
             lens_proxy._resolve_port(iid)
 
     def test_running_instance_returns_sole_port(self) -> None:
@@ -144,11 +160,11 @@ class TestForward:
             await lens_proxy.forward(LensInstanceId("ghost"), "wms", request)
 
     @pytest.mark.asyncio
-    async def test_not_running_instance_raises_unproxyable(self) -> None:
+    async def test_not_running_instance_raises_lens_starting(self) -> None:
         iid = LensInstanceId("starting-id")
         LensInstanceManager.instances = pmap({iid: LensInstance(process=None, lens_params={}, lens_name="skinnyWMS", ports={19000})})
         request = _make_request()
-        with pytest.raises(UnproxyableLens):
+        with pytest.raises(LensStarting):
             await lens_proxy.forward(iid, "wms", request)
 
     @pytest.mark.asyncio
