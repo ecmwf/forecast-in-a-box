@@ -16,7 +16,6 @@ import urllib.parse
 import uuid
 from dataclasses import dataclass
 from multiprocessing.process import BaseProcess
-from tempfile import TemporaryDirectory
 
 from cascade.deployment.logging import LoggingConfig
 from cascade.executor import platform
@@ -37,11 +36,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, eq=True, slots=True)
-class ExistingLogDirectory:
+class LogDirectory:
     name: str
-
-
-LogDirectory = TemporaryDirectory | ExistingLogDirectory
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -106,14 +102,8 @@ def launch_gateway() -> None:
         if isinstance(gateway, LocalGateway):
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
-            cascade_logging_base = startup_params.cascade_logging_base
             shared_path = startup_params.shared_path
-            backend_log_directory = os.getenv("FIAB_BACKEND_LOG_DIRECTORY")
-            logs_directory: LogDirectory = (
-                ExistingLogDirectory(backend_log_directory)
-                if backend_log_directory is not None
-                else TemporaryDirectory(prefix="fiabLogs", dir=cascade_logging_base)
-            )
+            logs_directory = LogDirectory(os.environ["FIAB_BACKEND_LOG_DIRECTORY"])
             logger.debug(f"logging base is at {logs_directory.name}")
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
@@ -138,7 +128,8 @@ def launch_gateway() -> None:
             log_base = f"{cascade_logging_base or '/tmp/'}fiabLogs{uuid.uuid4()}."
             logger.debug(f"logging base for tunnel gateway is {log_base}")
             remote_gateway_url = f"tcp://localhost:{handle.remote_port}"
-            logging_config = LoggingConfig(path_base=log_base, formatter="line")
+            logging_to_file = os.getenv("FIAB_LOGSTDOUT", "nay") != "yea"
+            logging_config = LoggingConfig(path_base=log_base if logging_to_file else None, formatter="line")
             cmd = [
                 "uv",
                 "run",
@@ -156,8 +147,11 @@ def launch_gateway() -> None:
                 cmd.extend(["--max_concurrent_jobs", str(max_concurrent_jobs)])
             if shared_path is not None:
                 cmd.extend(["--shared_path", shared_path])
-            tunnel.execute(handle, ["mkdir", "-p", log_base])
-            tunnel.execute(handle, cmd, output_path=log_base + "gwstdouterr")
+            if logging_to_file:
+                tunnel.execute(handle, ["mkdir", "-p", log_base])
+                tunnel.execute(handle, cmd, output_path=log_base + "gwstdouterr")
+            else:
+                tunnel.execute(handle, cmd)
             GatewayConnectionManager.gateway_connection = RemoteTunnel(handle=handle)
         elif isinstance(gateway, UnmanagedGateway):
             raise NotImplementedError("RemoteUrl gateway cannot be launched by backend")
