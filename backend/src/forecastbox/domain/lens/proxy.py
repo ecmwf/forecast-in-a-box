@@ -80,7 +80,7 @@ from fastapi.responses import StreamingResponse
 from starlette.datastructures import Headers
 
 from forecastbox.domain.lens.core import PREFIX as PREFIX_ROOT
-from forecastbox.domain.lens.exceptions import UnproxyableLens
+from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, UnproxyableLens
 from forecastbox.domain.lens.manager import LensInstanceId, get_status
 
 logger = logging.getLogger(__name__)
@@ -129,13 +129,17 @@ async def aclose_client() -> None:
 def _resolve_port(lens_instance_id: LensInstanceId) -> int:
     """Resolve a lens_instance_id to its bound port.
 
-    Forwards NoLensFound if the instance is unknown, and raises UnproxyableRens if it
-    is known but not `running`, or if it has a number of ports other than exactly one
-    (an invariant violation for the currently supported lens types).
+    Forwards NoLensFound if the instance is unknown. Raises LensStarting if the
+    instance is still starting up (transient, caller should retry), LensFailure if
+    the instance has exited (terminated or failed, not transient), and
+    UnproxyableLens if the instance is running but exposes a number of ports other
+    than exactly one (an invariant violation for the currently supported lens types).
     """
     detail = get_status(lens_instance_id)
+    if detail.status == "starting":
+        raise LensStarting(f"Lens instance {lens_instance_id!r} is still starting")
     if detail.status != "running":
-        raise UnproxyableLens(f"Lens instance {lens_instance_id!r} is not running (status={detail.status!r})")
+        raise LensFailure(f"Lens instance {lens_instance_id!r} is not running (status={detail.status!r})")
     if len(detail.ports) != 1:
         logger.error(f"Lens instance {lens_instance_id!r} does not expose exactly one port: {detail.ports!r}")
         raise UnproxyableLens(f"Lens instance {lens_instance_id!r} does not expose exactly one port")
@@ -222,7 +226,7 @@ async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request:
     """Forward `request` to the lens identified by `lens_instance_id`, streaming both
     the request body upstream and the response body back downstream.
 
-    Forwards exceptions such as NoLensFound or UnproxyableLens.
+    Forwards exceptions such as NoLensFound, LensStarting, LensFailure, or UnproxyableLens.
     Raises HTTP exceptions in case of upstream connection failure.
     """
     port = _resolve_port(lens_instance_id)

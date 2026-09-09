@@ -23,6 +23,7 @@ from forecastbox.domain.lens.manager import (
     LensInstanceId,
     LensInstanceManager,
     _compute_status,
+    check_server_ready,
     get_status,
     list_instances,
     shutdown_all_lens_instances,
@@ -39,6 +40,17 @@ def reset_lens_manager() -> Iterator[None]:
     yield
     LensInstanceManager.instances = original_instances
     FreePortsManager.free_ports = original_ports
+
+
+@pytest.fixture(autouse=True)
+def assume_ports_bound() -> Iterator[None]:
+    """By default, pretend every lens port is bound (server finished starting).
+
+    Individual tests exercising the "process alive but port not bound yet" path
+    override this via `patch("forecastbox.domain.lens.manager.check_server_ready", ...)`.
+    """
+    with patch("forecastbox.domain.lens.manager.check_server_ready", return_value=True):
+        yield
 
 
 def _make_instance(process: subprocess.Popen | None = None, returncode: int | None = None) -> LensInstance:
@@ -68,6 +80,13 @@ class TestComputeStatus:
         mock_proc.poll.return_value = None  # still alive
         instance = _make_instance(process=mock_proc)
         assert _compute_status(instance).status == "running"
+
+    def test_running_process_with_unbound_port_is_starting(self) -> None:
+        mock_proc = MagicMock(spec=subprocess.Popen)
+        mock_proc.poll.return_value = None  # still alive
+        instance = _make_instance(process=mock_proc)
+        with patch("forecastbox.domain.lens.manager.check_server_ready", return_value=False):
+            assert _compute_status(instance).status == "starting"
 
     def test_process_exited_zero_is_terminated(self) -> None:
         instance = _make_instance(returncode=0)
@@ -211,6 +230,12 @@ class TestShutdownAllInstances:
 
         with patch("forecastbox.domain.lens.manager.stop_instance", side_effect=flaky_stop):
             shutdown_all_lens_instances()  # should not raise
+
+
+class TestCheckServerReady:
+    def test_returns_false_when_nothing_listening(self) -> None:
+        # port 1 is a privileged, virtually-never-bound port; connecting should fail fast.
+        assert check_server_ready(port=1, timeout=0.05) is False
 
 
 class TestFreePortsManager:

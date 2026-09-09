@@ -3,6 +3,7 @@
 # - packages (bash+curl) for basic executability + getting remote data at runtime
 # - packages (libgfortran & friends) for being able to load ecmwf atlas lib
 # - packages (gdal) for that fiona unbuildable wheel required by ek plots < 1.0
+# - packages (glib) for the skinnywms
 # - no fiab itself, thats in either Dockerfile-dev or Dockerfile-release
 
 FROM debian:stable-slim
@@ -12,6 +13,7 @@ RUN : \
     && apt-get install -y bash curl ca-certificates \
     && apt-get install -y libgfortran5 libquadmath0 libgomp1 \
     && apt-get install -y gdal-bin libgdal-dev g++ \
+    && apt-get install -y libglib2.0-0t64 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --user-group --create-home --shell /bin/false fiab \
     && : ;
