@@ -21,15 +21,11 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime
-from tempfile import TemporaryDirectory
 
 import uvicorn
 
-from forecastbox.entrypoint.bootstrap.config import setup_process
+from forecastbox.entrypoint.bootstrap.config import init_logging_base, setup_process
 from forecastbox.utility.config import FIABConfig
-
-_BACKEND_LOG_DIRECTORY_ENV = "FIAB_BACKEND_LOG_DIRECTORY"
 
 logger = logging.getLogger(__name__)
 
@@ -59,19 +55,12 @@ async def _uvicorn_run(app_name: str, host: str, port: int) -> bool:
 
 def launch_backend() -> None:
     config = FIABConfig()
-    startup_params = getattr(config.cascade.gateway, "startup_params", None)
-    cascade_logging_base = None if startup_params is None else startup_params.cascade_logging_base
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H")
-    if cascade_logging_base is None:
-        log_directory = TemporaryDirectory(prefix=f"fiabLogs-{timestamp}")
-    else:
-        log_directory = TemporaryDirectory(prefix=timestamp, dir=cascade_logging_base)
-    os.environ[_BACKEND_LOG_DIRECTORY_ENV] = log_directory.name
+    log_base = init_logging_base(config)
 
-    # TODO something imported by this module reconfigures the logging -- find and remove!
+    # TODO something imported by this module reconfigures the logging -- find and remove! Probably inside uvicorn
     import forecastbox.entrypoint.app  # import inside function justified due to side effects
 
-    log_path = os.path.join(log_directory.name, "backend.logs.txt")
+    log_path = os.path.join(log_base, "backend.logs.txt")
     setup_process(stdout=True, log_path=log_path)
     logger.debug(f"logging initialized post-{forecastbox.entrypoint.app.__name__} import")
     port = config.backend.uvicorn_port

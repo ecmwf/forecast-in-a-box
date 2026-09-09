@@ -323,7 +323,7 @@ class GatewayStartupParams(FiabBaseModel):
     max_concurrent_jobs: int | None = 1
     """If more jobs submitted at a given time, all but this many wait in a queue"""
     cascade_logging_base: str | None = None
-    """Parent directory for the temporary log directory. When set, the directory is created here with a YYYY-MM-DDTHH prefix; otherwise it is created in the system temporary directory with a fiabLogs-YYYY-MM-DDTHH prefix."""
+    """Parent directory for the temporary log directory. When set, the directory is created there with a YYYY-MM-DDTHH prefix; otherwise it is created in the system temporary directory with a fiabLogs-YYYY-MM-DDTHH prefix. Use eg /home/<user>/fiabLogs or /tmp/fiabLogs"""
     shared_path: str | None = None
     """Shared filesystem path visible to all workers, required for Slurm submissions."""
     ssh_cluster_spec: SshClusterSpec | None = None

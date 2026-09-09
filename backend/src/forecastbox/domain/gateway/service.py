@@ -29,6 +29,7 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayNotRunning,
     GatewayNotStarted,
 )
+from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility import tunnel
 from forecastbox.utility.config import LocalGateway, RemoteGateway, StatusMessage, UnmanagedGateway, config
 
@@ -103,7 +104,10 @@ def launch_gateway() -> None:
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
             shared_path = startup_params.shared_path
-            logs_directory = LogDirectory(os.environ["FIAB_BACKEND_LOG_DIRECTORY"])
+            # NOTE we dont use gateway.startup_params logging base, because backend used to derive
+            # the directory already. And we must not modify config live as we dont want to persist
+            # that value later
+            logs_directory = LogDirectory(os.environ[BACKEND_LOG_DIRECTORY_ENV])
             logger.debug(f"logging base is at {logs_directory.name}")
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
