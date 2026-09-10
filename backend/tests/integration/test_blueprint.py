@@ -49,9 +49,14 @@ def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
     return {ConfigurationOptionId(key): value for key, value in values.items()}
 
 
-def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
+def ensure_completed_v2(
+    backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20, attempt_count: int | None = None
+) -> None:
     def do_action() -> Any:
-        response = backend_client.get("/run/get", params={"run_id": job_id}, timeout=10)
+        params = {"run_id": job_id}
+        if attempt_count is not None:
+            params["attempt_count"] = attempt_count
+        response = backend_client.get("/run/get", params=params, timeout=10)
         assert response.is_success, response.text
         return response.json()
 
@@ -1707,22 +1712,6 @@ def test_run_delete_not_found(backend_client_user: httpx.Client) -> None:
     """POST /run/delete with a non-existent run_id returns 404."""
     resp = backend_client_user.post("/run/delete", json={"run_id": "nonexistent-run-id", "attempt_count": 1})
     assert resp.status_code == 404
-
-
-def test_run_delete_attempt_conflict(backend_client_user: httpx.Client) -> None:
-    """POST /run/delete with a mismatched attempt_count returns 409."""
-    builder = _make_builder_source_only()
-    save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
-    assert save_resp.is_success, save_resp.text
-    blueprint_id = save_resp.json()["blueprint_id"]
-
-    run_resp = backend_client_user.post("/run/create", json={"blueprint_id": blueprint_id})
-    assert run_resp.is_success, run_resp.text
-    run_id = run_resp.json()["run_id"]
-    attempt_count = run_resp.json()["attempt_count"]
-
-    del_resp = backend_client_user.post("/run/delete", json={"run_id": run_id, "attempt_count": attempt_count + 1})
-    assert del_resp.status_code == 409
 
 
 def test_run_restart_attempt_conflict(backend_client_user: httpx.Client) -> None:

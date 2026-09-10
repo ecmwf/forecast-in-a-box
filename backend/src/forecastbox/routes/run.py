@@ -38,7 +38,7 @@ from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.gateway.service import get_gateway_url, get_logs_directory
 from forecastbox.domain.run import db, service
-from forecastbox.domain.run.cascade import RunOutputs
+from forecastbox.domain.run.cascade import RunOutputs, delete_cascade_job
 from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
@@ -139,7 +139,7 @@ class RunRestartResponse(FiabBaseModel):
 
 
 class RunDeleteRequest(FiabBaseModel):
-    """Identifies the attempt to delete. ``attempt_count`` must match the current latest attempt."""
+    """Identifies the attempt to delete."""
 
     run_id: RunId
     attempt_count: int
@@ -201,14 +201,11 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
     )
 
 
-async def _resolve_run_with_cascade(
+async def _resolve_run_record(
     execution_spec: RunLookup,
     auth_context: AuthContext,
-) -> tuple[db.RunRecord, str]:
-    """Fetch a Run and validate it has a cascade_job_id.
-
-    Raises HTTP 404 if not found or access denied, HTTP 409 if not yet submitted.
-    """
+) -> db.RunRecord:
+    """Fetch a Run. Raises HTTP 404 if not found or access denied."""
     try:
         execution = cast(
             db.RunRecord,
@@ -220,10 +217,7 @@ async def _resolve_run_with_cascade(
         raise HTTPException(status_code=404, detail=f"Run {execution_spec.run_id!r} not found.")
     except RunAccessDenied:
         raise HTTPException(status_code=403, detail=f"Access denied to execution {execution_spec.run_id!r}.")
-    cascade_job_id = execution.cascade_job_id
-    if cascade_job_id is None:
-        raise HTTPException(status_code=409, detail=f"Run {execution_spec.run_id!r} has not been submitted to cascade yet.")
-    return execution, cascade_job_id
+    return execution
 
 
 async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
@@ -375,41 +369,23 @@ async def delete_run(
     request: RunDeleteRequest,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> None:
-    """Delete an execution from the database and cascade.
-
-    ``attempt_count`` must match the current latest attempt to prevent races.
-    Returns 409 if it does not match.
-    """
-    try:
-        current = cast(
-            db.RunRecord, await execution_manager.await_jobs_db("run.get", partial(db.get_run, request.run_id, auth_context=auth_context))
-        )
-    except RunNotFound:
-        raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
-    except RunAccessDenied:
-        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.run_id!r}.")
-    if current.attempt_count != request.attempt_count:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Attempt count conflict for execution {request.run_id!r}: "
-                f"expected {request.attempt_count}, current is {current.attempt_count}."
-            ),
-        )
+    """Delete an execution from the database and cascade."""
     spec = RunLookup(run_id=request.run_id, attempt_count=request.attempt_count)
-    _, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
-    try:
-        client.request_response(
-            api.ResultDeletionRequest(datasets={cascade_job_id: []}),  # type: ignore[invalid-argument-type]
-            get_gateway_url(),
-        )
-    except Exception as e:
-        raise HTTPException(500, f"Job deletion failed: {e}")
-    finally:
+    run_record = await _resolve_run_record(spec, auth_context)
+    if run_record.cascade_job_id is not None:
+        # NOTE the else branch of this effectively lives in the background submission, which checks for entity being deleted after upserting cascade_job_id, and issuing a delete on its own
         try:
-            await execution_manager.await_jobs_db("run.delete", partial(db.soft_delete_run, request.run_id, auth_context=auth_context))
-        except (RunNotFound, RunAccessDenied):
-            pass
+            delete_cascade_job(run_record.cascade_job_id)
+        except Exception as e:
+            # NOTE we don't delete the db entity to not increase inconsistency
+            raise HTTPException(500, f"Job deletion failed: {e}")
+    try:
+        await execution_manager.await_jobs_db("run.delete", partial(db.soft_delete_run, request.run_id, auth_context=auth_context))
+    except RunNotFound:
+        # NOTE could only happen in a double delete which is from caller's PoV ok
+        logger.warning(f"presumably double delete on {request=}, ignoring")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.run_id!r}.")
 
 
 @router.post("/restart")
@@ -461,7 +437,9 @@ async def get_run_output_content(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
     """Retrieve the result of a specific output task, encoded as bytes."""
-    execution, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
+    execution = await _resolve_run_record(spec, auth_context)
+    if execution.cascade_job_id is None:
+        raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")
     dataset = DatasetId(task=TaskId(dataset_id), output="0")
 
     # Serve from locally cached value when available, without contacting cascade.
@@ -480,7 +458,7 @@ async def get_run_output_content(
     if mime_result.t is None:
         raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
     response = client.request_response(
-        api.ResultRetrievalRequest(job_id=JobId(cascade_job_id), dataset_id=dataset),
+        api.ResultRetrievalRequest(job_id=JobId(execution.cascade_job_id), dataset_id=dataset),
         get_gateway_url(),
     )
     response = cast(api.ResultRetrievalResponse, response)
@@ -501,6 +479,8 @@ async def get_run_logs(
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> Response:
     """Return a zip archive of logs for the given execution attempt."""
-    db_entity, cascade_job_id = await _resolve_run_with_cascade(spec, auth_context)
-    entity_dict = asdict(db_entity)
-    return await _build_run_logs_response(cascade_job_id, orjson.dumps(entity_dict))
+    run_record = await _resolve_run_record(spec, auth_context)
+    if run_record.cascade_job_id is None:
+        raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")
+    entity_dict = asdict(run_record)
+    return await _build_run_logs_response(run_record.cascade_job_id, orjson.dumps(entity_dict))
