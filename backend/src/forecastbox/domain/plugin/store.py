@@ -113,8 +113,19 @@ def populate_store(store: PluginStore, client: httpx.Client) -> None:
 
 
 class StoresManager:
-    stores: PMap[PluginStoreId, PluginStore] = pmap()
+    stores: PMap[PluginStoreId, PluginStore] | None = None
+    """None until `initialize_stores` has completed at least once. Distinguishes 'not initialized
+    yet' from 'initialized, but happens to have no stores configured' (an empty PMap)."""
     stores_lock: threading.Lock = threading.Lock()
+
+
+def stores_ready() -> bool:
+    """Whether the stores have finished their (asynchronous, submitted-at-startup) initialization.
+
+    Callers such as `register_plugin_from_store` rely on `StoresManager.stores` being populated;
+    right after process startup this may not be the case yet, so this helper lets HTTP callers
+    (see `forecastbox.routes.status`) report readiness instead of failing with a 500."""
+    return StoresManager.stores is not None
 
 
 def initialize_stores(plugin_stores_config: PluginStoresConfig) -> None:
@@ -137,7 +148,7 @@ def get_plugins_detail() -> dict[PluginCompositeId, tuple[PluginStoreEntry, Plug
             store.plugins[pluginId],
             store.remote[pluginId],
         )
-        for storeId, store in StoresManager.stores.items()
+        for storeId, store in (StoresManager.stores or pmap()).items()
         for pluginId in store.plugins.keys()
     }
 
@@ -166,7 +177,7 @@ def register_plugin_from_store(plugin_composite_key: PluginCompositeId) -> Plugi
     present into the config file, unless already there. Returns the settings the plugin is configured
     with. Synchronous and self-contained -- performs no pip operation, that is the caller's job"""
     # No lock needed for reads with pyrsistent immutable structures
-    if not StoresManager.stores:
+    if StoresManager is None:
         raise ValueError("stores not initialized")
     storeId, pluginId = plugin_composite_key.store, plugin_composite_key.local
     store = StoresManager.stores.get(storeId, None)
