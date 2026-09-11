@@ -96,7 +96,9 @@
     "retry": "Retry",
     "start": "Start lens",
     "stopOne": "Stop lens server",
-    "paused": "Auto-start paused — start lenses per panel"
+    "paused": "Auto-start paused — start lenses per panel",
+    "gone": "Lens server is gone",
+    "unproxyable": "Lens server cannot be reached through the proxy"
   },
   "panel": {
     "emptySlot": "Pick a second source to compare",

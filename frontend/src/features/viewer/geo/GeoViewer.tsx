@@ -84,6 +84,7 @@ import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
 import { DualMapView } from './DualMapView'
 import { SingleMapView } from './SingleMapView'
+import type { TFunction } from 'i18next'
 import type {
   Bbox,
   LayerRequestSettings,
@@ -146,6 +147,26 @@ function runsKey(settings: ReadonlyMap<string, LayerRequestSettings>): string {
       s.dims ? [`${name}=${JSON.stringify(s.dims)}`] : [],
     )
     .join(',')
+}
+
+/** Lens-proxy answers carry a meaning of their own (backend #712). */
+function lensProxyErrorText(
+  source: { error: string | null; errorStatus: number | null },
+  baseUrl: string,
+  t: TFunction<'visualise'>,
+): string | null {
+  if (!source.error) return null
+  if (!isLensProxyUrl(baseUrl)) return source.error
+  switch (source.errorStatus) {
+    case 500:
+      return t('lens.failed')
+    case 404:
+      return t('lens.gone')
+    case 400:
+      return t('lens.unproxyable')
+    default:
+      return source.error
+  }
 }
 
 export function GeoViewer({
@@ -963,7 +984,9 @@ export function GeoViewer({
   if (sourceA.error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 rounded-md border border-border bg-card p-6 text-center text-sm">
-        <P className="max-w-md text-danger">{sourceA.error}</P>
+        <P className="max-w-md text-danger">
+          {lensProxyErrorText(sourceA, a.baseUrl, t)}
+        </P>
         {!isLensProxyUrl(a.baseUrl) && (
           <P className="text-xs text-muted-foreground">{t('panel.corsHint')}</P>
         )}
@@ -1010,7 +1033,9 @@ export function GeoViewer({
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
           <span className="min-w-0 truncate">
             <span className="font-medium">{t('panel.bError')}</span>{' '}
-            <span className="text-muted-foreground">{sourceB.error}</span>
+            <span className="text-muted-foreground">
+              {lensProxyErrorText(sourceB, b.baseUrl, t)}
+            </span>
           </span>
           <span className="flex shrink-0 items-center gap-1.5">
             <Button

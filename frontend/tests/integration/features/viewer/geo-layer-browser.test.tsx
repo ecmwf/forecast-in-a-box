@@ -30,6 +30,7 @@ function lensSource(overrides: Partial<LensSource> = {}): LensSource {
     bbox: null,
     crs: [],
     error: null,
+    errorStatus: null,
     loadingLayers: false,
     retrying: false,
     groups: [],

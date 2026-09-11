@@ -126,7 +126,7 @@ const serveWms: HttpResponseResolver = async ({ request }) => {
   if (req === 'getcapabilities') {
     const result = serveCapabilities(key)
     if (result.kind === 'unavailable') {
-      return new HttpResponse(null, { status: 503, headers: CORS })
+      return new HttpResponse(null, { status: result.status, headers: CORS })
     }
     return new HttpResponse(result.xml, {
       headers: { ...CORS, 'Content-Type': 'text/xml' },

@@ -44,8 +44,9 @@ export interface MockWmsServerConfig {
   bbox?: [number, number, number, number]
   /** Advertised root `<CRS>` codes (default: the two web projections). */
   crs?: Array<string>
-  /** Requests answered 503 before the server starts serving capabilities. */
+  /** Requests answered `failureStatus` (default 503) before the server serves. */
   failuresBeforeSuccess?: number
+  failureStatus?: number
   /** GetMap TIME values answered with a WMS service exception. */
   failGetMapTimes?: Array<string>
   /** Delay every GetMap response (exercises superseding/abort paths). */
@@ -198,13 +199,13 @@ export function wmsCapabilitiesRequestCount(key: string | number): number {
  */
 export function serveCapabilities(
   key: string | number,
-): { kind: 'ok'; xml: string } | { kind: 'unavailable' } {
+): { kind: 'ok'; xml: string } | { kind: 'unavailable'; status: number } {
   const server = serverFor(String(key))
-  if (!server) return { kind: 'unavailable' }
+  if (!server) return { kind: 'unavailable', status: 503 }
   server.capabilitiesRequests++
   if (server.remainingFailures > 0) {
     server.remainingFailures--
-    return { kind: 'unavailable' }
+    return { kind: 'unavailable', status: server.config.failureStatus ?? 503 }
   }
   return {
     kind: 'ok',

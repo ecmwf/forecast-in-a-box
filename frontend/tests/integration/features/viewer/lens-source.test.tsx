@@ -67,4 +67,26 @@ describe('useLensSource cold-boot retry', () => {
       .toBe('ready:2t')
     expect(wmsCapabilitiesRequestCount(lensId)).toBe(7)
   })
+
+  it('stops at once when the proxy reports the lens process has died (500)', async () => {
+    const lensId = 'lens-dead'
+    const baseUrl = buildLensBaseUrl(lensId)
+    registerMockWmsServer(lensId, {
+      layers: [{ name: '2t', title: '2 m temperature' }],
+      failuresBeforeSuccess: 6,
+      failureStatus: 500,
+    })
+    const queryClient = new QueryClient()
+    const screen = await render(
+      <QueryClientProvider client={queryClient}>
+        <Probe baseUrl={baseUrl} />
+      </QueryClientProvider>,
+    )
+    await expect
+      .poll(() => screen.getByTestId('state').element().textContent, {
+        timeout: 5000,
+      })
+      .toBe('error')
+    expect(wmsCapabilitiesRequestCount(lensId)).toBe(1)
+  })
 })

@@ -37,6 +37,8 @@ const EXTERNAL_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
 const LENS_RETRY_DELAYS_MS = [
   300, 600, 1200, 2400, 4800, 5000, 5000, 5000, 5000, 5000,
 ] as const
+/** Lens proxy: 400 unproxyable, 404 gone, 500 dead — 503 (starting) retries. */
+const LENS_PROXY_FINAL_STATUSES = new Set([400, 404, 500])
 
 /** Cache identity for one server's parsed capabilities. */
 export function wmsCapabilitiesKey(baseUrl: string): ReadonlyArray<string> {
@@ -48,6 +50,8 @@ const NO_CRS: ReadonlyArray<string> = []
 
 export interface LensSource {
   layers: ReadonlyArray<ParsedLayer>
+  /** HTTP status behind `error`, when the failure was an HTTP answer. */
+  errorStatus: number | null
   decorationLayers: ReadonlyArray<ParsedLayer>
   /** EPSG:4326 [west, south, east, north] advertised by the server. */
   bbox: [number, number, number, number] | null
@@ -72,11 +76,15 @@ export function useLensSource(baseUrl: string | null): LensSource {
     enabled: baseUrl !== null,
     queryFn: ({ signal }): Promise<ParsedCapabilities> =>
       fetchCapabilities(baseUrl!, signal),
-    // Timeout/interruption burned a long attempt — surface it; Retry stays.
+    // Timeout/interruption burned a long attempt; final proxy answers won't change.
     retry: (failureCount, error) =>
       !(
         error instanceof CapabilitiesError &&
-        (error.kind === 'timeout' || error.kind === 'interrupted')
+        (error.kind === 'timeout' ||
+          error.kind === 'interrupted' ||
+          (isLensProxyUrl(baseUrl ?? '') &&
+            error.status !== undefined &&
+            LENS_PROXY_FINAL_STATUSES.has(error.status)))
       ) && failureCount <= retryDelays.length,
     retryDelay: (failureCount) =>
       retryDelays[Math.min(failureCount, retryDelays.length) - 1],
@@ -98,6 +106,10 @@ export function useLensSource(baseUrl: string | null): LensSource {
     bbox: query.data?.bbox ?? null,
     crs: query.data?.crs ?? NO_CRS,
     error: query.error ? query.error.message : null,
+    errorStatus:
+      query.error instanceof CapabilitiesError
+        ? (query.error.status ?? null)
+        : null,
     loadingLayers: baseUrl !== null && query.isPending,
     retrying: query.isFetching && query.failureCount > 0,
     groups,
