@@ -311,14 +311,16 @@ export function GeoToolbar({
             <Globe2 className="h-4 w-4" />
           </Button>
           <Popover>
+            {/* Reads the current projection so the control is findable. */}
             <PopoverTrigger
               render={
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+                  size="sm"
+                  className="relative h-7 gap-1 px-2 pointer-coarse:h-11"
                   title={`${t('projections.popover')} (${keyLabel(COMPARE_KEYS.projection)})`}
                   aria-label={t('projections.popover')}
+                  {...tourAttr(TOUR.visualise.projection)}
                 />
               }
             >
@@ -327,6 +329,10 @@ export function GeoToolbar({
                 show={reveal}
               />
               <Layers className="h-4 w-4" />
+              <span className="text-xs">
+                {t(`projections.short.${projection.id}`)}
+              </span>
+              <ChevronDown className="h-3 w-3 opacity-60" />
             </PopoverTrigger>
             <PopoverContent side="bottom" align="end" className="w-72 p-1">
               <P className="px-2 pt-1 pb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">

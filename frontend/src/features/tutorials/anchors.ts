@@ -43,6 +43,7 @@ export const TOUR = {
     expandRight: 'visualise.expand-right',
     timeline: 'visualise.timeline',
     timelineStatic: 'visualise.timeline-static',
+    projection: 'visualise.projection',
   },
 } as const
 

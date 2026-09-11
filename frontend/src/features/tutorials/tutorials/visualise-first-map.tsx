@@ -227,6 +227,12 @@ export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
       expandVia: TOUR.visualise.expandLeft,
     },
     {
+      id: 'projection',
+      anchor: TOUR.visualise.projection,
+      side: 'bottom',
+      advance: { kind: 'next-click' },
+    },
+    {
       id: 'time',
       anchor: TOUR.visualise.timeline,
       side: 'top',

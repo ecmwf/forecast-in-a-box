@@ -165,7 +165,7 @@ describe('visualise first-map tutorial', () => {
       )
       .toBeVisible()
     await expect
-      .element(screen.getByText('1 of 10', { exact: true }))
+      .element(screen.getByText('1 of 11', { exact: true }))
       .toBeVisible()
     await screen.getByRole('button', { name: 'Start', exact: true }).click()
 
@@ -202,6 +202,14 @@ describe('visualise first-map tutorial', () => {
         {
           timeout: 10000,
         },
+      )
+      .toBeVisible()
+    await screen.getByRole('button', { name: 'Next', exact: true }).click()
+
+    // Projection step: informational, anchored on the labelled trigger.
+    await expect
+      .element(
+        screen.getByRole('heading', { name: 'Change the map projection' }),
       )
       .toBeVisible()
     await screen.getByRole('button', { name: 'Next', exact: true }).click()
@@ -385,7 +393,7 @@ describe('visualise first-map tutorial', () => {
       )
       .toBeVisible()
     await expect
-      .element(screen.getByText('1 of 10', { exact: true }))
+      .element(screen.getByText('1 of 11', { exact: true }))
       .toBeVisible()
     await screen.getByRole('button', { name: 'Start', exact: true }).click()
 
@@ -426,7 +434,7 @@ describe('visualise first-map tutorial', () => {
       })
       .not.toBeNull()
     useTutorialsStore.getState().start('visualise-first-map')
-    useTutorialsStore.getState().setStep(6)
+    useTutorialsStore.getState().setStep(7)
 
     // DWD's Add button reads "Added" (disabled) — nothing to press, so the
     // step applies the slot-bar assignment itself.

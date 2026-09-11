@@ -200,7 +200,7 @@
     "firstStartHint": "A first start reads the run's files — usually 10–30 s."
   },
   "projections": {
-    "title": "Projection",
+    "title": "Map projection",
     "popover": "Projection & basemap",
     "merc": "Web Mercator",
     "geo": "Equirectangular (whole globe)",
@@ -208,7 +208,14 @@
     "spole": "Antarctic — polar stereographic",
     "laea": "Europe — equal-area (LAEA)",
     "blockedBy": "{{source}} does not serve this projection",
-    "snappedBack": "{{source}} does not serve the {{projection}} projection — back to Web Mercator"
+    "snappedBack": "{{source}} does not serve the {{projection}} projection — back to Web Mercator",
+    "short": {
+      "merc": "Mercator",
+      "geo": "Equirectangular",
+      "npole": "Arctic",
+      "spole": "Antarctic",
+      "laea": "Europe LAEA"
+    }
   },
   "wmsParams": {
     "t": "Temperature",
