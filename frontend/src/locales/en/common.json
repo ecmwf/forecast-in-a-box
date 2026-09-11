@@ -73,7 +73,8 @@
     "plugins": "Plugins",
     "concurrency": "Concurrency",
     "refresh": "Refresh Status",
-    "lastUpdated": "Last updated"
+    "lastUpdated": "Last updated",
+    "componentInitializing": "Loading"
   },
   "pagination": {
     "first": "First page",
