@@ -254,7 +254,6 @@ function RunCanvasInner({
               fitViewOptions={{ padding: 0.15, maxZoom: FIT_MAX_ZOOM }}
               // Default 0.5 floor can't fit a wide pipeline into a phone container.
               minZoom={0.1}
-              proOptions={{ hideAttribution: true }}
               onNodeClick={(_event, node) => {
                 // Toggle: click the already-selected block to clear.
                 setSelectedBlockId(selectedBlockId === node.id ? null : node.id)

@@ -419,7 +419,6 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
           // Instant hide while settling; fade in once the layout is final.
           settling ? 'opacity-0' : 'transition-opacity duration-150',
         )}
-        proOptions={{ hideAttribution: true }}
         // Default 0.5 floor can't fit a wide pipeline into a phone container.
         minZoom={0.1}
       >

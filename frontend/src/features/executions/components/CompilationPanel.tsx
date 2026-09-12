@@ -314,7 +314,6 @@ export function CompilationPanel({
             zoomOnScroll={true}
             fitView={true}
             fitViewOptions={{ padding: 0.18 }}
-            proOptions={{ hideAttribution: true }}
             onNodeMouseEnter={handleNodeMouseEnter}
             onNodeMouseLeave={handleNodeMouseLeave}
             onNodeClick={handleNodeClick}
