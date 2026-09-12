@@ -13,7 +13,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   addEdge,
@@ -31,13 +30,13 @@ import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import type { Connection, Edge, EdgeTypes, NodeTypes } from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
 import type { FableNode } from './nodes/BlockNode'
+import { CanvasMiniMap } from '@/components/common/CanvasMiniMap'
 import { getFactory } from '@/api/types/fable.types'
 import { layoutNodes } from '@/features/fable-builder/utils/layout-blocks'
 import { fableToGraph } from '@/features/fable-builder/utils/fable-to-graph'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useSidebarBlockDrop } from '@/features/fable-builder/hooks/useSidebarBlockDrop'
 import { useMedia } from '@/hooks/useMedia'
-import { useUiStore } from '@/stores/uiStore'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
@@ -59,8 +58,6 @@ const edgeTypes: EdgeTypes = {
 function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   // Must match FableBuilderPage's layout breakpoint (lg).
   const isDesktop = useMedia('(min-width: 1024px)')
-  const resolvedTheme = useUiStore((state) => state.resolvedTheme)
-  const isDark = resolvedTheme === 'dark'
 
   // Use individual selectors to avoid creating new objects on every render
   const fable = useFableBuilderStore((state) => state.fable)
@@ -437,17 +434,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
         {isDesktop && (
           <CanvasStatus nodeCount={nodes.length} edgeCount={edges.length} />
         )}
-        {isMiniMapOpen && isDesktop && (
-          <MiniMap
-            nodeStrokeWidth={3}
-            pannable
-            zoomable
-            position="bottom-right"
-            className="right-4! bottom-4! rounded-lg border border-border shadow-sm"
-            style={{ backgroundColor: isDark ? '#0f172a' : undefined }}
-            maskColor={isDark ? 'rgba(2, 6, 23, 0.6)' : 'rgba(0, 0, 0, 0.1)'}
-          />
-        )}
+        {isMiniMapOpen && isDesktop && <CanvasMiniMap />}
       </ReactFlow>
       <BlockDragPreview mode={dropMode} />
     </div>

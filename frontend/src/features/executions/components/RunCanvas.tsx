@@ -34,6 +34,8 @@ import type {
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { JobStatus } from '@/api/types/job.types'
+import { useMedia } from '@/hooks/useMedia'
+import { CanvasMiniMap } from '@/components/common/CanvasMiniMap'
 import {
   fableToEdges,
   fableToNodes,
@@ -128,6 +130,7 @@ function RunCanvasInner({
   const { t } = useTranslation('executions')
   const [showConfig, setShowConfig] = useState(true)
   const [maximized, setMaximized] = useState(false)
+  const isDesktop = useMedia('(min-width: 1024px)')
   const { fitView } = useReactFlow()
   const containerRef = useRef<HTMLDivElement>(null)
   const isInitialRender = useRef(true)
@@ -274,6 +277,7 @@ function RunCanvasInner({
                 position="bottom-left"
                 className="bottom-2! left-2!"
               />
+              {maximized && isDesktop && <CanvasMiniMap />}
               <Panel position="top-left" className="top-2! left-2!">
                 <Button
                   variant="outline"
