@@ -31,10 +31,13 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      <H3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
-        {title}
+    <div className="flex min-w-0 flex-col gap-3">
+      <H3
+        className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground"
+        title={title}
+      >
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="truncate">{title}</span>
       </H3>
       <ul className="space-y-3">{children}</ul>
     </div>
@@ -43,11 +46,16 @@ function Section({
 
 function NewsItem({ item }: { item: NewsLink }) {
   return (
-    <li>
-      <Link href={item.url} underline={false} className="text-sm font-medium">
+    // One line each so the card stays short in narrow columns; the title tooltip carries the rest.
+    <li className="min-w-0" title={item.title}>
+      <Link
+        href={item.url}
+        underline={false}
+        className="block truncate text-sm font-medium"
+      >
         {item.title}
       </Link>
-      <P className="mt-0.5 text-xs text-muted-foreground">
+      <P className="mt-0.5 truncate text-xs text-muted-foreground">
         {item.date ? `${item.source} · ${item.date}` : item.source}
       </P>
     </li>
