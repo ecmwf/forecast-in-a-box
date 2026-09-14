@@ -298,7 +298,9 @@
     "run": "run {{time}}",
     "runCount_one": "{{count}} run",
     "runCount_other": "{{count}} runs",
-    "runTitle": "Model run (reference time) the layers are drawn from"
+    "runTitle": "Model run (reference time) the layers are drawn from",
+    "submitted": "submitted {{time}}",
+    "submittedTitle": "When this run was submitted — not the forecast time"
   },
   "slots": {
     "swap": "Swap A and B",

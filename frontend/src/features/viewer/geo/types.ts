@@ -22,6 +22,8 @@ export interface CompareMapSource {
   id: string
   baseUrl: string
   label: string
+  /** Run submission time, null for external servers. */
+  submittedAt: string | null
   layers: ReadonlyArray<ParsedLayer>
   /** SkinnyWMS decoration layers (background/foreground) when lens-backed. */
   decorationLayers: ReadonlyArray<ParsedLayer>

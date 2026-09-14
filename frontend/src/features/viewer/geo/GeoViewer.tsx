@@ -133,6 +133,8 @@ export interface GeoViewerSource {
   id: string
   baseUrl: string
   label: string
+  /** When the run was submitted ("14 Sep 06:23"); shown after the label. */
+  submittedAt?: string | null
   /** External server's BBOX axis order; lens sources are always 'xy'. */
   bboxAxisOrder?: BboxAxisOrder
 }
@@ -901,6 +903,7 @@ export function GeoViewer({
     id: a.id,
     baseUrl: a.baseUrl,
     label: a.label,
+    submittedAt: a.submittedAt ?? null,
     layers: sourceA.layers,
     decorationLayers: sourceA.decorationLayers,
     activeOrder: activeOrderA,
@@ -929,6 +932,7 @@ export function GeoViewer({
         id: b.id,
         baseUrl: b.baseUrl,
         label: b.label,
+        submittedAt: b.submittedAt ?? null,
         layers: sourceB.layers,
         decorationLayers: sourceB.decorationLayers,
         activeOrder: activeOrderB,

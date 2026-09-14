@@ -32,12 +32,8 @@ import {
 import { BrushCleaning, HelpCircle, Loader2, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
-import {
-  SLOT_B_OFF,
-  entryDisplayName,
-  entryRef,
-  redactWmsUrl,
-} from '../entry-ref'
+import { SLOT_B_OFF, entryRef, redactWmsUrl } from '../entry-ref'
+import { slotCaption } from '../slot-caption'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
@@ -54,6 +50,7 @@ import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import type { TutorialId } from '@/stores/tutorialsStore'
+import { useAppTimeZone } from '@/lib/datetime'
 import {
   decodeViewerUrlState,
   encodeViewerUrlState,
@@ -245,6 +242,7 @@ function useActivePair(): ActivePair & {
 
 export function VisualisePage() {
   const { t } = useTranslation(['visualise', 'common'])
+  const timeZone = useAppTimeZone()
   const search = route.useSearch()
   const navigate = route.useNavigate()
   const entries = useComparisonStore((s) => s.entries)
@@ -548,7 +546,7 @@ export function VisualisePage() {
                 a={{
                   id: entryRef(a),
                   baseUrl: stateA.baseUrl,
-                  label: entryDisplayName(a),
+                  ...slotCaption(a, timeZone),
                   bboxAxisOrder: entryBboxAxisOrder(a),
                 }}
                 b={
@@ -556,7 +554,7 @@ export function VisualisePage() {
                     ? {
                         id: entryRef(b),
                         baseUrl: stateB.baseUrl,
-                        label: entryDisplayName(b),
+                        ...slotCaption(b, timeZone),
                         bboxAxisOrder: entryBboxAxisOrder(b),
                       }
                     : null
