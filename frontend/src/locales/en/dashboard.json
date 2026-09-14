@@ -50,13 +50,9 @@
   },
   "community": {
     "title": "Forecast-in-a-Box Community News",
-    "latestModels": "Latest Available Models",
-    "latestTopics": "Latest Forum Topics",
-    "new": "New",
-    "released": "Released {{time}}",
-    "postedBy": "Posted by {{author}} • {{time}}",
-    "viewRegistry": "View Model Registry",
-    "visitForum": "Visit Community Forum"
+    "press": "Press and articles",
+    "materials": "Presentations and materials",
+    "softwareAndCommunity": "Software and community"
   },
   "gettingStarted": {
     "title": "Getting Started Presets",
@@ -124,19 +120,5 @@
   "notification": {
     "newModels": "New models and model versions have been published in the",
     "registryLink": "model registry"
-  },
-  "mock": {
-    "models": {
-      "aifs": "AIFS Single",
-      "metNorwayMl": "MetNorway-ML",
-      "aicon": "AICON",
-      "aifsEns": "AIFS ENS"
-    },
-    "topics": {
-      "extremeWeather": "Best practices for extreme weather forecasting",
-      "modelAccuracy": "Comparing forecast model accuracy",
-      "optimizingRuntime": "Tips for optimizing forecast runtime",
-      "regionalModels": "Regional model recommendations"
-    }
   }
 }
