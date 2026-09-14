@@ -106,6 +106,14 @@ export function RunListPage() {
     () => filterRuns(runs, activeFilter, parseQuery(query), displayDateFor),
     [runs, activeFilter, query, displayDateFor],
   )
+  const runsById = useMemo(
+    () => new Map(runs.map((run) => [run.runId, run])),
+    [runs],
+  )
+  const toggleSelect = (runId: string) => {
+    const run = runsById.get(runId)
+    if (run) selection.toggle(run)
+  }
 
   if (isError) {
     return (
@@ -168,7 +176,7 @@ export function RunListPage() {
         onAddFacet={(token) => setQuery(addToken(query, token))}
         selectedIds={selection.selectedIds}
         selectionCap={selection.cap}
-        onToggleSelect={selection.toggle}
+        onToggleSelect={toggleSelect}
         header={
           <>
             <ForecastRunSearchHeader
@@ -185,8 +193,7 @@ export function RunListPage() {
               onGroupByChange={setGroupBy}
             />
             <CompareSelectionBar
-              runs={runs}
-              selectedIds={selection.selectedIds}
+              selectedRuns={selection.selectedRuns}
               onClear={selection.clear}
             />
           </>

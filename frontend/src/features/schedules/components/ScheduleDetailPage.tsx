@@ -163,6 +163,10 @@ export function ScheduleDetailPage() {
     displayDateFor,
   )
   const totalRunPages = runsData?.total_pages ?? 1
+  const toggleSelect = (runId: string) => {
+    const run = runViewModels.find((r) => r.runId === runId)
+    if (run) selection.toggle(run)
+  }
   const nextRunDate = nextRun
     ? serverTimeToLocal(nextRun, { roundMinute: true })
     : null
@@ -270,7 +274,7 @@ export function ScheduleDetailPage() {
         onAddFacet={(token) => setRunQuery((prev) => addToken(prev, token))}
         selectedIds={selection.selectedIds}
         selectionCap={selection.cap}
-        onToggleSelect={selection.toggle}
+        onToggleSelect={toggleSelect}
         header={
           <>
             <ForecastRunSearchHeader
@@ -287,8 +291,7 @@ export function ScheduleDetailPage() {
               onGroupByChange={setRunGroupBy}
             />
             <CompareSelectionBar
-              runs={runViewModels}
-              selectedIds={selection.selectedIds}
+              selectedRuns={selection.selectedRuns}
               onClear={selection.clear}
             />
           </>
