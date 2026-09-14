@@ -102,7 +102,7 @@ class AnemoiBuilder:
             date=strip_timezone(date),
             lead_time=lead_time,
             ensemble_members=ensemble,
-            artifacts=Artifacts(artifact_urls={self.artifact_id.to_str(): self.checkpoint.get_url()}),
+            artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
             **k,
         )
         return self._add_extra_output_keys(action)
@@ -111,7 +111,7 @@ class AnemoiBuilder:
         action = self.inference(lead_time=lead_time).from_initial_conditions(
             initial_conditions,
             **k,
-            artifacts=Artifacts(artifact_urls={self.artifact_id.to_str(): self.checkpoint.get_url()}),
+            artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
         )
         return self._add_extra_output_keys(action)
 
@@ -125,7 +125,7 @@ class AnemoiBuilder:
             date=strip_timezone(date),
             environment=env,
             ensemble_members=ensemble,
-            artifacts=Artifacts(artifact_urls={self.artifact_id.to_str(): self.checkpoint.get_url()}),
+            artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
             **k,
             **self.checkpoint.get_additional_kwargs(),
         )

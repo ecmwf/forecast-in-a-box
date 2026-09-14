@@ -207,7 +207,7 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
                 "fiab_plugin_test.runtime.source_filesize",
                 static_input_kw={"path": str(local_path)},
             )
-            with NodeMetadataContext(artifacts=Artifacts(artifact_urls={artifact_id.to_str(): ""})):
+            with NodeMetadataContext(artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(artifact_id): ""})):
                 action = from_source(payload)
         elif factory_id == "transform_increment":
             a = lookup[instance.input_ids["a"]]
