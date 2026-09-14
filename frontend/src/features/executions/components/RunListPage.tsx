@@ -8,7 +8,8 @@
  * does it submit to any jurisdiction.
  */
 
-/** The /executions page — the full, paginated Forecast Journal. */
+/** The /executions page — the Forecast Journal, filtered and paged in the client
+ * over the full run list (the backend list has no filters). */
 
 import { useCallback, useMemo, useState } from 'react'
 import { CalendarClock } from 'lucide-react'
@@ -19,11 +20,11 @@ import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import { useRunSelection } from '@/features/journal/hooks/useRunSelection'
 import { CompareSelectionBar } from '@/features/journal/components/CompareSelectionBar'
 import { Button } from '@/components/ui/button'
-import { useJobsStatus } from '@/api/hooks/useJobs'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
 import { filterRuns } from '@/features/journal/utils/filter-runs'
+import { pageSlice } from '@/features/journal/utils/page-slice'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
 import { ForecastRunSearchHeader } from '@/features/journal/components/ForecastRunSearchHeader'
@@ -59,6 +60,7 @@ export function RunListPage() {
   const groupBy: GroupBy = search.group ?? 'date'
 
   const setQuery = (value: string) => {
+    setPage(1)
     void navigate({ search: (prev) => ({ ...prev, q: value || undefined }) })
   }
   const setActiveFilter = (status: RunFilter) => {
@@ -78,9 +80,15 @@ export function RunListPage() {
     })
   }
 
-  const { data, isLoading, isError, error } = useJobsStatus(page, PAGE_SIZE)
-  const { runs, toggleBookmark } = useForecastRuns(data?.runs ?? [])
-  const totalPages = data?.total_pages ?? 1
+  const {
+    runs: allRuns,
+    counts: statusCounts,
+    total: totalRuns,
+    isLoading,
+    isError,
+    error,
+  } = useJobStatusCounts()
+  const { runs, toggleBookmark } = useForecastRuns(allRuns)
 
   // App-TZ date — keeps the facet aligned with the row in any client TZ.
   const { serverTimeToLocal, timeZone } = useServerTime()
@@ -91,7 +99,6 @@ export function RunListPage() {
   )
 
   const noRunsYet = !isLoading && runs.length === 0
-  const { counts: statusCounts, total: totalRuns } = useJobStatusCounts()
   const filterCounts = useMemo(
     () => ({
       all: totalRuns,
@@ -106,6 +113,7 @@ export function RunListPage() {
     () => filterRuns(runs, activeFilter, parseQuery(query), displayDateFor),
     [runs, activeFilter, query, displayDateFor],
   )
+  const paged = pageSlice(filtered, page, PAGE_SIZE)
   const runsById = useMemo(
     () => new Map(runs.map((run) => [run.runId, run])),
     [runs],
@@ -122,7 +130,7 @@ export function RunListPage() {
           title={t('page.title')}
           description={t('page.description')}
         />
-        <ErrorPanel message={error.message} />
+        <ErrorPanel message={error?.message ?? ''} />
       </ListPageContainer>
     )
   }
@@ -145,7 +153,7 @@ export function RunListPage() {
       />
 
       <ForecastRunList
-        runs={filtered}
+        runs={paged.items}
         isLoading={isLoading}
         emptyText={noRunsYet ? t('empty.description') : t('empty.filtered')}
         emptyAction={
@@ -200,8 +208,8 @@ export function RunListPage() {
         }
         footer={
           <Pagination
-            page={page}
-            totalPages={totalPages}
+            page={paged.page}
+            totalPages={paged.totalPages}
             onPageChange={setPage}
           />
         }

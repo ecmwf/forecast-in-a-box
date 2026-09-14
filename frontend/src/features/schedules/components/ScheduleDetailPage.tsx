@@ -49,6 +49,7 @@ import { RunCanvas } from '@/features/executions/components/RunCanvas'
 import { StatCard } from '@/features/dashboard/components/StatCard'
 import { scheduleRunToViewModel } from '@/features/journal/adapters'
 import { filterRuns } from '@/features/journal/utils/filter-runs'
+import { pageSlice } from '@/features/journal/utils/page-slice'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
 import { ForecastRunSearchHeader } from '@/features/journal/components/ForecastRunSearchHeader'
@@ -61,6 +62,8 @@ import { cn } from '@/lib/utils'
 import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 
 const PAGE_SIZE = 10
+/** The schedule runs endpoint has no filters: load them all, filter and page here. */
+const ALL_RUNS = 1000
 
 const SCHEDULE_RUN_FILTERS: ReadonlyArray<RunFilter> = [
   'all',
@@ -85,7 +88,7 @@ export function ScheduleDetailPage() {
 
   const { data: schedule, isLoading, isError } = useSchedule(scheduleId)
   const { data: nextRun } = useScheduleNextRun(scheduleId)
-  const { data: runsData } = useScheduleRuns(scheduleId, runsPage, PAGE_SIZE)
+  const { data: runsData } = useScheduleRuns(scheduleId, 1, ALL_RUNS)
   const updateSchedule = useUpdateSchedule()
   const { data: catalogue } = useBlockCatalogue()
   const { data: blueprint } = useFableRetrieve(schedule?.blueprint_id)
@@ -162,7 +165,8 @@ export function ScheduleDetailPage() {
     parseQuery(runQuery),
     displayDateFor,
   )
-  const totalRunPages = runsData?.total_pages ?? 1
+  const pagedRuns = pageSlice(filteredRuns, runsPage, PAGE_SIZE)
+  const totalRunPages = pagedRuns.totalPages
   const toggleSelect = (runId: string) => {
     const run = runViewModels.find((r) => r.runId === runId)
     if (run) selection.toggle(run)
@@ -267,7 +271,7 @@ export function ScheduleDetailPage() {
 
       {/* Runs — rendered through the shared Forecast Journal */}
       <ForecastRunList
-        runs={filteredRuns}
+        runs={pagedRuns.items}
         groupBy={runGroupBy}
         emptyText={t('detail.noRuns')}
         onToggleBookmark={toggleBookmark}
@@ -280,7 +284,10 @@ export function ScheduleDetailPage() {
             <ForecastRunSearchHeader
               title={t('schedules:detail.runsTitle')}
               query={runQuery}
-              onQueryChange={setRunQuery}
+              onQueryChange={(value) => {
+                setRunQuery(value)
+                setRunsPage(1)
+              }}
               activeFilter={runFilter}
               onFilterChange={(filter) => {
                 setRunFilter(filter)
@@ -303,7 +310,7 @@ export function ScheduleDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={runsPage <= 1}
+                  disabled={pagedRuns.page <= 1}
                   onClick={() => setRunsPage((p) => p - 1)}
                 >
                   <ChevronLeft className="mr-1 h-4 w-4" />
@@ -311,14 +318,14 @@ export function ScheduleDetailPage() {
                 </Button>
                 <span className="text-sm text-muted-foreground">
                   {t('pagination.page', {
-                    current: runsPage,
+                    current: pagedRuns.page,
                     total: totalRunPages,
                   })}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={runsPage >= totalRunPages}
+                  disabled={pagedRuns.page >= totalRunPages}
                   onClick={() => setRunsPage((p) => p + 1)}
                 >
                   {t('pagination.next')}
