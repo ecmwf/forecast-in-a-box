@@ -13,7 +13,8 @@ import re
 
 import numpy as np
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, Payload, from_source, merge
+from earthkit.workflows.fluent import Action, create_task_instance, from_source, merge
+from earthkit.workflows.metadata import Requirements, NodeMetadata
 from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimension
 from fiab_core.fable import (
     ActionLookup,
@@ -132,11 +133,11 @@ class OperationalForecastSource(Source):
 
         source = block.config_as_str(SOURCE)
         if source == "ecmwf-open-data":
-            metadata = {"environment": opendata_dependencies}
+            requirements = Requirements(environment=opendata_dependencies)
         elif source == "mars":
-            metadata = {"environment": mars_dependencies}
+            requirements = Requirements(environment=mars_dependencies)
         else:
-            metadata = {}
+            requirements = Requirements()
 
         subqube = fc_qube.select({"time": time}).compress()
         actions = []
@@ -154,19 +155,20 @@ class OperationalForecastSource(Source):
                     np.asarray(
                         [
                             [
-                                Payload(
+                                create_task_instance(
                                     "fiab_plugin_ecmwf.runtime.source.earthkit_source",
-                                    [source],
-                                    {
-                                        "requests": [
-                                            dict(
-                                                {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
-                                                param=ParamDBInstance.param_id_to_shortname(int(p)),
-                                                step=step,
-                                            )
-                                        ],
-                                    },
-                                    metadata=metadata,
+                                    static_input_ps=[
+                                        source,
+                                        {
+                                            "requests": [
+                                                dict(
+                                                    {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
+                                                    param=ParamDBInstance.param_id_to_shortname(int(p)),
+                                                    step=step,
+                                                )
+                                            ],
+                                        },
+                                    ],
                                 )
                                 for p in datacube[PARAM]
                             ]
@@ -175,6 +177,7 @@ class OperationalForecastSource(Source):
                     ),
                     dims=[STEP, PARAM],
                     coords={STEP: datacube[STEP], PARAM: datacube[PARAM]},
+                    node_metadata=NodeMetadata(requirements=requirements),
                 )
                 expand_dims = [dim for dim, values in datacube.items() if (len(values) > 1 and dim not in [STEP, PARAM])]
                 if len(expand_dims) > 0:
@@ -228,11 +231,11 @@ class ZarrSink(Sink):
             .combine_branches(dim=temp_dim)
             .concatenate(dim=temp_dim)
             .map(
-                Payload(
+                create_task_instance(
                     "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
-                    kwargs={"path": block.config_as_str(PATH)},
-                    metadata={"environment": ["zarr"]},
-                )
+                    static_input_kw={"path": block.config_as_str(PATH)},
+                ), 
+                node_metadata=NodeMetadata(requirements=Requirements(environment=["zarr"])),
             )
         )
         return Either.ok(action)
@@ -372,9 +375,9 @@ class GribSink(Sink):
             pass
 
         action = action.map(
-            Payload(
+            create_task_instance(
                 "fiab_plugin_ecmwf.runtime.sinks.write_grib",
-                kwargs={"path": block.config_as_str(PATH)},
+                static_input_kw={"path": block.config_as_str(PATH)},
             )
         )
         return Either.ok(action)
@@ -476,16 +479,16 @@ class MapPlotSink(Sink):
         )
 
         action = selected.map(
-            Payload(
+            create_task_instance(
                 "fiab_plugin_ecmwf.runtime.plots.map_plot",
-                kwargs={
+                static_input_kw={
                     "domain": block.config_as_geodomain(DOMAIN).with_bbox_earthkitplots().value or None,
                     "format": block.config_as_str(FORMAT),
                     "groupby": None if groupby == "none" else groupby,
                     # "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
                 },
-                metadata={"environment": ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11"]},
-            )
+            ),
+            node_metadata=NodeMetadata(requirements=Requirements(environment=["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11"])),
         )
         return Either.ok(action)
 

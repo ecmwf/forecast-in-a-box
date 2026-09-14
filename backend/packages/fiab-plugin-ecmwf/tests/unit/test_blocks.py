@@ -12,7 +12,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
-from earthkit.workflows.fluent import Action
+from earthkit.workflows.fluent import Action, create_task_instance, from_source
 from earthkit.workflows.nodetree import datacubes as nodetree_datacubes
 from earthkit.workflows.nodetree import nodetree_arrays, nodetree_dimensions
 from fiab_core.fable import (
@@ -67,6 +67,98 @@ def _select() -> Select:
     block = _block_builder("select")
     assert isinstance(block, Select)
     return block
+
+
+@pytest.fixture
+def dummy_blockinstance() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("dummy"),
+        _block_instance(
+            "dummy",
+            {
+                "source": "ecmwf-open-data",
+                "base_time": datetime(2024, 1, 1),
+                "forecast": "ifs-ens",
+            },
+        ),
+        OperationalForecastSource.configuration_options,
+    )
+
+
+@pytest.fixture
+def dummy_blockinstance_output() -> QubedOutput:
+    return QubedOutput()
+
+
+@pytest.fixture
+def operational_forecast_source_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("operationalForecastSource"),
+        _block_instance(
+            "operationalForecastSource",
+            {
+                "source": "ecmwf-open-data",
+                "base_time": datetime(2024, 1, 1),
+                "forecast": "ifs-ens",
+            },
+        ),
+        OperationalForecastSource.configuration_options,
+    )
+
+
+@pytest.fixture
+def operational_forecast_source_output() -> QubedOutput:
+    return QubedOutput(
+        dataqube=Qube.from_datacube(
+            {
+                PARAM: ["2t", "msl", "u"],
+                STEP: [0, 6, 12],
+                ENSEMBLE: [0, 1, 2, 3, 4],
+            }
+        )
+    )
+
+
+@pytest.fixture
+def operational_forecast_source_action(operational_forecast_source_output: QubedOutput) -> Action:
+    return from_source(np.asarray(create_task_instance("fiab_plugin_ecmwf.tests.noop"), dtype=object)).expand_as_qube(
+        operational_forecast_source_output.dataqube,
+        dims=[PARAM, STEP, ENSEMBLE],
+    )
+
+
+@pytest.fixture
+def ensemble_statistics_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("ensembleStatistics"),
+        BlockInstanceBase(
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "param": "2t",
+                    "statistic": "mean",
+                }
+            ),
+        ),
+        EnsembleStatistics.configuration_options,
+    )
+
+
+@pytest.fixture
+def temporal_statistics_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("temporalStatistics"),
+        BlockInstanceBase(
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values=_config(
+                {
+                    "param": "2t",
+                    "statistic": "mean",
+                }
+            ),
+        ),
+        TemporalStatistics.configuration_options,
+    )
 
 
 @pytest.fixture
@@ -761,8 +853,8 @@ class TestMapPlotSink:
     def _get_map_plot_domain(self, action: Action) -> object:
         for _, arr in nodetree_arrays(action.nodes):
             for node in arr.values.flat:
-                if hasattr(node, "payload") and "map_plot" in node.payload.func:
-                    return node.payload.kwargs["domain"]
+                if hasattr(node, "payload") and "map_plot" in node.payload.definition.entrypoint:
+                    return node.payload.static_input_kw["domain"]
         raise AssertionError("map_plot payload not found in compiled action")
 
     def test_compile_bbox_domain_is_reordered_to_wesn(
