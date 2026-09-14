@@ -13,7 +13,8 @@ import { Bookmark, History } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { NavigateFn } from '@tanstack/react-router'
 import type { Command } from './registry'
-import { useJobsStatus } from '@/api/hooks/useJobs'
+import type { JobExecutionDetail } from '@/api/types/job.types'
+import { useRecentRuns } from '@/api/hooks/useJobs'
 import { useBlockCatalogue } from '@/api/hooks/useFable'
 import {
   factoryIdToKey,
@@ -34,6 +35,7 @@ import {
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 
 const RECENT_RUN_COUNT = 6
+const EMPTY_RUNS: ReadonlyArray<JobExecutionDetail> = []
 
 /** Saved presets and plugin templates, each opening in Configure. */
 export function usePresetCommands(navigate: NavigateFn): Array<Command> {
@@ -75,8 +77,8 @@ export function usePresetCommands(navigate: NavigateFn): Array<Command> {
 /** The most recent runs, each opening its detail page. */
 export function useRunCommands(navigate: NavigateFn): Array<Command> {
   const { t } = useTranslation(['common', 'journal'])
-  const { data } = useJobsStatus(1, RECENT_RUN_COUNT)
-  const { runs } = useForecastRuns(data?.runs ?? [])
+  const { data } = useRecentRuns(RECENT_RUN_COUNT)
+  const { runs } = useForecastRuns(data ?? EMPTY_RUNS)
 
   return useMemo<Array<Command>>(
     () =>

@@ -26,7 +26,7 @@
 import { useEffect, useRef } from 'react'
 import i18n from 'i18next'
 import { useArtifacts, useDownloadModel } from '@/api/hooks/useArtifacts'
-import { useJobsStatus } from '@/api/hooks/useJobs'
+import { useRecentRuns } from '@/api/hooks/useJobs'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { useActivityStore } from '@/stores/activityStore'
@@ -101,14 +101,14 @@ function useCollectDownloads() {
  * Sync forecast jobs from the job list into the activity store.
  */
 function useCollectJobs() {
-  const { data } = useJobsStatus(1, 20)
+  const { data: runs } = useRecentRuns(20)
   const { serverTimeToLocal } = useServerTime()
 
   useEffect(() => {
-    if (!data?.runs) return
+    if (!runs) return
     const { tasks, addTask, updateTask } = useActivityStore.getState()
 
-    for (const job of data.runs) {
+    for (const job of runs) {
       const id = `job:${job.run_id}`
       const label = i18n.t('common:activity.jobLabel', {
         id: job.run_id.slice(0, 8),
@@ -145,7 +145,7 @@ function useCollectJobs() {
         })
       }
     }
-  }, [data, serverTimeToLocal])
+  }, [runs, serverTimeToLocal])
 }
 
 /**

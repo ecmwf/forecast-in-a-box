@@ -11,7 +11,8 @@
 import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
-import { useJobsStatus } from '@/api/hooks/useJobs'
+import type { JobExecutionDetail } from '@/api/types/job.types'
+import { useRecentRuns } from '@/api/hooks/useJobs'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
 import { H2 } from '@/components/base/typography'
@@ -19,11 +20,12 @@ import { Button } from '@/components/ui/button'
 
 /** Overview shows the latest runs and hands off to Execute for the rest. */
 const RECENT_RUN_COUNT = 5
+const EMPTY_RUNS: ReadonlyArray<JobExecutionDetail> = []
 
 export function ForecastJournal() {
   const { t } = useTranslation('journal')
-  const { data, isLoading } = useJobsStatus(1, RECENT_RUN_COUNT)
-  const { runs, toggleBookmark } = useForecastRuns(data?.runs ?? [])
+  const { data, isLoading } = useRecentRuns(RECENT_RUN_COUNT)
+  const { runs, toggleBookmark } = useForecastRuns(data ?? EMPTY_RUNS)
 
   return (
     <ForecastRunList
