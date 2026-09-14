@@ -15,14 +15,14 @@ import { Globe, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { probeWmsEndpoint } from '@/features/visualise/wms-probe'
 import { cspConnectPolicy } from '@/features/visualise/deployment'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import {
-  MAX_COMPARISON_ENTRIES,
-  useComparisonStore,
-} from '@/features/visualise/stores/comparisonStore'
+  useAddedToast,
+  useSlotRefs,
+} from '@/features/visualise/hooks/useBasketAdd'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { P } from '@/components/base/typography'
-import { showToast } from '@/lib/toast'
 
 type WmsFormError =
   | {
@@ -45,6 +45,8 @@ export function WmsUrlForm() {
   const [probing, setProbing] = useState(false)
   const [error, setError] = useState<WmsFormError>(null)
   const addEntry = useComparisonStore((s) => s.addEntry)
+  const slotRefs = useSlotRefs()
+  const addedToast = useAddedToast()
   const cspRestricted = useMemo(() => cspConnectPolicy().restricted, [])
 
   const submit = async () => {
@@ -63,17 +65,12 @@ export function WmsUrlForm() {
       )
       return
     }
-    const added = addEntry({
-      kind: 'wms',
-      url: result.baseUrl,
-      label: result.label,
-    })
-    if (added === 'added') {
-      showToast.success(t('toast.added', { name: result.label }))
-      setUrl('')
-    } else if (added === 'full') {
-      showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-    }
+    const added = addEntry(
+      { kind: 'wms', url: result.baseUrl, label: result.label },
+      slotRefs,
+    )
+    addedToast(result.label, added)
+    if (added.status === 'added') setUrl('')
   }
 
   const errorText =

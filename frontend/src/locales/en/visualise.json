@@ -12,8 +12,8 @@
   },
   "toast": {
     "added": "Added to comparison: {{name}}",
+    "addedMadeRoom": "Added to comparison: {{name}} — removed {{evicted}} to make room",
     "removed": "Removed from comparison: {{name}}",
-    "full": "Comparison is full ({{max}} sources max)",
     "unknownSource": "A shared source could not be found and was removed from the link",
     "invalidLink": "The comparison link contained an invalid source reference",
     "sourceLost": "A shared source is no longer available and was removed from the link: {{reason}}"

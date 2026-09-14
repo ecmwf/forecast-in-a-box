@@ -36,18 +36,25 @@ beforeEach(() => {
 
 describe('comparisonStore', () => {
   it('adds entries, stamps addedAt, and dedupes by ref', () => {
-    expect(store().addEntry(outputEntry(1))).toBe('added')
-    expect(store().addEntry(outputEntry(1))).toBe('duplicate')
+    expect(store().addEntry(outputEntry(1))).toMatchObject({ status: 'added' })
+    expect(store().addEntry(outputEntry(1))).toMatchObject({
+      status: 'duplicate',
+    })
     expect(store().entries).toHaveLength(1)
     expect(store().entries[0].addedAt).toBeGreaterThan(0)
   })
 
-  it('caps the basket at MAX_COMPARISON_ENTRIES', () => {
+  it('makes room by dropping the oldest entry not kept', () => {
     for (let i = 0; i < MAX_COMPARISON_ENTRIES; i++) {
-      expect(store().addEntry(outputEntry(i))).toBe('added')
+      store().addEntry(outputEntry(i))
     }
-    expect(store().addEntry(outputEntry(99))).toBe('full')
+    const keep = entryRef(store().entries[0])
+    const outcome = store().addEntry(outputEntry(99), [keep])
+    expect(outcome.status).toBe('added')
+    expect(outcome.evicted.map(entryRef)).toEqual([entryRef(outputEntry(1))])
     expect(store().entries).toHaveLength(MAX_COMPARISON_ENTRIES)
+    expect(store().entries.map(entryRef)).toContain(keep)
+    expect(store().addEntry(outputEntry(99)).status).toBe('duplicate')
   })
 
   it('removes by ref and clears', () => {

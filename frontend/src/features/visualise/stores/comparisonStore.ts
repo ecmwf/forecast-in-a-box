@@ -24,16 +24,23 @@ import { entryRef } from '../entry-ref'
 import type { ComparisonEntry, NewComparisonEntry } from '../entry-ref'
 import { STORAGE_KEYS, STORE_VERSIONS } from '@/lib/storage-keys'
 
+/** Basket size; adding beyond it drops the oldest entry not on the map. */
 export const MAX_COMPARISON_ENTRIES = 8
 
-export type AddEntryResult = 'added' | 'duplicate' | 'full'
+export interface AddEntryOutcome {
+  status: 'added' | 'duplicate'
+  /** Entries dropped to make room, oldest first. */
+  evicted: ReadonlyArray<ComparisonEntry>
+}
 
 interface ComparisonState {
   entries: Array<ComparisonEntry>
-  addEntry: (entry: NewComparisonEntry) => AddEntryResult
+  /** Adds unless present; `keepRefs` (slots A/B) are never evicted. */
+  addEntry: (
+    entry: NewComparisonEntry,
+    keepRefs?: ReadonlyArray<string | undefined>,
+  ) => AddEntryOutcome
   removeEntry: (ref: string) => void
-  /** Evict the oldest entries not in `keepRefs` until one more fits. */
-  makeRoom: (keepRefs: ReadonlyArray<string | undefined>) => void
   /** Fill in lazily-resolved display metadata for an `output` entry. */
   updateOutputMeta: (
     ref: string,
@@ -54,36 +61,27 @@ export const useComparisonStore = create<ComparisonState>()(
       (set, get) => ({
         entries: [],
 
-        addEntry: (entry) => {
+        addEntry: (entry, keepRefs = []) => {
           const ref = entryRef(entry)
-          const { entries } = get()
-          if (entries.some((e) => entryRef(e) === ref)) return 'duplicate'
-          if (entries.length >= MAX_COMPARISON_ENTRIES) return 'full'
+          const entries = [...get().entries]
+          if (entries.some((e) => entryRef(e) === ref)) {
+            return { status: 'duplicate', evicted: [] }
+          }
+          const keep = new Set(keepRefs.filter((r) => r !== undefined))
+          const evicted: Array<ComparisonEntry> = []
+          while (entries.length >= MAX_COMPARISON_ENTRIES) {
+            const idx = entries.findIndex((e) => !keep.has(entryRef(e)))
+            if (idx < 0) break
+            evicted.push(...entries.splice(idx, 1))
+          }
           set(
             { entries: [...entries, { ...entry, addedAt: Date.now() }] },
             undefined,
             'compare/addEntry',
           )
-          return 'added'
+          return { status: 'added', evicted }
         },
 
-        makeRoom: (keepRefs) =>
-          set(
-            (state) => {
-              const keep = new Set(keepRefs.filter((r) => r !== undefined))
-              const entries = [...state.entries]
-              while (entries.length >= MAX_COMPARISON_ENTRIES) {
-                const idx = entries.findIndex((e) => !keep.has(entryRef(e)))
-                if (idx < 0) break
-                entries.splice(idx, 1)
-              }
-              return entries.length === state.entries.length
-                ? state
-                : { entries }
-            },
-            undefined,
-            'compare/makeRoom',
-          ),
         removeEntry: (ref) =>
           set(
             (state) => ({

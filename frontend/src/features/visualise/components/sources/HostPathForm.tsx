@@ -15,32 +15,30 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isRemoteDeployment } from '@/features/visualise/deployment'
 import { useSkinnyWmsAvailable } from '@/api/hooks/useLens'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import {
-  MAX_COMPARISON_ENTRIES,
-  useComparisonStore,
-} from '@/features/visualise/stores/comparisonStore'
+  useAddedToast,
+  useSlotRefs,
+} from '@/features/visualise/hooks/useBasketAdd'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { P } from '@/components/base/typography'
-import { showToast } from '@/lib/toast'
 
 export function HostPathForm() {
   const { t } = useTranslation('visualise')
   const [path, setPath] = useState('')
   const addEntry = useComparisonStore((s) => s.addEntry)
+  const slotRefs = useSlotRefs()
+  const addedToast = useAddedToast()
   const lensUnavailable = useSkinnyWmsAvailable() === false
 
   const submit = () => {
     const trimmed = path.trim()
     if (!trimmed) return
     const label = trimmed.replace(/\/$/, '').split('/').pop() || trimmed
-    const result = addEntry({ kind: 'path', path: trimmed, label })
-    if (result === 'added') {
-      showToast.success(t('toast.added', { name: label }))
-      setPath('')
-    } else if (result === 'full') {
-      showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-    }
+    const result = addEntry({ kind: 'path', path: trimmed, label }, slotRefs)
+    addedToast(label, result)
+    if (result.status === 'added') setPath('')
   }
 
   return (

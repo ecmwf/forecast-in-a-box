@@ -31,10 +31,7 @@ import {
   decodeEntryRef,
   entryRef,
 } from '../entry-ref'
-import {
-  MAX_COMPARISON_ENTRIES,
-  useComparisonStore,
-} from '../stores/comparisonStore'
+import { useComparisonStore } from '../stores/comparisonStore'
 import { allowedWmsUrl } from '../wms-probe'
 import { jobKeys } from '@/api/hooks/useJobs'
 import { getJobStatus } from '@/api/endpoints/job'
@@ -77,7 +74,6 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
   const navigate = route.useNavigate()
   const queryClient = useQueryClient()
   const addEntry = useComparisonStore((s) => s.addEntry)
-  const makeRoom = useComparisonStore((s) => s.makeRoom)
   const entries = useComparisonStore((s) => s.entries)
   // Refs already handled this mount — failures must not retry in a loop.
   const processedRef = useRef<Set<string>>(new Set())
@@ -122,13 +118,7 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
                 label: pathLabel(pending.path),
               }
         // A link the user chose to open outranks stale basket entries.
-        makeRoom([search.a, search.b])
-        const result = addEntry(entry)
-        if (result === 'full') {
-          showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-          rewrite.set(pending.ref, undefined)
-          continue
-        }
+        addEntry(entry, [search.a, search.b])
         // Re-mint legacy `path:` as `dir:` in the URL; pre-mark it
         // processed so the rewrite isn't treated as fresh inbound.
         const canonical = entryRef(entry)
@@ -155,7 +145,7 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
       }
       setPendingUnverified([])
     },
-    [pendingUnverified, addEntry, makeRoom, search.a, search.b, navigate, t],
+    [pendingUnverified, addEntry, search.a, search.b, navigate, t],
   )
 
   useEffect(() => {
@@ -233,20 +223,18 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
             strip(ref)
             return
           }
-          makeRoom([search.a, search.b])
-          const result = addEntry({
-            kind: 'output',
-            jobId: decoded.jobId,
-            taskId: decoded.taskId,
-            blockId: meta.original_block,
-            runName: '',
-            blockTitle: meta.original_block,
-            runCreatedAt: detail.created_at,
-          })
-          if (result === 'full') {
-            showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-            strip(ref)
-          }
+          addEntry(
+            {
+              kind: 'output',
+              jobId: decoded.jobId,
+              taskId: decoded.taskId,
+              blockId: meta.original_block,
+              runName: '',
+              blockTitle: meta.original_block,
+              runCreatedAt: detail.created_at,
+            },
+            [search.a, search.b],
+          )
         })
         .catch((err: unknown) => {
           log.error('Failed to hydrate comparison source from URL', {
