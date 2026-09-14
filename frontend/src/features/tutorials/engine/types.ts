@@ -83,6 +83,8 @@ export interface RuntimeSnapshot<TLaunch> {
 export interface TutorialStep<TLaunch = unknown> {
   /** i18n leaf: <tutorial>.steps.<id>.* */
   id: string
+  /** Page the step lives on (navigated on entry); default: the tour route. */
+  route?: string
   /** `data-tour` id; absent = centered card. */
   anchor?: string
   /** Extra attribute selector for ids stamped on several elements. */
@@ -114,4 +116,6 @@ export interface TutorialDefinition<TLaunch = unknown> {
   /** Elements for `<tag>…</tag>` markup in step bodies (Trans components). */
   markup?: Record<string, ReactElement>
   steps: ReadonlyArray<TutorialStep<TLaunch>>
+  /** Called once when the run ends; null = status kept. */
+  onFinish?: (outcome: 'completed' | 'dismissed' | null) => void
 }
