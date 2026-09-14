@@ -48,7 +48,7 @@ describe('TimeZoneSelect', () => {
     await expect.element(screen.getByLabelText('Search timezone')).toBeVisible()
     await expect
       .element(screen.getByRole('option', { selected: true }))
-      .toHaveTextContent('UTC')
+      .toMatchTextContent('UTC')
   })
 
   it('filters the list by the search query', async () => {
@@ -71,7 +71,7 @@ describe('TimeZoneSelect', () => {
 
     await expect
       .element(screen.getByTestId('value'))
-      .toHaveTextContent('Europe/Berlin')
+      .toMatchTextContent('Europe/Berlin')
     expect(useUiStore.getState().timeZone).toBe('Europe/Berlin')
     const stored = JSON.parse(
       localStorage.getItem(STORAGE_KEYS.stores.ui) ?? '{}',
@@ -85,7 +85,7 @@ describe('TimeZoneSelect', () => {
     await userEvent.keyboard('{Enter}')
     await expect
       .element(screen.getByTestId('value'))
-      .toHaveTextContent('Asia/Tokyo')
+      .toMatchTextContent('Asia/Tokyo')
   })
 
   it('moves the highlight with the arrow keys', async () => {
@@ -98,6 +98,6 @@ describe('TimeZoneSelect', () => {
     )
     await expect
       .element(screen.getByTestId('value'))
-      .toHaveTextContent(matches[1])
+      .toMatchTextContent(matches[1])
   })
 })

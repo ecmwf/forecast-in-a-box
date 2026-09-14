@@ -18,7 +18,7 @@
 import axe from 'axe-core'
 import { createContext, useContext, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { page } from '@vitest/browser/context'
+import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -911,7 +911,7 @@ describe('GeoViewer', () => {
     await screen.rerender(<Harness portA={portA} portB={portB2} />)
     await expect
       .element(screen.getByLabelText('Time link mode'))
-      .toHaveTextContent('Same time (exact)')
+      .toMatchTextContent('Same time (exact)')
     expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
   })
 

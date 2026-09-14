@@ -51,6 +51,8 @@ export default mergeConfig(
         provider: playwright(),
         instances: [{ browser: 'chromium' }],
         headless: true,
+        // Vitest 5 locators match text exactly; the suites rely on substrings.
+        locators: { exact: false },
         // Desktop layout (vitest default 414 < lg auto-collapse); height
         // ≥896 keeps unstyled dialogs above the fold; tests may override.
         viewport: { width: 1280, height: 900 },

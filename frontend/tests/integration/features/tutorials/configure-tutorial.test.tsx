@@ -37,7 +37,7 @@ import {
 } from '@tanstack/react-router'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
 import { mockCatalogue } from '@tests/../mocks/data/fable.data'
-import type { Locator } from '@vitest/browser/context'
+import type { Locator } from 'vitest/browser'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import { Route as ConfigureRoute } from '@/routes/_authenticated/configure'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'

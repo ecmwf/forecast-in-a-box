@@ -236,12 +236,12 @@ describe('VisualisePage', () => {
     // Normalization fills A/B from basket order.
     const pickerA = screen.getByLabelText('Source for slot A')
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerA).toHaveTextContent('Run A')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerA).toMatchTextContent('Run A')
+    await expect.element(pickerB).toMatchTextContent('Run B')
 
     await screen.getByRole('button', { name: 'Swap A and B' }).click()
-    await expect.element(pickerA).toHaveTextContent('Run B')
-    await expect.element(pickerB).toHaveTextContent('Run A')
+    await expect.element(pickerA).toMatchTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run A')
   })
 
   it('a bare visit restores the last-used pair over basket order', async () => {
@@ -255,10 +255,10 @@ describe('VisualisePage', () => {
 
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
   })
 
   it('falls back to basket order when the stored pair left the basket', async () => {
@@ -272,10 +272,10 @@ describe('VisualisePage', () => {
 
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
   })
 
   it('swapping hands a healthy source to a slot whose start had failed', async () => {
@@ -324,7 +324,7 @@ describe('VisualisePage', () => {
     ).toHaveLength(0)
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Pick a source…')
+      .toMatchTextContent('Pick a source…')
   })
 
   it('gates local sources when SkinnyWMS is missing; external WMS stays', async () => {
@@ -503,10 +503,10 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
 
     await screen
       .getByRole('button', { name: 'Remove A from view — continue with B' })
@@ -516,7 +516,7 @@ describe('VisualisePage', () => {
     // in the basket for later).
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
     await expect
       .poll(
         () =>
@@ -532,7 +532,7 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
 
     await screen.getByRole('button', { name: 'Manage sources' }).click()
     const removeA = screen.getByRole('button', { name: /Remove Run A/ })
@@ -547,7 +547,7 @@ describe('VisualisePage', () => {
       .toHaveLength(1)
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
     // The removed ref left the URL — hydration must not resurrect it.
     await new Promise((r) => setTimeout(r, 1200))
     expect(useComparisonStore.getState().entries).toHaveLength(1)
@@ -559,7 +559,7 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
 
     await screen.getByRole('button', { name: 'Manage sources' }).click()
     const removeB = screen.getByRole('button', { name: /Remove Run B/ })
@@ -574,7 +574,7 @@ describe('VisualisePage', () => {
       .toHaveLength(1)
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
     await new Promise((r) => setTimeout(r, 1200))
     expect(useComparisonStore.getState().entries).toHaveLength(1)
 
@@ -582,7 +582,7 @@ describe('VisualisePage', () => {
     useComparisonStore.getState().addEntry(RUN_B)
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
   })
 
   it(
@@ -655,7 +655,7 @@ describe('VisualisePage', () => {
 
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
 
     // Cancel keeps everything.
     await screen.getByRole('button', { name: 'Clear all' }).click()
@@ -696,7 +696,7 @@ describe('VisualisePage', () => {
     await screen.getByRole('option', { name: /Run A/ }).click()
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
   })
 
   it('the X clears B and materialization does not re-fill it', async () => {
@@ -705,16 +705,16 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run B')
 
     await screen
       .getByRole('button', { name: 'Remove B from view — continue with A' })
       .click()
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
     // The `b=off` sentinel holds against the auto-fill effect, and the X
     // is gone while B is empty.
     await new Promise((r) => setTimeout(r, 1200))
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
     expect(
       screen
         .getByRole('button', { name: 'Remove B from view — continue with A' })
@@ -731,11 +731,11 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run B')
     await screen
       .getByRole('button', { name: 'Remove B from view — continue with A' })
       .click()
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
 
     // Adding a NEW source is the intent to compare — B fills with it,
     // even though the URL carried the deliberate `b=off`.
@@ -744,7 +744,7 @@ describe('VisualisePage', () => {
       url: 'http://localhost:54391/wms?',
       label: 'maps.dwd.de',
     })
-    await expect.element(pickerB).toHaveTextContent('maps.dwd.de')
+    await expect.element(pickerB).toMatchTextContent('maps.dwd.de')
   })
 
   it('the X ejects an external-WMS B (regression: fake Select items)', async () => {
@@ -760,13 +760,13 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('maps.dwd.de')
+    await expect.element(pickerB).toMatchTextContent('maps.dwd.de')
     await screen
       .getByRole('button', { name: 'Remove B from view — continue with A' })
       .click()
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
     await new Promise((r) => setTimeout(r, 1200))
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
   })
 
   it('identifies sources in the slot dropdown with kind and id', async () => {
@@ -791,14 +791,14 @@ describe('VisualisePage', () => {
 
     const pickerA = screen.getByLabelText('Source for slot A')
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run B')
 
     // Picking A's source for slot B must NOT swap — same-source compare
     // (different layers of one run) is a real workflow.
     await pickerB.click()
     await screen.getByRole('option', { name: 'Run A' }).click()
-    await expect.element(pickerA).toHaveTextContent('Run A')
-    await expect.element(pickerB).toHaveTextContent('Run A')
+    await expect.element(pickerA).toMatchTextContent('Run A')
+    await expect.element(pickerB).toMatchTextContent('Run A')
   })
 
   it('hydrates basket entries from a shared URL', async () => {
