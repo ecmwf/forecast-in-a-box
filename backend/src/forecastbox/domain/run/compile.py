@@ -17,9 +17,9 @@ from typing import cast
 from cascade.low.core import DatasetId, JobInstance, TaskId
 from cascade.low.func import assert_never
 from earthkit.workflows.compilers import graph2job
-from earthkit.workflows.metadata import BuilderMetadata
 from earthkit.workflows.fluent import NodeMetadataContext
 from earthkit.workflows.graph import Graph, deduplicate_nodes
+from earthkit.workflows.metadata import BuilderMetadata
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import BlockInstanceId, BlockInstanceOutput, ConfigurationOptionId, NoOutput, RawOutput
 

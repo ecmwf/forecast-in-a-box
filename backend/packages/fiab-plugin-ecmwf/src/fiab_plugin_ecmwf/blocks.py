@@ -15,7 +15,7 @@ from typing import Any, cast
 import numpy as np
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, create_task_instance, from_source, merge
-from earthkit.workflows.metadata import Requirements, NodeMetadata
+from earthkit.workflows.metadata import NodeMetadata, Requirements
 from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimension
 from fiab_core.fable import (
     ActionLookup,
@@ -359,7 +359,7 @@ class ZarrSink(Sink):
                 create_task_instance(
                     "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
                     static_input_kw={"path": block.config_as_str(PATH)},
-                ), 
+                ),
                 node_metadata=NodeMetadata(requirements=Requirements(environment=["zarr"])),
             )
         )
@@ -604,7 +604,9 @@ class MapPlotSink(Sink):
                     # "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
                 },
             ),
-            node_metadata=NodeMetadata(requirements=Requirements(environment=["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11"])),
+            node_metadata=NodeMetadata(
+                requirements=Requirements(environment=["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11"])
+            ),
         )
         return Either.ok(action)
 

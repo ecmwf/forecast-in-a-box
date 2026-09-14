@@ -109,7 +109,9 @@ class AnemoiBuilder:
 
     def from_initial_conditions(self, initial_conditions: Any, lead_time: int, **k: Any) -> Action:
         action = self.inference(lead_time=lead_time).from_initial_conditions(
-            initial_conditions, **k, artifacts=Artifacts(artifact_urls={self.artifact_id.to_str(): self.checkpoint.get_url()}),
+            initial_conditions,
+            **k,
+            artifacts=Artifacts(artifact_urls={self.artifact_id.to_str(): self.checkpoint.get_url()}),
         )
         return self._add_extra_output_keys(action)
 
