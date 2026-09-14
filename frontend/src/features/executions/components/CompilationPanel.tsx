@@ -16,7 +16,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
 } from '@xyflow/react'
@@ -26,6 +25,7 @@ import { useTranslation } from 'react-i18next'
 import type { Node, NodeMouseHandler, ReactFlowInstance } from '@xyflow/react'
 import type {
   BlockFactoryCatalogue,
+  BlockKind,
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { CompilationDetailTask, JobStatus } from '@/api/types/job.types'
@@ -33,6 +33,13 @@ import type {
   BlockGroupData,
   TaskNodeData,
 } from '@/features/executions/utils/taskDagLayout'
+import type { TaskKind } from '@/features/executions/utils/taskClassify'
+import {
+  BLOCK_KIND_MINIMAP_COLOR,
+  CanvasMiniMap,
+  NEUTRAL_MINIMAP_COLOR,
+} from '@/components/common/CanvasMiniMap'
+import { useMedia } from '@/hooks/useMedia'
 import { Button } from '@/components/ui/button'
 import { ApiClientError } from '@/api/client'
 import { getFactory } from '@/api/types/fable.types'
@@ -75,6 +82,23 @@ const nodeTypes = {
  * Force-graph tab (canvas) handles larger DAGs. */
 const MAX_LAYERED_TASKS = 150
 
+/** Task kinds onto the block kinds whose colour they carry; unknown stays neutral. */
+const TASK_KIND_BLOCK_KIND: Record<TaskKind, BlockKind | null> = {
+  payload: 'source',
+  select: 'transform',
+  transform: 'transform',
+  inference: 'product',
+  plot: 'sink',
+  unknown: null,
+}
+
+function compilationMinimapColor(node: Node): string {
+  if (node.type !== 'compilationTask') return NEUTRAL_MINIMAP_COLOR
+  const task = (node.data as TaskNodeData).task
+  const kind = TASK_KIND_BLOCK_KIND[classifyTask(task.task_id)]
+  return kind ? BLOCK_KIND_MINIMAP_COLOR[kind] : NEUTRAL_MINIMAP_COLOR
+}
+
 export function CompilationPanel({
   jobId,
   status,
@@ -82,6 +106,7 @@ export function CompilationPanel({
   catalogue,
   onSwitchTab,
 }: CompilationPanelProps) {
+  const isDesktop = useMedia('(min-width: 1024px)')
   const { t } = useTranslation('executions')
   const query = useCompilationDetail(jobId, status)
 
@@ -314,7 +339,6 @@ export function CompilationPanel({
             zoomOnScroll={true}
             fitView={true}
             fitViewOptions={{ padding: 0.18 }}
-            proOptions={{ hideAttribution: true }}
             onNodeMouseEnter={handleNodeMouseEnter}
             onNodeMouseLeave={handleNodeMouseLeave}
             onNodeClick={handleNodeClick}
@@ -327,21 +351,7 @@ export function CompilationPanel({
               color="#cbd5e1"
               className="dark:opacity-30"
             />
-            <MiniMap
-              position="bottom-right"
-              // Default minimap can't fill our custom node types — pick
-              // explicit colours so the markers are visible.
-              nodeColor={(node) =>
-                node.type === COMPILATION_BLOCK_NODE_TYPE
-                  ? 'rgb(203, 213, 225)'
-                  : 'rgb(59, 130, 246)'
-              }
-              nodeStrokeWidth={2}
-              maskColor="rgba(0, 0, 0, 0.06)"
-              pannable
-              zoomable
-              className="right-2! bottom-2! h-[80px]! w-[120px]! rounded-md border border-border bg-background/80 shadow-sm"
-            />
+            {isDesktop && <CanvasMiniMap nodeColor={compilationMinimapColor} />}
             <Controls
               showInteractive={false}
               position="bottom-left"

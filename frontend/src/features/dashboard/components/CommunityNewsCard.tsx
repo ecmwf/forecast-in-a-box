@@ -8,18 +8,51 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * CommunityNewsCard Component
- *
- * Shows latest models and forum topics
- */
-
-import { ChevronRight, MessageSquare, Zap } from 'lucide-react'
+import { Newspaper, Package, Presentation } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { mockForumTopics, mockModels } from '@/features/dashboard/data/mockData'
-import { H2, H3, H4, P } from '@/components/base/typography'
+import type { ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import type { NewsLink } from '@/features/dashboard/data/communityNews'
+import {
+  COMMUNITY_ITEMS,
+  MATERIAL_ITEMS,
+  PRESS_ITEMS,
+} from '@/features/dashboard/data/communityNews'
+import { H2, H3, Link, P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+
+function Section({
+  Icon,
+  title,
+  children,
+}: {
+  Icon: LucideIcon
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <H3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
+        {title}
+      </H3>
+      <ul className="space-y-3">{children}</ul>
+    </div>
+  )
+}
+
+function NewsItem({ item }: { item: NewsLink }) {
+  return (
+    <li>
+      <Link href={item.url} underline={false} className="text-sm font-medium">
+        {item.title}
+      </Link>
+      <P className="mt-0.5 text-xs text-muted-foreground">
+        {item.date ? `${item.source} · ${item.date}` : item.source}
+      </P>
+    </li>
+  )
+}
 
 export function CommunityNewsCard() {
   const { t } = useTranslation('dashboard')
@@ -27,77 +60,25 @@ export function CommunityNewsCard() {
   return (
     <Card className="flex flex-col p-6">
       <H2 className="mb-6 text-xl font-semibold">{t('community.title')}</H2>
-
       <div className="grid flex-1 grid-cols-1 gap-8 sm:grid-cols-2">
-        {/* Latest Available Models */}
-        <div className="flex flex-col gap-5">
-          <H3 className="flex items-center gap-2 text-sm font-semibold text-primary">
-            <Zap className="h-4 w-4" />
-            {t('community.latestModels')}
-          </H3>
-          <div className="flex-1 space-y-4">
-            {mockModels.map((model) => (
-              <div key={`${model.nameKey}-${model.version}`}>
-                <div className="flex items-start justify-between">
-                  <H4 className="text-sm font-medium">
-                    {t(model.nameKey)} {model.version}
-                  </H4>
-                  {model.isNew && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                    >
-                      {t('community.new')}
-                    </Badge>
-                  )}
-                </div>
-                <P className="mt-0.5 text-muted-foreground">
-                  {t('community.released', { time: model.releasedAt })}
-                </P>
-              </div>
-            ))}
-          </div>
-          <a
-            href="https://github.com/ecmwf/anemoi"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center text-sm font-medium text-primary hover:underline"
-          >
-            {t('community.viewRegistry')}
-            <ChevronRight className="ml-0.5 h-3 w-3" />
-          </a>
-        </div>
+        <Section Icon={Newspaper} title={t('community.press')}>
+          {PRESS_ITEMS.map((item) => (
+            <NewsItem key={item.url} item={item} />
+          ))}
+        </Section>
 
-        {/* Latest Forum Topics */}
-        <div className="flex flex-col gap-5 border-l-0 border-border pl-0 sm:border-l sm:pl-8">
-          <H3 className="flex items-center gap-2 text-sm font-semibold text-primary">
-            <MessageSquare className="h-4 w-4" />
-            {t('community.latestTopics')}
-          </H3>
-          <div className="flex-1 space-y-4">
-            {mockForumTopics.map((topic) => (
-              <div key={topic.titleKey}>
-                <H4 className="text-sm leading-snug font-medium">
-                  {t(topic.titleKey)}
-                </H4>
-                <P className="mt-0.5 text-muted-foreground">
-                  {t('community.postedBy', {
-                    author: topic.author,
-                    time: topic.postedAt,
-                  })}
-                </P>
-              </div>
+        <div className="flex flex-col gap-8">
+          <Section Icon={Presentation} title={t('community.materials')}>
+            {MATERIAL_ITEMS.map((item) => (
+              <NewsItem key={item.url} item={item} />
             ))}
-          </div>
-          <a
-            href="https://forum.ecmwf.int"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center text-sm font-medium text-primary hover:underline"
-          >
-            {t('community.visitForum')}
-            <ChevronRight className="ml-0.5 h-3 w-3" />
-          </a>
+          </Section>
+
+          <Section Icon={Package} title={t('community.softwareAndCommunity')}>
+            {COMMUNITY_ITEMS.map((item) => (
+              <NewsItem key={item.url} item={item} />
+            ))}
+          </Section>
         </div>
       </div>
     </Card>

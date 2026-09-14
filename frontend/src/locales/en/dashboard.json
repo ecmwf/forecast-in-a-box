@@ -50,13 +50,9 @@
   },
   "community": {
     "title": "Forecast-in-a-Box Community News",
-    "latestModels": "Latest Available Models",
-    "latestTopics": "Latest Forum Topics",
-    "new": "New",
-    "released": "Released {{time}}",
-    "postedBy": "Posted by {{author}} • {{time}}",
-    "viewRegistry": "View Model Registry",
-    "visitForum": "Visit Community Forum"
+    "press": "Press and articles",
+    "materials": "Presentations and materials",
+    "softwareAndCommunity": "Software and community"
   },
   "gettingStarted": {
     "title": "Getting Started Presets",
@@ -73,11 +69,12 @@
     "templates": {
       "loading": "Loading templates",
       "emptyTitle": "No plugin templates available",
-      "emptyDescription": "Install and enable the ECMWF plugin to see ready-made starting points.",
+      "emptyDescription": "Install a plugin that ships templates, such as the ECMWF plugin, to see ready-made starting points.",
       "managePlugins": "Manage plugins",
       "errorTitle": "Couldn't load templates",
       "errorDescription": "The template list is temporarily unavailable."
-    }
+    },
+    "viewAllTemplates": "View all templates"
   },
   "presets": {
     "title": "My Configuration Presets",
@@ -124,19 +121,5 @@
   "notification": {
     "newModels": "New models and model versions have been published in the",
     "registryLink": "model registry"
-  },
-  "mock": {
-    "models": {
-      "aifs": "AIFS Single",
-      "metNorwayMl": "MetNorway-ML",
-      "aicon": "AICON",
-      "aifsEns": "AIFS ENS"
-    },
-    "topics": {
-      "extremeWeather": "Best practices for extreme weather forecasting",
-      "modelAccuracy": "Comparing forecast model accuracy",
-      "optimizingRuntime": "Tips for optimizing forecast runtime",
-      "regionalModels": "Regional model recommendations"
-    }
   }
 }

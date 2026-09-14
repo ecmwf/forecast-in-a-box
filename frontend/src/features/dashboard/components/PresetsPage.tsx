@@ -13,7 +13,7 @@
 import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { Bookmark, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Link } from '@tanstack/react-router'
+import { Link, useSearch } from '@tanstack/react-router'
 import { useConfigPresets } from '../hooks/useConfigPresets'
 import {
   templateConfigureSearch,
@@ -292,6 +292,11 @@ const TemplateRow = memo(function ({ template }: { template: TemplateEntry }) {
 const PAGE_SIZE = 10
 
 type PresetFilter = 'all' | 'bookmarked' | 'templates'
+const PRESET_FILTERS: ReadonlyArray<PresetFilter> = [
+  'all',
+  'bookmarked',
+  'templates',
+]
 
 /** Case-insensitive substring test of a preset against one facet token. */
 function matchesPresetFacet(
@@ -341,7 +346,11 @@ export function PresetsPage() {
   const { presets, deletePreset, toggleFavourite } = useConfigPresets()
   const { templates } = useTemplatePresets()
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<PresetFilter>('all')
+  // Non-strict: the page also renders outside its route in tests.
+  const search = useSearch({ strict: false })
+  const [filter, setFilter] = useState<PresetFilter>(
+    () => PRESET_FILTERS.find((f) => f === search.filter) ?? 'all',
+  )
   const [page, setPage] = useState(1)
 
   // Defer filtering so typing in the search box stays responsive on long lists.

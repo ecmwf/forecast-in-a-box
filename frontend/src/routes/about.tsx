@@ -9,7 +9,7 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
-import { Dag } from '@/features/landing/components/Dag.tsx'
+import { AboutPage } from '@/features/about/components/AboutPage'
 import { PublicLayout } from '@/components/layout/PublicLayout'
 
 export const Route = createFileRoute('/about')({
@@ -19,7 +19,7 @@ export const Route = createFileRoute('/about')({
 function About() {
   return (
     <PublicLayout>
-      <Dag />
+      <AboutPage />
     </PublicLayout>
   )
 }

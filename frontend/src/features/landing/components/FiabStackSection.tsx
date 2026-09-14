@@ -11,6 +11,7 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
 import { Trans, useTranslation } from 'react-i18next'
+import { PoweredByLogos } from './PoweredByLogos'
 import { Button } from '@/components/ui/button.tsx'
 import { H3, Link, P } from '@/components/base/typography.tsx'
 
@@ -52,40 +53,7 @@ export function FiabStackSection() {
               {t('stack.poweredBy')}
             </H3>
             <div className="flex h-full items-center">
-              <div className="relative grid w-full grid-cols-2 gap-x-3 gap-y-6 sm:gap-6 lg:grid-cols-2">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src="/logos/packages/anemoi.webp"
-                      alt={t('brand.anemoi')}
-                      className="h-24"
-                    />
-                  </div>
-                  <Link
-                    href="https://github.com/ecmwf/anemoi"
-                    underline={false}
-                    color="muted"
-                  >
-                    {t('stack.anemoiDescription')}
-                  </Link>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src="/logos/packages/earthkit-light.svg"
-                      alt={t('brand.earthkit')}
-                      className="h-24"
-                    />
-                  </div>
-                  <Link
-                    href="https://earthkit.ecmwf.int"
-                    underline={false}
-                    color="muted"
-                  >
-                    {t('stack.earthkitDescription')}
-                  </Link>
-                </div>
-              </div>
+              <PoweredByLogos />
             </div>
           </div>
         </div>

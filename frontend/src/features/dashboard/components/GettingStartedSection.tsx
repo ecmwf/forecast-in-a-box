@@ -14,7 +14,7 @@
  * A blank canvas plus the starting points the ECMWF plugin ships as templates.
  */
 
-import { Layers } from 'lucide-react'
+import { ChevronRight, Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { GettingStartedCard } from './GettingStartedCard'
@@ -53,16 +53,28 @@ function StarterPanel({
 export function GettingStartedSection() {
   const { t } = useTranslation(['dashboard', 'common'])
   const navigate = useNavigate()
-  const { starters, hasStarters, isLoading, isError, refetch } =
+  const { starters, hasStarters, templateCount, isLoading, isError, refetch } =
     useStarterTemplates()
 
   const content = (
     <>
-      <div className="mb-6">
-        <H2 className="text-xl font-semibold">{t('gettingStarted.title')}</H2>
-        <P className="mt-1 text-muted-foreground">
-          {t('gettingStarted.subtitle')}
-        </P>
+      <div className="mb-6 flex items-baseline justify-between gap-3">
+        <div>
+          <H2 className="text-xl font-semibold">{t('gettingStarted.title')}</H2>
+          <P className="mt-1 text-muted-foreground">
+            {t('gettingStarted.subtitle')}
+          </P>
+        </div>
+        {templateCount > 0 && (
+          <Link
+            to="/presets"
+            search={{ filter: 'templates' }}
+            className="inline-flex shrink-0 items-center text-sm font-medium text-primary hover:underline"
+          >
+            {t('gettingStarted.viewAllTemplates')}
+            <ChevronRight className="ml-0.5 h-3 w-3" />
+          </Link>
+        )}
       </div>
 
       {/* Fixed four tracks: the card count varies, but matching the presets row
