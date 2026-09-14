@@ -195,14 +195,17 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
                 return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
             if not isinstance(duration, float):
                 return Either.error(f"Invalid type for {DURATION!r}: expected float, got {type(duration).__name__}")
-            action = from_source(create_task_instance("fiab_plugin_test.runtime.source_sleep", static_input_kw={"text": text, "duration": duration}))
+            action = from_source(
+                create_task_instance("fiab_plugin_test.runtime.source_sleep", static_input_kw={"text": text, "duration": duration})
+            )
         elif factory_id == "source_filesize":
             artifact_id = instance.configuration_values[CHECKPOINT]
             if not isinstance(artifact_id, CompositeArtifactId):
                 return Either.error(f"Invalid type for {CHECKPOINT!r}: expected artifact id, got {type(artifact_id).__name__}")
             local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
             payload = create_task_instance(
-                "fiab_plugin_test.runtime.source_filesize", static_input_kw={"path": str(local_path)},
+                "fiab_plugin_test.runtime.source_filesize",
+                static_input_kw={"path": str(local_path)},
             )
             with NodeMetadataContext(artifacts=Artifacts(artifact_urls={artifact_id.to_str(): ""})):
                 action = from_source(payload)
