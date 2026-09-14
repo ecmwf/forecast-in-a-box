@@ -35,6 +35,8 @@ export type AdvanceWhen =
       kind: 'search'
       check: (search: SearchRecord, atEntry: SearchRecord) => boolean
       explain?: (search: SearchRecord) => StepBlocker | null
+      /** Search writes this soon after entry re-baseline `atEntry` (the page settling). */
+      settleMs?: number
     }
   /** External state; `check` at entry + each change; `explain` = why not. */
   | {

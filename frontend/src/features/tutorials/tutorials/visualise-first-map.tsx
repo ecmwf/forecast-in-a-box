@@ -200,6 +200,8 @@ export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
       advance: {
         kind: 'search',
         check: (search, atEntry) => search.cam !== atEntry.cam,
+        // The map's initial fit writes `cam` too; only a later pan counts.
+        settleMs: 1500,
       },
       allowNext: true,
       // The source may have been added from inside the Add-source dialog.
