@@ -54,8 +54,12 @@ describe('TimeZoneSelect', () => {
   it('filters the list by the search query', async () => {
     const screen = await renderWithProviders(<Harness />)
     await screen.getByLabelText('Search timezone').fill('berlin')
-    await expect.element(screen.getByText('Europe/Berlin')).toBeVisible()
-    await expect.element(screen.getByText('Asia/Tokyo')).not.toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('option', { name: /^Europe\/Berlin/ }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('option', { name: /^Asia\/Tokyo/ }))
+      .not.toBeInTheDocument()
   })
 
   it('shows an empty state when nothing matches', async () => {
@@ -67,7 +71,7 @@ describe('TimeZoneSelect', () => {
   it('selecting a zone updates the store and persists it', async () => {
     const screen = await renderWithProviders(<Harness />)
     await screen.getByLabelText('Search timezone').fill('berlin')
-    await screen.getByText('Europe/Berlin').click()
+    await screen.getByRole('option', { name: /^Europe\/Berlin/ }).click()
 
     await expect
       .element(screen.getByTestId('value'))

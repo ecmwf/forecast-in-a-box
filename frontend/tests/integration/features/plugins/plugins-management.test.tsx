@@ -292,7 +292,9 @@ describe('Plugins Management Integration', () => {
       // Updates section should show plugins with hasUpdate: true
       // From mock data: "ECMWF Ensemble" has an update available
       // (it renders in the updates section AND the installed list)
-      await expect.element(screen.getByText('Updates Available')).toBeVisible()
+      await expect
+        .element(screen.getByRole('heading', { name: /^Updates Available/ }))
+        .toBeVisible()
       await expect
         .element(screen.getByText('ECMWF Ensemble').first())
         .toBeVisible()
@@ -374,7 +376,9 @@ describe('Plugins Management Integration', () => {
         .toBeVisible()
 
       // Wait for updates section to be visible
-      await expect.element(screen.getByText('Updates Available')).toBeVisible()
+      await expect
+        .element(screen.getByRole('heading', { name: /^Updates Available/ }))
+        .toBeVisible()
 
       // Find update buttons in the updates section
       const updateButtons = screen.getByRole('button', { name: /update/i })

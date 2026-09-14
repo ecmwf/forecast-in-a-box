@@ -796,7 +796,7 @@ describe('VisualisePage', () => {
     // Picking A's source for slot B must NOT swap — same-source compare
     // (different layers of one run) is a real workflow.
     await pickerB.click()
-    await screen.getByRole('option', { name: 'Run A' }).click()
+    await screen.getByRole('option', { name: /^Run A/ }).click()
     await expect.element(pickerA).toMatchTextContent('Run A')
     await expect.element(pickerB).toMatchTextContent('Run A')
   })

@@ -118,9 +118,15 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    await expect.element(screen.getByText('navigate')).toBeVisible()
-    await expect.element(screen.getByText('select')).toBeVisible()
-    await expect.element(screen.getByText('close')).toBeVisible()
+    await expect
+      .element(screen.getByText('navigate', { exact: false }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByText('select', { exact: false }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByText('close', { exact: false }))
+      .toBeVisible()
   })
 
   it('filters commands by label as the user types', async () => {
