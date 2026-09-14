@@ -137,8 +137,8 @@ def test_compiler_source_filesize_embeds_path_and_artifact_in_payload(tmp_path: 
     nodes = list(result.t.graph().nodes())
     assert len(nodes) == 1
     payload = nodes[0].payload
-    assert payload.kwargs["path"] == str(artifact_path)
-    assert fake_id in payload.metadata["artifacts"]
+    assert payload.static_input_kw["path"] == str(artifact_path)
+    assert fake_id.to_str() in nodes[0].metadata.artifacts.artifact_urls
 
 
 # ---------------------------------------------------------------------------

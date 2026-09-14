@@ -17,7 +17,8 @@ from typing import cast
 from cascade.low.core import DatasetId, JobInstance, TaskId
 from cascade.low.func import assert_never
 from earthkit.workflows.compilers import graph2job
-from earthkit.workflows.fluent import PayloadBuildingContext
+from earthkit.workflows.metadata import BuilderMetadata
+from earthkit.workflows.fluent import NodeMetadataContext
 from earthkit.workflows.graph import Graph, deduplicate_nodes
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import BlockInstanceId, BlockInstanceOutput, ConfigurationOptionId, NoOutput, RawOutput
@@ -64,10 +65,8 @@ def resolve_intrinsic_glyph_values(
 
 
 def _get_artifacts_list(graph: Graph) -> list[CompositeArtifactId]:
-    payloads = (node.payload for node in graph.nodes())
-    artifactLists = (
-        payload.metadata.get("artifacts", []) for payload in payloads if hasattr(payload, "metadata") and isinstance(payload.metadata, dict)
-    )
+    nodes = (node for node in graph.nodes())
+    artifactLists = [[CompositeArtifactId.from_str(key) for key in node.metadata.artifacts.artifact_urls.keys()] for node in nodes]
     artifacts = set(
         artifact
         for artifactList in artifactLists
@@ -165,7 +164,7 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
         if converted_values.t is None:
             raise ValueError(f"compile failed at {blockId=} with {converted_values.e}")
         routable.instance.configuration_values = converted_values.t
-        with PayloadBuildingContext(blockId=blockId):
+        with NodeMetadataContext(builder=BuilderMetadata(blockId=blockId)):
             result = plugin.compiler(action_lookup, routable.factory, routable.instance)
         if result.t is None:
             raise ValueError(f"compile failed at {blockId=} with {result.e}")
@@ -204,11 +203,10 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
 
     graph = deduplicate_nodes(graph)
     for node in graph.nodes():
-        metadata = getattr(node.payload, "metadata", None)
-        if not isinstance(metadata, dict) or "blockId" not in metadata:
+        task_block_id = node.metadata.builder.blockId
+        if task_block_id is None:
             raise ValueError(f"compile failed: missing blockId metadata on task {node.name}")
-        task_block_id = metadata["blockId"]
-        task_id, detail = fluentNode_to_detail(node, task_block_id)
+        task_id, detail = fluentNode_to_detail(node, cast(BlockInstanceId, task_block_id))
         task_detail[task_id] = detail
     job_instance = graph2job(graph)
     _hotfix_gpu_availability(job_instance)

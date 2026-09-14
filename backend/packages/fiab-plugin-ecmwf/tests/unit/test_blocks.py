@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-from earthkit.workflows.fluent import Action, Payload, from_source
+from earthkit.workflows.fluent import Action, create_task_instance, from_source
 from earthkit.workflows.nodetree import nodetree_arrays, nodetree_dimensions
 from fiab_core.fable import (
     BlockFactoryId,
@@ -127,7 +127,7 @@ def operational_forecast_source_output() -> QubedOutput:
 
 @pytest.fixture
 def operational_forecast_source_action(operational_forecast_source_output: QubedOutput) -> Action:
-    return from_source(np.asarray(Payload("fiab_plugin_ecmwf.tests.noop"), dtype=object)).expand_as_qube(
+    return from_source(np.asarray(create_task_instance("fiab_plugin_ecmwf.tests.noop"), dtype=object)).expand_as_qube(
         operational_forecast_source_output.dataqube,
         dims=[PARAM, STEP, ENSEMBLE],
     )
@@ -1050,8 +1050,8 @@ class TestMapPlotSink:
     def _get_map_plot_domain(self, action: Action) -> object:
         for _, arr in nodetree_arrays(action.nodes):
             for node in arr.values.flat:
-                if hasattr(node, "payload") and "map_plot" in node.payload.func:
-                    return node.payload.kwargs["domain"]
+                if hasattr(node, "payload") and "map_plot" in node.payload.definition.entrypoint:
+                    return node.payload.static_input_kw["domain"]
         raise AssertionError("map_plot payload not found in compiled action")
 
     def test_compile_bbox_domain_is_reordered_to_wesn(
