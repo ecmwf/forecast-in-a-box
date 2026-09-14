@@ -30,6 +30,7 @@ import {
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 
 /** Informational filler for the tracks the template cards would have taken. */
 function StarterPanel({
@@ -150,5 +151,9 @@ export function GettingStartedSection() {
     </>
   )
 
-  return <Card className="p-8">{content}</Card>
+  return (
+    <Card className="p-8" {...tourAttr(TOUR.overview.starters)}>
+      {content}
+    </Card>
+  )
 }

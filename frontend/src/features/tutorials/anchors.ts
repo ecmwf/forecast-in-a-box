@@ -17,6 +17,15 @@
  */
 
 export const TOUR = {
+  nav: {
+    overview: 'nav.overview',
+    configure: 'nav.configure',
+    execute: 'nav.execute',
+    visualise: 'nav.visualise',
+  },
+  overview: {
+    starters: 'overview.starters',
+  },
   configure: {
     canvas: 'configure.canvas',
     palette: 'configure.palette',

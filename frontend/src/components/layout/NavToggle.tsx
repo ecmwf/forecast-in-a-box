@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next'
 import { useFableRetrieve } from '@/api/hooks/useFable'
 import { useJobStatus } from '@/api/hooks/useJobs'
 import { useComparisonCount } from '@/features/visualise/stores/comparisonStore'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -35,15 +36,23 @@ const navItems = [
     labelKey: 'nav.overview',
     Icon: LayoutDashboard,
     exact: false,
+    tour: TOUR.nav.overview,
   },
   {
     to: '/configure',
     labelKey: 'nav.configuration',
     Icon: SlidersHorizontal,
     exact: false,
+    tour: TOUR.nav.configure,
   },
   // Exact: an open run highlights the run item, not this one — "Execute" stays a link to the list.
-  { to: '/execute', labelKey: 'nav.executions', Icon: Play, exact: true },
+  {
+    to: '/execute',
+    labelKey: 'nav.executions',
+    Icon: Play,
+    exact: true,
+    tour: TOUR.nav.execute,
+  },
 ] as const
 
 const itemClass = cn(
@@ -101,6 +110,7 @@ function VisualiseNavItem() {
       activeOptions={{ includeSearch: false }}
       className={itemClass}
       activeProps={{ className: activeItemClass, 'aria-current': 'page' }}
+      {...tourAttr(TOUR.nav.visualise)}
     >
       <Earth className="h-4 w-4" />
       {t('nav.visualise')}
@@ -132,13 +142,14 @@ export function NavToggle() {
       aria-label={t('nav.label')}
       className="inline-flex h-9 min-w-0 items-center gap-1 rounded-lg bg-muted p-1"
     >
-      {navItems.map(({ to, labelKey, Icon, exact }) => (
+      {navItems.map(({ to, labelKey, Icon, exact, tour }) => (
         <Link
           key={to}
           to={to}
           activeOptions={{ includeSearch: false, exact }}
           className={itemClass}
           activeProps={{ className: activeItemClass, 'aria-current': 'page' }}
+          {...tourAttr(tour)}
         >
           <Icon className="h-4 w-4" />
           {t(labelKey)}
