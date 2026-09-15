@@ -332,8 +332,13 @@ export function VisualisePage() {
   const [GeoViewer, setGeoViewer] = useState(() => makeGeoViewer())
   const stateA = useComparisonSource(a, { autoStart: true })
   const stateB = useComparisonSource(b, { autoStart: true })
+  // Lens on its way: the viewer's frame is already the right layout.
+  const aPending =
+    stateA.phase === 'resolvingDir' || stateA.phase === 'starting'
   const viewerFill = useViewportFill(
-    entries.length > 0 && a !== null && stateA.phase === 'running',
+    entries.length > 0 &&
+      a !== null &&
+      (stateA.phase === 'running' || aPending),
   )
 
   return (
@@ -494,7 +499,7 @@ export function VisualisePage() {
 
       {entries.length === 0 ? (
         <VisualiseHub />
-      ) : a && stateA.phase === 'running' ? (
+      ) : a && (stateA.phase === 'running' || aPending) ? (
         // Viewer bottom meets the viewport bottom; footer below the fold.
         <div
           ref={viewerFill.ref}
@@ -505,72 +510,85 @@ export function VisualisePage() {
           }
           className="h-[75vh] min-h-[480px]"
         >
-          {/* Local boundary: a failed viewer chunk (redeploy) or an
+          {stateA.phase !== 'running' ? (
+            // Lens still coming: the viewer-shaped skeleton holds the layout.
+            <GeoViewerSkeleton
+              label={
+                stateA.phase === 'starting'
+                  ? t('lens.starting')
+                  : t('lens.resolving')
+              }
+            />
+          ) : (
+            <>
+              {/* Local boundary: a failed viewer chunk (redeploy) or an
               OL/canvas throw must not take down the page shell. */}
-          <ErrorBoundary
-            onReset={() => setGeoViewer(() => makeGeoViewer())}
-            fallbackRender={({ error, resetErrorBoundary }) => (
-              <div className="flex h-full flex-col items-center justify-center gap-3">
-                <P className="font-medium">{t('viewerError.title')}</P>
-                <P
-                  title={error.message}
-                  className="max-w-lg truncate font-mono text-xs text-muted-foreground"
+              <ErrorBoundary
+                onReset={() => setGeoViewer(() => makeGeoViewer())}
+                fallbackRender={({ error, resetErrorBoundary }) => (
+                  <div className="flex h-full flex-col items-center justify-center gap-3">
+                    <P className="font-medium">{t('viewerError.title')}</P>
+                    <P
+                      title={error.message}
+                      className="max-w-lg truncate font-mono text-xs text-muted-foreground"
+                    >
+                      {error.message}
+                    </P>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={resetErrorBoundary}
+                      >
+                        {t('viewerError.retry')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.location.reload()}
+                      >
+                        {t('viewerError.reload')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              >
+                <Suspense
+                  fallback={<GeoViewerSkeleton label={t('common:loading')} />}
                 >
-                  {error.message}
-                </P>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={resetErrorBoundary}
-                  >
-                    {t('viewerError.retry')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => window.location.reload()}
-                  >
-                    {t('viewerError.reload')}
-                  </Button>
-                </div>
-              </div>
-            )}
-          >
-            <Suspense
-              fallback={<GeoViewerSkeleton label={t('common:loading')} />}
-            >
-              {/* Single JSX position — b flips null↔value without a
+                  {/* Single JSX position — b flips null↔value without a
                   remount, so camera/selection/time survive the switch. */}
-              <GeoViewer
-                a={{
-                  id: entryRef(a),
-                  baseUrl: stateA.baseUrl,
-                  ...slotCaption(a, timeZone),
-                  bboxAxisOrder: entryBboxAxisOrder(a),
-                }}
-                b={
-                  b && stateB.phase === 'running'
-                    ? {
-                        id: entryRef(b),
-                        baseUrl: stateB.baseUrl,
-                        ...slotCaption(b, timeZone),
-                        bboxAxisOrder: entryBboxAxisOrder(b),
-                      }
-                    : null
-                }
-                mode={mode}
-                onModeChange={onModeChange}
-                onRemoveB={clearSlotB}
-                onHelp={() => setHelpOpen((v) => !v)}
-                initialViewState={initialViewState}
-                onViewStateChange={onViewStateChange}
-              />
-            </Suspense>
-          </ErrorBoundary>
+                  <GeoViewer
+                    a={{
+                      id: entryRef(a),
+                      baseUrl: stateA.baseUrl,
+                      ...slotCaption(a, timeZone),
+                      bboxAxisOrder: entryBboxAxisOrder(a),
+                    }}
+                    b={
+                      b && stateB.phase === 'running'
+                        ? {
+                            id: entryRef(b),
+                            baseUrl: stateB.baseUrl,
+                            ...slotCaption(b, timeZone),
+                            bboxAxisOrder: entryBboxAxisOrder(b),
+                          }
+                        : null
+                    }
+                    mode={mode}
+                    onModeChange={onModeChange}
+                    onRemoveB={clearSlotB}
+                    onHelp={() => setHelpOpen((v) => !v)}
+                    initialViewState={initialViewState}
+                    onViewStateChange={onViewStateChange}
+                  />
+                </Suspense>
+              </ErrorBoundary>
+            </>
+          )}
         </div>
       ) : (
-        // A not running yet — lifecycle panels.
+        // A failed, paused or unresolved — panels with their actions.
         <div className="grid gap-3 lg:grid-cols-2">
           <ComparePanel slot="A" entry={a} state={stateA} />
           {b !== null && <ComparePanel slot="B" entry={b} state={stateB} />}

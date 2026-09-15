@@ -327,6 +327,24 @@ describe('VisualisePage', () => {
       .toMatchTextContent('Pick a source…')
   })
 
+  it('holds the viewer layout while the lens starts', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    const screen = await renderVisualisePage()
+
+    // Before the lens runs, the viewer-shaped skeleton stands in — not a
+    // lifecycle card that would reflow the page once the map mounts.
+    await expect
+      .element(
+        screen.getByRole('status', {
+          name: /Starting lens server|Locating output directory/,
+        }),
+      )
+      .toBeVisible()
+    await expect
+      .element(screen.getByText(/display is static/), { timeout: 8000 })
+      .toBeVisible()
+  })
+
   it('gates local sources when SkinnyWMS is missing; external WMS stays', async () => {
     resetLensState({ skinnyWmsInstalled: false })
     const screen = await renderVisualisePage()
