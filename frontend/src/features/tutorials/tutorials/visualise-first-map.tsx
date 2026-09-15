@@ -159,7 +159,7 @@ const compareServerName = (launch: FirstMapLaunch) =>
   launch.server.name === 'DWD' ? 'ECMWF' : 'DWD'
 
 /** Slot colours as the viewer paints them. */
-const SLOT_MARKUP = {
+export const SLOT_MARKUP = {
   slotA: <span className="font-medium text-blue-700 dark:text-blue-300" />,
   slotB: <span className="font-medium text-orange-700 dark:text-orange-300" />,
 }

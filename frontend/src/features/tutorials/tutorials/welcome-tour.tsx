@@ -11,6 +11,7 @@
 /** Welcome tour: one step per main page, pointing at its nav tab; ends on the starters. */
 
 import { TOUR } from '../anchors'
+import { SLOT_MARKUP } from './visualise-first-map'
 import type { TutorialDefinition } from '../engine/types'
 import { BLOCK_KIND_METADATA } from '@/api/types/fable.types'
 import { useOnboardingStore } from '@/stores/onboardingStore'
@@ -32,7 +33,7 @@ export const welcomeTourDefinition: TutorialDefinition<typeof LAUNCH> = {
   id: 'welcome-tour',
   route: '/overview',
   i18nKey: 'welcome',
-  markup: KIND_MARKUP,
+  markup: { ...KIND_MARKUP, ...SLOT_MARKUP },
   // Completing the tour counts as onboarded: no auto-reshow.
   onFinish: (outcome) => {
     if (outcome === 'completed') useOnboardingStore.getState().startForecast()
