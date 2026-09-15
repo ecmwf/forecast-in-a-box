@@ -12,16 +12,27 @@
 
 import { TOUR } from '../anchors'
 import type { TutorialDefinition } from '../engine/types'
+import { BLOCK_KIND_METADATA } from '@/api/types/fable.types'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 
 /** Nothing to resolve; stable object avoids re-renders. */
 const LAUNCH = {}
 export const useWelcomeTourLaunchContext = () => LAUNCH
 
+/** Block-kind words in the copy carry the canvas' kind colours; `<source>`
+ * is an HTML void tag, hence the `kind` prefix. */
+const KIND_MARKUP = Object.fromEntries(
+  Object.values(BLOCK_KIND_METADATA).map((meta) => [
+    `kind${meta.kind[0].toUpperCase()}${meta.kind.slice(1)}`,
+    <span className={`font-medium ${meta.color}`} />,
+  ]),
+)
+
 export const welcomeTourDefinition: TutorialDefinition<typeof LAUNCH> = {
   id: 'welcome-tour',
   route: '/overview',
   i18nKey: 'welcome',
+  markup: KIND_MARKUP,
   // Completing the tour counts as onboarded: no auto-reshow.
   onFinish: (outcome) => {
     if (outcome === 'completed') useOnboardingStore.getState().startForecast()

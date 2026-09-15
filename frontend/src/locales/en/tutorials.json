@@ -175,7 +175,7 @@
       },
       "blocks": {
         "title": "Compose forecasts from blocks",
-        "body": "<v>Configure</v> is the workflow builder. A source provides the data — an Anemoi model, an operational forecast, or a source a plugin adds. Transforms select parameters, products compute statistics, and one run can fan out to several outputs. Connect blocks on the canvas; configure each in the side panel."
+        "body": "<v>Configure</v> is the workflow builder. A <kindSource>source</kindSource> provides the data — an Anemoi model, an operational forecast, or a source a plugin adds. <kindTransform>Transforms</kindTransform> select parameters, <kindProduct>products</kindProduct> compute statistics, and one run can fan out to several <kindSink>outputs</kindSink>. Connect blocks on the canvas; configure each in the side panel."
       },
       "execution": {
         "title": "Run it, then inspect results in place",
