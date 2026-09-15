@@ -132,13 +132,6 @@ export function AboutPage() {
 
       <section className={`${SECTION} pt-24`}>
         <H2 className="border-0 pb-0 text-2xl">{t('collaboration.title')}</H2>
-        <P className="mt-2 max-w-3xl text-pretty text-muted-foreground">
-          <Trans
-            t={t}
-            i18nKey="about.funding.body"
-            components={PROJECT_LINKS}
-          />
-        </P>
         <div className="mt-10 grid divide-y border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           {PARTNER_LOGOS.map(({ key, src, href, size }) => (
             <a

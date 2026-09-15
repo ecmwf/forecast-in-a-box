@@ -61,15 +61,12 @@
         "description": "Selections, statistics and derived products such as ensemble probabilities or tropical cyclone tracks."
       },
       "dissemination": {
-        "title": "Dissemination",
+        "title": "Visualise",
         "description": "Interactive maps and plots in the browser, or GRIB, NetCDF and Zarr files for downstream tools."
       }
     },
     "people": {
       "builtWith": "Built with"
-    },
-    "funding": {
-      "body": "Forecast-in-a-Box is developed within <destinE>Destination Earth</destinE>, an initiative of the European Commission funded by the European Union and implemented by ECMWF together with ESA and EUMETSAT."
     }
   }
 }
