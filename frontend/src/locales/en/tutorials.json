@@ -183,7 +183,7 @@
       },
       "viewer": {
         "title": "Visualise and compare on the map",
-        "body": "<v>Visualise</v> renders stored GRIB outputs as WMS layers in the integrated viewer — no downloads. Load two sources as A and B, compare them in several modes, and step through lead times on a shared timeline. External WMS-compatible servers can be linked in for comparison."
+        "body": "<v>Visualise</v> renders stored forecast outputs as WMS layers in the integrated viewer — no downloads. Load two sources as A and B, compare them in several modes, and step through lead times on a shared timeline. External WMS-compatible servers can be linked in for comparison."
       },
       "activate": {
         "title": "Run your first forecast",
