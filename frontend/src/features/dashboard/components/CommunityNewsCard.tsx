@@ -12,14 +12,11 @@ import { Newspaper, Package, Presentation } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import type { NewsLink } from '@/features/dashboard/data/communityNews'
-import {
-  COMMUNITY_ITEMS,
-  MATERIAL_ITEMS,
-  PRESS_ITEMS,
-} from '@/features/dashboard/data/communityNews'
+import type { NewsLink } from '@/features/dashboard/hooks/useCommunityNews'
+import { useCommunityNews } from '@/features/dashboard/hooks/useCommunityNews'
 import { H2, H3, Link, P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 
 function Section({
   Icon,
@@ -62,33 +59,59 @@ function NewsItem({ item }: { item: NewsLink }) {
   )
 }
 
+/** Two-line placeholders in the shape of a news item. */
+function NewsItemSkeleton() {
+  return (
+    <li>
+      <Skeleton className="h-4 w-4/5" />
+      <Skeleton className="mt-1.5 h-3 w-2/5" />
+    </li>
+  )
+}
+
+function NewsList({
+  items,
+  placeholders,
+}: {
+  items: ReadonlyArray<NewsLink> | undefined
+  placeholders: number
+}) {
+  if (items === undefined) {
+    return Array.from({ length: placeholders }, (_, i) => (
+      <NewsItemSkeleton key={i} />
+    ))
+  }
+  return items.map((item) => <NewsItem key={item.url} item={item} />)
+}
+
 export function CommunityNewsCard() {
   const { t } = useTranslation('dashboard')
+  const { data, isError } = useCommunityNews()
 
   return (
     <Card className="flex flex-col p-6">
       <H2 className="mb-6 text-xl font-semibold">{t('community.title')}</H2>
-      <div className="grid flex-1 grid-cols-1 gap-8 sm:grid-cols-2">
-        <Section Icon={Newspaper} title={t('community.press')}>
-          {PRESS_ITEMS.map((item) => (
-            <NewsItem key={item.url} item={item} />
-          ))}
-        </Section>
-
-        <div className="flex flex-col gap-8">
-          <Section Icon={Presentation} title={t('community.materials')}>
-            {MATERIAL_ITEMS.map((item) => (
-              <NewsItem key={item.url} item={item} />
-            ))}
+      {isError ? (
+        <P className="text-sm text-muted-foreground">
+          {t('community.unavailable')}
+        </P>
+      ) : (
+        <div className="grid flex-1 grid-cols-1 gap-8 sm:grid-cols-2">
+          <Section Icon={Newspaper} title={t('community.press')}>
+            <NewsList items={data?.press} placeholders={5} />
           </Section>
 
-          <Section Icon={Package} title={t('community.softwareAndCommunity')}>
-            {COMMUNITY_ITEMS.map((item) => (
-              <NewsItem key={item.url} item={item} />
-            ))}
-          </Section>
+          <div className="flex flex-col gap-8">
+            <Section Icon={Presentation} title={t('community.materials')}>
+              <NewsList items={data?.materials} placeholders={3} />
+            </Section>
+
+            <Section Icon={Package} title={t('community.softwareAndCommunity')}>
+              <NewsList items={data?.community} placeholders={3} />
+            </Section>
+          </div>
         </div>
-      </div>
+      )}
     </Card>
   )
 }

@@ -217,3 +217,8 @@ export const API_ENDPOINTS = {
     currentTime: `${API_PREFIX}/experiment/operational/scheduler/current_time`,
   },
 } as const
+
+/** Static files served next to the app and fetched at runtime. */
+export const STATIC_FILES = {
+  communityNews: '/community-news.json',
+} as const

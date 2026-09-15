@@ -52,7 +52,8 @@
     "title": "Forecast-in-a-Box Community News",
     "press": "Press and articles",
     "materials": "Presentations and materials",
-    "softwareAndCommunity": "Software and community"
+    "softwareAndCommunity": "Software and community",
+    "unavailable": "The news list could not be loaded."
   },
   "gettingStarted": {
     "title": "Getting Started Presets",
