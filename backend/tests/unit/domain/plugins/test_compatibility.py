@@ -273,34 +273,34 @@ def test_ambiguous_local_target_identity_raises_identify_error(monkeypatch: pyte
 def test_get_compatible_versions_filters_by_major() -> None:
     versions = ["1.0.0", "1.1.0", "2.0.0", "0.9.0"]
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("1.0.0")):
-        result = list(get_compatible_versions(_PLUGIN, iter(versions)))
+        result = list(get_compatible_versions(_PLUGIN.pip_source, iter(versions)))
     assert result == ["1.0.0", "1.1.0"]
 
 
 def test_get_compatible_versions_empty_input() -> None:
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("1.0.0")):
-        result = list(get_compatible_versions(_PLUGIN, iter([])))
+        result = list(get_compatible_versions(_PLUGIN.pip_source, iter([])))
     assert result == []
 
 
 def test_get_compatible_versions_none_match() -> None:
     versions = ["2.0.0", "3.0.0"]
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("1.0.0")):
-        result = list(get_compatible_versions(_PLUGIN, iter(versions)))
+        result = list(get_compatible_versions(_PLUGIN.pip_source, iter(versions)))
     assert result == []
 
 
 def test_get_compatible_versions_skips_invalid_strings() -> None:
     versions = ["1.0.0", "not-a-version", "1.2.3", "bad"]
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("1.0.0")):
-        result = list(get_compatible_versions(_PLUGIN, iter(versions)))
+        result = list(get_compatible_versions(_PLUGIN.pip_source, iter(versions)))
     assert result == ["1.0.0", "1.2.3"]
 
 
 def test_get_compatible_versions_major_zero() -> None:
     versions = ["0.1.0", "0.2.0", "1.0.0"]
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("0.5.0")):
-        result = list(get_compatible_versions(_PLUGIN, iter(versions)))
+        result = list(get_compatible_versions(_PLUGIN.pip_source, iter(versions)))
     assert result == ["0.1.0", "0.2.0"]
 
 
@@ -308,7 +308,7 @@ def test_get_compatible_versions_is_streaming() -> None:
     """Verify the function is a generator (lazy evaluation)."""
     versions = ["1.0.0", "1.1.0"]
     with patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version("1.0.0")):
-        gen = get_compatible_versions(_PLUGIN, iter(versions))
+        gen = get_compatible_versions(_PLUGIN.pip_source, iter(versions))
     import inspect
 
     assert inspect.isgenerator(gen)
