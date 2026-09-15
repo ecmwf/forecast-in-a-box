@@ -20,6 +20,7 @@ import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import { useRunSelection } from '@/features/journal/hooks/useRunSelection'
 import { CompareSelectionBar } from '@/features/journal/components/CompareSelectionBar'
 import { Button } from '@/components/ui/button'
+import { P } from '@/components/base/typography'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
@@ -84,10 +85,12 @@ export function RunListPage() {
     runs: allRuns,
     counts: statusCounts,
     total: totalRuns,
+    serverTotal,
     isLoading,
     isError,
     error,
   } = useJobStatusCounts()
+  const windowCapped = serverTotal > totalRuns
   const { runs, toggleBookmark } = useForecastRuns(allRuns)
 
   // App-TZ date — keeps the facet aligned with the row in any client TZ.
@@ -204,6 +207,14 @@ export function RunListPage() {
               selectedRuns={selection.selectedRuns}
               onClear={selection.clear}
             />
+            {windowCapped && (
+              <P className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+                {t('list.windowCapped', {
+                  shown: totalRuns,
+                  total: serverTotal,
+                })}
+              </P>
+            )}
           </>
         }
         footer={

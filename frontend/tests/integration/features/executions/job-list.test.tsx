@@ -35,6 +35,7 @@ import {
 import { resetLensState } from '@tests/../mocks/data/lens.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
+import { RUN_WINDOW } from '@/api/hooks/useJobStatusCounts'
 import { RunListPage } from '@/features/executions/components/RunListPage'
 import i18n from '@/lib/i18n'
 
@@ -262,6 +263,14 @@ describe('RunListPage Integration', () => {
   })
 
   describe('across pages', () => {
+    it('says so when the run window leaves older runs out', async () => {
+      seedCompletedRuns(RUN_WINDOW)
+      const screen = await renderJobList()
+      await expect
+        .element(screen.getByText(/^Showing the 300 most recent of \d+ runs\./))
+        .toBeVisible()
+    })
+
     it('a status filter spans the whole list, not the current page', async () => {
       seedCompletedRuns(12)
       const screen = await renderJobList()
