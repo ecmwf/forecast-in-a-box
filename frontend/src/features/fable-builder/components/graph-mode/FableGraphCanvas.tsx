@@ -31,6 +31,7 @@ import type { Connection, Edge, EdgeTypes, NodeTypes } from '@xyflow/react'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
 import type { FableNode } from './nodes/BlockNode'
 import { CanvasMiniMap } from '@/components/common/CanvasMiniMap'
+import { withMeasured } from '@/components/common/canvas-measured'
 import { getFactory } from '@/api/types/fable.types'
 import { layoutNodes } from '@/features/fable-builder/utils/layout-blocks'
 import { fableToGraph } from '@/features/fable-builder/utils/fable-to-graph'
@@ -191,11 +192,14 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
     // Preserve the current selection — `fableToGraph` builds nodes without a
     // `selected` flag, so re-apply it here for the same-commit rebuild.
-    setNodes(
-      layouted.map((node) =>
-        node.id === selectedBlockIdRef.current
-          ? { ...node, selected: true }
-          : node,
+    setNodes((prev) =>
+      withMeasured(
+        layouted.map((node) =>
+          node.id === selectedBlockIdRef.current
+            ? { ...node, selected: true }
+            : node,
+        ),
+        prev,
       ),
     )
     setEdges(newEdges)

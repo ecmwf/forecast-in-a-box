@@ -23,6 +23,7 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -36,6 +37,7 @@ import type {
 import type { JobStatus } from '@/api/types/job.types'
 import { useMedia } from '@/hooks/useMedia'
 import { CanvasMiniMap } from '@/components/common/CanvasMiniMap'
+import { withMeasured } from '@/components/common/canvas-measured'
 import {
   fableToEdges,
   fableToNodes,
@@ -222,6 +224,11 @@ function RunCanvasInner({
       canvasHeight: computeCanvasHeight(laid),
     }
   }, [fable, catalogue, isRunning, blockProgress])
+  // React Flow owns the node state so its measurements stick across rebuilds.
+  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes)
+  useEffect(() => {
+    setNodes((prev) => withMeasured(layoutedNodes, prev))
+  }, [layoutedNodes, setNodes])
 
   return (
     <ShowConfigContext value={showConfig}>
@@ -244,7 +251,8 @@ function RunCanvasInner({
             )}
           >
             <ReactFlow
-              nodes={layoutedNodes}
+              nodes={nodes}
+              onNodesChange={onNodesChange}
               edges={edges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
