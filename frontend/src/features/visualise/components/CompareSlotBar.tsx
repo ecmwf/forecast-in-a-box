@@ -60,8 +60,9 @@ export function CompareSlotBar({
   return (
     // Below lg the B group takes its own row and the swap trails it, so
     // both rows lead with their slot badge (A over B, aligned).
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-      <div className="flex max-w-full min-w-0 items-center gap-2 lg:flex-1">
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-nowrap">
+      {/* Groups size to their content and only shrink when the row is tight. */}
+      <div className="flex max-w-full min-w-0 shrink items-center gap-2">
         <SlotPicker
           slot="a"
           entries={entries}
@@ -71,7 +72,7 @@ export function CompareSlotBar({
         />
         {bRef && <ClearSlotButton slot="a" onClear={() => onClearSlot('a')} />}
       </div>
-      <div className="flex max-w-full min-w-0 items-center gap-2 max-lg:w-full lg:flex-1">
+      <div className="flex max-w-full min-w-0 shrink items-center gap-2 max-lg:w-full">
         <Button
           variant="outline"
           size="icon"
@@ -175,7 +176,7 @@ function SlotPicker({
       >
         {/* lg+: two lines and share the row's width (capped); else one compact line. */}
         <SelectTrigger
-          className="h-9 w-64 max-w-full min-w-0 text-sm *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:flex-1 lg:h-auto! lg:w-full lg:max-w-104 lg:py-1.5 lg:*:data-[slot=select-value]:line-clamp-none"
+          className="h-9 w-64 max-w-full min-w-0 text-sm *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:flex-1 lg:h-auto! lg:w-104 lg:py-1.5 lg:*:data-[slot=select-value]:line-clamp-none"
           aria-label={t('slots.pickerAria', { slot: slot.toUpperCase() })}
         >
           {/* Base UI shows the raw value for programmatically-set
