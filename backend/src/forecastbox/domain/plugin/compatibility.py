@@ -95,7 +95,8 @@ plugin_default_specifier()
     Build the default ``SpecifierSet`` for a plugin install based on the installed fiab-core major.
 check_environment_baseline()
     Raise ``PluginEnvironmentAlreadyBroken`` if the running interpreter's environment already
-    fails ``uv pip check``, before any plugin install/update is attempted.
+    fails ``uv pip check``, before any plugin install/update is attempted. Known-benign false
+    positives (see ``_pip_check_has_only_known_benign_incompatibilities``) are ignored.
 install_plugin_compatibly(pip_source, version, module_name)
     Install or update a plugin, freezing and preserving the rest of the environment. Assumes the
     environment is already known-good; does not run the baseline check itself.
@@ -138,6 +139,31 @@ from forecastbox.utility.pth_activation import (
 
 logger = logging.getLogger(__name__)
 
+# Known, benign false-positive `uv pip check` incompatibility messages, matched verbatim as a
+# substring of a "The package ..." incompatibility line. See `_pip_check_has_only_known_benign_incompatibilities`
+# for why these are safe to ignore rather than fixed by reinstalling.
+_KNOWN_BENIGN_PIP_CHECK_INCOMPATIBILITIES = ("The package `nvidia-cusparselt-cu13` was built for a different platform",)
+
+
+def _pip_check_has_only_known_benign_incompatibilities(output: str) -> bool:
+    """Return True if every "The package ..." incompatibility line in *output* (the combined
+    stderr/stdout of a failed ``uv pip check``) matches a known, benign false positive; False if
+    there are no such lines at all, or if any line is not a known false positive.
+
+    Background: some ``nvidia-cusparselt-cu13`` wheels on PyPI (at least version 0.8.1) ship an
+    internal ``dist-info/WHEEL`` metadata tag (``manylinux2014_sbsa``) that does not match the
+    wheel filename's platform tag (``manylinux2014_aarch64``). ``uv``/``pip`` correctly select and
+    install the ``aarch64`` wheel by filename, but ``uv pip check`` reads the installed metadata
+    tag and reports a permanent false-positive "built for a different platform" incompatibility on
+    aarch64 Linux hosts (e.g. NVIDIA DGX Spark). Reinstalling does not help -- every distribution
+    of this wheel version carries the same mismatched internal metadata. We special-case this
+    exact message so it does not permanently block plugin installs on affected hosts.
+    """
+    incompatibility_lines = [line.strip() for line in output.splitlines() if line.strip().startswith("The package ")]
+    if not incompatibility_lines:
+        return False
+    return all(any(known in line for known in _KNOWN_BENIGN_PIP_CHECK_INCOMPATIBILITIES) for line in incompatibility_lines)
+
 
 def get_fiabcore_version() -> Version:
     """Return the currently installed version of ``fiab-core`` as a ``Version`` object."""
@@ -167,7 +193,11 @@ def check_environment_baseline() -> None:
     python = sys.executable
     baseline = run_pip_check(python)
     if not baseline.ok:
-        msg = f"stage=baseline-check: existing environment already fails `uv pip check`, refusing to install: {baseline.stderr or baseline.stdout}"
+        output = baseline.stderr or baseline.stdout
+        if _pip_check_has_only_known_benign_incompatibilities(output):
+            logger.warning(f"stage=baseline-check: ignoring known-benign `uv pip check` incompatibilities: {output}")
+            return
+        msg = f"stage=baseline-check: existing environment already fails `uv pip check`, refusing to install: {output}"
         logger.error(msg)
         raise PluginEnvironmentAlreadyBroken(msg)
 
@@ -311,11 +341,18 @@ def install_plugin_compatibly(pip_source: str, version: Version | None, module_n
 
     post_check = run_pip_check(python)
     if not post_check.ok:
-        msg = (
-            f"stage=post-check: environment failed `uv pip check` after installing {plugin_requirement_args}; "
-            f"this is detection, not rollback -- the environment may be broken: {post_check.stderr or post_check.stdout}"
-        )
-        logger.error(msg)
-        return Either.error(msg)
+        post_check_output = post_check.stderr or post_check.stdout
+        if _pip_check_has_only_known_benign_incompatibilities(post_check_output):
+            logger.warning(
+                f"stage=post-check: ignoring known-benign `uv pip check` incompatibilities after installing "
+                f"{plugin_requirement_args}: {post_check_output}"
+            )
+        else:
+            msg = (
+                f"stage=post-check: environment failed `uv pip check` after installing {plugin_requirement_args}; "
+                f"this is detection, not rollback -- the environment may be broken: {post_check_output}"
+            )
+            logger.error(msg)
+            return Either.error(msg)
 
     return Either.ok(installed_versions)

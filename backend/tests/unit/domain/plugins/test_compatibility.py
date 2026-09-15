@@ -180,6 +180,26 @@ def test_check_environment_baseline_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     check_environment_baseline()  # should not raise
 
 
+def test_check_environment_baseline_ignores_known_benign_cusparselt_incompatibility(monkeypatch: pytest.MonkeyPatch) -> None:
+    stderr = (
+        "Checked 220 packages in 2ms\nFound 1 incompatibility\nThe package `nvidia-cusparselt-cu13` was built for a different platform\n"
+    )
+    monkeypatch.setattr("forecastbox.domain.plugin.compatibility.run_pip_check", lambda python: _fail(stderr=stderr))
+    check_environment_baseline()  # should not raise -- known benign false positive
+
+
+def test_check_environment_baseline_raises_when_other_incompatibility_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    stderr = (
+        "Checked 220 packages in 2ms\n"
+        "Found 2 incompatibilities\n"
+        "The package `nvidia-cusparselt-cu13` was built for a different platform\n"
+        "The package `foo` requires `bar>=2`, but you have `bar==1.0`\n"
+    )
+    monkeypatch.setattr("forecastbox.domain.plugin.compatibility.run_pip_check", lambda python: _fail(stderr=stderr))
+    with pytest.raises(PluginEnvironmentAlreadyBroken, match="foo"):
+        check_environment_baseline()
+
+
 def test_freeze_failure_stops_before_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:
     dry_run_called = []
     monkeypatch.setattr("forecastbox.domain.plugin.compatibility.run_pip_check", lambda python: _ok())
@@ -222,6 +242,15 @@ def test_post_check_failure_is_reported(monkeypatch: pytest.MonkeyPatch) -> None
     assert result.e is not None
     assert "post-check" in result.e
     assert "broken after install" in result.e
+
+
+def test_post_check_ignores_known_benign_cusparselt_incompatibility(monkeypatch: pytest.MonkeyPatch) -> None:
+    stderr = (
+        "Checked 220 packages in 2ms\nFound 1 incompatibility\nThe package `nvidia-cusparselt-cu13` was built for a different platform\n"
+    )
+    _patch_all(monkeypatch, post_check=_fail(stderr=stderr))
+    result = install_plugin_compatibly("my-plugin", Version("2.5.0"), "my_plugin")
+    assert result.e is None  # known benign false positive, should not be reported as a failure
 
 
 def test_successful_install_returns_installed_versions(monkeypatch: pytest.MonkeyPatch) -> None:
