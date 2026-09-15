@@ -1,7 +1,8 @@
 #!/usr/bin/env -S uv run
 # /// script
 # dependencies = [
-#    "earthkit-workflows-anemoi",
+#    "earthkit-workflows>=0.9.0",
+#    "earthkit-workflows-anemoi>=0.7.2",
 #    "qubed",
 #    "anemoi-inference",
 #    "fire",
@@ -21,7 +22,7 @@ from typing import Any
 
 from qubed import Qube
 
-extra_output_keys = {"class": ["ai"], "type": ["fc"], "stream": ["oper"]}
+extra_output_keys = {"class": "ai", "type": "fc", "stream": "oper"}
 
 
 @lru_cache(maxsize=None)
@@ -50,13 +51,19 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
 
 def get_package_versions(checkpoint_path: str) -> list[str]:
     checkpoint = open_checkpoint(checkpoint_path)
+    module_versions = checkpoint._metadata.provenance_training()["module_versions"]
 
     deps = ["anemoi.models", "anemoi-graphs", "torch", "torch_geometric"]
-    return [
-        f"{dep}=={checkpoint._metadata.provenance_training()['module_versions'][dep]}"
-        for dep in deps
-        if dep in checkpoint._metadata.provenance_training()["module_versions"]
-    ]
+    result = []
+    for dep in deps:
+        if dep not in module_versions:
+            continue
+        version = module_versions[dep]
+        # non-registry installs (editable/git) report a DotDict with 'version' and 'source' instead of a plain string
+        if hasattr(version, "version"):
+            version = version.version
+        result.append(f"{dep}=={version}")
+    return result
 
 
 def get_bytes_on_disk(checkpoint_path: str) -> int:
@@ -105,21 +112,22 @@ def generate_artifact_entry(
 
     artifact_entry: dict[str, Any] = {
         "artifact_type": "AnemoiCheckpoint",
-        "store_info": {
+        "common": {
             "url": url,
             "display_name": display_name,
             "display_author": display_author,
             "display_description": display_description,
             "comment": comment,
             "disk_size_bytes": get_bytes_on_disk(checkpoint_path),
+            "supported_platforms": [p.strip() for p in supported_platforms.split(",") if p.strip()],
+        },
+        "specific": {
             "minimum_gpu_memory_mib": minimum_gpu_memory_mib,
             "pip_package_constraints": get_package_versions(checkpoint_path),
-            "supported_platforms": [p.strip() for p in supported_platforms.split(",") if p.strip()],
             "input_characteristics": [c.strip() for c in input_characteristics.split(",") if c.strip()],
             "input_qube": qubes["input_qube"],
             "output_qube": qubes["output_qube"],
             "extra_output_keys": extra_output_keys,
-            "input_options": {},
             "timestep": get_timestep(checkpoint_path),
         },
     }
