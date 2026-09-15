@@ -133,6 +133,9 @@ function RunCanvasInner({
   const [showConfig, setShowConfig] = useState(true)
   const [maximized, setMaximized] = useState(false)
   const isDesktop = useMedia('(min-width: 1024px)')
+  const isPhone = useMedia('(max-width: 639px)')
+  // Inline needs desktop room; maximized has room on anything but a phone.
+  const showMiniMap = maximized ? !isPhone : isDesktop
   const { fitView } = useReactFlow()
   const containerRef = useRef<HTMLDivElement>(null)
   const isInitialRender = useRef(true)
@@ -285,7 +288,7 @@ function RunCanvasInner({
                 position="bottom-left"
                 className="bottom-2! left-2!"
               />
-              {maximized && isDesktop && <CanvasMiniMap />}
+              {showMiniMap && <CanvasMiniMap />}
               <Panel position="top-left" className="top-2! left-2!">
                 <Button
                   variant="outline"
