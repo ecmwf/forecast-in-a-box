@@ -28,13 +28,13 @@ from fiab_core.types import StringType
 
 
 def test_block_configuration_option_parses_value_type() -> None:
-    option = BlockConfigurationOption(title="Title", description="Description", value_type="str")
+    option = BlockConfigurationOption.model_validate({"title": "Title", "description": "Description", "value_type": "str"})
 
     assert isinstance(option.value_type, StringType)
 
 
 def test_block_configuration_option_serializes_value_type() -> None:
-    option = BlockConfigurationOption(title="Title", description="Description", value_type="str")
+    option = BlockConfigurationOption.model_validate({"title": "Title", "description": "Description", "value_type": "str"})
 
     dumped = option.model_dump()
     dumped_json = option.model_dump_json()
@@ -46,7 +46,7 @@ def test_block_configuration_option_serializes_value_type() -> None:
 
 def test_block_configuration_option_rejects_invalid_value_type() -> None:
     with pytest.raises(ValidationError, match="Invalid type expression"):
-        BlockConfigurationOption(title="Title", description="Description", value_type="not-a-fable-type")
+        BlockConfigurationOption.model_validate({"title": "Title", "description": "Description", "value_type": "not-a-fable-type"})
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ def test_blueprint_template_environment_rejects_unknown_field() -> None:
 
 
 def test_blueprint_template_example_input_accepts_valid_type_hint() -> None:
-    inp = BlueprintTemplateExampleInput(example_value="hello", type_hint="str")
+    inp = BlueprintTemplateExampleInput.model_validate({"example_value": "hello", "type_hint": "str"})
     assert isinstance(inp.type_hint, StringType)
     assert inp.type_hint.serialize() == "str"
     assert inp.model_dump()["type_hint"] == "str"
@@ -137,4 +137,4 @@ def test_blueprint_template_example_input_accepts_none_type_hint() -> None:
 
 def test_blueprint_template_example_input_rejects_invalid_type_hint() -> None:
     with pytest.raises(ValidationError):
-        BlueprintTemplateExampleInput(example_value="hello", type_hint="not-a-fable-type")
+        BlueprintTemplateExampleInput.model_validate({"example_value": "hello", "type_hint": "not-a-fable-type"})

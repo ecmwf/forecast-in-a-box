@@ -11,6 +11,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from fastapi.exceptions import HTTPException
 from fiab_core.fable import (
@@ -179,10 +180,14 @@ def test_versions_falls_back_to_config_when_not_in_store() -> None:
 
 
 def test_versions_pip_source_passed_to_get_package_versions() -> None:
-    with _patch_store() as mock_detail, _patch_fiabcore("1.0.0"):
+    with _patch_store(), _patch_fiabcore("1.0.0"):
         with patch("forecastbox.routes.plugins.get_package_versions", return_value=iter([])) as mock_gpv:
             get_plugin_versions(_COMPOSITE_ID)
-    mock_gpv.assert_called_once_with("fiab-plugin-ecmwf")
+    mock_gpv.assert_called_once()
+    assert mock_gpv.call_args is not None
+    args = mock_gpv.call_args.args
+    assert args[0] == "fiab-plugin-ecmwf"
+    assert isinstance(args[1], httpx.Client)
 
 
 @pytest.mark.asyncio
