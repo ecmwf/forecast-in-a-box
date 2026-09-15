@@ -172,7 +172,7 @@ def check_environment_baseline() -> None:
         raise PluginEnvironmentAlreadyBroken(msg)
 
 
-def get_compatible_versions(plugin_settings: PluginSettings, available_versions: Iterator[str]) -> Iterator[str]:
+def get_compatible_versions(pip_source: str, available_versions: Iterator[str]) -> Iterator[str]:
     """Yield versions from *available_versions* that are compatible with the installed ``fiab-core``, that is,
     the plugin major version equals the ``fiab-core`` major version."""
     fiabcore_major = get_fiabcore_version().major
@@ -181,7 +181,7 @@ def get_compatible_versions(plugin_settings: PluginSettings, available_versions:
             v = Version(version_str)
         except InvalidVersion:
             # NOTE should not happen, these should come from pypi
-            logger.error(f"Skipping invalid version string {version_str!r} for {plugin_settings.pip_source!r}")
+            logger.error(f"Skipping invalid version string {version_str!r} for {pip_source!r}")
             continue
         if v.major == fiabcore_major:
             yield version_str

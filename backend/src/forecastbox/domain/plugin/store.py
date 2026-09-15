@@ -24,16 +24,19 @@ import httpx
 import orjson
 from cascade.low.func import assert_never
 from fiab_core.fable import PluginCompositeId, PluginId
+from packaging.version import Version
 from pydantic import Field
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 from typing_extensions import Self
 
+from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.submit import submit_update_single
 from forecastbox.utility.concurrency.manager import ConcurrentPools, TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
 from forecastbox.utility.httpx import fetch_content
+from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
@@ -61,16 +64,13 @@ class PluginRemoteInfo(FiabBaseModel):
 
 
 def get_latest_version(package_name: str, client: httpx.Client) -> str:
-    url = f"https://pypi.org/pypi/{package_name}/json"
     try:
-        response = client.get(url)
-        if response.status_code == 200:
-            return response.json()["info"]["version"]
-        else:
-            logger.warning(f"getting version of {package_name=} => failure {response=}")
-    except Exception:
-        logger.exception(f"getting version of {package_name=} => failure {response=}")
-    return "unknown"
+        available = get_package_versions(package_name, client)
+        compatible = get_compatible_versions(package_name, available)
+        return max(compatible, key=lambda v: Version(v))
+    except Exception as e:
+        logger.error(f"getting version of {package_name=} => failure {e!r}")
+        return "unknown"
 
 
 class PluginStore(FiabBaseModel):

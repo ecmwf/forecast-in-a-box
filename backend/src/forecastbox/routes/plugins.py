@@ -18,6 +18,7 @@ import logging
 from functools import partial
 from typing import Annotated, cast
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from fiab_core.fable import BlockInstanceId, BlueprintTemplateExampleInput, ConfigurationOptionId, PluginCompositeId
@@ -90,11 +91,10 @@ async def update_plugin(
         except InvalidVersion:
             raise HTTPException(status_code=422, detail=f"Invalid version string: {version!r}")
     else:
-        settings_and_source = _pluginId2settingsAndSource(pluginCompositeId)
-        if settings_and_source is None:
+        settings = _pluginId2settings(pluginCompositeId)
+        if settings is None:
             raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-        plugin_settings, pip_source = settings_and_source
-        versions = _settings2Versions(plugin_settings, pip_source)
+        versions = _source2Versions(settings.pip_source)
         if not versions.versions:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -112,21 +112,22 @@ class PluginVersions(FiabBaseModel):
     """Compatible versions, sorted newest first."""
 
 
-def _pluginId2settingsAndSource(pluginCompositeId: PluginCompositeId) -> tuple[PluginSettings, str] | None:
+def _pluginId2settings(pluginCompositeId: PluginCompositeId) -> PluginSettings | None:
     store_detail = get_plugins_detail()
     if pluginCompositeId in store_detail:
         store_entry, _ = store_detail[pluginCompositeId]
         pip_source = store_entry.pip_source
-        return PluginSettings(pip_source=pip_source, module_name=store_entry.module_name), pip_source
+        return PluginSettings(pip_source=pip_source, module_name=store_entry.module_name)
     if pluginCompositeId in config.external.plugins:
         plugin_settings = config.external.plugins[pluginCompositeId]
-        return plugin_settings, plugin_settings.pip_source
+        return plugin_settings
     return None
 
 
-def _settings2Versions(pluginSettings: PluginSettings, pipSource: str) -> PluginVersions:
-    available = get_package_versions(pipSource)
-    compatible = get_compatible_versions(pluginSettings, available)
+def _source2Versions(pipSource: str) -> PluginVersions:
+    with httpx.Client() as client:  # TODO pool those?
+        available = get_package_versions(pipSource, client)
+    compatible = get_compatible_versions(pipSource, available)
     sorted_versions = sorted(compatible, key=lambda v: Version(v), reverse=True)
     return PluginVersions(versions=sorted_versions)
 
@@ -139,10 +140,10 @@ def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends(
     on PyPI are considered; locally-installed or git-sourced plugins will
     receive an empty list.
     """
-    settings_and_source = _pluginId2settingsAndSource(pluginCompositeId)
-    if settings_and_source is None:
+    settings = _pluginId2settings(pluginCompositeId)
+    if settings is None:
         raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-    return _settings2Versions(*settings_and_source)
+    return _source2Versions(settings.pip_source)
 
 
 @router.post("/install")
