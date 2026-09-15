@@ -37,8 +37,10 @@ const EXTERNAL_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
 const LENS_RETRY_DELAYS_MS = [
   300, 600, 1200, 2400, 4800, 5000, 5000, 5000, 5000, 5000,
 ] as const
-/** Lens proxy: 400 unproxyable, 404 gone, 500 dead — 503 (starting) retries. */
-const LENS_PROXY_FINAL_STATUSES = new Set([400, 404, 500])
+/** Lens proxy: 400 unproxyable, 404 gone. 503 (starting) retries, and so
+ * does 500: a proxy hiccup answers 500 too, and the status poll already
+ * settles a dead process. */
+const LENS_PROXY_FINAL_STATUSES = new Set([400, 404])
 
 /** Cache identity for one server's parsed capabilities. */
 export function wmsCapabilitiesKey(baseUrl: string): ReadonlyArray<string> {
