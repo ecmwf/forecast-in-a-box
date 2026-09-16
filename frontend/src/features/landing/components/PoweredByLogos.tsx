@@ -10,7 +10,6 @@
 
 import { useTranslation } from 'react-i18next'
 import { Link } from '@/components/base/typography'
-import { cn } from '@/lib/utils'
 
 const PROJECTS = [
   {
@@ -25,20 +24,13 @@ const PROJECTS = [
   },
 ] as const
 
-/** Anemoi and Earthkit logos with one-line descriptions; shared by landing and About. */
-export function PoweredByLogos({ spread = false }: { spread?: boolean }) {
+/** Anemoi and Earthkit logos with one-line descriptions for the landing page. */
+export function PoweredByLogos() {
   const { t } = useTranslation('landing')
   return (
     <div className="grid w-full grid-cols-2 gap-x-8 gap-y-6">
-      {PROJECTS.map(({ key, href, logo }, i) => (
-        <div
-          key={key}
-          // spread: second block hugs the right edge so the pair spans the row
-          className={cn(
-            'flex flex-col gap-4',
-            spread && i > 0 && 'justify-self-end',
-          )}
-        >
+      {PROJECTS.map(({ key, href, logo }) => (
+        <div key={key} className="flex flex-col gap-4">
           {/* Fixed logo row keeps both descriptions on one line regardless of logo aspect. */}
           <a href={href} className="flex h-20 items-center">
             <img

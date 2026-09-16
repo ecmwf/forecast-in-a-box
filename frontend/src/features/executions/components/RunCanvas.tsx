@@ -23,6 +23,7 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -36,6 +37,7 @@ import type {
 import type { JobStatus } from '@/api/types/job.types'
 import { useMedia } from '@/hooks/useMedia'
 import { CanvasMiniMap } from '@/components/common/CanvasMiniMap'
+import { withMeasured } from '@/components/common/canvas-measured'
 import {
   fableToEdges,
   fableToNodes,
@@ -131,6 +133,9 @@ function RunCanvasInner({
   const [showConfig, setShowConfig] = useState(true)
   const [maximized, setMaximized] = useState(false)
   const isDesktop = useMedia('(min-width: 1024px)')
+  const isPhone = useMedia('(max-width: 639px)')
+  // Inline needs desktop room; maximized has room on anything but a phone.
+  const showMiniMap = maximized ? !isPhone : isDesktop
   const { fitView } = useReactFlow()
   const containerRef = useRef<HTMLDivElement>(null)
   const isInitialRender = useRef(true)
@@ -222,6 +227,11 @@ function RunCanvasInner({
       canvasHeight: computeCanvasHeight(laid),
     }
   }, [fable, catalogue, isRunning, blockProgress])
+  // React Flow owns the node state so its measurements stick across rebuilds.
+  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes)
+  useEffect(() => {
+    setNodes((prev) => withMeasured(layoutedNodes, prev))
+  }, [layoutedNodes, setNodes])
 
   return (
     <ShowConfigContext value={showConfig}>
@@ -244,7 +254,8 @@ function RunCanvasInner({
             )}
           >
             <ReactFlow
-              nodes={layoutedNodes}
+              nodes={nodes}
+              onNodesChange={onNodesChange}
               edges={edges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
@@ -277,7 +288,7 @@ function RunCanvasInner({
                 position="bottom-left"
                 className="bottom-2! left-2!"
               />
-              {maximized && isDesktop && <CanvasMiniMap />}
+              {showMiniMap && <CanvasMiniMap />}
               <Panel position="top-left" className="top-2! left-2!">
                 <Button
                   variant="outline"

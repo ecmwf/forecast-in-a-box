@@ -56,7 +56,7 @@ async function readOnboardingStatus(page: Page): Promise<string | null> {
 }
 
 test.describe('First-run onboarding', () => {
-  test('a fresh visit walks the tour into a real preset start', async ({
+  test('a fresh visit walks the tour page by page into a real start', async ({
     page,
   }) => {
     await visitOverview(page)
@@ -65,27 +65,31 @@ test.describe('First-run onboarding', () => {
     await expect(dialog.getByText(WELCOME_TITLE)).toBeVisible({
       timeout: 15000,
     })
-    await expect(dialog.getByText('1 of 6')).toBeVisible()
-
     await dialog.getByRole('button', { name: 'Take the tour' }).click()
-    await expect(dialog.getByText('Your dashboard, at a glance')).toBeVisible()
-    for (const title of [
-      'Compose forecasts from blocks',
-      'Run it, then inspect results in place',
-      'Visualise and compare on the map',
-      'Run your first forecast',
-    ]) {
-      await dialog.getByRole('button', { name: 'Continue' }).click()
-      await expect(dialog.getByText(title)).toBeVisible()
+
+    // The guided part runs as coachmarks on the real pages.
+    const card = page.locator('[data-tour-card]')
+    await expect(
+      card.getByRole('heading', { name: 'Your dashboard, at a glance' }),
+    ).toBeVisible()
+    await expect(card.getByText('1 of 5', { exact: true })).toBeVisible()
+    const pages = [
+      ['/configure', 'Compose forecasts from blocks'],
+      ['/execute', 'Run it, then inspect results in place'],
+      ['/visualise', 'Visualise and compare on the map'],
+      ['/overview', 'Run your first forecast'],
+    ] as const
+    for (const [i, [path, title]] of pages.entries()) {
+      await card
+        .getByRole('button', { name: i === 0 ? 'Start' : 'Next' })
+        .click()
+      await page.waitForURL(new RegExp(`${path}(\\?|$)`), { timeout: 15000 })
+      await expect(card.getByRole('heading', { name: title })).toBeVisible()
     }
 
-    const card = page.getByTestId('onboarding-preset-card').first()
-    await expect(card).toBeVisible({ timeout: 15000 })
-    await card.click()
-    await dialog.getByRole('button', { name: 'Open in Configure' }).click()
-
-    await page.waitForURL(/configure\?.*template=true/, { timeout: 15000 })
-    await expect(page.getByText(WELCOME_TITLE)).not.toBeVisible()
+    await page.getByRole('button', { name: 'Start from Scratch' }).click()
+    await page.waitForURL(/configure\?.*fresh=true/, { timeout: 15000 })
+    await expect(card).not.toBeVisible()
     expect(await readOnboardingStatus(page)).toBe('active')
   })
 

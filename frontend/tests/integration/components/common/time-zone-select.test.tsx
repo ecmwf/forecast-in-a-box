@@ -48,14 +48,18 @@ describe('TimeZoneSelect', () => {
     await expect.element(screen.getByLabelText('Search timezone')).toBeVisible()
     await expect
       .element(screen.getByRole('option', { selected: true }))
-      .toHaveTextContent('UTC')
+      .toMatchTextContent('UTC')
   })
 
   it('filters the list by the search query', async () => {
     const screen = await renderWithProviders(<Harness />)
     await screen.getByLabelText('Search timezone').fill('berlin')
-    await expect.element(screen.getByText('Europe/Berlin')).toBeVisible()
-    await expect.element(screen.getByText('Asia/Tokyo')).not.toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('option', { name: /^Europe\/Berlin/ }))
+      .toBeVisible()
+    await expect
+      .element(screen.getByRole('option', { name: /^Asia\/Tokyo/ }))
+      .not.toBeInTheDocument()
   })
 
   it('shows an empty state when nothing matches', async () => {
@@ -67,11 +71,11 @@ describe('TimeZoneSelect', () => {
   it('selecting a zone updates the store and persists it', async () => {
     const screen = await renderWithProviders(<Harness />)
     await screen.getByLabelText('Search timezone').fill('berlin')
-    await screen.getByText('Europe/Berlin').click()
+    await screen.getByRole('option', { name: /^Europe\/Berlin/ }).click()
 
     await expect
       .element(screen.getByTestId('value'))
-      .toHaveTextContent('Europe/Berlin')
+      .toMatchTextContent('Europe/Berlin')
     expect(useUiStore.getState().timeZone).toBe('Europe/Berlin')
     const stored = JSON.parse(
       localStorage.getItem(STORAGE_KEYS.stores.ui) ?? '{}',
@@ -85,7 +89,7 @@ describe('TimeZoneSelect', () => {
     await userEvent.keyboard('{Enter}')
     await expect
       .element(screen.getByTestId('value'))
-      .toHaveTextContent('Asia/Tokyo')
+      .toMatchTextContent('Asia/Tokyo')
   })
 
   it('moves the highlight with the arrow keys', async () => {
@@ -98,6 +102,6 @@ describe('TimeZoneSelect', () => {
     )
     await expect
       .element(screen.getByTestId('value'))
-      .toHaveTextContent(matches[1])
+      .toMatchTextContent(matches[1])
   })
 })

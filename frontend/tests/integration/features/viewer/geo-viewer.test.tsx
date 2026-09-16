@@ -18,7 +18,7 @@
 import axe from 'axe-core'
 import { createContext, useContext, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { page } from '@vitest/browser/context'
+import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -911,7 +911,7 @@ describe('GeoViewer', () => {
     await screen.rerender(<Harness portA={portA} portB={portB2} />)
     await expect
       .element(screen.getByLabelText('Time link mode'))
-      .toHaveTextContent('Same time (exact)')
+      .toMatchTextContent('Same time (exact)')
     expect(screen.getByText('B +6 h').elements()).toHaveLength(0)
   })
 
@@ -1244,11 +1244,11 @@ describe('GeoViewer preload', () => {
 
       // No time-aware selection yet — no toggle.
       expect(
-        screen.getByRole('switch', { name: 'Preload time steps' }).elements(),
+        screen.getByRole('switch', { name: /^Preload time steps/ }).elements(),
       ).toHaveLength(0)
 
       await screen.getByText('2 m temperature').first().click()
-      const toggle = screen.getByRole('switch', { name: 'Preload time steps' })
+      const toggle = screen.getByRole('switch', { name: /^Preload time steps/ })
       await expect.element(toggle).toBeInTheDocument()
       // The current instant (T00) loads; neighbours wait for the toggle.
       await expect
@@ -1695,7 +1695,7 @@ describe('GeoViewer projections', () => {
         .element(screen.getByRole('button', { name: /Outline/ }))
         .toHaveAttribute('aria-pressed', 'true')
 
-      await screen.getByRole('radio', { name: 'Web Mercator' }).click()
+      await screen.getByRole('radio', { name: /^Web Mercator/ }).click()
       await expect
         .poll(() => lastCrs(portA), { timeout: 8000 })
         .toBe('EPSG:3857')
@@ -1721,7 +1721,7 @@ describe('GeoViewer projections', () => {
       .element(screen.getByText('B · Run B does not serve this projection'))
       .toBeVisible()
     await expect
-      .element(screen.getByRole('radio', { name: 'Web Mercator' }))
+      .element(screen.getByRole('radio', { name: /^Web Mercator/ }))
       .toBeEnabled()
   })
 

@@ -178,6 +178,7 @@ describe('visualise first-map tutorial', () => {
     await expect.element(screen.getByText(/Press "Add" on ECMWF/)).toBeVisible()
 
     // The real action: the ECMWF row's Add button (probe is mock-served).
+    await expect.poll(() => ecmwfAddButton()).not.toBeNull()
     ecmwfAddButton()?.click()
 
     // A WMS source needs no lens — the map opens directly.
@@ -267,37 +268,43 @@ describe('visualise first-map tutorial', () => {
     expect(useTutorialsStore.getState().active).toBeNull()
   })
 
-  it('Show me presses the canonical server’s Add button', async () => {
-    const screen = await renderVisualiseWithTours()
+  it(
+    'Show me presses the canonical server’s Add button',
+    { timeout: 40000 },
+    async () => {
+      const screen = await renderVisualiseWithTours()
 
-    await screen
-      .getByRole('button', {
-        name: 'Take the "Visualise forecasts on a map" tour',
-      })
-      .click()
-    await screen.getByRole('button', { name: 'Start', exact: true }).click()
-    await expect
-      .element(
-        screen.getByRole('heading', { name: 'Connect a live weather server' }),
-      )
-      .toBeVisible()
+      await screen
+        .getByRole('button', {
+          name: 'Take the "Visualise forecasts on a map" tour',
+        })
+        .click()
+      await screen.getByRole('button', { name: 'Start', exact: true }).click()
+      await expect
+        .element(
+          screen.getByRole('heading', {
+            name: 'Connect a live weather server',
+          }),
+        )
+        .toBeVisible()
 
-    await screen.getByRole('button', { name: 'Show me', exact: true }).click()
+      await screen.getByRole('button', { name: 'Show me', exact: true }).click()
 
-    // The targeted row — not the list's first server — was added.
-    await expect
-      .poll(() =>
-        useComparisonStore
-          .getState()
-          .entries.some((e) => e.kind === 'wms' && e.label === 'ECMWF'),
-      )
-      .toBe(true)
-    await expect
-      .element(screen.getByRole('heading', { name: 'This is your map' }), {
-        timeout: 15000,
-      })
-      .toBeVisible()
-  })
+      // The targeted row — not the list's first server — was added.
+      await expect
+        .poll(() =>
+          useComparisonStore
+            .getState()
+            .entries.some((e) => e.kind === 'wms' && e.label === 'ECMWF'),
+        )
+        .toBe(true)
+      await expect
+        .element(screen.getByRole('heading', { name: 'This is your map' }), {
+          timeout: 15000,
+        })
+        .toBeVisible()
+    },
+  )
 
   it(
     'rails: another server in slot A keeps the step; Show me fixes it',

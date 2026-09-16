@@ -12,8 +12,8 @@
   },
   "toast": {
     "added": "Added to comparison: {{name}}",
+    "addedMadeRoom": "Added to comparison: {{name}} — removed {{evicted}} to make room",
     "removed": "Removed from comparison: {{name}}",
-    "full": "Comparison is full ({{max}} sources max)",
     "unknownSource": "A shared source could not be found and was removed from the link",
     "invalidLink": "The comparison link contained an invalid source reference",
     "sourceLost": "A shared source is no longer available and was removed from the link: {{reason}}"
@@ -96,7 +96,9 @@
     "retry": "Retry",
     "start": "Start lens",
     "stopOne": "Stop lens server",
-    "paused": "Auto-start paused — start lenses per panel"
+    "paused": "Auto-start paused — start lenses per panel",
+    "gone": "Lens server is gone",
+    "unproxyable": "Lens server cannot be reached through the proxy"
   },
   "panel": {
     "emptySlot": "Pick a second source to compare",
@@ -298,7 +300,9 @@
     "run": "run {{time}}",
     "runCount_one": "{{count}} run",
     "runCount_other": "{{count}} runs",
-    "runTitle": "Model run (reference time) the layers are drawn from"
+    "runTitle": "Model run (reference time) the layers are drawn from",
+    "submitted": "submitted {{time}}",
+    "submittedTitle": "When this run was submitted — not the forecast time"
   },
   "slots": {
     "swap": "Swap A and B",

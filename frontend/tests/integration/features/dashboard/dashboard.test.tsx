@@ -22,12 +22,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HttpResponse, http } from 'msw'
 import { renderWithRouter } from '@tests/utils/render'
 import { worker } from '@tests/test-extend'
+import { mockCommunityNews } from '../../../../mocks/handlers/news.handlers'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { CommunityNewsCard } from '@/features/dashboard/components/CommunityNewsCard'
 import { GettingStartedSection } from '@/features/dashboard/components/GettingStartedSection'
 import { WelcomeCard } from '@/features/dashboard/components/WelcomeCard'
 import { AuthContext } from '@/features/auth/AuthContext'
-import { API_ENDPOINTS } from '@/api/endpoints'
+import { API_ENDPOINTS, STATIC_FILES } from '@/api/endpoints'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 // Mock useMedia to simulate desktop layout
@@ -224,16 +225,37 @@ describe('Dashboard', () => {
   })
 
   describe('CommunityNewsCard', () => {
-    it('renders community news section', async () => {
+    it('renders the links from the news file', async () => {
       const screen = await renderWithRouter(
         <AuthContext.Provider value={anonymousAuth}>
           <CommunityNewsCard />
         </AuthContext.Provider>,
       )
 
-      // Should render the card with a heading
       const heading = screen.getByRole('heading', { level: 2 })
       await expect.element(heading).toBeVisible()
+      for (const list of Object.values(mockCommunityNews)) {
+        for (const item of list) {
+          await expect
+            .element(screen.getByRole('link', { name: item.title }))
+            .toHaveAttribute('href', item.url)
+        }
+      }
+    })
+
+    it('says so when the news file cannot be loaded', async () => {
+      worker.use(
+        http.get(STATIC_FILES.communityNews, () => HttpResponse.error()),
+      )
+      const screen = await renderWithRouter(
+        <AuthContext.Provider value={anonymousAuth}>
+          <CommunityNewsCard />
+        </AuthContext.Provider>,
+      )
+
+      await expect
+        .element(screen.getByText('The news list could not be loaded.'))
+        .toBeVisible()
     })
   })
 })

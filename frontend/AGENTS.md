@@ -262,6 +262,13 @@ See [development_guidelines/TESTING.md](./development_guidelines/TESTING.md) for
 
 See [Internationalization (i18n)](#internationalization-i18n) for the full mechanism.
 
+### Update the Community News card
+
+1. Edit `public/community-news.json` — three lists (`press`, `materials`,
+   `community`) of `{ title, url, source, date? }`; newest first.
+2. No code change: the Overview fetches the file at runtime and validates it
+   against the schema in `src/features/dashboard/hooks/useCommunityNews.ts`.
+
 ## Reference Docs
 
 - [development_guidelines/TESTING.md](./development_guidelines/TESTING.md) — Test patterns and strategy

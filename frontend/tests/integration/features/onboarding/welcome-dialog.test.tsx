@@ -9,8 +9,8 @@
  */
 
 /**
- * WelcomeDialog integration — six-step tour navigation, snooze-vs-skip
- * dismissal, and the preset handover against MSW starter templates.
+ * WelcomeDialog integration — the hand-over to the guided welcome tour and
+ * the snooze-vs-skip dismissal paths.
  */
 
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -19,6 +19,7 @@ import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { WelcomeDialog } from '@/features/onboarding/components/WelcomeDialog'
 import { useOnboardingStore } from '@/stores/onboardingStore'
+import { useTutorialsStore } from '@/stores/tutorialsStore'
 
 const anonymousAuth: AuthContextValue = {
   isLoading: false,
@@ -44,56 +45,43 @@ describe('WelcomeDialog', () => {
     document.head.appendChild(style)
   })
 
-  it('walks the six steps and lands on the real starter presets', async () => {
+  it('"Take the tour" closes the card and starts the guided welcome tour', async () => {
     const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
     await expect
       .element(screen.getByText('Welcome to Forecast-in-a-Box'))
       .toBeVisible()
-    await expect.element(screen.getByText('1 of 6')).toBeVisible()
-
     await screen.getByRole('button', { name: 'Take the tour' }).click()
-    await expect
-      .element(screen.getByText('Your dashboard, at a glance'))
-      .toBeVisible()
 
-    const titles = [
-      'Compose forecasts from blocks',
-      'Run it, then inspect results in place',
-      'Visualise and compare on the map',
-      'Run your first forecast',
-    ]
-    for (const title of titles) {
-      await screen.getByRole('button', { name: 'Continue' }).click()
-      await expect.element(screen.getByText(title)).toBeVisible()
-    }
-
-    await expect.element(screen.getByText('6 of 6')).toBeVisible()
-    await expect
-      .element(screen.getByTestId('onboarding-preset-card').first())
-      .toBeVisible()
-    await expect
-      .element(screen.getByRole('button', { name: 'Open in Configure' }))
-      .toBeVisible()
+    expect(useTutorialsStore.getState().active).toEqual({
+      id: 'welcome-tour',
+      stepIndex: 0,
+    })
+    // The card's own decision is a plain dismissal; the tour runs on its own.
+    expect(useOnboardingStore.getState().welcomeOpen).toBe(false)
+    expect(useOnboardingStore.getState().status).toBe('snoozed')
   })
 
-  it('the dots jump straight to a step', async () => {
+  it('the checkbox makes a tour start a permanent skip of the card', async () => {
     const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
-    await screen.getByRole('button', { name: 'Go to step 5' }).click()
-    await expect
-      .element(screen.getByText('Visualise and compare on the map'))
-      .toBeVisible()
+    await screen.getByText("Don't show this again").click()
+    await screen.getByRole('button', { name: 'Take the tour' }).click()
+
+    expect(useOnboardingStore.getState().status).toBe('skipped')
+    expect(useTutorialsStore.getState().active?.id).toBe('welcome-tour')
   })
 
   it('"Skip for now" snoozes with a timestamp', async () => {
     const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
     await screen.getByRole('button', { name: 'Skip for now' }).click()
+
     const state = useOnboardingStore.getState()
     expect(state.status).toBe('snoozed')
     expect(state.snoozeCount).toBe(1)
     expect(state.snoozedAt).not.toBeNull()
+    expect(useTutorialsStore.getState().active).toBeNull()
   })
 
   it('the checkbox turns dismissal into a permanent skip', async () => {
@@ -101,21 +89,8 @@ describe('WelcomeDialog', () => {
 
     await screen.getByText("Don't show this again").click()
     await screen.getByRole('button', { name: 'Skip for now' }).click()
+
     expect(useOnboardingStore.getState().status).toBe('skipped')
-  })
-
-  it('"Open in Configure" activates onboarding with the selected preset', async () => {
-    const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
-
-    await screen.getByRole('button', { name: 'Go to step 6' }).click()
-    const firstCard = screen.getByTestId('onboarding-preset-card').first()
-    await expect.element(firstCard).toBeVisible()
-    const selectedName = firstCard.element().getAttribute('aria-label')
-    await firstCard.click()
-    await screen.getByRole('button', { name: 'Open in Configure' }).click()
-
-    expect(useOnboardingStore.getState().status).toBe('active')
-    expect(selectedName).toBeTruthy()
   })
 
   it('a reopen from a decided state swaps the checkbox for the Help note', async () => {

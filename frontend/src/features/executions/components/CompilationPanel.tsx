@@ -18,6 +18,7 @@ import {
   Controls,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Share2 } from 'lucide-react'
@@ -62,6 +63,7 @@ import { humaniseTaskName } from '@/features/executions/utils/taskName'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { P } from '@/components/base/typography'
+import { withMeasured } from '@/components/common/canvas-measured'
 
 interface CompilationPanelProps {
   jobId: string
@@ -231,6 +233,11 @@ export function CompilationPanel({
       return node
     })
   }, [graph.nodes, selectionTaskSet, contributingBlockIds])
+  // React Flow owns the node state so its measurements stick across rebuilds.
+  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState(nodes)
+  useEffect(() => {
+    setFlowNodes((prev) => withMeasured(nodes, prev))
+  }, [nodes, setFlowNodes])
 
   const edges = useMemo(() => {
     if (!selectionTaskSet) return graph.edges
@@ -329,7 +336,8 @@ export function CompilationPanel({
               // Initial fit — the graph-change effect handles later updates.
               requestAnimationFrame(() => instance.fitView({ padding: 0.18 }))
             }}
-            nodes={nodes}
+            nodes={flowNodes}
+            onNodesChange={onNodesChange}
             edges={edges}
             nodeTypes={nodeTypes}
             nodesDraggable={false}

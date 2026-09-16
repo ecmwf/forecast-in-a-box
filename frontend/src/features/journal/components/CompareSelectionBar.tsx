@@ -18,15 +18,13 @@ import { Button } from '@/components/ui/button'
 import { showToast } from '@/lib/toast'
 
 interface CompareSelectionBarProps {
-  runs: ReadonlyArray<ForecastRunViewModel>
-  selectedIds: ReadonlySet<string>
+  selectedRuns: ReadonlyArray<ForecastRunViewModel>
   onClear: () => void
 }
 
 /** Sits under a run list's search header: two ticked runs open in Visualise. */
 export function CompareSelectionBar({
-  runs,
-  selectedIds,
+  selectedRuns,
   onClear,
 }: CompareSelectionBarProps) {
   const { t } = useTranslation('journal')
@@ -34,11 +32,13 @@ export function CompareSelectionBar({
   const [comparing, setComparing] = useState(false)
 
   async function compare() {
-    const picked = runs.filter((run) => selectedIds.has(run.runId))
-    if (picked.length !== 2) return
+    if (selectedRuns.length !== 2) return
     setComparing(true)
     try {
-      const result = await buildRunPairComparison(picked[0], picked[1])
+      const result = await buildRunPairComparison(
+        selectedRuns[0],
+        selectedRuns[1],
+      )
       if (!result.ok) {
         showToast.error(t('compare.noOutput'))
         return
@@ -52,20 +52,20 @@ export function CompareSelectionBar({
   return (
     <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-2 text-sm text-muted-foreground">
       <span>
-        {selectedIds.size > 0
-          ? t('compare.selectedCount', { count: selectedIds.size })
+        {selectedRuns.length > 0
+          ? t('compare.selectedCount', { count: selectedRuns.length })
           : t('compare.selectTwoHint')}
       </span>
       <Button
         size="sm"
         variant="outline"
-        disabled={selectedIds.size !== 2 || comparing}
+        disabled={selectedRuns.length !== 2 || comparing}
         onClick={() => void compare()}
       >
         <Columns2 className="mr-1.5 h-4 w-4" />
         {t('compare.compareSelected')}
       </Button>
-      {selectedIds.size > 0 && (
+      {selectedRuns.length > 0 && (
         <Button size="sm" variant="ghost" onClick={onClear}>
           {t('compare.clear')}
         </Button>

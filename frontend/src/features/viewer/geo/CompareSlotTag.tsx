@@ -31,6 +31,7 @@ export function CompareSlotTag({
   loading = false,
   timeLabel = null,
   runLabel = null,
+  submittedAt = null,
 }: {
   slot: SourceSlot
   label: string
@@ -41,6 +42,8 @@ export function CompareSlotTag({
   timeLabel?: string | null
   /** Model run in effect, shown muted after the valid time. */
   runLabel?: string | null
+  /** Run submission time, shown after the name — not a forecast time. */
+  submittedAt?: string | null
 }) {
   const { t } = useTranslation('visualise')
   return (
@@ -78,6 +81,14 @@ export function CompareSlotTag({
       <span className="truncate text-muted-foreground" title={label}>
         {label}
       </span>
+      {submittedAt && (
+        <span
+          className="shrink-0 text-muted-foreground/70"
+          title={t('slotTag.submittedTitle')}
+        >
+          {t('slotTag.submitted', { time: submittedAt })}
+        </span>
+      )}
     </div>
   )
 }

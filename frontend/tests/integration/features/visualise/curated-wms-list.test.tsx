@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { render } from 'vitest-browser-react'
+import { renderWithRouter } from '@tests/utils/render'
 import { I18nextProvider } from 'react-i18next'
 import { CuratedWmsList } from '@/features/visualise/components/sources/CuratedWmsList'
 import { CURATED_WMS_SERVERS } from '@/features/visualise/curated-wms'
@@ -30,8 +30,9 @@ vi.mock('@/features/visualise/wms-probe', () => ({
   ),
 }))
 
+// The list reads the A/B slot refs from the router to protect them.
 function renderList() {
-  return render(
+  return renderWithRouter(
     <I18nextProvider i18n={i18n}>
       <CuratedWmsList />
     </I18nextProvider>,

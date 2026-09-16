@@ -8,24 +8,31 @@
  * does it submit to any jurisdiction.
  */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import type { ForecastRunViewModel } from '@/features/journal/types'
 
-/** Capped multi-select of run ids for the compare-in-Visualise flow. */
+/** Capped multi-select for the compare-in-Visualise flow; keeps the runs
+ * themselves so a pick survives paging and filtering. */
 export function useRunSelection(cap: number) {
-  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  )
+  const [selected, setSelected] = useState<
+    ReadonlyMap<string, ForecastRunViewModel>
+  >(() => new Map())
   const toggle = useCallback(
-    (runId: string) => {
-      setSelectedIds((prev) => {
-        const next = new Set(prev)
-        if (next.has(runId)) next.delete(runId)
-        else if (next.size < cap) next.add(runId)
+    (run: ForecastRunViewModel) => {
+      setSelected((prev) => {
+        const next = new Map(prev)
+        if (next.has(run.runId)) next.delete(run.runId)
+        else if (next.size < cap) next.set(run.runId, run)
         return next
       })
     },
     [cap],
   )
-  const clear = useCallback(() => setSelectedIds(new Set()), [])
-  return { selectedIds, toggle, clear, cap }
+  const clear = useCallback(() => setSelected(new Map()), [])
+  const selectedIds = useMemo(
+    () => new Set(selected.keys()) as ReadonlySet<string>,
+    [selected],
+  )
+  const selectedRuns = useMemo(() => [...selected.values()], [selected])
+  return { selectedIds, selectedRuns, toggle, clear, cap }
 }

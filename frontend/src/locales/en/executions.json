@@ -312,7 +312,8 @@
   },
   "list": {
     "loading": "Loading runs...",
-    "error": "Failed to load runs"
+    "error": "Failed to load runs",
+    "windowCapped": "Showing the {{shown}} most recent of {{total}} runs. Older runs are not listed."
   },
   "pagination": {
     "previous": "Previous",

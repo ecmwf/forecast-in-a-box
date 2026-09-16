@@ -40,7 +40,7 @@ interface OnboardingState {
   openWelcome: () => void
   /** Every dialog close path; `dontShowAgain` = the checkbox state. */
   closeWelcome: (dontShowAgain: boolean) => void
-  /** Preset card / blank-canvas click — the tour did its job. */
+  /** The guided tour finished — the welcome card stops auto-reshowing. */
   startForecast: () => void
   /** Existing-user detection and other silent opt-outs. */
   skip: () => void

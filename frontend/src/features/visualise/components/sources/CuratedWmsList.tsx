@@ -16,10 +16,11 @@ import { useTranslation } from 'react-i18next'
 import type { CuratedWmsServer } from '@/features/visualise/curated-wms'
 import { useCuratedWmsServers } from '@/features/visualise/curated-wms'
 import { probeWmsEndpoint } from '@/features/visualise/wms-probe'
+import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
 import {
-  MAX_COMPARISON_ENTRIES,
-  useComparisonStore,
-} from '@/features/visualise/stores/comparisonStore'
+  useAddedToast,
+  useSlotRefs,
+} from '@/features/visualise/hooks/useBasketAdd'
 import { Button } from '@/components/ui/button'
 import { P } from '@/components/base/typography'
 import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
@@ -30,6 +31,8 @@ export function CuratedWmsList() {
   const servers = useCuratedWmsServers()
   const entries = useComparisonStore((s) => s.entries)
   const addEntry = useComparisonStore((s) => s.addEntry)
+  const slotRefs = useSlotRefs()
+  const addedToast = useAddedToast()
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
 
   // Probe stores URLs via `new URL(...).toString()` — match that form.
@@ -60,16 +63,13 @@ export function CuratedWmsList() {
       )
       return
     }
-    const added = addEntry({
-      kind: 'wms',
-      url: result.baseUrl,
-      label: server.name,
-    })
-    if (added === 'added') {
-      showToast.success(t('toast.added', { name: server.name }))
-    } else if (added === 'full') {
-      showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-    }
+    addedToast(
+      server.name,
+      addEntry(
+        { kind: 'wms', url: result.baseUrl, label: server.name },
+        slotRefs,
+      ),
+    )
   }
 
   return (

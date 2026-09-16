@@ -11,7 +11,8 @@
 /**
  * Drives the active guided tour: anchors the coachmark (satisfied work
  * presents as review), subscribes the advance condition, renders the
- * spotlight; both hide while a modal is open. Route-leave ends the run.
+ * spotlight; both hide while a modal is open. Steps may live on other
+ * pages (navigated on entry); any other route-leave ends the run.
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -114,7 +115,14 @@ function ActiveTutorial({
   )
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const setStep = useTutorialsStore((s) => s.setStep)
-  const finish = useTutorialsStore((s) => s.finish)
+  const finishRun = useTutorialsStore((s) => s.finish)
+  const finish = useCallback(
+    (outcome: 'completed' | 'dismissed' | null) => {
+      def.onFinish?.(outcome)
+      finishRun(outcome)
+    },
+    [def, finishRun],
+  )
 
   const step = stepIndex < def.steps.length ? def.steps[stepIndex] : null
   const stepKeyBase = `${id}:${stepIndex}`
@@ -161,13 +169,27 @@ function ActiveTutorial({
   const advance = reviewing ? NEXT_CLICK : baseAdvance
   const stepKey = `${stepKeyBase}:${variant?.key ?? 'base'}`
 
-  // Route-leave ends the run — unless the step expects it (then completes).
+  // Off the step's page: navigate there once on entry; later leaves end the run.
+  const stepRoute = step?.route ?? def.route
+  const landedRef = useRef<string | null>(null)
+  const navigatedRef = useRef<string | null>(null)
   useEffect(() => {
-    if (pathname === def.route) return
+    if (step === null) return
+    if (pathname === stepRoute) {
+      landedRef.current = stepKeyBase
+      return
+    }
     if (advance.kind === 'route' && advance.match(pathname)) return
+    if (landedRef.current !== stepKeyBase) {
+      if (navigatedRef.current !== stepKeyBase) {
+        navigatedRef.current = stepKeyBase
+        void router.navigate({ to: stepRoute } as never)
+      }
+      return
+    }
     showToast.info(t('common.endedToast'))
     finish(null)
-  }, [pathname, def.route, advance, finish, t])
+  }, [pathname, stepRoute, stepKeyBase, step, advance, finish, router, t])
 
   const goNext = () => {
     if (stepIndex + 1 >= def.steps.length) finish('completed')
@@ -299,7 +321,9 @@ function ActiveTutorial({
           ? t('common.start')
           : t('common.next')
     : step.allowNext === true
-      ? t('common.next')
+      ? isLast
+        ? t('common.done')
+        : t('common.next')
       : null
 
   // Review steps show immediately even anchorless (their UI may be gone).

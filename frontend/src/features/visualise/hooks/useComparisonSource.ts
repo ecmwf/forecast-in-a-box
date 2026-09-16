@@ -60,6 +60,9 @@ export type ComparisonSourceState =
 /** In-flight lens starts keyed by path — shared across hook instances. */
 const pendingStartByPath = new Map<string, Promise<string>>()
 const startedIdByPath = new Map<string, string>()
+/** Revivals per directory for a lens that dies after serving; then ask the user. */
+const MAX_AUTO_RESTARTS = 2
+const autoRestartsByPath = new Map<string, number>()
 
 function ensureLensStarted(
   path: string,
@@ -209,8 +212,18 @@ export function useComparisonSource(
       statusQuery.error instanceof ApiClientError &&
       statusQuery.error.status === 404) ||
     diedAfterServing
+  const [restartsExhausted, setRestartsExhausted] = useState(false)
   useEffect(() => {
     if (!statusGone || !startedLensId) return
+    if (diedAfterServing && localPath) {
+      const restarts = (autoRestartsByPath.get(localPath) ?? 0) + 1
+      autoRestartsByPath.set(localPath, restarts)
+      if (restarts > MAX_AUTO_RESTARTS) {
+        // Keeps crashing after serving: stop reviving it, show Failed.
+        setRestartsExhausted(true)
+        return
+      }
+    }
     servedIdsRef.current.delete(startedLensId)
     setStarted(null)
     if (localPath) {
@@ -227,7 +240,9 @@ export function useComparisonSource(
   }, [statusGone, diedAfterServing, startedLensId, localPath])
 
   const retry = useCallback(() => {
+    setRestartsExhausted(false)
     if (localPath) {
+      autoRestartsByPath.delete(localPath)
       attemptedPathsRef.current.delete(localPath)
       // Evict only the instance we know failed — rejected starts already
       // self-evict, and a blanket evict could clobber a sibling's fresh
@@ -260,6 +275,7 @@ export function useComparisonSource(
 
   // An error atop last-known-running keeps serving — death is 404/terminal.
   const terminal =
+    restartsExhausted ||
     startError !== null ||
     (!!lensId &&
       statusQuery.isError &&
