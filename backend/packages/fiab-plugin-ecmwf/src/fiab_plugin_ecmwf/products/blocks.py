@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from importlib.resources import path
+from importlib.resources import as_file, files
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_pproc_schema(cache_size: int) -> Schema:
-    with path("fiab_plugin_ecmwf.products.pproc", "schema.yaml") as pproc_schema:
+    with as_file(files("fiab_plugin_ecmwf.products.pproc") / "schema.yaml") as pproc_schema:
         return Schema.from_file(str(pproc_schema), matching_cache_size=cache_size)
 
 

@@ -16,22 +16,16 @@ import pytest
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactResolved, ArtifactsProvider, CommonArtifactMetadata, CompositeArtifactId
 from qubed import Qube
 
-DUMMY_QUBE = Qube.from_json(
+from fiab_plugin_ecmwf.qubed_utils import expand
+
+DUMMY_QUBE = Qube.from_datacube(
     {
-        "key": "root",
-        "values": {"type": "enum", "dtype": "str", "values": ("root",)},
-        "metadata": {},
-        "children": [
-            {
-                "key": "levtype",
-                "values": {"type": "enum", "dtype": "str", "values": ("sfc",)},
-                "metadata": {"name": {"shape": (1, 1, 1), "dtype": "str", "values": ["surface"]}},
-                "children": [
-                    {"key": "param", "values": {"type": "enum", "dtype": "str", "values": ("2t", "msl")}, "metadata": {}, "children": []}
-                ],
-            }
-        ],
-    }
+        "class": "ai",
+        "stream": "oper",
+        "type": "fc",
+        "levtype": "sfc",
+        "param": ["134", "136", "143", "151", "165", "166", "167", "168", "228", "235"],
+    },
 )
 
 

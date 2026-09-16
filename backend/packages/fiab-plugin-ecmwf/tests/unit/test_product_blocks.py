@@ -8,12 +8,14 @@
 # nor does it submit to any jurisdiction.
 
 
-from typing import cast
+from datetime import datetime
+from typing import Any, cast
 
 import pytest
 from earthkit.workflows import nodetree
-from earthkit.workflows.fluent import Action, merge
+from earthkit.workflows.fluent import Action
 from earthkit.workflows.plugins.pproc.fluent import from_source
+from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstanceId,
@@ -24,12 +26,18 @@ from fiab_core.fable import (
     BlockInstance as BlockInstanceBase,
 )
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
+from pytest_lazy_fixtures import lf
 from qubed import Qube
 
 from fiab_plugin_ecmwf import plugin
+from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource
 from fiab_plugin_ecmwf.block_utils import (
+    BASE_TIME,
+    CHECKPOINT,
     COMPARISON,
     ENSEMBLE,
+    INPUT_SOURCE,
+    LEAD_TIME,
     LEVTYPE,
     PARAM,
     STEP,
@@ -44,7 +52,7 @@ from fiab_plugin_ecmwf.products.blocks import (
     PredefinedThresholdProbability,
     ThermalIndices,
 )
-from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, datacubes, select
+from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, select
 
 PRODUCT_BLOCKS = [
     BlockFactoryId("ensembleStatistics"),
@@ -119,80 +127,67 @@ class TestEnsembleStatistics:
             == "list[enumClosed[str]('mean','std')]"
         )
 
-    def test_from_operational_forecast_source(
-        self, ensemble_statistics_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
+    @pytest.mark.parametrize(
+        "forecast_output, expected_params",
+        [
+            (lf("operational_forecast_source_output"), {"167", "151", "131"}),
+            # (lf("anemoi_source_ensemble_output"), {"167", "151"}),
+        ],
+    )
+    def test_from_forecast_source(
+        self, ensemble_statistics_configuration: BlockInstance, forecast_output: QubedOutput, expected_params: set[str]
     ) -> None:
         block = EnsembleStatistics()
 
-        assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
+        assert block.intersect(other=forecast_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=ensemble_statistics_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            inputs={"dataset": forecast_output},  # type: ignore[dict-item],
             restrictions={},
         )
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, PARAM)
-        assert axes(output)[PARAM] == {"167", "151", "131"}
+        assert axes(output)[PARAM] == expected_params
         assert axes(output)[TYPE] == {"em"}
 
-    def test_from_anemoi_source_ensemble(
-        self, ensemble_statistics_configuration: BlockInstance, anemoi_source_ensemble_output: QubedOutput
-    ) -> None:
-        block = EnsembleStatistics()
-
-        assert block.intersect(other=anemoi_source_ensemble_output)  # type: ignore[arg-type]
-        output = block.validate(  # type: ignore[assignment]
-            block=ensemble_statistics_configuration,
-            inputs={"dataset": anemoi_source_ensemble_output},  # type: ignore[dict-item],
-            restrictions={},
-        )
-        assert isinstance(output, QubedOutput)
-        assert output.dataqube is not None
-        assert contains(output, PARAM)
-        assert axes(output)[PARAM] == {"2t", "msl"}
-        assert axes(output)[TYPE] == {"em"}
-
-    def test_operational_forecast_compile(
+    @pytest.mark.parametrize(
+        "forecast_output, source_action, expected, identical_qubes",
+        [
+            (
+                lf("operational_forecast_source_output"),
+                lf("operational_forecast_source_action"),
+                {PARAM: {"167", "151", "131"}, TYPE: {"em"}, STEP: {0, 6, 12}},
+                True,
+            ),
+            # (
+            #     lf("anemoi_source_ensemble_output"),
+            #     lf("anemoi_source_ensemble_action"),
+            #     {PARAM: {"2t", "msl"}, TYPE: {"em"}, STEP: set(range(1, 25))},
+            #     False,
+            # ),
+        ],
+    )
+    def test_compile(
         self,
-        operational_forecast_source_output: QubedOutput,
-        operational_forecast_source_action: Action,
         ensemble_statistics_configuration: BlockInstance,
+        forecast_output: QubedOutput,
+        source_action: Action,
+        expected: dict[str, set[Any]],
+        identical_qubes: bool,
     ) -> None:
         block = EnsembleStatistics()
-        output = block.validate(
-            block=ensemble_statistics_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={}
-        )  # type: ignore[dict-item]
+        output = block.validate(block=ensemble_statistics_configuration, inputs={"dataset": forecast_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(
-            inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
+            inputs={BlockInstanceId("source_output"): source_action},
             block=ensemble_statistics_configuration,
         ).get_or_raise()
         requests = nodetree.datacubes(action.nodes)
         assert len(requests) == 2
-        assert set.union(*[set(req[PARAM]) for req in requests]) == {"167", "151", "131"}
-        assert set.union(*[set(req[TYPE]) for req in requests]) == {"em"}
-        assert set.union(*[set(req[STEP]) for req in requests]) == {0, 6, 12}
-        assert list(datacubes(output)) == requests
-
-    def test_anemoi_source_compile(
-        self,
-        anemoi_source_ensemble_output: QubedOutput,
-        anemoi_source_ensemble_action: Action,
-        ensemble_statistics_configuration: BlockInstance,
-    ) -> None:
-        block = EnsembleStatistics()
-        output = block.validate(block=ensemble_statistics_configuration, inputs={"dataset": anemoi_source_ensemble_output}, restrictions={})  # type: ignore[dict-item]
-        action = block.compile(
-            inputs={BlockInstanceId("source_output"): anemoi_source_ensemble_action},
-            block=ensemble_statistics_configuration,
-        ).get_or_raise()
-        requests = nodetree.datacubes(action.nodes)
-        assert len(requests) == 1
-        assert set.union(*[set(req[PARAM]) for req in requests]) == {"2t", "msl"}
-        assert set.union(*[set(req[TYPE]) for req in requests]) == {"em"}
-        assert set.union(*[set(req[STEP]) for req in requests]) == set(range(1, 25))
-        # TODO: Re-enable when AnemoiSource validate and compile outputs match
-        # assert list(datacubes(output)) == requests
+        for dim, values in expected.items():
+            assert set.union(*[set(req[dim]) for req in requests]) == values
+        if identical_qubes:
+            assert list(datacubes(output)) == requests
 
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):
@@ -200,25 +195,30 @@ class TestEnsembleStatistics:
 
 
 class TestPredefinedThresholdProb:
-    def test_from_operational_forecast_source(
-        self, predefined_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
+    @pytest.mark.parametrize(
+        "forecast_output, expected",
+        [
+            (lf("operational_forecast_source_output"), {"param": {"131073"}, "type": {"ep"}, "step": {12}, "levtype": {"sfc"}}),
+            # (lf("anemoi_source_ensemble_output"), {"param": {"131073"}, "type": {"ep"}, "step": {12}, "levtype": {"sfc"}}),
+        ],
+    )
+    def test_from_forecast_source(
+        self, predefined_threshold_prob_configuration: BlockInstance, forecast_output: QubedOutput, expected: dict[str, set[Any]]
     ) -> None:
         block = PredefinedThresholdProbability()
 
-        assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
+        assert block.intersect(other=forecast_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=predefined_threshold_prob_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            inputs={"dataset": forecast_output},  # type: ignore[dict-item],
             restrictions={},
         )
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         assert contains(output, PARAM)
         output_axes = axes(output)
-        assert output_axes[PARAM] == {"131073"}
-        assert output_axes[TYPE] == {"ep"}
-        assert output_axes[STEP] == {12}
-        assert output_axes[LEVTYPE] == {"sfc"}
+        for dim, values in expected.items():
+            assert output_axes[dim] == values
 
     def test_intersect(self, dummy_blockinstance: BlockInstance) -> None:
         oper_output = cast(QubedOutput, OperationalForecastSource().validate(block=dummy_blockinstance, inputs={}, restrictions={}))
@@ -240,26 +240,44 @@ class TestPredefinedThresholdProb:
         )
         assert restrictions[PARAM].serialize() == f"enumClosed[str]('{_param_id_to_param_key('131073')}')"
 
+    @pytest.mark.parametrize(
+        "forecast_output, source_action, expected, identical_qubes",
+        [
+            (
+                lf("operational_forecast_source_output"),
+                lf("operational_forecast_source_action"),
+                {PARAM: ["131073"], TYPE: ["ep"], STEP: [12], LEVTYPE: ["sfc"]},
+                True,
+            ),
+            # (
+            #     lf("anemoi_source_ensemble_output"),
+            #     lf("anemoi_source_ensemble_action"),
+            #     {PARAM: ["131073"], TYPE: ["ep"], STEP: [12], LEVTYPE: ["sfc"]},
+            #     False,
+            # ),
+        ],
+    )
     def test_compile(
         self,
-        operational_forecast_source_output: QubedOutput,
-        operational_forecast_source_action: Action,
+        forecast_output: QubedOutput,
+        source_action: Action,
         predefined_threshold_prob_configuration: BlockInstance,
+        expected: dict[str, set[Any]],
+        identical_qubes: bool,
     ) -> None:
         block = PredefinedThresholdProbability()
-        output = block.validate(
-            block=predefined_threshold_prob_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={}
-        )  # type: ignore[dict-item]
+        output = block.validate(block=predefined_threshold_prob_configuration, inputs={"dataset": forecast_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(
-            inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
+            inputs={BlockInstanceId("source_output"): source_action},
             block=predefined_threshold_prob_configuration,
         ).get_or_raise()
         requests = nodetree.datacubes(action.nodes)
         assert len(requests) == 1
         assert "class" in requests[0]
-        for dim, value in {PARAM: ["131073"], TYPE: ["ep"], STEP: [12]}.items():
+        for dim, value in expected.items():
             assert requests[0][dim] == value
-        assert list(datacubes(output)) == requests
+        if identical_qubes:
+            assert list(datacubes(output)) == requests
 
     def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
         for expansion in plugin().expander(threshold_probability_output):
@@ -270,15 +288,20 @@ class TestCustomThresholdProb:
     def test_catalogue_value_type_is_canonical(self) -> None:
         assert CustomThresholdProbability.configuration_options[COMPARISON].value_type.serialize() == "enumClosed[str]('>=','<=','>','<')"
 
-    def test_from_operational_forecast_source(
-        self, custom_threshold_prob_configuration: BlockInstance, operational_forecast_source_output: QubedOutput
-    ) -> None:
+    @pytest.mark.parametrize(
+        "forecast_output",
+        [
+            lf("operational_forecast_source_output"),
+            # lf("anemoi_source_ensemble_output"),
+        ],
+    )
+    def test_from_forecast_source(self, forecast_output: QubedOutput, custom_threshold_prob_configuration: BlockInstance) -> None:
         block = CustomThresholdProbability()
 
-        assert block.intersect(other=operational_forecast_source_output)  # type: ignore[arg-type]
+        assert block.intersect(other=forecast_output)  # type: ignore[arg-type]
         output = block.validate(  # type: ignore[assignment]
             block=custom_threshold_prob_configuration,
-            inputs={"dataset": operational_forecast_source_output},  # type: ignore[dict-item],
+            inputs={"dataset": forecast_output},  # type: ignore[dict-item],
             restrictions={},
         )
         assert isinstance(output, QubedOutput)
@@ -289,37 +312,35 @@ class TestCustomThresholdProb:
         assert output_axes[TYPE] == {"ep"}
         assert len(output_axes[STEP]) > 0
 
-    def test_from_anemoi_source_ensemble(
-        self, custom_threshold_prob_configuration: BlockInstance, anemoi_source_ensemble_output: QubedOutput
-    ) -> None:
-        block = CustomThresholdProbability()
-
-        assert block.intersect(other=anemoi_source_ensemble_output)  # type: ignore[arg-type]
-        output = block.validate(  # type: ignore[assignment]
-            block=custom_threshold_prob_configuration,
-            inputs={"dataset": anemoi_source_ensemble_output},  # type: ignore[dict-item],
-            restrictions={},
-        )
-        assert isinstance(output, QubedOutput)
-        assert output.dataqube is not None
-        assert contains(output, PARAM)
-        output_axes = axes(output)
-        assert len(output_axes[PARAM]) == 2
-        assert output_axes[TYPE] == {"ep"}
-        assert len(output_axes[STEP]) > 0
-
-    def test_operational_forecast_compile(
+    @pytest.mark.parametrize(
+        "forecast_output, source_action, expected_params, identical_qubes",
+        [
+            (
+                lf("operational_forecast_source_output"),
+                lf("operational_forecast_source_action"),
+                {"167", "151", "131"},
+                True,
+            ),
+            # (
+            #     lf("anemoi_source_ensemble_output"),
+            #     lf("anemoi_source_ensemble_action"),
+            #     {"2t", "msl"},
+            #     False,
+            # )
+        ],
+    )
+    def test_compile(
         self,
-        operational_forecast_source_output: QubedOutput,
-        operational_forecast_source_action: Action,
+        forecast_output: QubedOutput,
+        source_action: Action,
         custom_threshold_prob_configuration: BlockInstance,
+        expected_params: set[str],
+        identical_qubes: bool,
     ) -> None:
         block = CustomThresholdProbability()
-        output = block.validate(
-            block=custom_threshold_prob_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={}
-        )  # type: ignore[dict-item]
+        output = block.validate(block=custom_threshold_prob_configuration, inputs={"dataset": forecast_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(
-            inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
+            inputs={BlockInstanceId("source_output"): source_action},
             block=custom_threshold_prob_configuration,
         ).get_or_raise()
         requests = nodetree.datacubes(action.nodes)
@@ -328,32 +349,9 @@ class TestCustomThresholdProb:
             assert THRESHOLD not in request
             assert COMPARISON not in request
             assert request[TYPE] == ["ep"]
-            assert set.isdisjoint(set(request[PARAM]), {"131", "151", "167"}) is False
-        assert list(datacubes(output)) == requests
-
-    def test_anemoi_source__compile(
-        self,
-        anemoi_source_ensemble_output: QubedOutput,
-        anemoi_source_ensemble_action: Action,
-        custom_threshold_prob_configuration: BlockInstance,
-    ) -> None:
-        block = CustomThresholdProbability()
-        output = block.validate(
-            block=custom_threshold_prob_configuration, inputs={"dataset": anemoi_source_ensemble_output}, restrictions={}
-        )  # type: ignore[dict-item]
-        action = block.compile(
-            inputs={BlockInstanceId("source_output"): anemoi_source_ensemble_action},
-            block=custom_threshold_prob_configuration,
-        ).get_or_raise()
-        requests = nodetree.datacubes(action.nodes)
-        assert len(requests) == 1
-        for request in requests:
-            assert THRESHOLD not in request
-            assert COMPARISON not in request
-            assert request[TYPE] == ["ep"]
-            assert set.isdisjoint(set(request[PARAM]), {"2t", "msl"}) is False
-        # TODO: Re-enable when AnemoiSource validate and compile outputs match
-        # assert list(datacubes(output)) == requests
+            assert set.isdisjoint(set(request[PARAM]), expected_params) is False
+        if identical_qubes:
+            assert list(datacubes(output)) == requests
 
     def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
         for expansion in plugin().expander(threshold_probability_output):
@@ -362,6 +360,13 @@ class TestCustomThresholdProb:
 
 class TestThermalIndices:
     @pytest.mark.parametrize(
+        "forecast_output",
+        [
+            lf("full_operational_forecast_source_output"),
+            # lf("anemoi_source_ensemble_output"),
+        ],
+    )
+    @pytest.mark.parametrize(
         "oper_selection",
         [
             {ENSEMBLE: [0], STEP: [0, 6, 12]},
@@ -369,14 +374,14 @@ class TestThermalIndices:
         ],
         ids=["single", "ensemble"],
     )
-    def test_from_operational_forecast_source(
+    def test_from_forecast_source(
         self,
-        full_operational_forecast_source_output: QubedOutput,
+        forecast_output: QubedOutput,
         thermal_indices_configuration: BlockInstance,
         oper_selection: dict[str, list[int | str]],
     ) -> None:
         block = ThermalIndices()
-        source_output = select(full_operational_forecast_source_output, oper_selection)
+        source_output = select(forecast_output, oper_selection)
         source_axes = axes(source_output)
         if len(oper_selection[ENSEMBLE]) == 1:
             source_output = collapse(source_output, ENSEMBLE)
@@ -410,7 +415,7 @@ class TestThermalIndices:
         ],
         ids=["single", "ensemble"],
     )
-    def test_compile(
+    def test_operational_forecast_source_compile(
         self,
         mock_forecast_preset: pytest.FixtureRequest,
         dummy_blockinstance: BlockInstance,
@@ -443,6 +448,53 @@ class TestThermalIndices:
         assert len(requests) == expected
         assert all(req[PARAM] == ["260242", "261023"] for req in requests)
         assert list(datacubes(output)) == requests
+
+    @pytest.mark.parametrize(
+        "ensemble, expected",
+        [
+            [1, 1],
+            # [[1, 2, 3], 2],
+        ],
+        ids=["single"],
+    )
+    def test_anemoi_source_compile(
+        self,
+        dummy_checkpoint: CompositeArtifactId,
+        anemoi_source_ensemble_output: QubedOutput,
+        thermal_indices_configuration: BlockInstance,
+        ensemble: list[int],
+        expected: int,
+    ) -> None:
+        block_instance = BlockInstance.from_block(
+            BlockFactoryId("anemoiSource"),
+            BlockInstanceBase(
+                input_ids={},
+                configuration_values={
+                    CHECKPOINT: dummy_checkpoint,
+                    INPUT_SOURCE: "opendata",
+                    LEAD_TIME: 24,
+                    BASE_TIME: datetime(2024, 1, 1),
+                    ENSEMBLE: ensemble,
+                },
+            ),
+            AnemoiSource.configuration_options,
+        )
+        source_action = AnemoiSource().compile(inputs={}, block=block_instance).get_or_raise()
+        if ensemble == 1:
+            anemoi_source_ensemble_output = coxpand(anemoi_source_ensemble_output, ENSEMBLE, {ENSEMBLE: [1]})
+
+        block = ThermalIndices()
+        output = block.validate(block=thermal_indices_configuration, inputs={"dataset": anemoi_source_ensemble_output}, restrictions={})  # type: ignore[dict-item]
+
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): source_action},
+            block=thermal_indices_configuration,
+        ).get_or_raise()
+        requests = nodetree.datacubes(action.nodes)
+        assert len(requests) == expected
+        assert all(req[PARAM] == ["260242", "261023"] for req in requests)
+        for index, cube in enumerate(datacubes(output)):
+            assert all(cube[dim] == requests[index][dim] for dim in cube)
 
     @pytest.mark.parametrize(
         "param_config, expected_steps",

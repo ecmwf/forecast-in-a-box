@@ -4,6 +4,9 @@
 #    "earthkit-workflows-anemoi",
 #    "qubed",
 #    "anemoi-inference",
+#    "metkitlib",
+#    "pymetkit",
+#    "qubed",
 #    "fire",
 # ]
 # ///
@@ -37,6 +40,9 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
     variables_metadata = metadata.typed_variables
 
     from earthkit.workflows.plugins.anemoi.utils import _expansion_qube
+    from pymetkit import ParamDB
+    from qubed import Qube
+    from qubed.value_types import QEnum
 
     in_variables = metadata.select_variables(include=["prognostic", "forcing", "constant"], has_mars_requests=False)
     out_variables = metadata.select_variables(include=["diagnostic", "prognostic"], has_mars_requests=False)
@@ -44,7 +50,15 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
 
     in_qube = _expansion_qube(in_variables, variables_metadata, model_step, 6).remove_by_key("step")
     out_qube = _expansion_qube(out_variables, variables_metadata, model_step, 6).remove_by_key("step")
+    out_qube.to_json()
 
+    def _shortname_to_param_id(node: Qube) -> None:
+        if node.key == "param":
+            paramdb = ParamDB()
+            new_values = [str(paramdb.shortname_to_param_id(x, context={"class": "ai"}, access="dissemination")) for x in node.values]
+            node.values = QEnum(new_values)
+
+    out_qube.walk(_shortname_to_param_id)
     return {"input_qube": in_qube.to_json(), "output_qube": out_qube.to_json()}
 
 
