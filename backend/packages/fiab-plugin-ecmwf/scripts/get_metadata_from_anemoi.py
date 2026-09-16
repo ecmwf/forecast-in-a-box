@@ -24,7 +24,7 @@ from typing import Any
 
 from qubed import Qube
 
-extra_output_keys = {"class": ["ai"], "type": ["fc"], "stream": ["oper"]}
+extra_output_keys = {"class": "ai", "type": "fc", "stream": "oper"}
 
 
 @lru_cache(maxsize=None)

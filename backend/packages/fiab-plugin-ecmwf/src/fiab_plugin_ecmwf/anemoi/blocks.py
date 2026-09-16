@@ -189,7 +189,7 @@ class AnemoiBaseBlock:
         qubed_output = checkpoint.combine_if_nested_qube(checkpoint.get_model_output(lead_time))
 
         # Ensure alignment in output qube and action metadata
-        qubed_output = expand(qubed_output, checkpoint.extra_output_keys)
+        qubed_output = expand(qubed_output, {key: [value] for key, value in checkpoint.extra_output_keys.items()})
 
         if checkpoint.is_ensemble_model is False:
             return QubedOutput(dataqube=qubed_output)
