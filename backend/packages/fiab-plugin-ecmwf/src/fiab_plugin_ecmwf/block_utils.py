@@ -1,5 +1,5 @@
-from typing import Any
 import functools
+from typing import Any
 
 from fiab_core.fable import ConfigurationOptionId, QubedOutput
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
@@ -10,6 +10,7 @@ BASE_TIME = ConfigurationOptionId("base_time")
 CHECKPOINT = ConfigurationOptionId("checkpoint")
 COMPARISON = ConfigurationOptionId("comparison")
 DIMENSION = ConfigurationOptionId("dimension")
+DATE = ConfigurationOptionId("date")
 DOMAIN = ConfigurationOptionId("domain")
 ENSEMBLE = ConfigurationOptionId("number")
 FORECAST = ConfigurationOptionId("forecast")
@@ -26,6 +27,7 @@ SPLITBY = ConfigurationOptionId("splitby")
 STATISTIC = ConfigurationOptionId("statistic")
 STEP = ConfigurationOptionId("step")
 THRESHOLD = ConfigurationOptionId("threshold")
+TIME = ConfigurationOptionId("time")
 TYPE = ConfigurationOptionId("type")
 VALUES = ConfigurationOptionId("values")
 

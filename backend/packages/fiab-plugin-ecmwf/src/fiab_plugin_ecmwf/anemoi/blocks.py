@@ -27,16 +27,18 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
 from fiab_core.tools.validators import positive
-from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
+from fiab_core.types import ClosedEnumType, DatetimeType, IntType, ListType, OpenEnumType
 
-from fiab_plugin_ecmwf.environments import mars_dependencies
 from fiab_plugin_ecmwf.block_utils import (
     BASE_TIME,
     CHECKPOINT,
+    DATE,
     ENSEMBLE,
     INPUT_SOURCE,
     LEAD_TIME,
+    TIME,
 )
+from fiab_plugin_ecmwf.environments import mars_dependencies
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
 from .utils import (
@@ -165,7 +167,14 @@ class AnemoiBaseBlock:
             return QubedOutput(dataqube=qubed_input)
 
         if base_time is not None:
-            qubed_input = expand(qubed_input, {BASE_TIME: [strip_timezone(base_time)]})
+            datetime = strip_timezone(base_time)
+            qubed_input = expand(
+                qubed_input,
+                {
+                    DATE: [datetime.date().strftime("%Y%m%d")],
+                    TIME: [datetime.time().strftime("%H%M")],
+                },
+            )
 
         if isinstance(ensemble_members, int) and ensemble_members > 1:
             qubed_input = expand(qubed_input, {ENSEMBLE: [ensemble_members]})
@@ -186,7 +195,14 @@ class AnemoiBaseBlock:
             return QubedOutput(dataqube=qubed_output)
 
         if base_time is not None:
-            qubed_output = expand(qubed_output, {BASE_TIME: [strip_timezone(base_time)]})
+            datetime = strip_timezone(base_time)
+            qubed_output = expand(
+                qubed_output,
+                {
+                    DATE: [datetime.date().strftime("%Y%m%d")],
+                    TIME: [datetime.time().strftime("%H%M")],
+                },
+            )
 
         if isinstance(ensemble_members, int) and ensemble_members > 1:
             qubed_output = expand(qubed_output, {ENSEMBLE: [ensemble_members]})
@@ -254,11 +270,19 @@ class AnemoiSource(Source, AnemoiBaseBlock):
         input_source = block.config_as_str(INPUT_SOURCE)
         builder = AnemoiBuilder(block.config_as_artifactid(CHECKPOINT))
 
+        datetime = strip_timezone(block.config_as_datetime(BASE_TIME))
         action = builder.from_input(
             input_source=input_source,
             lead_time=block.config_as_int(LEAD_TIME, validator=positive),
-            date=strip_timezone(block.config_as_datetime(BASE_TIME)),
+            date=datetime,
             ensemble=block.config_as_int(ENSEMBLE, validator=positive),
+        )
+        action.set_scalar_coords(
+            {
+                DATE: datetime.date().strftime("%Y%m%d"),
+                TIME: datetime.time().strftime("%H%M"),
+            },
+            override=True,
         )
         return Either.ok(action)
 
@@ -311,12 +335,19 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
 
         builder = AnemoiBuilder(block.config_as_artifactid(CHECKPOINT))
 
+        base_time = strip_timezone(block.config_as_datetime(BASE_TIME))
         action = builder.get_initial_conditions(
             input_source=block.config_as_str(INPUT_SOURCE),
-            date=strip_timezone(block.config_as_datetime(BASE_TIME)),
+            date=base_time,
             ensemble=block.config_as_int(ENSEMBLE, validator=positive),
         )
-
+        action.set_scalar_coords(
+            {
+                DATE: base_time.date().strftime("%Y%m%d"),
+                TIME: base_time.time().strftime("%H%M"),
+            },
+            override=True,
+        )
         return Either.ok(action)
 
 
@@ -354,7 +385,9 @@ class AnemoiTransform(Transform, AnemoiBaseBlock):
 
         input_dataset = inputs["initial conditions"]
         ensemble_members = axes(input_dataset).get(ENSEMBLE, 0)
-        base_time = list(axes(input_dataset).get(BASE_TIME, set()))[0]
+        date = list(axes(input_dataset).get(DATE, set()))[0]
+        time = list(axes(input_dataset).get(TIME, set()))[0]
+        base_time = datetime.strptime(f"{date}{time}", "%Y%m%d%H%M")
 
         self.validate_lead_time(checkpoint, lead_time)
         self.validate_ensemble(checkpoint, ensemble_members)
