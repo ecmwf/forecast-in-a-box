@@ -41,7 +41,8 @@ function useCollectDownloads() {
   const prevKeysRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    const { tasks, addTask, updateTask } = useActivityStore.getState()
+    const { tasks, dismissed, addTask, updateTask, forgetDismissed } =
+      useActivityStore.getState()
     const currentKeys = new Set(Object.keys(downloads))
 
     // Build a name lookup from the artifacts list
@@ -63,7 +64,7 @@ function useCollectDownloads() {
       const existing = tasks[id]
       if (existing) {
         updateTask(id, { progress, description })
-      } else {
+      } else if (!dismissed[id]) {
         addTask({
           id,
           type: 'download',
@@ -82,16 +83,32 @@ function useCollectDownloads() {
       if (!currentKeys.has(key)) {
         const id = `download:${key}`
         const task = tasks[id]
+        const done = {
+          status: 'completed' as const,
+          description: i18n.t('common:activity.downloadComplete'),
+          progress: 100,
+          completedAt: Date.now(),
+        }
         if (task && task.status === 'active') {
-          updateTask(id, {
-            status: 'completed',
-            description: i18n.t('common:activity.downloadComplete'),
-            progress: 100,
-            completedAt: Date.now(),
+          updateTask(id, done)
+        } else if (dismissed[id]) {
+          // Dismissed while running; the outcome is still news.
+          addTask({
+            id,
+            type: 'download',
+            label: nameByKey.get(key) ?? key.replace('--', '/'),
+            startedAt: Date.now(),
+            navigateTo: '/admin/artifacts',
+            ...done,
           })
         }
       }
     }
+
+    const stale = Object.keys(dismissed).filter(
+      (id) => id.startsWith('download:') && !currentKeys.has(id.slice(9)),
+    )
+    if (stale.length > 0) forgetDismissed(stale)
 
     prevKeysRef.current = currentKeys
   }, [downloads, artifacts])
@@ -106,7 +123,8 @@ function useCollectJobs() {
 
   useEffect(() => {
     if (!runs) return
-    const { tasks, addTask, updateTask } = useActivityStore.getState()
+    const { tasks, dismissed, addTask, updateTask, forgetDismissed } =
+      useActivityStore.getState()
 
     for (const job of runs) {
       const id = `job:${job.run_id}`
@@ -114,26 +132,30 @@ function useCollectJobs() {
         id: job.run_id.slice(0, 8),
       })
       const isTerminal = isTerminalStatus(job.status)
+      const outcome = {
+        status:
+          job.status === 'completed'
+            ? ('completed' as const)
+            : ('failed' as const),
+        description:
+          job.status === 'completed'
+            ? i18n.t('common:activity.jobCompleted')
+            : i18n.t('common:activity.jobFailed', {
+                error: job.error ?? i18n.t('common:activity.unknownError'),
+              }),
+        completedAt: Date.now(),
+      }
 
       const existingTask = tasks[id]
       if (existingTask) {
         // Update existing
         if (isTerminal && existingTask.status === 'active') {
-          updateTask(id, {
-            status: job.status === 'completed' ? 'completed' : 'failed',
-            description:
-              job.status === 'completed'
-                ? i18n.t('common:activity.jobCompleted')
-                : i18n.t('common:activity.jobFailed', {
-                    error: job.error ?? i18n.t('common:activity.unknownError'),
-                  }),
-            completedAt: Date.now(),
-          })
+          updateTask(id, outcome)
         } else if (!isTerminal) {
           updateTask(id, { description: capitalize(job.status) })
         }
-      } else if (!isTerminal) {
-        // Add new active job (only if not already added by SubmitRunDialog)
+      } else if (isTerminal ? dismissed[id] : !dismissed[id]) {
+        // New active job (unless dismissed), or a dismissed one that finished.
         addTask({
           id,
           type: 'job',
@@ -142,16 +164,25 @@ function useCollectJobs() {
           status: 'active',
           startedAt: serverTimeToLocal(job.created_at).getTime(),
           navigateTo: `/execute/${job.run_id}`,
+          ...(isTerminal && outcome),
         })
       }
     }
+
+    // Runs that left the recent window cannot come back; drop their dismissals.
+    const live = new Set(runs.map((job) => `job:${job.run_id}`))
+    const stale = Object.keys(dismissed).filter(
+      (id) => id.startsWith('job:') && !live.has(id),
+    )
+    if (stale.length > 0) forgetDismissed(stale)
   }, [runs, serverTimeToLocal])
 }
 
 /**
  * Mount this hook once in the app shell to collect activity from all sources.
  * Completed/failed entries remain in the Notification Center until the user
- * dismisses them (individually or via "Clear").
+ * dismisses them (individually or via "Clear"). A dismissed active task stays
+ * hidden until it finishes, then reappears once with its outcome.
  */
 export function useActivityCollector() {
   useCollectDownloads()
