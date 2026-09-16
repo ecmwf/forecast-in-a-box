@@ -20,6 +20,9 @@ import importlib
 import inspect
 import logging
 import pkgutil
+from collections.abc import Callable
+from concurrent.futures import Future
+from typing import TypeVar
 
 from fiab_core.artifacts import ArtifactsProvider
 
@@ -34,7 +37,7 @@ from forecastbox.domain.lens.proxy import aclose_client as aclose_lens_proxy_cli
 from forecastbox.domain.notification.service import init_broadcaster
 from forecastbox.domain.plugin.store import submit_initialize_stores
 from forecastbox.domain.plugin.submit import submit_load_all as submit_load_plugins
-from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.concurrency.manager import ConcurrentPools, TaskName, execution_manager
 from forecastbox.utility.config import ConcurrentThreads, config
 from forecastbox.utility.dispatcher import (
     DispatcherRegistration,
@@ -52,6 +55,8 @@ from forecastbox.utility.initializer import Initializer, Initializers
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
 logger = logging.getLogger(__name__)
+
+_T = TypeVar("_T")
 
 
 async def start_db_schema() -> None:
@@ -142,19 +147,72 @@ def start_artifact_provider() -> None:
     ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path))
 
 
-def _start_artifact_manager_plugin_catalog() -> None:
-    # TODO -- split in two, but there is a dependency between them!
+# The two barriers below let independent `Initializer` steps be gated on one another
+# without coupling their domain functions together (see `submit_load_all`, which is
+# unaware that its `start_after` future ultimately traces back to the artifact catalog
+# refresh, and `start_scheduler`, which is unaware of the plugin catalog at all).
+#
+# Each barrier is acked with the *same outcome* as the upstream step it is attached to,
+# via `_forward_to_barrier`: a successful upstream resolves the barrier with `None`, a
+# failed (or cancelled) upstream resolves the barrier with that same failure. This way,
+# a step gated on a barrier observes a failure early (and can choose to log-and-skip, as
+# `start_scheduler` does) rather than blocking forever or failing later on some
+# unrelated `None` value.
+#
+# TODO rework into better alignment with execution manager / initializers after concurrency migration concluded
+ArtifactsCatalogInitialized: Future[None] = Future()
+PluginsCatalogInitialized: Future[None] = Future()
+
+
+def _forward_to_barrier(barrier: Future[None]) -> Callable[[Future[_T]], None]:
+    """Build a done-callback that forwards the outcome of the future it is attached to
+    onto ``barrier`` (success, failure, or cancellation alike). Intended to be cheap and
+    non-blocking, so it can run on whichever thread completes the upstream future.
+    """
+
+    def _forward(done: Future[_T]) -> None:
+        if barrier.done():
+            return
+        if done.cancelled():
+            barrier.cancel()
+            return
+        error = done.exception()
+        if error is not None:
+            barrier.set_exception(error)
+        else:
+            barrier.set_result(None)
+
+    return _forward
+
+
+def _start_artifact_manager() -> None:
     catalog_ready = submit_refresh_catalog()
-    submit_load_plugins(start_after=catalog_ready)
+    catalog_ready.add_done_callback(_forward_to_barrier(ArtifactsCatalogInitialized))
 
 
-def _stop_artifact_manager_plugin_catalog() -> None:
+def _stop_artifact_manager() -> None:
     join_artifact_manager(timeout_sec=10)
 
 
+def _start_plugin_catalog() -> None:
+    # TODO consider introducing some 'AwaitOther' pool with high capacity
+    artifacts_ready = execution_manager.submit_unmonitored(
+        ConcurrentPools.General,
+        TaskName("plugin.await-artifacts-catalog"),
+        ArtifactsCatalogInitialized.result,
+    )
+    plugins_ready = submit_load_plugins(start_after=artifacts_ready)
+    plugins_ready.add_done_callback(_forward_to_barrier(PluginsCatalogInitialized))
+
+
 def _start_scheduler() -> None:
-    # TODO delay the start until plugins are ready
-    start_scheduler()
+    # TODO consider introducing some 'AwaitOther' pool with high capacity
+    plugins_ready = execution_manager.submit_unmonitored(
+        ConcurrentPools.General,
+        TaskName("scheduler.await-plugins-catalog"),
+        PluginsCatalogInitialized.result,
+    )
+    plugins_ready.add_done_callback(start_scheduler)
 
 
 def _stop_scheduler() -> None:
@@ -189,11 +247,8 @@ def build_initializers() -> Initializers:
         Initializer("broadcaster", start=_start_broadcaster),
         Initializer("artifact_stores", start=_start_artifact_stores),
         Initializer("artifact_provider", start=start_artifact_provider),
-        Initializer(
-            "artifact_manager_plugin_catalog",
-            start=_start_artifact_manager_plugin_catalog,
-            stop=_stop_artifact_manager_plugin_catalog,
-        ),
+        Initializer("artifact_manager", start=_start_artifact_manager, stop=_stop_artifact_manager),
+        Initializer("plugin_catalog", start=_start_plugin_catalog),
     ]
     if config.backend.allow_scheduler:
         initializers.append(Initializer("scheduler", start=_start_scheduler, stop=_stop_scheduler))
