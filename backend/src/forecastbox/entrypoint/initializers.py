@@ -56,8 +56,6 @@ from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
 logger = logging.getLogger(__name__)
 
-_T = TypeVar("_T")
-
 
 async def start_db_schema() -> None:
     """Create db tables declared by every `forecastbox.schemata` submodule.
@@ -160,8 +158,11 @@ def start_artifact_provider() -> None:
 # unrelated `None` value.
 #
 # TODO rework into better alignment with execution manager / initializers after concurrency migration concluded
+# TODO we submit these futures via General pool, which may block it -- consider instead some AwaitOther
+# pool with high capacity to accomodate these no-consumption-long-duration tasks, to not livelock the pool
 ArtifactsCatalogInitialized: Future[None] = Future()
 PluginsCatalogInitialized: Future[None] = Future()
+_T = TypeVar("_T")
 
 
 def _forward_to_barrier(barrier: Future[None]) -> Callable[[Future[_T]], None]:
@@ -195,7 +196,6 @@ def _stop_artifact_manager() -> None:
 
 
 def _start_plugin_catalog() -> None:
-    # TODO consider introducing some 'AwaitOther' pool with high capacity
     artifacts_ready = execution_manager.submit_unmonitored(
         ConcurrentPools.General,
         TaskName("plugin.await-artifacts-catalog"),
@@ -206,7 +206,6 @@ def _start_plugin_catalog() -> None:
 
 
 def _start_scheduler() -> None:
-    # TODO consider introducing some 'AwaitOther' pool with high capacity
     plugins_ready = execution_manager.submit_unmonitored(
         ConcurrentPools.General,
         TaskName("scheduler.await-plugins-catalog"),

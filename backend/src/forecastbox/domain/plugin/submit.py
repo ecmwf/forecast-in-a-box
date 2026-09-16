@@ -114,9 +114,7 @@ def submit_load_all(start_after: Future[None]) -> Future[None]:
 
     Returns a `Future` that resolves once the load has completed (or, if the
     reservation was refused or ``start_after`` failed, resolves with that failure
-    instead) -- so callers gating further startup steps on this operation observe
-    the same outcome, rather than an unrelated `None`.
-    """
+    instead)."""
     result = reserve_operation()
     if not result.accepted:
         logger.error(f"failed to submit load_plugins: {result.reason}")

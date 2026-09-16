@@ -166,7 +166,7 @@ def start_scheduler(start_after: Future[None] | None = None) -> None:
 
     This is a stand-in until the scheduler is migrated onto `ExecutionManager` like the
     plugin machinery already is; called with no argument (eg. from the scheduler restart
-    route), it starts immediately, exactly as before.
+    route), it starts immediately.
     """
     if start_after is not None:
         try:

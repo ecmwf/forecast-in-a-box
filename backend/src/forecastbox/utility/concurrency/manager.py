@@ -598,10 +598,7 @@ class ExecutionManager:
 
         If ``dependency`` fails (or is cancelled) and ``run_if_dependency_failed`` is
         False (the default), ``task`` is never submitted, and the returned future is
-        resolved with that same failure -- so callers that chain further work off the
-        returned future observe the failure immediately, instead of e.g. blocking
-        forever or failing later on some unrelated `None` value.
-        """
+        resolved with that same failure."""
         result_future: Future[T] = Future()
 
         def continue_submission(done: Future[Any]) -> None:
