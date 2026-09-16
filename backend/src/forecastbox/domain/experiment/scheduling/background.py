@@ -14,6 +14,7 @@ Runs in its own thread.
 import datetime as dt
 import logging
 import threading
+from concurrent.futures import Future
 
 from forecastbox.domain.experiment.scheduling import db
 from forecastbox.domain.experiment.scheduling.job_utils import experiment2runnable
@@ -154,7 +155,25 @@ class Globals:
     scheduler: SchedulerThread | None = None
 
 
-def start_scheduler() -> None:
+def start_scheduler(start_after: Future[None] | None = None) -> None:
+    """Start the scheduler thread.
+
+    ``start_after``, if given, gates the actual start on some prerequisite (eg. plugins
+    having finished loading): if it is not yet resolved, this call blocks until it is;
+    if it resolved with a failure (or was cancelled), the start is aborted -- logged as
+    critical, but not raised -- since a failed prerequisite elsewhere should not itself
+    take down the scheduler startup path.
+
+    This is a stand-in until the scheduler is migrated onto `ExecutionManager` like the
+    plugin machinery already is; called with no argument (eg. from the scheduler restart
+    route), it starts immediately.
+    """
+    if start_after is not None:
+        try:
+            start_after.result()
+        except BaseException as error:
+            logger.critical(f"scheduler start aborted, prerequisite failed with {repr(error)}")
+            return
     with timed_acquire(scheduler_lock, timeout_acquire_lifecycle) as acquired:
         if not acquired:
             raise ValueError("Could not acquire scheduler_lock within timeout during start")

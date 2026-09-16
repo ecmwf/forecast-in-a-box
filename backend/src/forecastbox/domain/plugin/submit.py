@@ -109,13 +109,19 @@ def _run_load_all(plugins: PluginsSettings) -> None:
     _run_managed("Initial plugin load", partial(_load_plugins, plugins))
 
 
-def submit_load_all(start_after: Future[None]) -> None:
-    """Reserve and submit the initial load-all-plugins operation"""
+def submit_load_all(start_after: Future[None]) -> Future[None]:
+    """Reserve and submit the initial load-all-plugins operation.
+
+    Returns a `Future` that resolves once the load has completed (or, if the
+    reservation was refused or ``start_after`` failed, resolves with that failure
+    instead)."""
     result = reserve_operation()
     if not result.accepted:
         logger.error(f"failed to submit load_plugins: {result.reason}")
         finish_with_error(f"failed to submit load_plugins: {result.reason}")
-        return
+        failed: Future[None] = Future()
+        failed.set_exception(RuntimeError(f"failed to submit load_plugins: {result.reason}"))
+        return failed
 
     def _record_dependency_failure(done: Future[None]) -> None:
         # NOTE this is just a rollback -- we reserve prior to submit, but the callable
@@ -127,7 +133,7 @@ def submit_load_all(start_after: Future[None]) -> None:
             finish_with_error(f"catalog refresh dependency failed: {repr(error)}")
 
     start_after.add_done_callback(_record_dependency_failure)
-    execution_manager.submit_after(
+    return execution_manager.submit_after(
         start_after,
         ConcurrentPools.PluginManagement,
         TaskName("plugin.initial-load"),
