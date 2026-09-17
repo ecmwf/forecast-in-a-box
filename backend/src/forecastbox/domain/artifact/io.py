@@ -136,6 +136,13 @@ def _download_artifact_local(
     artifact_path = get_artifact_local_path(composite_id, data_dir_url)
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
 
+    if checkpoint.url.startswith("file://"):
+        file_path = Path(urllib.parse.urlparse(checkpoint.url).path).resolve()
+        logger.info(f"Source is a local file - copying from {file_path} to {artifact_path}")
+        shutil.copy(file_path, str(artifact_path))
+        logger.info(f"Successfully copied artifact {composite_id} to {artifact_path}")
+        return
+
     temp_file = tempfile.NamedTemporaryFile(prefix="artifact_", suffix=".ckpt", delete=False)
     temp_path = Path(temp_file.name)
     temp_file.close()
