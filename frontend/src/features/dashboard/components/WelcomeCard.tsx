@@ -34,7 +34,7 @@ import type { ReactNode } from 'react'
 import type { TrafficLightStatus } from '@/types/status.types'
 import { useArtifacts } from '@/api/hooks/useArtifacts'
 import { useStatus } from '@/api/hooks/useStatus'
-import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
+import { RUN_WINDOW, useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { Card, CardContent } from '@/components/ui/card'
@@ -98,7 +98,7 @@ export function WelcomeCard({ className }: WelcomeCardProps) {
   const { serverTimeToLocal } = useServerTime()
   const {
     counts,
-    total,
+    serverTotal,
     runs,
     runningProgress,
     isLoading: isJobCountLoading,
@@ -257,11 +257,14 @@ export function WelcomeCard({ className }: WelcomeCardProps) {
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   ) : (
                     <span className="text-lg font-semibold">
-                      {total.toLocaleString()}
+                      {serverTotal.toLocaleString()}
                     </span>
                   )}
                   {!isJobCountLoading && trend !== null && (
                     <span
+                      title={t('welcome.stats.trendTitle', {
+                        window: RUN_WINDOW,
+                      })}
                       className={cn(
                         'flex items-center text-sm font-medium',
                         trend >= 0
@@ -280,7 +283,7 @@ export function WelcomeCard({ className }: WelcomeCardProps) {
                   )}
                 </>
               }
-              subtext={t('welcome.stats.thisMonth')}
+              subtext={t('welcome.stats.toDate')}
               className="cursor-pointer transition-colors hover:bg-muted/80"
             />
           </RunActivityPopover>

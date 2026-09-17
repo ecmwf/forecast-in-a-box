@@ -38,7 +38,7 @@ export function RunActivityPopover({
   side = 'bottom',
 }: RunActivityPopoverProps) {
   const { t } = useTranslation('dashboard')
-  const { runs } = useJobStatusCounts()
+  const { runs, total: windowTotal, serverTotal } = useJobStatusCounts()
   const { serverTimeToLocal } = useServerTime()
 
   const { data, recentTotal } = useMemo(() => {
@@ -95,6 +95,9 @@ export function RunActivityPopover({
     >
       <p className="mb-2 text-sm text-muted-foreground">
         {t('welcome.activity.summary', { count: recentTotal })}
+        {/* The chart only sees the polled window. */}
+        {serverTotal > windowTotal &&
+          ` ${t('welcome.activity.windowCapped', { shown: windowTotal })}`}
       </p>
 
       <Suspense
