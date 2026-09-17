@@ -31,7 +31,7 @@ import forecastbox.schemata
 from forecastbox.domain.artifact.base import get_artifact_local_path
 from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
-from forecastbox.domain.gateway.service import shutdown_processes
+from forecastbox.domain.gateway.service import ensure_gateway, launch_gateway, shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
 from forecastbox.domain.lens.proxy import aclose_client as aclose_lens_proxy_client
 from forecastbox.domain.notification.service import init_broadcaster
@@ -205,13 +205,33 @@ def _start_plugin_catalog() -> None:
     plugins_ready.add_done_callback(_forward_to_barrier(PluginsCatalogInitialized))
 
 
+GatewayInitialized: Future[None] = Future()
+
+
+def _run_gateway_startup() -> None:
+    launch_gateway()
+    ensure_gateway()
+
+
+def _start_gateway() -> None:
+    startup = execution_manager.submit_unmonitored(ConcurrentPools.General, TaskName("gateway.start"), _run_gateway_startup)
+    startup.add_done_callback(_forward_to_barrier(GatewayInitialized))
+
+
+def _await_scheduler_prereqs() -> None:
+    # NOTE if both futures failed, only the plugins failure is surfaced here -- the gateway
+    # failure was already logged via its own barrier's done-callback, so nothing is lost.
+    PluginsCatalogInitialized.result()
+    GatewayInitialized.result()
+
+
 def _start_scheduler() -> None:
-    plugins_ready = execution_manager.submit_unmonitored(
+    prereqs_ready = execution_manager.submit_unmonitored(
         ConcurrentPools.General,
-        TaskName("scheduler.await-plugins-catalog"),
-        PluginsCatalogInitialized.result,
+        TaskName("scheduler.await-prereqs"),
+        _await_scheduler_prereqs,
     )
-    plugins_ready.add_done_callback(start_scheduler)
+    prereqs_ready.add_done_callback(start_scheduler)
 
 
 def _stop_scheduler() -> None:
@@ -248,6 +268,7 @@ def build_initializers() -> Initializers:
         Initializer("artifact_provider", start=start_artifact_provider),
         Initializer("artifact_manager", start=_start_artifact_manager, stop=_stop_artifact_manager),
         Initializer("plugin_catalog", start=_start_plugin_catalog),
+        Initializer("gateway", start=_start_gateway),
     ]
     if config.backend.allow_scheduler:
         initializers.append(Initializer("scheduler", start=_start_scheduler, stop=_stop_scheduler))

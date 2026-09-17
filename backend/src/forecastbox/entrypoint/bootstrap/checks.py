@@ -8,7 +8,7 @@ import httpx
 from cascade.low.func import assert_never
 
 from forecastbox.entrypoint.bootstrap.procs import ChildProcessGroup
-from forecastbox.utility.config import ROUTE_PREFIX, FIABConfig, StatusMessage, _default_plugins
+from forecastbox.utility.config import ROUTE_PREFIX, FIABConfig, _default_plugins
 
 logger = logging.getLogger(__name__)
 
@@ -79,16 +79,10 @@ def _wait_for(client: httpx.Client, url: str, attempts: int, condition: Callable
     raise StartupError(f"failure on {url}: no more retries")
 
 
-def check_backend_ready(
-    config: FIABConfig, handles: ChildProcessGroup | None = None, attempts: int = 20, spawn_gateway: bool = True
-) -> None:
+def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup | None = None, attempts: int = 20) -> None:
     try:
         with httpx.Client() as client:
             _wait_for(client, config.backend.local_url() + f"{ROUTE_PREFIX}/status", attempts, _call_succ)
-            if spawn_gateway:
-                client.post(config.backend.local_url() + f"{ROUTE_PREFIX}/gateway/start").raise_for_status()
-            gw_check = lambda resp, _: resp.raise_for_status().text == f'"{StatusMessage.gateway_running}"'
-            _wait_for(client, config.backend.local_url() + f"{ROUTE_PREFIX}/gateway/status", attempts, gw_check)
     except StartupError as e:
         logger.error(f"failed to start the backend: {e}")
         if handles is not None:
