@@ -52,6 +52,7 @@ class _FakeSubmitJobRequest:
 class _FakeJobInstanceRich:
     jobInstance: Any
     checkpointSpec: Any
+    custom_pip_indices: Any = ()
 
 
 def _spec_with_environment(environment: EnvironmentSpecification) -> run_cascade.ExecutionSpecification:
@@ -92,6 +93,23 @@ def test_execute_cascade_uses_config_default_infra_when_unset(patch_submit_stack
     assert response == "ok"
     request = patch_submit_stack["request"]
     assert isinstance(request.job.infra_spec, _FakeSlurmCluster)
+
+
+def test_execute_cascade_passes_custom_pip_indices_to_job_instance(
+    patch_submit_stack: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        config.cascade,
+        "constraints",
+        CascadeConstraints(custom_pip_indices=("https://download.pytorch.org/whl/cu129",)),
+    )
+    monkeypatch.setattr(config.cascade, "gateway", UnmanagedGateway(gateway_type="unmanaged", cascade_url="tcp://gw"))
+
+    response = run_cascade.execute_cascade(_spec_with_environment(EnvironmentSpecification()))
+
+    assert response == "ok"
+    request = patch_submit_stack["request"]
+    assert request.job.job_instance.custom_pip_indices == ("https://download.pytorch.org/whl/cu129",)
 
 
 def test_execute_cascade_explicit_env_infra_overrides_default(patch_submit_stack: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:

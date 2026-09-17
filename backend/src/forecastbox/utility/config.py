@@ -368,6 +368,13 @@ class CascadeConstraints(FiabBaseModel):
     """Default number of workers per hosts for Cascade if unspecified in a job."""
     max_workers_per_host: int = 8
     """Max number of workers per host for Cascade."""
+    custom_pip_indices: tuple[str, ...] = ()
+    """Extra package sources used by workers when installing per-job runtime environments,
+    such as model checkpoint pip_package_constraints. Absolute filesystem paths are treated
+    as --find-links (local wheelhouse directories). All other values are treated as
+    --extra-index-url, for example a CUDA-specific PyTorch wheel index such as
+    https://download.pytorch.org/whl/cu129, which is needed to resolve torch wheels with a
+    +cuXXX local version tag (these are not published to the default PyPI index)."""
 
 
 class CascadeSettings(FiabBaseModel):

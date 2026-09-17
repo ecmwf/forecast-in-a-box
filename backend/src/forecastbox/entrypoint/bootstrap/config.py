@@ -64,7 +64,7 @@ def export_recursive(dikt: dict, delimiter: str, prefix: str) -> None:
         else:
             if isinstance(v, pydantic.SecretStr):
                 v = v.get_secret_value()
-            if isinstance(v, (list, set)):
+            if isinstance(v, (list, set, tuple)):
                 v = json.dumps(list(v))
             if v is not None:
                 os.environ[f"{prefix}{k}"] = str(v)
