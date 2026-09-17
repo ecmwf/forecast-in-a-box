@@ -158,6 +158,7 @@ def start_artifact_provider() -> None:
 # unrelated `None` value.
 #
 # TODO rework into better alignment with execution manager / initializers after concurrency migration concluded
+# In particular, we dont want to consume a thread by awaiting on a future, we want sequential task graphs
 # TODO we submit these futures via General pool, which may block it -- consider instead some AwaitOther
 # pool with high capacity to accomodate these no-consumption-long-duration tasks, to not livelock the pool
 ArtifactsCatalogInitialized: Future[None] = Future()
