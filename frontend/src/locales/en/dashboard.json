@@ -23,7 +23,8 @@
       "of": "of {{total}}",
       "downloadedModels": "Downloaded models",
       "totalForecasts": "Total runs",
-      "thisMonth": "Executed this month",
+      "toDate": "Forecast runs to date",
+      "trendTitle": "This month against last month, counted over the {{window}} most recent runs",
       "executionStatus": "Run status",
       "totalJobs": "Total",
       "noActiveJobs": "No active runs"
@@ -32,6 +33,7 @@
       "title": "Run activity",
       "summary_one": "{{count}} run in the last 6 months",
       "summary_other": "{{count}} runs in the last 6 months",
+      "windowCapped": "Counted over the {{shown}} most recent runs.",
       "openRuns": "Open runs"
     },
     "models": {
