@@ -199,9 +199,10 @@ def status_gateway() -> str:
     if isinstance(gateway_connection, LocalProcess):
         if gateway_connection.process.exitcode is not None:
             raise GatewayExited(gateway_connection.process.exitcode)
+        # TODO -- call gw status api once available
         return StatusMessage.gateway_running
     elif isinstance(gateway_connection, RemoteTunnel):
-        # TODO -- call gw status api once available, on fallback run command to check the proc status?
+        # TODO -- call gw status api once available, on fallback run sh command through tunnel to check the proc status?
         if tunnel.status(gateway_connection.handle):
             return StatusMessage.gateway_running
         raise GatewayExited(255)
