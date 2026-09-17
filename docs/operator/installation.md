@@ -40,6 +40,10 @@ Consult the docker examples:
 1. [slim](../../deployment/v2) -- just "run fiab.sh warmup in a Dockerfile" which is sufficient for a demonstration,
 2. [ewc](../../deployment/ewc) -- a more involved setup, though may be a bit out of date.
 
+For a smooth and performant execution of bigger models, a GPU is recommended.
+The `slim` image does _not_ come with CUDA pre-installed, however, cooperates well with [NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-container-toolkit).
+In other words, install the toolkit on the _host_ machine, then run `slim` in any container runtime (docker, compose, containerd, ...) with the GPU resource, and the FIAB in the container recognizes and utilizes the mounted GPU.
+
 # Developer Setup
 
 See [backend development](../../backend/development.md) and [frontend guidelines](../../frontend/GUIDELINES.md).
