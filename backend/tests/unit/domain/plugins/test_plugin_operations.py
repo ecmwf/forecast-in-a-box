@@ -188,7 +188,7 @@ def _patch_get_plugin_state(db_state: MagicMock | None) -> Any:
 async def test_submit_update_single_uses_plugin_management_pool_and_task_name() -> None:
     with (
         _patch_get_plugin_state(_fake_db_state_with_plugin()),
-        patch.object(submit_module.execution_manager, "awaitable_submit", new=AsyncMock()) as mock_submit,
+        patch.object(submit_module.execution_manager, "submit_monitored") as mock_submit,
     ):
         result = await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     assert result == ""
@@ -210,7 +210,7 @@ async def test_submit_update_single_rejects_overlapping_operation() -> None:
 async def test_submit_update_single_rolls_back_reservation_on_submission_rejected() -> None:
     with (
         _patch_get_plugin_state(_fake_db_state_with_plugin()),
-        patch.object(submit_module.execution_manager, "awaitable_submit", side_effect=SubmissionRejected("pool full")),
+        patch.object(submit_module.execution_manager, "submit_monitored", side_effect=SubmissionRejected("pool full")),
     ):
         with pytest.raises(SubmissionRejected):
             await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
@@ -236,13 +236,13 @@ async def test_submit_update_single_reports_not_configured_when_no_db_state() ->
 async def test_submit_update_single_emits_installed_event_when_plugin_not_yet_loaded() -> None:
     with (
         _patch_get_plugin_state(_fake_db_state_with_plugin()),
-        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+        patch.object(submit_module.execution_manager, "submit_monitored") as mock_submit,
     ):
 
-        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
+        def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
             task()
 
-        mock_await_submit.side_effect = _run
+        mock_submit.side_effect = _run
         with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
             await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     mock_notify.assert_called_once()
@@ -255,13 +255,13 @@ async def test_submit_update_single_emits_updated_event_when_plugin_already_load
     PluginManager.plugins = PluginManager.plugins.set(_PLUGIN_ID, MagicMock())
     with (
         _patch_get_plugin_state(_fake_db_state_with_plugin()),
-        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+        patch.object(submit_module.execution_manager, "submit_monitored") as mock_submit,
     ):
 
-        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
+        def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
             task()
 
-        mock_await_submit.side_effect = _run
+        mock_submit.side_effect = _run
         with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
             await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     mock_notify.assert_called_once()
@@ -274,13 +274,13 @@ async def test_submit_update_single_emits_updated_event_when_plugin_already_load
 async def test_submit_update_single_emits_settings_applied_event_when_not_installing() -> None:
     with (
         _patch_get_plugin_state(_fake_db_state_with_plugin()),
-        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+        patch.object(submit_module.execution_manager, "submit_monitored") as mock_submit,
     ):
 
-        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
+        def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
             task()
 
-        mock_await_submit.side_effect = _run
+        mock_submit.side_effect = _run
         with patch.object(submit_module, "update_single"), patch.object(submit_module, "_notify_success") as mock_notify:
             await submit_module.submit_update_single(_PLUGIN_ID, install=False, version=None)
     mock_notify.assert_called_once()
@@ -297,19 +297,19 @@ async def test_submit_update_single_emits_settings_applied_event_when_not_instal
 async def test_submit_unload_single_available_after_prior_update_failure() -> None:
     PluginManager.updater_error = "prior failure"
     with (
-        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+        patch.object(submit_module.execution_manager, "submit_monitored") as mock_submit,
         patch.object(submit_module, "unload_single") as mock_unload_single,
     ):
 
-        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
+        def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
             task()
 
-        mock_await_submit.side_effect = _run
+        mock_submit.side_effect = _run
         with patch.object(submit_module, "_notify_success") as mock_notify:
             await submit_module.submit_unload_single(_PLUGIN_ID)
     mock_unload_single.assert_called_once_with(_PLUGIN_ID)
-    mock_await_submit.assert_called_once()
-    args, _ = mock_await_submit.call_args
+    mock_submit.assert_called_once()
+    args, _ = mock_submit.call_args
     assert args[0] == ConcurrentPools.PluginManagement
     assert args[1] == "plugin.unload"
     mock_notify.assert_called_once()
@@ -328,19 +328,19 @@ async def test_submit_unload_single_rejects_overlapping_operation() -> None:
 async def test_submit_uninstall_single_uses_plugin_management_pool_and_task_name() -> None:
     with (
         _patch_get_plugin_state(_fake_db_state_with_plugin()),
-        patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
+        patch.object(submit_module.execution_manager, "submit_monitored") as mock_submit,
         patch.object(submit_module, "uninstall_plugin_sync") as mock_uninstall_sync,
     ):
 
-        async def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
+        def _run(pool_name: object, task_name: object, task: Callable[[], object]) -> None:
             task()
 
-        mock_await_submit.side_effect = _run
+        mock_submit.side_effect = _run
         with patch.object(submit_module, "_notify_success") as mock_notify:
             await submit_module.submit_uninstall_single(_PLUGIN_ID)
     mock_uninstall_sync.assert_called_once_with(_PLUGIN_ID)
-    mock_await_submit.assert_called_once()
-    args, _ = mock_await_submit.call_args
+    mock_submit.assert_called_once()
+    args, _ = mock_submit.call_args
     assert args[0] == ConcurrentPools.PluginManagement
     assert args[1] == "plugin.uninstall"
     mock_notify.assert_called_once()
@@ -352,7 +352,7 @@ async def test_submit_uninstall_single_uses_plugin_management_pool_and_task_name
 async def test_submit_uninstall_single_rolls_back_reservation_on_submission_rejected() -> None:
     with (
         _patch_get_plugin_state(_fake_db_state_with_plugin()),
-        patch.object(submit_module.execution_manager, "awaitable_submit", side_effect=SubmissionRejected("pool full")),
+        patch.object(submit_module.execution_manager, "submit_monitored", side_effect=SubmissionRejected("pool full")),
     ):
         with pytest.raises(SubmissionRejected):
             await submit_module.submit_uninstall_single(_PLUGIN_ID)
