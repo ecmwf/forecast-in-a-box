@@ -65,7 +65,7 @@ def _parse_plugin_ids(plugin: str | None) -> list[PluginCompositeId]:
     """Convert the comma separated `-p` value into composite ids, defaulting to the configured
     default plugins when not given"""
     if plugin is None:
-        return list(_default_plugins())
+        return config.external.default_plugins
     entries = [e.strip() for e in plugin.split(",")]
     if not all(entries):
         raise ValueError(f"malformed plugin list: {plugin!r}")
