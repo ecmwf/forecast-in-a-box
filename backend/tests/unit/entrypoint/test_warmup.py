@@ -88,7 +88,7 @@ def warmup_mocks() -> Iterator[dict[str, MagicMock]]:
 
 def test_defaults_to_configured_default_plugins(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    with patch.object(warmup_module, "_default_plugins", lambda: [_ALPHA]):
+    with patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]):
         warmup_module.warmup()
     parent.update_single.assert_called_once_with(_ALPHA, _SETTINGS, install=True, version=None)
 
