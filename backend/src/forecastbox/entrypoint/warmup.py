@@ -42,12 +42,14 @@ import fire
 from fiab_core.fable import PluginCompositeId
 
 from forecastbox.domain.artifact.manager import join_artifact_manager, submit_refresh_catalog
+from forecastbox.domain.plugin.db import get_plugin_state
 from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
 from forecastbox.domain.plugin.loading import update_single
-from forecastbox.domain.plugin.store import initialize_stores, register_plugin_from_store
+from forecastbox.domain.plugin.settings import PluginSettings
+from forecastbox.domain.plugin.store import initialize_stores, resolve_plugin_from_store
 from forecastbox.entrypoint.bootstrap.config import setup_process
 from forecastbox.entrypoint.initializers import start_artifact_provider, start_db_schema
-from forecastbox.utility.config import PluginSettings, _default_plugins, config, validate_runtime
+from forecastbox.utility.config import _default_plugins, config, validate_runtime
 from forecastbox.utility.packages import PackagesError
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
@@ -63,7 +65,7 @@ def _parse_plugin_ids(plugin: str | None) -> list[PluginCompositeId]:
     """Convert the comma separated `-p` value into composite ids, defaulting to the configured
     default plugins when not given"""
     if plugin is None:
-        return list(_default_plugins().keys())
+        return config.external.default_plugins
     entries = [e.strip() for e in plugin.split(",")]
     if not all(entries):
         raise ValueError(f"malformed plugin list: {plugin!r}")
@@ -71,16 +73,17 @@ def _parse_plugin_ids(plugin: str | None) -> list[PluginCompositeId]:
 
 
 def _resolve_settings(plugin_id: PluginCompositeId) -> PluginSettings:
-    """Register the plugin in the config file based on the store entry, falling back to an
-    already configured entry when the plugin is unknown to the stores"""
+    """Resolve the plugin from the stores, falling back to its already-persisted DB state
+    when the plugin is currently unknown to the stores (e.g. reinstalling a plugin whose
+    store entry has since been removed)"""
     try:
-        return register_plugin_from_store(plugin_id)
+        return resolve_plugin_from_store(plugin_id)
     except ValueError as e:
-        configured = config.external.plugins.get(plugin_id, None)
-        if configured is None:
+        db_state = get_plugin_state(PluginCompositeId.to_str(plugin_id))
+        if db_state is None:
             raise
-        logger.warning(f"plugin {PluginCompositeId.to_str(plugin_id)} not resolvable from stores ({e}), using the configured entry")
-        return configured
+        logger.warning(f"plugin {PluginCompositeId.to_str(plugin_id)} not resolvable from stores ({e}), using the persisted DB state")
+        return db_state.to_settings()
 
 
 def _install_plugins(plugin_ids: list[PluginCompositeId]) -> dict[str, str]:

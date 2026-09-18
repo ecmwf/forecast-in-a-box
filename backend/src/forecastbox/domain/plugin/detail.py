@@ -31,6 +31,7 @@ from pydantic import Field
 from forecastbox.domain.plugin.db import PluginStateRecord, get_all_plugin_states
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy
+from forecastbox.domain.plugin.settings import PluginRefreshStrategy
 from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail
 from forecastbox.utility.concurrency.manager import execution_manager
@@ -64,6 +65,8 @@ class PluginInstallSettings(FiabBaseModel):
     """Templates that are available for use. If the plugin is disabled or not loaded, this is an empty list."""
     glyph_remapping: dict[str, str]
     """Glyph remapping the user applied during installation. Empty map if disabled or not configured."""
+    update_strategy: PluginRefreshStrategy
+    """Whether the plugin is pip-updated on every launch (``automatic``) or only on explicit request (``manual``)."""
 
 
 class PluginInstallData(FiabBaseModel):
@@ -150,6 +153,7 @@ def _build_detail(
             excluded_templates=excluded,
             included_templates=included,
             glyph_remapping=dict(db_state.glyph_remapping),
+            update_strategy=db_state.update_strategy,
         )
 
     # load_errors -- db non-install errors + in-memory errors + template-ingest errors from DB

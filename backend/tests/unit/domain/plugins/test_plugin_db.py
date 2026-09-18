@@ -45,7 +45,7 @@ def mem_session_maker(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmaker
 
 def test_upsert_creates_row_with_defaults(mem_session_maker: sessionmaker[Session]) -> None:
     """First upsert inserts a row with empty excluded_templates and glyph_remapping."""
-    plugin_db.upsert_plugin_state(plugin_id="localTest:single", version="1.2.3", enabled=True)
+    plugin_db.upsert_plugin_state(plugin_id="localTest:single", version="1.2.3", pip_source="src", module_name="mod", enabled=True)
 
     state = plugin_db.get_plugin_state("localTest:single")
     assert state is not None
@@ -62,7 +62,7 @@ def test_upsert_creates_row_with_defaults(mem_session_maker: sessionmaker[Sessio
 
 def test_upsert_updates_version_without_clobbering(mem_session_maker: sessionmaker[Session]) -> None:
     """Second upsert updates plugin_version/plugin_errors but does not clobber excluded_templates / glyph_remapping."""
-    plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.1.0", enabled=True)
+    plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.1.0", pip_source="src", module_name="mod", enabled=True)
 
     # Simulate writes by later subsystems directly to DB
     from sqlalchemy import update as sa_update
@@ -90,7 +90,7 @@ def test_upsert_updates_version_without_clobbering(mem_session_maker: sessionmak
 
 def test_upsert_no_version_change_does_not_set_ingest(mem_session_maker: sessionmaker[Session]) -> None:
     """When version is unchanged, asset_ingest_needed is not set again once cleared."""
-    plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0.0", enabled=True)
+    plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0.0", pip_source="src", module_name="mod", enabled=True)
     plugin_db.clear_asset_ingest_needed(plugin_id="s:p")
 
     plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0.0", enabled=True)
@@ -102,7 +102,7 @@ def test_upsert_no_version_change_does_not_set_ingest(mem_session_maker: session
 
 def test_upsert_reenable_sets_ingest(mem_session_maker: sessionmaker[Session]) -> None:
     """Re-enabling a disabled plugin sets asset_ingest_needed=True."""
-    plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0.0", enabled=True)
+    plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0.0", pip_source="src", module_name="mod", enabled=True)
     plugin_db.clear_asset_ingest_needed(plugin_id="s:q")
     plugin_db.upsert_plugin_state(plugin_id="s:q", enabled=False)
 
@@ -123,7 +123,14 @@ def test_upsert_none_version_on_missing_row_raises(mem_session_maker: sessionmak
 def test_upsert_persists_plugin_errors(mem_session_maker: sessionmaker[Session]) -> None:
     """An install failure writes structured errors and records the attempt."""
     install_err = PluginError(source="install", severity="error", detail="pip failed: some reason")
-    plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="unknown", enabled=True, plugin_errors=PluginErrors([install_err]))
+    plugin_db.upsert_plugin_state(
+        plugin_id="bad:plugin",
+        version="unknown",
+        pip_source="src",
+        module_name="mod",
+        enabled=True,
+        plugin_errors=PluginErrors([install_err]),
+    )
 
     state = plugin_db.get_plugin_state("bad:plugin")
     assert state is not None
@@ -135,7 +142,9 @@ def test_upsert_persists_plugin_errors(mem_session_maker: sessionmaker[Session])
 def test_upsert_clears_plugin_errors_with_empty_list(mem_session_maker: sessionmaker[Session]) -> None:
     """Passing plugin_errors=[] clears previously stored errors; passing None leaves them untouched."""
     old_err = PluginError(source="install", severity="error", detail="old error")
-    plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="0.1.0", plugin_errors=PluginErrors([old_err]))
+    plugin_db.upsert_plugin_state(
+        plugin_id="bad:plugin", version="0.1.0", pip_source="src", module_name="mod", plugin_errors=PluginErrors([old_err])
+    )
     # None should not touch the errors
     plugin_db.upsert_plugin_state(plugin_id="bad:plugin")
     state = plugin_db.get_plugin_state("bad:plugin")
@@ -150,10 +159,12 @@ def test_upsert_clears_plugin_errors_with_empty_list(mem_session_maker: sessionm
 
 def test_get_all_plugin_states(mem_session_maker: sessionmaker[Session]) -> None:
     """get_all_plugin_states returns all persisted rows."""
-    plugin_db.upsert_plugin_state(plugin_id="storeA:p1", version="1.0", enabled=True)
+    plugin_db.upsert_plugin_state(plugin_id="storeA:p1", version="1.0", pip_source="src", module_name="mod", enabled=True)
     plugin_db.upsert_plugin_state(
         plugin_id="storeA:p2",
         version="unknown",
+        pip_source="src",
+        module_name="mod",
         enabled=True,
         plugin_errors=PluginErrors([PluginError(source="install", severity="error", detail="err")]),
     )
@@ -171,7 +182,7 @@ def test_get_plugin_state_missing(mem_session_maker: sessionmaker[Session]) -> N
 
 def test_upsert_settings_partial_excluded(mem_session_maker: sessionmaker[Session]) -> None:
     """upsert_plugin_state overwrites excluded_templates when provided, leaves glyph_remapping unchanged."""
-    plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0", enabled=True)
+    plugin_db.upsert_plugin_state(plugin_id="s:p", version="1.0", pip_source="src", module_name="mod", enabled=True)
     plugin_db.upsert_plugin_state(plugin_id="s:p", excluded_templates=["tplA"])
 
     state = plugin_db.get_plugin_state("s:p")
@@ -188,7 +199,7 @@ def test_upsert_settings_partial_excluded(mem_session_maker: sessionmaker[Sessio
 
 def test_upsert_settings_empty_list_clears(mem_session_maker: sessionmaker[Session]) -> None:
     """Passing an empty list for excluded_templates explicitly clears the stored list."""
-    plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0", enabled=True)
+    plugin_db.upsert_plugin_state(plugin_id="s:q", version="1.0", pip_source="src", module_name="mod", enabled=True)
     plugin_db.upsert_plugin_state(plugin_id="s:q", excluded_templates=["x", "y"])
     plugin_db.upsert_plugin_state(plugin_id="s:q", excluded_templates=[])
 
@@ -199,7 +210,7 @@ def test_upsert_settings_empty_list_clears(mem_session_maker: sessionmaker[Sessi
 
 def test_upsert_settings_triggers_ingest_on_change(mem_session_maker: sessionmaker[Session]) -> None:
     """Changing excluded_templates or glyph_remapping sets asset_ingest_needed=True."""
-    plugin_db.upsert_plugin_state(plugin_id="s:r", version="1.0", enabled=True)
+    plugin_db.upsert_plugin_state(plugin_id="s:r", version="1.0", pip_source="src", module_name="mod", enabled=True)
     plugin_db.clear_asset_ingest_needed(plugin_id="s:r")
 
     plugin_db.upsert_plugin_state(plugin_id="s:r", excluded_templates=["tplZ"])
