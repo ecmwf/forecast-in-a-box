@@ -10,11 +10,7 @@
 """API for Plugin Stores -- data retrieval and extractions.
 
 Owns a lock-protected state StoresManager which reflects what the configured
-stores actually offer as plugins.
-
-Owns operations that modify the config file."""
-# TODO ideally we transition all the individual plugin info into the database.
-# But we need to solve the default plugin selection/installation first then
+stores actually offer as plugins."""
 
 import logging
 import threading
@@ -31,10 +27,11 @@ from pyrsistent.typing import PMap
 from typing_extensions import Self
 
 from forecastbox.domain.plugin.compatibility import get_compatible_versions
+from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.submit import submit_update_single
 from forecastbox.utility.concurrency.manager import ConcurrentPools, TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
-from forecastbox.utility.config import PluginSettings, PluginStoreConfig, PluginStoreId, PluginStoresConfig, config, config_edit_lock
+from forecastbox.utility.config import PluginStoreConfig, PluginStoreId, PluginStoresConfig, config
 from forecastbox.utility.httpx import fetch_content
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -122,7 +119,7 @@ class StoresManager:
 def stores_ready() -> bool:
     """Whether the stores have finished their (asynchronous, submitted-at-startup) initialization.
 
-    Callers such as `register_plugin_from_store` rely on `StoresManager.stores` being populated;
+    Callers such as `resolve_plugin_from_store` rely on `StoresManager.stores` being populated;
     right after process startup this may not be the case yet, so this helper lets HTTP callers
     (see `forecastbox.routes.status`) report readiness instead of failing with a 500."""
     return StoresManager.stores is not None
@@ -172,10 +169,11 @@ def submit_initialize_stores() -> None:
     )
 
 
-def register_plugin_from_store(plugin_composite_key: PluginCompositeId) -> PluginSettings:
-    """Retrieves the plugin information from the store and inserts the record of the plugin being
-    present into the config file, unless already there. Returns the settings the plugin is configured
-    with. Synchronous and self-contained -- performs no pip operation, that is the caller's job"""
+def resolve_plugin_from_store(plugin_composite_key: PluginCompositeId) -> PluginSettings:
+    """Retrieves the plugin information from the store and returns the settings to install it
+    with. Synchronous and self-contained -- performs no pip operation and no persistence,
+    that is the caller's job (see ``domain.plugin.loading.update_single``, which persists the
+    returned settings into the plugin_state database table upon a successful install)."""
     # No lock needed for reads with pyrsistent immutable structures
     if StoresManager is None:
         raise ValueError("stores not initialized")
@@ -187,21 +185,15 @@ def register_plugin_from_store(plugin_composite_key: PluginCompositeId) -> Plugi
     if pluginStoreEntry is None:
         raise ValueError(f"plugin with id {pluginId} not known to store {storeId}")
 
-    if plugin_composite_key not in config.external.plugins:
-        with timed_acquire(config_edit_lock, 5) as result:
-            if not result:
-                raise ValueError("failed to acquire the shared lock")
-            config.external.plugins[plugin_composite_key] = PluginSettings(
-                pip_source=pluginStoreEntry.pip_source,
-                module_name=pluginStoreEntry.module_name,
-                update_strategy="manual",
-            )
-            config.save_to_file()
-    return config.external.plugins[plugin_composite_key]
+    return PluginSettings(
+        pip_source=pluginStoreEntry.pip_source,
+        module_name=pluginStoreEntry.module_name,
+        update_strategy="manual",
+    )
 
 
 async def submit_install_single(plugin_composite_key: PluginCompositeId) -> None:
-    """Retrieves the information from the store, inserts the record of plugin being presents
-    into the config file, then submits the actual pip operation via `plugins.submit`"""
-    register_plugin_from_store(plugin_composite_key)
-    await submit_update_single(plugin_composite_key, install=True, version=None)
+    """Retrieves the information from the store, then submits the actual pip operation via
+    `plugins.submit`"""
+    settings = resolve_plugin_from_store(plugin_composite_key)
+    await submit_update_single(plugin_composite_key, install=True, version=None, settings=settings)

@@ -99,7 +99,7 @@ def install_default_plugins(config: FIABConfig, attempts: int = 20) -> None:
     try:
         with httpx.Client(follow_redirects=True) as client:
             _wait_for(client, config.backend.local_url() + f"{ROUTE_PREFIX}/status", attempts, _plugins_ready)
-            for pluginId in _default_plugins().keys():
+            for pluginId in _default_plugins():
                 url = config.backend.local_url() + f"{ROUTE_PREFIX}/plugin/install"
                 try:
                     client.post(url, json=pluginId.model_dump()).raise_for_status()

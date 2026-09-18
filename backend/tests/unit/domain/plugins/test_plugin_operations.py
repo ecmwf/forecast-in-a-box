@@ -16,6 +16,7 @@ uninstall use the correct pool/task names without creating or joining a thread.
 
 from collections.abc import Callable, Generator
 from concurrent.futures import Future
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -74,7 +75,7 @@ def test_failed_catalog_dependency_leaves_not_ready_and_does_not_run_loader() ->
     catalog_future: Future[None] = Future()
     ran_loader = False
 
-    def _fake_run_initial_load(plugins: object) -> None:
+    def _fake_run_initial_load() -> None:
         nonlocal ran_loader
         ran_loader = True
 
@@ -172,17 +173,21 @@ def test_run_managed_does_not_convert_per_plugin_errors_to_global_failure() -> N
 # ---------------------------------------------------------------------------
 
 
-def _fake_config_with_plugin() -> MagicMock:
+def _fake_db_state_with_plugin() -> MagicMock:
     settings = MagicMock()
-    fake_config = MagicMock()
-    fake_config.external.plugins = {_PLUGIN_ID: settings}
-    return fake_config
+    db_state = MagicMock()
+    db_state.to_settings.return_value = settings
+    return db_state
+
+
+def _patch_get_plugin_state(db_state: MagicMock | None) -> Any:
+    return patch.object(submit_module.execution_manager, "await_jobs_db", new=AsyncMock(return_value=db_state))
 
 
 @pytest.mark.asyncio
 async def test_submit_update_single_uses_plugin_management_pool_and_task_name() -> None:
     with (
-        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        _patch_get_plugin_state(_fake_db_state_with_plugin()),
         patch.object(submit_module.execution_manager, "awaitable_submit", new=AsyncMock()) as mock_submit,
     ):
         result = await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
@@ -196,7 +201,7 @@ async def test_submit_update_single_uses_plugin_management_pool_and_task_name() 
 @pytest.mark.asyncio
 async def test_submit_update_single_rejects_overlapping_operation() -> None:
     PluginManager.operation_in_progress = True
-    with patch.object(submit_module, "config", _fake_config_with_plugin()):
+    with _patch_get_plugin_state(_fake_db_state_with_plugin()):
         result = await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     assert "not idle" in result
 
@@ -204,7 +209,7 @@ async def test_submit_update_single_rejects_overlapping_operation() -> None:
 @pytest.mark.asyncio
 async def test_submit_update_single_rolls_back_reservation_on_submission_rejected() -> None:
     with (
-        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        _patch_get_plugin_state(_fake_db_state_with_plugin()),
         patch.object(submit_module.execution_manager, "awaitable_submit", side_effect=SubmissionRejected("pool full")),
     ):
         with pytest.raises(SubmissionRejected):
@@ -215,15 +220,22 @@ async def test_submit_update_single_rolls_back_reservation_on_submission_rejecte
 @pytest.mark.asyncio
 async def test_submit_update_single_blocked_by_existing_global_failure() -> None:
     PluginManager.updater_error = "prior failure"
-    with patch.object(submit_module, "config", _fake_config_with_plugin()):
+    with _patch_get_plugin_state(_fake_db_state_with_plugin()):
         result = await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
     assert "failed" in result
 
 
 @pytest.mark.asyncio
+async def test_submit_update_single_reports_not_configured_when_no_db_state() -> None:
+    with _patch_get_plugin_state(None):
+        result = await submit_module.submit_update_single(_PLUGIN_ID, install=True, version=None)
+    assert "not configured" in result
+
+
+@pytest.mark.asyncio
 async def test_submit_update_single_emits_installed_event_when_plugin_not_yet_loaded() -> None:
     with (
-        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        _patch_get_plugin_state(_fake_db_state_with_plugin()),
         patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
     ):
 
@@ -242,7 +254,7 @@ async def test_submit_update_single_emits_installed_event_when_plugin_not_yet_lo
 async def test_submit_update_single_emits_updated_event_when_plugin_already_loaded() -> None:
     PluginManager.plugins = PluginManager.plugins.set(_PLUGIN_ID, MagicMock())
     with (
-        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        _patch_get_plugin_state(_fake_db_state_with_plugin()),
         patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
     ):
 
@@ -261,7 +273,7 @@ async def test_submit_update_single_emits_updated_event_when_plugin_already_load
 @pytest.mark.asyncio
 async def test_submit_update_single_emits_settings_applied_event_when_not_installing() -> None:
     with (
-        patch.object(submit_module, "config", _fake_config_with_plugin()),
+        _patch_get_plugin_state(_fake_db_state_with_plugin()),
         patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
     ):
 
@@ -314,9 +326,8 @@ async def test_submit_unload_single_rejects_overlapping_operation() -> None:
 
 @pytest.mark.asyncio
 async def test_submit_uninstall_single_uses_plugin_management_pool_and_task_name() -> None:
-    fake_config = _fake_config_with_plugin()
     with (
-        patch.object(submit_module, "config", fake_config),
+        _patch_get_plugin_state(_fake_db_state_with_plugin()),
         patch.object(submit_module.execution_manager, "awaitable_submit") as mock_await_submit,
         patch.object(submit_module, "uninstall_plugin_sync") as mock_uninstall_sync,
     ):
@@ -339,11 +350,17 @@ async def test_submit_uninstall_single_uses_plugin_management_pool_and_task_name
 
 @pytest.mark.asyncio
 async def test_submit_uninstall_single_rolls_back_reservation_on_submission_rejected() -> None:
-    fake_config = _fake_config_with_plugin()
     with (
-        patch.object(submit_module, "config", fake_config),
+        _patch_get_plugin_state(_fake_db_state_with_plugin()),
         patch.object(submit_module.execution_manager, "awaitable_submit", side_effect=SubmissionRejected("pool full")),
     ):
         with pytest.raises(SubmissionRejected):
             await submit_module.submit_uninstall_single(_PLUGIN_ID)
     assert PluginManager.operation_in_progress is False
+
+
+@pytest.mark.asyncio
+async def test_submit_uninstall_single_raises_when_not_installed() -> None:
+    with _patch_get_plugin_state(None):
+        with pytest.raises(ValueError, match="not installed"):
+            await submit_module.submit_uninstall_single(_PLUGIN_ID)

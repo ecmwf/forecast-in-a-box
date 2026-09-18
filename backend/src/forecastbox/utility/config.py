@@ -9,7 +9,6 @@
 
 import logging
 import os
-import threading
 import urllib.parse
 from enum import StrEnum
 from pathlib import Path
@@ -164,24 +163,12 @@ class AuthSettings(FiabBaseModel):
         return errors
 
 
-PluginRefreshStrategy = Literal["automatic", "manual"]
-
-
-class PluginSettings(FiabBaseModel):
-    """A pip-installable plugin with an importible module"""
-
-    pip_source: str
-    """Name of the package if assuming PyPI, or a local path, git repo, ... Anything that pip accepts"""
-    module_name: str
-    """A string such that `importlib.import_module(module_name)` gives a module that has a `plugin` attribute of type fiab_core.plugin.Plugin`"""
-    update_strategy: PluginRefreshStrategy = "manual"
-    """Whether we should invoke `pip install --update <plugin>` on every launch, or let user handle that manually or via API"""
-
-
 PluginCompositeIdReadable = Annotated[
     PluginCompositeId, BeforeValidator(PluginCompositeId.from_str), PlainSerializer(PluginCompositeId.to_str, return_type=str)
 ]
-PluginsSettings = dict[PluginCompositeIdReadable, PluginSettings]
+DefaultPluginIds = list[PluginCompositeIdReadable]
+"""Ids of plugins to be installed automatically on first run. Not a record of currently
+installed plugins -- that lives in the plugin_state database table."""
 
 
 class PluginStoreConfig(FiabBaseModel):
@@ -195,13 +182,8 @@ class PluginStoreConfig(FiabBaseModel):
 PluginStoresConfig = dict[PluginStoreId, PluginStoreConfig]
 
 
-def _default_plugins() -> PluginsSettings:
-    return {
-        PluginCompositeIdReadable.from_str("ecmwf:ecmwf-base"): PluginSettings(
-            pip_source="fiab-plugin-ecmwf",
-            module_name="fiab_plugin_ecmwf",
-        ),
-    }
+def _default_plugins() -> DefaultPluginIds:
+    return [PluginCompositeIdReadable.from_str("ecmwf:ecmwf-base")]
 
 
 def _default_plugin_stores() -> PluginStoresConfig:
@@ -262,7 +244,9 @@ class ProductSettings(FiabBaseModel):
 
 
 class ExternalServicesSettings(FiabBaseModel):
-    plugins: PluginsSettings = Field(default_factory=_default_plugins)
+    default_plugins: DefaultPluginIds = Field(default_factory=_default_plugins)
+    """Ids of plugins installed automatically on first run. Does not reflect currently
+    installed plugins -- see the plugin_state database table for that."""
     plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
     artifact_stores: ArtifactStoresConfig = Field(default_factory=_default_artifact_stores)
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
@@ -473,4 +457,3 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
-config_edit_lock = threading.Lock()

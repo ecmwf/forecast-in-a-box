@@ -33,9 +33,9 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pyrsistent import pmap
 
+from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry
 from forecastbox.routes.plugins import get_plugin_versions, get_template_example_values, install_plugin, update_plugin
-from forecastbox.utility.config import PluginSettings
 
 # ---------------------------------------------------------------------------
 # Helpers that mirror the route logic without depending on FastAPI/HTTP stack
@@ -144,45 +144,54 @@ def _patch_fiabcore(version_str: str = "1.0.0") -> PatchType:
     return patch("forecastbox.domain.plugin.compatibility.get_fiabcore_version", return_value=Version(version_str))
 
 
-def test_versions_returns_compatible_sorted_descending() -> None:
+@pytest.mark.asyncio
+async def test_versions_returns_compatible_sorted_descending() -> None:
     available = ["1.0.0", "1.2.0", "2.0.0", "1.1.0"]
     with _patch_store(), _patch_versions(available), _patch_fiabcore("1.0.0"):
-        result = get_plugin_versions(_COMPOSITE_ID)
+        result = await get_plugin_versions(_COMPOSITE_ID)
     assert result.versions == ["1.2.0", "1.1.0", "1.0.0"]
 
 
-def test_versions_returns_empty_when_nothing_compatible() -> None:
+@pytest.mark.asyncio
+async def test_versions_returns_empty_when_nothing_compatible() -> None:
     available = ["2.0.0", "3.0.0"]
     with _patch_store(), _patch_versions(available), _patch_fiabcore("1.0.0"):
-        result = get_plugin_versions(_COMPOSITE_ID)
+        result = await get_plugin_versions(_COMPOSITE_ID)
     assert result.versions == []
 
 
-def test_versions_404_when_plugin_not_in_store_or_config() -> None:
+@pytest.mark.asyncio
+async def test_versions_404_when_plugin_not_in_store_or_db() -> None:
     unknown_id = PluginCompositeId(store=PluginStoreId("unknown"), local=PluginId("unknown"))
-    with patch("forecastbox.routes.plugins.get_plugins_detail", return_value={}):
-        with patch("forecastbox.routes.plugins.config") as mock_config:
-            mock_config.external.plugins = {}
-            with pytest.raises(HTTPException) as exc_info:
-                get_plugin_versions(unknown_id)
+    with (
+        patch("forecastbox.routes.plugins.get_plugins_detail", return_value={}),
+        patch("forecastbox.routes.plugins.execution_manager.await_jobs_db", new=AsyncMock(return_value=None)),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_plugin_versions(unknown_id)
     assert exc_info.value.status_code == 404
 
 
-def test_versions_falls_back_to_config_when_not_in_store() -> None:
-    plugin_settings = PluginSettings(pip_source="fiab-plugin-ecmwf", module_name="fiab_plugin_ecmwf")
+@pytest.mark.asyncio
+async def test_versions_falls_back_to_db_when_not_in_store() -> None:
+    db_state = MagicMock()
+    db_state.to_settings.return_value = PluginSettings(pip_source="fiab-plugin-ecmwf", module_name="fiab_plugin_ecmwf")
     available = ["1.0.0", "1.3.0"]
-    with patch("forecastbox.routes.plugins.get_plugins_detail", return_value={}):
-        with patch("forecastbox.routes.plugins.config") as mock_config:
-            mock_config.external.plugins = {_COMPOSITE_ID: plugin_settings}
-            with _patch_versions(available), _patch_fiabcore("1.5.0"):
-                result = get_plugin_versions(_COMPOSITE_ID)
+    with (
+        patch("forecastbox.routes.plugins.get_plugins_detail", return_value={}),
+        patch("forecastbox.routes.plugins.execution_manager.await_jobs_db", new=AsyncMock(return_value=db_state)),
+        _patch_versions(available),
+        _patch_fiabcore("1.5.0"),
+    ):
+        result = await get_plugin_versions(_COMPOSITE_ID)
     assert result.versions == ["1.3.0", "1.0.0"]
 
 
-def test_versions_pip_source_passed_to_get_package_versions() -> None:
+@pytest.mark.asyncio
+async def test_versions_pip_source_passed_to_get_package_versions() -> None:
     with _patch_store(), _patch_fiabcore("1.0.0"):
         with patch("forecastbox.routes.plugins.get_package_versions", return_value=iter([])) as mock_gpv:
-            get_plugin_versions(_COMPOSITE_ID)
+            await get_plugin_versions(_COMPOSITE_ID)
     mock_gpv.assert_called_once()
     assert mock_gpv.call_args is not None
     args = mock_gpv.call_args.args

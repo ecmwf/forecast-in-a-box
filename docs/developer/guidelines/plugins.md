@@ -49,22 +49,28 @@ That will run the `pip install <url>`. You _can_ include `-e` in the url, which 
 We don't support live reloads, ie, if you make code changes, you best restart the backend (but you don't need to reinstall the plugin).
 
 Do not install the plugin yourself into the backend's venv -- a part of the installation process is inserting
-an entry into the database as well as into the config file. Failure to do so may leave the backend in an inconsistent state.
+an entry into the database (the `plugin_state` table), which records the pip source, module name, and
+installed version. Failure to go through the install flow may leave the backend in an inconsistent state.
 If you want to test the "would it actually install" outside of backend, you may run `uv pip install --dry-run` with the respective `venv` to see what would happen -- this is definitively recommended if you want to see the possible error line hands-on and fast.
 Note that backend itself does a `--dry-run` first when installing a plugin -- you don't need to worry that a misconfigured plugin would destroy everything.
 But extracting the error from the backend logs may be more lengthy than seeing it first-hand.
 
-## Troubleshooting
-If things go very wrong, you can wipe the `venv` and the database (in `.fiab/jobs.db`) (or use the `--full-reinstall`, consult [launching.md](./launching.md)), and remove a section looking like
+If you would like your plugin to be installed automatically on first launch of a fresh install, add its id
+to `external.default_plugins` in `config.toml`, eg:
 ```
-[external.plugins."localTest1:single"]
-pip_source = "file://./packages/fiab-plugin-test"
-module_name = "fiab_plugin_test"
+[external]
+default_plugins = ["yourPluginStore:yourPluginId"]
 ```
-from your `config.toml` (**not** the `external.plugin_stores` config you have added before -- this is the plugin itself, a record of its installation, added _automatically_ during the installation process).
-Next run of `just dev`/`fiab.sh` would re-create the db and venv in a pristine state, and a next install of the plugin would add the entry to config.
+This is only consulted on first run (see `entrypoint.warmup` and `entrypoint.bootstrap.checks.install_default_plugins`) --
+it is a list of ids, not a full plugin specification, and it is never rewritten by the backend at runtime.
 
-You can attempt a finer surgery instead -- delete the line corresponding to your plugin from the `plugin_state` table in the database (it's just sqlite), uninstall the package from the venv, and remove the corresponding section from the config.
+## Troubleshooting
+If things go very wrong, you can wipe the `venv` and the database (in `.fiab/job.db`) (or use the `--full-reinstall`, consult [launching.md](./launching.md)).
+The config file itself does not need any editing -- it only ever contains plugin *stores* and, optionally, the
+ids of default plugins to auto-install on first run, never the install record of a concrete plugin.
+Next run of `just dev`/`fiab.sh` would re-create the db and venv in a pristine state.
+
+You can attempt a finer surgery instead -- delete the row corresponding to your plugin from the `plugin_state` table in the database (it's just sqlite), and uninstall the package from the venv.
 If you have external dependencies by your plugin, you need to handle them manually as well.
 
 Multiple things can go wrong: Installation, Import, Update, Uninstallation.
