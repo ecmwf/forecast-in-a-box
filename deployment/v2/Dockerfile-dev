@@ -49,8 +49,6 @@ COPY --chown=fiab:fiab install/artifacts.json install/artifacts.json
 # NOTE maybe allow for buildarg override?
 COPY --chown=fiab:fiab deployment/v2/config.toml-dev backend/.fiab/config.toml
 
-# TODO for some reason ecmwf-base is also installed as a plugin -- eradicate! Null the store config?
-
 USER fiab
 # NOTE add `--offline` to the sync, but that misbehaved on setuptools-scm which were for some reason not synced correctly above
 RUN : \
