@@ -175,7 +175,7 @@ async def submit_update_single(
     else:
         on_success = PluginInstalledEvent(plugin_id=plugin_id_str)
     try:
-        await execution_manager.awaitable_submit(
+        execution_manager.submit_monitored(
             ConcurrentPools.PluginManagement,
             TaskName("plugin.update"),
             partial(_run_managed, trigger, partial(update_single, pluginId, settings, install, version), on_success),
@@ -187,7 +187,7 @@ async def submit_update_single(
 
 
 async def submit_unload_single(pluginId: PluginCompositeId) -> None:
-    """Reserve and await an unload operation. The caller (route) owns success/failure
+    """Reserve and submit an unload operation. The caller (route) owns success/failure
     reporting; a recorded global ``updater_error`` does not block this cleanup path.
     """
     result = reserve_operation(refuse_on_error=False)
@@ -196,7 +196,7 @@ async def submit_unload_single(pluginId: PluginCompositeId) -> None:
     trigger = f"Unload of plugin {pluginId}"
     on_success = PluginUnloadedEvent(plugin_id=PluginCompositeId.to_str(pluginId))
     try:
-        await execution_manager.awaitable_submit(
+        execution_manager.submit_monitored(
             ConcurrentPools.PluginManagement,
             TaskName("plugin.unload"),
             partial(_run_managed, trigger, partial(unload_single, pluginId), on_success),
@@ -217,7 +217,7 @@ async def submit_uninstall_single(pluginId: PluginCompositeId) -> None:
     trigger = f"Uninstall of plugin {pluginId}"
     on_success = PluginUninstalledEvent(plugin_id=PluginCompositeId.to_str(pluginId))
     try:
-        await execution_manager.awaitable_submit(
+        execution_manager.submit_monitored(
             ConcurrentPools.PluginManagement,
             TaskName("plugin.uninstall"),
             partial(_run_managed, trigger, partial(uninstall_plugin_sync, pluginId), on_success),
