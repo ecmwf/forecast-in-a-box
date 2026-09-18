@@ -115,7 +115,7 @@ from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
 from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
-from forecastbox.utility.config import PluginSettings
+from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.utility.packages import (
     PackagesError,
     exclude_distribution,

@@ -10,7 +10,7 @@ There are two ways of launching:
 
 The `fiab.sh` is a standalone script, meaning you don't need to check out the repo itself, and it installs itself in `~/.fiab` (configurable).
 It generally pulls the most recent released version, but it is still based on a `venv`, and you can configure it arbitrarily, including editable installs of plugins.
-However, a plugin should be installed through UI (or backend API call to be precise) rather than directly through pip into the venv, at least for the first time, as that puts the right entities into the database/config.
+However, a plugin should be installed through UI (or backend API call to be precise) rather than directly through pip into the venv, at least for the first time, as that puts the right entities into the database.
 Consult [plugins.md](./plugins.md) for more details about plugin installations.
 
 The `just dev`, on the other hand, reflects the current state of the repo you have checked out, meaning every component (the backend, the frontend, the core for plugin contract) is an editable install in the repo.
