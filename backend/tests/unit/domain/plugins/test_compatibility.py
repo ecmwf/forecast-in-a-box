@@ -22,7 +22,7 @@ from forecastbox.domain.plugin.compatibility import (
     plugin_default_specifier,
 )
 from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
-from forecastbox.utility.config import PluginSettings
+from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.utility.packages import CommandResult, PackagesError
 
 # ---------------------------------------------------------------------------

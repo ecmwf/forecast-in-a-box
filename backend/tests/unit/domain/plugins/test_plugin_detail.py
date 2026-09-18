@@ -67,6 +67,7 @@ def _make_db_state(
     plugin_errors: list[dict] | None = None,
     template_errors: dict[str, str] | None = None,
     glyph_remapping: dict[str, str] | None = None,
+    update_strategy: str = "manual",
 ) -> MagicMock:
     state = MagicMock()
     state.plugin_id = PluginCompositeId.to_str(plugin_id)
@@ -77,6 +78,7 @@ def _make_db_state(
     state.glyph_remapping = glyph_remapping or {}
     state.template_errors = template_errors or {}
     state.enabled = enabled
+    state.update_strategy = update_strategy
     return state
 
 

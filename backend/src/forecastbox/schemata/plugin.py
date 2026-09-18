@@ -30,6 +30,9 @@ class PluginState(Base):
 
     plugin_id = Column(String(255), primary_key=True, nullable=False)
     plugin_version = Column(String(255), nullable=False)
+    pip_source = Column(String(1024), nullable=False)
+    module_name = Column(String(255), nullable=False)
+    update_strategy = Column(String(32), nullable=False, default="manual")
     updated_at = Column(UTCDateTime, nullable=False)
     plugin_errors = Column(JSON, nullable=False, default=list)
     excluded_templates = Column(JSON, nullable=False, default=list)
