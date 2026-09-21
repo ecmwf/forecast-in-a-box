@@ -72,7 +72,7 @@ def crawl(url: str, model: str, datacubes: dict) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Create dataset file from ECMWF open data catalogue")
     parser.add_argument("--model", type=str, default="ifs", help="Model to get catalogue for")
-    parser.add_argument("--output", type=str, default="ifs-ens.yaml", help="Output filename")
+    parser.add_argument("--output", type=str, default="ifs-ens.json", help="Output filename")
     parser.add_argument("--member-zero", type=str, default="type=fc", help="Identifier for member zero")
     args = parser.parse_args()
 
@@ -90,11 +90,14 @@ if __name__ == "__main__":
                 v = list(map(TYPES[k], v))
             final_qcube[k] = sorted(v)
         qube = qube | Qube.from_datacube(final_qcube)
-    qube = qube.compress()
+    qube.compress()
 
     config = {}
     if len(args.member_zero) != 0:
         config["member_zero"] = {x.split("=")[0]: x.split("=")[1] for x in args.member_zero.split(",")}
-    config["datacubes"] = [x for x in qube.datacubes()]
+    config["datacubes"] = [x for x in qube.to_datacubes()]
+    for dcube in config["datacubes"]:
+        for k in ["root"]:
+            dcube.pop(k, None)
     with open(args.output, "w") as f:
         json.dump(config, f, indent=4)
