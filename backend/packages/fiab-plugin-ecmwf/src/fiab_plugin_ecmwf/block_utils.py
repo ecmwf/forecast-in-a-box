@@ -3,7 +3,7 @@ from typing import Any
 
 from fiab_core.fable import ConfigurationOptionId, QubedOutput
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
-from pymetkit import ParamDB
+from pymetkit.paramdb import ParamDB
 from qubed import Qube
 
 BASE_TIME = ConfigurationOptionId("base_time")

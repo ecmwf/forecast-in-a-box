@@ -4,7 +4,7 @@ from importlib.resources import files
 from typing import Optional
 
 import yaml
-from pymetkit import ParamDB
+from pymetkit.paramdb import ParamDB
 from qubed import Qube
 
 

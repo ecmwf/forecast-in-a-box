@@ -27,7 +27,7 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Sink, Source, Transform
 from fiab_core.types import ClosedEnumType, DatetimeType, GeoDomainType, ListType, ParameterType, StringType
-from pymetkit import ParamDB
+from pymetkit.paramdb import ParamDB
 from qubed import Qube
 
 from fiab_plugin_ecmwf.block_utils import (

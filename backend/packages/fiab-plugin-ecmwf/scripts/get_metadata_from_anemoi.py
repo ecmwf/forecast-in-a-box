@@ -40,7 +40,7 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
     variables_metadata = metadata.typed_variables
 
     from earthkit.workflows.plugins.anemoi.utils import _expansion_qube
-    from pymetkit import ParamDB
+    from pymetkit.paramdb import ParamDB
     from qubed import Qube
     from qubed.value_types import QEnum
 
