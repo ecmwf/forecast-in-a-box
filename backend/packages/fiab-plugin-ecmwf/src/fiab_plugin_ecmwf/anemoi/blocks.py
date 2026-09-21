@@ -14,6 +14,7 @@ from typing import Any
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
+from earthkit.workflows.nodetree import nodetree_arrays, nodetree_dimensions, nodetree_from_dict
 from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions  # ty: ignore[unresolved-import]
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
@@ -27,7 +28,9 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
 from fiab_core.tools.validators import positive
-from fiab_core.types import ClosedEnumType, DatetimeType, IntType, ListType, OpenEnumType
+from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
+from qubed import Qube
+from qubed.value_types import QEnum
 
 from fiab_plugin_ecmwf.block_utils import (
     BASE_TIME,
@@ -82,6 +85,19 @@ class AnemoiBuilder:
         """
         for key, values in self.checkpoint.extra_output_keys.items():
             action.set_scalar_coords({key: values})
+
+        if "paramId" in nodetree_dimensions(action.nodes):
+            # Rename paramId axis to param in the action
+            action = type(action)(
+                nodetree_from_dict(
+                    {
+                        path: array.rename({"paramId": "param"}).assign_coords(
+                            {"param": [str(x) for x in array.coords["paramId"].data.tolist()]}
+                        )
+                        for path, array in nodetree_arrays(action.nodes)
+                    }
+                )
+            )
         return action
 
     def inference(self, lead_time: int, *, extra_environment: list[str] | None = None) -> Inference:
@@ -89,11 +105,21 @@ class AnemoiBuilder:
         env = self.checkpoint.get_environment()
         env.extend(extra_environment or [])
 
+        # Convert param to paramId for expansion
+        checkpoint_output = self.checkpoint.get_model_output(lead_time=lead_time)
+
+        def _param_to_paramId(node: Qube) -> None:
+            if node.key == "param":
+                node.key = "paramId"
+                node.values = QEnum([int(x) for x in node.values])
+
+        checkpoint_output.walk(_param_to_paramId)
+
         return Inference(
             ckpt=self._local_path,
             lead_time=lead_time,
             environment=env,
-            expansion_qube=self.checkpoint.get_model_output(lead_time=lead_time),
+            expansion_qube=checkpoint_output,
             **self.checkpoint.get_additional_kwargs(),
         )
 
