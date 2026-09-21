@@ -250,9 +250,9 @@ class CustomThresholdProbability(Product):
         return contains(other, ENSEMBLE) and len(axes(other)[ENSEMBLE]) > 1 and contains(other, PARAM)
 
 
-class ThermalIndices(Product):
-    title: str = "Thermal Indices"
-    description: str = "Computes thermal indices"
+class DerivedSurfaceParameters(Product):
+    title: str = "Derived Parameters"
+    description: str = "Computes derived parameters from input datasets"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         PARAM: BlockConfigurationOption(
             title="Parameters",
@@ -261,20 +261,11 @@ class ThermalIndices(Product):
         ),
     }
     inputs: list[str] = ["dataset"]
-    thermo_params: list[str] = [
-        "261001",
-        "261014",
-        "261015",
-        "260004",
-        "260242",
-        "261016",
-        "260005",
-        "260255",
-        "261018",
-        "261002",
-        "261023",
-    ]
     stat_type: list[str] = ["cf", "pf", "fc"]
+
+    @property
+    def derived_params(self) -> list[str]:
+        raise NotImplementedError()
 
     def validate(
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
@@ -282,16 +273,16 @@ class ThermalIndices(Product):
         input_dataset = _extract_dataset(inputs, "dataset")
         surface_cubes = select(input_dataset, {"levtype": "sfc"})
         coords = {dim: list(values) for dim, values in axes(surface_cubes).items() if len(values) == 1}
-        thermo_qube = Qube.empty()
+        derived_qube = Qube.empty()
         for output, _ in PPROC_SCHEMA.outputs_from_inputs(
             forecast=ForecastDefinition(datacubes=list(datacubes(surface_cubes))),
-            output_template={**coords, PARAM: self.thermo_params, TYPE: list(axes(surface_cubes)[TYPE])},
+            output_template={**coords, PARAM: self.derived_params, TYPE: list(axes(surface_cubes)[TYPE])},
         ):
-            thermo_qube = thermo_qube | Qube.from_datacube(output)
+            derived_qube = derived_qube | Qube.from_datacube(output)
 
-        restrictions[PARAM] = ListType(ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(thermo_qube)[PARAM]]))
+        restrictions[PARAM] = ListType(ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(derived_qube)[PARAM]]))
         selected_param_ids = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
-        param_qube = thermo_qube.select({PARAM: selected_param_ids})
+        param_qube = derived_qube.select({PARAM: selected_param_ids})
         # Compute for all steps available for all selected parameters
         allowed_steps = set.intersection(*[set(x[STEP]) for x in datacubes(param_qube)])
 
@@ -322,7 +313,6 @@ class ThermalIndices(Product):
 
     def intersect(self, other: QubedOutput) -> bool:
         surface_cubes = select(other, {"levtype": "sfc"})
-        # Thermal indices can only be computed from forecast outputs
         fc_types = set.intersection(axes(surface_cubes).get(TYPE, set()), self.stat_type)
         if len(fc_types) == 0:
             return False
@@ -331,7 +321,7 @@ class ThermalIndices(Product):
         try:
             for _ in PPROC_SCHEMA.outputs_from_inputs(
                 forecast=ForecastDefinition(datacubes=list(datacubes(surface_cubes))),
-                output_template={**coords, PARAM: self.thermo_params, TYPE: list(fc_types)},
+                output_template={**coords, PARAM: self.derived_params, TYPE: list(fc_types)},
                 method="dfs",
             ):
                 return True
@@ -339,3 +329,41 @@ class ThermalIndices(Product):
             logger.debug(e)
             pass
         return False
+
+
+class ThermalIndices(DerivedSurfaceParameters):
+    title: str = "Thermal Indices"
+    description: str = "Computes thermal indices"
+
+    @property
+    def derived_params(self) -> list[str]:
+        return [
+            "261001",
+            "261014",
+            "261015",
+            "260004",
+            "260242",
+            "261016",
+            "260005",
+            "260255",
+            "261018",
+            "261002",
+            "261023",
+        ]
+
+
+class WindSpeed(DerivedSurfaceParameters):
+    title: str = "Wind Speed"
+    description: str = "Computes wind speed from u and v wind components"
+
+    @property
+    def derived_params(self) -> list[str]:
+        """
+        Returns a list of parameter IDs for wind speeds ws, 10m ws, 100m ws, 200m ws.
+        """
+        return [
+            "10",
+            "207",
+            "228249",
+            "228241",
+        ]

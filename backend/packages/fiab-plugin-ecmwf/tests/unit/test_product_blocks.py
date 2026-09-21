@@ -51,6 +51,7 @@ from fiab_plugin_ecmwf.products.blocks import (
     EnsembleStatistics,
     PredefinedThresholdProbability,
     ThermalIndices,
+    WindSpeed,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, select
 
@@ -59,6 +60,7 @@ PRODUCT_BLOCKS = [
     BlockFactoryId("predefinedThresholdProbability"),
     BlockFactoryId("customThresholdProbability"),
     BlockFactoryId("thermalIndices"),
+    BlockFactoryId("windSpeed"),
 ]
 
 
@@ -112,6 +114,20 @@ def thermal_indices_configuration() -> BlockInstance:
             },
         ),
         ThermalIndices.configuration_options,
+    )
+
+
+@pytest.fixture
+def wind_speed_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("windSpeed"),
+        BlockInstanceBase(
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values={
+                PARAM: [_param_id_to_param_key(id) for id in ["207", "228249"]],
+            },
+        ),
+        WindSpeed.configuration_options,
     )
 
 
@@ -462,7 +478,7 @@ class TestThermalIndices:
         dummy_checkpoint: CompositeArtifactId,
         anemoi_source_ensemble_output: QubedOutput,
         thermal_indices_configuration: BlockInstance,
-        ensemble: list[int],
+        ensemble: int,
         expected: int,
     ) -> None:
         block_instance = BlockInstance.from_block(
@@ -584,3 +600,140 @@ class TestThermalIndices:
         for param in ["260004", "260242", "261016", "260005", "260255", "261018", "261023"]:
             assert _param_id_to_param_key(param) in restrictions[PARAM].serialize()
         assert _param_id_to_param_key("261001") not in restrictions[PARAM].serialize()
+
+
+class TestWindSpeed:
+    @pytest.mark.parametrize(
+        "forecast_output",
+        [
+            lf("full_operational_forecast_source_output"),
+            # lf("anemoi_source_ensemble_output"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "oper_selection",
+        [
+            {ENSEMBLE: [0], STEP: [0, 6, 12]},
+            {ENSEMBLE: [0, 1, 2], STEP: [0, 6, 12]},
+        ],
+        ids=["single", "ensemble"],
+    )
+    def test_from_forecast_source(
+        self,
+        forecast_output: QubedOutput,
+        wind_speed_configuration: BlockInstance,
+        oper_selection: dict[str, list[int | str]],
+    ) -> None:
+        block = WindSpeed()
+        source_output = select(forecast_output, oper_selection)
+        source_axes = axes(source_output)
+        if len(oper_selection[ENSEMBLE]) == 1:
+            source_output = collapse(source_output, ENSEMBLE)
+
+        assert block.intersect(other=source_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=wind_speed_configuration,
+            inputs={"dataset": source_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        output_axes = axes(output)
+        assert len(output_axes.get(PARAM, [])) == 2
+        assert len(output_axes.get(STEP, [])) > 0
+        for cube in datacubes(output):
+            cube.pop(PARAM, None)
+            assert all(set(cube[dim]).issubset(source_axes[dim]) for dim in cube)
+            assert select(source_output, cube).dataqube is not None
+        if len(oper_selection[ENSEMBLE]) == 1:
+            assert ENSEMBLE not in output_axes
+        else:
+            assert ENSEMBLE in output_axes
+            assert output_axes[ENSEMBLE] == set(oper_selection[ENSEMBLE])
+
+    @pytest.mark.parametrize(
+        "oper_selection, expected",
+        [
+            [{ENSEMBLE: [0]}, 1],
+            [{ENSEMBLE: [0, 1, 2]}, 2],
+        ],
+        ids=["single", "ensemble"],
+    )
+    def test_operational_forecast_source_compile(
+        self,
+        mock_forecast_preset: pytest.FixtureRequest,
+        dummy_blockinstance: BlockInstance,
+        full_operational_forecast_source_output: QubedOutput,
+        wind_speed_configuration: BlockInstance,
+        oper_selection: dict[str, list[int | str]],
+        expected: int,
+    ) -> None:
+        selection = {STEP: [0, 6, 12], ENSEMBLE: oper_selection[ENSEMBLE]}
+        operational_forecast_source_output = select(full_operational_forecast_source_output, selection)
+        if len(oper_selection[ENSEMBLE]) == 1:
+            operational_forecast_source_output = collapse(operational_forecast_source_output, ENSEMBLE)
+        operational_forecast_source_action = (
+            OperationalForecastSource().compile(inputs={}, block=dummy_blockinstance).get_or_raise().select(selection, expand=True)
+        )
+
+        block = WindSpeed()
+        output = block.validate(block=wind_speed_configuration, inputs={"dataset": operational_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
+
+        if len(oper_selection[ENSEMBLE]) == 1:
+            operational_forecast_source_action._squeeze_dimension(ENSEMBLE, drop=True)
+
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): operational_forecast_source_action},
+            block=wind_speed_configuration,
+        ).get_or_raise()
+        requests = nodetree.datacubes(action.nodes)
+        assert len(requests) == expected
+        assert all(req[PARAM] == ["207", "228249"] for req in requests)
+        assert list(datacubes(output)) == requests
+
+    @pytest.mark.parametrize(
+        "ensemble, expected",
+        [
+            [1, 1],
+            # [[1, 2, 3], 2],
+        ],
+        ids=["single"],
+    )
+    def test_anemoi_source_compile(
+        self,
+        dummy_checkpoint: CompositeArtifactId,
+        anemoi_source_ensemble_output: QubedOutput,
+        wind_speed_configuration: BlockInstance,
+        ensemble: int,
+        expected: int,
+    ) -> None:
+        block_instance = BlockInstance.from_block(
+            BlockFactoryId("anemoiSource"),
+            BlockInstanceBase(
+                input_ids={},
+                configuration_values={
+                    CHECKPOINT: dummy_checkpoint,
+                    INPUT_SOURCE: "opendata",
+                    LEAD_TIME: 24,
+                    BASE_TIME: datetime(2024, 1, 1),
+                    ENSEMBLE: ensemble,
+                },
+            ),
+            AnemoiSource.configuration_options,
+        )
+        source_action = AnemoiSource().compile(inputs={}, block=block_instance).get_or_raise()
+        if ensemble == 1:
+            anemoi_source_ensemble_output = coxpand(anemoi_source_ensemble_output, ENSEMBLE, {ENSEMBLE: [1]})
+
+        block = WindSpeed()
+        output = block.validate(block=wind_speed_configuration, inputs={"dataset": anemoi_source_ensemble_output}, restrictions={})  # type: ignore[dict-item]
+
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): source_action},
+            block=wind_speed_configuration,
+        ).get_or_raise()
+        requests = nodetree.datacubes(action.nodes)
+        assert len(requests) == expected
+        assert all(req[PARAM] == ["207", "228249"] for req in requests)
+        for index, cube in enumerate(datacubes(output)):
+            assert all(cube[dim] == requests[index][dim] for dim in cube)

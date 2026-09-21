@@ -8,7 +8,7 @@ config:
   filter:type:
     fc/cf/pf:
       filter:param:
-        "10/207":
+        "10/207/228249/228241":
           preprocessing:
             - operation: norm
         "261016":
@@ -875,6 +875,10 @@ inputs:
           fc_inputs:
             select:
               param: ["228246", "228247"]
+        "228241":
+          fc_inputs:
+            select:
+              param: ["228239", "228240"]
         "261001":
           fc_inputs:
             - select:
