@@ -371,12 +371,12 @@ class WindSpeed(DerivedSurfaceParameters):
 
 
 class Quantiles(Product):
-    title: str = "Ensemble Mean and Standard Deviation"
-    description: str = "Computes ensemble mean or standard deviation"
+    title: str = "Quantiles"
+    description: str = "Computes quantiles over ensemble members"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         QUANTILE: BlockConfigurationOption(
             title="Quantiles",
-            description="Quantiles to compute over the ensemble",
+            description="Number of quantiles to compute over the ensemble",
             value_type=IntType(),
             default_value="100",
         ),
