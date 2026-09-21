@@ -79,7 +79,9 @@
       "failed": "Could not reach {{name}}",
       "checking": "Checking WMS capabilities…",
       "timedOut": "{{name}} timed out — the server may be slow, try again",
-      "interrupted": "{{name}} dropped the connection while sending its catalog — try again, or later"
+      "interrupted": "{{name}} dropped the connection while sending its catalog — try again, or later",
+      "ecmwfKeyHint": "Use your ECMWF key for more layers",
+      "ecmwfKeyActive": "Using your ECMWF key"
     }
   },
   "viewerError": {
@@ -443,5 +445,24 @@
     "title": "Visualise forecasts on a map",
     "description": "Load a previously generated result, connect an external WMS server, or point at a GRIB folder on the host. One source opens a map view; a second turns it into a comparison.",
     "browseAll": "Browse all runs"
+  },
+  "ecmwfKey": {
+    "title": "ECMWF API key",
+    "description": "Unlocks the layers your ECMWF account is entitled to on the ECMWF WMS server. The key is kept in this browser only.",
+    "keyPage": "Find your key at api.ecmwf.int",
+    "label": "API key",
+    "placeholder": "Paste your key",
+    "save": "Save",
+    "remove": "Remove key",
+    "cancel": "Cancel",
+    "checking": "Checking the key with the ECMWF WMS server…",
+    "rejected": "The ECMWF WMS server rejected this key.",
+    "unreachable": "The ECMWF WMS server did not accept this key, or could not be reached. Check the key and try again.",
+    "show": "Show key",
+    "hide": "Hide key",
+    "activeTitle": "Key active",
+    "activeTail": "ending in …{{tail}}",
+    "replaceLabel": "Replace key",
+    "replace": "Replace"
   }
 }

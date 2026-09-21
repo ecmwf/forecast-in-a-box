@@ -130,7 +130,9 @@
     "signOut": "Sign Out",
     "timezoneDialogTitle": "Application timezone",
     "timezoneDialogDescription": "All dates and times — including forecast base times — are shown and entered in this timezone. Defaults to UTC.",
-    "schedules": "Scheduled runs"
+    "schedules": "Scheduled runs",
+    "ecmwfKey": "ECMWF API key",
+    "ecmwfKeySet": "set"
   },
   "commandPalette": {
     "title": "Command Palette",

@@ -37,6 +37,8 @@ import {
 import { buildLensBaseUrl, stopLens } from '@/api/endpoints/lens'
 import { ApiClientError } from '@/api/client'
 import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
+import { withEcmwfKey } from '@/features/visualise/ecmwf-key'
+import { useEcmwfKey } from '@/stores/ecmwfKeyStore'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('useComparisonSource')
@@ -116,6 +118,7 @@ export function useComparisonSource(
 ): ComparisonSourceState {
   const { autoStart } = options
   const isOutput = entry?.kind === 'output'
+  const ecmwfKey = useEcmwfKey()
 
   // 1) Resolve the directory (output entries only; a path IS the dir).
   const dirQuery = useStoredDirPath(
@@ -259,7 +262,7 @@ export function useComparisonSource(
   if (entry.kind === 'wms') {
     return {
       phase: 'running',
-      baseUrl: entry.url,
+      baseUrl: withEcmwfKey(entry.url, ecmwfKey),
       lensId: null,
       localPath: null,
     }

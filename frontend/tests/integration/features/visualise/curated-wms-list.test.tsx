@@ -14,6 +14,7 @@ import { I18nextProvider } from 'react-i18next'
 import { CuratedWmsList } from '@/features/visualise/components/sources/CuratedWmsList'
 import { CURATED_WMS_SERVERS } from '@/features/visualise/curated-wms'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
+import { useEcmwfKeyStore } from '@/stores/ecmwfKeyStore'
 import i18n from '@/lib/i18n'
 
 vi.mock('@/features/visualise/wms-probe', () => ({
@@ -59,7 +60,8 @@ describe('CuratedWmsList', () => {
       .getByText('ECMWF', { exact: true })
       .element()
       .closest('li')!
-    ;(row.querySelector('button') as HTMLButtonElement).click()
+    // Skip the key hint button that precedes Add on this row.
+    ;(row.querySelector('button[data-server]') as HTMLButtonElement).click()
 
     await expect
       .poll(() => useComparisonStore.getState().entries)
@@ -68,6 +70,18 @@ describe('CuratedWmsList', () => {
     await expect
       .element(screen.getByRole('button', { name: /added/i }))
       .toBeDisabled()
+  })
+
+  it('offers the ECMWF key dialog on the ECMWF row only', async () => {
+    const screen = await renderList()
+    await screen
+      .getByRole('button', { name: 'Use your ECMWF key for more layers' })
+      .click()
+    expect(useEcmwfKeyStore.getState().dialogOpen).toBe(true)
+    // One hint in the whole list.
+    expect(
+      screen.getByRole('button', { name: /ECMWF key/ }).elements(),
+    ).toHaveLength(1)
   })
 
   it('shows a checking hint while the probe runs', async () => {
