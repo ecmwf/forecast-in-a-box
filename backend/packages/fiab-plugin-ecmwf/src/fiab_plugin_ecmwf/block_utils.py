@@ -30,6 +30,7 @@ THRESHOLD = ConfigurationOptionId("threshold")
 TIME = ConfigurationOptionId("time")
 TYPE = ConfigurationOptionId("type")
 VALUES = ConfigurationOptionId("values")
+QUANTILE = ConfigurationOptionId("quantile")
 
 
 ParamDBInstance = ParamDB()

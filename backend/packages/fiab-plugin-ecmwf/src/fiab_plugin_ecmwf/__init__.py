@@ -26,6 +26,7 @@ from fiab_plugin_ecmwf.products.blocks import (
     CustomThresholdProbability,
     EnsembleStatistics,
     PredefinedThresholdProbability,
+    Quantiles,
     ThermalIndices,
     WindSpeed,
 )
@@ -40,6 +41,7 @@ blocks: dict[BlockFactoryId, QubedBlockBuilder] = {
     BlockFactoryId("customThresholdProbability"): CustomThresholdProbability(),
     BlockFactoryId("thermalIndices"): ThermalIndices(),
     BlockFactoryId("windSpeed"): WindSpeed(),
+    BlockFactoryId("quantiles"): Quantiles(),
     BlockFactoryId("select"): Select(),
     BlockFactoryId("zarrSink"): ZarrSink(),
     BlockFactoryId("gribSink"): GribSink(),

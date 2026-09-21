@@ -40,6 +40,7 @@ from fiab_plugin_ecmwf.block_utils import (
     LEAD_TIME,
     LEVTYPE,
     PARAM,
+    QUANTILE,
     STEP,
     THRESHOLD,
     TYPE,
@@ -50,6 +51,7 @@ from fiab_plugin_ecmwf.products.blocks import (
     CustomThresholdProbability,
     EnsembleStatistics,
     PredefinedThresholdProbability,
+    Quantiles,
     ThermalIndices,
     WindSpeed,
 )
@@ -61,6 +63,7 @@ PRODUCT_BLOCKS = [
     BlockFactoryId("customThresholdProbability"),
     BlockFactoryId("thermalIndices"),
     BlockFactoryId("windSpeed"),
+    BlockFactoryId("quantiles"),
 ]
 
 
@@ -128,6 +131,20 @@ def wind_speed_configuration() -> BlockInstance:
             },
         ),
         WindSpeed.configuration_options,
+    )
+
+
+@pytest.fixture
+def quantiles_configuration() -> BlockInstance:
+    return BlockInstance.from_block(
+        BlockFactoryId("quantiles"),
+        BlockInstanceBase(
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values={
+                QUANTILE: 4,
+            },
+        ),
+        Quantiles.configuration_options,
     )
 
 
@@ -737,3 +754,72 @@ class TestWindSpeed:
         assert all(req[PARAM] == ["207", "228249"] for req in requests)
         for index, cube in enumerate(datacubes(output)):
             assert all(cube[dim] == requests[index][dim] for dim in cube)
+
+
+class TestQuantiles:
+    @pytest.mark.parametrize(
+        "forecast_output, expected_params",
+        [
+            (lf("operational_forecast_source_output"), {"167", "151", "131"}),
+            # (lf("anemoi_source_ensemble_output"), {"167", "151"}),
+        ],
+    )
+    def test_from_forecast_source(
+        self, quantiles_configuration: BlockInstance, forecast_output: QubedOutput, expected_params: set[str]
+    ) -> None:
+        block = Quantiles()
+
+        assert block.intersect(other=forecast_output)  # type: ignore[arg-type]
+        output = block.validate(  # type: ignore[assignment]
+            block=quantiles_configuration,
+            inputs={"dataset": forecast_output},  # type: ignore[dict-item],
+            restrictions={},
+        )
+        assert isinstance(output, QubedOutput)
+        assert output.dataqube is not None
+        assert contains(output, PARAM)
+        assert axes(output)[PARAM] == expected_params
+        assert axes(output)[TYPE] == {"pb"}
+        assert axes(output)[QUANTILE] == {f"{q}:4" for q in range(5)}
+
+    @pytest.mark.parametrize(
+        "forecast_output, source_action, expected, identical_qubes",
+        [
+            (
+                lf("operational_forecast_source_output"),
+                lf("operational_forecast_source_action"),
+                {PARAM: {"167", "151", "131"}, TYPE: {"pb"}, STEP: {0, 6, 12}},
+                True,
+            ),
+            # (
+            #     lf("anemoi_source_ensemble_output"),
+            #     lf("anemoi_source_ensemble_action"),
+            #     {PARAM: {"2t", "msl"}, TYPE: {"em"}, STEP: set(range(1, 25))},
+            #     False,
+            # ),
+        ],
+    )
+    def test_compile(
+        self,
+        quantiles_configuration: BlockInstance,
+        forecast_output: QubedOutput,
+        source_action: Action,
+        expected: dict[str, set[Any]],
+        identical_qubes: bool,
+    ) -> None:
+        block = Quantiles()
+        output = block.validate(block=quantiles_configuration, inputs={"dataset": forecast_output}, restrictions={})  # type: ignore[dict-item]
+        action = block.compile(
+            inputs={BlockInstanceId("source_output"): source_action},
+            block=quantiles_configuration,
+        ).get_or_raise()
+        requests = nodetree.datacubes(action.nodes)
+        assert len(requests) == 2
+        for dim, values in expected.items():
+            assert set.union(*[set(req[dim]) for req in requests]) == values
+        if identical_qubes:
+            assert list(datacubes(output)) == requests
+
+    def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
+        for expansion in plugin().expander(ensemble_statistics_output):
+            assert expansion.factory not in PRODUCT_BLOCKS

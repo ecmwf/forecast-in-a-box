@@ -24,7 +24,7 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Product
-from fiab_core.types import ClosedEnumType, FloatType, ListType, ParameterType
+from fiab_core.types import ClosedEnumType, FloatType, IntType, ListType, ParameterType
 from ppcore.products import action_from_outputs
 from ppcore.schema.forecast import ForecastDefinition
 from ppcore.schema.schema import Schema
@@ -35,6 +35,7 @@ from fiab_plugin_ecmwf.block_utils import (
     COMPARISON,
     ENSEMBLE,
     PARAM,
+    QUANTILE,
     STATISTIC,
     STEP,
     THRESHOLD,
@@ -367,3 +368,51 @@ class WindSpeed(DerivedSurfaceParameters):
             "228249",
             "228241",
         ]
+
+
+class Quantiles(Product):
+    title: str = "Ensemble Mean and Standard Deviation"
+    description: str = "Computes ensemble mean or standard deviation"
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        QUANTILE: BlockConfigurationOption(
+            title="Quantiles",
+            description="Quantiles to compute over the ensemble",
+            value_type=IntType(),
+            default_value="100",
+        ),
+    }
+    inputs: list[str] = ["dataset"]
+    stat_type: str = "pb"
+
+    def validate(
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
+        input_dataset = _extract_dataset(inputs, "dataset")
+        quantile = block.config_as_int(QUANTILE)
+        coords = axes(input_dataset)
+        output = coxpand(
+            select(input_dataset, {ENSEMBLE: 1}),
+            [dim for dim in [ENSEMBLE, TYPE] if dim in coords],
+            {TYPE: [self.stat_type], QUANTILE: [f"{q}:{quantile}" for q in range(quantile + 1)]},
+        )
+        return output
+
+    def compile(
+        self,
+        inputs: ActionLookup,
+        block: BlockInstanceRich,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+        input_task_action = inputs[input_task]
+        output_qube = self.validate(
+            block, {"dataset": QubedOutput(dataqube=from_datacubes(nodetree_datacubes(input_task_action.nodes)))}, {}
+        )
+        action = action_from_outputs(
+            requests=list(datacubes(output_qube)),
+            pproc_schema=PPROC_SCHEMA,
+            forecast=input_task_action.as_action(PProcAction),
+        )
+        return Either.ok(action)
+
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, ENSEMBLE) and len(axes(other)[ENSEMBLE]) > 1 and contains(other, PARAM)

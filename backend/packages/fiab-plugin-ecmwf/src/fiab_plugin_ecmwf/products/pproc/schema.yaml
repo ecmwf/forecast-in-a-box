@@ -373,6 +373,19 @@ config:
               edition: 2
               bitsPerValue: 16
               productDefinitionTemplateNumber: 12
+    pb:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      statistics:
+        operation: quantiles
+        metadata:
+          edition: 2
+          bitsPerValue: 16
+          productDefinitionTemplateNumber: 86
+      filter:steptype:
+        instantaneous: {}
+        range:
+          metadata:
+            productDefinitionTemplateNumber: 87
     ep:
       metadata_from_output: ["param", "stream", "date", "type"]
       statistics:
