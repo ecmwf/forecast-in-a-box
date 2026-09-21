@@ -32,23 +32,22 @@ TYPE = ConfigurationOptionId("type")
 VALUES = ConfigurationOptionId("values")
 
 
-@functools.cache
+ParamDBInstance = ParamDB()
+
+
 def _param_id_to_param_key(param_id: str) -> str:
+    # TODO: Improve efficiency due to repeated calls in block validation
     try:
         param_id_int = int(param_id)
     except ValueError:
         return param_id
-    db = ParamDB()
-    shortname = db.param_id_to_shortname(param_id_int)
+    shortname = ParamDBInstance.param_id_to_shortname(param_id_int)
     return f"{shortname}-{param_id}"
 
 
-@functools.cache
 def _param_key_to_param_id(param_key: str) -> str:
-    if "-" not in param_key:
-        return param_key
-    _, param_id = param_key.split("-", 1)
-    return param_id
+    idx = param_key.find("-")
+    return param_key[idx + 1 :] if idx != -1 else param_key
 
 
 def _extract_dataset(inputs: dict[str, QubedOutput], name: str) -> QubedOutput:

@@ -30,6 +30,7 @@ from ppcore.schema.forecast import ForecastDefinition
 from ppcore.schema.schema import Schema
 from qubed import Qube
 
+import fiab_plugin_ecmwf.products.pproc
 from fiab_plugin_ecmwf.block_utils import (
     COMPARISON,
     ENSEMBLE,
@@ -49,7 +50,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_pproc_schema(cache_size: int) -> Schema:
-    with as_file(files("fiab_plugin_ecmwf.products.pproc") / "schema.yaml") as pproc_schema:
+    with as_file(files(fiab_plugin_ecmwf.products.pproc) / "schema.yaml") as pproc_schema:
         return Schema.from_file(str(pproc_schema), matching_cache_size=cache_size)
 
 

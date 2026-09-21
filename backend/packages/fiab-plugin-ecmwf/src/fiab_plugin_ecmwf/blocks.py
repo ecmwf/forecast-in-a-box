@@ -27,7 +27,6 @@ from fiab_core.fable import (
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Sink, Source, Transform
 from fiab_core.types import ClosedEnumType, DatetimeType, GeoDomainType, ListType, ParameterType, StringType
-from pymetkit.paramdb import ParamDB
 from qubed import Qube
 
 from fiab_plugin_ecmwf.block_utils import (
@@ -46,6 +45,7 @@ from fiab_plugin_ecmwf.block_utils import (
     SPLITBY,
     STEP,
     VALUES,
+    ParamDBInstance,
     _axis_value_strings,
     _extract_dataset,
     _is_empty_qube,
@@ -125,7 +125,6 @@ class OperationalForecastSource(Source):
         forecast = block.config_as_str(FORECAST)
         fc_preset = FORECAST_DATASETS[forecast]
         fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
-        paramdb = ParamDB()
 
         basetime = block.config_as_datetime(BASE_TIME)
         date = basetime.strftime("%Y%m%d")
@@ -162,7 +161,7 @@ class OperationalForecastSource(Source):
                                         "requests": [
                                             dict(
                                                 {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
-                                                param=paramdb.param_id_to_shortname(int(p)),
+                                                param=ParamDBInstance.param_id_to_shortname(int(p)),
                                                 step=step,
                                             )
                                         ],

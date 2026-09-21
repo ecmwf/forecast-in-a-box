@@ -4,8 +4,9 @@ from importlib.resources import files
 from typing import Optional
 
 import yaml
-from pymetkit.paramdb import ParamDB
 from qubed import Qube
+
+from fiab_plugin_ecmwf.block_utils import ParamDBInstance
 
 
 @dataclass(init=False, frozen=True, eq=True, slots=True)
@@ -15,11 +16,10 @@ class ForecastDataset:
 
     def __init__(self, datacubes: list[dict], member_zero: Optional[dict] = None, shortname_to_paramid: bool = True) -> None:
         if shortname_to_paramid:
-            paramdb = ParamDB()
             for index, cube in enumerate(datacubes):
                 cube = cube.copy()
                 cube["param"] = [
-                    str(paramdb.shortname_to_param_id(shortname, context={k: cube[k] for k in ["class", "stream", "type"]}))
+                    str(ParamDBInstance.shortname_to_param_id(shortname, context={k: cube[k] for k in ["class", "stream", "type"]}))
                     for shortname in cube["param"]
                 ]
                 datacubes[index] = cube
