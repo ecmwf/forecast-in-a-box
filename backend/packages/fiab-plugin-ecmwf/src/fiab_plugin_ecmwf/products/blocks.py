@@ -251,7 +251,7 @@ class CustomThresholdProbability(Product):
         return contains(other, ENSEMBLE) and len(axes(other)[ENSEMBLE]) > 1 and contains(other, PARAM)
 
 
-class DerivedSurfaceParameters(Product):
+class DerivedParameters(Product):
     title: str = "Derived Parameters"
     description: str = "Computes derived parameters from input datasets"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
@@ -268,16 +268,19 @@ class DerivedSurfaceParameters(Product):
     def derived_params(self) -> list[str]:
         raise NotImplementedError()
 
+    def input_dataset_selection(self, input_dataset: QubedOutput) -> QubedOutput:
+        return input_dataset
+
     def validate(
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         input_dataset = _extract_dataset(inputs, "dataset")
-        surface_cubes = select(input_dataset, {"levtype": "sfc"})
-        coords = {dim: list(values) for dim, values in axes(surface_cubes).items() if len(values) == 1}
+        input_cube = self.input_dataset_selection(input_dataset)
+        coords = {dim: list(values) for dim, values in axes(input_cube).items() if len(values) == 1}
         derived_qube = Qube.empty()
         for output, _ in PPROC_SCHEMA.outputs_from_inputs(
-            forecast=ForecastDefinition(datacubes=list(datacubes(surface_cubes))),
-            output_template={**coords, PARAM: self.derived_params, TYPE: list(axes(surface_cubes)[TYPE])},
+            forecast=ForecastDefinition(datacubes=list(datacubes(input_cube))),
+            output_template={**coords, PARAM: self.derived_params, TYPE: list(axes(input_cube)[TYPE])},
         ):
             derived_qube = derived_qube | Qube.from_datacube(output)
 
@@ -291,9 +294,9 @@ class DerivedSurfaceParameters(Product):
         # output that might be missing in the output mars keys emitted by PProc
         output_qube = Qube.empty()
         for datacube in param_qube.select({STEP: allowed_steps}).datacubes():
-            datacube.pop(PARAM, None)
-            output_qube = output_qube | select(input_dataset, datacube).dataqube
-        return coxpand(QubedOutput(dataqube=output_qube), [PARAM], {PARAM: selected_param_ids})
+            params = datacube.pop(PARAM)
+            output_qube = output_qube | coxpand(select(input_dataset, datacube), [PARAM], {PARAM: params}).dataqube
+        return QubedOutput(dataqube=output_qube)
 
     def compile(
         self,
@@ -313,28 +316,32 @@ class DerivedSurfaceParameters(Product):
         return Either.ok(action)
 
     def intersect(self, other: QubedOutput) -> bool:
-        surface_cubes = select(other, {"levtype": "sfc"})
-        fc_types = set.intersection(axes(surface_cubes).get(TYPE, set()), self.stat_type)
+        input_cubes = self.input_dataset_selection(other)
+        fc_types = set.intersection(axes(input_cubes).get(TYPE, set()), self.stat_type)
         if len(fc_types) == 0:
             return False
 
-        coords = {dim: list(values) for dim, values in axes(surface_cubes).items() if len(values) == 1}
         try:
-            for _ in PPROC_SCHEMA.outputs_from_inputs(
-                forecast=ForecastDefinition(datacubes=list(datacubes(surface_cubes))),
-                output_template={**coords, PARAM: self.derived_params, TYPE: list(fc_types)},
-                method="dfs",
-            ):
-                return True
+            for input_cube in datacubes(input_cubes):
+                coords = {dim: list(values) for dim, values in input_cube.items() if len(values) == 1}
+                for _ in PPROC_SCHEMA.outputs_from_inputs(
+                    forecast=ForecastDefinition(datacubes=list(datacubes(input_cubes))),
+                    output_template={**coords, PARAM: self.derived_params, TYPE: list(fc_types)},
+                    method="dfs",
+                ):
+                    return True
         except Exception as e:
             logger.debug(e)
             pass
         return False
 
 
-class ThermalIndices(DerivedSurfaceParameters):
+class ThermalIndices(DerivedParameters):
     title: str = "Thermal Indices"
     description: str = "Computes thermal indices"
+
+    def input_dataset_selection(self, input_dataset: QubedOutput) -> QubedOutput:
+        return select(input_dataset, {"levtype": "sfc"})
 
     @property
     def derived_params(self) -> list[str]:
@@ -353,7 +360,7 @@ class ThermalIndices(DerivedSurfaceParameters):
         ]
 
 
-class WindSpeed(DerivedSurfaceParameters):
+class WindSpeed(DerivedParameters):
     title: str = "Wind Speed"
     description: str = "Computes wind speed from u and v wind components"
 

@@ -127,7 +127,7 @@ def wind_speed_configuration() -> BlockInstance:
         BlockInstanceBase(
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
-                PARAM: [_param_id_to_param_key(id) for id in ["207", "228249"]],
+                PARAM: [_param_id_to_param_key(id) for id in ["10", "207", "228249"]],
             },
         ),
         WindSpeed.configuration_options,
@@ -624,10 +624,10 @@ class TestThermalIndices:
 
 class TestWindSpeed:
     @pytest.mark.parametrize(
-        "forecast_output",
+        "forecast_output, expected_params",
         [
-            lf("full_operational_forecast_source_output"),
-            # lf("anemoi_source_ensemble_output"),
+            [lf("full_operational_forecast_source_output"), {"10", "207", "228249"}],
+            # [lf("anemoi_source_ensemble_output"), {"10", "207"}],
         ],
     )
     @pytest.mark.parametrize(
@@ -643,6 +643,7 @@ class TestWindSpeed:
         forecast_output: QubedOutput,
         wind_speed_configuration: BlockInstance,
         oper_selection: dict[str, list[int | str]],
+        expected_params: set[str],
     ) -> None:
         block = WindSpeed()
         source_output = select(forecast_output, oper_selection)
@@ -659,7 +660,7 @@ class TestWindSpeed:
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         output_axes = axes(output)
-        assert len(output_axes.get(PARAM, [])) == 2
+        assert output_axes.get(PARAM, set()) == expected_params
         assert len(output_axes.get(STEP, [])) > 0
         for cube in datacubes(output):
             cube.pop(PARAM, None)
@@ -674,8 +675,8 @@ class TestWindSpeed:
     @pytest.mark.parametrize(
         "oper_selection, expected",
         [
-            [{ENSEMBLE: [0]}, 1],
-            [{ENSEMBLE: [0, 1, 2]}, 2],
+            [{ENSEMBLE: [0]}, 2],
+            [{ENSEMBLE: [0, 1, 2]}, 4],
         ],
         ids=["single", "ensemble"],
     )
@@ -708,7 +709,7 @@ class TestWindSpeed:
         ).get_or_raise()
         requests = nodetree.datacubes(action.nodes)
         assert len(requests) == expected
-        assert all(req[PARAM] == ["207", "228249"] for req in requests)
+        assert all(set(req[PARAM]).issubset({"10", "207", "228249"}) for req in requests)
         assert list(datacubes(output)) == requests
 
     @pytest.mark.parametrize(
@@ -754,7 +755,7 @@ class TestWindSpeed:
         ).get_or_raise()
         requests = nodetree.datacubes(action.nodes)
         assert len(requests) == expected
-        assert all(req[PARAM] == ["207", "228249"] for req in requests)
+        assert all(set(req[PARAM]).issubset({"10", "207", "228249"}) for req in requests)
         for index, cube in enumerate(datacubes(output)):
             assert all(cube[dim] == requests[index][dim] for dim in cube)
 
