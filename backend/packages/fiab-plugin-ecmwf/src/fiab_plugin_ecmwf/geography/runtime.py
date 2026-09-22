@@ -44,7 +44,7 @@ def _get_bbox_from_string(identifier: str) -> BBox:
     # NOTE: These Domain classes will be migrated to earthkit-geo soon (tm)
     # NOTE: Update to .plots.geography.* if upgrading to earthkit-plots > 1.0
     try:
-        from earthkit.plots.geo.domains import Domain
+        from earthkit.plots.geo.domains import Domain  # type: ignore[unresolved-import]
     except ImportError as e:
         raise RuntimeError("Cannot import `earthkit-plots") from e
 
