@@ -87,6 +87,7 @@ def _parse(type_expr: str) -> tuple[FableType, str]:
         ("geodomainSingle", GeoDomainSingleType),
         ("bboxWSEN", BoundingBoxWSENType),
         ("geodomain", GeoDomainType),
+        ("grid", GridType),
     ]
     for name, factory in _ATOMIC:
         n = len(name)
@@ -140,7 +141,7 @@ def _parse(type_expr: str) -> tuple[FableType, str]:
 
     raise NotFableType(
         f"Invalid type expression: {type_expr!r}. "
-        "Expected one of: str, int, float, date, datetime, timedelta, none, country, bboxWSEN, geodomain, "
+        "Expected one of: str, int, float, date, datetime, timedelta, none, country, bboxWSEN, geodomain, grid, "
         "enumClosed[subtype](...), enumOpen[subtype](...), list[...], union[...]"
     )
 

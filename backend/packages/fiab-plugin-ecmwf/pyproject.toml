@@ -29,6 +29,7 @@ optional-dependencies.runtime = [
     "earthkit>=0.13.2",
     "earthkit-plots>=0.3.5,<1.0",
     "earthkit-workflows-anemoi[runtime-inference]",
+    "mir-python",
 ]
 
 [dependency-groups]

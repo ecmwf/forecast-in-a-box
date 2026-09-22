@@ -10,11 +10,11 @@
 """Utilities for converting between various representations"""
 
 from dataclasses import dataclass, field, replace
-from typing import NewType, Self
+from typing import Literal, NewType, Self
 
 from fiab_core.types import UnrestrictedGeoDomainLiteral
 
-GeoDomainRuntimeType = list[str] | UnrestrictedGeoDomainLiteral | list[int]
+GeoDomainRuntimeType = list[str] | UnrestrictedGeoDomainLiteral | list[float]
 
 
 @dataclass
@@ -27,7 +27,7 @@ class GeoDomainWrapper:
         passthrough"""
         if set(fmt) != {"w", "s", "e", "n"}:
             raise ValueError(f"expected some permutation of 'wsen', but got {fmt} instead")
-        if isinstance(self.value, list) and len(self.value) > 0 and isinstance(self.value[0], int):
+        if isinstance(self.value, list) and len(self.value) > 0 and isinstance(self.value[0], (int, float)):
             current = {v: i for i, v in enumerate(self.fmt)}
             l = []
             for v in fmt:
