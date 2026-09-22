@@ -43,6 +43,7 @@ The application uses Tailwind CSS font size classes. **14px (text-sm) is the min
 3. **Avoid text-xs (12px)**
    - Do not use for any readable content
    - Only acceptable for decorative or non-essential UI elements
+   - Deliberate exception: the map viewer (`src/features/viewer`) keeps 10–12px panel labels and time-slider ticks; map chrome is denser by design
 
 ### Examples
 

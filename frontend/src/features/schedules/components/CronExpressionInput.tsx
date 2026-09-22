@@ -8,19 +8,23 @@
  * does it submit to any jurisdiction.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CronFrequency } from '@/features/schedules/utils/cron'
 import {
   DAY_NAME_KEYS,
   cronToHumanReadable,
   frequencyToCron,
-  localHourMinuteToServer,
+  localHourMinuteToUtc,
   parseCronForUI,
-  serverHourMinuteToLocal,
+  utcHourMinuteToLocal,
 } from '@/features/schedules/utils/cron'
-import { useServerTime } from '@/api/hooks/useSchedules'
-import { timeZoneOffsetLabel } from '@/lib/datetime'
+
+import {
+  formatInZone,
+  timeZoneOffsetLabel,
+  useAppTimeZone,
+} from '@/lib/datetime'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NumericInput } from '@/components/ui/numeric-input'
@@ -58,7 +62,7 @@ export function CronExpressionInput({
   onChange,
 }: CronExpressionInputProps) {
   const { t } = useTranslation('executions')
-  const { offsetMs, timeZone } = useServerTime()
+  const timeZone = useAppTimeZone()
   const parsed = parseCronForUI(value)
 
   const [frequency, setFrequency] = useState<CronFrequency>(
@@ -67,16 +71,21 @@ export function CronExpressionInput({
   const [dayOfWeek, setDayOfWeek] = useState(parsed?.dayOfWeek ?? 1)
   const [showRaw, setShowRaw] = useState(false)
 
-  // Derive displayed hour/minute from the cron expression (server time) + offset
-  // This recomputes whenever the cron value or offset changes — no stale state
-  const serverHour = parsed?.hour ?? 6
-  const serverMinute = parsed?.minute ?? 0
-  const localTime =
-    offsetMs != null
-      ? serverHourMinuteToLocal(serverHour, serverMinute, offsetMs, timeZone)
-      : { hour: serverHour, minute: serverMinute }
+  // Live clock in the schedule zone, so the entered hour has a reference.
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
 
-  /** Convert local hour/minute to server time and emit the cron expression */
+  // Displayed hour/minute derive from the cron expression (UTC) each render.
+  const localTime = utcHourMinuteToLocal(
+    parsed?.hour ?? 6,
+    parsed?.minute ?? 0,
+    timeZone,
+  )
+
+  /** Convert app-timezone hour/minute to UTC and emit the cron expression */
   function emitCron(
     freq: CronFrequency,
     lHour: number,
@@ -84,12 +93,12 @@ export function CronExpressionInput({
     day: number,
   ) {
     if (freq === 'custom') return
-    if (offsetMs != null && freq !== 'hourly') {
-      const server = localHourMinuteToServer(lHour, lMinute, offsetMs, timeZone)
-      onChange(frequencyToCron(freq, server.hour, server.minute, day))
-    } else {
+    if (freq === 'hourly') {
       onChange(frequencyToCron(freq, lHour, lMinute, day))
+      return
     }
+    const utc = localHourMinuteToUtc(lHour, lMinute, timeZone)
+    onChange(frequencyToCron(freq, utc.hour, utc.minute, day))
   }
 
   function handleFrequencyChange(newFrequency: CronFrequency) {
@@ -135,7 +144,7 @@ export function CronExpressionInput({
 
       {/* Time/day inputs — displayed in local time */}
       {frequency !== 'custom' && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {frequency === 'weekly' && (
             <select
               value={dayOfWeek}
@@ -168,6 +177,12 @@ export function CronExpressionInput({
               <span className="text-sm text-muted-foreground">
                 {timeZoneOffsetLabel(timeZone)}
               </span>
+              <span className="ml-auto text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+                {t('cron.now', {
+                  time: formatInZone(now, timeZone, 'HH:mm'),
+                  zone: timeZoneOffsetLabel(timeZone),
+                })}
+              </span>
             </>
           )}
           {frequency === 'hourly' && (
@@ -185,7 +200,7 @@ export function CronExpressionInput({
         </div>
       )}
 
-      {/* Raw cron toggle (server time) */}
+      {/* Raw cron toggle (UTC) */}
       <div>
         <button
           type="button"
@@ -209,7 +224,7 @@ export function CronExpressionInput({
 
       {/* Human-readable preview */}
       <P className="text-sm text-muted-foreground">
-        {cronToHumanReadable(value, offsetMs, timeZone)}
+        {cronToHumanReadable(value, timeZone)}
       </P>
     </div>
   )

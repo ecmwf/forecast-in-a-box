@@ -13,7 +13,15 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from cascade.gateway.api import JobSpec, LocalProcesses, SlurmCluster, SshCluster, SubmitJobRequest, SubmitJobResponse
+from cascade.gateway.api import (
+    JobSpec,
+    LocalProcesses,
+    ResultDeletionRequest,
+    SlurmCluster,
+    SshCluster,
+    SubmitJobRequest,
+    SubmitJobResponse,
+)
 from cascade.gateway.client import request_response
 from cascade.low.core import JobInstance, JobInstanceRich, TaskId
 from fiab_core.fable import BlockInstanceId
@@ -154,3 +162,9 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
         return SubmitJobResponse(job_id=None, error=repr(e))
 
     return submit_job_response
+
+
+def delete_cascade_job(cascade_job_id: str) -> None:
+    # TODO we actually have no cascade job deletion request! Once there is one, implement and replace
+    request = ResultDeletionRequest(datasets={cascade_job_id: []})  # type: ignore[invalid-argument-type]
+    request_response(request, get_gateway_url())

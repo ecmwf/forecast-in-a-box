@@ -25,6 +25,10 @@ import type {
 } from '@/api/types/fable.types'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
+  isFactoryAvailable,
+  useAvailableFactoryIds,
+} from '@/features/fable-builder/hooks/useAvailableFactoryIds'
+import {
   BLOCK_KIND_METADATA,
   BLOCK_KIND_ORDER,
   factoryIdToKey,
@@ -41,6 +45,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 // Transparent image used to suppress the browser's default drag ghost.
@@ -64,35 +69,9 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
     (state) => state.setDraggedFactory,
   )
   const fable = useFableBuilderStore((state) => state.fable)
-  const validationState = useFableBuilderStore((state) => state.validationState)
   const isValidating = useFableBuilderStore((state) => state.isValidating)
 
-  const blockCount = Object.keys(fable.blocks).length
-
-  const availableFactoryIds = useMemo(() => {
-    if (blockCount === 0) {
-      if (!validationState) {
-        // Validation not available yet — signal sources-only mode.
-        // TODO: Change when backend validation works properly
-        return 'sources-only' as const
-      }
-      return new Set(
-        validationState.possibleSources.map((id) => factoryIdToKey(id)),
-      )
-    }
-
-    if (!validationState) return null
-
-    const allExpansions = new Set<string>()
-    for (const blockState of Object.values(validationState.blockStates)) {
-      for (const expansion of blockState.possibleExpansions) {
-        allExpansions.add(factoryIdToKey(expansion))
-      }
-    }
-    // No expansions (e.g. a block has errors) → keep every block available
-    // instead of greying the palette. Mirrors AddNodeButton's fallback.
-    return allExpansions.size > 0 ? allExpansions : null
-  }, [validationState, blockCount])
+  const availableFactoryIds = useAvailableFactoryIds()
 
   const groupedFactories = useMemo(() => {
     const groups = new Map<
@@ -125,11 +104,11 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
           factory: factoryId,
         }
         const key = factoryIdToKey(pluginBlockFactoryId)
-        const isAvailable =
-          availableFactoryIds === null ||
-          (availableFactoryIds === 'sources-only'
-            ? factory.kind === 'source'
-            : availableFactoryIds.has(key))
+        const isAvailable = isFactoryAvailable(
+          availableFactoryIds,
+          factory,
+          key,
+        )
         group.push({ id: pluginBlockFactoryId, factory, isAvailable })
       }
     }
@@ -170,7 +149,7 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" {...tourAttr(TOUR.configure.palette)}>
       <div className="border-b border-border p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <H2 className="text-sm font-semibold">{t('palette.title')}</H2>
@@ -245,6 +224,8 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
                     return (
                       <button
                         key={factoryIdToKey(id)}
+                        data-factory-key={factoryIdToKey(id)}
+                        {...tourActionAttr('add-block')}
                         draggable={canInteract}
                         onClick={() =>
                           canInteract && handleAddBlock(id, factory)
@@ -276,7 +257,7 @@ export function BlockPalette({ catalogue }: BlockPaletteProps) {
                           <P className="truncate font-medium">
                             {factory.title}
                           </P>
-                          <P className="truncate text-muted-foreground">
+                          <P className="line-clamp-2 text-muted-foreground">
                             {factory.description}
                           </P>
                         </div>

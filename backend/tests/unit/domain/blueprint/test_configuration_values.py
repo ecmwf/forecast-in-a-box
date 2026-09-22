@@ -7,6 +7,7 @@ from fiab_core.fable import (
     BlockInstance,
     ConfigurationOptionId,
 )
+from fiab_core.types.definitions import IntType, StringType
 
 from forecastbox.domain.blueprint.configuration_values import convert_known_configuration_values
 
@@ -27,8 +28,8 @@ def _make_factory() -> BlockFactory:
         title="Increment",
         description="Adds amount",
         configuration_options={
-            AMOUNT: BlockConfigurationOption(title="", description="", value_type="int"),
-            TEXT: BlockConfigurationOption(title="", description="", value_type="str"),
+            AMOUNT: BlockConfigurationOption(title="", description="", value_type=IntType()),
+            TEXT: BlockConfigurationOption(title="", description="", value_type=StringType()),
         },
         inputs=["a"],
     )

@@ -138,6 +138,14 @@ export const API_ENDPOINTS = {
   },
 
   /**
+   * Notification push channel
+   */
+  notification: {
+    /** WS - Server-push ClientNotification stream */
+    ws: `${API_PREFIX}/notification/ws`,
+  },
+
+  /**
    * Job monitoring and execution endpoints
    */
   job: {
@@ -182,6 +190,9 @@ export const API_ENDPOINTS = {
     list: `${API_PREFIX}/lens/list`,
     /** GET - List supported lens types */
     supported: `${API_PREFIX}/lens/supported`,
+    /** ANY - Proxy base; the running lens is reached at
+     *  `${proxyBase}/<lens_instance_id>/<upstream path>` */
+    proxyBase: `${API_PREFIX}/lens/proxy`,
   },
 
   /**
@@ -205,4 +216,9 @@ export const API_ENDPOINTS = {
     /** GET - Get the scheduler's current time */
     currentTime: `${API_PREFIX}/experiment/operational/scheduler/current_time`,
   },
+} as const
+
+/** Static files served next to the app and fetched at runtime. */
+export const STATIC_FILES = {
+  communityNews: '/community-news.json',
 } as const

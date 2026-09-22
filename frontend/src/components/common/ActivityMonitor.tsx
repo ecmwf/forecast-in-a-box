@@ -171,7 +171,7 @@ export function ActivityMonitor() {
                       type="button"
                       aria-label={t('activity.clearAll')}
                       onClick={clearAll}
-                      className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                     />
                   }
                 >
@@ -184,7 +184,7 @@ export function ActivityMonitor() {
             )}
             <PopoverClose
               aria-label={t('close')}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </PopoverClose>
@@ -373,7 +373,7 @@ function ActivityTaskRow({
             e.stopPropagation()
             onDismiss()
           }}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
         >
           <X className="h-3.5 w-3.5" />
         </button>

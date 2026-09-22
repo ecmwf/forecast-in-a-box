@@ -137,7 +137,7 @@ export function PluginDetailPage({ plugin, catalogue }: PluginDetailPageProps) {
       <div className="flex items-start gap-4">
         <PluginIcon plugin={plugin} size="lg" />
         <div className="min-w-0 flex-1">
-          <H1 className="text-2xl font-bold">{plugin.name}</H1>
+          <H1 className="text-2xl">{plugin.name}</H1>
           <P className="mt-1 text-muted-foreground">
             {plugin.author}
             {plugin.version &&

@@ -29,6 +29,9 @@ function matchesFacet(
   if (key === 'output') {
     return run.outputKinds.some((kind) => kind.toLowerCase().includes(needle))
   }
+  if (key === 'schedule') {
+    return (run.scheduleName ?? '').toLowerCase().includes(needle)
+  }
   if (key === 'date') {
     // App-TZ rendered date — raw UTC prefix would diverge for non-UTC clients.
     return displayDateFor(run).includes(needle)
@@ -53,7 +56,7 @@ export function filterRuns(
   })
 
   return applyFacetQuery(byTab, query, {
-    supportedKeys: ['model', 'output', 'tag', 'date'],
+    supportedKeys: ['model', 'output', 'tag', 'date', 'schedule'],
     matchFacet: (run, key, value) =>
       matchesFacet(run, key, value, displayDateFor),
     matchText: (run, text) =>

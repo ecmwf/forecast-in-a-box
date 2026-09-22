@@ -21,7 +21,8 @@ import { STORAGE_KEYS } from '@/lib/storage-keys'
 
 const LEFT_MIN = 200
 const LEFT_MAX = 400
-const LEFT_DEFAULT = 256 // w-64
+const LEFT_DEFAULT = 296 // fits the block descriptions at 1440px
+const LEFT_DEFAULT_V2 = 256
 const RIGHT_MIN = 300
 const RIGHT_MAX = 500
 const RIGHT_DEFAULT = 320 // w-80
@@ -53,10 +54,14 @@ export const useUiPreferencesStore = create<UiPreferencesState>()(
     }),
     {
       name: STORAGE_KEYS.stores.fableBuilderUi,
-      version: 2,
-      // RIGHT_MIN was raised so the datetime field's full date always fits
-      migrate: (persisted) => {
+      version: 3,
+      // v2: RIGHT_MIN raised so the datetime field's full date always fits.
+      // v3: wider left default; only an untouched default moves.
+      migrate: (persisted, version) => {
         const s = (persisted ?? {}) as Partial<UiPreferencesState>
+        if (version < 3 && s.leftSidebarWidth === LEFT_DEFAULT_V2) {
+          s.leftSidebarWidth = LEFT_DEFAULT
+        }
         if (
           typeof s.rightSidebarWidth === 'number' &&
           s.rightSidebarWidth < RIGHT_MIN

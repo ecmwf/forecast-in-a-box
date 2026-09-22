@@ -11,7 +11,10 @@
 
 A ``PluginError`` captures one diagnostic item produced during the plugin
 lifecycle. A plugin may accumulate multiple errors and/or warnings across
-different lifecycle phases.
+different lifecycle phases. Unlike Exceptions, which are emphemeral runtime
+constructs, this is a persisted entity reflecting the state of the virtual
+environment.
+
 
 Lifecycle sources:
 - ``install`` -- pip install phase; failure here means the package could not be

@@ -15,7 +15,7 @@
  * Run with: npm run test:e2e:stack
  */
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
 
 /**

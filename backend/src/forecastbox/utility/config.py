@@ -27,6 +27,10 @@ from forecastbox.utility.pydantic import FiabBaseModel
 fiab_home = Path(os.environ["FIAB_ROOT"]) if "FIAB_ROOT" in os.environ else (Path.home() / ".fiab")
 logger = logging.getLogger(__name__)
 
+# NOTE not the best place for this to be, but better than spread adhoc all over. It is actually needed
+# inside various domains as well due to eg proxies and responses, its not just for routes
+ROUTE_PREFIX = "/api/v1"
+
 
 def _validate_url(url: str) -> bool:
     # TODO add DNS resolution attempt or something
@@ -78,6 +82,7 @@ class ConcurrencySettings(FiabBaseModel):
     startup_timeout_seconds: float = Field(default=10, gt=0)
     shutdown_timeout_seconds: float = Field(default=10, gt=0)
 
+    # TODO this actually can be default pydantic validator, not needed to be runtime-only
     def validate_runtime(self) -> list[str]:
         errors: list[str] = []
         required_pools = set(ConcurrentPools)
@@ -318,7 +323,7 @@ class GatewayStartupParams(FiabBaseModel):
     max_concurrent_jobs: int | None = 1
     """If more jobs submitted at a given time, all but this many wait in a queue"""
     cascade_logging_base: str | None = None
-    """Where to store logs of cascade gw and jobs. Use eg /home/<user>/fiabLogs or /tmp/fiabLogs"""
+    """Parent directory for the temporary log directory. When set, the directory is created there with a YYYY-MM-DDTHH prefix; otherwise it is created in the system temporary directory with a fiabLogs-YYYY-MM-DDTHH prefix. Use eg /home/<user>/fiabLogs or /tmp/fiabLogs"""
     shared_path: str | None = None
     """Shared filesystem path visible to all workers, required for Slurm submissions."""
     ssh_cluster_spec: SshClusterSpec | None = None

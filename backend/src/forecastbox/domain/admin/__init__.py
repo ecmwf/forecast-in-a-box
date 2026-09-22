@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class Globals:
     # those are exported by fiab.sh
     ReleaseMarker = os.environ.get("FIAB_RELEASE_MARKER", None)
-    FirstRun = os.environ.get("FIAB_FIRST_RUN", "false") == "true"
+    FirstRun = os.environ.get("FIAB_FIRSTRUN", "false") == "true"
 
 
 @dataclasses.dataclass(frozen=True, eq=True, slots=True)

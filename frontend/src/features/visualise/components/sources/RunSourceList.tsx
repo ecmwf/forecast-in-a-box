@@ -127,7 +127,7 @@ function RunSourceRow({
             {name}
           </P>
           {row.runCreatedAt && (
-            <span className="shrink-0 rounded bg-muted px-1.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+            <span className="shrink-0 rounded-md bg-muted px-1.5 font-mono text-[11px] text-muted-foreground tabular-nums">
               {formatInZone(
                 new Date(row.runCreatedAt),
                 timeZone,

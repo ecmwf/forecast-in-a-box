@@ -64,16 +64,17 @@ from forecastbox.domain.glyphs.jinja_interpolation import get_custom_functions
 from forecastbox.domain.glyphs.types import GlobalGlyphId
 from forecastbox.domain.glyphs.validation import validate_glyph
 from forecastbox.domain.plugin.compatibility import get_fiabcore_version
-from forecastbox.domain.plugin.manager import catalogue_view, plugins_ready
+from forecastbox.domain.plugin.status import catalogue_view, plugins_ready
 from forecastbox.schemata.blueprint import BlueprintSource
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.config import ROUTE_PREFIX
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import value_dt2str
 
 logger = logging.getLogger(__name__)
-PREFIX = "/api/v1/blueprint"
+PREFIX = f"{ROUTE_PREFIX}/blueprint"
 
 router = APIRouter(
     tags=["blueprint"],
@@ -178,7 +179,7 @@ class BlueprintValidationExpansionResponse(FiabBaseModel):
     possible_sources: list[PluginBlockFactoryId]
     possible_expansions: dict[BlockInstanceId, list[SerializedBlockExpansion]]
     configuration_restrictions: dict[BlockInstanceId, dict[ConfigurationOptionId, str]] = {}
-    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str]]
+    resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str | None]]
     missing_glyphs: dict[BlockInstanceId, dict[ConfigurationOptionId, list[str]]] = {}
     block_output_qubes: dict[BlockInstanceId, dict[str, Any]] = {}
 

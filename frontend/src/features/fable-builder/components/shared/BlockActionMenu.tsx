@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** Block "more actions" menu — shared by the graph node and the form-mode card. */
+/** Block "more actions" menu for the graph node. */
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'

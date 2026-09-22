@@ -47,7 +47,7 @@ export function ComparePanel({
       <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
         <span
           className={cn(
-            'flex h-5 w-5 shrink-0 items-center justify-center rounded font-mono text-xs font-bold',
+            'flex h-5 w-5 shrink-0 items-center justify-center rounded-md font-mono text-xs font-bold',
             SLOT_BADGE_CLASS[slot],
           )}
         >

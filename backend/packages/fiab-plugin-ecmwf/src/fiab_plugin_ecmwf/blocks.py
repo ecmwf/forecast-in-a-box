@@ -19,15 +19,14 @@ from fiab_core.fable import (
     ConfigurationOptionId,
     ConfigurationOptionRestriction,
     QubedOutput,
-    RawOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Sink, Source, Transform
-from fiab_core.types import ClosedEnumType, DatetimeType, GeoDomainType, ListType, ParameterType, StringType
-from pymetkit import ParamDB
+from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Source, Transform
+from fiab_core.types import ClosedEnumType, DatetimeType, ListType, StringType
 from qubed import Qube
 
 from .block_utils import (
+    ParamDBInstance,
     _axis_value_strings,
     _extract_dataset,
     _is_empty_qube,
@@ -38,22 +37,17 @@ from .block_utils import (
 from .constants import (
     BASE_TIME,
     DIMENSION,
-    DOMAIN,
     ENSEMBLE,
     FORECAST,
-    FORMAT,
-    GROUPBY,
-    LEVEL,
     LEVTYPE,
     PARAM,
-    PATH,
     SOURCE,
-    SPLITBY,
     STEP,
     VALUES,
 )
 from .datasets import load_datasets
-from .qubed_utils import axes, common_dimensions, contains, dimensions, expand, select
+from .environments import mars_dependencies, opendata_dependencies
+from .qubed_utils import axes, contains, dimensions, expand, select
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +102,18 @@ class OperationalForecastSource(Source):
         forecast = block.config_as_str(FORECAST)
         fc_preset = FORECAST_DATASETS[forecast]
         fc_qube = fc_preset.as_qube(ens_dim=ENSEMBLE)
-        paramdb = ParamDB()
 
         basetime = block.config_as_datetime(BASE_TIME)
         date = basetime.strftime("%Y%m%d")
         time = self._convert_time(basetime.time().hour)
+
+        source = block.config_as_str(SOURCE)
+        if source == "ecmwf-open-data":
+            metadata = {"environment": opendata_dependencies}
+        elif source == "mars":
+            metadata = {"environment": mars_dependencies}
+        else:
+            metadata = {}
 
         subqube = fc_qube.select({"time": time}).compress()
         actions = []
@@ -132,16 +133,17 @@ class OperationalForecastSource(Source):
                             [
                                 Payload(
                                     "fiab_plugin_ecmwf.runtime.source.earthkit_source",
-                                    [block.config_as_str(SOURCE)],
+                                    [source],
                                     {
                                         "requests": [
                                             dict(
                                                 {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
-                                                param=paramdb.param_id_to_shortname(int(p)),
+                                                param=ParamDBInstance.param_id_to_shortname(int(p)),
                                                 step=step,
                                             )
                                         ],
                                     },
+                                    metadata=metadata,
                                 )
                                 for p in datacube[PARAM]
                             ]

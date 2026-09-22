@@ -80,6 +80,20 @@ export function useCompilationDetail(
   })
 }
 
+/** One request serves every "newest runs" consumer; callers take a slice. */
+const RECENT_RUNS_WINDOW = 20
+
+export function useRecentRuns(count: number) {
+  return useQuery({
+    queryKey: jobKeys.list(1, RECENT_RUNS_WINDOW),
+    queryFn: () => getJobsStatus(1, RECENT_RUNS_WINDOW),
+    select: (data: JobExecutionList) =>
+      data.runs.slice(0, Math.min(count, RECENT_RUNS_WINDOW)),
+    refetchInterval: 10000,
+    refetchOnWindowFocus: false,
+  })
+}
+
 export function useJobsStatus(
   page: number = 1,
   pageSize: number = 10,

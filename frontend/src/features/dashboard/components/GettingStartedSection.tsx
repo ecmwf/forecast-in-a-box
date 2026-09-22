@@ -14,30 +14,23 @@
  * A blank canvas plus the starting points the ECMWF plugin ships as templates.
  */
 
-import { Layers } from 'lucide-react'
+import { ChevronRight, Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { ContinueWorkbenchCard } from './ContinueWorkbenchCard'
 import { GettingStartedCard } from './GettingStartedCard'
 import {
   TemplateStarterCard,
   TemplateStarterCardSkeleton,
 } from './TemplateStarterCard'
 import type { ReactNode } from 'react'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import {
   STARTER_TEMPLATE_LIMIT,
   useStarterTemplates,
 } from '@/features/dashboard/hooks/useStarterTemplates'
-import { useWorkbenchSummary } from '@/features/fable-builder/hooks/useWorkbenchSummary'
 import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-
-interface GettingStartedSectionProps {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
-}
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 
 /** Informational filler for the tracks the template cards would have taken. */
 function StarterPanel({
@@ -58,26 +51,32 @@ function StarterPanel({
   )
 }
 
-export function GettingStartedSection({
-  variant,
-  shadow,
-}: GettingStartedSectionProps) {
+export function GettingStartedSection() {
   const { t } = useTranslation(['dashboard', 'common'])
   const navigate = useNavigate()
-  const { starters, hasStarters, isLoading, isError, refetch } =
+  const { starters, hasStarters, templateCount, isLoading, isError, refetch } =
     useStarterTemplates()
-  const workbench = useWorkbenchSummary()
 
   const content = (
     <>
-      <div className="mb-6">
-        <H2 className="text-xl font-semibold">{t('gettingStarted.title')}</H2>
-        <P className="mt-1 text-muted-foreground">
-          {t('gettingStarted.subtitle')}
-        </P>
+      <div className="mb-6 flex items-baseline justify-between gap-3">
+        <div>
+          <H2 className="text-xl font-semibold">{t('gettingStarted.title')}</H2>
+          <P className="mt-1 text-muted-foreground">
+            {t('gettingStarted.subtitle')}
+          </P>
+        </div>
+        {templateCount > 0 && (
+          <Link
+            to="/presets"
+            search={{ filter: 'templates' }}
+            className="inline-flex shrink-0 items-center text-sm font-medium text-primary hover:underline"
+          >
+            {t('gettingStarted.viewAllTemplates')}
+            <ChevronRight className="ml-0.5 h-3 w-3" />
+          </Link>
+        )}
       </div>
-
-      {workbench && <ContinueWorkbenchCard summary={workbench} />}
 
       {/* Fixed four tracks: the card count varies, but matching the presets row
           below matters more than absorbing the gap. */}
@@ -152,13 +151,8 @@ export function GettingStartedSection({
     </>
   )
 
-  // Modern variant: no card wrapper, content floats on page background
-  if (variant === 'modern') {
-    return <div className="space-y-6">{content}</div>
-  }
-
   return (
-    <Card className="p-8" variant={variant} shadow={shadow}>
+    <Card className="p-8" {...tourAttr(TOUR.overview.starters)}>
       {content}
     </Card>
   )

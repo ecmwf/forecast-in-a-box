@@ -13,18 +13,21 @@ from copy import deepcopy
 from functools import reduce
 from operator import or_
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Iterable, Mapping, cast
 
 from earthkit.data.utils.dates import to_timedelta
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactsProvider, CompositeArtifactId
-from fiab_core.fable import QubedOutput
 from fiab_core.tools.plugins import _detect_editable_install
 from fiab_core.types import ArtifactType, ClosedEnumType, FableType
 from qubed import Qube
 
 from ..qubed_utils import expand
 
-INPUT_SOURCE_CONFIGURATION_OPTIONS = {"polytope": {"collection": "initial-conditions"}}
+INPUT_SOURCE_CONFIGURATION_OPTIONS = {
+    "polytope": {"collection": "ecmwf-mars"},
+    "opendata:google": {"source": "google"},
+    "opendata:aws": {"source": "aws"},
+}
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +58,14 @@ def get_checkpoint_enum_type() -> FableType:
         return ArtifactType()
     values = [CompositeArtifactId.to_str(k) for k in available_checkpoints]
     return ClosedEnumType(values, subtype=ArtifactType())
+
+
+def _expand_qube(qube: Qube | dict[str, Qube], dim: Mapping[str, Iterable[Any]]) -> Qube | dict[str, Qube]:
+    """Expand the qube along the specified dimension(s), handling both single qube and multiple qube cases."""
+    if isinstance(qube, dict):
+        nested_qube = cast(dict[str, Qube], qube)
+        return {key: expand(q, dim) for key, q in nested_qube.items()}
+    return expand(qube, dim)
 
 
 class CheckpointArtifact:
@@ -95,15 +106,33 @@ class CheckpointArtifact:
 
     def validate_lead_time(self, lead_time: int) -> str | None:
         """Validate configured lead time against the checkpoint timestep."""
-        checkpoint = self.checkpoint()
-        model_step_seconds = _timestep_seconds(checkpoint.timestep)
-        lead_time_seconds = lead_time * 3600
-
-        if lead_time_seconds <= model_step_seconds:
-            return f"Configuration option 'lead_time' must be greater than checkpoint timestep {checkpoint.timestep!r}, got {lead_time}h"
-        if lead_time_seconds % model_step_seconds != 0:
-            return f"Configuration option 'lead_time' must be a multiple of checkpoint timestep {checkpoint.timestep!r}, got {lead_time}h"
+        if lead_time <= self.model_step:
+            return f"Configuration option 'lead_time' must be greater than checkpoint timestep {self.model_step!r}, got {lead_time}h"
+        if lead_time % self.model_step != 0:
+            return f"Configuration option 'lead_time' must be a multiple of checkpoint timestep {self.model_step!r}, got {lead_time}h"
         return None
+
+    @property
+    def model_step(self) -> int:
+        """Get the model step in hours from the checkpoint artifact"""
+        checkpoint = self.checkpoint()
+        return _timestep_seconds(checkpoint.timestep) // 3600
+
+    @property
+    def is_ensemble_model(self) -> bool | None:
+        """Get whether the model can be run as an ensemble from the checkpoint artifact"""
+        checkpoint = self.checkpoint()
+        if checkpoint.configuration.is_ensemble_model is None:
+            return None
+        return checkpoint.configuration.is_ensemble_model is True
+
+    @property
+    def extra_output_keys(self) -> dict[str, str]:
+        """Additional metadata from the checkpoint artifact for use in actions and qubes.
+
+        i.e. MARS metadata
+        """
+        return self.checkpoint().extra_output_keys
 
     def get_model_output(self, lead_time: int) -> Qube | dict[str, Qube]:
         """Get the model output qube from the checkpoint artifact"""
@@ -112,12 +141,10 @@ class CheckpointArtifact:
 
         lead_time_seconds = lead_time * 3600
         model_step_seconds = _timestep_seconds(checkpoint.timestep)
+
         steps = list(map(lambda x: x // 3600, range(model_step_seconds, lead_time_seconds + model_step_seconds, model_step_seconds)))
 
-        if isinstance(qube, dict):
-            nested_qube = cast(dict[str, Qube], qube)
-            return {key: expand(q, {"step": steps}) for key, q in nested_qube.items()}
-        return expand(qube, {"step": steps})
+        return _expand_qube(qube, {"step": steps})
 
     def get_additional_kwargs(self) -> dict[str, Any]:
         """Get additional kwargs for the model inference from the checkpoint artifact, such as post processors and control options."""
@@ -156,11 +183,15 @@ class CheckpointArtifact:
         elif len(input_source) != 1:
             raise ValueError(f"Input source must have exactly one key representing the source name, got {input_source}")
 
-        source_name = next(iter(input_source.keys()))
+        source_name: str = next(iter(input_source.keys()))
         input_source = deepcopy(input_source)  # Don't modify the original input source dict
 
         if source_name in INPUT_SOURCE_CONFIGURATION_OPTIONS:
             input_source[source_name].update(INPUT_SOURCE_CONFIGURATION_OPTIONS[source_name])
+
+        if ":" in source_name:
+            input_source[source_name.split(":")[0]] = input_source.pop(source_name)
+            source_name = source_name.split(":")[0]
 
         if configuration.pre_processors is not None:
             input_source[source_name].setdefault("pre_processors", []).extend(configuration.pre_processors)

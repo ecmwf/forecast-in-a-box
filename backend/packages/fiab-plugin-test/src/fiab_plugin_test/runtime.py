@@ -14,7 +14,13 @@ def source_sleep(text: str, duration: float) -> str:
     return text
 
 
-def source_text(text: str) -> str:
+DEFAULT_TEXT = "Hic Sunt Leones"
+
+
+def source_text(text: str | None) -> str:
+    """Return the given text, imputing the default when an explicit null was configured."""
+    if text is None:
+        return DEFAULT_TEXT
     return text
 
 

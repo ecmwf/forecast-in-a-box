@@ -52,7 +52,25 @@ class MockedForecastDataset(ForecastDataset):
         full_qube = super().as_qube(ens_dim, include_member_zero=include_member_zero, **extra)
         selected_qube = full_qube.select(
             {
-                PARAM: ["165", "166", "167", "168", "169", "175", "176", "177", "228021", "47", "151", "140232", "140232", "131", "132"],
+                PARAM: [
+                    "165",
+                    "166",
+                    "167",
+                    "168",
+                    "169",
+                    "175",
+                    "176",
+                    "177",
+                    "228021",
+                    "47",
+                    "151",
+                    "140232",
+                    "140232",
+                    "131",
+                    "132",
+                    "228246",
+                    "228247",
+                ],
                 STEP: ["0", "6", "12"],
                 ENSEMBLE: ["0", "1", "2", "3", "4"],
             }

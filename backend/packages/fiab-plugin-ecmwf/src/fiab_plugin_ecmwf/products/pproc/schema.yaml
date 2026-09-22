@@ -8,9 +8,26 @@ config:
   filter:type:
     fc/cf/pf:
       filter:param:
-        "10/207":
+        "10":
           preprocessing:
             - operation: norm
+              metadata: 
+                paramId: 10
+        "207":
+          preprocessing:
+            - operation: norm
+              metadata: 
+                paramId: 207
+        "228249":
+          preprocessing:
+            - operation: norm
+              metadata: 
+                paramId: 228249
+        "228241":
+          preprocessing:
+            - operation: norm
+              metadata: 
+                paramId: 228241
         "261016":
           entrypoint: pproc-thermal-indices
           preprocessing:
@@ -373,6 +390,19 @@ config:
               edition: 2
               bitsPerValue: 16
               productDefinitionTemplateNumber: 12
+    pb:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      statistics:
+        operation: quantiles
+        metadata:
+          edition: 2
+          bitsPerValue: 16
+          productDefinitionTemplateNumber: 86
+      filter:steptype:
+        instantaneous: {}
+        range:
+          metadata:
+            productDefinitionTemplateNumber: 87
     ep:
       metadata_from_output: ["param", "stream", "date", "type"]
       statistics:
@@ -875,6 +905,10 @@ inputs:
           fc_inputs:
             select:
               param: ["228246", "228247"]
+        "228241":
+          fc_inputs:
+            select:
+              param: ["228239", "228240"]
         "261001":
           fc_inputs:
             - select:

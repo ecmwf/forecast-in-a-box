@@ -111,6 +111,7 @@ def _refresh_catalog_task() -> None:
         logger.exception(f"catalog refresh failed with {repr(e)}")
         with timed_acquire(ArtifactManager.lock, timeout_acquire_error) as _:
             ArtifactManager.refresh_error = repr(e)
+        raise
 
 
 def submit_refresh_catalog() -> Future[None]:  # ty: ignore[invalid-return-type]

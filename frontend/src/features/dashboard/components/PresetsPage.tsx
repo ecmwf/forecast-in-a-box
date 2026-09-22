@@ -13,7 +13,7 @@
 import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { Bookmark, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Link } from '@tanstack/react-router'
+import { Link, useSearch } from '@tanstack/react-router'
 import { useConfigPresets } from '../hooks/useConfigPresets'
 import {
   templateConfigureSearch,
@@ -292,6 +292,11 @@ const TemplateRow = memo(function ({ template }: { template: TemplateEntry }) {
 const PAGE_SIZE = 10
 
 type PresetFilter = 'all' | 'bookmarked' | 'templates'
+const PRESET_FILTERS: ReadonlyArray<PresetFilter> = [
+  'all',
+  'bookmarked',
+  'templates',
+]
 
 /** Case-insensitive substring test of a preset against one facet token. */
 function matchesPresetFacet(
@@ -335,15 +340,17 @@ function filterPresets(
 
 export function PresetsPage() {
   const { t } = useTranslation(['dashboard', 'journal'])
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const showFlow = useUiStore((state) => state.journalShowFlow)
   const setShowFlow = useUiStore((state) => state.setJournalShowFlow)
 
   const { presets, deletePreset, toggleFavourite } = useConfigPresets()
   const { templates } = useTemplatePresets()
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<PresetFilter>('all')
+  // Non-strict: the page also renders outside its route in tests.
+  const search = useSearch({ strict: false })
+  const [filter, setFilter] = useState<PresetFilter>(
+    () => PRESET_FILTERS.find((f) => f === search.filter) ?? 'all',
+  )
   const [page, setPage] = useState(1)
 
   // Defer filtering so typing in the search box stays responsive on long lists.
@@ -388,11 +395,7 @@ export function PresetsPage() {
         description={t('presets.page.description')}
       />
 
-      <Card
-        className="overflow-hidden"
-        variant={dashboardVariant}
-        shadow={panelShadow}
-      >
+      <Card className="overflow-hidden">
         {/* Header bar */}
         <div className="flex flex-col items-start justify-between gap-4 border-b border-border p-6 sm:flex-row sm:items-center">
           {/* Title + flow-preview toggles */}

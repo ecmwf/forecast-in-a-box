@@ -23,12 +23,14 @@
  */
 
 import { HttpResponse, delay, http } from 'msw'
+import { broadcastClientNotification } from './notification.handlers'
 import type {
   CompositeArtifactId,
   MlModelDetail,
   MlModelOverview,
   QubeNode,
 } from '@/api/types/artifacts.types'
+import type { ClientNotification } from '@/api/types/notification.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
 
 /**
@@ -405,6 +407,24 @@ export function resetArtifactsHandlerState(): void {
   ongoingDownloads.clear()
 }
 
+/** Mirror of the backend's ArtifactDownloadFinishedEvent.as_client_notification. */
+function downloadFinishedNotification(
+  id: CompositeArtifactId,
+): ClientNotification {
+  return {
+    text: `Artifact ${id.artifact_local_id} finished downloading successfully`,
+    sourceDomainName: 'artifact',
+    sourceDomainEvent: 'artifactDownloadFinished',
+    context: {
+      artifact_store_id: id.artifact_store_id,
+      artifact_local_id: id.artifact_local_id,
+      success: true,
+    },
+    detailRoute: 'api/v1/artifacts/model_details',
+    refreshRoutes: ['api/v1/artifacts/list_models'],
+  }
+}
+
 export const artifactsHandlers = [
   // GET /api/v1/artifacts/list_models
   http.get(API_ENDPOINTS.artifacts.listModels, async () => {
@@ -482,6 +502,7 @@ export const artifactsHandlers = [
     const progress = advanceProgress(key)
     if (progress >= 100) {
       model.is_available = true
+      broadcastClientNotification(downloadFinishedNotification(body))
       return HttpResponse.json({
         status: 'available',
         composite_id: compositeIdStr(body),

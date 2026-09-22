@@ -18,7 +18,7 @@
  * the rest stay plain text.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircle2,
   ChevronRight,
@@ -166,6 +166,10 @@ export function TemplateParamsDialog({
   )
   // The expansion lags the inputs (debounce + fetch) — verdicts wait for it.
   const settled = !isValidating && debouncedValues === values
+  // The inputs `expansion` was actually computed for (frozen while revalidating).
+  const verdictValuesRef = useRef(values)
+  if (settled) verdictValuesRef.current = values
+  const verdictValues = verdictValuesRef.current
 
   const errorCount = expansion
     ? expansion.global_errors.length +
@@ -338,8 +342,10 @@ export function TemplateParamsDialog({
   }
 
   const renderField = (name: string, grouped = false) => {
+    // Verdicts flip only on settle — mid-validation flips bounce the dialog.
+    const verdictValue = verdictValues[name] ?? ''
     const preview = resolvedPreview(name)
-    const missing = settled && isMissing(name)
+    const missing = isMissing(name) && (values[name] ?? '') === verdictValue
     const meta = examples?.example_glyphs[name]
     // Templates declare their own types; nothing is inferred elsewhere.
     const valueType = meta?.type_hint
@@ -433,9 +439,7 @@ export function TemplateParamsDialog({
             </p>
           ) : (
             preview !== null &&
-            preview !== (values[name] ?? '') && (
-              <ResolvedPreview preview={preview} />
-            )
+            preview !== verdictValue && <ResolvedPreview preview={preview} />
           )}
         </div>
       </div>

@@ -184,7 +184,7 @@ export default function PdfViewer({
               <SkipBack className="h-4 w-4" />
               <kbd className={kbdBadge}>←</kbd>
             </button>
-            <span className="min-w-10 text-center font-mono text-xs tabular-nums">
+            <span className="min-w-10 text-center font-mono text-sm tabular-nums">
               {navIndex.current} / {navIndex.total}
             </span>
             <button
@@ -212,7 +212,7 @@ export default function PdfViewer({
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="min-w-12 text-center font-mono text-xs tabular-nums">
+          <span className="min-w-12 text-center font-mono text-sm tabular-nums">
             {t('outputs.viewer.pageOfTotal', {
               page: pageNumber,
               total: totalPages || '?',
@@ -240,7 +240,7 @@ export default function PdfViewer({
           >
             <ZoomOut className="h-4 w-4" />
           </button>
-          <span className="min-w-12 text-center font-mono text-xs tabular-nums">
+          <span className="min-w-12 text-center font-mono text-sm tabular-nums">
             {Math.round(scale * 100)}%
           </span>
           <button

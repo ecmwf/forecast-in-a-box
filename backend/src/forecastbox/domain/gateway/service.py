@@ -12,11 +12,11 @@
 import logging
 import os
 import threading
+import time
 import urllib.parse
 import uuid
 from dataclasses import dataclass
 from multiprocessing.process import BaseProcess
-from tempfile import TemporaryDirectory
 
 from cascade.deployment.logging import LoggingConfig
 from cascade.executor import platform
@@ -30,6 +30,7 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayNotRunning,
     GatewayNotStarted,
 )
+from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility import tunnel
 from forecastbox.utility.config import LocalGateway, RemoteGateway, StatusMessage, UnmanagedGateway, config
 
@@ -37,8 +38,13 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, eq=True, slots=True)
+class LogDirectory:
+    name: str
+
+
+@dataclass(frozen=True, eq=True, slots=True)
 class LocalProcess:
-    logs_directory: TemporaryDirectory
+    logs_directory: LogDirectory
     process: BaseProcess
     gateway_url: str
 
@@ -92,15 +98,20 @@ def _local_process_entrypoint(cascade_url: str, log_base: str | None, max_concur
 
 def launch_gateway() -> None:
     with GatewayConnectionManager.lock:
+        gateway = config.cascade.gateway
+        if isinstance(gateway, UnmanagedGateway):
+            logger.warning("gateway is unmanaged, launch_gateway is a no-op")
+            return
         if GatewayConnectionManager.gateway_connection is not None:
             raise GatewayAlreadyRunning("Process already running.")
-        gateway = config.cascade.gateway
         if isinstance(gateway, LocalGateway):
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
-            cascade_logging_base = startup_params.cascade_logging_base
             shared_path = startup_params.shared_path
-            logs_directory = TemporaryDirectory(prefix="fiabLogs", dir=cascade_logging_base)
+            # NOTE we dont use gateway.startup_params logging base, because backend used to derive
+            # the directory already. And we must not modify config live as we dont want to persist
+            # that value later
+            logs_directory = LogDirectory(os.environ[BACKEND_LOG_DIRECTORY_ENV])
             logger.debug(f"logging base is at {logs_directory.name}")
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
@@ -146,8 +157,6 @@ def launch_gateway() -> None:
             tunnel.execute(handle, ["mkdir", "-p", log_base])
             tunnel.execute(handle, cmd, output_path=log_base + "gwstdouterr")
             GatewayConnectionManager.gateway_connection = RemoteTunnel(handle=handle)
-        elif isinstance(gateway, UnmanagedGateway):
-            raise NotImplementedError("RemoteUrl gateway cannot be launched by backend")
         else:
             assert_never(gateway)
 
@@ -169,7 +178,7 @@ def get_gateway_url() -> str:
         assert_never(gateway_connection)
 
 
-def get_logs_directory() -> Either[TemporaryDirectory, str]:  # ty: ignore[invalid-type-arguments]
+def get_logs_directory() -> Either[LogDirectory, str]:  # ty: ignore[invalid-type-arguments]
     gateway_connection = GatewayConnectionManager.gateway_connection
     if gateway_connection is None:
         return Either.error("gateway connection not initialized")
@@ -190,9 +199,10 @@ def status_gateway() -> str:
     if isinstance(gateway_connection, LocalProcess):
         if gateway_connection.process.exitcode is not None:
             raise GatewayExited(gateway_connection.process.exitcode)
+        # TODO -- call gw status api once available
         return StatusMessage.gateway_running
     elif isinstance(gateway_connection, RemoteTunnel):
-        # TODO -- call gw status api once available, on fallback run command to check the proc status?
+        # TODO -- call gw status api once available, on fallback run sh command through tunnel to check the proc status?
         if tunnel.status(gateway_connection.handle):
             return StatusMessage.gateway_running
         raise GatewayExited(255)
@@ -201,6 +211,30 @@ def status_gateway() -> str:
         return StatusMessage.gateway_running
     else:
         assert_never(gateway_connection)
+
+
+def ensure_gateway(attempts: int = 30, interval_seconds: float = 0.5) -> None:
+    """Poll status_gateway until it reports gateway_running status.
+
+    Intended to be called right after launch_gateway, to bound how long we wait for
+    the newly launched gateway to confirm it is up. Raises GatewayExited immediately
+    if the process is observed to have already exited, without retrying further.
+    Raises GatewayNotRunning if the gateway does not report running status within
+    the attempt budget.
+    """
+    last_error: BaseException | None = None
+    for _ in range(attempts):
+        try:
+            status = status_gateway()
+        except GatewayExited:
+            raise
+        except GatewayNotStarted as error:
+            last_error = error
+        else:
+            if status == StatusMessage.gateway_running:
+                return
+        time.sleep(interval_seconds)
+    raise GatewayNotRunning(f"gateway did not report running status within {attempts * interval_seconds:.1f}s") from last_error
 
 
 def get_current_cascade_proc() -> int | str:

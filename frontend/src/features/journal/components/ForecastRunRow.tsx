@@ -25,6 +25,7 @@ import { FableMiniFlow } from '@/features/journal/components/FableMiniFlow'
 import { JournalChip } from '@/features/journal/components/JournalChip'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { RunRowMenu } from '@/features/journal/components/RunRowMenu'
+import { Checkbox } from '@/components/ui/checkbox'
 import { formatInZone, timeZoneOffsetLabel } from '@/lib/datetime'
 import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
@@ -34,6 +35,11 @@ interface ForecastRunRowProps {
   onToggleBookmark: (runId: string) => void
   /** Clicking a model/output/tag chip adds it to the journal search. */
   onAddFacet?: (token: FacetToken) => void
+  /** Present when the list is in multi-select mode. */
+  selected?: boolean
+  /** Unselectable while a selection cap is reached elsewhere. */
+  selectDisabled?: boolean
+  onToggleSelect?: (runId: string) => void
 }
 
 /**
@@ -44,6 +50,9 @@ export const ForecastRunRow = memo(function ({
   run,
   onToggleBookmark,
   onAddFacet,
+  selected,
+  selectDisabled,
+  onToggleSelect,
 }: ForecastRunRowProps) {
   const { t } = useTranslation('journal')
   const { serverTimeToLocal, timeZone } = useServerTime()
@@ -59,13 +68,28 @@ export const ForecastRunRow = memo(function ({
     formatInZone(startedInstant, timeZone, 'yyyy-MM-dd HH:mm') +
     ` ${timeZoneOffsetLabel(timeZone, startedInstant)}`
   const startedDate = formatInZone(startedInstant, timeZone, 'yyyy-MM-dd')
-  const runIdLabel =
-    run.runId.length > 12 ? `${run.runId.slice(0, 12)}...` : run.runId
   const modelLabel = run.modelLabel
 
   return (
-    <div className="group/row p-6 transition-colors hover:bg-muted/50">
+    <div
+      className="group/row p-6 transition-colors hover:bg-muted/50"
+      data-testid={`run-row-${run.runId}`}
+    >
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+        {onToggleSelect && (
+          <Checkbox
+            checked={selected === true}
+            disabled={selectDisabled}
+            onCheckedChange={() => onToggleSelect(run.runId)}
+            aria-label={t('item.select', { name: title })}
+            title={
+              run.hasComparableOutput === false
+                ? t('item.notComparable')
+                : undefined
+            }
+            className="mt-1 sm:mt-0"
+          />
+        )}
         {/* Status */}
         <div className="mt-1 shrink-0 sm:mt-0">
           <RunStatusIcon status={run.status} />
@@ -86,9 +110,9 @@ export const ForecastRunRow = memo(function ({
               type="button"
               onClick={() => setMetadataOpen(true)}
               aria-label={t('item.editMetadata')}
-              className="hit-target-y shrink-0 text-muted-foreground opacity-0 transition-[color,opacity] group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:text-primary [@media(hover:none)]:opacity-100"
+              className="hit-target-y flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-[color,opacity] group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:text-primary [@media(hover:none)]:opacity-100"
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Pencil className="h-4 w-4" />
             </button>
           </div>
           {run.displayDescription && (
@@ -103,7 +127,7 @@ export const ForecastRunRow = memo(function ({
                 type="button"
                 onClick={() => onAddFacet({ key: 'date', value: startedDate })}
                 aria-label={t('item.filterByDate')}
-                className="rounded transition-colors hover:text-foreground"
+                className="hit-target-y rounded-md transition-colors hover:text-foreground"
               >
                 {startedAt}
               </button>
@@ -121,22 +145,47 @@ export const ForecastRunRow = memo(function ({
               </>
             )}
           </div>
+          {run.errorMessage && (
+            // First line only; the detail page has the full text.
+            <p
+              className="mb-2 truncate text-sm text-red-600 dark:text-red-400"
+              title={run.errorMessage}
+            >
+              {run.errorMessage.split('\n')[0]}
+            </p>
+          )}
           <div className="flex flex-wrap items-start gap-2">
-            {run.scheduleName && (
-              <span className="inline-flex items-center gap-1 rounded bg-indigo-500/10 px-2 py-0.5 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                <CalendarClock className="h-3 w-3" />
-                {t('item.scheduled')}
-              </span>
-            )}
+            {run.scheduleName &&
+              (onAddFacet ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onAddFacet({ key: 'schedule', value: run.scheduleName! })
+                  }
+                  title={run.scheduleName}
+                  aria-label={t('item.filterBySchedule', {
+                    name: run.scheduleName,
+                  })}
+                  className="inline-flex items-center gap-1 rounded-md bg-indigo-500/10 px-2 py-0.5 text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-500/20 dark:text-indigo-400"
+                >
+                  <CalendarClock className="h-3 w-3" />
+                  {t('item.scheduled')}
+                </button>
+              ) : (
+                <span
+                  title={run.scheduleName}
+                  className="inline-flex items-center gap-1 rounded-md bg-indigo-500/10 px-2 py-0.5 text-sm font-medium text-indigo-600 dark:text-indigo-400"
+                >
+                  <CalendarClock className="h-3 w-3" />
+                  {t('item.scheduled')}
+                </span>
+              ))}
             {run.fromPreset && (
-              <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary">
+              <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary">
                 <Bookmark className="h-3 w-3" />
                 {t('item.preset')}
               </span>
             )}
-            <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
-              #{runIdLabel}
-            </span>
             {/* Derived (system) facets, then user tags. */}
             {modelLabel && (
               <JournalChip
@@ -190,7 +239,7 @@ export const ForecastRunRow = memo(function ({
               type="button"
               onClick={() => onToggleBookmark(run.runId)}
               className={cn(
-                'hit-target-y transition-colors hover:text-yellow-500',
+                'hit-target-y flex size-6 items-center justify-center rounded-md transition-colors hover:text-yellow-500',
                 run.isBookmarked && 'text-yellow-500',
               )}
               aria-label={
@@ -261,7 +310,10 @@ function RunAction({ run }: { run: ForecastRunViewModel }) {
     <Link
       to="/execute/$jobId"
       params={{ jobId: run.runId }}
-      className={cn('text-sm font-semibold hover:underline', variant.className)}
+      className={cn(
+        'hit-target-y text-sm font-semibold hover:underline',
+        variant.className,
+      )}
     >
       {variant.label}
     </Link>

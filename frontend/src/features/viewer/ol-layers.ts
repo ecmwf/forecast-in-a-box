@@ -21,16 +21,18 @@
  */
 
 import ImageLayer from 'ol/layer/Image'
-import VectorTileLayer from 'ol/layer/VectorTile'
 import ImageWMS from 'ol/source/ImageWMS'
-import { fromLonLat } from 'ol/proj'
-import { applyStyle as applyMapboxStyle } from 'ol-mapbox-style'
 import { toWmsEndpoint } from './wms-capabilities'
 import type { LoadFunction } from 'ol/Image'
-import type VectorTileSource from 'ol/source/VectorTile'
-import { createLogger } from '@/lib/logger'
-
-const log = createLogger('viewer')
+import type { Extent } from 'ol/extent'
+import type LayerGroup from 'ol/layer/Group'
+import type Projection from 'ol/proj/Projection'
+import type VectorTileLayer from 'ol/layer/VectorTile'
+import type { ViewerProjection } from './projections'
+import {
+  CARTO_POSITRON_STYLE_URL,
+  makeVectorBasemapLayer,
+} from '@/lib/map/ol-basemap'
 
 // External web basemap (Carto vector); the SkinnyWMS native basemap is separate.
 export interface ExternalBasemapOption {
@@ -43,7 +45,8 @@ export interface ExternalBasemapOption {
 }
 
 /** `visualise`-namespace keys — resolved with `t()` at render. */
-type BasemapLabelKey = 'basemaps.cartoPositron' | 'basemaps.skinnywms'
+type BasemapLabelKey =
+  'basemaps.cartoPositron' | 'basemaps.outline' | 'basemaps.skinnywms'
 
 // SkinnyWMS's own map — `background` as the base, borders overlaid.
 export interface SkinnyWmsBasemapOption {
@@ -52,7 +55,23 @@ export interface SkinnyWmsBasemapOption {
   labelKey: BasemapLabelKey
 }
 
-export type BasemapOption = ExternalBasemapOption | SkinnyWmsBasemapOption
+// Bundled coast/border strokes + graticule — any projection, offline.
+export interface OutlineBasemapOption {
+  type: 'outline'
+  id: string
+  labelKey: BasemapLabelKey
+}
+
+export type BasemapOption =
+  ExternalBasemapOption | OutlineBasemapOption | SkinnyWmsBasemapOption
+
+/** Web-Mercator tile basemaps need a Mercator view. */
+export function basemapFitsProjection(
+  opt: BasemapOption,
+  projection: ViewerProjection,
+): boolean {
+  return opt.type !== 'vector' || projection.mercator
+}
 
 // Satellite-imagery basemaps removed pending licensing review — the
 // wms-image machinery lives in git history.
@@ -61,7 +80,7 @@ export const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
     type: 'vector',
     id: 'carto-positron-vector',
     labelKey: 'basemaps.cartoPositron',
-    styleUrl: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    styleUrl: CARTO_POSITRON_STYLE_URL,
   },
 ]
 
@@ -72,41 +91,30 @@ export const SKINNYWMS_BASEMAP: SkinnyWmsBasemapOption = {
   labelKey: 'basemaps.skinnywms',
 }
 
+export const OUTLINE_BASEMAP: OutlineBasemapOption = {
+  type: 'outline',
+  id: 'outline',
+  labelKey: 'basemaps.outline',
+}
+
 export const DEFAULT_BASEMAP_ID = BASEMAPS[0].id
 export const DEFAULT_LAYER_OPACITY = 0.85
 // SkinnyWMS border overlay sits above every data layer.
 export const REFERENCE_OVERLAY_Z = 1000
 
-// Standard Web Mercator world extent (projection asymptotes at ±85.0511°);
-// constrains panning to the basemap's coverage.
-export const WEB_MERCATOR_EXTENT: [number, number, number, number] = [
-  ...fromLonLat([-180, -85.0511]),
-  ...fromLonLat([180, 85.0511]),
-] as [number, number, number, number]
-
-// Initial fit target — full longitude, latitude biased north so Antarctica
-// is cropped and Scandinavia gets proper screen real estate. "Fit to
-// globe" toolbar button overrides with the full WMS bbox.
-export const INITIAL_VIEW_BBOX_WGS84: [number, number, number, number] = [
-  -180, -55, 180, 85,
-]
+/** What a freshly built map mounts: Carto, or Outline off-Mercator. */
+export function defaultBasemapFor(projection: ViewerProjection): BasemapOption {
+  return projection.mercator ? BASEMAPS[0] : OUTLINE_BASEMAP
+}
 
 export type ExternalBasemapLayer = VectorTileLayer
-export type BasemapLayer = ExternalBasemapLayer | ImageLayer<ImageWMS>
+export type BasemapLayer =
+  ExternalBasemapLayer | LayerGroup | ImageLayer<ImageWMS>
 
 export function makeBasemapLayer(
   opt: ExternalBasemapOption,
 ): ExternalBasemapLayer {
-  // Vector tiles (Mapbox-style JSON). declutter: no label overlap; extent: one world so margins stay empty.
-  const layer = new VectorTileLayer<VectorTileSource>({
-    declutter: true,
-    extent: WEB_MERCATOR_EXTENT,
-  })
-  // Empty CSS suppresses ol-mapbox-style's broken jsdelivr fontsource fetch; labels fall back to stack fonts.
-  applyMapboxStyle(layer, opt.styleUrl, { webfonts: '/empty-font.css' }).catch(
-    (err) => log.error('Failed to apply vector basemap style', { error: err }),
-  )
-  return layer
+  return makeVectorBasemapLayer(opt.styleUrl)
 }
 
 /**
@@ -180,12 +188,15 @@ export function cancellingImageLoader(): LoadFunction {
 export function makeDataLayerSource(
   baseUrl: string,
   params: Record<string, string>,
+  /** Request-side projection twin (BBOX axis order); default: the view's. */
+  projection?: Projection,
 ): ImageWMS {
   return new ImageWMS({
     // OL appends its own params with the correct separator, so full
     // endpoints with an existing query string are safe here.
     url: toWmsEndpoint(baseUrl),
     params,
+    projection,
     serverType: 'mapserver',
     crossOrigin: 'anonymous',
     hidpi: false,
@@ -198,13 +209,21 @@ export function makeDataLayerSource(
 export function makeSkinnyWmsBasemap(
   baseUrl: string,
   backgroundLayerName: string,
+  /** View projection extent — clips out-of-world BBOXes (→ stretched). */
+  extent: Extent | undefined,
+  /** SkinnyWMS reads BBOXes easting-first (see requestProjection). */
+  projection?: Projection,
 ): ImageLayer<ImageWMS> {
-  const source = makeDataLayerSource(baseUrl, {
-    LAYERS: backgroundLayerName,
-    STYLES: '',
-    FORMAT: 'image/png',
-    // Opaque — it's the base layer.
-    TRANSPARENT: 'FALSE',
-  })
-  return new ImageLayer({ source, extent: WEB_MERCATOR_EXTENT })
+  const source = makeDataLayerSource(
+    baseUrl,
+    {
+      LAYERS: backgroundLayerName,
+      STYLES: '',
+      FORMAT: 'image/png',
+      // Opaque — it's the base layer.
+      TRANSPARENT: 'FALSE',
+    },
+    projection,
+  )
+  return new ImageLayer({ source, extent })
 }

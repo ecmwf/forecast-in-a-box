@@ -1,0 +1,15 @@
+{
+  "welcome": {
+    "dontShowAgain": "Don't show this again",
+    "reopened": "Reopened from Help · Welcome tour",
+    "skip": "Skip for now",
+    "close": "Close",
+    "takeTour": "Take the tour"
+  },
+  "steps": {
+    "welcome": {
+      "title": "Welcome to Forecast-in-a-Box",
+      "body": "Run state-of-the-art AI weather forecasts on your own hardware, with free open data. This short tour walks you through the main pages — about two minutes."
+    }
+  }
+}

@@ -32,10 +32,9 @@ import { RunStatusDetailsPopover } from './RunStatusDetailsPopover'
 import { ModelSummaryPopover } from './ModelSummaryPopover'
 import type { ReactNode } from 'react'
 import type { TrafficLightStatus } from '@/types/status.types'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { useArtifacts } from '@/api/hooks/useArtifacts'
 import { useStatus } from '@/api/hooks/useStatus'
-import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
+import { RUN_WINDOW, useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { Card, CardContent } from '@/components/ui/card'
@@ -89,19 +88,17 @@ const statusIcons: Record<TrafficLightStatus, ReactNode> = {
 }
 
 interface WelcomeCardProps {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
   className?: string
 }
 
-export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
+export function WelcomeCard({ className }: WelcomeCardProps) {
   const { data: user } = useUser()
   const { t } = useTranslation('dashboard')
   const { trafficLightStatus } = useStatus()
   const { serverTimeToLocal } = useServerTime()
   const {
     counts,
-    total,
+    serverTotal,
     runs,
     runningProgress,
     isLoading: isJobCountLoading,
@@ -166,7 +163,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
   }
 
   return (
-    <Card className={cn('p-6', className)} variant={variant} shadow={shadow}>
+    <Card className={cn('p-6', className)}>
       <H2 className="mb-6 text-xl font-semibold">
         {isAnonymous
           ? t('welcome.titleAnonymous')
@@ -260,11 +257,14 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   ) : (
                     <span className="text-lg font-semibold">
-                      {total.toLocaleString()}
+                      {serverTotal.toLocaleString()}
                     </span>
                   )}
                   {!isJobCountLoading && trend !== null && (
                     <span
+                      title={t('welcome.stats.trendTitle', {
+                        window: RUN_WINDOW,
+                      })}
                       className={cn(
                         'flex items-center text-sm font-medium',
                         trend >= 0
@@ -283,7 +283,7 @@ export function WelcomeCard({ variant, shadow, className }: WelcomeCardProps) {
                   )}
                 </>
               }
-              subtext={t('welcome.stats.thisMonth')}
+              subtext={t('welcome.stats.toDate')}
               className="cursor-pointer transition-colors hover:bg-muted/80"
             />
           </RunActivityPopover>

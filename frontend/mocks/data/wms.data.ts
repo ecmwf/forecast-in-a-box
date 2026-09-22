@@ -9,12 +9,18 @@
  */
 
 /**
- * Mock state for SkinnyWMS lens servers, keyed by port. Tests register a
- * server per fake lens port; the `*\/wms` handler serves a capabilities
- * document in the exact shape SkinnyWMS emits (decoration layers, per-layer
- * TIME dimension, legend URLs on the internal bind address so `rebaseLensUrl`
- * is exercised). Unregistered ports answer 503, mirroring the real race where
- * a lens reports `running` before its WMS port accepts requests.
+ * Mock state for SkinnyWMS lens servers, keyed by a generic string key — a
+ * literal port (tests that talk to `http://localhost:<port>` directly, as
+ * an external-style bare origin) or a lens instance id (tests that go
+ * through the real `/api/v1/lens/proxy/<id>` route, matching production).
+ * The `*\/wms` handler serves a capabilities document in the exact shape
+ * SkinnyWMS emits (decoration layers, per-layer TIME dimension, legend URLs
+ * on an internal bind address so `rebaseLensUrl` is exercised). Unregistered
+ * keys answer 503, mirroring the real race where a lens reports `running`
+ * before its WMS port accepts requests — unless a default config was
+ * registered via `registerDefaultMockWmsServer`, which seeds any
+ * unregistered key on first use (a running lens whose exact id/port a test
+ * doesn't need to predict).
  */
 
 export interface MockWmsLayerConfig {
@@ -22,6 +28,12 @@ export interface MockWmsLayerConfig {
   title: string
   /** Raw TIME dimension, e.g. '2026-07-06T00:00:00Z,2026-07-06T06:00:00Z'. */
   time?: string
+  /** Advertised styles (default: one `default`). */
+  styles?: Array<{ name: string; title?: string; abstract?: string }>
+  /** Own EX_GeographicBoundingBox [west, south, east, north]. */
+  bbox?: [number, number, number, number]
+  /** Extra ISO8601 dimensions, e.g. reference_time. */
+  dimensions?: Array<{ name: string; values: string; default?: string }>
 }
 
 export interface MockWmsServerConfig {
@@ -30,8 +42,11 @@ export interface MockWmsServerConfig {
   decorations?: Array<string>
   /** EPSG:4326 [west, south, east, north]. */
   bbox?: [number, number, number, number]
-  /** Requests answered 503 before the server starts serving capabilities. */
+  /** Advertised root `<CRS>` codes (default: the two web projections). */
+  crs?: Array<string>
+  /** Requests answered `failureStatus` (default 503) before the server serves. */
   failuresBeforeSuccess?: number
+  failureStatus?: number
   /** GetMap TIME values answered with a WMS service exception. */
   failGetMapTimes?: Array<string>
   /** Delay every GetMap response (exercises superseding/abort paths). */
@@ -42,57 +57,140 @@ interface MockWmsServer {
   config: MockWmsServerConfig
   remainingFailures: number
   capabilitiesRequests: number
+  /** Fake internal bind port advertised in legend URLs, independent of the
+   *  routing key (which may be a non-numeric lens instance id). */
+  internalPort: number
 }
 
-let servers = new Map<number, MockWmsServer>()
+let servers = new Map<string, MockWmsServer>()
+let defaultConfig: MockWmsServerConfig | null = null
+let internalPortCounter = 40000
 
 export function resetWmsState(): void {
   servers = new Map()
+  defaultConfig = null
+  internalPortCounter = 40000
   getMapLog.clear()
+  getMapDetailLog.clear()
+  legendLog.clear()
 }
 
-export function hasMockWmsServer(port: number): boolean {
-  return servers.has(port)
+export function hasMockWmsServer(key: string | number): boolean {
+  return servers.has(String(key))
 }
 
-export function registerMockWmsServer(
-  port: number,
-  config: MockWmsServerConfig,
-): void {
-  servers.set(port, {
+/** Some config would serve this key (explicit registration or the default). */
+export function hasMockWmsConfig(key: string | number): boolean {
+  return servers.has(String(key)) || defaultConfig !== null
+}
+
+function createServer(config: MockWmsServerConfig): MockWmsServer {
+  return {
     config,
     remainingFailures: config.failuresBeforeSuccess ?? 0,
     capabilitiesRequests: 0,
-  })
+    internalPort: internalPortCounter++,
+  }
 }
 
-/** GetMap requests seen per port (TIME param values, in order). */
-const getMapLog = new Map<number, Array<string | null>>()
-
-export function recordGetMap(port: number, time: string | null): void {
-  const log = getMapLog.get(port) ?? []
-  log.push(time)
-  getMapLog.set(port, log)
+export function registerMockWmsServer(
+  key: string | number,
+  config: MockWmsServerConfig,
+): void {
+  servers.set(String(key), createServer(config))
 }
 
-export function getMapRequests(port: number): ReadonlyArray<string | null> {
-  return getMapLog.get(port) ?? []
+/** Seed any unregistered key with this config on first use — for flows
+ *  (auto-started lenses) where the test doesn't predict the exact key. */
+export function registerDefaultMockWmsServer(
+  config: MockWmsServerConfig,
+): void {
+  defaultConfig = config
 }
 
-/** Should this port's GetMap fail for the given TIME? */
-export function getMapFailsFor(port: number, time: string | null): boolean {
-  const times = servers.get(port)?.config.failGetMapTimes
+function serverFor(key: string): MockWmsServer | undefined {
+  const existing = servers.get(key)
+  if (existing) return existing
+  if (!defaultConfig) return undefined
+  const created = createServer(defaultConfig)
+  servers.set(key, created)
+  return created
+}
+
+/** GetMap requests seen per key (TIME param values, in order). */
+const getMapLog = new Map<string, Array<string | null>>()
+
+export interface GetMapRequest {
+  time: string | null
+  crs: string | null
+  bbox: string | null
+  styles: string | null
+  layers: string | null
+  /** `DIM_*` params, lower-cased without the prefix. */
+  dims: Record<string, string>
+}
+
+/** Full GetMap params per key, parallel to `getMapLog`. */
+const getMapDetailLog = new Map<string, Array<GetMapRequest>>()
+
+export function recordGetMap(key: string | number, req: GetMapRequest): void {
+  const k = String(key)
+  const log = getMapLog.get(k) ?? []
+  log.push(req.time)
+  getMapLog.set(k, log)
+  const details = getMapDetailLog.get(k) ?? []
+  details.push(req)
+  getMapDetailLog.set(k, details)
+}
+
+export function getMapRequests(
+  key: string | number,
+): ReadonlyArray<string | null> {
+  return getMapLog.get(String(key)) ?? []
+}
+
+/** Legend requests seen per key. */
+const legendLog = new Map<string, Array<Record<string, string | null>>>()
+
+export function recordLegendRequest(
+  key: string | number,
+  params: Record<string, string | null>,
+): void {
+  const k = String(key)
+  const log = legendLog.get(k) ?? []
+  log.push(params)
+  legendLog.set(k, log)
+}
+
+export function legendRequests(
+  key: string | number,
+): ReadonlyArray<Record<string, string | null>> {
+  return legendLog.get(String(key)) ?? []
+}
+
+export function getMapRequestDetails(
+  key: string | number,
+): ReadonlyArray<GetMapRequest> {
+  return getMapDetailLog.get(String(key)) ?? []
+}
+
+/** Should this key's GetMap fail for the given TIME? */
+export function getMapFailsFor(
+  key: string | number,
+  time: string | null,
+): boolean {
+  const times = servers.get(String(key))?.config.failGetMapTimes
   return !!time && !!times && times.includes(time)
 }
 
-/** Configured GetMap response delay for a port (0 = respond immediately). */
-export function getMapDelayFor(port: number): number {
-  return servers.get(port)?.config.getMapDelayMs ?? 0
+/** Configured GetMap response delay for a key (0 = respond immediately). */
+export function getMapDelayFor(key: string | number): number {
+  return servers.get(String(key))?.config.getMapDelayMs ?? 0
 }
 
 /** Capabilities requests seen by a server (asserting retry behaviour). */
-export function wmsCapabilitiesRequestCount(port: number): number {
-  return servers.get(port)?.capabilitiesRequests ?? 0
+export function wmsCapabilitiesRequestCount(key: string | number): number {
+  return servers.get(String(key))?.capabilitiesRequests ?? 0
 }
 
 /**
@@ -100,37 +198,69 @@ export function wmsCapabilitiesRequestCount(port: number): number {
  * `unregistered` and `failing` both surface to the client as 503.
  */
 export function serveCapabilities(
-  port: number,
-): { kind: 'ok'; xml: string } | { kind: 'unavailable' } {
-  const server = servers.get(port)
-  if (!server) return { kind: 'unavailable' }
+  key: string | number,
+): { kind: 'ok'; xml: string } | { kind: 'unavailable'; status: number } {
+  const server = serverFor(String(key))
+  if (!server) return { kind: 'unavailable', status: 503 }
   server.capabilitiesRequests++
   if (server.remainingFailures > 0) {
     server.remainingFailures--
-    return { kind: 'unavailable' }
+    return { kind: 'unavailable', status: server.config.failureStatus ?? 503 }
   }
-  return { kind: 'ok', xml: capabilitiesXml(port, server.config) }
+  return {
+    kind: 'ok',
+    xml: capabilitiesXml(server.internalPort, server.config),
+  }
 }
 
-function layerXml(port: number, layer: MockWmsLayerConfig): string {
+function layerXml(internalPort: number, layer: MockWmsLayerConfig): string {
   const time = layer.time
     ? `<Dimension name="time" units="ISO8601">${layer.time}</Dimension>`
+    : ''
+  const dims = (layer.dimensions ?? [])
+    .map(
+      (dim) =>
+        `<Dimension name="${dim.name}" units="ISO8601"${dim.default ? ` default="${dim.default}"` : ''}>${dim.values}</Dimension>`,
+    )
+    .join('\n')
+  const styles = (layer.styles ?? [{ name: 'default' }])
+    .map(
+      (s) => `<Style>
+      <Name>${s.name}</Name>
+      ${s.title ? `<Title>${s.title}</Title>` : ''}
+      ${s.abstract ? `<Abstract>${s.abstract}</Abstract>` : ''}
+      <LegendURL width="1024" height="128">
+        <OnlineResource xlink:href="http://0.0.0.0:${internalPort}/legend?layer=${encodeURIComponent(layer.name)}&amp;style=${encodeURIComponent(s.name)}&amp;width=1024&amp;height=128"/>
+      </LegendURL>
+    </Style>`,
+    )
+    .join('\n')
+  const bbox = layer.bbox
+    ? `<EX_GeographicBoundingBox>
+      <westBoundLongitude>${layer.bbox[0]}</westBoundLongitude>
+      <eastBoundLongitude>${layer.bbox[2]}</eastBoundLongitude>
+      <southBoundLatitude>${layer.bbox[1]}</southBoundLatitude>
+      <northBoundLatitude>${layer.bbox[3]}</northBoundLatitude>
+    </EX_GeographicBoundingBox>`
     : ''
   return `<Layer>
     <Name>${layer.name}</Name>
     <Title>${layer.title}</Title>
+    ${bbox}
     ${time}
-    <Style>
-      <Name>default</Name>
-      <LegendURL>
-        <OnlineResource xlink:href="http://0.0.0.0:${port}/legend?layer=${encodeURIComponent(layer.name)}"/>
-      </LegendURL>
-    </Style>
+    ${dims}
+    ${styles}
   </Layer>`
 }
 
-function capabilitiesXml(port: number, config: MockWmsServerConfig): string {
+function capabilitiesXml(
+  internalPort: number,
+  config: MockWmsServerConfig,
+): string {
   const [west, south, east, north] = config.bbox ?? [-180, -90, 180, 90]
+  const crs = (config.crs ?? ['EPSG:3857', 'EPSG:4326'])
+    .map((code) => `<CRS>${code}</CRS>`)
+    .join('')
   const decorations = (config.decorations ?? ['background', 'foreground'])
     .map((name) => `<Layer><Name>${name}</Name><Title>${name}</Title></Layer>`)
     .join('\n')
@@ -142,6 +272,7 @@ function capabilitiesXml(port: number, config: MockWmsServerConfig): string {
     </Request>
     <Layer>
       <Title>WMS server</Title>
+      ${crs}
       <EX_GeographicBoundingBox>
         <westBoundLongitude>${west}</westBoundLongitude>
         <eastBoundLongitude>${east}</eastBoundLongitude>
@@ -149,7 +280,7 @@ function capabilitiesXml(port: number, config: MockWmsServerConfig): string {
         <northBoundLatitude>${north}</northBoundLatitude>
       </EX_GeographicBoundingBox>
       ${decorations}
-      ${config.layers.map((l) => layerXml(port, l)).join('\n')}
+      ${config.layers.map((l) => layerXml(internalPort, l)).join('\n')}
     </Layer>
   </Capability>
 </WMS_Capabilities>`

@@ -10,9 +10,10 @@
 
 /**
  * Basemap management for a viewer map: the swap between the external
- * vector basemap and the lens's SkinnyWMS-native background, plus the
- * coastline/border reference overlay that rides above the data layers
- * while the native basemap is active. One instance per (map × lens).
+ * vector basemap, the bundled Outline basemap, and the lens's
+ * SkinnyWMS-native background, plus the coastline/border reference
+ * overlay that rides above the data layers while the native basemap is
+ * active. One instance per (map × lens).
  */
 
 import { useEffect, useMemo, useRef } from 'react'
@@ -20,19 +21,27 @@ import ImageLayer from 'ol/layer/Image'
 import { skinnyWmsBasemap } from '../wms-capabilities'
 import {
   BASEMAPS,
-  DEFAULT_BASEMAP_ID,
+  OUTLINE_BASEMAP,
   REFERENCE_OVERLAY_Z,
   SKINNYWMS_BASEMAP,
-  WEB_MERCATOR_EXTENT,
+  basemapFitsProjection,
+  defaultBasemapFor,
   makeBasemapLayer,
   makeDataLayerSource,
   makeSkinnyWmsBasemap,
 } from '../ol-layers'
+import {
+  polarGraticuleFor,
+  requestProjection,
+  viewerProjectionOf,
+} from '../projections'
 import type { RefObject } from 'react'
 import type OlMap from 'ol/Map'
 import type ImageWMS from 'ol/source/ImageWMS'
 import type { ParsedLayer } from '../wms-capabilities'
 import type { BasemapLayer, BasemapOption } from '../ol-layers'
+import type { OutlineTheme } from '@/lib/map/ol-outline'
+import { makeOutlineBasemapLayer } from '@/lib/map/ol-outline'
 
 export function useBasemap(options: {
   mapRef: RefObject<OlMap | null>
@@ -42,6 +51,8 @@ export function useBasemap(options: {
   basemapId: string
   /** Basemap layer opacity (0 hides it entirely). Default 1. */
   opacity?: number
+  /** Outline basemap palette. Default light. */
+  theme?: OutlineTheme
   incLoading: () => void
   decLoading: () => void
   /** useOlMapBase recreation counter — re-apply after a map rebuild. */
@@ -54,16 +65,17 @@ export function useBasemap(options: {
     decorationLayers,
     basemapId,
     opacity = 1,
+    theme = 'light',
     incLoading,
     decLoading,
     mapVersion,
   } = options
   // What this map actually shows. The skinny basemap is served BY the
   // lens (key includes baseUrl); a rebuilt map arrives showing the
-  // default — both cases must re-apply.
+  // projection's default — both cases must re-apply.
   const appliedRef = useRef<{ map: OlMap | null; key: string }>({
     map: null,
-    key: DEFAULT_BASEMAP_ID,
+    key: '',
   })
   const referenceLayerRef = useRef<ImageLayer<ImageWMS> | null>(null)
   const opacityRef = useRef(opacity)
@@ -78,6 +90,7 @@ export function useBasemap(options: {
   const availableBasemaps = useMemo<ReadonlyArray<BasemapOption>>(
     () => [
       ...BASEMAPS,
+      OUTLINE_BASEMAP,
       ...(skinnyBasemap.background ? [SKINNYWMS_BASEMAP] : []),
     ],
     [skinnyBasemap.background],
@@ -89,32 +102,49 @@ export function useBasemap(options: {
     const map = mapRef.current
     const oldLayer = basemapLayerRef.current
     if (!map || !oldLayer) return
-    if (appliedRef.current.map !== map) {
-      // A (re)built map mounts the default basemap (useOlMapBase).
-      appliedRef.current = { map, key: DEFAULT_BASEMAP_ID }
-    }
-    const opt = availableBasemaps.find((b) => b.id === basemapId) ?? BASEMAPS[0]
-    const key =
-      opt.type === 'skinnywms' && skinnyBasemap.background
+    const projection = viewerProjectionOf(map.getView())
+    const keyOf = (opt: BasemapOption) =>
+      opt.type === 'skinnywms'
         ? `${opt.id}|${baseUrl}`
-        : opt.id
+        : opt.type === 'outline'
+          ? `${opt.id}|${theme}`
+          : opt.id
+    if (appliedRef.current.map !== map) {
+      // A (re)built map mounts the projection's default (useOlMapBase).
+      appliedRef.current = { map, key: keyOf(defaultBasemapFor(projection)) }
+    }
+    let opt = availableBasemaps.find((b) => b.id === basemapId) ?? BASEMAPS[0]
+    // Carto needs Mercator; skinnywms needs a `background` layer.
+    if (!basemapFitsProjection(opt, projection)) opt = OUTLINE_BASEMAP
+    if (opt.type === 'skinnywms' && !skinnyBasemap.background) {
+      opt = defaultBasemapFor(projection)
+    }
+    const key = keyOf(opt)
     if (appliedRef.current.key === key) return
     appliedRef.current = { map, key }
+    const extent = map.getView().getProjection().getExtent()
     let newLayer: BasemapLayer
     if (opt.type === 'skinnywms' && skinnyBasemap.background) {
       const skinny = makeSkinnyWmsBasemap(
         baseUrl,
         skinnyBasemap.background.name,
+        extent,
+        requestProjection(map.getView(), 'xy'),
       )
       const source = skinny.getSource()
       source?.on('imageloadstart', incLoading)
       source?.on('imageloadend', decLoading)
       source?.on('imageloaderror', decLoading)
       newLayer = skinny
+    } else if (opt.type === 'outline') {
+      newLayer = makeOutlineBasemapLayer(
+        projection.code,
+        extent,
+        theme,
+        polarGraticuleFor(projection),
+      )
     } else {
-      // Carto basemap — or skinnywms with no background, which falls back.
-      const external = opt.type === 'skinnywms' ? BASEMAPS[0] : opt
-      const tiled = makeBasemapLayer(external)
+      const tiled = makeBasemapLayer(opt.type === 'vector' ? opt : BASEMAPS[0])
       const source = tiled.getSource()
       source?.on('tileloadstart', incLoading)
       source?.on('tileloadend', decLoading)
@@ -129,6 +159,7 @@ export function useBasemap(options: {
     availableBasemaps,
     skinnyBasemap.background,
     baseUrl,
+    theme,
     mapRef,
     basemapLayerRef,
     incLoading,
@@ -143,7 +174,7 @@ export function useBasemap(options: {
   useEffect(() => {
     basemapLayerRef.current?.setOpacity(opacity)
     referenceLayerRef.current?.setOpacity(opacity)
-  }, [opacity, basemapId, basemapLayerRef, mapVersion])
+  }, [opacity, basemapId, theme, basemapLayerRef, mapVersion])
 
   // -------- SkinnyWMS reference overlay --------
   // Coastline/border layers over the data while the SkinnyWMS basemap is
@@ -153,19 +184,24 @@ export function useBasemap(options: {
     if (!map) return
     if (basemapId !== SKINNYWMS_BASEMAP.id) return
     if (skinnyBasemap.reference.length === 0) return
-    const source = makeDataLayerSource(baseUrl, {
-      LAYERS: skinnyBasemap.reference.map((l) => l.name).join(','),
-      STYLES: '',
-      FORMAT: 'image/png',
-      TRANSPARENT: 'TRUE',
-    })
+    // SkinnyWMS-only layers: easting-first BBOX in projected CRSs.
+    const source = makeDataLayerSource(
+      baseUrl,
+      {
+        LAYERS: skinnyBasemap.reference.map((l) => l.name).join(','),
+        STYLES: '',
+        FORMAT: 'image/png',
+        TRANSPARENT: 'TRUE',
+      },
+      requestProjection(map.getView(), 'xy'),
+    )
     source.on('imageloadstart', incLoading)
     source.on('imageloadend', decLoading)
     source.on('imageloaderror', decLoading)
     const overlay = new ImageLayer({
       source,
       zIndex: REFERENCE_OVERLAY_Z,
-      extent: WEB_MERCATOR_EXTENT,
+      extent: map.getView().getProjection().getExtent(),
     })
     overlay.setOpacity(opacityRef.current)
     referenceLayerRef.current = overlay

@@ -301,6 +301,16 @@ describe('FableValidationExpansionSchema block_output_qubes', () => {
     const result = FableValidationExpansionSchema.parse({ ...base })
     expect(result.block_output_qubes).toEqual({})
   })
+
+  it('accepts a null resolved value for an explicitly null option (ecmwf#691)', () => {
+    const result = FableValidationExpansionSchema.parse({
+      ...base,
+      resolved_configuration_options: { b1: { text: null, fname: 'out' } },
+    })
+    expect(result.resolved_configuration_options).toEqual({
+      b1: { text: null, fname: 'out' },
+    })
+  })
 })
 
 describe('partitionBlueprintTags', () => {

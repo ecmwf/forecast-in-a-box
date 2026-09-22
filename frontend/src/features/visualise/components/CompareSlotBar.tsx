@@ -18,7 +18,9 @@
 
 import { ArrowLeftRight, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { entryDetail, entryDisplayName, entryRef } from '../entry-ref'
+import { entryDetail, entryRef } from '../entry-ref'
+import { slotCaption } from '../slot-caption'
+import type { TFunction } from 'i18next'
 import type { ComparisonEntry } from '../entry-ref'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { formatInZone, useAppTimeZone } from '@/lib/datetime'
+import { useAppTimeZone } from '@/lib/datetime'
 
 const SLOT_BADGE: Record<'a' | 'b', string> = {
   a: 'bg-slot-a text-white',
@@ -58,8 +60,9 @@ export function CompareSlotBar({
   return (
     // Below lg the B group takes its own row and the swap trails it, so
     // both rows lead with their slot badge (A over B, aligned).
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="flex max-w-full min-w-0 items-center gap-2">
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-nowrap">
+      {/* Groups size to their content and only shrink when the row is tight. */}
+      <div className="flex max-w-full min-w-0 shrink items-center gap-2">
         <SlotPicker
           slot="a"
           entries={entries}
@@ -69,7 +72,7 @@ export function CompareSlotBar({
         />
         {bRef && <ClearSlotButton slot="a" onClear={() => onClearSlot('a')} />}
       </div>
-      <div className="flex max-w-full min-w-0 items-center gap-2 max-lg:w-full">
+      <div className="flex max-w-full min-w-0 shrink items-center gap-2 max-lg:w-full">
         <Button
           variant="outline"
           size="icon"
@@ -121,17 +124,20 @@ function ClearSlotButton({
   )
 }
 
-/** Date suffix for same-named sources — skipped when the name embeds one. */
-function triggerSuffix(
+/** Second line of a picker: what the source is, in the caption's words. */
+function triggerMeta(
   entry: ComparisonEntry,
   timeZone: string,
-): string | null {
-  if (entry.kind === 'output' && entry.runCreatedAt) {
-    if (/\d{4}-\d{2}-\d{2}/.test(entryDisplayName(entry))) return null
-    return formatInZone(new Date(entry.runCreatedAt), timeZone, 'dd MMM HH:mm')
-  }
-  // wms/path labels already carry their host / directory name.
-  return null
+  t: TFunction<'visualise'>,
+): string {
+  const { detail } = entryDetail(entry)
+  if (entry.kind !== 'output') return detail
+  const { label, submittedAt } = slotCaption(entry, timeZone)
+  const parts = [
+    submittedAt ? t('slotTag.submitted', { time: submittedAt }) : null,
+    entry.blockTitle && entry.blockTitle !== label ? entry.blockTitle : null,
+  ]
+  return parts.filter(Boolean).join(' · ')
 }
 
 function SlotPicker({
@@ -151,12 +157,12 @@ function SlotPicker({
   const { t } = useTranslation('visualise')
   const timeZone = useAppTimeZone()
   const current = entries.find((e) => entryRef(e) === value)
-  const suffix = current ? triggerSuffix(current, timeZone) : null
+  const caption = current ? slotCaption(current, timeZone) : null
   return (
-    <div className="flex max-w-full min-w-0 items-center gap-1.5">
+    <div className="flex max-w-full min-w-0 items-center gap-1.5 lg:flex-1">
       <span
         className={cn(
-          'flex h-6 w-6 shrink-0 items-center justify-center rounded font-mono text-xs font-bold',
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-mono text-xs font-bold',
           SLOT_BADGE[slot],
         )}
       >
@@ -168,23 +174,27 @@ function SlotPicker({
           if (typeof ref === 'string' && ref) onChange(ref)
         }}
       >
+        {/* lg+: two lines and share the row's width (capped); else one compact line. */}
         <SelectTrigger
-          className="h-9 w-64 max-w-full min-w-0 text-sm"
+          className="h-9 w-64 max-w-full min-w-0 text-sm *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:flex-1 lg:h-auto! lg:w-104 lg:py-1.5 lg:*:data-[slot=select-value]:line-clamp-none"
           aria-label={t('slots.pickerAria', { slot: slot.toUpperCase() })}
         >
           {/* Base UI shows the raw value for programmatically-set
               selections — render the display name explicitly. */}
           <SelectValue placeholder={t('slots.placeholder')}>
-            {current ? (
-              <span className="flex min-w-0 items-baseline gap-1.5">
-                <span className="min-w-0 truncate">
-                  {entryDisplayName(current)}
+            {current && caption ? (
+              <span className="flex w-full min-w-0 flex-col items-start text-left">
+                <span className="flex max-w-full min-w-0 items-baseline gap-1.5">
+                  <span className="min-w-0 truncate">{caption.label}</span>
+                  {caption.submittedAt && (
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums lg:hidden">
+                      {caption.submittedAt}
+                    </span>
+                  )}
                 </span>
-                {suffix && (
-                  <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
-                    {suffix}
-                  </span>
-                )}
+                <span className="max-w-full min-w-0 truncate text-xs font-normal text-muted-foreground max-lg:hidden">
+                  {triggerMeta(current, timeZone, t)}
+                </span>
               </span>
             ) : null}
           </SelectValue>
@@ -193,7 +203,7 @@ function SlotPicker({
           {entries.map((entry) => {
             const ref = entryRef(entry)
             const { kind, detail } = entryDetail(entry)
-            const date = triggerSuffix(entry, timeZone)
+            const { label, submittedAt } = slotCaption(entry, timeZone)
             // One chip per slot the row occupies (both on self-compare).
             const chipSlots = (['a', 'b'] as const).filter((s) =>
               s === slot ? ref === value : ref === markRef,
@@ -211,16 +221,16 @@ function SlotPicker({
                     {/* whitespace-normal: the ItemText wrapper is nowrap. */}
                     <span
                       className="line-clamp-2 min-w-0 flex-1 break-words whitespace-normal"
-                      title={entryDisplayName(entry)}
+                      title={label}
                     >
-                      {entryDisplayName(entry)}
+                      {label}
                     </span>
                     {chipSlots.map((s) => (
                       <span
                         key={s}
                         title={t('slots.inSlot', { slot: s.toUpperCase() })}
                         className={cn(
-                          'shrink-0 rounded px-1 font-mono text-[10px] font-bold',
+                          'shrink-0 rounded-md px-1 font-mono text-[10px] font-bold',
                           SLOT_BADGE[s],
                         )}
                       >
@@ -229,12 +239,14 @@ function SlotPicker({
                     ))}
                   </div>
                   <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="shrink-0 rounded bg-muted px-1 font-mono text-[10px] uppercase">
+                    <span className="shrink-0 rounded-md bg-muted px-1 font-mono text-[10px] uppercase">
                       {t(`slots.kind.${kind}`)}
                     </span>
                     <span className="min-w-0 truncate font-mono">{detail}</span>
-                    {date && (
-                      <span className="shrink-0 tabular-nums">{date}</span>
+                    {submittedAt && (
+                      <span className="shrink-0 tabular-nums">
+                        {t('slotTag.submitted', { time: submittedAt })}
+                      </span>
                     )}
                   </div>
                 </div>

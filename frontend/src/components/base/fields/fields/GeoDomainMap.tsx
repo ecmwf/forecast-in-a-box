@@ -32,7 +32,6 @@ import {
   SquareDashed,
 } from 'lucide-react'
 import 'ol/ol.css'
-import countriesGeo from '../data/countries.geo.json'
 import {
   boxHandles,
   clampBboxLatitudeForMercator,
@@ -48,6 +47,7 @@ import {
 import type { Coordinate } from 'ol/coordinate'
 import type { Pixel } from 'ol/pixel'
 import type { Bbox, BoxHandle, BoxHandleRole, OlExtent } from './geo-domain'
+import countriesGeo from '@/lib/map/data/countries.geo.json'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {

@@ -17,7 +17,7 @@
  * Uses MSW mocks for API responses.
  */
 
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import type { Page } from '@playwright/test'
 
 // Zustand persistence key for the UI store (see src/lib/storage-keys.ts).

@@ -36,9 +36,9 @@ export function PinnedLegendsBar({
   onUnpin: (key: string) => void
 }) {
   const { t } = useTranslation('executions')
-  // Advertised legends whose endpoint failed — their cards are dropped.
-  const [failedKeys, setFailedKeys] = useState<ReadonlySet<string>>(new Set())
-  const shown = items.filter((i) => !failedKeys.has(i.key))
+  // Legend URLs whose endpoint failed — by URL, so a style switch retries.
+  const [failedUrls, setFailedUrls] = useState<ReadonlySet<string>>(new Set())
+  const shown = items.filter((i) => !failedUrls.has(i.url))
   if (shown.length === 0) return null
   // Pick column count to match item count exactly (so the strip always
   // fills the row), capped at 3 on very wide screens. Special case: 4
@@ -59,7 +59,7 @@ export function PinnedLegendsBar({
           {shown.map(({ key, title, url }) => (
             <div
               key={key}
-              className="flex items-start gap-2 rounded border border-border bg-card px-2 py-2"
+              className="flex items-start gap-2 rounded-md border border-border bg-card px-2 py-2"
             >
               <div className="min-w-0 flex-1">
                 <P className="truncate text-xs font-medium" title={title}>
@@ -71,7 +71,7 @@ export function PinnedLegendsBar({
                   className="mt-1 h-auto max-h-40 w-full object-contain"
                   loading="lazy"
                   onError={() =>
-                    setFailedKeys((prev) => new Set(prev).add(key))
+                    setFailedUrls((prev) => new Set(prev).add(url))
                   }
                 />
               </div>

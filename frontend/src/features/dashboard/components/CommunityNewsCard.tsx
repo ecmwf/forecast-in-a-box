@@ -8,104 +8,110 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * CommunityNewsCard Component
- *
- * Shows latest models and forum topics
- */
-
-import { ChevronRight, MessageSquare, Zap } from 'lucide-react'
+import { Newspaper, Package, Presentation } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
-import { mockForumTopics, mockModels } from '@/features/dashboard/data/mockData'
-import { H2, H3, H4, P } from '@/components/base/typography'
+import type { ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import type { NewsLink } from '@/features/dashboard/hooks/useCommunityNews'
+import { useCommunityNews } from '@/features/dashboard/hooks/useCommunityNews'
+import { H2, H3, Link, P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 
-interface CommunityNewsCardProps {
-  variant?: DashboardVariant
-  shadow?: PanelShadow
+function Section({
+  Icon,
+  title,
+  children,
+}: {
+  Icon: LucideIcon
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <H3
+        className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground"
+        title={title}
+      >
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="truncate">{title}</span>
+      </H3>
+      <ul className="space-y-3">{children}</ul>
+    </div>
+  )
 }
 
-export function CommunityNewsCard({ variant, shadow }: CommunityNewsCardProps) {
+function NewsItem({ item }: { item: NewsLink }) {
+  return (
+    // One line each so the card stays short in narrow columns; the title tooltip carries the rest.
+    <li className="min-w-0" title={item.title}>
+      <Link
+        href={item.url}
+        underline={false}
+        className="block truncate text-sm font-medium"
+      >
+        {item.title}
+      </Link>
+      <P className="mt-0.5 truncate text-xs text-muted-foreground">
+        {item.date ? `${item.source} · ${item.date}` : item.source}
+      </P>
+    </li>
+  )
+}
+
+/** Two-line placeholders in the shape of a news item. */
+function NewsItemSkeleton() {
+  return (
+    <li>
+      <Skeleton className="h-4 w-4/5" />
+      <Skeleton className="mt-1.5 h-3 w-2/5" />
+    </li>
+  )
+}
+
+function NewsList({
+  items,
+  placeholders,
+}: {
+  items: ReadonlyArray<NewsLink> | undefined
+  placeholders: number
+}) {
+  if (items === undefined) {
+    return Array.from({ length: placeholders }, (_, i) => (
+      <NewsItemSkeleton key={i} />
+    ))
+  }
+  return items.map((item) => <NewsItem key={item.url} item={item} />)
+}
+
+export function CommunityNewsCard() {
   const { t } = useTranslation('dashboard')
+  const { data, isError } = useCommunityNews()
 
   return (
-    <Card className="flex flex-col p-6" variant={variant} shadow={shadow}>
+    <Card className="flex flex-col p-6">
       <H2 className="mb-6 text-xl font-semibold">{t('community.title')}</H2>
+      {isError ? (
+        <P className="text-sm text-muted-foreground">
+          {t('community.unavailable')}
+        </P>
+      ) : (
+        <div className="grid flex-1 grid-cols-1 gap-8 sm:grid-cols-2">
+          <Section Icon={Newspaper} title={t('community.press')}>
+            <NewsList items={data?.press} placeholders={5} />
+          </Section>
 
-      <div className="grid flex-1 grid-cols-1 gap-8 sm:grid-cols-2">
-        {/* Latest Available Models */}
-        <div className="flex flex-col gap-5">
-          <H3 className="flex items-center gap-2 text-sm font-semibold text-primary">
-            <Zap className="h-4 w-4" />
-            {t('community.latestModels')}
-          </H3>
-          <div className="flex-1 space-y-4">
-            {mockModels.map((model) => (
-              <div key={`${model.nameKey}-${model.version}`}>
-                <div className="flex items-start justify-between">
-                  <H4 className="text-sm font-medium">
-                    {t(model.nameKey)} {model.version}
-                  </H4>
-                  {model.isNew && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                    >
-                      {t('community.new')}
-                    </Badge>
-                  )}
-                </div>
-                <P className="mt-0.5 text-muted-foreground">
-                  {t('community.released', { time: model.releasedAt })}
-                </P>
-              </div>
-            ))}
-          </div>
-          <a
-            href="https://github.com/ecmwf/anemoi"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center text-sm font-medium text-primary hover:underline"
-          >
-            {t('community.viewRegistry')}
-            <ChevronRight className="ml-0.5 h-3 w-3" />
-          </a>
-        </div>
+          <div className="flex flex-col gap-8">
+            <Section Icon={Presentation} title={t('community.materials')}>
+              <NewsList items={data?.materials} placeholders={3} />
+            </Section>
 
-        {/* Latest Forum Topics */}
-        <div className="flex flex-col gap-5 border-l-0 border-border pl-0 sm:border-l sm:pl-8">
-          <H3 className="flex items-center gap-2 text-sm font-semibold text-primary">
-            <MessageSquare className="h-4 w-4" />
-            {t('community.latestTopics')}
-          </H3>
-          <div className="flex-1 space-y-4">
-            {mockForumTopics.map((topic) => (
-              <div key={topic.titleKey}>
-                <H4 className="text-sm leading-snug font-medium">
-                  {t(topic.titleKey)}
-                </H4>
-                <P className="mt-0.5 text-muted-foreground">
-                  {t('community.postedBy', {
-                    author: topic.author,
-                    time: topic.postedAt,
-                  })}
-                </P>
-              </div>
-            ))}
+            <Section Icon={Package} title={t('community.softwareAndCommunity')}>
+              <NewsList items={data?.community} placeholders={3} />
+            </Section>
           </div>
-          <a
-            href="https://forum.ecmwf.int"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center text-sm font-medium text-primary hover:underline"
-          >
-            {t('community.visitForum')}
-            <ChevronRight className="ml-0.5 h-3 w-3" />
-          </a>
         </div>
-      </div>
+      )}
     </Card>
   )
 }

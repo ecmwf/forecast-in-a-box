@@ -17,9 +17,9 @@ from fastapi import APIRouter
 
 from forecastbox.domain.auth.oidc import oauth_client
 from forecastbox.domain.auth.users import UserCreate, UserRead, UserUpdate, auth_backend, fastapi_users
-from forecastbox.utility.config import config
+from forecastbox.utility.config import ROUTE_PREFIX, config
 
-PREFIX = "/api/v1"
+PREFIX = ROUTE_PREFIX
 
 router = APIRouter()
 SECRET = config.auth.jwt_secret.get_secret_value()
@@ -33,7 +33,7 @@ if oauth_client is not None:
         oauth_client,
         auth_backend,
         SECRET,
-        redirect_url=config.auth.public_url + "/api/v1/auth/oidc/callback",
+        redirect_url=config.auth.public_url + f"{ROUTE_PREFIX}/auth/oidc/callback",
         is_verified_by_default=True,
         associate_by_email=True,
     )

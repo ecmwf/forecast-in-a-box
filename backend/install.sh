@@ -1,3 +1,7 @@
+# Used in the deployment/ewc docker files
+# Remove only after those are removed
+# Do *not* use in new usecases
+
 set -euo pipefail
 
 if [ ! -d /app/.venv ] ; then uv venv --seed /app/.venv --python 3.12 ; fi

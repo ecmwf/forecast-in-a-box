@@ -44,9 +44,6 @@
     "untitledConfiguration": "Untitled Configuration"
   },
   "header": {
-    "share": "Share",
-    "shareCopied": "Copied!",
-    "shareFailed": "Could not copy link to clipboard",
     "graph": "Graph",
     "form": "Form",
     "exportConfig": "Export Config",
@@ -66,12 +63,14 @@
     "runOnSchedule": "Run on Schedule",
     "submitOptions": "More submit options",
     "backToEdit": "Back to Edit",
-    "submitJob": "Submit Job",
+    "submitJob": "Start Run",
     "reviewTooltipNoBlocks": "Add blocks to your configuration",
     "reviewTooltipNoSink": "Add at least one output block",
     "reviewTooltipInvalid": "Fix validation errors before submitting",
     "undo": "Undo",
-    "redo": "Redo"
+    "redo": "Redo",
+    "file": "File",
+    "moreTags": "+{{count}}"
   },
   "blockCount_one": "{{count}} block",
   "blockCount_other": "{{count}} blocks",
@@ -81,30 +80,20 @@
     "saving": "Saving draft…",
     "saved": "Draft saved"
   },
-  "replaceDialog": {
-    "title": "Which configuration do you want to work on?",
-    "subtitle": "There is unsaved work on the canvas — choose what to continue with.",
-    "subtitleSaved": "A configuration is open on the canvas — choose what to continue with.",
-    "benchLabel": "Previous configuration (unsaved)",
-    "benchLabelSaved": "Previous configuration",
-    "discardHintSaved": "Replaces your current configuration",
-    "incomingLabel": "New configuration",
-    "blockCount_one": "{{count}} block",
-    "blockCount_other": "{{count}} blocks",
-    "newConfiguration": "New, empty configuration",
-    "unknownIncoming": "Selected configuration",
-    "blankCanvas": "Blank canvas",
-    "keepHint": "Keep working on this",
-    "discardHint": "Discards your unsaved work"
-  },
   "validationStatus": {
     "validating": "Validating",
-    "valid": "Valid",
-    "issues_one": "{{count}} issue",
-    "issues_other": "{{count}} issues",
+    "valid": "Ready to run",
+    "issues_one": "{{count}} issue to fix",
+    "issues_other": "{{count}} issues to fix",
     "globalIssueLabel": "Configuration",
     "validatingConfiguration": "Validating configuration...",
-    "configurationIssues": "Configuration Issues"
+    "configurationIssues": "Configuration Issues",
+    "hints": {
+      "invalidValue": "Open the block and pick a valid value for this option.",
+      "missingConfig": "Fill in the required options in the configuration panel.",
+      "noOutput": "Add an output block, for example a GRIB sink or a map plot.",
+      "unknownGlyph": "Define the variable under Variables, or replace it with a value."
+    }
   },
   "blockActions": {
     "duplicate": "Duplicate",
@@ -125,7 +114,10 @@
     "blockConfiguration": "Block Configuration"
   },
   "configPanel": {
-    "selectBlock": "Select a block to configure",
+    "emptyTitle": "Nothing selected",
+    "emptyDescription": "Pick a block on the canvas to configure it, or start here.",
+    "addSource": "Add a source",
+    "startFromPreset": "Start from a preset",
     "inputConnections": "Input Connections",
     "configuration": "Configuration",
     "noConfigOptions": "No configuration options",
@@ -146,42 +138,6 @@
     "clickSourceToStart": "Click or drag a source to get started",
     "clickToAdd": "Click or drag blocks onto the canvas"
   },
-  "pipeline": {
-    "structure": "Pipeline Structure",
-    "topologyPlaceholder": "Add blocks to see the pipeline topology"
-  },
-  "formCanvas": {
-    "previousStep": "Previous Step",
-    "nextStep": "Next Step",
-    "stepHeading": "{{label}}s",
-    "selectToStart": "Select a {{kind}} to get started:",
-    "addAnother": "Add another {{kind}}:",
-    "loadingSources": "Loading available sources...",
-    "completePreviousStep": "Complete the previous step to see available {{kind}}s."
-  },
-  "connections": {
-    "pipelineFlow": "Pipeline Flow",
-    "inputCount_one": "{{count}} input",
-    "inputCount_other": "{{count}} inputs",
-    "outputCount_one": "{{count}} output",
-    "outputCount_other": "{{count}} outputs",
-    "noConnections": "No connections",
-    "notConnectedDownstream": "Not connected to any downstream block",
-    "inputConnections": "Input Connections",
-    "noCompatibleSourcesAvailable": "No compatible sources available",
-    "noConfigOptions": "No configuration options",
-    "selectSource": "Select source..."
-  },
-  "blockInstance": {
-    "hasErrors": "Has errors",
-    "deleteBlock": "Delete Block",
-    "deleteConfirm": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone.",
-    "cancel": "Cancel",
-    "delete": "Delete"
-  },
-  "blockTabs": {
-    "fallbackTitle": "Block"
-  },
   "addBlockNode": {
     "addKind": "Add {{label}}"
   },
@@ -192,24 +148,20 @@
     "directionDownstream": "downstream"
   },
   "graphOptions": {
-    "ariaLabel": "Graph options",
     "view": "View",
     "tidyUp": "Tidy up configuration",
     "unlockNodes": "Unlock nodes",
     "lockNodes": "Lock nodes",
     "showMinimap": "Show minimap",
     "layout": "Layout",
-    "autoLayout": "Auto-layout",
     "direction": "Direction",
     "topToBottom": "↓ Top to Bottom",
-    "leftToRight": "→ Left to Right",
-    "edges": "Edges",
-    "style": "Style",
-    "curved": "Curved",
-    "rounded": "Rounded",
-    "orthogonal": "Orthogonal",
-    "switchToForm": "Switch to form layout",
-    "switchToGraph": "Switch to graph layout"
+    "leftToRight": "→ Left to Right"
+  },
+  "canvasStatus": {
+    "zoom": "{{value}}%",
+    "edgeCount_one": "{{count}} connection",
+    "edgeCount_other": "{{count}} connections"
   },
   "addNode": {
     "searchPlaceholder": "Search blocks...",
@@ -263,7 +215,7 @@
     "summaryDescription_one": "{{count}} block configured",
     "summaryDescription_other": "{{count}} blocks configured",
     "backToEdit": "Back to Edit",
-    "submitJob": "Submit Job",
+    "submitJob": "Start Run",
     "kindHeading": "{{label}}s"
   },
   "configSummary": {
@@ -308,6 +260,57 @@
       "valid": "Configuration validates",
       "issues": "{{count}} validation issue",
       "issues_other": "{{count}} validation issues"
+    }
+  },
+  "shelf": {
+    "title": "Unsaved work set aside",
+    "setAside": "Previous configuration set aside — restore it from the bar above the canvas.",
+    "evicted": "Replaced the configuration that was set aside earlier.",
+    "swapped": "Your work swapped onto the shelf — restore it from the bar above the canvas.",
+    "restore": "Restore",
+    "export": "Export",
+    "discard": "Discard set-aside configuration",
+    "untitled": "Untitled configuration",
+    "blockCount_one": "{{count}} block",
+    "blockCount_other": "{{count}} blocks",
+    "justNow": "just now",
+    "minutesAgo_one": "{{count}} minute ago",
+    "minutesAgo_other": "{{count}} minutes ago",
+    "hoursAgo_one": "{{count}} hour ago",
+    "hoursAgo_other": "{{count}} hours ago",
+    "daysAgo_one": "{{count}} day ago",
+    "daysAgo_other": "{{count}} days ago"
+  },
+  "help": {
+    "open": "Help & shortcuts",
+    "title": "Configuration canvas",
+    "intro": "A forecast configuration is a pipeline of blocks: data flows from a source through transforms and products into outputs. Build it on the canvas, configure each block on the right, and run it from the header.",
+    "sections": {
+      "canvas": {
+        "title": "Canvas",
+        "body": "Blocks are cards wired left to right. Drag to pan, scroll to zoom, and use the controls in the corner to fit the view. Click a card to select it; its + handle adds a connected block, or drag from the handle to wire by hand."
+      },
+      "palette": {
+        "title": "Block palette",
+        "body": "Every block you can use, grouped by kind: <sourceKind>Source</sourceKind> fetches data, <transformKind>Transform</transformKind> reshapes it, <productKind>Product</productKind> computes something new, <outputKind>Output</outputKind> stores or plots the result. Blocks come from installed plugins — the Plugins page adds more. Greyed rows cannot follow the currently selected block."
+      },
+      "configure": {
+        "title": "Configuring a block",
+        "body": "The panel on the right lists the selected block’s inputs and fields. Fields offer the values the upstream data actually has. Type ${…} to reference a variable — local variables and glyphs resolve at run time."
+      },
+      "validation": {
+        "title": "Validation",
+        "body": "Every edit is checked on the spot. A red ring marks a block with issues; the header badge counts them and lists them — each entry jumps to its block. The pipeline can be run once it reads “Valid”."
+      },
+      "run": {
+        "title": "Running and saving",
+        "body": "Run Once submits the pipeline and opens its run page; the caret next to it offers a review step and scheduling. Save Config keeps the pipeline as a preset; the more menu shares, exports, or loads a configuration file. Unsaved work is kept as a draft in this browser."
+      }
+    },
+    "shortcuts": {
+      "title": "Keyboard shortcuts",
+      "undo": "Undo",
+      "redo": "Redo"
     }
   }
 }

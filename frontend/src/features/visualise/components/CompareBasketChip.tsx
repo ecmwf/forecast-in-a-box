@@ -94,7 +94,7 @@ export function CompareBasketChip({
         {slot && (
           <span
             className={cn(
-              'flex h-4 w-4 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold',
+              'flex h-4 w-4 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-bold',
               SLOT_BADGE_CLASS[slot],
             )}
           >
@@ -109,7 +109,7 @@ export function CompareBasketChip({
               defaultValue={name}
               aria-label={t('basket.editLabel')}
               placeholder={t('basket.labelPlaceholder')}
-              className="block w-40 rounded border border-border bg-background px-1 text-sm outline-none focus:border-ring"
+              className="block w-40 rounded-md border border-border bg-background px-1 text-sm outline-none focus:border-ring"
               onClick={(e) => e.stopPropagation()}
               onBlur={(e) => commitRename(e.target.value)}
               onKeyDown={(e) => {
@@ -129,7 +129,7 @@ export function CompareBasketChip({
           )}
         </span>
         {kindTag && (
-          <span className="rounded border border-border px-1 font-mono text-[10px] tracking-wide text-muted-foreground">
+          <span className="rounded-md border border-border px-1 font-mono text-[10px] tracking-wide text-muted-foreground">
             {kindTag}
           </span>
         )}
@@ -140,7 +140,7 @@ export function CompareBasketChip({
           onClick={() => setEditing(true)}
           aria-label={t('basket.editLabel')}
           title={t('basket.editLabel')}
-          className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Pencil className="h-3 w-3" />
         </button>
@@ -150,7 +150,7 @@ export function CompareBasketChip({
         onClick={onRemove}
         aria-label={t('basket.remove', { name })}
         title={t('basket.remove', { name })}
-        className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <X className="h-3.5 w-3.5" />
       </button>

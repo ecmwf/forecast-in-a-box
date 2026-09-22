@@ -56,7 +56,7 @@ export function ArtifactRow({
             {artifact.platforms.map((platform) => (
               <span
                 key={platform}
-                className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"
+                className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"
               >
                 {platform}
               </span>

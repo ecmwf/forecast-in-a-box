@@ -29,11 +29,14 @@ import { resetFableHandlerState } from '../mocks/handlers/fable.handlers'
 import { resetPluginsHandlerState } from '../mocks/handlers/plugins.handlers'
 import { useActivityStore } from '@/stores/activityStore'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
+import { useOnboardingStore } from '@/stores/onboardingStore'
+import { useTutorialsStore } from '@/stores/tutorialsStore'
 import { useCommandStore } from '@/stores/commandStore'
 import { useConfigStore } from '@/stores/configStore'
 import { useUiStore } from '@/stores/uiStore'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useStatusStore } from '@/features/status/stores/statusStore'
+import { resetPollIntervals } from '@/api/pollIntervals'
 
 // Start MSW browser worker before all tests
 beforeAll(async () => {
@@ -49,6 +52,9 @@ beforeAll(async () => {
  *  retrieve error` from sporadically seeing a stale `fable-100`/`fable-101`
  *  from an earlier save mutation. */
 function resetSharedState(): void {
+  // Back to production cadences; file-level beforeEach overrides run later.
+  resetPollIntervals()
+
   // MSW handler-scoped mutable state
   resetFableHandlerState()
   resetPluginsHandlerState()
@@ -64,12 +70,22 @@ function resetSharedState(): void {
   useConfigStore.getState().resetConfig()
   useActivityStore.getState().clearAll()
   useComparisonStore.setState({ entries: [] })
+  useOnboardingStore.getState().reset()
+  useTutorialsStore.getState().reset()
 
   // localStorage carries both the persisted UI-preferences slice and any
   // fable-builder draft written by `useDraftPersistence`. Test files that
   // previously called `localStorage.clear()` in their own beforeEach can
   // now drop that boilerplate.
   localStorage.clear()
+}
+
+/** Shelf reset stays lazy: a static import would pull storage→logger into
+ *  every file's module graph before logger.test.ts can stub console. */
+async function resetShelfState(): Promise<void> {
+  const { useWorkbenchShelfStore } =
+    await import('@/features/fable-builder/stores/workbenchShelfStore')
+  useWorkbenchShelfStore.getState().clear()
 }
 
 /**
@@ -89,13 +105,15 @@ afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0))
   worker.resetHandlers()
   resetSharedState()
+  await resetShelfState()
 })
 
 // Belt-and-braces: a second reset right before each test body runs, so a
 // failed afterEach or a module-scoped write from an unrelated file can't
 // poison the next test either.
-beforeEach(() => {
+beforeEach(async () => {
   resetSharedState()
+  await resetShelfState()
 })
 
 // Stop the worker after all tests complete

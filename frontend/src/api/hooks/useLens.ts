@@ -14,6 +14,7 @@ import type {
   SupportedLensDetail,
 } from '@/api/types/lens.types'
 import { ApiClientError } from '@/api/client'
+import { pollIntervals } from '@/api/pollIntervals'
 import {
   getLensStatus,
   listLenses,
@@ -51,7 +52,7 @@ export function useLensList() {
   return useQuery<Array<LensInstanceDetailResponse>>({
     queryKey: lensKeys.list(),
     queryFn: () => listLenses(),
-    refetchInterval: 5000,
+    refetchInterval: () => pollIntervals.lensList,
     refetchOnWindowFocus: false,
   })
 }
@@ -81,14 +82,17 @@ export function useLensStatus(lensInstanceId: string | undefined) {
     meta: { expectedErrorStatuses: [404] },
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      if (!status || status === 'starting') return 1000
-      return status === 'running' ? 15_000 : false
+      if (!status || status === 'starting') return pollIntervals.lensStarting
+      return status === 'running' ? pollIntervals.lensRunning : false
     },
     refetchOnWindowFocus: false,
     // One dropped poll must not read as lens death; 404 (gone) is definitive.
     retry: (failureCount, error) =>
       failureCount < 2 &&
       !(error instanceof ApiClientError && error.status === 404),
+    // React Query's default backoff, from an injectable base.
+    retryDelay: (attempt) =>
+      Math.min(pollIntervals.lensRetryBase * 2 ** attempt, 30_000),
   })
 }
 

@@ -17,7 +17,8 @@
  * Completed/failed records persist across reloads (capped at the most
  * recent COMPLETED_CAP entries) so the Notification Center shows history.
  * Active tasks are NOT persisted — they are re-derived from live sources
- * on mount via useActivityCollector.
+ * on mount via useActivityCollector. Dismissing an active task records its
+ * id so the collector leaves it hidden until the task finishes.
  */
 
 import { create } from 'zustand'
@@ -41,11 +42,15 @@ export interface ActivityTask {
 
 interface ActivityState {
   tasks: Partial<Record<string, ActivityTask>>
+  /** Active tasks the user dismissed; the collector must not re-add them. */
+  dismissed: Partial<Record<string, true>>
   addTask: (task: ActivityTask) => void
   updateTask: (id: string, updates: Partial<ActivityTask>) => void
   removeTask: (id: string) => void
   clearCompleted: () => void
   clearAll: () => void
+  /** Drop dismissals whose tasks are gone from their live source. */
+  forgetDismissed: (ids: ReadonlyArray<string>) => void
 }
 
 const COMPLETED_CAP = 50
@@ -57,6 +62,16 @@ export function rewriteLegacyRoute(path: string): string {
     .replace(/^\/executions(?=\/|$)/, '/execute')
     .replace(/^\/runs(?=\/|$)/, '/execute')
     .replace(/^\/dashboard(?=\/|$)/, '/overview')
+}
+
+function without(
+  dismissed: Partial<Record<string, true>>,
+  ids: ReadonlyArray<string>,
+): Partial<Record<string, true>> {
+  if (!ids.some((id) => dismissed[id])) return dismissed
+  const next = { ...dismissed }
+  for (const id of ids) delete next[id]
+  return next
 }
 
 function evictOldestCompleted(
@@ -91,11 +106,14 @@ export const useActivityStore = create<ActivityState>()(
     persist(
       (set) => ({
         tasks: {},
+        dismissed: {},
 
+        // Adding is deliberate, so it lifts an earlier dismissal of the id.
         addTask: (task) =>
           set(
             (state) => ({
               tasks: evictOldestCompleted({ ...state.tasks, [task.id]: task }),
+              dismissed: without(state.dismissed, [task.id]),
             }),
             undefined,
             'addTask',
@@ -120,8 +138,10 @@ export const useActivityStore = create<ActivityState>()(
         removeTask: (id) =>
           set(
             (state) => {
-              const { [id]: _, ...rest } = state.tasks
-              return { tasks: rest }
+              const { [id]: removed, ...rest } = state.tasks
+              return removed?.status === 'active'
+                ? { tasks: rest, dismissed: { ...state.dismissed, [id]: true } }
+                : { tasks: rest }
             },
             undefined,
             'removeTask',
@@ -142,11 +162,27 @@ export const useActivityStore = create<ActivityState>()(
             'clearCompleted',
           ),
 
-        // Wipes everything, including active entries. The collector will
-        // immediately re-add any tasks that are still live (e.g. an
-        // in-progress download), so this effectively clears only the
-        // history of completed/failed records.
-        clearAll: () => set({ tasks: {} }, undefined, 'clearAll'),
+        // Active entries stay hidden until they finish; the collector re-adds
+        // a finished one so the outcome still shows.
+        clearAll: () =>
+          set(
+            (state) => {
+              const dismissed = { ...state.dismissed }
+              for (const [id, task] of Object.entries(state.tasks)) {
+                if (task?.status === 'active') dismissed[id] = true
+              }
+              return { tasks: {}, dismissed }
+            },
+            undefined,
+            'clearAll',
+          ),
+
+        forgetDismissed: (ids) =>
+          set(
+            (state) => ({ dismissed: without(state.dismissed, ids) }),
+            undefined,
+            'forgetDismissed',
+          ),
       }),
       {
         name: STORAGE_KEYS.stores.activity,
@@ -160,6 +196,7 @@ export const useActivityStore = create<ActivityState>()(
               ([, task]) => task !== undefined && task.status !== 'active',
             ),
           ),
+          dismissed: state.dismissed,
         }),
         migrate: (persisted, version) => {
           const state = persisted as {

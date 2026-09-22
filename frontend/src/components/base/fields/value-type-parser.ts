@@ -136,7 +136,8 @@ function flatten(t: FableType, raw: string): ParsedValueType {
         }
       }
       return { type: 'unknown', raw }
-    // Grammar-valid but widget-less: geodomainSingle, bboxWSEN, union.
+    // Grammar-valid but widget-less: geodomainSingle, bboxWSEN, union,
+    // timedelta, none.
     default:
       return { type: 'unknown', raw }
   }

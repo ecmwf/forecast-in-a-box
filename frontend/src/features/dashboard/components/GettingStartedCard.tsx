@@ -117,7 +117,7 @@ export function GettingStartedCard({
           <span
             key={tag}
             className={cn(
-              'rounded px-2 py-1 text-sm text-muted-foreground',
+              'rounded-md px-2 py-1 text-sm text-muted-foreground',
               isRecommended
                 ? 'border border-border bg-card dark:bg-card'
                 : 'bg-muted',

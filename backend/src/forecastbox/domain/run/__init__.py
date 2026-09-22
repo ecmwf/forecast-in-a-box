@@ -11,7 +11,7 @@
 Manages the Run domain -- execution of python workflows using the `cascade`
 execution engine, based on a Blueprint.
 
-Depends on Blueprint, Glyph, Plugin and Gateway domains -- all are used when
-compiling and submitting a Run.
+Depends on Artifact, Blueprint, Glyph, Plugin and Gateway domains -- all are
+used when compiling and submitting a Run.
 Depended on by Experiment domain (which spawns Runs).
 """

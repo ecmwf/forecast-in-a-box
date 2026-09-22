@@ -13,7 +13,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import { CanvasTexture, MeshBasicMaterial } from 'three'
 import type { GlobeMethods } from 'react-globe.gl'
 import { useSpriteSheetAnimation } from '@/features/landing/hooks/useSpriteSheetAnimation'
-import coastlinesLow from '@/features/landing/data/coastlines-low.json'
+import coastlinesLow from '@/lib/map/data/coastlines-low.json'
 
 const defaultPOV = { lat: 52, lng: 16, altitude: 1.4 }
 

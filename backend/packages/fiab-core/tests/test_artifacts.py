@@ -7,6 +7,12 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+"""
+Tests parsing methods on a fake catalog.
+Does not interact with the *real* catalog in install/artifacts.json -- that is not a unit test,
+that is a responsibility of the scripts/parse_test_artifacts_catalog.py
+"""
+
 import json
 
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactLocalId, ArtifactStoreId, CommonArtifactMetadata, CompositeArtifactId, parse_json

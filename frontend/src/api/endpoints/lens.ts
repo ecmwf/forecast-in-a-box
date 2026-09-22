@@ -10,8 +10,9 @@
 
 /**
  * Lens API client. The lens routes are passthroughs to the backend lens
- * manager, which spawns external tools (e.g. SkinnyWMS) on dynamic ports.
- * Always check status until `running` before talking to the lens directly.
+ * manager, which spawns external tools (e.g. SkinnyWMS) internally and
+ * exposes them only through the same-origin proxy path. Always check
+ * status until `running` before talking to the lens directly.
  */
 
 import { z } from 'zod'
@@ -69,20 +70,29 @@ export async function listSupportedLenses(): Promise<
 }
 
 /**
- * A lens binds to 127.0.0.1:<port> next to the backend, so the browser can
- * reach it only when it runs on the backend's host (local / single-host
- * deployments). Build the direct URL on the backend host at the lens port.
+ * A lens is reachable only through the backend's same-origin proxy path,
+ * which forwards to the internal process. Build that path from the lens
+ * instance id.
  */
-export function buildLensBaseUrl(port: number): string {
-  const backendBase = getBackendBaseUrl()
-  const base = new URL(backendBase || window.location.origin)
-  return `${base.protocol}//${base.hostname}:${port}`
+export function buildLensBaseUrl(lensInstanceId: string): string {
+  return `${API_ENDPOINTS.lens.proxyBase}/${encodeURIComponent(lensInstanceId)}`
 }
 
 /**
- * GetCapabilities URL for the WMS instance behind a lens. Suitable for
- * pasting into external WMS clients (QGIS, ArcGIS, etc.).
+ * GetCapabilities URL for the WMS instance behind a lens, in-app fetches
+ * only (relative, same-origin).
  */
-export function buildWmsCapabilitiesUrl(port: number): string {
-  return `${buildLensBaseUrl(port)}/wms?service=WMS&version=1.3.0&request=GetCapabilities`
+export function buildWmsCapabilitiesUrl(lensInstanceId: string): string {
+  return `${buildLensBaseUrl(lensInstanceId)}/wms?service=WMS&version=1.3.0&request=GetCapabilities`
+}
+
+/**
+ * Absolute GetCapabilities URL, suitable for pasting into external WMS
+ * clients (QGIS, ArcGIS, etc.) that don't share the app's origin.
+ */
+export function buildAbsoluteWmsCapabilitiesUrl(
+  lensInstanceId: string,
+): string {
+  const origin = getBackendBaseUrl() || window.location.origin
+  return `${origin}${buildWmsCapabilitiesUrl(lensInstanceId)}`
 }

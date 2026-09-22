@@ -10,12 +10,12 @@ from fiab_core.fable import BlockInstanceId
 
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.run import service as run_service
+from forecastbox.domain.run.db import RunRecord
 from forecastbox.domain.run.detail import CompilationDetail, TaskDetail
 from forecastbox.domain.run.exceptions import CompilationDetailNotFound
 from forecastbox.domain.run.service import RunDetail
 from forecastbox.domain.run.types import RunId
 from forecastbox.routes.run import RunLookup, get_run, list_runs
-from forecastbox.schemata.run import Run
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.pagination import PaginationSpec
 
@@ -79,7 +79,7 @@ async def test_poll_and_update_requests_detailed_report_and_translates_to_block_
         patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://localhost:8067"),
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=AsyncMock()),
     ):
-        detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
+        detail = await run_service.poll_and_update(cast(RunRecord, execution), detailed_report=True)
 
     request = mock_request.call_args.args[0]
     assert request.detailed_report is True
@@ -121,7 +121,7 @@ async def test_poll_and_update_disables_detailed_report_when_cache_misses() -> N
         patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://localhost:8067"),
         patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=AsyncMock()),
     ):
-        detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
+        detail = await run_service.poll_and_update(cast(RunRecord, execution), detailed_report=True)
 
     request = mock_request.call_args.args[0]
     assert request.detailed_report is False
@@ -149,7 +149,7 @@ async def test_poll_and_update_returns_empty_detailed_fields_for_completed_runs(
         compiler_runtime_context={},
     )
 
-    detail = await run_service.poll_and_update(cast(Run, execution), detailed_report=True)
+    detail = await run_service.poll_and_update(cast(RunRecord, execution), detailed_report=True)
 
     assert detail.completed_block_ids == None
     assert detail.planned_block_ids == None

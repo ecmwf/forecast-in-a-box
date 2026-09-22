@@ -155,11 +155,21 @@ def backend_client() -> Generator[httpx.Client, None, None]:
     shutdown_event_artifacts = None
     p_artifacts = None
     client = None
+    frontend_symlink = None
     try:
         td = tempfile.TemporaryDirectory()
         td_data = tempfile.TemporaryDirectory()
         os.environ["FIAB_ROOT"] = td.name
-        os.environ["FIAB_TEST_FRONTEND"] = str(pathlib.Path(__file__).parent / "static")
+
+        # The `static/` directory is normally produced by the frontend build and bundled into
+        # the wheel (see the `fiabwheel` recipe in the repo root's justfile). On a clean checkout
+        # it does not exist, so we symlink in a placeholder used purely for these integration
+        # tests. If a developer already has a real build in place, we leave it untouched.
+        assert forecastbox.utility.config.__file__ is not None
+        static_dir = pathlib.Path(forecastbox.utility.config.__file__).parent.parent / "static"
+        if not static_dir.exists():
+            static_dir.symlink_to(pathlib.Path(__file__).parent / "static", target_is_directory=True)
+            frontend_symlink = static_dir
         (pathlib.Path(td.name) / "pylock.toml.timestamp").write_text("1761908420:d0.0.1")
         # we need to monkeypath this, because of eager import this was already initialised
         # to user's personal config file
@@ -173,6 +183,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.backend.data_path = f"file://{td_data.name}"
         config.backend.allow_scheduler = True
+        plugin_test_loc = pathlib.Path(__file__).parent.parent / "packages" / "fiab-plugin-test"
         config.external.artifact_stores = {
             ArtifactStoreId(fake_artifact_store_id): ArtifactStoreConfig(
                 url=f"http://localhost:{fake_artifact_registry_port}/artifacts.json",
@@ -181,13 +192,13 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         }
         config.external.plugin_stores = {
             PluginStoreId("localTest"): PluginStoreConfig(
-                url="file://../../packages/fiab-plugin-test",
+                url=f"file://{plugin_test_loc}",
                 method="localSingle",
             ),
         }
         config.external.plugins = {
             testPluginId: PluginSettings(
-                pip_source="-e file://../../packages/fiab-plugin-test",
+                pip_source=f"-e file://{plugin_test_loc}",
                 module_name="fiab_plugin_test",
             ),
         }
@@ -203,7 +214,6 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         p_artifacts = get_mp_ctx("other").Process(target=run_artifact_registry, args=(shutdown_event_artifacts,))
         p_artifacts.start()
 
-        validate_runtime(config)
         handles = launch_all(config)
         client = httpx.Client(base_url=config.backend.local_url() + "/api/v1", follow_redirects=True)
         # we need to call admin register before yielding this to anybody, because the first registered user is admin
@@ -227,6 +237,8 @@ def backend_client() -> Generator[httpx.Client, None, None]:
             td.cleanup()
         if td_data is not None:
             td_data.cleanup()
+        if frontend_symlink is not None:
+            frontend_symlink.unlink(missing_ok=True)
 
 
 @pytest.fixture(scope="session")

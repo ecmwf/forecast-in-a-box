@@ -31,10 +31,6 @@
     "anemoiDescription": "Open-source ML framework for developing, training, and deploying weather forecasting models",
     "earthkitDescription": "Open-source tools for seamless earth science workflows"
   },
-  "dag": {
-    "title": "Dynamic Product Execution",
-    "subtitle": "From anemoi to pproc, all in the box."
-  },
   "collaboration": {
     "title": "A Collaboration between"
   },
@@ -44,5 +40,33 @@
     "ecmwf": "ECMWF",
     "metNorway": "MetNorway",
     "destinE": "DestinE"
+  },
+  "about": {
+    "eyebrow": "About Forecast-in-a-Box",
+    "lead": "Traditional weather forecasting relies on large-scale numerical simulations that run on high-performance computing (HPC) systems. These methods demand significant computational resources, involve complex workflows, and produce vast amounts of data — often exceeding what an individual user needs. Forecast-in-a-Box leverages advances in data-driven modelling to dramatically reduce computational and energy costs while delivering tailored forecast products directly to users. It packages the entire forecasting chain into a simple, user-friendly application. Built on the open-source <anemoi>Anemoi</anemoi> and <earthkit>Earthkit</earthkit> projects, it provides a reproducible and modular environment that integrates data access, model execution, and visualisation — enabling accurate, locally run forecasts on laptops, on-premise computing infrastructure, or in the cloud.",
+    "box": {
+      "title": "What is in the box",
+      "subtitle": "Easy to install and hardware agnostic, with a fully configurable workflow behind an intuitive UI.",
+      "step": "Step {{n}} · {{kind}} blocks",
+      "initialisation": {
+        "title": "Initialisation",
+        "description": "Initial conditions from ECMWF open data, MARS or your own archive, fetched on demand."
+      },
+      "modelRun": {
+        "title": "Model run",
+        "description": "Any Anemoi checkpoint runs locally, from the AIFS to regional models such as Bris."
+      },
+      "productGeneration": {
+        "title": "Product generation",
+        "description": "Selections, statistics and derived products such as ensemble probabilities or tropical cyclone tracks."
+      },
+      "dissemination": {
+        "title": "Visualise",
+        "description": "Interactive maps and plots in the browser, or GRIB, NetCDF and Zarr files for downstream tools."
+      }
+    },
+    "people": {
+      "builtWith": "Built with"
+    }
   }
 }

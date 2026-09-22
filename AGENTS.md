@@ -13,7 +13,8 @@
 * there is pre-commit configured. Ideally do `uv run prek` before every commit. The `prek` itself is declared as a `dev` dependency in the `backend`s venv managed by `uv`
 
 # General
-* do not use fancy unicode or emoji characters when writing text/markdown files, commit messages, comments, or docstring.
+* do not use fancy unicode or emoji characters when writing text/markdown files, commit messages, comments, or docstring
+* keep docstrings to a plain statement of current behaviour/contract; avoid trailing "so that" / "instead of" / "rather than" / "as before" explanatory clauses that explain why the behaviour matters to callers or contrast it with some other (hypothetical or historical) behaviour
 * do not use double space after `.` when writing comments and doc strings
 * when asked to fetch PR review comments, use the GitHub GraphQL API to fetch only **unresolved** threads:
   ```bash

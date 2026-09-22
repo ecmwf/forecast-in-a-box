@@ -10,6 +10,12 @@
 """Entrypoint for the standalone fiab execution (frontend, backend and cascade spawned by a single process).
 Also used in case backend+cascade were launched by the OS as a service, in which case we only check the service
 for liveness and open the browser window here, with the rest logic happening in standalone.service
+
+The responsibility of this module is to spawn the backend process, and do post-start health checks and setup
+endpoint calls (like http call to install default plugins), and register sigterm handlers.
+
+The actual logic of instantiating the backend (the FastAPI app, the background threads, etc) happens in
+entrypoint/app.py, as it is coupled to FastAPI's API
 """
 
 import logging
@@ -19,6 +25,7 @@ import types
 import webbrowser
 from multiprocessing import Process, get_context
 
+import httpx
 from fiab_core.fable import PluginCompositeId
 
 import forecastbox.entrypoint.bootstrap.service
@@ -27,7 +34,7 @@ from forecastbox.entrypoint.bootstrap.checks import check_backend_ready, install
 from forecastbox.entrypoint.bootstrap.config import export_recursive, setup_process
 from forecastbox.entrypoint.bootstrap.launchers import launch_backend
 from forecastbox.entrypoint.bootstrap.procs import ChildProcessGroup, previous_cleanup
-from forecastbox.utility.config import FIABConfig, UnmanagedGateway, validate_runtime
+from forecastbox.utility.config import FIABConfig, validate_runtime
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
 
@@ -48,15 +55,14 @@ def launch_all(config: FIABConfig, attempts: int = 20) -> ChildProcessGroup:
         backend = get_context("forkserver").Process(target=launch_backend)
         backend.start()
         handle = ChildProcessGroup((backend,))
-        spawn_gateway = not isinstance(config.cascade.gateway, UnmanagedGateway)
     else:
         if not forecastbox.entrypoint.bootstrap.service.is_running():
             raise ValueError("configured to use service, but is not running!")
         handle = ChildProcessGroup(())
-        spawn_gateway = False
 
-    check_backend_ready(config, handle, attempts, spawn_gateway)
+    check_backend_ready(config, handle, attempts)
     if should_install_default_plugin():
+        logger.debug("will install default plugins")
         install_default_plugins(config)
 
     if config.backend.launch_browser:
@@ -72,6 +78,7 @@ if __name__ == "__main__":
     handles = launch_all(config)
 
     def sigterm_handler(_signo: int, _stack_frame: types.FrameType | None) -> None:
+        # when receiving sigterm, we need to explicitly propagate it, otherwise we'd get zombies
         handles.shutdown()
         sys.exit(0)
 
@@ -80,4 +87,5 @@ if __name__ == "__main__":
         handles.wait()
     except KeyboardInterrupt:
         logger.info("keyboard interrupt, application shutting down")
+        # NOTE the Keyboard Interrupt propagates to all subprocesses, we dont really need to do anything except await them
         handles.wait()

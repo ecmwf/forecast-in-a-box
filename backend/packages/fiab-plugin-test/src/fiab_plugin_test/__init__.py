@@ -1,4 +1,5 @@
 import importlib.metadata
+import json
 import pathlib
 
 from cascade.low.func import Either
@@ -23,7 +24,7 @@ from fiab_core.fable import (
     RawOutput,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
-from fiab_core.types import ArtifactType, ClosedEnumType, FableType, FloatType, IntType, StringType, parse
+from fiab_core.types import ArtifactType, ClosedEnumType, FableType, FloatType, IntType, NoneType, StringType, UnionType, parse
 
 TEXT = ConfigurationOptionId("text")
 DURATION = ConfigurationOptionId("duration")
@@ -50,8 +51,10 @@ catalogue = lambda: BlockFactoryCatalogue(
         BlockFactoryId("source_text"): BlockFactory(
             kind="source",
             title="Source Text",
-            description="Returns the input text",
-            configuration_options={TEXT: BlockConfigurationOption(title="", description="", value_type=StringType())},
+            description="Returns the input text, or a default when the text is an explicit null",
+            configuration_options={
+                TEXT: BlockConfigurationOption(title="", description="", value_type=UnionType([StringType(), NoneType()]))
+            },
             inputs=[],
         ),
         BlockFactoryId("source_sleep"): BlockFactory(
@@ -142,20 +145,47 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
     return []
 
 
-def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
+def _environment_spec() -> list[str]:
+    """The worker environment specification for this plugin.
+
+    When the plugin is installed from its local source tree (an editable install, or an
+    unversioned dev checkout), workers must be given that very source tree -- otherwise
+    in-tree runtime changes would silently not be exercised, as the released wheel of the
+    very same version would get installed instead. Only a regular install falls back to
+    the pinned release.
+    """
     self_version = importlib.metadata.version("fiab-plugin-test")
-    if self_version == "0.0.0":
-        spec = [f"-e {pathlib.Path(__file__).parent.parent.parent}"]
-    else:
-        spec = [f"fiab-plugin-test=={self_version}"]
+    regular = [f"fiab-plugin-test=={self_version}"]
+    local_root = pathlib.Path(__file__).parent.parent.parent
+    try:
+        direct_url = importlib.metadata.distribution("fiab-plugin-test").read_text("direct_url.json")
+        if not direct_url:
+            return regular
+        dist = json.loads(direct_url)
+        is_editable = dist["dir_info"]["editable"]
+        # NOTE git installs etc probably behave oddly here but they make no sense here anyway
+        is_local = dist["url"].startswith("file:")
+        if not is_local:
+            return regular
+        elif is_editable:
+            return [f"-e {local_root}"]
+        else:
+            return [f"{local_root}"]
+    except Exception:
+        return regular
+
+
+def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
+    spec = _environment_spec()
     with PayloadBuildingContext(environment=spec):
         # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
         if factory_id == "source_42":
             action = from_source(Payload("fiab_plugin_test.runtime.source_42"))
         elif factory_id == "source_text":
             text = instance.configuration_values[TEXT]
-            if not isinstance(text, str):
-                return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
+            # NOTE an explicit null is a valid value here -- the default is imputed at runtime
+            if text is not None and not isinstance(text, str):
+                return Either.error(f"Invalid type for {TEXT!r}: expected str or None, got {type(text).__name__}")
             action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))
         elif factory_id == "source_sleep":
             text = instance.configuration_values[TEXT]

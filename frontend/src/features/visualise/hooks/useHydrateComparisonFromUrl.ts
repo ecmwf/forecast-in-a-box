@@ -31,10 +31,7 @@ import {
   decodeEntryRef,
   entryRef,
 } from '../entry-ref'
-import {
-  MAX_COMPARISON_ENTRIES,
-  useComparisonStore,
-} from '../stores/comparisonStore'
+import { useComparisonStore } from '../stores/comparisonStore'
 import { allowedWmsUrl } from '../wms-probe'
 import { jobKeys } from '@/api/hooks/useJobs'
 import { getJobStatus } from '@/api/endpoints/job'
@@ -120,12 +117,8 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
                 path: pending.path,
                 label: pathLabel(pending.path),
               }
-        const result = addEntry(entry)
-        if (result === 'full') {
-          showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-          rewrite.set(pending.ref, undefined)
-          continue
-        }
+        // A link the user chose to open outranks stale basket entries.
+        addEntry(entry, [search.a, search.b])
         // Re-mint legacy `path:` as `dir:` in the URL; pre-mark it
         // processed so the rewrite isn't treated as fresh inbound.
         const canonical = entryRef(entry)
@@ -152,10 +145,12 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
       }
       setPendingUnverified([])
     },
-    [pendingUnverified, addEntry, navigate, t],
+    [pendingUnverified, addEntry, search.a, search.b, navigate, t],
   )
 
   useEffect(() => {
+    // Run lookups settle in link order so the basket keeps a-before-b.
+    let chain: Promise<void> = Promise.resolve()
     for (const ref of [search.a, search.b]) {
       if (!ref || ref === SLOT_B_OFF || processedRef.current.has(ref)) continue
       if (entries.some((e) => entryRef(e) === ref)) {
@@ -210,11 +205,13 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
       }
 
       // `run:` — validate the task is a stored-output marker of that run.
-      void queryClient
-        .ensureQueryData({
-          queryKey: jobKeys.status(decoded.jobId),
-          queryFn: () => getJobStatus(decoded.jobId),
-        })
+      chain = chain
+        .then(() =>
+          queryClient.ensureQueryData({
+            queryKey: jobKeys.status(decoded.jobId),
+            queryFn: () => getJobStatus(decoded.jobId),
+          }),
+        )
         .then((detail) => {
           const meta = detail.outputs?.[decoded.taskId]
           if (meta?.mime_type !== GRIB_DIR_MIME) {
@@ -226,19 +223,18 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
             strip(ref)
             return
           }
-          const result = addEntry({
-            kind: 'output',
-            jobId: decoded.jobId,
-            taskId: decoded.taskId,
-            blockId: meta.original_block,
-            runName: '',
-            blockTitle: meta.original_block,
-            runCreatedAt: detail.created_at,
-          })
-          if (result === 'full') {
-            showToast.error(t('toast.full', { max: MAX_COMPARISON_ENTRIES }))
-            strip(ref)
-          }
+          addEntry(
+            {
+              kind: 'output',
+              jobId: decoded.jobId,
+              taskId: decoded.taskId,
+              blockId: meta.original_block,
+              runName: '',
+              blockTitle: meta.original_block,
+              runCreatedAt: detail.created_at,
+            },
+            [search.a, search.b],
+          )
         })
         .catch((err: unknown) => {
           log.error('Failed to hydrate comparison source from URL', {

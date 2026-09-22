@@ -19,8 +19,10 @@ import { useEffect, useRef, useState } from 'react'
 import { toLonLat } from 'ol/proj'
 import { unByKey } from 'ol/Observable'
 import { DEFAULT_BASEMAP_ID } from '../ol-layers'
-import type { RefObject } from 'react'
+import { DEFAULT_PROJECTION_ID } from '../projection-ids'
+import { RUN_DIMENSION } from '../wms-capabilities'
 import type View from 'ol/View'
+import type { ProjectionId } from '../projection-ids'
 import type { LensSource } from '../hooks/useLensSource'
 import type { PairedLayer } from './layer-pairing'
 import type { CompareSelection } from './useCompareSelection'
@@ -41,7 +43,7 @@ function servedNames(
 export function useViewerUrlState({
   initial,
   onViewStateChange,
-  viewRef,
+  view,
   selection,
   pairing,
   sourceA,
@@ -53,11 +55,13 @@ export function useViewerUrlState({
   timeLinkMode,
   offsetMs,
   basemapId,
+  projectionId,
 }: {
   /** Mount snapshot of the URL state; later changes are ignored. */
   initial: ViewerUrlState | null
   onViewStateChange?: (partial: Partial<ViewerUrlState>) => void
-  viewRef: RefObject<View | null>
+  /** The current View — a projection switch swaps in a new instance. */
+  view: View
   selection: CompareSelection
   pairing: { pairs: ReadonlyArray<PairedLayer> }
   sourceA: LensSource
@@ -69,17 +73,27 @@ export function useViewerUrlState({
   timeLinkMode: TimeLinkMode
   offsetMs: number
   basemapId: string
+  projectionId: ProjectionId
 }): void {
   // -------- One-shot layer restore (per slot) --------
   const pendingLayersRef = useRef<{
     a: ReadonlyArray<string>
     b: ReadonlyArray<string>
+    /** Aligned with `a`/`b`; null = the server default. */
+    stylesA: ReadonlyArray<string | null>
+    stylesB: ReadonlyArray<string | null>
+    runsA: ReadonlyArray<string | null>
+    runsB: ReadonlyArray<string | null>
     unlinked: boolean
   } | null>(
     initial?.layersA?.length || initial?.layersB?.length
       ? {
           a: initial.layersA ?? [],
           b: initial.layersB ?? [],
+          stylesA: initial.stylesA ?? [],
+          stylesB: initial.stylesB ?? [],
+          runsA: initial.runsA ?? [],
+          runsB: initial.runsB ?? [],
           unlinked: initial.unlinkedLayers === true,
         }
       : null,
@@ -108,13 +122,20 @@ export function useViewerUrlState({
       // B may still be starting; if it never runs the URL keeps the value.
       if (slot === 'b' && !hasB) continue
       const available = new Set(source.layers.map((l) => l.name))
+      const styles = slot === 'a' ? pending.stylesA : pending.stylesB
+      const runs = slot === 'a' ? pending.runsA : pending.runsB
       // Reverse: toggles prepend, so the first name ends up on top.
-      for (const name of [...names].reverse()) {
+      for (const [i, name] of [...names.entries()].reverse()) {
         if (!available.has(name)) continue
+        const style = styles[i] ?? null
+        const run = runs[i] ?? null
+        // Runs are per server: set on this side whatever the mode.
+        if (run) selection.setLayerDim(slot, name, RUN_DIMENSION, run)
         if (pending.unlinked) {
           if (!selection.isLayerActive(slot, name)) {
             selection.toggleLayer(slot, name)
           }
+          if (style) selection.setLayerStyle(slot, name, style)
         } else {
           const pair = pairing.pairs.find(
             (p) => p.perSource[slot]?.name === name,
@@ -126,6 +147,8 @@ export function useViewerUrlState({
           ) {
             toggledNow.add(pair.key)
             selection.togglePair(pair.key)
+            // A's style wins for a pair listed on both sides.
+            if (style) selection.setPairStyle(pair.key, style)
           }
         }
       }
@@ -147,6 +170,8 @@ export function useViewerUrlState({
     selection.linkMode,
   ])
 
+  const settingsA = selection.settingsFor('a')
+  const settingsB = selection.settingsFor('b')
   // -------- Live report (page debounces into the URL) --------
   useEffect(() => {
     if (!onViewStateChange) return
@@ -157,6 +182,8 @@ export function useViewerUrlState({
       timeLink: timeLinkMode,
       offsetMs,
       basemap: basemapId === DEFAULT_BASEMAP_ID ? undefined : basemapId,
+      projection:
+        projectionId === DEFAULT_PROJECTION_ID ? undefined : projectionId,
     }
     // Hold restored fields until slots settle — mid-load writes would strip them.
     if (!restorePending.a) {
@@ -165,12 +192,24 @@ export function useViewerUrlState({
         sourceA.layers,
         sourceA.loadingLayers || sourceA.error !== null,
       )
+      partial.stylesA = partial.layersA.map(
+        (name) => settingsA.get(name)?.style ?? null,
+      )
+      partial.runsA = partial.layersA.map(
+        (name) => settingsA.get(name)?.dims?.[RUN_DIMENSION] ?? null,
+      )
     }
     if (!restorePending.b) {
       partial.layersB = servedNames(
         activeOrderB,
         sourceB.layers,
         sourceB.loadingLayers || sourceB.error !== null,
+      )
+      partial.stylesB = partial.layersB.map(
+        (name) => settingsB.get(name)?.style ?? null,
+      )
+      partial.runsB = partial.layersB.map(
+        (name) => settingsB.get(name)?.dims?.[RUN_DIMENSION] ?? null,
       )
     }
     if (!restorePending.a && !restorePending.b) {
@@ -181,6 +220,8 @@ export function useViewerUrlState({
     onViewStateChange,
     activeOrderA,
     activeOrderB,
+    settingsA,
+    settingsB,
     sourceA.layers,
     sourceA.loadingLayers,
     sourceA.error,
@@ -194,22 +235,24 @@ export function useViewerUrlState({
     timeLinkMode,
     offsetMs,
     basemapId,
+    projectionId,
   ])
   useEffect(() => {
-    const view = viewRef.current
-    if (!onViewStateChange || !view) return
+    if (!onViewStateChange) return
     const report = () => {
       const center = view.getCenter()
       const zoom = view.getZoom()
       if (!center || zoom === undefined) return
-      const [lon, lat] = toLonLat(center)
+      const [lon, lat] = toLonLat(center, view.getProjection())
       if (![lon, lat, zoom].every(Number.isFinite)) return
       onViewStateChange({ camera: { lon, lat, zoom } })
     }
+    // A swapped-in View carries the camera over — report it at once.
+    report()
     const keys = [
       view.on('change:center', report),
       view.on('change:resolution', report),
     ]
     return () => unByKey(keys)
-  }, [onViewStateChange, viewRef])
+  }, [onViewStateChange, view])
 }

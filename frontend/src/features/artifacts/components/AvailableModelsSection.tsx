@@ -23,7 +23,6 @@ import type {
   ArtifactInfo,
   CompositeArtifactId,
 } from '@/api/types/artifacts.types'
-import type { DashboardVariant, PanelShadow } from '@/stores/uiStore'
 import { H3, P } from '@/components/base/typography'
 import { Input } from '@/components/ui/input'
 
@@ -34,8 +33,6 @@ interface AvailableModelsSectionProps {
   onViewDetails?: (artifact: ArtifactInfo) => void
   isDownloading: (compositeId: CompositeArtifactId) => boolean
   getDownloadProgress: (compositeId: CompositeArtifactId) => number | undefined
-  variant?: DashboardVariant
-  shadow?: PanelShadow
 }
 
 export function AvailableModelsSection({
@@ -45,8 +42,6 @@ export function AvailableModelsSection({
   onViewDetails,
   isDownloading,
   getDownloadProgress,
-  variant,
-  shadow,
 }: AvailableModelsSectionProps) {
   const { t } = useTranslation('artifacts')
   const [searchQuery, setSearchQuery] = useState('')
@@ -130,8 +125,6 @@ export function AvailableModelsSection({
               onViewDetails={onViewDetails}
               isDownloading={isDownloading(artifact.id)}
               downloadProgress={getDownloadProgress(artifact.id)}
-              variant={variant}
-              shadow={shadow}
             />
           ))}
         </div>

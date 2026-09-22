@@ -50,7 +50,7 @@ export function GlyphListItem({ glyph, onEdit }: GlyphListItemProps) {
 
         <div className="grow">
           <div className="mb-1 flex items-center gap-2">
-            <code className="rounded bg-muted px-2 py-0.5 font-mono text-sm font-medium">
+            <code className="rounded-md bg-muted px-2 py-0.5 font-mono text-sm font-medium">
               {'${' + glyph.key + '}'}
             </code>
             <span className="truncate text-xs text-muted-foreground italic">

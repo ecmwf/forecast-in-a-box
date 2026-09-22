@@ -22,14 +22,17 @@ import { Link } from '@tanstack/react-router'
 import type { ScheduleDefinitionResponse } from '@/api/types/schedule.types'
 import type { FacetToken } from '@/features/journal/facets/facet-types'
 import { showToast } from '@/lib/toast'
-import { useServerTime, useUpdateSchedule } from '@/api/hooks/useSchedules'
-import { cronToHumanReadable } from '@/features/schedules/utils/cron'
+import {
+  useScheduleNextRun,
+  useServerTime,
+  useUpdateSchedule,
+} from '@/api/hooks/useSchedules'
+import {
+  cronToHumanReadable,
+  formatLocalDateTime,
+} from '@/features/schedules/utils/cron'
 import { EditScheduleDialog } from '@/features/schedules/components/EditScheduleDialog'
 import { JournalChip } from '@/features/journal/components/JournalChip'
-import {
-  STATUS_BADGE_VARIANTS,
-  StatusBadge,
-} from '@/components/common/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { P } from '@/components/base/typography'
@@ -49,23 +52,22 @@ export function ScheduleListItem({
 }: ScheduleListItemProps) {
   const { t } = useTranslation('schedules')
   const updateSchedule = useUpdateSchedule()
-  const { offsetMs, serverTimeToLocal, timeZone } = useServerTime()
+  const { serverTimeToLocal, timeZone } = useServerTime()
   const [editOpen, setEditOpen] = useState(false)
 
-  const createdAt = formatDistanceToNow(
-    serverTimeToLocal(schedule.created_at),
-    { addSuffix: true },
+  const { data: nextRunRaw } = useScheduleNextRun(
+    schedule.enabled ? scheduleId : undefined,
   )
-
-  const truncatedId =
-    scheduleId.length > 12 ? `${scheduleId.slice(0, 12)}...` : scheduleId
+  const nextRun = nextRunRaw
+    ? serverTimeToLocal(nextRunRaw, { roundMinute: true })
+    : null
 
   const displayName =
     schedule.display_name ||
     `${t('detail.untitledSchedule')} ${scheduleId.slice(0, 8)}`
 
   const cronDescription = schedule.cron_expr
-    ? cronToHumanReadable(schedule.cron_expr, offsetMs, timeZone)
+    ? cronToHumanReadable(schedule.cron_expr, timeZone)
     : null
 
   async function handleToggleEnabled(newEnabled: boolean) {
@@ -112,19 +114,6 @@ export function ScheduleListItem({
             >
               {displayName}
             </Link>
-            <StatusBadge
-              variant={
-                schedule.enabled
-                  ? {
-                      label: t('detail.enabled'),
-                      ...STATUS_BADGE_VARIANTS.active,
-                    }
-                  : {
-                      label: t('detail.disabled'),
-                      ...STATUS_BADGE_VARIANTS.disabled,
-                    }
-              }
-            />
             {/* Reveal on row hover; always shown where hover is unavailable. */}
             <button
               type="button"
@@ -140,15 +129,27 @@ export function ScheduleListItem({
               {schedule.display_description}
             </P>
           )}
-          <div className="mb-2 text-sm text-muted-foreground">
+          {/* The cadence is what tells schedules apart, so it reads as body text. */}
+          <div
+            className={cn(
+              'mb-2 text-sm',
+              schedule.enabled ? 'text-foreground' : 'text-muted-foreground',
+            )}
+          >
             {cronDescription}
-            {' · '}
-            {createdAt}
+            {nextRun && (
+              <span
+                className="text-muted-foreground"
+                title={formatLocalDateTime(nextRun, timeZone)}
+              >
+                {' · '}
+                {t('list.nextRun', {
+                  when: formatDistanceToNow(nextRun, { addSuffix: true }),
+                })}
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-sm text-muted-foreground">
-              #{truncatedId}
-            </span>
             {schedule.tags?.map((tag) => (
               <JournalChip
                 key={tag}

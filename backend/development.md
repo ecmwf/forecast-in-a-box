@@ -15,7 +15,8 @@
   * when `ty` is not powerful enough, use `ty:ignore `
   * use `typing.cast` when the code logic is implicitly erasing the type information
   * do not use annotation-as-string unless necessary -- that is, prefer `f: TypeExpression` instead of `f: "TypeExpression"`
-* prioritize using pydantic BaseModel or dataclasses.dataclass object for capturing contracts and interfaces.
+* prioritize using pydantic BaseModel or dataclasses.dataclass object for capturing contracts and interfaces
+  * if an object would cross language/host boundaries go with pydantic to have json serde, otherwise dataclass. Do not use NamedTuples
   * when using pydantic, use `FiabBaseModel` from `forecastbox.utility.pydantic` (or `FiabCoreBaseModel` from `fiab_core.pydantic_utils` in fiab-core) instead of `pydantic.BaseModel` directly, unless the model requires dynamic field handling (e.g., `extra="allow"` for JSON Schema types). These base models set `extra="forbid"` to catch misconfigured constructors early. If you need the dynamic model handling, mark it clearly with a comment.
   * ideally keep them plain, stateless, frozen, without functions -- we end up serializing those objects often over to other python processes or different languages
     * having a few methods that provide convenience views, ser/de, validation, conversion does not necessarilly hurt -- its primarily about keeping the codebase generally functional and data-oriented rather than object-oriented.
@@ -23,7 +24,8 @@
   * a convenience decorator `frozendc` exists in `forecastbox.utility.structural` but direct decorator syntax is preferred for type safety
   * when using a primitive type in a semantically restricted context, utilize typing.NewType -- for example, dont do `user_id: str` but `UserId = typing.NewType("UserId", str); user_id: UserId`, because not every string is a valid UserId. This prevents a mixture of ids and gives a stronger type validity
 * use comments sparingly, for non-obvious code only. Add docstrings to functions called from other modules only. When adding docstring, use compact style -- dont separate out Args and Returns, describe everything in one or two paragraphs. Do not make two spaces after a dot.
-* all imports belong to top level of the file, dont import inside function definitions unless necessiated by runtime
+  * when making a code change, do not refer to the previous state in the docstring or the comment. In other words, do not put to docstring texts like "this function replaces the original function". This belongs to commit message, not to the code!
+* all imports belong to top level of the file, dont import inside function definitions unless necessiated by runtime (and in that case, always add explanatory comment at the site)
 * dont alias in imports unless there is a name collision, or unless its a standard shortcut: `datetime as dt`, `multiprocessing as mp`, `numpy as np`, `xarray as xr`, `earthkit.data as ekd`
 * never use python keywords and builtins as variable names -- for example, don't use `id` variable, prefer `id_<something>` or `id_`
 

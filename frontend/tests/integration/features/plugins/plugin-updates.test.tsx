@@ -45,10 +45,12 @@ import {
   useUpdatePlugin,
 } from '@/api/hooks/usePlugins'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import { setPollIntervalsForTests } from '@/api/pollIntervals'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PluginsFilters } from '@/features/plugins/components/PluginsFilters'
+import { compareInstalledPlugins } from '@/features/plugins/utils/plugin-sort'
 import { PluginsList } from '@/features/plugins/components/PluginsList'
 import { UninstalledPluginsSection } from '@/features/plugins/components/UninstalledPluginsSection'
 import { UpdatesAvailableSection } from '@/features/plugins/components/UpdatesAvailableSection'
@@ -149,15 +151,7 @@ function TestPluginsPage() {
     const withUpdates = filteredPlugins.filter((p) => p.hasUpdate)
     const installed = filteredPlugins
 
-    installed.sort((a, b) => {
-      if (a.hasUpdate !== b.hasUpdate) {
-        return a.hasUpdate ? -1 : 1
-      }
-      if (a.isEnabled !== b.isEnabled) {
-        return a.isEnabled ? -1 : 1
-      }
-      return a.name.localeCompare(b.name)
-    })
+    installed.sort(compareInstalledPlugins)
 
     return {
       pluginsWithUpdates: filteringAvailable ? [] : withUpdates,
@@ -273,6 +267,8 @@ function TestPluginsPage() {
 describe('Plugin Updates Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Don't sit out the production 2 s catalogue-recovery poll.
+    setPollIntervalsForTests({ pluginCatalogue: 50 })
   })
 
   // -----------------------------------------------------------------------
@@ -289,7 +285,9 @@ describe('Plugin Updates Integration', () => {
         .toBeVisible()
 
       // Updates section should show with the correct title
-      await expect.element(screen.getByText('Updates Available')).toBeVisible()
+      await expect
+        .element(screen.getByRole('heading', { name: /^Updates Available/ }))
+        .toBeVisible()
     })
 
     it('shows the ECMWF Ensemble plugin in the updates section', async () => {
@@ -352,7 +350,9 @@ describe('Plugin Updates Integration', () => {
         .toBeVisible()
 
       // Wait for updates section
-      await expect.element(screen.getByText('Updates Available')).toBeVisible()
+      await expect
+        .element(screen.getByRole('heading', { name: /^Updates Available/ }))
+        .toBeVisible()
 
       // Should have an Update Now button
       await expect
@@ -424,7 +424,9 @@ describe('Plugin Updates Integration', () => {
         .toBeVisible()
 
       // In the updates call-to-action section...
-      await expect.element(screen.getByText('Updates Available')).toBeVisible()
+      await expect
+        .element(screen.getByRole('heading', { name: /^Updates Available/ }))
+        .toBeVisible()
 
       // ...AND counted in the installed list
       await expect.element(screen.getByText('Total: 1')).toBeVisible()
@@ -437,7 +439,11 @@ describe('Plugin Updates Integration', () => {
 
       // Structured diagnostics visible on the installed card
       await expect
-        .element(screen.getByText('import failed: incompatible core'))
+        .element(
+          screen.getByText('import failed: incompatible core', {
+            exact: false,
+          }),
+        )
         .toBeVisible()
     })
   })
@@ -488,7 +494,9 @@ describe('Plugin Updates Integration', () => {
         .toBeVisible()
 
       // The updates section should still show
-      await expect.element(screen.getByText('Updates Available')).toBeVisible()
+      await expect
+        .element(screen.getByRole('heading', { name: /^Updates Available/ }))
+        .toBeVisible()
     })
 
     it('hides updates section when search query does not match any updatable plugin', async () => {
@@ -508,7 +516,7 @@ describe('Plugin Updates Integration', () => {
 
       // Updates section should no longer appear (ECMWF Ensemble is filtered out)
       await expect
-        .element(screen.getByText('Updates Available'))
+        .element(screen.getByRole('heading', { name: /^Updates Available/ }))
         .not.toBeInTheDocument()
     })
 
@@ -588,7 +596,9 @@ describe('Plugin Updates Integration', () => {
         .toBeVisible()
 
       // Verify updates section is visible initially
-      await expect.element(screen.getByText('Updates Available')).toBeVisible()
+      await expect
+        .element(screen.getByRole('heading', { name: /^Updates Available/ }))
+        .toBeVisible()
       await expect
         .element(screen.getByText('ECMWF Ensemble').first())
         .toBeVisible()
@@ -604,7 +614,9 @@ describe('Plugin Updates Integration', () => {
       // MSW update handler has 1000ms delay + refetch (300ms for details)
       // Wait for the updates section to disappear (plugin is now up to date)
       await expect
-        .element(screen.getByText('Updates Available'), { timeout: 5000 })
+        .element(screen.getByRole('heading', { name: /^Updates Available/ }), {
+          timeout: 5000,
+        })
         .not.toBeInTheDocument()
 
       // The plugin should now appear in the installed section with the new version

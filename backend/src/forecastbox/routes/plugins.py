@@ -18,7 +18,8 @@ import logging
 from functools import partial
 from typing import Annotated, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from fiab_core.fable import BlockInstanceId, BlueprintTemplateExampleInput, ConfigurationOptionId, PluginCompositeId
 from packaging.version import InvalidVersion, Version
@@ -29,17 +30,18 @@ from forecastbox.domain.plugin.compatibility import get_compatible_versions
 from forecastbox.domain.plugin.db import PluginStateRecord, get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.detail import PluginListing, build_plugin_listing
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy, PluginNotFound
-from forecastbox.domain.plugin.manager import PluginManager, submit_update_single, uninstall_plugin, unload_single
-from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_plugin
+from forecastbox.domain.plugin.state import PluginManager
+from forecastbox.domain.plugin.store import get_plugins_detail, submit_install_single
+from forecastbox.domain.plugin.submit import submit_uninstall_single, submit_unload_single, submit_update_single
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.concurrency.manager import execution_manager
-from forecastbox.utility.config import PluginSettings, config
+from forecastbox.utility.config import ROUTE_PREFIX, PluginSettings, config
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
 
 logger = logging.getLogger(__name__)
 
-PREFIX = "/api/v1/plugin"
+PREFIX = f"{ROUTE_PREFIX}/plugin"
 
 router = APIRouter(
     tags=["blueprint"],
@@ -61,15 +63,16 @@ async def get_plugin_list() -> PluginListing:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Plugin manager is busy; retry later")
 
 
-# TODO ideally we'd return the redirect here, but that is basically guaranteed to end up with a 503 because
-# the plugins aren't ready yet -- we probably need to await here or smth
-# get_catalogue_redirect = lambda request: RedirectResponse(request.url_for("get_catalogue"), status_code=status.HTTP_303_SEE_OTHER)
-get_catalogue_redirect = lambda request: Response(status_code=202)
+# NOTE many routes are lazy in the sense they *submit* an operation (for eg pip install) and return with a success, before that
+# operation is finished. We don't treat it as a clean 200, because it could actually fail later.
+# Whether it succeeded would be ultimately derived from /list endpoint, but we don't want to return a redirect either, because
+# that route would quite possibly fail right await due to submitted update being in progress.
+# Ultimately, the caller is expected to subscribe to notifications, which will contain the success/failure + url to refresh
+Accepted = Response(status_code=202)
 
 
 @router.post("/update")
-def update_plugin(
-    request: Request,
+async def update_plugin(
     pluginCompositeId: PluginCompositeId,
     version: str | None = None,
     admin: UserRead | None = Depends(get_admin_user),
@@ -88,21 +91,20 @@ def update_plugin(
         except InvalidVersion:
             raise HTTPException(status_code=422, detail=f"Invalid version string: {version!r}")
     else:
-        settings_and_source = _pluginId2settingsAndSource(pluginCompositeId)
-        if settings_and_source is None:
+        settings = _pluginId2settings(pluginCompositeId)
+        if settings is None:
             raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-        plugin_settings, pip_source = settings_and_source
-        versions = _settings2Versions(plugin_settings, pip_source)
+        versions = _source2Versions(settings.pip_source)
         if not versions.versions:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"No compatible versions found for plugin {pluginCompositeId!r}",
             )
         target = Version(versions.versions[0])
-    result = submit_update_single(pluginCompositeId, install=True, version=target)
+    result = await submit_update_single(pluginCompositeId, install=True, version=target)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
-    return get_catalogue_redirect(request)
+    return Accepted
 
 
 class PluginVersions(FiabBaseModel):
@@ -110,21 +112,22 @@ class PluginVersions(FiabBaseModel):
     """Compatible versions, sorted newest first."""
 
 
-def _pluginId2settingsAndSource(pluginCompositeId: PluginCompositeId) -> tuple[PluginSettings, str] | None:
+def _pluginId2settings(pluginCompositeId: PluginCompositeId) -> PluginSettings | None:
     store_detail = get_plugins_detail()
     if pluginCompositeId in store_detail:
         store_entry, _ = store_detail[pluginCompositeId]
         pip_source = store_entry.pip_source
-        return PluginSettings(pip_source=pip_source, module_name=store_entry.module_name), pip_source
+        return PluginSettings(pip_source=pip_source, module_name=store_entry.module_name)
     if pluginCompositeId in config.external.plugins:
         plugin_settings = config.external.plugins[pluginCompositeId]
-        return plugin_settings, plugin_settings.pip_source
+        return plugin_settings
     return None
 
 
-def _settings2Versions(pluginSettings: PluginSettings, pipSource: str) -> PluginVersions:
-    available = get_package_versions(pipSource)
-    compatible = get_compatible_versions(pluginSettings, available)
+def _source2Versions(pipSource: str) -> PluginVersions:
+    with httpx.Client() as client:  # TODO pool those?
+        available = get_package_versions(pipSource, client)
+    compatible = get_compatible_versions(pipSource, available)
     sorted_versions = sorted(compatible, key=lambda v: Version(v), reverse=True)
     return PluginVersions(versions=sorted_versions)
 
@@ -137,25 +140,23 @@ def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, Depends(
     on PyPI are considered; locally-installed or git-sourced plugins will
     receive an empty list.
     """
-    settings_and_source = _pluginId2settingsAndSource(pluginCompositeId)
-    if settings_and_source is None:
+    settings = _pluginId2settings(pluginCompositeId)
+    if settings is None:
         raise HTTPException(status_code=404, detail=f"Plugin {pluginCompositeId!r} not found")
-    return _settings2Versions(*settings_and_source)
+    return _source2Versions(settings.pip_source)
 
 
 @router.post("/install")
-def install_plugin(request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
+async def install_plugin(pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
     # TODO possibly add optional version parameter
-    submit_install_plugin(pluginCompositeId)
-    return get_catalogue_redirect(request)
+    await submit_install_single(pluginCompositeId)
+    return Accepted
 
 
 @router.post("/uninstall")
-async def uninstall_plugin_endpoint(
-    request: Request, pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)
-) -> Response:
-    await uninstall_plugin(pluginCompositeId)
-    return get_catalogue_redirect(request)
+async def uninstall_plugin_endpoint(pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
+    await submit_uninstall_single(pluginCompositeId)
+    return Accepted
 
 
 class PluginSettingsUpdateRequest(FiabBaseModel):
@@ -172,7 +173,6 @@ class PluginSettingsUpdateRequest(FiabBaseModel):
 
 @router.post("/settings")
 async def update_plugin_settings_endpoint(
-    request: Request,
     body: PluginSettingsUpdateRequest,
     admin: UserRead | None = Depends(get_admin_user),
 ) -> Response:
@@ -192,11 +192,12 @@ async def update_plugin_settings_endpoint(
     except PluginNotFound:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id_str} not found")
     if body.isEnabled is False:
-        unload_single(body.pluginCompositeId)
-    result = submit_update_single(body.pluginCompositeId, install=False, version=None)
+        await submit_unload_single(body.pluginCompositeId)
+        return Accepted
+    result = await submit_update_single(body.pluginCompositeId, install=False, version=None)
     if result:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
-    return get_catalogue_redirect(request)
+    return Accepted
 
 
 class TemplateExampleValuesResponse(FiabBaseModel):

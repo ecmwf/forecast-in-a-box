@@ -14,19 +14,27 @@ import '@/lib/i18n'
 import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
   CapabilitiesError,
+  RUN_DIMENSION,
+  activeLayersBbox,
   appendWmsParams,
   combineScaleBands,
+  dimensionValues,
   expandTimeSteps,
   fetchCapabilities,
   groupLayers,
-  isLoopbackUrl,
+  isLensProxyUrl,
+  isWorldBbox,
+  layerRequestParams,
+  legendStripUrl,
   parseCapabilities,
   parseWmsTimestamp,
   partitionGroups,
   rebaseLensUrl,
+  resolveStyle,
   scaleBandState,
   scaleBandTargetResolution,
   skinnyWmsBasemap,
+  supportsCrs,
   toWmsEndpoint,
   uniquePressureLevels,
 } from '@/features/viewer/wms-capabilities'
@@ -412,7 +420,7 @@ describe('expandTimeSteps', () => {
 })
 
 describe('rebaseLensUrl', () => {
-  it('grafts the upstream path and query onto the base URL', () => {
+  it('grafts the upstream path and query onto a bare-origin external base', () => {
     expect(
       rebaseLensUrl(
         'http://0.0.0.0:54321/wms?service=WMS&request=GetMap',
@@ -439,6 +447,57 @@ describe('rebaseLensUrl', () => {
     expect(
       rebaseLensUrl(advertised, 'https://eccharts.ecmwf.int/wms/?token=public'),
     ).toBe(advertised)
+  })
+
+  it('grafts onto the lens proxy path regardless of its own pathname', () => {
+    // The proxy base is same-origin and non-root (`/api/v1/lens/proxy/<id>`)
+    // — unlike external bases, it must still rebase, not be used verbatim.
+    expect(
+      rebaseLensUrl(
+        'http://0.0.0.0:54321/wms?service=WMS&request=GetMap',
+        '/api/v1/lens/proxy/lens-1',
+      ),
+    ).toBe('/api/v1/lens/proxy/lens-1/wms?service=WMS&request=GetMap')
+  })
+
+  it('tolerates a trailing slash on the lens proxy base', () => {
+    expect(
+      rebaseLensUrl(
+        'http://0.0.0.0:54321/legend?layer=2t',
+        '/api/v1/lens/proxy/lens-1/',
+      ),
+    ).toBe('/api/v1/lens/proxy/lens-1/legend?layer=2t')
+  })
+
+  it('does not double the prefix on an already-proxied advertised URL', () => {
+    // A lens honouring X-Forwarded-Prefix advertises already-proxied URLs.
+    expect(
+      rebaseLensUrl(
+        'https://fiab.example/api/v1/lens/proxy/lens-1/wms?request=GetMap',
+        '/api/v1/lens/proxy/lens-1',
+      ),
+    ).toBe('/api/v1/lens/proxy/lens-1/wms?request=GetMap')
+  })
+
+  it('grafts a relative advertised URL onto the lens proxy base', () => {
+    // The proxy contract asks lenses to prefer relative self-URLs.
+    expect(
+      rebaseLensUrl('/wms?request=GetMap', '/api/v1/lens/proxy/lens-1'),
+    ).toBe('/api/v1/lens/proxy/lens-1/wms?request=GetMap')
+  })
+
+  it('keeps the WMS endpoint on a query-only advertised URL', () => {
+    // A query-only href is relative to the capabilities document itself, so
+    // it must resolve against `/wms` rather than the proxy root.
+    expect(rebaseLensUrl('?request=GetMap', '/api/v1/lens/proxy/lens-1')).toBe(
+      '/api/v1/lens/proxy/lens-1/wms?request=GetMap',
+    )
+  })
+
+  it('resolves a path-relative advertised URL as a sibling of /wms', () => {
+    expect(rebaseLensUrl('legend?layer=2t', '/api/v1/lens/proxy/lens-1')).toBe(
+      '/api/v1/lens/proxy/lens-1/legend?layer=2t',
+    )
   })
 })
 
@@ -535,6 +594,15 @@ describe('toWmsEndpoint / appendWmsParams', () => {
     expect(toWmsEndpoint('not a url')).toBe('not a url')
   })
 
+  it('appends /wms to the lens proxy path despite its non-root pathname', () => {
+    expect(toWmsEndpoint('/api/v1/lens/proxy/lens-1')).toBe(
+      '/api/v1/lens/proxy/lens-1/wms',
+    )
+    expect(toWmsEndpoint('/api/v1/lens/proxy/lens-1/')).toBe(
+      '/api/v1/lens/proxy/lens-1/wms',
+    )
+  })
+
   it('joins params with the correct separator', () => {
     expect(appendWmsParams('http://h/wms', 'request=GetCapabilities')).toBe(
       'http://h/wms?request=GetCapabilities',
@@ -545,17 +613,16 @@ describe('toWmsEndpoint / appendWmsParams', () => {
   })
 })
 
-describe('isLoopbackUrl', () => {
-  it('recognises our lens hosts', () => {
-    expect(isLoopbackUrl('http://localhost:54301/wms')).toBe(true)
-    expect(isLoopbackUrl('http://127.0.0.1:8080')).toBe(true)
-    expect(isLoopbackUrl('http://[::1]:9000/x')).toBe(true)
+describe('isLensProxyUrl', () => {
+  it('recognises our lens proxy path', () => {
+    expect(isLensProxyUrl('/api/v1/lens/proxy/lens-1')).toBe(true)
+    expect(isLensProxyUrl('/api/v1/lens/proxy/lens-1/wms')).toBe(true)
   })
 
-  it('rejects external servers and junk', () => {
-    expect(isLoopbackUrl('https://maps.dwd.de/geoserver/ows?')).toBe(false)
-    expect(isLoopbackUrl('https://localhost.evil.example')).toBe(false)
-    expect(isLoopbackUrl('not a url')).toBe(false)
+  it('rejects external servers and unrelated paths', () => {
+    expect(isLensProxyUrl('https://maps.dwd.de/geoserver/ows?')).toBe(false)
+    expect(isLensProxyUrl('http://localhost:54301/wms')).toBe(false)
+    expect(isLensProxyUrl('/api/v1/lens/status')).toBe(false)
   })
 })
 
@@ -685,5 +752,237 @@ describe('fetchCapabilities', () => {
     await expect(fetchCapabilities('http://localhost:9999')).rejects.toSatisfy(
       (err) => err instanceof CapabilitiesError && err.kind === 'interrupted',
     )
+  })
+})
+
+describe('parseCapabilities — CRS', () => {
+  const caps = (crsXml: string) => `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <Capability>
+    <Layer>
+      <Title>root</Title>
+      ${crsXml}
+      <Layer><Name>2t</Name><Title>2t</Title><CRS>EPSG:3035</CRS></Layer>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>`
+
+  it('collects CRS codes from the whole tree, 1.1.1 SRS lists included', () => {
+    const parsed = parseCapabilities(
+      caps(
+        '<CRS>EPSG:4326</CRS><CRS>EPSG:32661</CRS><SRS>EPSG:3857 EPSG:900913</SRS>',
+      ),
+    )
+    expect(parsed.crs).toEqual([
+      'EPSG:4326',
+      'EPSG:32661',
+      'EPSG:3857',
+      'EPSG:900913',
+      'EPSG:3035',
+    ])
+  })
+
+  it('supportsCrs: exact codes, aliases, and the empty-list default', () => {
+    const advertised = ['EPSG:4326', 'EPSG:32661', 'EPSG:32762', 'EPSG:900913']
+    expect(supportsCrs(advertised, 'EPSG:32661')).toBe(true)
+    // Magics advertises UPS South under a typo'd code — accept it.
+    expect(supportsCrs(advertised, 'EPSG:32761')).toBe(true)
+    expect(supportsCrs(advertised, 'EPSG:3857')).toBe(true)
+    expect(supportsCrs(advertised, 'EPSG:3035')).toBe(false)
+    expect(supportsCrs([], 'EPSG:3857')).toBe(true)
+    expect(supportsCrs([], 'EPSG:32661')).toBe(false)
+  })
+})
+
+describe('parseCapabilities — per-layer bbox', () => {
+  const xml = `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <Capability>
+    <Layer>
+      <Title>root</Title>
+      <EX_GeographicBoundingBox>
+        <westBoundLongitude>-180</westBoundLongitude>
+        <eastBoundLongitude>180</eastBoundLongitude>
+        <southBoundLatitude>-90</southBoundLatitude>
+        <northBoundLatitude>90</northBoundLatitude>
+      </EX_GeographicBoundingBox>
+      <Layer>
+        <Name>regional</Name><Title>Regional</Title>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-42.16</westBoundLongitude>
+          <eastBoundLongitude>38.83</eastBoundLongitude>
+          <southBoundLatitude>37.71</southBoundLatitude>
+          <northBoundLatitude>69.58</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <Layer><Name>child</Name><Title>Child</Title></Layer>
+      </Layer>
+      <Layer><Name>global</Name><Title>Global</Title></Layer>
+      <Layer>
+        <Name>legacy</Name><Title>Legacy</Title>
+        <LatLonBoundingBox minx="19" miny="59" maxx="32" maxy="71"/>
+      </Layer>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>`
+
+  it('keeps each layer own box, inherits the parent one, and reads 1.1.1 boxes', () => {
+    const parsed = parseCapabilities(xml)
+    const byName = new Map(parsed.layers.map((l) => [l.name, l]))
+    expect(byName.get('regional')?.bbox).toEqual([-42.16, 37.71, 38.83, 69.58])
+    // Inheritance: the child takes its parent's footprint, not the root's.
+    expect(byName.get('child')?.bbox).toEqual([-42.16, 37.71, 38.83, 69.58])
+    expect(byName.get('global')?.bbox).toEqual([-180, -90, 180, 90])
+    expect(byName.get('legacy')?.bbox).toEqual([19, 59, 32, 71])
+    // The root box is still the server-wide fit target.
+    expect(parsed.bbox).toEqual([-180, -90, 180, 90])
+  })
+})
+
+describe('styles, dimensions and request params', () => {
+  const xml = `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <Capability><Layer><Title>root</Title>
+    <Layer>
+      <Name>t2m</Name><Title>2 m temperature</Title>
+      <Dimension name="time" units="ISO8601">2026-09-03T05:00:00Z/2026-09-06T13:00:00Z/PT1H</Dimension>
+      <Dimension name="reference_time" units="ISO8601" default="2026-09-04T01:00:00Z">2026-09-03T04:00:00Z,2026-09-04T01:00:00Z</Dimension>
+      <Style>
+        <Name>sh_all</Name><Title>Contour shade</Title>
+        <Abstract>Method : Area fill
+   Level range : -48 to 56</Abstract>
+        <LegendURL width="1024" height="128"><Format>image/png</Format>
+          <OnlineResource xlink:href="http://0.0.0.0:19001/wms?request=GetLegendGraphic&amp;layer=t2m&amp;style=sh_all&amp;width=1024&amp;height=128"/>
+        </LegendURL>
+      </Style>
+      <Style><Name>ct_red</Name><Title>Contours</Title>
+        <LegendURL><OnlineResource xlink:href="https://example.org/legend?style=ct_red"/></LegendURL>
+      </Style>
+    </Layer>
+  </Layer></Capability>
+</WMS_Capabilities>`
+
+  it('parses style title, abstract and legend size, and extra dimensions', () => {
+    const layer = parseCapabilities(xml).layers[0]
+    expect(layer.styles[0]).toMatchObject({
+      name: 'sh_all',
+      title: 'Contour shade',
+      abstract: 'Method : Area fill Level range : -48 to 56',
+      legendSize: { width: 1024, height: 128 },
+    })
+    expect(layer.styles[1].legendSize).toBeUndefined()
+    expect(layer.dimensions).toEqual([
+      {
+        name: 'reference_time',
+        raw: '2026-09-03T04:00:00Z,2026-09-04T01:00:00Z',
+        default: '2026-09-04T01:00:00Z',
+        units: 'ISO8601',
+      },
+    ])
+    // TIME stays where the timeline reads it, not in `dimensions`.
+    expect(layer.time?.raw).toContain('PT1H')
+  })
+
+  it('resolveStyle falls back to the first advertised style', () => {
+    const layer = parseCapabilities(xml).layers[0]
+    expect(resolveStyle(layer, 'ct_red')?.name).toBe('ct_red')
+    expect(resolveStyle(layer, 'nope')?.name).toBe('sh_all')
+    expect(resolveStyle(layer, null)?.name).toBe('sh_all')
+  })
+
+  it('legendStripUrl resizes only URLs that carried a size', () => {
+    const [sized, unsized] = parseCapabilities(xml).layers[0].styles
+    const strip = legendStripUrl(sized, 256)!
+    expect(strip).toContain('width=256')
+    expect(strip).toContain('height=32')
+    expect(legendStripUrl(unsized, 256)).toBe(
+      'https://example.org/legend?style=ct_red',
+    )
+  })
+
+  it('layerRequestParams carries the style and DIM_ params', () => {
+    const layer = parseCapabilities(xml).layers[0]
+    expect(
+      layerRequestParams(
+        layer,
+        { style: 'ct_red', dims: { reference_time: '2026-09-04T01:00:00Z' } },
+        '2026-09-04T02:00:00Z',
+      ),
+    ).toEqual({
+      LAYERS: 't2m',
+      STYLES: 'ct_red',
+      FORMAT: 'image/png',
+      TRANSPARENT: 'TRUE',
+      TIME: '2026-09-04T02:00:00Z',
+      DIM_REFERENCE_TIME: '2026-09-04T01:00:00Z',
+    })
+    expect(layerRequestParams(layer, undefined, null).STYLES).toBe('sh_all')
+  })
+})
+
+describe('dimensionValues', () => {
+  const xml = `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0"><Capability><Layer><Title>root</Title>
+  <Layer><Name>t</Name><Title>t</Title>
+    <Dimension name="REFERENCE_TIME" units="ISO8601" default="2026-09-04T00:00:00Z">2026-09-03T00:00:00Z/2026-09-04T00:00:00Z/PT12H</Dimension>
+    <Dimension name="elevation" units="m">10, 50,100</Dimension>
+  </Layer>
+</Layer></Capability></WMS_Capabilities>`
+  it('expands ISO8601 intervals and splits plain lists', () => {
+    const layer = parseCapabilities(xml).layers[0]
+    expect(dimensionValues(layer, RUN_DIMENSION)).toEqual([
+      '2026-09-03T00:00:00.000Z',
+      '2026-09-03T12:00:00.000Z',
+      '2026-09-04T00:00:00.000Z',
+    ])
+    expect(dimensionValues(layer, 'elevation')).toEqual(['10', '50', '100'])
+    expect(dimensionValues(layer, 'nope')).toEqual([])
+  })
+})
+
+describe('activeLayersBbox', () => {
+  const layer = (name: string, bbox?: [number, number, number, number]) =>
+    ({ name, title: name, styles: [], bbox }) as unknown as ParsedLayer
+  it('unions the active layers and gives up when one has no bbox', () => {
+    const layers = [
+      layer('a', [-10, 40, 10, 60]),
+      layer('b', [0, 30, 30, 50]),
+      layer('c'),
+    ]
+    expect(activeLayersBbox(layers, ['a', 'b'])).toEqual([-10, 30, 30, 60])
+    expect(activeLayersBbox(layers, ['a'])).toEqual([-10, 40, 10, 60])
+    expect(activeLayersBbox(layers, ['a', 'c'])).toBeNull()
+    expect(activeLayersBbox(layers, [])).toBeNull()
+    expect(isWorldBbox([-180, -90, 180, 90])).toBe(true)
+    expect(isWorldBbox([-10, 40, 10, 60])).toBe(false)
+  })
+})
+
+describe('parseBbox fallbacks', () => {
+  const caps = (layerXml: string) => `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0"><Capability><Layer><Title>root</Title>
+  <EX_GeographicBoundingBox><westBoundLongitude>-180</westBoundLongitude><eastBoundLongitude>180</eastBoundLongitude><southBoundLatitude>-90</southBoundLatitude><northBoundLatitude>90</northBoundLatitude></EX_GeographicBoundingBox>
+  ${layerXml}
+</Layer></Capability></WMS_Capabilities>`
+  it('reads a GeoServer 1.3.0 EPSG:4326 BoundingBox, latitude first', () => {
+    const layer = parseCapabilities(
+      caps(
+        '<Layer><Name>eu</Name><Title>eu</Title><CRS>EPSG:4326</CRS><BoundingBox CRS="EPSG:4326" minx="29.46875" miny="-23.53125" maxx="70.53125" maxy="62.53125"/><BoundingBox CRS="EPSG:3857" minx="-2.6e6" miny="3.4e6" maxx="7e6" maxy="1.1e7"/></Layer>',
+      ),
+    ).layers[0]
+    expect(layer.bbox).toEqual([-23.53125, 29.46875, 62.53125, 70.53125])
+  })
+  it('accepts CRS:84 and lon-first EPSG:4326 as written', () => {
+    const a = parseCapabilities(
+      caps(
+        '<Layer><Name>a</Name><Title>a</Title><BoundingBox CRS="CRS:84" minx="-10" miny="40" maxx="10" maxy="60"/></Layer>',
+      ),
+    ).layers[0]
+    expect(a.bbox).toEqual([-10, 40, 10, 60])
+    const b = parseCapabilities(
+      caps(
+        '<Layer><Name>b</Name><Title>b</Title><BoundingBox CRS="EPSG:4326" minx="-120" miny="20" maxx="-60" maxy="50"/></Layer>',
+      ),
+    ).layers[0]
+    expect(b.bbox).toEqual([-120, 20, -60, 50])
   })
 })

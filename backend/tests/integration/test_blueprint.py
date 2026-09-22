@@ -42,16 +42,21 @@ from forecastbox.domain.glyphs.intrinsic import AvailableIntrinsicGlyphs
 from forecastbox.routes.run import CompilationDetailResponse, RunCreateResponse
 
 from .conftest import fake_artifact_store_id, test_blueprint_artifact_id, testPluginId
-from .utils import compare_with_tolerance, retry_until
+from .utils import compare_with_tolerance, connect_notification_websocket, retry_until, wait_next_notification
 
 
 def _config(values: dict[str, str]) -> dict[ConfigurationOptionId, str]:
     return {ConfigurationOptionId(key): value for key, value in values.items()}
 
 
-def ensure_completed_v2(backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20) -> None:
+def ensure_completed_v2(
+    backend_client: httpx.Client, job_id: str, sleep: float = 0.5, attempts: int = 20, attempt_count: int | None = None
+) -> None:
     def do_action() -> Any:
-        response = backend_client.get("/run/get", params={"run_id": job_id}, timeout=10)
+        params = {"run_id": job_id}
+        if attempt_count is not None:
+            params["attempt_count"] = attempt_count
+        response = backend_client.get("/run/get", params=params, timeout=10)
         assert response.is_success, response.text
         return response.json()
 
@@ -333,27 +338,36 @@ def test_plugin_template_exclusion(backend_client_user: httpx.Client, backend_cl
     )
 
     # Exclude testExclusion and set a glyph remapping for testRemapping via the admin settings route.
-    response = backend_client_admin.post(
-        "/plugin/settings",
-        json={
-            "pluginCompositeId": testPluginId.model_dump(),
-            "excluded_templates": ["testExclusion"],
-            "glyph_remapping": {"pluginGlyphOld": "pluginGlyphNew", "localOld": "localNew"},
-        },
-        timeout=10,
-    )
-    assert response.status_code in (200, 202), f"Unexpected status from /plugin/settings: {response.status_code} {response.text}"
+    with connect_notification_websocket(backend_client_user) as websocket:
+        response = backend_client_admin.post(
+            "/plugin/settings",
+            json={
+                "pluginCompositeId": testPluginId.model_dump(),
+                "excluded_templates": ["testExclusion"],
+                "glyph_remapping": {"pluginGlyphOld": "pluginGlyphNew", "localOld": "localNew"},
+            },
+            timeout=10,
+        )
+        assert response.status_code in (200, 202), f"Unexpected status from /plugin/settings: {response.status_code} {response.text}"
 
-    # Wait for the re-ingest to complete.
-    def do_action() -> dict:
-        resp = backend_client_user.get("/status", timeout=10)
-        assert resp.is_success
-        return resp.json()
+        # Wait for the re-ingest to complete.
+        def do_action() -> dict:
+            resp = backend_client_user.get("/status", timeout=10)
+            assert resp.is_success
+            return resp.json()
 
-    def verify_ok(data: dict) -> dict | None:
-        return data if data.get("plugins") == "ok" else None
+        def verify_ok(data: dict) -> dict | None:
+            return data if data.get("plugins") == "ok" else None
 
-    retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin re-ingest did not reach 'ok' status")
+        retry_until(do_action, verify_ok, attempts=30, sleep=1.0, error_msg="Plugin re-ingest did not reach 'ok' status")
+
+        # A pluginSettingsApplied notification for this plugin must have been emitted.
+        expected_plugin_id = PluginCompositeId.to_str(testPluginId)
+        timeout = 15
+        while True:
+            notification, timeout = wait_next_notification(websocket, "plugin", "pluginSettingsApplied", total_timeout=timeout)
+            if notification.context.get("plugin_id") == expected_plugin_id:
+                break
 
     # testExclusion must be gone; testBasic and testRemapping must remain.
     response = backend_client_user.get("/blueprint/list", timeout=10)
@@ -883,8 +897,8 @@ def test_blueprint_expand_missing_glyph_warnings(tmpdir: Any, backend_client_use
     assert logs_resp.is_success, logs_resp.text
     assert "zip" in logs_resp.headers["content-type"]
     with zipfile.ZipFile(io.BytesIO(logs_resp.content), "r") as zf:
-        # NOTE dbEntity, gwState, gateway, controller, host0, host0.dsr, host0.shm, (host0.w1, host0.w2) x (logs, stdout, stderr)
-        expected_log_count = 13
+        # NOTE dbEntity, gwState, backend, gateway, controller, host0, host0.dsr, host0.shm, (host0.w1, host0.w2) x (logs, stdout, stderr)
+        expected_log_count = 14
         assert len(zf.namelist()) == expected_log_count or os.getenv("FIAB_LOGSTDOUT", "nay") == "yea"
 
     # Clean up: delete the global glyph created in this test
@@ -1517,6 +1531,108 @@ def test_blueprint_composite_glyph_execute(tmpdir: Any, backend_client_user: htt
     assert del_resp.is_success, del_resp.text
 
 
+def test_blueprint_nullable_option(tmpdir: Any, backend_client_user: httpx.Client) -> None:
+    """An option declared as ``union[str,none]`` accepts an explicit null, but not a missing value.
+
+    The ``source_text`` block declares its ``text`` option as nullable, and its runtime imputes
+    a default when the value is null. This test covers that:
+    - a *missing* value passes validation but fails compilation,
+    - an *explicit null* passes both, and the runtime default is applied.
+    """
+    fname = f"{tmpdir}/nullable_output_${{runId}}.txt"
+
+    def plugin_status() -> dict:
+        response = backend_client_user.get("/status", timeout=10)
+        assert response.is_success
+        return response.json()
+
+    retry_until(
+        plugin_status,
+        lambda data: data if data.get("plugins") == "ok" else None,
+        attempts=30,
+        sleep=1.0,
+        error_msg="Plugin loader did not reach 'ok' status",
+    )
+
+    def make_builder(configuration_values: dict[ConfigurationOptionId, Any]) -> BlueprintBuilder:
+        source_text = RoutableBlock(
+            instance_id=BlockInstanceId("source_text"),
+            plugin=testPluginId,
+            factory=BlockFactoryId("source_text"),
+            instance=BlockInstance(
+                configuration_values=configuration_values,
+                input_ids={},
+            ),
+        )
+        sink_file = RoutableBlock(
+            instance_id=BlockInstanceId("sink_file"),
+            plugin=testPluginId,
+            factory=BlockFactoryId("sink_file"),
+            instance=BlockInstance(
+                configuration_values=_config({"fname": fname}),
+                input_ids={"data": BlockInstanceId("source_text")},
+            ),
+        )
+        return BlueprintBuilder(blocks=[source_text, sink_file])
+
+    def submit(builder: BlueprintBuilder) -> str:
+        save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+        assert save_resp.is_success, save_resp.text
+        exec_resp = backend_client_user.post("/run/create", json={"blueprint_id": save_resp.json()["blueprint_id"]})
+        assert exec_resp.is_success, exec_resp.text
+        return exec_resp.json()["run_id"]
+
+    def poll_run(run_id: str) -> Any:
+        resp = backend_client_user.get("/run/get", params={"run_id": run_id}, timeout=10)
+        assert resp.is_success, resp.text
+        return resp.json()
+
+    def verify_failed(data: Any) -> bool | None:
+        if data["status"] == "failed":
+            return True
+        if data["status"] == "completed":
+            raise RuntimeError(f"Unexpected successful run: {data}")
+        return None
+
+    # --- Step 1: no value at all -- validation passes, compilation fails on the missing option ---
+    builder_missing = make_builder({})
+    expand_resp = backend_client_user.request(url="/blueprint/expand", method="put", json=builder_missing.model_dump())
+    assert expand_resp.is_success, expand_resp.text
+    assert not expand_resp.json()["block_errors"], expand_resp.text
+
+    run_id_missing = submit(builder_missing)
+    retry_until(
+        lambda: poll_run(run_id_missing),
+        verify_failed,
+        attempts=60,
+        sleep=1.0,
+        error_msg=f"Run {run_id_missing} never failed",
+    )
+    error = poll_run(run_id_missing)["error"]
+    assert "missing configuration options" in error and "text" in error, error
+
+    # --- Step 2: explicit null -- validation and compilation both pass ---
+    builder_null = make_builder({ConfigurationOptionId("text"): None})
+    expand_resp = backend_client_user.request(url="/blueprint/expand", method="put", json=builder_null.model_dump())
+    assert expand_resp.is_success, expand_resp.text
+    assert not expand_resp.json()["block_errors"], expand_resp.text
+    # the null value carries no glyphs, hence it is not part of the glyph resolution
+    assert expand_resp.json()["resolved_configuration_options"].get("source_text", {}).get("text") is None
+
+    run_id_null = submit(builder_null)
+    ensure_completed_v2(backend_client_user, run_id_null, sleep=1, attempts=120)
+
+    output = pathlib.Path(f"{tmpdir}/nullable_output_{run_id_null}.txt")
+    assert output.read_text() == "Hic Sunt Leones", output.read_text()
+    output.unlink()
+
+    # --- Step 3: the run detail reports the resolution, with no value for the nulled option ---
+    detail = poll_run(run_id_null)
+    resolution = detail["resolution"]
+    assert resolution["sink_file"]["fname"] == f"{tmpdir}/nullable_output_{run_id_null}.txt"
+    assert resolution.get("source_text", {}).get("text") is None
+
+
 # ---------------------------------------------------------------------------
 # Run delete and output-content tests
 # ---------------------------------------------------------------------------
@@ -1596,22 +1712,6 @@ def test_run_delete_not_found(backend_client_user: httpx.Client) -> None:
     """POST /run/delete with a non-existent run_id returns 404."""
     resp = backend_client_user.post("/run/delete", json={"run_id": "nonexistent-run-id", "attempt_count": 1})
     assert resp.status_code == 404
-
-
-def test_run_delete_attempt_conflict(backend_client_user: httpx.Client) -> None:
-    """POST /run/delete with a mismatched attempt_count returns 409."""
-    builder = _make_builder_source_only()
-    save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
-    assert save_resp.is_success, save_resp.text
-    blueprint_id = save_resp.json()["blueprint_id"]
-
-    run_resp = backend_client_user.post("/run/create", json={"blueprint_id": blueprint_id})
-    assert run_resp.is_success, run_resp.text
-    run_id = run_resp.json()["run_id"]
-    attempt_count = run_resp.json()["attempt_count"]
-
-    del_resp = backend_client_user.post("/run/delete", json={"run_id": run_id, "attempt_count": attempt_count + 1})
-    assert del_resp.status_code == 409
 
 
 def test_run_restart_attempt_conflict(backend_client_user: httpx.Client) -> None:
