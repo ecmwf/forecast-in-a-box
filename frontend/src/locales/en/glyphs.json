@@ -30,7 +30,11 @@
     "saving": "Saving...",
     "cancel": "Cancel",
     "createSuccess": "Variable created",
-    "updateSuccess": "Variable updated"
+    "updateSuccess": "Variable updated",
+    "delete": "Delete",
+    "deleteLabel": "Delete {{key}}",
+    "deleteSuccess": "Variable deleted",
+    "deleteFailed": "Could not delete the variable"
   },
   "form": {
     "title": "Create Global Variable",
@@ -113,5 +117,11 @@
       "floorDayAction": "Truncate to date",
       "floorDayTooltip": "Appends `| floor_day` to truncate the expression to midnight"
     }
+  },
+  "confirmDelete": {
+    "title": "Delete {{key}}?",
+    "description": "Configurations that still reference {{key}} will fail to resolve it until they are updated.",
+    "cancel": "Cancel",
+    "confirm": "Delete"
   }
 }
