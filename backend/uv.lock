@@ -1277,12 +1277,16 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows-anemoi"
-version = "0.7.4.dev1"
-source = { git = "https://github.com/ecmwf/earthkit-workflows-anemoi?rev=bump%2Fekw-0.16.0#a363ea416e5faa06fe22d8d4e1ad8a5af83a8061" }
+version = "0.8.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-utils", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "earthkit-workflows", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "qubed", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2c/c8/f00dfeb6cc90328927d3a6c8e82d6cea7744b455ba881f93db7a0184b733/earthkit_workflows_anemoi-0.8.0.tar.gz", hash = "sha256:d840d6262db27bf22e55f9f5f2f9b66fef3c7beb3adf1dca496f67054729d66b", size = 52286, upload-time = "2026-09-22T15:51:47.734Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/17/a7a69d934a2e27b7a31fcdc0701430064496fa7a0382040221598efc9238/earthkit_workflows_anemoi-0.8.0-py3-none-any.whl", hash = "sha256:bc87873f47281fc30b2225ba9ec734bcf65cb70b336664476ce47a9c803b28e8", size = 24407, upload-time = "2026-09-22T15:51:46.771Z" },
 ]
 
 [package.optional-dependencies]
