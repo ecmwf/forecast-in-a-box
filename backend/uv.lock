@@ -3197,7 +3197,7 @@ wheels = [
 
 [[package]]
 name = "pproc-core"
-version = "0.3.1"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "code-meters", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -3209,9 +3209,9 @@ dependencies = [
     { name = "pydantic", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "qubed", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f8/e9/706c14ff15217f801c752ba66dfe2ce35b6b950d24afd300828f4608119d/pproc_core-0.3.1.tar.gz", hash = "sha256:e882eed7b647f38188c4666794628eb3f6ae62a2d01c54d2c47a0b8ee5c917b7", size = 187557, upload-time = "2026-08-13T09:15:54.761Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/81/7b/45b627cbab92117ec0d493756ec250a802ff4f8e7ca1392dfd9afe54d767/pproc_core-0.4.0.tar.gz", hash = "sha256:239a23e62992a0a773bddec1ff27efd87e26cfcefd7409674bd2862d67288264", size = 187350, upload-time = "2026-09-22T15:42:28.978Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/ea/3120226a5319c9b0911b3dc8498ad7093a89d37a729a66ede5e4a689a3e6/pproc_core-0.3.1-py3-none-any.whl", hash = "sha256:2e6fdeca0de2bb2074786f9f7f3c4fe809e16a2ef93cf1d3276cbb6b4150cd17", size = 62905, upload-time = "2026-08-13T09:15:53.518Z" },
+    { url = "https://files.pythonhosted.org/packages/82/9c/0c794350c809b7c4eb51b012afc24df213261d5400141c51d29072a8d702/pproc_core-0.4.0-py3-none-any.whl", hash = "sha256:df7624618d03cd4befe512ae1676405809bf880b4002db2b96ee795cc7c173ef", size = 62682, upload-time = "2026-09-22T15:42:27.832Z" },
 ]
 
 [[package]]
