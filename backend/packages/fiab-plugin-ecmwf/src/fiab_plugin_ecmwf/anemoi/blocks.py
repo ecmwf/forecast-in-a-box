@@ -32,7 +32,7 @@ from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
 from qubed import Qube
 from qubed.value_types import QEnum
 
-from fiab_plugin_ecmwf.block_utils import (
+from fiab_plugin_ecmwf.constants import (
     BASE_TIME,
     CHECKPOINT,
     DATE,

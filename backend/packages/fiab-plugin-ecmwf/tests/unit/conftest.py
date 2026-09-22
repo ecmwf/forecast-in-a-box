@@ -26,7 +26,11 @@ from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from qubed import Qube
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource
-from fiab_plugin_ecmwf.block_utils import (
+from fiab_plugin_ecmwf.blocks import (
+    FORECAST_DATASETS,
+    OperationalForecastSource,
+)
+from fiab_plugin_ecmwf.constants import (
     BASE_TIME,
     CHECKPOINT,
     ENSEMBLE,
@@ -37,10 +41,6 @@ from fiab_plugin_ecmwf.block_utils import (
     SOURCE,
     STATISTIC,
     STEP,
-)
-from fiab_plugin_ecmwf.blocks import (
-    FORECAST_DATASETS,
-    OperationalForecastSource,
 )
 from fiab_plugin_ecmwf.datasets import ForecastDataset
 from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics

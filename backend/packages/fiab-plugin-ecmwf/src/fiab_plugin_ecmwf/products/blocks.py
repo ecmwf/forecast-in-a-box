@@ -32,6 +32,12 @@ from qubed import Qube
 
 import fiab_plugin_ecmwf.products.pproc
 from fiab_plugin_ecmwf.block_utils import (
+    _axis_value_strings,
+    _extract_dataset,
+    _param_id_to_param_key,
+    _param_key_to_param_id,
+)
+from fiab_plugin_ecmwf.constants import (
     COMPARISON,
     ENSEMBLE,
     PARAM,
@@ -40,10 +46,6 @@ from fiab_plugin_ecmwf.block_utils import (
     STEP,
     THRESHOLD,
     TYPE,
-    _axis_value_strings,
-    _extract_dataset,
-    _param_id_to_param_key,
-    _param_key_to_param_id,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, from_datacubes, select
 
