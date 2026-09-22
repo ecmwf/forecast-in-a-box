@@ -120,9 +120,5 @@
     },
     "basedOn": "Based on: {{name}}",
     "deleted": "Preset deleted"
-  },
-  "notification": {
-    "newModels": "New models and model versions have been published in the",
-    "registryLink": "model registry"
   }
 }
