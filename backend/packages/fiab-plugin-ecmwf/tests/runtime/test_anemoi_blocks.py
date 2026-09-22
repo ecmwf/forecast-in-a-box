@@ -11,18 +11,20 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
+from earthkit.workflows import fluent, nodetree
 from fiab_core.artifacts import CompositeArtifactId
-from fiab_core.fable import BlockFactoryId, ConfigurationOptionId, PluginCompositeId, QubedOutput
+from fiab_core.fable import BlockFactoryId, BlockInstanceId, ConfigurationOptionId, QubedOutput
 from fiab_core.fable import BlockInstance as BlockInstanceBase
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from fiab_core.types import WrongType
+from pytest_lazy_fixtures import lf
 from qubed import Qube
 
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.anemoi.utils import CheckpointArtifact, get_checkpoint_enum_type
-from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, expand
+from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, datacubes, expand
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -112,7 +114,7 @@ def anemoi_transform_configuration(dummy_checkpoint: CompositeArtifactId) -> Blo
     return _make_block(
         AnemoiTransform,
         {"checkpoint": dummy_checkpoint, "lead_time": 24},
-        input_ids={"dataset": "src"},
+        input_ids={"initial conditions": "src"},
     )
 
 
@@ -146,6 +148,26 @@ class TestCheckpointArtifact:
         assert list(selected.leaves(metadata=True))
 
 
+# ---------------------------------------------------------------------------
+# Fixtures - validated actions
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def anemoi_source_action(anemoi_source_configuration: BlockInstance) -> fluent.Action:
+    return AnemoiSource().compile(inputs={}, block=anemoi_source_configuration).get_or_raise()  # type: ignore[return-value]
+
+
+@pytest.fixture
+def anemoi_source_ensemble_action(anemoi_source_ensemble_configuration: BlockInstance) -> fluent.Action:
+    return AnemoiSource().compile(inputs={}, block=anemoi_source_ensemble_configuration).get_or_raise()  # type: ignore[return-value]
+
+
+@pytest.fixture
+def anemoi_input_source_action(anemoi_input_source_configuration: BlockInstance) -> fluent.Action:
+    return AnemoiInputSource().compile(inputs={}, block=anemoi_input_source_configuration).get_or_raise()  # type: ignore[return-value]
+
+
 # ===================================================================
 # AnemoiSource
 # ===================================================================
@@ -176,8 +198,8 @@ class TestAnemoiSourceValidate:
         assert contains(anemoi_source_ensemble_output, "param")
 
     def test_has_basetime(self, anemoi_source_output: QubedOutput) -> None:
-        assert contains(anemoi_source_output, "base_time")
-        assert set(axes(anemoi_source_output)["base_time"]) == {datetime(2024, 1, 1)}
+        assert contains(anemoi_source_output, "date")
+        assert set(axes(anemoi_source_output)["date"]) == {"20240101"}
 
     def test_invalid_lead_time_not_a_digit(self, dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_raw_block(
@@ -270,6 +292,22 @@ class TestAnemoiSourceIntersect:
         assert not AnemoiSource().intersect(other=MagicMock())  # type: ignore[arg-type]
 
 
+class TestAnemoiSourceCompile:
+    @pytest.mark.parametrize(
+        "source_output, source_action, exclude_keys",
+        [
+            [lf("anemoi_source_output"), lf("anemoi_source_action"), ["dataset", "number"]],
+            [lf("anemoi_source_ensemble_output"), lf("anemoi_source_ensemble_action"), ["dataset"]],
+        ],
+    )
+    def test_compile(self, source_output: QubedOutput, source_action: fluent.Action, exclude_keys: list[str]) -> None:
+        action_datacubes = nodetree.datacubes(source_action.nodes)
+        for index, cube in enumerate(datacubes(source_output)):
+            # TODO: remove "number" from exclude_keys and values check once validate and compile are consistent
+            assert set(cube.keys()) == set(x for x in action_datacubes[index] if x not in exclude_keys)
+            assert all(cube[dim] == action_datacubes[index][dim] for dim in cube if dim != "number")
+
+
 # ===================================================================
 # AnemoiInputSource
 # ===================================================================
@@ -350,7 +388,7 @@ class TestAnemoiTransformValidate:
             inputs={"initial conditions": anemoi_input_source_output},
             restrictions={},
         )  # type: ignore[assignment]
-        assert set(axes(output)["base_time"]) == {datetime(2024, 1, 1)}
+        assert set(axes(output)["date"]) == {"20240101"}
 
     def test_invalid_lead_time_not_a_digit(self, dummy_checkpoint: CompositeArtifactId, anemoi_input_source_output: QubedOutput) -> None:
         block = _make_raw_block(
@@ -423,6 +461,55 @@ class TestAnemoiTransformIntersect:
 
     def test_rejects_non_qubed_output(self) -> None:
         assert not AnemoiTransform().intersect(other=MagicMock())  # type: ignore[arg-type]
+
+
+class TestAnemoiTransformCompile:
+    # TODO: the commented out tests are allowed by validate, but do not compile. Re-enable when issues are fixed.
+
+    @pytest.mark.parametrize(
+        "source_output, source_action",
+        [
+            # [lf("anemoi_source_output"), lf("anemoi_source_action")],
+            # [lf("anemois_source_ensemble_output"), lf("anemois_source_ensemble_action")],
+            [lf("anemoi_input_source_output"), lf("anemoi_input_source_action")],
+        ],
+    )
+    def test_compile_from_source(
+        self, anemoi_transform_configuration: BlockInstance, source_output: QubedOutput, source_action: fluent.Action
+    ) -> None:
+        qubed_output = AnemoiTransform().validate(
+            block=anemoi_transform_configuration, inputs={"initial conditions": source_output}, restrictions={}
+        )
+        action = (
+            AnemoiTransform().compile(inputs={BlockInstanceId("src"): source_action}, block=anemoi_transform_configuration).get_or_raise()
+        )
+        action_datacubes = nodetree.datacubes(action.nodes)
+        for index, cube in enumerate(datacubes(qubed_output)):
+            # TODO: re-enable "number" once validate and compile are consistent
+            assert set(cube.keys()) == set(x for x in action_datacubes[index] if x not in ["dataset", "number"])
+            assert all(cube[dim] == action_datacubes[index][dim] for dim in cube)
+
+    # @pytest.mark.parametrize("source_output, source_action", [
+    #         [lf("anemoi_input_source_output"), lf("anemoi_input_source_action")],
+    # ])
+    # def test_compile_from_transform(self, dummy_checkpoint: CompositeArtifactId, anemoi_transform_configuration: BlockInstance, source_output: QubedOutput, source_action: fluent.Action) -> None:
+    #     first_output = AnemoiTransform().validate(block=anemoi_transform_configuration, inputs={"initial conditions": source_output}, restrictions={})
+    #     first_action = AnemoiTransform().compile(inputs={"src": source_action}, block=anemoi_transform_configuration).get_or_raise()
+    #     second_config = _make_block(
+    #         AnemoiTransform,
+    #         {"checkpoint": dummy_checkpoint, "lead_time": 48},
+    #         input_ids={"initial conditions": "first_transform"},
+    #     )
+    #     second_output: QubedOutput = AnemoiTransform().validate(
+    #         block=second_config,
+    #         inputs={"initial conditions": first_output},
+    #         restrictions={},
+    #     )
+    #     second_action = AnemoiTransform().compile(inputs={"first_transform": first_action}, block=second_config).get_or_raise()
+    #     action_datacubes = nodetree.datacubes(second_action.nodes)
+    #     for index, cube in enumerate(datacubes(second_output)):
+    #         assert set(cube.keys()) == set(x for x in action_datacubes[index] if x not in ["dataset"])
+    #         assert all(cube[dim] == action_datacubes[index][dim] for dim in cube)
 
 
 # ===================================================================

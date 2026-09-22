@@ -49,7 +49,7 @@ template = BlueprintTemplate(
             instance=BlockInstance(
                 configuration_values={
                     ConfigurationOptionId("dimension"): "param",
-                    ConfigurationOptionId("values"): "2t",
+                    ConfigurationOptionId("values"): "2t-167",
                 },
                 input_ids={
                     "dataset": BlockInstanceId("source"),
@@ -72,7 +72,6 @@ template = BlueprintTemplate(
             factory_id=BlockFactoryId("ensembleStatistics"),
             instance=BlockInstance(
                 configuration_values={
-                    ConfigurationOptionId("param"): "2t",
                     ConfigurationOptionId("statistic"): "${statistic}",
                 },
                 input_ids={
@@ -84,7 +83,7 @@ template = BlueprintTemplate(
             factory_id=BlockFactoryId("mapPlotSink"),
             instance=BlockInstance(
                 configuration_values={
-                    ConfigurationOptionId("param"): "2t",
+                    ConfigurationOptionId("param"): "2t-167",
                     ConfigurationOptionId("domain"): "${area}",
                     ConfigurationOptionId("format"): "${plotFormat}",
                     ConfigurationOptionId("groupby"): "none",
