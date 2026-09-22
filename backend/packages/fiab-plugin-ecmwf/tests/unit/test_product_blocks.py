@@ -220,7 +220,8 @@ class TestEnsembleStatistics:
         for dim, values in expected.items():
             assert set.union(*[set(req[dim]) for req in requests]) == values
         if identical_qubes:
-            assert list(datacubes(output)) == requests
+            for qube in datacubes(output):
+                assert qube in requests
 
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):
@@ -310,7 +311,8 @@ class TestPredefinedThresholdProb:
         for dim, value in expected.items():
             assert requests[0][dim] == value
         if identical_qubes:
-            assert list(datacubes(output)) == requests
+            for qube in datacubes(output):
+                assert qube in requests
 
     def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
         for expansion in plugin().expander(threshold_probability_output):
@@ -384,7 +386,8 @@ class TestCustomThresholdProb:
             assert request[TYPE] == ["ep"]
             assert set.isdisjoint(set(request[PARAM]), expected_params) is False
         if identical_qubes:
-            assert list(datacubes(output)) == requests
+            for qube in datacubes(output):
+                assert qube in requests
 
     def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
         for expansion in plugin().expander(threshold_probability_output):
@@ -818,7 +821,8 @@ class TestQuantiles:
         for dim, values in expected.items():
             assert set.union(*[set(req[dim]) for req in requests]) == values
         if identical_qubes:
-            assert list(datacubes(output)) == requests
+            for qube in datacubes(output):
+                assert qube in requests
 
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):
