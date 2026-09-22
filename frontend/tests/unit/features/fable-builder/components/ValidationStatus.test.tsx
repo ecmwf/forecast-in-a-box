@@ -83,6 +83,31 @@ describe('ValidationStatusBadge — issues popover', () => {
       .toBeVisible()
   })
 
+  it('adds a fix hint for recognised error shapes', async () => {
+    useFableBuilderStore.getState().setValidationState({
+      ...erroredState,
+      blockStates: {
+        b1: {
+          ...erroredState.blockStates.b1,
+          errors: [
+            "Invalid value for configuration option 'source': expected str",
+          ],
+          missingGlyphs: {},
+        },
+      },
+    })
+    const screen = await renderWithProviders(<ValidationStatusBadge />)
+
+    await screen.getByRole('button', { name: /1 issue/ }).click()
+    await expect
+      .element(
+        screen.getByText(
+          'Open the block and pick a valid value for this option.',
+        ),
+      )
+      .toBeVisible()
+  })
+
   it('clicking an issue selects the offending block', async () => {
     const screen = await renderWithProviders(<ValidationStatusBadge />)
 
@@ -92,7 +117,7 @@ describe('ValidationStatusBadge — issues popover', () => {
     expect(useFableBuilderStore.getState().selectedBlockId).toBe('b1')
   })
 
-  it('renders the plain Valid badge when there are no issues', async () => {
+  it('renders the Ready to run badge when there are no issues', async () => {
     useFableBuilderStore.getState().setValidationState({
       ...erroredState,
       isValid: true,
@@ -100,6 +125,6 @@ describe('ValidationStatusBadge — issues popover', () => {
     })
     const screen = await renderWithProviders(<ValidationStatusBadge />)
 
-    await expect.element(screen.getByText('Valid')).toBeVisible()
+    await expect.element(screen.getByText('Ready to run')).toBeVisible()
   })
 })

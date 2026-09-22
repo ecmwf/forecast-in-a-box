@@ -205,8 +205,9 @@ describe('Fable Builder Save & Load', () => {
       expect(Object.keys(state.fable.blocks)).toHaveLength(3)
       expect(state.isDirty).toBe(false)
 
-      // Block count should update in the header
+      // Block count on the canvas; the header shows the blueprint's tags
       await expect.element(screen.getByText('3 blocks')).toBeVisible()
+      await expect.element(screen.getByText('temperature')).toBeVisible()
 
       // Select the source block to see its configuration
       useFableBuilderStore.getState().selectBlock('block_source_1')

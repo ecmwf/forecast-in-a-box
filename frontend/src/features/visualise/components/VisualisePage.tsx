@@ -29,21 +29,18 @@ import {
   useRef,
   useState,
 } from 'react'
-import { BrushCleaning, Loader2, Plus } from 'lucide-react'
+import { BrushCleaning, HelpCircle, Loader2, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getRouteApi } from '@tanstack/react-router'
-import {
-  SLOT_B_OFF,
-  entryDisplayName,
-  entryRef,
-  redactWmsUrl,
-} from '../entry-ref'
+import { SLOT_B_OFF, entryRef, redactWmsUrl } from '../entry-ref'
+import { slotCaption } from '../slot-caption'
 import { useComparisonStore } from '../stores/comparisonStore'
 import { useComparisonSource } from '../hooks/useComparisonSource'
 import { useStopOrphanedLenses } from '../hooks/useStopOrphanedLenses'
 import { useHydrateComparisonFromUrl } from '../hooks/useHydrateComparisonFromUrl'
 import { useEnrichComparisonEntry } from '../hooks/useEnrichComparisonEntry'
 
+import { curatedBboxAxisOrder } from '../curated-wms'
 import { CompareSlotBar } from './CompareSlotBar'
 import { ComparePanel } from './ComparePanel'
 import { SourcePicker } from './SourcePicker'
@@ -52,11 +49,20 @@ import type { ComparisonEntry } from '../entry-ref'
 import type { ComparisonSourceState } from '../hooks/useComparisonSource'
 import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
+import type { TutorialId } from '@/stores/tutorialsStore'
+import { useAppTimeZone } from '@/lib/datetime'
 import {
   decodeViewerUrlState,
   encodeViewerUrlState,
 } from '@/features/viewer/geo/view-url-state'
 import { GeoViewerSkeleton } from '@/features/viewer/geo/GeoViewerSkeleton'
+import { CompareHelpDialog } from '@/features/viewer/geo/CompareHelpDialog'
+import { COMPARE_KEYS, keyLabel } from '@/features/viewer/geo/useGeoShortcuts'
+import { readStorageJson, writeStorageJson } from '@/lib/storage'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
+import { useOverlayCloseRequest } from '@/lib/overlay-requests'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
+import { useTutorialsStore } from '@/stores/tutorialsStore'
 import { useViewportFill } from '@/hooks/useViewportFill'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
@@ -93,6 +99,11 @@ const makeGeoViewer = () =>
 
 const route = getRouteApi('/_authenticated/visualise')
 
+/** `?tour=` values → tutorial ids (the route schema owns the enum). */
+const TOUR_PARAM: Record<'first-map', TutorialId> = {
+  'first-map': 'visualise-first-map',
+}
+
 export interface ActivePair {
   a: ComparisonEntry | null
   b: ComparisonEntry | null
@@ -116,12 +127,12 @@ function useActivePair(): ActivePair & {
   const aValid = search.a !== undefined && byRef.has(search.a)
   const bValid = search.b !== undefined && byRef.has(search.b)
 
-  // Materialize missing slots from basket order (route file explains why
-  // the pair is always pinned in the URL). `b=off` is a deliberate single
-  // view — never re-fill it. Unresolved refs belong to
-  // useHydrateComparisonFromUrl (add/strip/rewrite) — wait, or filling the
-  // sibling slot races that update. `replace` keeps history clean while
-  // chips are clicked around.
+  // Materialize missing slots from the last-used pair, then basket order
+  // (route file explains why the pair is always pinned in the URL).
+  // `b=off` is a deliberate single view — never re-fill it. Unresolved
+  // refs belong to useHydrateComparisonFromUrl (add/strip/rewrite) — wait,
+  // or filling the sibling slot races that update. `replace` keeps
+  // history clean while chips are clicked around.
   useEffect(() => {
     if (entries.length === 0) return
     const refs = entries.map((e) => entryRef(e))
@@ -132,8 +143,25 @@ function useActivePair(): ActivePair & {
     const bUnresolved =
       !bMissing && search.b !== SLOT_B_OFF && !byRef.has(search.b!)
     if (aUnresolved || bUnresolved) return
-    const nextA = aMissing ? refs.find((r) => r !== search.b) : search.a
-    const nextB = bMissing ? refs.find((r) => r !== nextA) : search.b
+    const stored = readStorageJson<{ a: string; b: string }>(
+      STORAGE_KEYS.visualise.lastPair,
+    )
+    const storedA =
+      stored && byRef.has(stored.a) && stored.a !== search.b
+        ? stored.a
+        : undefined
+    const nextA = aMissing
+      ? (storedA ?? refs.find((r) => r !== search.b))
+      : search.a
+    const storedB =
+      stored &&
+      (stored.b === SLOT_B_OFF || byRef.has(stored.b)) &&
+      stored.b !== nextA
+        ? stored.b
+        : undefined
+    const nextB = bMissing
+      ? (storedB ?? refs.find((r) => r !== nextA))
+      : search.b
     if (nextA !== search.a || nextB !== search.b) {
       void navigate({
         search: (prev) => ({ ...prev, a: nextA, b: nextB }),
@@ -141,6 +169,32 @@ function useActivePair(): ActivePair & {
       })
     }
   }, [entries, byRef, search.a, search.b, navigate])
+
+  // A source ADDED while B is off fills B (adding = starting a comparison).
+  // Growth only: the persisted basket and URL hydration never re-fill it.
+  const knownRefsRef = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const refs = entries.map((e) => entryRef(e))
+    const known = knownRefsRef.current
+    knownRefsRef.current = new Set(refs)
+    if (known === null || search.b !== SLOT_B_OFF) return
+    const added = refs.find((r) => !known.has(r) && r !== search.a)
+    if (added === undefined) return
+    void navigate({
+      search: (prev) => ({ ...prev, b: added }),
+      replace: true,
+    })
+  }, [entries, search.a, search.b, navigate])
+
+  // Remember the resolved pair so a bare /visualise restores it.
+  useEffect(() => {
+    if (!aValid) return
+    if (search.b !== SLOT_B_OFF && !bValid) return
+    writeStorageJson(STORAGE_KEYS.visualise.lastPair, {
+      a: search.a!,
+      b: search.b!,
+    })
+  }, [aValid, bValid, search.a, search.b])
 
   // Plain assignment — the same source in both slots is a real workflow
   // (unlink layers, compare two parameters of one run; or pair with the
@@ -188,6 +242,7 @@ function useActivePair(): ActivePair & {
 
 export function VisualisePage() {
   const { t } = useTranslation(['visualise', 'common'])
+  const timeZone = useAppTimeZone()
   const search = route.useSearch()
   const navigate = route.useNavigate()
   const entries = useComparisonStore((s) => s.entries)
@@ -258,12 +313,32 @@ export function VisualisePage() {
     [],
   )
 
+  // `?tour=` makes tour launches plain links; the param is one-shot.
+  const tourParam = search.tour
+  useEffect(() => {
+    if (tourParam === undefined) return
+    useTutorialsStore.getState().start(TOUR_PARAM[tourParam])
+    void navigate({
+      search: (prev) => ({ ...prev, tour: undefined }),
+      replace: true,
+    })
+  }, [tourParam, navigate])
+
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  // The picker is this page's only closable overlay.
+  useOverlayCloseRequest(useCallback(() => setPickerOpen(false), []))
   const [GeoViewer, setGeoViewer] = useState(() => makeGeoViewer())
   const stateA = useComparisonSource(a, { autoStart: true })
   const stateB = useComparisonSource(b, { autoStart: true })
+  // Lens on its way: the viewer's frame is already the right layout.
+  const aPending =
+    stateA.phase === 'resolvingDir' || stateA.phase === 'starting'
   const viewerFill = useViewportFill(
-    entries.length > 0 && a !== null && stateA.phase === 'running',
+    entries.length > 0 &&
+      a !== null &&
+      (stateA.phase === 'running' || aPending),
   )
 
   return (
@@ -302,7 +377,12 @@ export function VisualisePage() {
           <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
             <DialogTrigger
               render={
-                <Button variant="outline" size="sm" className="gap-1.5" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  {...tourAttr(TOUR.visualise.addSource)}
+                />
               }
             >
               <Plus className="h-3.5 w-3.5" />
@@ -363,8 +443,21 @@ export function VisualisePage() {
               </AlertDialogContent>
             </AlertDialog>
           )}
+          {/* Help lives at page level so the tour entry point never hides. */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setHelpOpen(true)}
+            title={`${t('help.open')} (${keyLabel(COMPARE_KEYS.help)})`}
+            aria-label={t('help.open')}
+            {...tourAttr(TOUR.visualise.help)}
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
+      <CompareHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
 
       {/* Link-borne sources need explicit consent; any close declines. */}
       <AlertDialog
@@ -387,7 +480,7 @@ export function VisualisePage() {
                   title={detail}
                   className="flex min-w-0 items-baseline gap-2"
                 >
-                  <span className="rounded border border-border px-1 font-mono text-[10px] tracking-wide text-muted-foreground">
+                  <span className="rounded-md border border-border px-1 font-mono text-[10px] tracking-wide text-muted-foreground">
                     {t(p.kind === 'wms' ? 'basket.kindWms' : 'basket.kindPath')}
                   </span>
                   <span className="truncate font-mono text-xs">{detail}</span>
@@ -406,7 +499,7 @@ export function VisualisePage() {
 
       {entries.length === 0 ? (
         <VisualiseHub />
-      ) : a && stateA.phase === 'running' ? (
+      ) : a && (stateA.phase === 'running' || aPending) ? (
         // Viewer bottom meets the viewport bottom; footer below the fold.
         <div
           ref={viewerFill.ref}
@@ -417,69 +510,85 @@ export function VisualisePage() {
           }
           className="h-[75vh] min-h-[480px]"
         >
-          {/* Local boundary: a failed viewer chunk (redeploy) or an
+          {stateA.phase !== 'running' ? (
+            // Lens still coming: the viewer-shaped skeleton holds the layout.
+            <GeoViewerSkeleton
+              label={
+                stateA.phase === 'starting'
+                  ? t('lens.starting')
+                  : t('lens.resolving')
+              }
+            />
+          ) : (
+            <>
+              {/* Local boundary: a failed viewer chunk (redeploy) or an
               OL/canvas throw must not take down the page shell. */}
-          <ErrorBoundary
-            onReset={() => setGeoViewer(() => makeGeoViewer())}
-            fallbackRender={({ error, resetErrorBoundary }) => (
-              <div className="flex h-full flex-col items-center justify-center gap-3">
-                <P className="font-medium">{t('viewerError.title')}</P>
-                <P
-                  title={error.message}
-                  className="max-w-lg truncate font-mono text-xs text-muted-foreground"
+              <ErrorBoundary
+                onReset={() => setGeoViewer(() => makeGeoViewer())}
+                fallbackRender={({ error, resetErrorBoundary }) => (
+                  <div className="flex h-full flex-col items-center justify-center gap-3">
+                    <P className="font-medium">{t('viewerError.title')}</P>
+                    <P
+                      title={error.message}
+                      className="max-w-lg truncate font-mono text-xs text-muted-foreground"
+                    >
+                      {error.message}
+                    </P>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={resetErrorBoundary}
+                      >
+                        {t('viewerError.retry')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.location.reload()}
+                      >
+                        {t('viewerError.reload')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              >
+                <Suspense
+                  fallback={<GeoViewerSkeleton label={t('common:loading')} />}
                 >
-                  {error.message}
-                </P>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={resetErrorBoundary}
-                  >
-                    {t('viewerError.retry')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => window.location.reload()}
-                  >
-                    {t('viewerError.reload')}
-                  </Button>
-                </div>
-              </div>
-            )}
-          >
-            <Suspense
-              fallback={<GeoViewerSkeleton label={t('common:loading')} />}
-            >
-              {/* Single JSX position — b flips null↔value without a
+                  {/* Single JSX position — b flips null↔value without a
                   remount, so camera/selection/time survive the switch. */}
-              <GeoViewer
-                a={{
-                  id: entryRef(a),
-                  baseUrl: stateA.baseUrl,
-                  label: entryDisplayName(a),
-                }}
-                b={
-                  b && stateB.phase === 'running'
-                    ? {
-                        id: entryRef(b),
-                        baseUrl: stateB.baseUrl,
-                        label: entryDisplayName(b),
-                      }
-                    : null
-                }
-                mode={mode}
-                onModeChange={onModeChange}
-                onRemoveB={clearSlotB}
-                initialViewState={initialViewState}
-                onViewStateChange={onViewStateChange}
-              />
-            </Suspense>
-          </ErrorBoundary>
+                  <GeoViewer
+                    a={{
+                      id: entryRef(a),
+                      baseUrl: stateA.baseUrl,
+                      ...slotCaption(a, timeZone),
+                      bboxAxisOrder: entryBboxAxisOrder(a),
+                    }}
+                    b={
+                      b && stateB.phase === 'running'
+                        ? {
+                            id: entryRef(b),
+                            baseUrl: stateB.baseUrl,
+                            ...slotCaption(b, timeZone),
+                            bboxAxisOrder: entryBboxAxisOrder(b),
+                          }
+                        : null
+                    }
+                    mode={mode}
+                    onModeChange={onModeChange}
+                    onRemoveB={clearSlotB}
+                    onHelp={() => setHelpOpen((v) => !v)}
+                    initialViewState={initialViewState}
+                    onViewStateChange={onViewStateChange}
+                  />
+                </Suspense>
+              </ErrorBoundary>
+            </>
+          )}
         </div>
       ) : (
-        // A not running yet — lifecycle panels.
+        // A failed, paused or unresolved — panels with their actions.
         <div className="grid gap-3 lg:grid-cols-2">
           <ComparePanel slot="A" entry={a} state={stateA} />
           {b !== null && <ComparePanel slot="B" entry={b} state={stateB} />}
@@ -489,13 +598,18 @@ export function VisualisePage() {
   )
 }
 
+/** Curated external servers may need an easting-first WMS BBOX. */
+function entryBboxAxisOrder(entry: ComparisonEntry): 'xy' | undefined {
+  return entry.kind === 'wms' ? curatedBboxAxisOrder(entry.url) : undefined
+}
+
 /** Compact B lifecycle indicator shown while the viewer runs solo. */
 function SlotBStatusChip({ state }: { state: ComparisonSourceState }) {
   const { t } = useTranslation('visualise')
   if (state.phase === 'running' || state.phase === 'idle') return null
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <span className="flex h-4 w-4 items-center justify-center rounded bg-slot-b font-mono text-[10px] font-bold text-white">
+      <span className="flex h-4 w-4 items-center justify-center rounded-md bg-slot-b font-mono text-[10px] font-bold text-white">
         B
       </span>
       {state.phase === 'failed' || state.phase === 'dirError' ? (

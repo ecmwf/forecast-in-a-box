@@ -9,7 +9,6 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { fromLonLat } from 'ol/proj'
 import type { MapAnnotation } from '@/features/viewer/geo/annotations'
 import {
   annotationVisibleOn,
@@ -40,7 +39,7 @@ const pin = (
   lonLat: [number, number] = [8.55, 47.37],
 ): MapAnnotation => ({
   id,
-  coordinate: fromLonLat(lonLat) as [number, number],
+  lonLat,
   label: id,
   text: `note ${id}`,
   color: 'red',
@@ -61,8 +60,8 @@ describe('annotations GeoJSON round-trip', () => {
       expect(restored.sourceId).toBe(pins[i].sourceId)
       expect(restored.label).toBe(pins[i].label)
       expect(restored.color).toBe('red')
-      expect(restored.coordinate[0]).toBeCloseTo(pins[i].coordinate[0], 0)
-      expect(restored.coordinate[1]).toBeCloseTo(pins[i].coordinate[1], 0)
+      expect(restored.lonLat[0]).toBeCloseTo(pins[i].lonLat[0], 4)
+      expect(restored.lonLat[1]).toBeCloseTo(pins[i].lonLat[1], 4)
     })
   })
 
@@ -184,7 +183,7 @@ describe('annotations GeoJSON round-trip', () => {
     ]}`
     const parsed = parseAnnotationsGeojson(mixed)
     expect(parsed.map((p) => p.text)).toEqual(['good'])
-    expect(parsed[0].coordinate.every(Number.isFinite)).toBe(true)
+    expect(parsed[0].lonLat.every(Number.isFinite)).toBe(true)
 
     const allBad = `{"type":"FeatureCollection","features":[
       {"type":"Feature","properties":{"text":"inf"},"geometry":

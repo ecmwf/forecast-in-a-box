@@ -25,11 +25,11 @@ from pydantic import UUID4
 from forecastbox.domain.admin import Release, get_local_release, get_most_recent_release, get_pylock, mark_release, save_pylock
 from forecastbox.domain.auth.db import delete_user_by_id, get_user_by_id, list_users, patch_user_by_id, update_user_by_id
 from forecastbox.domain.auth.users import UserRead, UserUpdate, current_active_user
-from forecastbox.utility.config import BackendSettings, CascadeSettings, ExternalServicesSettings, config
+from forecastbox.utility.config import ROUTE_PREFIX, BackendSettings, CascadeSettings, ExternalServicesSettings, config
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.rsjf import ExportedSchemas, FormDefinition, from_pydantic
 
-PREFIX = "/api/v1/admin"
+PREFIX = f"{ROUTE_PREFIX}/admin"
 
 logger = logging.getLogger(__name__)
 

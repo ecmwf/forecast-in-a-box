@@ -7,8 +7,8 @@ name: CD for artifacts catalog update
 #
 # Given a base tag cX.Y.Z (produced by cd-core), it validates that the only
 # change since the last catalog tag (cX.Y.Z.N) is to install/artifacts.json,
-# validates the JSON schema using fiab-core at version X.Y.Z, and pushes a
-# new cX.Y.Z.(N+1) tag to mark the updated catalog.
+# validates the JSON schema using fiab-core at version X.Y.Z, checks every checkpoint url
+# against the artifact store, and pushes a new cX.Y.Z.(N+1) tag to mark the updated catalog.
 
 on:
   workflow_dispatch:
@@ -63,7 +63,8 @@ jobs:
           fi
 
           VERSION="${BASE_TAG#c}"
-          uv run --no-project --with "fiab-core==${VERSION}" python backend/packages/fiab-core/scripts/parse_artifacts_catalog.py install/artifacts.json
+          # catalog must parse, every checkpoint url must resolve and its disk_size_bytes must match the actual download
+          uv run --no-project --with "fiab-core==${VERSION}" python backend/packages/fiab-core/scripts/parse_test_artifacts_catalog.py install/artifacts.json
 
           IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "${HIGHEST_TAG#c}"
           NEW_TAG="c${MAJOR}.${MINOR}.${PATCH}.$((BUILD + 1))"

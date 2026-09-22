@@ -18,5 +18,9 @@ class NotStringInput(TypeError):
     """Raised when validate_convert receives a non-string input."""
 
 
+class NotNoneInput(TypeError):
+    """Raised when validate_convert of a none-typed value receives a non-None input."""
+
+
 class WrongType(Exception):
     """Raised when a value cannot be converted to the target type."""

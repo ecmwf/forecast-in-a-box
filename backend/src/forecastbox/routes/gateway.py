@@ -23,9 +23,9 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayNotStarted,
 )
 from forecastbox.domain.gateway.service import launch_gateway, status_gateway, stop_gateway
-from forecastbox.utility.config import UnmanagedGateway, config
+from forecastbox.utility.config import ROUTE_PREFIX, UnmanagedGateway, config
 
-PREFIX = "/api/v1/gateway"
+PREFIX = f"{ROUTE_PREFIX}/gateway"
 
 router = APIRouter(
     tags=["gateway"],

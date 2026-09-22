@@ -146,6 +146,41 @@ export const mockCatalogue: BlockFactoryCatalogue = {
         },
         inputs: ['dataset'],
       },
+      mapPlotSink: {
+        kind: 'sink',
+        title: 'Map Plot',
+        description: 'Render a geographic map using earthkit-plots',
+        configuration_options: {
+          param: {
+            title: 'Parameters',
+            description: "Parameters to select and plot (e.g. '2t', 'msl')",
+            value_type: 'list[param]',
+          },
+          domain: {
+            title: 'Domain',
+            description: 'Area to display: auto, global, or a named region',
+            value_type: 'geodomain',
+          },
+          format: {
+            title: 'Format',
+            description: 'Output image format',
+            value_type: serializeValueType(closedEnum(['png', 'pdf', 'svg'])),
+          },
+          groupby: {
+            title: 'Group By',
+            description: 'Dimension to create subplots over',
+            value_type: serializeValueType(
+              closedEnum(['valid_datetime', 'step', 'number', 'none']),
+            ),
+          },
+          splitby: {
+            title: 'Split By',
+            description: 'Dimensions to separate plots by',
+            value_type: 'list[str]',
+          },
+        },
+        inputs: ['dataset'],
+      },
     },
   },
 }
@@ -354,6 +389,11 @@ export function calculateExpansion(fable: FableBuilderV1): {
       factory: 'zarrSink',
       restrictions: {},
     },
+    {
+      plugin: pluginId('ecmwf', 'ecmwf-base'),
+      factory: 'mapPlotSink',
+      restrictions: {},
+    },
   ]
 
   for (const [blockId, instance] of Object.entries(fable.blocks)) {
@@ -367,6 +407,16 @@ export function calculateExpansion(fable: FableBuilderV1): {
       )
       block_errors[blockId] = errors
       continue
+    }
+
+    // Empty closed enums fail like the backend; other fields stay lenient.
+    for (const [key, option] of Object.entries(factory.configuration_options)) {
+      const value = instance.configuration_values[key] ?? ''
+      if (value === '' && option.value_type.startsWith('enumClosed')) {
+        errors.push(
+          `Invalid value for configuration option '${key}': expected ${option.value_type}. '' is not a valid option`,
+        )
+      }
     }
 
     // Check for missing inputs

@@ -11,12 +11,13 @@
 
 import logging
 import math
+import re
 from abc import ABC, abstractmethod
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Iterable, Literal, get_args
 
 import fiab_core  # to satisfy the type checker for artifacts annotation
-from fiab_core.types.exceptions import NotStringInput, WrongType
+from fiab_core.types.exceptions import NotNoneInput, NotStringInput, WrongType
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,22 @@ class StringType(FableType):
 
     def serialize(self) -> str:
         return "str"
+
+
+class NoneType(FableType):
+    """The none type. The only accepted value is ``None``, which is returned as-is.
+
+    Meant to be used as a member of a union, eg ``union[int,none]``, to declare that
+    an option accepts an explicit null. Note that an explicit null is a different thing
+    than a missing value -- the latter is never passed to validate_convert at all."""
+
+    def validate_convert(self, value: Any) -> None:
+        if value is not None:
+            raise NotNoneInput(f"Expected None, got {type(value).__name__}")
+        return None
+
+    def serialize(self) -> str:
+        return "none"
 
 
 class IntType(FableType):
@@ -135,6 +152,63 @@ class DatetimeType(FableType):
         return "datetime"
 
 
+# NOTE deliberately no support for calendar-dependent components (years, months) since
+# they do not correspond to a fixed duration and would make the conversion ambiguous.
+# The leading 'P' designator is checked for and stripped separately, so it is not part
+# of this pattern. All groups are optional; at least one must actually be present for a
+# match to be considered meaningful (checked by the caller, since an all-absent match
+# still satisfies this regex, e.g. for a bare 'T').
+_TIMEDELTA_PATTERN = re.compile(
+    r"^"
+    r"(?:(?P<weeks>\d+)W)?"
+    r"(?:(?P<days>\d+)D)?"
+    r"(?:T"
+    r"(?:(?P<hours>\d+)H)?"
+    r"(?:(?P<minutes>\d+)M)?"
+    r"(?:(?P<seconds>\d+(?:\.\d+)?)S)?"
+    r")?"
+    r"$"
+)
+
+
+class TimeDeltaType(FableType):
+    """The timedelta type. Converts an ISO 8601 duration string to datetime.timedelta.
+
+    Supports the fixed-length components weeks (W), days (D), hours (H), minutes (M) and
+    seconds (S, may be fractional), the latter three following a literal 'T' designator,
+    e.g. 'P3DT12H30M', 'PT30M', 'P1W'. Calendar-dependent components (years, months) are
+    not supported, since a fixed number of days cannot represent them unambiguously.
+
+    The leading 'P' designator is optional on input for convenience, so e.g. 'T12H' or
+    '3DT1M' are accepted too.
+    """
+
+    def validate_convert(self, value: Any) -> timedelta:
+        if not isinstance(value, str):
+            raise NotStringInput(f"Expected string, got {type(value).__name__}")
+
+        raw = value.strip()
+        body = raw[1:] if raw.startswith("P") else raw
+        if not body:
+            raise WrongType(f"Cannot parse {value!r} as timedelta (expected ISO 8601 duration format)")
+
+        match = _TIMEDELTA_PATTERN.match(body)
+        if match is None or not any(match.groupdict().values()):
+            raise WrongType(f"Cannot parse {value!r} as timedelta (expected ISO 8601 duration format)")
+
+        groups = match.groupdict()
+        return timedelta(
+            weeks=int(groups["weeks"] or 0),
+            days=int(groups["days"] or 0),
+            hours=int(groups["hours"] or 0),
+            minutes=int(groups["minutes"] or 0),
+            seconds=float(groups["seconds"] or 0),
+        )
+
+    def serialize(self) -> str:
+        return "timedelta"
+
+
 # GENERIC TYPES
 
 
@@ -174,8 +248,8 @@ class ClosedEnumType(FableType):
         self._item_set = set(self.items)
 
     def validate_convert(self, value: Any) -> Any:
-        if not isinstance(value, str):
-            raise NotStringInput(f"Expected string, got {type(value).__name__}")
+        # NOTE no isinstance check here -- the subtype is responsible for rejecting
+        # inputs of a wrong shape, and it may well accept a non-string one (eg NoneType)
         converted = self.subtype.validate_convert(value)
         if converted not in self._item_set:
             options = ", ".join(str(item) for item in self.items)
@@ -198,8 +272,7 @@ class OpenEnumType(FableType):
         self.items = [self.subtype.validate_convert(item) for item in items]
 
     def validate_convert(self, value: Any) -> Any:
-        if not isinstance(value, str):
-            raise NotStringInput(f"Expected string, got {type(value).__name__}")
+        # NOTE see the comment in ClosedEnumType.validate_convert
         return self.subtype.validate_convert(value)
 
     def serialize(self) -> str:
@@ -229,7 +302,7 @@ class ListType(FableType):
         for i, item in enumerate(items):
             try:
                 result.append(self.item_type.validate_convert(item))
-            except (NotStringInput, WrongType) as e:
+            except (NotStringInput, NotNoneInput, WrongType) as e:
                 raise WrongType(f"Error converting list item at index {i} ({item!r}): {e}")
 
         return result
@@ -245,13 +318,18 @@ class UnionType(FableType):
         self.types = types
 
     def validate_convert(self, value: Any) -> Any:
-        if not isinstance(value, str):
-            raise NotStringInput(f"Expected string, got {type(value).__name__}")
+        # NOTE we deliberately try the member types *before* checking that the input is a
+        # string, because some members (notably NoneType) legitimately accept a non-string
+        # input. Only if no member accepted the value do we report the non-string input.
+        # This makes an input like a list against `union[none]` report NotStringInput, which
+        # is a bit misleading, but we accept that in exchange for a simpler implementation.
         for t in self.types:
             try:
                 return t.validate_convert(value)
-            except WrongType:
+            except (WrongType, NotStringInput, NotNoneInput):
                 continue
+        if not isinstance(value, str):
+            raise NotStringInput(f"Expected string, got {type(value).__name__}")
         raise WrongType(f"Cannot convert {value!r} to any of: {', '.join(t.serialize() for t in self.types)}")
 
     def serialize(self) -> str:

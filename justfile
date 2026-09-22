@@ -60,7 +60,9 @@ dev *args:
 
     args=({{args}})
 
-    for arg in "${args[@]}" ; do
+    # NOTE on MacOS, empty array fails to expand in a for-safe way, hence we need
+    # conditional expansion into itself (${var+"$var"} basically)
+    for arg in ${args[@]+"${args[@]}"} ; do
         if [ "$arg" == "full-reinstall" ] ; then
             echo "full reinstall! Will drop the db and sync the venv"
             pushd backend
@@ -72,7 +74,10 @@ dev *args:
 
     frontend_build_marker=frontend/dist/.git-commit
     frontend_build_needed=false
-    if [[ ! -L backend/src/forecastbox/static ||
+    if [[ ! -e frontend ]] ; then
+        # exotic scenario during docker dev
+        frontend_build_needed=false
+    elif [[ ! -L backend/src/forecastbox/static ||
         ! -d backend/src/forecastbox/static ||
         ! -f "$frontend_build_marker" ]] ; then
         frontend_build_needed=true

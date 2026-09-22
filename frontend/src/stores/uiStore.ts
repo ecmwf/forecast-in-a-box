@@ -20,9 +20,6 @@ import { devtools, persist } from 'zustand/middleware'
 import { STORAGE_KEYS, STORE_VERSIONS } from '@/lib/storage-keys'
 
 export type Theme = 'light' | 'dark' | 'system'
-export type LayoutMode = 'fluid' | 'boxed'
-export type DashboardVariant = 'default' | 'flat' | 'modern' | 'gradient'
-export type PanelShadow = 'none' | 'sm' | 'md' | 'lg'
 export type AdminViewMode = 'table' | 'card'
 
 interface UiState {
@@ -36,14 +33,6 @@ interface UiState {
   resolvedTheme: 'light' | 'dark'
   setResolvedTheme: (theme: 'light' | 'dark') => void
   toggleTheme: () => void
-
-  // Dashboard layout state
-  layoutMode: LayoutMode
-  setLayoutMode: (mode: LayoutMode) => void
-  dashboardVariant: DashboardVariant
-  setDashboardVariant: (variant: DashboardVariant) => void
-  panelShadow: PanelShadow
-  setPanelShadow: (shadow: PanelShadow) => void
 
   // Admin view modes (table/card toggle on the plugins and artifacts pages)
   pluginsViewMode: AdminViewMode
@@ -69,9 +58,6 @@ const initialState = {
   isInitialized: false,
   theme: 'system' as Theme,
   resolvedTheme: 'light' as 'light' | 'dark',
-  layoutMode: 'fluid' as LayoutMode,
-  dashboardVariant: 'gradient' as DashboardVariant,
-  panelShadow: 'none' as PanelShadow,
   pluginsViewMode: 'table' as AdminViewMode,
   modelsViewMode: 'table' as AdminViewMode,
   artifactsViewMode: 'table' as AdminViewMode,
@@ -110,11 +96,6 @@ export const useUiStore = create<UiState>()(
               resolvedTheme: newTheme,
             }
           }),
-
-        // Dashboard layout management
-        setLayoutMode: (layoutMode) => set({ layoutMode }),
-        setDashboardVariant: (dashboardVariant) => set({ dashboardVariant }),
-        setPanelShadow: (panelShadow) => set({ panelShadow }),
 
         // Admin view mode management
         setPluginsViewMode: (pluginsViewMode) => set({ pluginsViewMode }),
@@ -179,11 +160,15 @@ export const useUiStore = create<UiState>()(
             state.timeZone = 'UTC'
           }
 
+          // v7: one card style and one page width — the switches are gone.
+          if (version < 7) {
+            delete state.layoutMode
+            delete state.dashboardVariant
+            delete state.panelShadow
+          }
+
           return state as {
             theme: Theme
-            layoutMode: LayoutMode
-            dashboardVariant: DashboardVariant
-            panelShadow: PanelShadow
             pluginsViewMode: AdminViewMode
             modelsViewMode: AdminViewMode
             artifactsViewMode: AdminViewMode
@@ -192,9 +177,6 @@ export const useUiStore = create<UiState>()(
         },
         partialize: (state) => ({
           theme: state.theme,
-          layoutMode: state.layoutMode,
-          dashboardVariant: state.dashboardVariant,
-          panelShadow: state.panelShadow,
           pluginsViewMode: state.pluginsViewMode,
           modelsViewMode: state.modelsViewMode,
           artifactsViewMode: state.artifactsViewMode,

@@ -12,6 +12,7 @@
 import pluginQuery from '@tanstack/eslint-plugin-query'
 import { tanstackConfig } from '@tanstack/eslint-config'
 import licenseHeader from 'eslint-plugin-license-header'
+import reactHooks from 'eslint-plugin-react-hooks'
 
 export default [
   { ignores: ['dist', '*.config.js', 'public', 'development_guidelines'] },
@@ -21,6 +22,57 @@ export default [
     rules: {
       'no-restricted-imports': ['error', { patterns: ['@radix-ui/*'] }],
     },
+  },
+  // Tours stay decoupled from pages (AGENTS.md → Key Rules), enforced here.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/features/tutorials/**', 'src/routes/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@radix-ui/*'] },
+            {
+              group: [
+                '@/features/tutorials/*',
+                '!@/features/tutorials/anchors',
+              ],
+              message:
+                'Page code may import only @/features/tutorials/anchors; start tours via @/stores/tutorialsStore.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/features/tutorials/engine/**', 'src/features/tutorials/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@radix-ui/*'] },
+            {
+              group: [
+                '@/features/*',
+                '!@/features/tutorials',
+                '!@/features/tutorials/**',
+              ],
+              message:
+                'The tour engine knows no page domain — put domain signals in the tour definition.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Hooks after an early return crash with React #310 once the branch flips.
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: { 'react-hooks/rules-of-hooks': 'error' },
   },
   {
     files: ['!src/components/ui/**'],

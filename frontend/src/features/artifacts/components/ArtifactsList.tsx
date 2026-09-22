@@ -23,11 +23,7 @@ import type {
   ArtifactInfo,
   CompositeArtifactId,
 } from '@/api/types/artifacts.types'
-import type {
-  AdminViewMode,
-  DashboardVariant,
-  PanelShadow,
-} from '@/stores/uiStore'
+import type { AdminViewMode } from '@/stores/uiStore'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Card } from '@/components/ui/card'
 import { useMedia } from '@/hooks/useMedia'
@@ -38,8 +34,6 @@ interface ArtifactsListProps {
   onDelete: (compositeId: CompositeArtifactId) => void
   onViewDetails?: (artifact: ArtifactInfo) => void
   deletingId?: CompositeArtifactId
-  variant?: DashboardVariant
-  shadow?: PanelShadow
 }
 
 export function ArtifactsList({
@@ -48,8 +42,6 @@ export function ArtifactsList({
   onDelete,
   onViewDetails,
   deletingId,
-  variant,
-  shadow,
 }: ArtifactsListProps) {
   const { t } = useTranslation('artifacts')
 
@@ -85,8 +77,6 @@ export function ArtifactsList({
               onDelete={onDelete}
               onViewDetails={onViewDetails}
               isDeleting={isDeleting}
-              variant={variant}
-              shadow={shadow}
             />
           )
         })}
@@ -96,7 +86,7 @@ export function ArtifactsList({
 
   // Table view
   return (
-    <Card className="overflow-hidden" variant={variant} shadow={shadow}>
+    <Card className="overflow-hidden">
       {/* Header Row */}
       <div className="hidden grid-cols-12 gap-4 border-b border-border bg-muted/50 px-6 py-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase sm:grid">
         <div className="col-span-5">{t('table.model')}</div>

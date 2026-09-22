@@ -54,6 +54,8 @@ jobs:
           mkdir packagesDist
 
           pushd fiab-core
+          patchFallbackVersion "$TAG_FIABCORE_MAJ"
+          git add pyproject.toml
           source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
           just build
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
@@ -65,6 +67,7 @@ jobs:
 
           pushd fiab-plugin-test
           patchFiabCoreDep "$TAG_FIABCORE_MAJ"
+          patchFallbackVersion "$TAG_FIABCORE_MAJ"
           git add pyproject.toml
           source $REPO_ROOT/scripts/cicd/prepareBuildVenv.sh
           just build

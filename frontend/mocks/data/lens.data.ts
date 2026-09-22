@@ -103,10 +103,11 @@ export function pollMockLens(id: string): LensInstanceDetailResponse | null {
         ports: [port],
       }
       // Serve WMS behind every mock lens so the viewer/compare flows work
-      // end-to-end in dev:mock. Tests that pre-registered the port keep
-      // their fixture.
-      if (!hasMockWmsServer(port)) {
-        registerMockWmsServer(port, DEFAULT_LENS_WMS_CONFIG)
+      // end-to-end in dev:mock. Tests that pre-registered the id keep
+      // their fixture. Keyed by instance id — the browser reaches it via
+      // `/api/v1/lens/proxy/<id>`, never the (backend-only) port above.
+      if (!hasMockWmsServer(id)) {
+        registerMockWmsServer(id, DEFAULT_LENS_WMS_CONFIG)
       }
     } else {
       instance.pollsUntilRunning--

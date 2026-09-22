@@ -25,7 +25,7 @@ import forecastbox.domain.plugin.db as plugin_db
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.blueprint.service import CORE_VERSION_MISMATCH_TAG_KEY, BlueprintBuilder, BlueprintValidationExpansion
 from forecastbox.domain.plugin.db import get_plugin_state, upsert_plugin_state
-from forecastbox.domain.plugin.manager import _ingest_plugin_templates
+from forecastbox.domain.plugin.template_ingest import ingest_plugin_templates
 from forecastbox.schemata.jobs import Base
 
 _PLUGIN_ID = PluginCompositeId(store=PluginStoreId("myStore"), local=PluginId("myPlugin"))
@@ -85,7 +85,7 @@ def test_ingest_plugin_templates_reserved_tag_recorded_as_template_error(
     _patch_validation_ok(monkeypatch)
     plugin = _make_plugin(tags=[CORE_VERSION_MISMATCH_TAG_KEY])
 
-    _ingest_plugin_templates(_PLUGIN_ID, plugin)
+    ingest_plugin_templates(_PLUGIN_ID, plugin)
 
     state = get_plugin_state(_PLUGIN_ID_STR)
     assert state is not None
@@ -98,7 +98,7 @@ def test_ingest_plugin_templates_normal_tag_not_flagged(mem_session_maker: sessi
     _patch_validation_ok(monkeypatch)
     plugin = _make_plugin(tags=["normal-tag"])
 
-    _ingest_plugin_templates(_PLUGIN_ID, plugin)
+    ingest_plugin_templates(_PLUGIN_ID, plugin)
 
     state = get_plugin_state(_PLUGIN_ID_STR)
     assert state is not None

@@ -47,13 +47,17 @@ import {
   stopMockLens,
 } from '@tests/../mocks/data/lens.data'
 import {
+  registerDefaultMockWmsServer,
   registerMockWmsServer,
   wmsCapabilitiesRequestCount,
 } from '@tests/../mocks/data/wms.data'
 import type * as GeoViewerModule from '@/features/viewer/geo/GeoViewer'
 import { Route as VisualiseRoute } from '@/routes/_authenticated/visualise'
+import { setPollIntervalsForTests } from '@/api/pollIntervals'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
 import { useComparisonStore } from '@/features/visualise/stores/comparisonStore'
+import { entryRef } from '@/features/visualise/entry-ref'
+import { STORAGE_KEYS } from '@/lib/storage-keys'
 import i18n from '@/lib/i18n'
 
 // While armed the viewer throws on render (error-boundary tests) — a
@@ -132,17 +136,23 @@ const RUN_B = {
 } as const
 
 beforeEach(() => {
+  // Production cadence costs 15-20 s per liveness/outage cycle.
+  setPollIntervalsForTests({
+    lensList: 250,
+    lensStarting: 100,
+    lensRunning: 250,
+    lensRetryBase: 40,
+  })
   resetJobsState()
   injectMockExecution(secondGribRunExecution)
   resetLensState()
   viewerCrash.armed = false
-  // Mock lenses allocate ports from 54300 — serve WMS on the first few so
-  // panels that reach `running` can load capabilities.
-  for (let port = 54300; port < 54306; port++) {
-    registerMockWmsServer(port, {
-      layers: [{ name: '2t', title: '2 m temperature' }],
-    })
-  }
+  // Auto-started lenses get sequential ids (lens-1, lens-2, …) unknown to
+  // the test in advance — seed a default WMS config so any of them can
+  // load capabilities once running.
+  registerDefaultMockWmsServer({
+    layers: [{ name: '2t', title: '2 m temperature' }],
+  })
 })
 
 describe('VisualisePage', () => {
@@ -226,12 +236,46 @@ describe('VisualisePage', () => {
     // Normalization fills A/B from basket order.
     const pickerA = screen.getByLabelText('Source for slot A')
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerA).toHaveTextContent('Run A')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerA).toMatchTextContent('Run A')
+    await expect.element(pickerB).toMatchTextContent('Run B')
 
     await screen.getByRole('button', { name: 'Swap A and B' }).click()
-    await expect.element(pickerA).toHaveTextContent('Run B')
-    await expect.element(pickerB).toHaveTextContent('Run A')
+    await expect.element(pickerA).toMatchTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run A')
+  })
+
+  it('a bare visit restores the last-used pair over basket order', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    localStorage.setItem(
+      STORAGE_KEYS.visualise.lastPair,
+      JSON.stringify({ a: entryRef(RUN_B), b: entryRef(RUN_A) }),
+    )
+    const screen = await renderVisualisePage()
+
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toMatchTextContent('Run B')
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toMatchTextContent('Run A')
+  })
+
+  it('falls back to basket order when the stored pair left the basket', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    localStorage.setItem(
+      STORAGE_KEYS.visualise.lastPair,
+      JSON.stringify({ a: 'run:gone~x', b: 'run:gone~y' }),
+    )
+    const screen = await renderVisualisePage()
+
+    await expect
+      .element(screen.getByLabelText('Source for slot A'))
+      .toMatchTextContent('Run A')
+    await expect
+      .element(screen.getByLabelText('Source for slot B'))
+      .toMatchTextContent('Run B')
   })
 
   it('swapping hands a healthy source to a slot whose start had failed', async () => {
@@ -280,7 +324,25 @@ describe('VisualisePage', () => {
     ).toHaveLength(0)
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Pick a source…')
+      .toMatchTextContent('Pick a source…')
+  })
+
+  it('holds the viewer layout while the lens starts', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    const screen = await renderVisualisePage()
+
+    // Before the lens runs, the viewer-shaped skeleton stands in — not a
+    // lifecycle card that would reflow the page once the map mounts.
+    await expect
+      .element(
+        screen.getByRole('status', {
+          name: /Starting lens server|Locating output directory/,
+        }),
+      )
+      .toBeVisible()
+    await expect
+      .element(screen.getByText(/display is static/), { timeout: 8000 })
+      .toBeVisible()
   })
 
   it('gates local sources when SkinnyWMS is missing; external WMS stays', async () => {
@@ -324,6 +386,8 @@ describe('VisualisePage', () => {
   })
 
   it('surfaces a lens-registry outage with Retry instead of spinning', async () => {
+    // Park the list poll so only the Retry click can recover the page.
+    setPollIntervalsForTests({ lensList: 60_000 })
     setLensListOutage(true)
     useComparisonStore.getState().addEntry(RUN_A)
     const screen = await renderVisualisePage()
@@ -342,7 +406,7 @@ describe('VisualisePage', () => {
 
   it(
     'keeps the running viewer through a transient status-poll outage',
-    { timeout: 60000 },
+    { timeout: 15000 },
     async () => {
       useComparisonStore.getState().addEntry(RUN_A)
       const screen = await renderVisualisePage()
@@ -354,11 +418,12 @@ describe('VisualisePage', () => {
       failNextLensStatusPolls(3)
       await expect
         .poll(() => pendingLensStatusFailures(), {
-          timeout: 30000,
-          interval: 500,
+          timeout: 10000,
+          interval: 100,
         })
         .toBe(0)
-      await new Promise((r) => setTimeout(r, 800))
+      // One further poll cycle, so wrong failure UI would have shown.
+      await new Promise((r) => setTimeout(r, 400))
 
       // Stale-running keeps the viewer mounted; no failure UI, no remount.
       await expect.element(screen.getByText(/display is static/)).toBeVisible()
@@ -456,10 +521,10 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
 
     await screen
       .getByRole('button', { name: 'Remove A from view — continue with B' })
@@ -469,7 +534,7 @@ describe('VisualisePage', () => {
     // in the basket for later).
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
     await expect
       .poll(
         () =>
@@ -485,7 +550,7 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
 
     await screen.getByRole('button', { name: 'Manage sources' }).click()
     const removeA = screen.getByRole('button', { name: /Remove Run A/ })
@@ -500,7 +565,7 @@ describe('VisualisePage', () => {
       .toHaveLength(1)
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
     // The removed ref left the URL — hydration must not resurrect it.
     await new Promise((r) => setTimeout(r, 1200))
     expect(useComparisonStore.getState().entries).toHaveLength(1)
@@ -512,7 +577,7 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
 
     await screen.getByRole('button', { name: 'Manage sources' }).click()
     const removeB = screen.getByRole('button', { name: /Remove Run B/ })
@@ -527,7 +592,7 @@ describe('VisualisePage', () => {
       .toHaveLength(1)
     await expect
       .element(screen.getByLabelText('Source for slot A'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
     await new Promise((r) => setTimeout(r, 1200))
     expect(useComparisonStore.getState().entries).toHaveLength(1)
 
@@ -535,7 +600,7 @@ describe('VisualisePage', () => {
     useComparisonStore.getState().addEntry(RUN_B)
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
   })
 
   it(
@@ -566,7 +631,7 @@ describe('VisualisePage', () => {
 
   it(
     'revives a lens the backend marks failed after it served',
-    { timeout: 40000 },
+    { timeout: 15000 },
     async () => {
       useComparisonStore.getState().addEntry(RUN_A)
       const screen = await renderVisualisePage()
@@ -579,7 +644,7 @@ describe('VisualisePage', () => {
       await expect
         .element(screen.getByText(/display is static/), { timeout: 10000 })
         .toBeVisible()
-      await new Promise((r) => setTimeout(r, 2200))
+      await new Promise((r) => setTimeout(r, 500))
       const firstId = listMockLenses()[0].lens_instance_id
 
       // External stop on the real backend keeps the record, status failed.
@@ -595,7 +660,7 @@ describe('VisualisePage', () => {
               lensesNow[0].lens_instance_id !== firstId
             )
           },
-          { timeout: 25000 },
+          { timeout: 10000 },
         )
         .toBe(true)
     },
@@ -608,7 +673,7 @@ describe('VisualisePage', () => {
 
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run B')
+      .toMatchTextContent('Run B')
 
     // Cancel keeps everything.
     await screen.getByRole('button', { name: 'Clear all' }).click()
@@ -649,7 +714,7 @@ describe('VisualisePage', () => {
     await screen.getByRole('option', { name: /Run A/ }).click()
     await expect
       .element(screen.getByLabelText('Source for slot B'))
-      .toHaveTextContent('Run A')
+      .toMatchTextContent('Run A')
   })
 
   it('the X clears B and materialization does not re-fill it', async () => {
@@ -658,21 +723,46 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run B')
 
     await screen
       .getByRole('button', { name: 'Remove B from view — continue with A' })
       .click()
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
     // The `b=off` sentinel holds against the auto-fill effect, and the X
     // is gone while B is empty.
     await new Promise((r) => setTimeout(r, 1200))
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
     expect(
       screen
         .getByRole('button', { name: 'Remove B from view — continue with A' })
         .elements(),
     ).toHaveLength(0)
+  })
+
+  it('a source added while B is off goes straight into B', async () => {
+    useComparisonStore.getState().addEntry(RUN_A)
+    useComparisonStore.getState().addEntry(RUN_B)
+    registerMockWmsServer(54391, {
+      layers: [{ name: 'dwd:layer', title: 'DWD layer' }],
+    })
+    const screen = await renderVisualisePage()
+
+    const pickerB = screen.getByLabelText('Source for slot B')
+    await expect.element(pickerB).toMatchTextContent('Run B')
+    await screen
+      .getByRole('button', { name: 'Remove B from view — continue with A' })
+      .click()
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
+
+    // Adding a NEW source is the intent to compare — B fills with it,
+    // even though the URL carried the deliberate `b=off`.
+    useComparisonStore.getState().addEntry({
+      kind: 'wms',
+      url: 'http://localhost:54391/wms?',
+      label: 'maps.dwd.de',
+    })
+    await expect.element(pickerB).toMatchTextContent('maps.dwd.de')
   })
 
   it('the X ejects an external-WMS B (regression: fake Select items)', async () => {
@@ -688,13 +778,13 @@ describe('VisualisePage', () => {
     const screen = await renderVisualisePage()
 
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('maps.dwd.de')
+    await expect.element(pickerB).toMatchTextContent('maps.dwd.de')
     await screen
       .getByRole('button', { name: 'Remove B from view — continue with A' })
       .click()
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
     await new Promise((r) => setTimeout(r, 1200))
-    await expect.element(pickerB).toHaveTextContent('Pick a source…')
+    await expect.element(pickerB).toMatchTextContent('Pick a source…')
   })
 
   it('identifies sources in the slot dropdown with kind and id', async () => {
@@ -719,14 +809,14 @@ describe('VisualisePage', () => {
 
     const pickerA = screen.getByLabelText('Source for slot A')
     const pickerB = screen.getByLabelText('Source for slot B')
-    await expect.element(pickerB).toHaveTextContent('Run B')
+    await expect.element(pickerB).toMatchTextContent('Run B')
 
     // Picking A's source for slot B must NOT swap — same-source compare
     // (different layers of one run) is a real workflow.
     await pickerB.click()
-    await screen.getByRole('option', { name: 'Run A' }).click()
-    await expect.element(pickerA).toHaveTextContent('Run A')
-    await expect.element(pickerB).toHaveTextContent('Run A')
+    await screen.getByRole('option', { name: /^Run A/ }).click()
+    await expect.element(pickerA).toMatchTextContent('Run A')
+    await expect.element(pickerB).toMatchTextContent('Run A')
   })
 
   it('hydrates basket entries from a shared URL', async () => {

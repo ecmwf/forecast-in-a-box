@@ -592,22 +592,49 @@ class ExecutionManager:
         task: SyncTask[T],
         *,
         run_if_dependency_failed: bool = False,
-    ) -> None:
+    ) -> Future[T]:
+        """Submit ``task`` to ``pool_name`` once ``dependency`` completes, and return a
+        `Future` that mirrors the eventual outcome.
+
+        If ``dependency`` fails (or is cancelled) and ``run_if_dependency_failed`` is
+        False (the default), ``task`` is never submitted, and the returned future is
+        resolved with that same failure."""
+        result_future: Future[T] = Future()
+
         def continue_submission(done: Future[Any]) -> None:
             dependency_failed = False
+            dependency_error: BaseException | None = None
             try:
                 done.result()
             except BaseException as error:
                 dependency_failed = True
+                dependency_error = error
                 self._record_failure(pool_name, task_name, error)
             if dependency_failed and not run_if_dependency_failed:
+                assert dependency_error is not None
+                result_future.set_exception(dependency_error)
                 return
             try:
-                self._submit_monitored_receipt(pool_name, task_name, task)
+                inner_future = self._submit_monitored_receipt(pool_name, task_name, task)
             except BaseException as error:
                 self._record_failure(pool_name, task_name, error)
+                result_future.set_exception(error)
+                return
+
+            def forward_outcome(inner_done: Future[T]) -> None:
+                if inner_done.cancelled():
+                    result_future.cancel()
+                    return
+                inner_error = inner_done.exception()
+                if inner_error is not None:
+                    result_future.set_exception(inner_error)
+                else:
+                    result_future.set_result(inner_done.result())
+
+            inner_future.add_done_callback(forward_outcome)
 
         dependency.add_done_callback(continue_submission)
+        return result_future
 
     def status(self) -> ExecutionStatus:
         with self._lock:

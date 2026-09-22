@@ -25,10 +25,21 @@ export default mergeConfig(
         'lz-string',
         'date-fns',
         '@date-fns/tz',
+        // First-import of a not-yet-optimized subpath re-optimizes mid-run
+        // and dual-loads React ("Cannot read properties of null").
+        '@tanstack/charts',
+        '@tanstack/charts/motion',
+        '@tanstack/charts/scales/band',
+        '@tanstack/charts/scales/linear',
+        '@tanstack/charts/tooltip',
+        '@tanstack/charts/react/tooltip',
+        '@base-ui/react/checkbox',
       ],
     },
     test: {
       globals: true,
+      // Chromium's benign ResizeObserver notice; keep it out of the report.
+      onConsoleLog: (log) => !log.includes('ResizeObserver loop'),
       include: [
         'src/**/*.{test,spec}.{ts,tsx}',
         'tests/**/*.{test,spec}.{ts,tsx}',

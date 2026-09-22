@@ -85,7 +85,9 @@ describe('NavToggle', () => {
     await expect.element(screen.getByText('Overview')).toBeVisible()
     await expect.element(screen.getByText('Configure')).toBeVisible()
     await expect.element(screen.getByText('Execute')).toBeVisible()
-    await expect.element(screen.getByText('Visualise')).toBeVisible()
+    await expect
+      .element(screen.getByRole('link', { name: /^Visualise/ }))
+      .toBeVisible()
   })
 
   it('marks Overview as active on /overview', async () => {
@@ -122,7 +124,9 @@ describe('NavToggle', () => {
 
   it('shows Visualise without a badge while the basket is empty', async () => {
     const screen = await renderNavToggle('/overview')
-    await expect.element(screen.getByText('Visualise')).toBeVisible()
+    await expect
+      .element(screen.getByRole('link', { name: /^Visualise/ }))
+      .toBeVisible()
     expect(screen.getByText('0').elements()).toHaveLength(0)
   })
 
@@ -138,7 +142,9 @@ describe('NavToggle', () => {
       label: 'B',
     })
     const screen = await renderNavToggle('/overview')
-    await expect.element(screen.getByText('Visualise')).toBeVisible()
+    await expect
+      .element(screen.getByRole('link', { name: /^Visualise/ }))
+      .toBeVisible()
     await expect.element(screen.getByText('2')).toBeVisible()
   })
 })

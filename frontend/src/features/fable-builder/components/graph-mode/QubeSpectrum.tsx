@@ -75,7 +75,7 @@ export function QubeSpectrum({
           <div
             key={dim.key}
             title={`${dim.key} (${dim.values.length})`}
-            className="shrink-0 rounded-[2px]"
+            className="shrink-0 rounded-xs"
             style={{
               width: metrics.bar,
               height: barHeight(dim),
@@ -105,7 +105,7 @@ export function QubeSpectrum({
                     aria-label={`${dim.key}: ${dim.values.length}`}
                     onClick={() => onBarClick(dim.key)}
                     className={cn(
-                      'shrink-0 cursor-pointer rounded-[2px] transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                      'shrink-0 cursor-pointer rounded-xs transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                       dimmed && 'opacity-30',
                     )}
                     style={{

@@ -1,5 +1,7 @@
 val:
     uv run ty check src/
+    uv run ty check tests/unit
+    uv run ty check tests/integration
     just test
 
 test:

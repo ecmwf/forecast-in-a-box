@@ -33,10 +33,11 @@ from forecastbox.domain.glyphs.resolution import (
     merge_glyph_values,
 )
 from forecastbox.domain.run import db
-from forecastbox.domain.run.cascade import execute_cascade
+from forecastbox.domain.run.cascade import delete_cascade_job, execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.detail import store_compilation_detail
+from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.memcache import TooLargeEntry
@@ -124,6 +125,24 @@ def execute_background(
                 cascade_proc=get_current_cascade_proc(),
                 outputs=compilation_result.run_outputs.model_dump(),
             )
+            get_id = lambda: f"{run_id=}, {attempt_count=}, {auth_context=}, cascade_job_id={response.job_id}"
+
+            def delete_cascade() -> None:
+                try:
+                    delete_cascade_job(cast(str, response.job_id))  # NOTE cast due to ty being confused
+                except Exception as e:
+                    logger.warning(f"cascade deletion of {get_id()} failed with {e!r}. Ignoring.")
+
+            try:
+                run_record = db.get_run(run_id, attempt_count, auth_context=auth_context)
+                if run_record.is_deleted:
+                    logger.debug(f"deleting cascade entity right after submission due to run entity deleted: {get_id()}.")
+                    delete_cascade()
+            except RunNotFound:
+                logger.warning(f"RunNotFound of run submitted by itself: {get_id()}. Issuing CascadeDelete.")
+                delete_cascade()
+            except RunAccessDenied:
+                logger.warning(f"RunAccessDenied to run submitted by itself: {get_id()}. Ignoring.")
         else:
             error = (response.error or "no error provided by cascade")[:255]
             db.update_run_runtime(run_id, attempt_count, status="failed", error=error)

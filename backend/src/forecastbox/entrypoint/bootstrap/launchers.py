@@ -10,20 +10,32 @@
 """Launcher methods for backend and cascade -- utilized by
 - entrypoint.main for launch_backend,
 - entrypoint.bootstrap.service for launch_backend,
+
+Basically just a wrapper on uvicorn launching, as we need to override the logging configuration.
+
+The actual logic of instantiating the backend (the FastAPI app, the background threads, etc) happens in
+entrypoint/app.py, as it is coupled to FastAPI's API
 """
 
 import asyncio
 import logging
+import os
+import sys
 
 import uvicorn
 
-from forecastbox.entrypoint.bootstrap.config import setup_process
+from forecastbox.entrypoint.bootstrap.config import init_logging_base, setup_process
 from forecastbox.utility.config import FIABConfig
 
 logger = logging.getLogger(__name__)
 
 
-async def _uvicorn_run(app_name: str, host: str, port: int) -> None:
+async def _uvicorn_run(app_name: str, host: str, port: int) -> bool:
+    """Runs the uvicorn server until it stops. Returns True if either the startup or the
+    shutdown lifespan sequence failed, per uvicorn's own bookkeeping -- see
+    `forecastbox.entrypoint.app.lifespan` and `forecastbox.utility.initializer` for how such
+    a failure can arise on our side.
+    """
     # NOTE we pass None to log config to not interfere with original logging setting
     config = uvicorn.Config(
         app_name,
@@ -38,19 +50,27 @@ async def _uvicorn_run(app_name: str, host: str, port: int) -> None:
     #    reload_dirs=["forecastbox"],
     server = uvicorn.Server(config)
     await server.serve()
+    return bool(server.lifespan.startup_failed or server.lifespan.shutdown_failed)
 
 
 def launch_backend() -> None:
     config = FIABConfig()
-    # TODO something imported by this module reconfigures the logging -- find and remove!
+    log_base = init_logging_base(config)
+
+    # TODO something imported by this module reconfigures the logging -- find and remove! Probably inside uvicorn
     import forecastbox.entrypoint.app  # import inside function justified due to side effects
 
-    setup_process()
+    log_path = os.path.join(log_base, "backend.logs.txt")
+    setup_process(stdout=True, log_path=log_path)
     logger.debug(f"logging initialized post-{forecastbox.entrypoint.app.__name__} import")
     port = config.backend.uvicorn_port
     host = config.backend.uvicorn_host
     task = _uvicorn_run("forecastbox.entrypoint.app:app", host, port)
+    lifespan_failed = None
     try:
-        asyncio.run(task)
+        lifespan_failed = asyncio.run(task)
     except KeyboardInterrupt:
         pass  # no need to spew stacktrace to log
+    if lifespan_failed:
+        logger.error("backend lifespan startup or shutdown failed, exiting with error code")
+        sys.exit(1)

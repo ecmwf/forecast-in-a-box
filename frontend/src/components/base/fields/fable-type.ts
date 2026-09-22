@@ -29,6 +29,8 @@ export type FableType =
   | { kind: 'float' }
   | { kind: 'date' }
   | { kind: 'datetime' }
+  | { kind: 'timedelta' }
+  | { kind: 'none' }
   | { kind: 'geodomain' }
   | { kind: 'geodomainSingle' }
   | { kind: 'bboxWSEN' }
@@ -51,6 +53,9 @@ export const intType: FableType = { kind: 'int' }
 export const floatType: FableType = { kind: 'float' }
 export const dateType: FableType = { kind: 'date' }
 export const datetimeType: FableType = { kind: 'datetime' }
+export const timedeltaType: FableType = { kind: 'timedelta' }
+/** Only valid as a union member: `union[str,none]` admits an explicit null. */
+export const noneType: FableType = { kind: 'none' }
 export const geodomainType: FableType = { kind: 'geodomain' }
 export const artifactType: FableType = { kind: 'artifact' }
 export const paramType: FableType = { kind: 'param' }
@@ -96,9 +101,13 @@ export function unionOf(types: ReadonlyArray<FableType>): FableType {
 
 // -------- Serialization (mirrors FableType.serialize) --------
 
-/** Mirrors `_serialize_enum_item`: date/datetime items bare ISO, str-ish quoted. */
+/** Mirrors `_serialize_enum_item`: date/datetime/timedelta items bare ISO, str-ish quoted. */
 function serializeEnumItem(item: string | number, subtype: FableType): string {
-  if (subtype.kind === 'date' || subtype.kind === 'datetime') {
+  if (
+    subtype.kind === 'date' ||
+    subtype.kind === 'datetime' ||
+    subtype.kind === 'timedelta'
+  ) {
     return String(item)
   }
   return typeof item === 'string' ? `'${item}'` : String(item)
@@ -116,6 +125,10 @@ export function serializeValueType(t: FableType): string {
       return 'date'
     case 'datetime':
       return 'datetime'
+    case 'timedelta':
+      return 'timedelta'
+    case 'none':
+      return 'none'
     case 'geodomain':
       return 'geodomain'
     case 'geodomainSingle':
@@ -147,6 +160,7 @@ const ATOMS: ReadonlyArray<[keyword: string, kind: FableType]> = [
   ['geodomainsingle', { kind: 'geodomainSingle' }],
   ['date-iso8601', dateType],
   ['geodomain', geodomainType],
+  ['timedelta', timedeltaType],
   ['datetime', datetimeType],
   ['bboxwsen', { kind: 'bboxWSEN' }],
   ['artifact', artifactType],
@@ -155,6 +169,7 @@ const ATOMS: ReadonlyArray<[keyword: string, kind: FableType]> = [
   ['number', floatType],
   ['param', paramType],
   ['float', floatType],
+  ['none', noneType],
   ['date', dateType],
   ['int', intType],
   ['str', stringType],

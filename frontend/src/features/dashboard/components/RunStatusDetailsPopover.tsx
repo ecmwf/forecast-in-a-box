@@ -144,7 +144,7 @@ export function RunStatusDetailsPopover({
             to="/execute"
             className="flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-muted/80"
           >
-            {t('welcome.actions.manageExecutions')}
+            {t('welcome.activity.openRuns')}
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>

@@ -27,10 +27,15 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { z } from 'zod'
-import { resetJobsState } from '@tests/../mocks/data/job.data'
+import {
+  injectMockExecution,
+  resetJobsState,
+  secondGribRunExecution,
+} from '@tests/../mocks/data/job.data'
 import { resetLensState } from '@tests/../mocks/data/lens.data'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
+import { RUN_WINDOW } from '@/api/hooks/useJobStatusCounts'
 import { RunListPage } from '@/features/executions/components/RunListPage'
 import i18n from '@/lib/i18n'
 
@@ -105,18 +110,40 @@ function renderJobList() {
 
 // Run-id chips truncate to runId.slice(0, 12) + "...", e.g. job-completed-001 → #job-complete...
 
+/** Enough completed runs to spill past the first page of ten. */
+function seedCompletedRuns(count: number) {
+  for (let i = 0; i < count; i++) {
+    const createdAt = new Date(Date.now() - (i + 1) * 60_000).toISOString()
+    injectMockExecution({
+      ...secondGribRunExecution,
+      run_id: `job-completed-extra-${String(i + 1).padStart(2, '0')}`,
+      created_at: createdAt,
+      updated_at: createdAt,
+    })
+  }
+}
+
 describe('RunListPage Integration', () => {
   beforeEach(() => {
     localStorage.clear()
     resetJobsState()
     resetLensState()
+    // No Tailwind in browser mode: the Base UI checkbox is an empty span with
+    // no box, which Playwright treats as invisible. Give it one.
+    if (!document.querySelector('[data-test-shim="checkbox"]')) {
+      const style = document.createElement('style')
+      style.setAttribute('data-test-shim', 'checkbox')
+      style.textContent =
+        '[data-slot="checkbox"]{display:inline-block;width:16px;height:16px}'
+      document.head.appendChild(style)
+    }
   })
 
   describe('rendering', () => {
     it('renders the page header', async () => {
       const screen = await renderJobList()
       await expect
-        .element(screen.getByRole('heading', { level: 1, name: 'Executions' }))
+        .element(screen.getByRole('heading', { level: 1, name: 'Runs' }))
         .toBeVisible()
     })
 
@@ -140,10 +167,18 @@ describe('RunListPage Integration', () => {
 
     it('renders runs from the API', async () => {
       const screen = await renderJobList()
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-      await expect.element(screen.getByText('#job-errored-...')).toBeVisible()
-      await expect.element(screen.getByText('#job-submitte...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-errored-003'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-submitted-004'))
+        .toBeVisible()
     })
 
     it('falls back to "Untitled forecast" when the blueprint is unavailable', async () => {
@@ -176,8 +211,10 @@ describe('RunListPage Integration', () => {
       const screen = await renderJobList()
       await screen.getByRole('button', { name: 'Running', exact: true }).click()
 
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
-      expect(screen.getByText('#job-complete...').query()).toBeNull()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
+      expect(screen.getByTestId('run-row-job-completed-001').query()).toBeNull()
     })
 
     it('filters to completed runs', async () => {
@@ -186,18 +223,26 @@ describe('RunListPage Integration', () => {
         .getByRole('button', { name: 'Completed', exact: true })
         .click()
 
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      expect(screen.getByText('#job-running-...').query()).toBeNull()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
+      expect(screen.getByTestId('run-row-job-running-002').query()).toBeNull()
     })
 
     it('returns to all runs when All is clicked', async () => {
       const screen = await renderJobList()
       await screen.getByRole('button', { name: 'Running', exact: true }).click()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
 
       await screen.getByRole('button', { name: 'All', exact: true }).click()
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      await expect.element(screen.getByText('#job-running-...')).toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('run-row-job-running-002'))
+        .toBeVisible()
     })
   })
 
@@ -210,8 +255,62 @@ describe('RunListPage Integration', () => {
       await search.fill('completed')
       await userEvent.keyboard('{Enter}')
 
-      await expect.element(screen.getByText('#job-complete...')).toBeVisible()
-      expect(screen.getByText('#job-running-...').query()).toBeNull()
+      await expect
+        .element(screen.getByTestId('run-row-job-completed-001'))
+        .toBeVisible()
+      expect(screen.getByTestId('run-row-job-running-002').query()).toBeNull()
+    })
+  })
+
+  describe('across pages', () => {
+    it('says so when the run window leaves older runs out', async () => {
+      seedCompletedRuns(RUN_WINDOW)
+      const screen = await renderJobList()
+      await expect
+        .element(screen.getByText(/^Showing the 300 most recent of \d+ runs\./))
+        .toBeVisible()
+    })
+
+    it('a status filter spans the whole list, not the current page', async () => {
+      seedCompletedRuns(12)
+      const screen = await renderJobList()
+      await screen
+        .getByRole('button', { name: 'Completed', exact: true })
+        .click()
+
+      await expect.element(screen.getByText('Page 1 of 2')).toBeVisible()
+      expect(screen.getByTestId('run-row-job-running-002').query()).toBeNull()
+
+      await screen.getByRole('button', { name: 'Next', exact: true }).click()
+      await expect.element(screen.getByText('Page 2 of 2')).toBeVisible()
+      expect(screen.getByTestId('run-row-job-running-002').query()).toBeNull()
+    })
+
+    it('runs ticked on different pages stay selected for comparison', async () => {
+      seedCompletedRuns(12)
+      const screen = await renderJobList()
+      await screen
+        .getByRole('button', { name: 'Completed', exact: true })
+        .click()
+      await expect.element(screen.getByText('Page 1 of 2')).toBeVisible()
+
+      // Seed order: the fixtures first, then the extras — 01 lands on page 1, 12 on page 2.
+      const row1 = screen.getByTestId('run-row-job-completed-extra-01')
+      await expect.element(row1).toBeVisible()
+      // Long unstyled page: bring the row into the test viewport first.
+      row1.element().scrollIntoView({ block: 'center' })
+      await row1.getByRole('checkbox').click()
+      await screen.getByRole('button', { name: 'Next', exact: true }).click()
+      await expect.element(screen.getByText('Page 2 of 2')).toBeVisible()
+      const row12 = screen.getByTestId('run-row-job-completed-extra-12')
+      await expect.element(row12).toBeVisible()
+      row12.element().scrollIntoView({ block: 'center' })
+      await row12.getByRole('checkbox').click()
+
+      await expect.element(screen.getByText('2 runs selected')).toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'Compare selected' }))
+        .toBeEnabled()
     })
   })
 })

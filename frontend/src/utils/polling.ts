@@ -44,6 +44,9 @@ export interface CreatePollingTaskOptions<T> {
   signal: AbortSignal
   /** Invoked with every polled value, including the terminal one. */
   onProgress?: (result: T) => void
+  /** Receives a `wake()` that ends the current between-poll delay early,
+   *  triggering an immediate re-poll. Called once, before the first poll. */
+  onWake?: (wake: () => void) => void
 }
 
 /**
@@ -59,12 +62,20 @@ export async function createPollingTask<T>({
   interval,
   signal,
   onProgress,
+  onWake,
 }: CreatePollingTaskOptions<T>): Promise<T> {
+  let wake: (() => void) | null = null
+  onWake?.(() => wake?.())
   for (;;) {
     signal.throwIfAborted()
     const result = await poll()
     onProgress?.(result)
     if (until(result)) return result
-    await wait(interval, signal)
+    // A wake during an in-flight poll is a no-op: that poll is already fresh
+    await new Promise<void>((resolve, reject) => {
+      wake = resolve
+      wait(interval, signal).then(resolve, reject)
+    })
+    wake = null
   }
 }

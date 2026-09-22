@@ -11,21 +11,21 @@
 /** Header for authenticated pages: system status, help, and settings menu. */
 
 import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import {
   Blocks,
+  CalendarClock,
   Cloud,
   FileText,
   Globe,
   HelpCircle,
-  Layout,
   LogOut,
-  Maximize2,
-  Minimize2,
   Monitor,
   Moon,
+  Search,
   Settings,
+  Sparkles,
   Sun,
   User,
   Variable,
@@ -62,9 +62,12 @@ import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { StatusIndicator } from '@/components/common/StatusIndicator'
 import { useAuth } from '@/features/auth/AuthContext'
 import { cn } from '@/lib/utils'
+import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 import { useUser } from '@/hooks/useUser'
 import { useStatus } from '@/api/hooks/useStatus'
 import { useUiStore } from '@/stores/uiStore'
+import { useCommandStore } from '@/stores/commandStore'
+import { useOnboardingStore } from '@/stores/onboardingStore'
 import { timeZoneOffsetLabel, useAppTimeZone } from '@/lib/datetime'
 
 export function AuthenticatedHeader() {
@@ -73,14 +76,12 @@ export function AuthenticatedHeader() {
   const { authType, signOut } = useAuth()
   const theme = useUiStore((state) => state.theme)
   const setTheme = useUiStore((state) => state.setTheme)
-  const layoutMode = useUiStore((state) => state.layoutMode)
-  const setLayoutMode = useUiStore((state) => state.setLayoutMode)
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const setDashboardVariant = useUiStore((state) => state.setDashboardVariant)
   const setTimeZone = useUiStore((state) => state.setTimeZone)
   const timeZone = useAppTimeZone()
   const [tzDialogOpen, setTzDialogOpen] = useState(false)
   const { t } = useTranslation('common')
+  const setCommandOpen = useCommandStore((state) => state.setOpen)
+  const navigate = useNavigate()
 
   const isAuthenticated = authType === 'authenticated'
   const isSuperuser = user?.is_superuser ?? false
@@ -91,12 +92,18 @@ export function AuthenticatedHeader() {
     await signOut()
   }
 
+  // Non-destructive replay of the welcome tour: status and progress persist.
+  const handleOpenWelcomeTour = () => {
+    useOnboardingStore.getState().openWelcome()
+    void navigate({ to: '/overview' })
+  }
+
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card">
       <div
         className={cn(
+          PAGE_WIDTH_CLASS,
           'flex h-16 items-center gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8',
-          layoutMode === 'boxed' && 'mx-auto max-w-7xl',
         )}
       >
         {/* Logo — flex-1 balances the actions so the nav stays centred. */}
@@ -134,12 +141,25 @@ export function AuthenticatedHeader() {
           {/* Activity Monitor */}
           <ActivityMonitor />
 
+          {/* Command palette (also ⌘K / Ctrl+K) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden text-muted-foreground sm:inline-flex"
+            aria-label={t('commandPalette.open')}
+            title={t('commandPalette.open')}
+            onClick={() => setCommandOpen(true)}
+          >
+            <Search className="h-5 w-5" />
+          </Button>
+
           {/* Help Button */}
           <Button
             variant="ghost"
             size="icon"
             className="text-muted-foreground"
             aria-label={t('userMenu.help')}
+            onClick={handleOpenWelcomeTour}
           >
             <HelpCircle className="h-5 w-5" />
           </Button>
@@ -182,23 +202,6 @@ export function AuthenticatedHeader() {
               {/* View Group */}
               <DropdownMenuGroup>
                 <DropdownMenuLabel>{t('userMenu.view')}</DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() =>
-                    setLayoutMode(layoutMode === 'boxed' ? 'fluid' : 'boxed')
-                  }
-                >
-                  {layoutMode === 'boxed' ? (
-                    <>
-                      <Maximize2 className="mr-2 h-4 w-4" />
-                      {t('userMenu.fluidLayout')}
-                    </>
-                  ) : (
-                    <>
-                      <Minimize2 className="mr-2 h-4 w-4" />
-                      {t('userMenu.boxedLayout')}
-                    </>
-                  )}
-                </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
                     <Sun className="mr-2 h-4 w-4" />
@@ -228,37 +231,6 @@ export function AuthenticatedHeader() {
                     </DropdownMenuSubContent>
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <Layout className="mr-2 h-4 w-4" />
-                    {t('userMenu.cardStyle')}
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent>
-                      <DropdownMenuRadioGroup
-                        value={dashboardVariant}
-                        onValueChange={(value) =>
-                          setDashboardVariant(
-                            value as 'default' | 'flat' | 'modern' | 'gradient',
-                          )
-                        }
-                      >
-                        <DropdownMenuRadioItem value="default">
-                          {t('userMenu.cardDefault')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="flat">
-                          {t('userMenu.cardFlat')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="modern">
-                          {t('userMenu.cardModern')}
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="gradient">
-                          {t('userMenu.cardGradient')}
-                        </DropdownMenuRadioItem>
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
                 <DropdownMenuItem onClick={() => setTzDialogOpen(true)}>
                   <Globe className="mr-2 h-4 w-4" />
                   {t('userMenu.timezone')}
@@ -272,6 +244,10 @@ export function AuthenticatedHeader() {
 
               {/* Help & Documentation */}
               <DropdownMenuGroup>
+                <DropdownMenuItem onClick={handleOpenWelcomeTour}>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {t('userMenu.welcomeTour')}
+                </DropdownMenuItem>
                 <DropdownMenuItem>
                   <HelpCircle className="mr-2 h-4 w-4" />
                   {t('userMenu.helpSupport')}
@@ -310,6 +286,10 @@ export function AuthenticatedHeader() {
                     <DropdownMenuLabel>
                       {t('userMenu.administration')}
                     </DropdownMenuLabel>
+                    <DropdownMenuItem render={<Link to="/schedules" />}>
+                      <CalendarClock className="mr-2 h-4 w-4" />
+                      {t('userMenu.schedules')}
+                    </DropdownMenuItem>
                     <DropdownMenuItem render={<Link to="/admin/plugins" />}>
                       <Blocks className="mr-2 h-4 w-4" />
                       {t('userMenu.plugins')}

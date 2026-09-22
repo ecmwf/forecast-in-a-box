@@ -14,7 +14,7 @@ fields derived from the in-memory plugin state and DB rows.
 """
 
 import threading
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, _patch, patch
 
 import pytest
 from fiab_core.fable import (
@@ -80,15 +80,15 @@ def _make_db_state(
     return state
 
 
-def _patch_db(states: list[MagicMock]) -> object:
+def _patch_db(states: list[MagicMock]) -> _patch:
     return patch("forecastbox.domain.plugin.detail.get_all_plugin_states", new=AsyncMock(return_value=states))
 
 
-def _patch_store(detail: dict | None = None) -> object:
+def _patch_store(detail: dict | None = None) -> _patch:
     return patch("forecastbox.domain.plugin.detail.get_plugins_detail", return_value=detail or {})
 
 
-def _patch_time() -> object:
+def _patch_time() -> _patch:
     return patch("forecastbox.domain.plugin.detail.value_dt2str", return_value="2024-01-01T00:00:00")
 
 

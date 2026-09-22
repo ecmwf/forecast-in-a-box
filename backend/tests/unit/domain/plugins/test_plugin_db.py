@@ -22,7 +22,7 @@ from sqlalchemy.pool import StaticPool
 
 import forecastbox.domain.plugin.db as plugin_db
 import forecastbox.schemata.jobs as _jobs_module
-from forecastbox.domain.plugin.errors import PluginError
+from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.domain.plugin.exceptions import PluginNotFound
 from forecastbox.schemata.jobs import Base
 from forecastbox.schemata.plugin import PluginState
@@ -76,7 +76,7 @@ def test_upsert_updates_version_without_clobbering(mem_session_maker: sessionmak
         session.commit()
 
     # Re-install (update) -- new version triggers asset_ingest_needed=True
-    plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.2.0", plugin_errors=[])
+    plugin_db.upsert_plugin_state(plugin_id="myStore:myPlugin", version="0.2.0", plugin_errors=PluginErrors([]))
 
     state = plugin_db.get_plugin_state("myStore:myPlugin")
     assert state is not None
@@ -123,7 +123,7 @@ def test_upsert_none_version_on_missing_row_raises(mem_session_maker: sessionmak
 def test_upsert_persists_plugin_errors(mem_session_maker: sessionmaker[Session]) -> None:
     """An install failure writes structured errors and records the attempt."""
     install_err = PluginError(source="install", severity="error", detail="pip failed: some reason")
-    plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="unknown", enabled=True, plugin_errors=[install_err])
+    plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="unknown", enabled=True, plugin_errors=PluginErrors([install_err]))
 
     state = plugin_db.get_plugin_state("bad:plugin")
     assert state is not None
@@ -135,14 +135,14 @@ def test_upsert_persists_plugin_errors(mem_session_maker: sessionmaker[Session])
 def test_upsert_clears_plugin_errors_with_empty_list(mem_session_maker: sessionmaker[Session]) -> None:
     """Passing plugin_errors=[] clears previously stored errors; passing None leaves them untouched."""
     old_err = PluginError(source="install", severity="error", detail="old error")
-    plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="0.1.0", plugin_errors=[old_err])
+    plugin_db.upsert_plugin_state(plugin_id="bad:plugin", version="0.1.0", plugin_errors=PluginErrors([old_err]))
     # None should not touch the errors
     plugin_db.upsert_plugin_state(plugin_id="bad:plugin")
     state = plugin_db.get_plugin_state("bad:plugin")
     assert state is not None
     assert state.plugin_errors == [old_err.model_dump()]
     # [] should clear them
-    plugin_db.upsert_plugin_state(plugin_id="bad:plugin", plugin_errors=[])
+    plugin_db.upsert_plugin_state(plugin_id="bad:plugin", plugin_errors=PluginErrors([]))
     state = plugin_db.get_plugin_state("bad:plugin")
     assert state is not None
     assert state.plugin_errors == []
@@ -155,7 +155,7 @@ def test_get_all_plugin_states(mem_session_maker: sessionmaker[Session]) -> None
         plugin_id="storeA:p2",
         version="unknown",
         enabled=True,
-        plugin_errors=[PluginError(source="install", severity="error", detail="err")],
+        plugin_errors=PluginErrors([PluginError(source="install", severity="error", detail="err")]),
     )
 
     states = plugin_db.get_all_plugin_states()

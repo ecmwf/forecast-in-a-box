@@ -54,10 +54,10 @@ export const STORAGE_KEYS = {
     favourites: 'fiab.fable.favourites',
     /** The workbench draft — the single auto-saved work-in-progress */
     draft: 'fiab.fable.draft',
+    /** Configuration set aside when an incoming one replaced it */
+    shelf: 'fiab.fable.shelf',
     /** Legacy per-target draft map — read once for migration into `draft` */
     drafts: 'fiab.fable.drafts',
-    /** Pipeline (form-mode) sidebar open/closed flag */
-    pipelineSidebarOpen: 'fiab.fable.pipeline-sidebar-open',
   },
 
   /**
@@ -87,6 +87,14 @@ export const STORAGE_KEYS = {
   },
 
   /**
+   * Visualise page (direct localStorage)
+   */
+  visualise: {
+    /** Last-used A/B slot pair; seeds the slots on a bare /visualise visit */
+    lastPair: 'fiab.visualise.last-pair',
+  },
+
+  /**
    * Zustand store persistence keys
    */
   stores: {
@@ -102,6 +110,12 @@ export const STORAGE_KEYS = {
     activity: 'fiab.store.activity',
     /** Geographic comparison basket (collected sources) */
     comparison: 'fiab.store.comparison',
+    /** First-run onboarding status */
+    onboarding: 'fiab.store.onboarding',
+    /** Per-tutorial guided-tour outcomes */
+    tutorials: 'fiab.store.tutorials',
+    /** Pinned default WMS style per server and layer */
+    stylePins: 'fiab.store.style-pins',
   },
 } as const
 
@@ -122,11 +136,14 @@ export const STORAGE_KEYS = {
  * ```
  */
 export const STORE_VERSIONS = {
-  ui: 6, // v6: Add application timezone preference
+  ui: 7, // v7: Removed layoutMode, dashboardVariant, panelShadow
   config: 1,
-  fableBuilder: 2, // v2: Removed configDisplayMode, added isMiniMapOpen
+  fableBuilder: 3, // v3: Removed mode, edgeStyle, autoLayout
   activity: 2, // v2: navigateTo rewritten for /executions→/execute, /dashboard→/overview
   comparison: 1,
+  onboarding: 2, // v2: Removed pluginStepNeeded
+  tutorials: 1,
+  stylePins: 1,
 } as const
 
 /**

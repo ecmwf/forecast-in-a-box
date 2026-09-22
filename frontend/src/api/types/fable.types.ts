@@ -250,7 +250,7 @@ export const FableValidationExpansionSchema = z.object({
     .optional()
     .default({}),
   resolved_configuration_options: z
-    .record(z.string(), z.record(z.string(), z.string()))
+    .record(z.string(), z.record(z.string(), z.string().nullable()))
     .optional()
     .default({}),
   missing_glyphs: z
@@ -422,7 +422,10 @@ export interface FableValidationState {
    * glyph references (${...}). Sourced from /blueprint/expand — the frontend
    * never resolves glyphs client-side.
    */
-  resolvedConfigurationOptions: Record<BlockInstanceId, Record<string, string>>
+  resolvedConfigurationOptions: Record<
+    BlockInstanceId,
+    Record<string, string | null>
+  >
   /**
    * Per-block output qube (qubed node tree), keyed by BlockInstanceId.
    * The qube flowing out of a block — i.e. on every edge leaving it. Used by

@@ -1,0 +1,2 @@
+val:
+    uv run python run_scenarios.py

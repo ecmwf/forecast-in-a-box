@@ -21,12 +21,18 @@ import type {
 import { getJobsStatus } from '@/api/endpoints/job'
 import { jobKeys } from '@/api/hooks/useJobs'
 
-/** Page size for the run list backing the counts. */
-const COUNTS_PAGE_SIZE = 1000
+/** Newest runs the counts and the runs page cover; each row costs the
+ * backend a poll-and-update, so the window stays modest. */
+export const RUN_WINDOW = 300
+/** The full list changes slowly and is large; live status rides the small recent-runs query. */
+const RUN_WINDOW_INTERVAL_MS = 30_000
 
 interface JobStatusCounts {
   counts: Record<JobStatus, number>
+  /** Runs inside the window. */
   total: number
+  /** Runs the backend holds; more than `total` once the window is exceeded. */
+  serverTotal: number
   runs: Array<JobExecutionDetail>
   runningCount: number
   /** Mean progress (0–100) across every running forecast. */
@@ -66,6 +72,7 @@ function computeCounts(data: JobExecutionList): JobStatusCounts {
   return {
     counts,
     total,
+    serverTotal: data.total,
     runs: data.runs,
     runningCount: counts.running,
     runningProgress:
@@ -84,6 +91,7 @@ const EMPTY_COUNTS: JobStatusCounts = {
     unknown: 0,
   },
   total: 0,
+  serverTotal: 0,
   runs: [],
   runningCount: 0,
   runningProgress: 0,
@@ -95,10 +103,11 @@ export function useJobStatusCounts() {
   // compute the 6 counts in `select` so the reduction runs only when data
   // changes — not on every render.
   const query = useQuery({
-    queryKey: jobKeys.list(1, COUNTS_PAGE_SIZE),
-    queryFn: () => getJobsStatus(1, COUNTS_PAGE_SIZE),
+    queryKey: jobKeys.list(1, RUN_WINDOW),
+    queryFn: () => getJobsStatus(1, RUN_WINDOW),
     select: computeCounts,
-    refetchInterval: 10000,
+    refetchInterval: RUN_WINDOW_INTERVAL_MS,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
   })
 
@@ -108,6 +117,8 @@ export function useJobStatusCounts() {
     ...data,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
     refetch: query.refetch,
   }
 }

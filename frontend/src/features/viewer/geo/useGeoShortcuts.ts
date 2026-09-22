@@ -38,6 +38,7 @@ import type { CompareMode } from './types'
 export const COMPARE_KEYS = {
   sidebars: 'B',
   fit: 'F',
+  projection: 'P',
   copy: 'C',
   export: 'E',
   help: 'H',
@@ -84,6 +85,8 @@ export function useGeoShortcuts(handlers: {
   onToggleSidebars: () => void
   onMode: (mode: CompareMode) => void
   onFit: (() => void) | null
+  /** Next available map projection. */
+  onProjectionCycle: () => void
   onCopy: () => void
   onExport: () => void
   onHelp: () => void
@@ -98,6 +101,7 @@ export function useGeoShortcuts(handlers: {
     onToggleSidebars,
     onMode,
     onFit,
+    onProjectionCycle,
     onCopy,
     onExport,
     onHelp,
@@ -141,6 +145,7 @@ export function useGeoShortcuts(handlers: {
     gated(() => onFit?.()),
     opts,
   )
+  useHotkey(COMPARE_KEYS.projection, gated(onProjectionCycle), opts)
   useHotkey(COMPARE_KEYS.copy, gated(onCopy), opts)
   useHotkey(COMPARE_KEYS.export, gated(onExport), opts)
   useHotkey(COMPARE_KEYS.help, gated(onHelp), opts)

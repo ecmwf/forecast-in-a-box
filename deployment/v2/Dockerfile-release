@@ -1,0 +1,16 @@
+# dockerfile with a released fiab
+# - on top of Dockerfile-base
+# - the specified release, pulled in at the build time
+# - no config override, meaning all defaults
+
+FROM fiab-base:latest 
+
+ARG FIAB_RELEASE="v0.0.0"
+ENV FIAB_RELEASE=$FIAB_RELEASE
+RUN : \
+    && curl https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/$FIAB_RELEASE/scripts/fiab.sh > /home/fiab/fiab.sh \
+    && chmod u+x /home/fiab/fiab.sh \
+    && /home/fiab/fiab.sh warmup \
+    && : ;
+
+ENTRYPOINT ["/home/fiab/fiab.sh"]

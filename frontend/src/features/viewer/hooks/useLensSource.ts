@@ -21,7 +21,7 @@ import {
   CapabilitiesError,
   fetchCapabilities,
   groupLayers,
-  isLoopbackUrl,
+  isLensProxyUrl,
 } from '../wms-capabilities'
 import type {
   LayerGroup,
@@ -30,13 +30,17 @@ import type {
 } from '../wms-capabilities'
 
 // GetCapabilities retry — lens `running` precedes WMS-port readiness.
-// Loopback = our own lens: a cold SkinnyWMS boot can take tens of
-// seconds, so keep trying (~35 s) instead of parking on an error the
-// next attempt would clear. External servers keep the snappy ladder.
+// Our lens proxy: a cold SkinnyWMS boot can take tens of seconds, so keep
+// trying (~35 s) instead of parking on an error the next attempt would
+// clear. External servers keep the snappy ladder.
 const EXTERNAL_RETRY_DELAYS_MS = [300, 600, 1200, 2400, 4800] as const
-const LOOPBACK_RETRY_DELAYS_MS = [
+const LENS_RETRY_DELAYS_MS = [
   300, 600, 1200, 2400, 4800, 5000, 5000, 5000, 5000, 5000,
 ] as const
+/** Lens proxy: 400 unproxyable, 404 gone. 503 (starting) retries, and so
+ * does 500: a proxy hiccup answers 500 too, and the status poll already
+ * settles a dead process. */
+const LENS_PROXY_FINAL_STATUSES = new Set([400, 404])
 
 /** Cache identity for one server's parsed capabilities. */
 export function wmsCapabilitiesKey(baseUrl: string): ReadonlyArray<string> {
@@ -44,12 +48,17 @@ export function wmsCapabilitiesKey(baseUrl: string): ReadonlyArray<string> {
 }
 
 const NO_LAYERS: ReadonlyArray<ParsedLayer> = []
+const NO_CRS: ReadonlyArray<string> = []
 
 export interface LensSource {
   layers: ReadonlyArray<ParsedLayer>
+  /** HTTP status behind `error`, when the failure was an HTTP answer. */
+  errorStatus: number | null
   decorationLayers: ReadonlyArray<ParsedLayer>
   /** EPSG:4326 [west, south, east, north] advertised by the server. */
   bbox: [number, number, number, number] | null
+  /** Advertised CRS codes (empty until loaded — see `supportsCrs`). */
+  crs: ReadonlyArray<string>
   error: string | null
   loadingLayers: boolean
   /** True between failed attempts while the retry ladder is running. */
@@ -61,19 +70,23 @@ export interface LensSource {
 /** `baseUrl: null` yields an inert source: no fetch, empty layers. */
 export function useLensSource(baseUrl: string | null): LensSource {
   const retryDelays =
-    baseUrl !== null && isLoopbackUrl(baseUrl)
-      ? LOOPBACK_RETRY_DELAYS_MS
+    baseUrl !== null && isLensProxyUrl(baseUrl)
+      ? LENS_RETRY_DELAYS_MS
       : EXTERNAL_RETRY_DELAYS_MS
   const query = useQuery({
     queryKey: wmsCapabilitiesKey(baseUrl ?? ''),
     enabled: baseUrl !== null,
     queryFn: ({ signal }): Promise<ParsedCapabilities> =>
       fetchCapabilities(baseUrl!, signal),
-    // Timeout/interruption burned a long attempt — surface it; Retry stays.
+    // Timeout/interruption burned a long attempt; final proxy answers won't change.
     retry: (failureCount, error) =>
       !(
         error instanceof CapabilitiesError &&
-        (error.kind === 'timeout' || error.kind === 'interrupted')
+        (error.kind === 'timeout' ||
+          error.kind === 'interrupted' ||
+          (isLensProxyUrl(baseUrl ?? '') &&
+            error.status !== undefined &&
+            LENS_PROXY_FINAL_STATUSES.has(error.status)))
       ) && failureCount <= retryDelays.length,
     retryDelay: (failureCount) =>
       retryDelays[Math.min(failureCount, retryDelays.length) - 1],
@@ -93,7 +106,12 @@ export function useLensSource(baseUrl: string | null): LensSource {
     layers,
     decorationLayers: query.data?.decorationLayers ?? NO_LAYERS,
     bbox: query.data?.bbox ?? null,
+    crs: query.data?.crs ?? NO_CRS,
     error: query.error ? query.error.message : null,
+    errorStatus:
+      query.error instanceof CapabilitiesError
+        ? (query.error.status ?? null)
+        : null,
     loadingLayers: baseUrl !== null && query.isPending,
     retrying: query.isFetching && query.failureCount > 0,
     groups,

@@ -2,7 +2,11 @@
 # /// script
 # dependencies = [
 #    "earthkit-workflows-anemoi",
+#    "qubed",
 #    "anemoi-inference",
+#    "metkitlib",
+#    "pymetkit",
+#    "qubed",
 #    "fire",
 # ]
 # ///
@@ -18,6 +22,10 @@ Usage:
 from functools import lru_cache
 from typing import Any
 
+from qubed import Qube
+
+extra_output_keys = {"class": "ai", "type": "fc", "stream": "oper"}
+
 
 @lru_cache(maxsize=None)
 def open_checkpoint(checkpoint_path: str) -> "Checkpoint":  # type: ignore
@@ -32,6 +40,9 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
     variables_metadata = metadata.typed_variables
 
     from earthkit.workflows.plugins.anemoi.utils import _expansion_qube
+    from pymetkit.paramdb import ParamDB
+    from qubed import Qube
+    from qubed.value_types import QEnum
 
     in_variables = metadata.select_variables(include=["prognostic", "forcing", "constant"], has_mars_requests=False)
     out_variables = metadata.select_variables(include=["diagnostic", "prognostic"], has_mars_requests=False)
@@ -39,7 +50,15 @@ def get_qubes(checkpoint_path: str) -> dict[str, Any]:
 
     in_qube = _expansion_qube(in_variables, variables_metadata, model_step, 6).remove_by_key("step")
     out_qube = _expansion_qube(out_variables, variables_metadata, model_step, 6).remove_by_key("step")
+    out_qube.to_json()
 
+    def _shortname_to_param_id(node: Qube) -> None:
+        if node.key == "param":
+            paramdb = ParamDB()
+            new_values = [str(paramdb.shortname_to_param_id(x, context={"class": "ai"}, access="dissemination")) for x in node.values]
+            node.values = QEnum(new_values)
+
+    out_qube.walk(_shortname_to_param_id)
     return {"input_qube": in_qube.to_json(), "output_qube": out_qube.to_json()}
 
 
@@ -113,6 +132,7 @@ def generate_artifact_entry(
             "input_characteristics": [c.strip() for c in input_characteristics.split(",") if c.strip()],
             "input_qube": qubes["input_qube"],
             "output_qube": qubes["output_qube"],
+            "extra_output_keys": extra_output_keys,
             "input_options": {},
             "timestep": get_timestep(checkpoint_path),
         },

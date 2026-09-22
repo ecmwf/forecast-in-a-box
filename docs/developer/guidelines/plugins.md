@@ -31,6 +31,8 @@ The same for an already installed plugin with incompatible constraint.
 ## Local Development
 It is assumed that for development, you have a repository containing your plugin as a python project.
 You can then use for the backend both a production-install (using the `fiab.sh` script) or a development-install (using the `just dev` command).
+Consult the [launching](./launching.md) doc for more detail.
+
 Either way, you need to have the following in your `config.toml` something like this:
 ```
 [external.plugin_stores.yourPluginStore]
@@ -49,9 +51,11 @@ We don't support live reloads, ie, if you make code changes, you best restart th
 Do not install the plugin yourself into the backend's venv -- a part of the installation process is inserting
 an entry into the database as well as into the config file. Failure to do so may leave the backend in an inconsistent state.
 If you want to test the "would it actually install" outside of backend, you may run `uv pip install --dry-run` with the respective `venv` to see what would happen -- this is definitively recommended if you want to see the possible error line hands-on and fast.
+Note that backend itself does a `--dry-run` first when installing a plugin -- you don't need to worry that a misconfigured plugin would destroy everything.
+But extracting the error from the backend logs may be more lengthy than seeing it first-hand.
 
 ## Troubleshooting
-If things go very wrong, you can wipe the `venv` and the database (in `.fiab/jobs.db`), and remove a section looking like
+If things go very wrong, you can wipe the `venv` and the database (in `.fiab/jobs.db`) (or use the `--full-reinstall`, consult [launching.md](./launching.md)), and remove a section looking like
 ```
 [external.plugins."localTest1:single"]
 pip_source = "file://./packages/fiab-plugin-test"

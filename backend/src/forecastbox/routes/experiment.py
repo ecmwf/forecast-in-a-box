@@ -33,11 +33,12 @@ from forecastbox.domain.experiment.scheduling.background import start_scheduler,
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
+from forecastbox.utility.config import ROUTE_PREFIX
 from forecastbox.utility.pagination import PaginationSpec
 from forecastbox.utility.pydantic import FiabBaseModel
 from forecastbox.utility.time import current_time, value_dt2str
 
-PREFIX = "/api/v1/experiment"
+PREFIX = f"{ROUTE_PREFIX}/experiment"
 
 logger = logging.getLogger(__name__)
 

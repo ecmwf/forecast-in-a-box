@@ -218,6 +218,19 @@ describe('parseValueType', () => {
     it('returns unknown for empty string', () => {
       expect(parseValueType('')).toEqual({ type: 'string' })
     })
+
+    // Grammar-valid since fiab-core #691/#704 but still widget-less: they
+    // must land on the text fallback, not be rejected.
+    it('returns unknown for timedelta and none-bearing unions', () => {
+      expect(parseValueType('timedelta')).toEqual({
+        type: 'unknown',
+        raw: 'timedelta',
+      })
+      expect(parseValueType('union[str,none]')).toEqual({
+        type: 'unknown',
+        raw: 'union[str,none]',
+      })
+    })
   })
 
   describe('optional types', () => {

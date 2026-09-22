@@ -187,9 +187,7 @@ export function Link({
 
   // Resolve children - handle both ReactNode and render function
   const resolvedChildren =
-    typeof children === 'function'
-      ? children({ isActive: false, isTransitioning: false })
-      : children
+    typeof children === 'function' ? children({ isActive: false }) : children
 
   if (isExternal) {
     const targetLink = href || (typeof to === 'string' ? to : '#')

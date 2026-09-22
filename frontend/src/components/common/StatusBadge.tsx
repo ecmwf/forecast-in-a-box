@@ -58,6 +58,12 @@ export const STATUS_BADGE_VARIANTS = {
     badgeClass:
       'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 border-red-200 dark:border-red-800',
   },
+  /** In-progress work, in brand blue — `--primary` carries both themes. */
+  busy: {
+    dotClass: 'bg-primary',
+    barClass: 'bg-primary',
+    badgeClass: 'bg-primary/10 text-primary border-primary/20',
+  },
   warning: {
     dotClass: 'bg-amber-500',
     barClass: 'bg-amber-500',

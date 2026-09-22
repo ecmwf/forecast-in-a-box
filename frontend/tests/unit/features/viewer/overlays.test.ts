@@ -42,15 +42,15 @@ describe('parseGeojsonOverlay', () => {
     expect(overlay.labelProperty).toBeNull()
   })
 
-  it('parses features, reprojected, with a stable overlay shape', () => {
+  it('parses features, kept in lon/lat, with a stable overlay shape', () => {
     const overlay = parseGeojsonOverlay('tracks.geojson', VALID)
     expect(overlay.name).toBe('tracks.geojson')
     expect(overlay.featureCount).toBe(2)
     expect(overlay.visible).toBe(true)
-    expect(overlay.source.getFeatures()).toHaveLength(2)
-    // Reprojection to Web Mercator happened (coords no longer lon/lat).
-    const [x] = overlay.source.getFeatures()[1].getGeometry()!.getExtent()
-    expect(Math.abs(x)).toBeGreaterThan(180)
+    expect(overlay.features).toHaveLength(2)
+    // Stays WGS84 — each map reprojects its own copy.
+    const [x] = overlay.features[1].getGeometry()!.getExtent()
+    expect(Math.abs(x)).toBeLessThanOrEqual(180)
   })
 
   it('throws on junk and on empty collections', () => {
@@ -78,7 +78,7 @@ describe('parseGeojsonOverlay', () => {
     ]}`
     const overlay = parseGeojsonOverlay('mixed.geojson', mixed)
     expect(overlay.featureCount).toBe(1)
-    expect(overlay.source.getFeatures()).toHaveLength(1)
+    expect(overlay.features).toHaveLength(1)
 
     const allBad = `{"type":"FeatureCollection","features":[
       {"type":"Feature","properties":{},"geometry":

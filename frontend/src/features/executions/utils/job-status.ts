@@ -20,9 +20,9 @@ const JOB_STATUS_VARIANT: Record<
   JobStatus,
   keyof typeof STATUS_BADGE_VARIANTS
 > = {
-  submitted: 'available',
-  preparing: 'available',
-  running: 'warning',
+  submitted: 'warning',
+  preparing: 'warning',
+  running: 'busy',
   completed: 'active',
   failed: 'error',
   unknown: 'disabled',

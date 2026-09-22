@@ -171,6 +171,15 @@
     "updateFailed": "Update failed",
     "failedWithReason": "{{label}}: {{reason}}"
   },
+  "notifications": {
+    "installed": "Plugin {{plugin}} installed",
+    "updated": "Plugin {{plugin}} updated",
+    "settingsApplied": "Plugin {{plugin}} settings applied",
+    "unloaded": "Plugin {{plugin}} disabled",
+    "uninstalled": "Plugin {{plugin}} uninstalled",
+    "globalError": "{{trigger}} failed",
+    "globalErrorGeneric": "A plugin operation failed"
+  },
   "admin": {
     "verifyAccessError": "Could not verify admin access. Please try again."
   }

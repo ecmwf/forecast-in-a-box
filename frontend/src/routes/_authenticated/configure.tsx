@@ -24,6 +24,8 @@ const searchSchema = z.object({
   templateName: z.string().optional(),
   /** Explicit blank-canvas intent; a bench holding unsaved work asks first. */
   fresh: z.boolean().optional(),
+  /** Plain-link tour launch (help surfaces); stripped on start. */
+  tour: z.enum(['first-run']).optional().catch(undefined),
 })
 
 export type ConfigureSearch = z.infer<typeof searchSchema>
@@ -34,8 +36,15 @@ export const Route = createFileRoute('/_authenticated/configure')({
 })
 
 function ConfigurePage() {
-  const { state, fableId, template, templatePlugin, templateName, fresh } =
-    Route.useSearch()
+  const {
+    state,
+    fableId,
+    template,
+    templatePlugin,
+    templateName,
+    fresh,
+    tour,
+  } = Route.useSearch()
   return (
     <FableBuilderPage
       key={builderSessionKey({ fableId, template })}
@@ -45,6 +54,7 @@ function ConfigurePage() {
       templatePlugin={templatePlugin}
       templateName={templateName}
       fresh={fresh}
+      tour={tour}
     />
   )
 }

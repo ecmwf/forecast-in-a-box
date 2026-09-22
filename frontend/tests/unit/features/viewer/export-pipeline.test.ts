@@ -94,7 +94,7 @@ describe('composeCaptures', () => {
   it('bakes notes only into captures that show the pin’s source', async () => {
     const bPin = {
       id: 'p1',
-      coordinate: [0, 0] as [number, number],
+      lonLat: [0, 0] as [number, number],
       label: '1',
       text: 'B-side eddy',
       color: 'orange' as const,

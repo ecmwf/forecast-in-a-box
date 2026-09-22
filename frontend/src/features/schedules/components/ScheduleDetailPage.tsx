@@ -30,6 +30,8 @@ import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
 import type { GroupBy } from '@/features/journal/grouping/group-runs'
 import { formatInZone } from '@/lib/datetime'
 import { showToast } from '@/lib/toast'
+import { CompareSelectionBar } from '@/features/journal/components/CompareSelectionBar'
+import { useRunSelection } from '@/features/journal/hooks/useRunSelection'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
 import {
   useSchedule,
@@ -47,18 +49,21 @@ import { RunCanvas } from '@/features/executions/components/RunCanvas'
 import { StatCard } from '@/features/dashboard/components/StatCard'
 import { scheduleRunToViewModel } from '@/features/journal/adapters'
 import { filterRuns } from '@/features/journal/utils/filter-runs'
+import { pageSlice } from '@/features/journal/utils/page-slice'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
 import { ForecastRunSearchHeader } from '@/features/journal/components/ForecastRunSearchHeader'
 import { useRunFavourites } from '@/features/journal/hooks/useRunFavourites'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { H2, P } from '@/components/base/typography'
+import { H1, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { useUiStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
+import { PAGE_WIDTH_CLASS } from '@/lib/page-width'
 
 const PAGE_SIZE = 10
+/** The schedule runs endpoint has no filters: load them all, filter and page here. */
+const ALL_RUNS = 1000
 
 const SCHEDULE_RUN_FILTERS: ReadonlyArray<RunFilter> = [
   'all',
@@ -74,27 +79,33 @@ export function ScheduleDetailPage() {
   const { scheduleId } = useParams({
     from: '/_authenticated/schedules/$scheduleId',
   })
-  const layoutMode = useUiStore((state) => state.layoutMode)
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const [runsPage, setRunsPage] = useState(1)
   const [runFilter, setRunFilter] = useState<RunFilter>('all')
   const [runQuery, setRunQuery] = useState('')
   const [runGroupBy, setRunGroupBy] = useState<GroupBy>('date')
   const [editScheduleOpen, setEditScheduleOpen] = useState(false)
+  const selection = useRunSelection(2)
 
   const { data: schedule, isLoading, isError } = useSchedule(scheduleId)
   const { data: nextRun } = useScheduleNextRun(scheduleId)
-  const { data: runsData } = useScheduleRuns(scheduleId, runsPage, PAGE_SIZE)
+  const { data: runsData } = useScheduleRuns(scheduleId, 1, ALL_RUNS)
   const updateSchedule = useUpdateSchedule()
   const { data: catalogue } = useBlockCatalogue()
   const { data: blueprint } = useFableRetrieve(schedule?.blueprint_id)
-  const { offsetMs, serverTimeToLocal, timeZone } = useServerTime()
+  const { serverTimeToLocal, timeZone } = useServerTime()
   const { isBookmarked, toggleBookmark } = useRunFavourites()
 
   const containerClass = cn(
-    'mx-auto space-y-6 px-4 py-8 sm:px-6 lg:px-8',
-    layoutMode === 'boxed' ? 'max-w-7xl' : 'max-w-none',
+    PAGE_WIDTH_CLASS,
+    'space-y-6 px-4 py-8 sm:px-6 lg:px-8',
+  )
+
+  // App-TZ date — keeps the facet aligned with the row in any client TZ.
+  // Declared before the early returns so the hook order never changes.
+  const displayDateFor = useCallback(
+    (run: ForecastRunViewModel) =>
+      formatInZone(serverTimeToLocal(run.createdAt), timeZone, 'yyyy-MM-dd'),
+    [serverTimeToLocal, timeZone],
   )
 
   if (isLoading) {
@@ -120,7 +131,7 @@ export function ScheduleDetailPage() {
     `${t('detail.untitledSchedule')} ${scheduleId.slice(0, 8)}`
 
   const cronDescription = schedule.cron_expr
-    ? cronToHumanReadable(schedule.cron_expr, offsetMs, timeZone)
+    ? cronToHumanReadable(schedule.cron_expr, timeZone)
     : null
 
   async function handleToggleEnabled(newEnabled?: boolean) {
@@ -148,19 +159,21 @@ export function ScheduleDetailPage() {
       isBookmarked: isBookmarked(run.run_id),
     }),
   )
-  // App-TZ date — keeps the facet aligned with the row in any client TZ.
-  const displayDateFor = useCallback(
-    (run: ForecastRunViewModel) =>
-      formatInZone(serverTimeToLocal(run.createdAt), timeZone, 'yyyy-MM-dd'),
-    [serverTimeToLocal, timeZone],
-  )
   const filteredRuns = filterRuns(
     runViewModels,
     runFilter,
     parseQuery(runQuery),
     displayDateFor,
   )
-  const totalRunPages = runsData?.total_pages ?? 1
+  const pagedRuns = pageSlice(filteredRuns, runsPage, PAGE_SIZE)
+  const totalRunPages = pagedRuns.totalPages
+  const toggleSelect = (runId: string) => {
+    const run = runViewModels.find((r) => r.runId === runId)
+    if (run) selection.toggle(run)
+  }
+  const nextRunDate = nextRun
+    ? serverTimeToLocal(nextRun, { roundMinute: true })
+    : null
 
   return (
     <div className={containerClass}>
@@ -178,7 +191,7 @@ export function ScheduleDetailPage() {
 
       <div>
         <div className="flex items-center gap-2">
-          <H2 className="text-xl font-semibold">{displayName}</H2>
+          <H1 className="text-2xl">{displayName}</H1>
           <Button
             variant="ghost"
             size="icon"
@@ -228,14 +241,18 @@ export function ScheduleDetailPage() {
           label={t('detail.nextRun')}
           icon={<Calendar className="h-4 w-4" />}
           value={
-            <span className="text-lg font-semibold">
-              {nextRun
-                ? formatLocalDateTime(
-                    serverTimeToLocal(nextRun, { roundMinute: true }),
-                    timeZone,
-                  )
-                : '-'}
-            </span>
+            nextRunDate ? (
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-lg font-semibold">
+                  {formatLocalDateTime(nextRunDate, timeZone)}
+                </span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {formatDistanceToNow(nextRunDate, { addSuffix: true })}
+                </span>
+              </span>
+            ) : (
+              <span className="text-lg font-semibold">-</span>
+            )
           }
         />
         <StatCard
@@ -254,27 +271,37 @@ export function ScheduleDetailPage() {
 
       {/* Runs — rendered through the shared Forecast Journal */}
       <ForecastRunList
-        runs={filteredRuns}
+        runs={pagedRuns.items}
         groupBy={runGroupBy}
         emptyText={t('detail.noRuns')}
         onToggleBookmark={toggleBookmark}
         onAddFacet={(token) => setRunQuery((prev) => addToken(prev, token))}
-        variant={dashboardVariant}
-        shadow={panelShadow}
+        selectedIds={selection.selectedIds}
+        selectionCap={selection.cap}
+        onToggleSelect={toggleSelect}
         header={
-          <ForecastRunSearchHeader
-            title={t('schedules:detail.runsTitle')}
-            query={runQuery}
-            onQueryChange={setRunQuery}
-            activeFilter={runFilter}
-            onFilterChange={(filter) => {
-              setRunFilter(filter)
-              setRunsPage(1)
-            }}
-            filters={SCHEDULE_RUN_FILTERS}
-            groupBy={runGroupBy}
-            onGroupByChange={setRunGroupBy}
-          />
+          <>
+            <ForecastRunSearchHeader
+              title={t('schedules:detail.runsTitle')}
+              query={runQuery}
+              onQueryChange={(value) => {
+                setRunQuery(value)
+                setRunsPage(1)
+              }}
+              activeFilter={runFilter}
+              onFilterChange={(filter) => {
+                setRunFilter(filter)
+                setRunsPage(1)
+              }}
+              filters={SCHEDULE_RUN_FILTERS}
+              groupBy={runGroupBy}
+              onGroupByChange={setRunGroupBy}
+            />
+            <CompareSelectionBar
+              selectedRuns={selection.selectedRuns}
+              onClear={selection.clear}
+            />
+          </>
         }
         footer={
           totalRunPages > 1 ? (
@@ -283,7 +310,7 @@ export function ScheduleDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={runsPage <= 1}
+                  disabled={pagedRuns.page <= 1}
                   onClick={() => setRunsPage((p) => p - 1)}
                 >
                   <ChevronLeft className="mr-1 h-4 w-4" />
@@ -291,14 +318,14 @@ export function ScheduleDetailPage() {
                 </Button>
                 <span className="text-sm text-muted-foreground">
                   {t('pagination.page', {
-                    current: runsPage,
+                    current: pagedRuns.page,
                     total: totalRunPages,
                   })}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={runsPage >= totalRunPages}
+                  disabled={pagedRuns.page >= totalRunPages}
                   onClick={() => setRunsPage((p) => p + 1)}
                 >
                   {t('pagination.next')}

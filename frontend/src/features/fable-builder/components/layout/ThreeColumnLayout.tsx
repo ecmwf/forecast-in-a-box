@@ -15,6 +15,7 @@ import { CollapsedSidebarHandle } from '@/components/common/CollapsedSidebarHand
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useUiPreferencesStore } from '@/features/fable-builder/stores/uiPreferencesStore'
 import { SplitHandleChrome } from '@/components/common/SplitResizeHandle'
+import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
 interface ThreeColumnLayoutProps {
@@ -101,6 +102,7 @@ export function ThreeColumnLayout({
           side="left"
           onExpand={togglePalette}
           label={t('layout.showBlockPalette')}
+          buttonAttrs={tourAttr(TOUR.configure.expandPalette)}
         />
       )}
 
@@ -190,6 +192,7 @@ export function ThreeColumnLayout({
           side="right"
           onExpand={toggleConfigPanel}
           label={t('layout.showConfigPanel')}
+          buttonAttrs={tourAttr(TOUR.configure.expandConfig)}
         />
       )}
     </div>

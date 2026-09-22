@@ -20,7 +20,7 @@ interface BlockValidation {
   /** Field-level errors keyed by config option key; null when none. */
   fieldErrors: Record<string, Array<string>> | null
   /** Backend-resolved config map (`/blueprint/expand`); null when unresolved. */
-  resolvedConfig: Record<string, string> | null
+  resolvedConfig: Record<string, string | null> | null
   /** Unresolvable glyph names per config option key; null when none. */
   missingGlyphs?: Record<string, ReadonlyArray<string>> | null
 }
@@ -52,7 +52,7 @@ export function useFieldErrors(): Record<string, Array<string>> | null {
   return useContext(BlockValidationContext).fieldErrors
 }
 
-export function useResolvedConfig(): Record<string, string> | null {
+export function useResolvedConfig(): Record<string, string | null> | null {
   return useContext(BlockValidationContext).resolvedConfig
 }
 

@@ -9,13 +9,15 @@
  */
 
 /**
- * Feature guide + shortcut reference for the compare viewer, opened from
- * the toolbar info icon or `?`. Content lives in the `compare` i18n
- * namespace under `help.*`.
+ * Feature guide + shortcut reference for the compare viewer (page help
+ * button or `H`); also the guided tour's second launch surface. Content
+ * lives in the `visualise` i18n namespace under `help.*`.
  */
 
+import { GraduationCap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { COMPARE_KEYS, keyLabel } from './useGeoShortcuts'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -24,6 +26,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { P } from '@/components/base/typography'
+import { useTutorialsStore } from '@/stores/tutorialsStore'
 
 const SECTIONS = ['modes', 'layers', 'time', 'tools', 'export'] as const
 
@@ -33,6 +36,7 @@ type ShortcutId =
   | 'pan'
   | 'annotate'
   | 'fit'
+  | 'projection'
   | 'copy'
   | 'export'
   | 'flicker'
@@ -56,6 +60,7 @@ const SHORTCUTS: ReadonlyArray<{
   { keys: COMPARE_KEYS.pan.map(keyLabel), id: 'pan' },
   { keys: [keyLabel(COMPARE_KEYS.annotate)], id: 'annotate' },
   { keys: [keyLabel(COMPARE_KEYS.fit)], id: 'fit' },
+  { keys: [keyLabel(COMPARE_KEYS.projection)], id: 'projection' },
   { keys: [keyLabel(COMPARE_KEYS.copy)], id: 'copy' },
   { keys: [keyLabel(COMPARE_KEYS.export)], id: 'export' },
   { keys: [keyLabel('Space')], id: 'flicker' },
@@ -72,6 +77,12 @@ export function CompareHelpDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation('visualise')
+  const { t: tTut } = useTranslation('tutorials')
+  const tourStatus = useTutorialsStore((s) => s.statuses['visualise-first-map'])
+  const startTour = () => {
+    onOpenChange(false)
+    useTutorialsStore.getState().start('visualise-first-map')
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -97,6 +108,29 @@ export function CompareHelpDialog({
           ))}
 
           <section>
+            <P className="text-sm font-semibold">
+              {tTut('launch.sectionTitle')}
+            </P>
+            <P className="mt-0.5 text-sm text-muted-foreground">
+              {tTut('firstMap.title')} — {tTut('firstMap.description')}
+              {tourStatus === 'completed' && (
+                <span className="ml-1 text-xs">
+                  · {tTut('launch.completed')}
+                </span>
+              )}
+            </P>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 gap-1.5"
+              onClick={startTour}
+            >
+              <GraduationCap className="h-3.5 w-3.5" />
+              {tTut('launch.take')}
+            </Button>
+          </section>
+
+          <section>
             <P className="text-sm font-semibold">{t('help.shortcuts.title')}</P>
             <table className="mt-1 w-full text-sm">
               <tbody>
@@ -113,7 +147,7 @@ export function CompareHelpDialog({
                               …
                             </span>
                           ) : (
-                            <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
+                            <kbd className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
                               {k}
                             </kbd>
                           )}

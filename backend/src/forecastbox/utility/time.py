@@ -43,6 +43,11 @@ def current_time(reason: TimeQueryReason) -> datetime:
     return datetime.now(UTC)
 
 
+def get_sleepable_difference(current: datetime, target: datetime) -> float:
+    """Return the time in seconds between two datetimes, preserving fractions of a second."""
+    return (target - current).total_seconds()
+
+
 def from_timestamp(ts: float) -> datetime:
     """The `ts` is to come from like file stat ctime"""
     local_install_time = datetime.fromtimestamp(ts)

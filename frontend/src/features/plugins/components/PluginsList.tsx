@@ -20,11 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { PluginCard } from './PluginCard'
 import { PluginRow } from './PluginRow'
 import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
-import type {
-  AdminViewMode,
-  DashboardVariant,
-  PanelShadow,
-} from '@/stores/uiStore'
+import type { AdminViewMode } from '@/stores/uiStore'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Card } from '@/components/ui/card'
 import { useMedia } from '@/hooks/useMedia'
@@ -39,8 +35,6 @@ interface PluginsListProps {
   onUninstall: (compositeId: PluginCompositeId) => void
   onUpdate: (compositeId: PluginCompositeId) => void
   onViewDetails?: (plugin: PluginInfo) => void
-  variant?: DashboardVariant
-  shadow?: PanelShadow
 }
 
 export function PluginsList({
@@ -52,8 +46,6 @@ export function PluginsList({
   onUninstall,
   onUpdate,
   onViewDetails,
-  variant,
-  shadow,
 }: PluginsListProps) {
   const { t } = useTranslation('plugins')
 
@@ -88,8 +80,6 @@ export function PluginsList({
             onUninstall={onUninstall}
             onUpdate={onUpdate}
             onViewDetails={onViewDetails}
-            variant={variant}
-            shadow={shadow}
           />
         ))}
       </div>
@@ -98,7 +88,7 @@ export function PluginsList({
 
   // Table view - using ForecastJournal pattern
   return (
-    <Card className="overflow-hidden" variant={variant} shadow={shadow}>
+    <Card className="overflow-hidden">
       {/* Header Row (Hidden on mobile) */}
       <div className="hidden grid-cols-12 gap-4 border-b border-border bg-muted/50 px-6 py-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase sm:grid">
         <div className="col-span-5">{t('table.headers.plugin')}</div>

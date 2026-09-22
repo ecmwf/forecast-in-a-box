@@ -17,11 +17,11 @@ requires-python = ">=3.11"
 dynamic = [ "version" ]
 
 dependencies = [
-    "fiab-core>=2,<3", # auto-updateable -- do not remove this comment
+    "fiab-core>=5,<6", # auto-updateable -- do not remove this comment
     "earthkit-workflows>=0.15.6",
     "earthkit-workflows-anemoi>=0.7.2",
     "pproc-core>=0.3.1",
-    "pymetkit @ git+https://git@github.com/ecmwf/metkit.git@feature/paramdb-api",
+    "pymetkit>=1.21.0.28", 
 ]
 
 optional-dependencies.runtime = [
@@ -35,6 +35,7 @@ optional-dependencies.runtime = [
 [dependency-groups]
 dev = [
   "ty==0.0.2",
+  "pytest_lazy_fixtures",
 ]
 
 [tool.setuptools_scm]
@@ -44,7 +45,7 @@ __version__ = "{version}"
 '''
 local_scheme = "no-local-version"
 root = ".."
-fallback_version = "0.0.0"
+fallback_version = "5.0.0" # auto-updateable -- do not remove this comment
 tag_regex = '^[vd](?P<version>\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$'
 
 [tool.ruff]

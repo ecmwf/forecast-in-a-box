@@ -184,6 +184,18 @@ const useDownloadStore = create<DownloadStore>()((set) => ({
 /** Module-level abort controllers — not in Zustand since they're not serialisable */
 const abortControllers = new Map<string, AbortController>()
 
+/** Wake functions of in-flight download polls, keyed like `abortControllers`. */
+const downloadWakers = new Map<string, () => void>()
+
+/**
+ * Re-poll an in-flight download immediately (the notification dispatcher
+ * calls this on artifactDownloadFinished); the poll response stays the
+ * source of truth. No-op when nothing is polling for the model.
+ */
+export function wakeDownloadPolling(compositeId: CompositeArtifactId): void {
+  downloadWakers.get(encodeArtifactId(compositeId))?.()
+}
+
 /**
  * Start a download polling loop for a model.
  * Runs independently of React component lifecycle.
@@ -220,11 +232,13 @@ async function startDownloadPolling(
           status: r.status,
         })
       },
+      onWake: (wake) => downloadWakers.set(key, wake),
     })
     onComplete?.()
     return response
   } finally {
     abortControllers.delete(key)
+    downloadWakers.delete(key)
     removePendingDownload(key)
     useDownloadStore.getState().removeProgress(key)
   }

@@ -8,9 +8,23 @@
  * does it submit to any jurisdiction.
  */
 
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import type { ActivityTask } from '@/stores/activityStore'
 import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { rewriteLegacyRoute, useActivityStore } from '@/stores/activityStore'
+
+const task = (
+  id: string,
+  status: ActivityTask['status'] = 'active',
+): ActivityTask => ({
+  id,
+  type: 'job',
+  label: id,
+  description: status,
+  status,
+  startedAt: 1,
+  ...(status !== 'active' && { completedAt: 2 }),
+})
 
 describe('rewriteLegacyRoute', () => {
   it('maps renamed route prefixes onto the live routes', () => {
@@ -65,5 +79,52 @@ describe('activity store v1 → v2 migration', () => {
     // Records without a link survive unchanged.
     expect(tasks['plugin:1']?.label).toBe('Plugin install')
     expect(tasks['plugin:1']?.navigateTo).toBeUndefined()
+  })
+})
+
+describe('dismissing active tasks', () => {
+  beforeEach(() => {
+    useActivityStore.setState({ tasks: {}, dismissed: {} })
+  })
+
+  it('removeTask remembers an active task, not a finished one', () => {
+    const { addTask, removeTask } = useActivityStore.getState()
+    addTask(task('job:run'))
+    addTask(task('job:done', 'completed'))
+    removeTask('job:run')
+    removeTask('job:done')
+    expect(useActivityStore.getState().tasks).toEqual({})
+    expect(useActivityStore.getState().dismissed).toEqual({ 'job:run': true })
+  })
+
+  it('clearAll remembers every active task', () => {
+    const { addTask, clearAll } = useActivityStore.getState()
+    addTask(task('job:a'))
+    addTask(task('download:b'))
+    addTask(task('job:c', 'failed'))
+    clearAll()
+    expect(useActivityStore.getState().tasks).toEqual({})
+    expect(useActivityStore.getState().dismissed).toEqual({
+      'job:a': true,
+      'download:b': true,
+    })
+  })
+
+  it('addTask lifts the dismissal, so a finished task shows again', () => {
+    const { addTask, clearAll } = useActivityStore.getState()
+    addTask(task('job:a'))
+    clearAll()
+    addTask(task('job:a', 'completed'))
+    expect(useActivityStore.getState().tasks['job:a']?.status).toBe('completed')
+    expect(useActivityStore.getState().dismissed).toEqual({})
+  })
+
+  it('forgetDismissed drops only the given ids', () => {
+    const { addTask, clearAll, forgetDismissed } = useActivityStore.getState()
+    addTask(task('job:a'))
+    addTask(task('job:b'))
+    clearAll()
+    forgetDismissed(['job:a', 'job:missing'])
+    expect(useActivityStore.getState().dismissed).toEqual({ 'job:b': true })
   })
 })

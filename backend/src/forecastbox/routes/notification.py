@@ -22,10 +22,11 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from forecastbox.domain.notification.events import PlaceholderNotificationEvent
 from forecastbox.domain.notification.service import register_client, unregister_client
+from forecastbox.utility.config import ROUTE_PREFIX
 from forecastbox.utility.dispatcher import Event, EventName, submit_event
 from forecastbox.utility.pydantic import FiabBaseModel
 
-PREFIX = "/api/v1/notification"
+PREFIX = f"{ROUTE_PREFIX}/notification"
 
 logger = logging.getLogger(__name__)
 

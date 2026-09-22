@@ -34,7 +34,8 @@ export default defineConfig(({ mode }) => {
       }),
       viteReact(),
       tailwindcss(),
-      // CSP: the WMS lens lives on dynamic loopback ports in every build.
+      // Loopback is not for the lens (same-origin via the proxy) but for a
+      // user's own WMS — one bundle serves both a domain and localhost.
       // External WMS hosts: dev allows all; prod bakes in the curated list
       // plus FIAB_CSP_EXTRA_HOSTS (space-separated source expressions).
       {
@@ -88,7 +89,7 @@ export default defineConfig(({ mode }) => {
               // not duplicated into / bundled with individual route chunks.
               {
                 name: 'charts',
-                test: /node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/,
+                test: /node_modules[\\/](@tanstack[\\/]charts|d3-[^\\/]+)[\\/]/,
               },
               {
                 name: 'flow',
@@ -121,6 +122,8 @@ export default defineConfig(({ mode }) => {
             target: env.VITE_API_BASE || 'http://localhost:8000',
             changeOrigin: true,
             secure: false,
+            // Forward WebSocket upgrades (notification push channel)
+            ws: true,
             cookieDomainRewrite: 'localhost',
             // Rewrite Location headers in redirect responses to use the proxy host
             // This fixes issues with backend 303 redirects containing absolute URLs to port 8000

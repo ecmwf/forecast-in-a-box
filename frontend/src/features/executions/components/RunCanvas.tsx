@@ -23,6 +23,7 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -34,6 +35,9 @@ import type {
   FableBuilderV1,
 } from '@/api/types/fable.types'
 import type { JobStatus } from '@/api/types/job.types'
+import { useMedia } from '@/hooks/useMedia'
+import { CanvasMiniMap } from '@/components/common/CanvasMiniMap'
+import { withMeasured } from '@/components/common/canvas-measured'
 import {
   fableToEdges,
   fableToNodes,
@@ -53,12 +57,12 @@ export function useShowConfig() {
 
 /** As-run values keyed by block, then option; empty until they resolve. */
 const ResolvedConfigContext = createContext<
-  Record<string, Record<string, string>>
+  Record<string, Record<string, string | null>>
 >({})
 
 export function useResolvedConfigFor(
   blockId: string,
-): Record<string, string> | undefined {
+): Record<string, string | null> | undefined {
   return useContext(ResolvedConfigContext)[blockId]
 }
 
@@ -89,7 +93,7 @@ interface RunCanvasProps {
   completedBlockIds?: ReadonlyArray<BlockInstanceId> | null
   plannedBlockIds?: ReadonlyArray<BlockInstanceId> | null
   /** As-run values by block then option; absent while loading or unrecorded. */
-  resolvedConfig?: Record<string, Record<string, string>>
+  resolvedConfig?: Record<string, Record<string, string | null>>
 }
 
 /** Fit never zooms past 1:1 — a tiny graph stays natural-sized, not blown up. */
@@ -128,6 +132,10 @@ function RunCanvasInner({
   const { t } = useTranslation('executions')
   const [showConfig, setShowConfig] = useState(true)
   const [maximized, setMaximized] = useState(false)
+  const isDesktop = useMedia('(min-width: 1024px)')
+  const isPhone = useMedia('(max-width: 639px)')
+  // Inline needs desktop room; maximized has room on anything but a phone.
+  const showMiniMap = maximized ? !isPhone : isDesktop
   const { fitView } = useReactFlow()
   const containerRef = useRef<HTMLDivElement>(null)
   const isInitialRender = useRef(true)
@@ -200,16 +208,15 @@ function RunCanvasInner({
     })
     const hasPlanInfo = blockProgress.plannedSet.size > 0
     const remapped = edgeList.map((e) => {
-      // Not running → always smoothstep.
-      // Running with detailed plan → beam only edges into currently-running
-      // blocks; finished and not-yet-started edges stay static.
-      // Running without detailed plan (older backend, or pre-plan tick) →
-      // fall back to beaming everything as before.
-      const shouldBeam =
+      // Running → every edge gets the ambient beam (track + drifting dots);
+      // the glowing worm marks only edges into currently-running blocks
+      // (or everything when no detailed plan is available).
+      const worm =
         isRunning && (!hasPlanInfo || blockProgress.runningSet.has(e.target))
       return {
         ...e,
-        type: shouldBeam ? ('beam' as const) : ('smoothstep' as const),
+        type: isRunning ? ('beam' as const) : ('smoothstep' as const),
+        data: { worm },
         animated: false,
         style: undefined,
       }
@@ -220,6 +227,11 @@ function RunCanvasInner({
       canvasHeight: computeCanvasHeight(laid),
     }
   }, [fable, catalogue, isRunning, blockProgress])
+  // React Flow owns the node state so its measurements stick across rebuilds.
+  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes)
+  useEffect(() => {
+    setNodes((prev) => withMeasured(layoutedNodes, prev))
+  }, [layoutedNodes, setNodes])
 
   return (
     <ShowConfigContext value={showConfig}>
@@ -242,7 +254,8 @@ function RunCanvasInner({
             )}
           >
             <ReactFlow
-              nodes={layoutedNodes}
+              nodes={nodes}
+              onNodesChange={onNodesChange}
               edges={edges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
@@ -255,7 +268,6 @@ function RunCanvasInner({
               fitViewOptions={{ padding: 0.15, maxZoom: FIT_MAX_ZOOM }}
               // Default 0.5 floor can't fit a wide pipeline into a phone container.
               minZoom={0.1}
-              proOptions={{ hideAttribution: true }}
               onNodeClick={(_event, node) => {
                 // Toggle: click the already-selected block to clear.
                 setSelectedBlockId(selectedBlockId === node.id ? null : node.id)
@@ -276,6 +288,7 @@ function RunCanvasInner({
                 position="bottom-left"
                 className="bottom-2! left-2!"
               />
+              {showMiniMap && <CanvasMiniMap />}
               <Panel position="top-left" className="top-2! left-2!">
                 <Button
                   variant="outline"

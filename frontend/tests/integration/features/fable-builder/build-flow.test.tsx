@@ -266,8 +266,8 @@ describe('Fable Builder Integration', () => {
       .element(screen.getByRole('button', { name: /Back to Edit/i }))
       .toBeVisible()
 
-    // And the "Submit Job" button (the label is in a sm:inline span)
-    await expect.element(screen.getByText('Submit Job')).toBeVisible()
+    // And the "Start Run" button (the label is in a sm:inline span)
+    await expect.element(screen.getByText('Start Run')).toBeVisible()
   })
 
   it('allows returning from review step to edit step', async () => {
@@ -316,7 +316,7 @@ describe('Fable Builder Integration', () => {
     // The dialog opens straight from the canvas — step stays 'edit'.
     expect(useFableBuilderStore.getState().step).toBe('edit')
     expect(useFableBuilderStore.getState().submitDialogOpen).toBe(true)
-    await expect.element(screen.getByText('Submit Forecast Job')).toBeVisible()
+    await expect.element(screen.getByText('Run Forecast')).toBeVisible()
   })
 
   it('opens the submit dialog on the schedule tab via "Run on Schedule"', async () => {
@@ -434,8 +434,8 @@ describe('Fable Builder Integration', () => {
       .element(screen.getByRole('button', { name: /Back to Edit/i }))
       .toBeVisible()
 
-    // The Submit Job button should be present
-    await expect.element(screen.getByText('Submit Job')).toBeVisible()
+    // The Start Run button should be present
+    await expect.element(screen.getByText('Start Run')).toBeVisible()
     // Per-test timeout raised: the 8 s validation poll above can't fit the
     // default 5 s test budget.
   }, 15000)

@@ -13,12 +13,12 @@ These classes are both frontend-exposed (serialised as JSON in HTTP responses) a
 consumed internally by the service layer.  Changes to field names or structure affect
 the frontend contract; coordinate with frontend consumers before making breaking changes.
 
-The public entry-point is ``build_plugin_listing()``.  It acquires the PluginManager
-lock for the duration of the in-memory snapshot capture *and* the database reads, so
-that both are taken from the same logical point in time.  This is not a fully
-transactional read (the SQLite reads are not inside a DB transaction), but it is
-sufficient for a consistent UI snapshot.  The lock is held only for the duration of
-these fast operations; long-running work must not be done under it.
+The public entry-point is ``build_plugin_listing()``.  It captures the PluginManager's
+in-memory plugin/error snapshot under the short state lock, releases the lock, and only
+then awaits the jobs-DB pool for database state.  This is a best-effort composed snapshot
+(the in-memory and DB reads are not from exactly the same instant, and the SQLite reads
+are not inside a single DB transaction), but it is sufficient for a consistent-enough UI
+listing while keeping the state lock short.
 """
 
 import logging
@@ -31,7 +31,7 @@ from pydantic import Field
 from forecastbox.domain.plugin.db import PluginStateRecord, get_all_plugin_states
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
 from forecastbox.domain.plugin.exceptions import PluginManagerBusy
-from forecastbox.domain.plugin.manager import PluginManager
+from forecastbox.domain.plugin.state import PluginManager
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry, get_plugins_detail
 from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
@@ -171,17 +171,19 @@ def _build_detail(
 async def build_plugin_listing() -> PluginListing:
     """Build and return the full plugin listing.
 
-    Acquires the PluginManager lock, captures in-memory plugin and error snapshots,
-    then performs all DB reads while still holding the lock to ensure a consistent
-    view.  Raises ``PluginManagerBusy`` if the lock cannot be acquired within the
-    timeout, which the route layer translates to a 503 response.
+    Captures the in-memory plugin and error snapshots under the short PluginManager state
+    lock, releases the lock, then awaits the jobs-DB pool for database state -- a jobs-DB
+    wait must never happen while the state lock is held.  Raises ``PluginManagerBusy`` if
+    the state lock cannot be acquired within the timeout, which the route layer translates
+    to a 503 response.
     """
     with timed_acquire(PluginManager.lock, 0.5) as acquired:
         if not acquired:
             raise PluginManagerBusy("plugin manager lock could not be acquired; retry later")
         plugins_snapshot: dict[PluginCompositeId, Plugin] = dict(PluginManager.plugins)
         errors_snapshot: dict[PluginCompositeId, PluginErrors] = dict(PluginManager.errors)
-        db_states = await execution_manager.await_jobs_db("plugin.state.list", partial(get_all_plugin_states))
+
+    db_states = await execution_manager.await_jobs_db("plugin.state.list", partial(get_all_plugin_states))
 
     store_detail = get_plugins_detail()
 

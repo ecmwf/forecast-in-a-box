@@ -27,11 +27,14 @@ function run(overrides: Partial<ForecastRunViewModel>): ForecastRunViewModel {
     modelLabel: 'AIFS Single',
     outputCount: 2,
     lostOutputCount: 0,
+    errorMessage: null,
     outputKinds: ['image'],
     tags: ['europe'],
     blueprintId: 'bp-1',
     fromPreset: false,
     scheduleName: null,
+    scheduleId: null,
+    hasComparableOutput: null,
     isBookmarked: false,
     ...overrides,
   }
@@ -77,6 +80,15 @@ const runs: Array<ForecastRunViewModel> = [
 const ids = (result: Array<ForecastRunViewModel>) => result.map((r) => r.runId)
 
 describe('filterRuns', () => {
+  it('matches the schedule facet against the schedule name', () => {
+    const sample = [
+      run({ runId: 'a', scheduleName: 'Nightly Europe' }),
+      run({ runId: 'b', scheduleName: null }),
+    ]
+    const hits = filterRuns(sample, 'all', parseQuery('schedule:europe'))
+    expect(hits.map((r) => r.runId)).toEqual(['a'])
+  })
+
   it('returns every run for the "all" filter and an empty query', () => {
     expect(filterRuns(runs, 'all', parseQuery(''))).toHaveLength(4)
   })

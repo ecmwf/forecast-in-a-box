@@ -8,7 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from importlib.resources import path
+from importlib.resources import as_file, files
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -24,12 +24,13 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Product
-from fiab_core.types import ClosedEnumType, FloatType, ListType, ParameterType
+from fiab_core.types import ClosedEnumType, FloatType, IntType, ListType, ParameterType
 from ppcore.products import action_from_outputs
 from ppcore.schema.forecast import ForecastDefinition
 from ppcore.schema.schema import Schema
 from qubed import Qube
 
+import fiab_plugin_ecmwf.products.pproc
 from fiab_plugin_ecmwf.block_utils import (
     _axis_value_strings,
     _extract_dataset,
@@ -40,6 +41,7 @@ from fiab_plugin_ecmwf.constants import (
     COMPARISON,
     ENSEMBLE,
     PARAM,
+    QUANTILE,
     STATISTIC,
     STEP,
     THRESHOLD,
@@ -51,7 +53,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_pproc_schema(cache_size: int) -> Schema:
-    with path("fiab_plugin_ecmwf.products.pproc", "schema.yaml") as pproc_schema:
+    with as_file(files(fiab_plugin_ecmwf.products.pproc) / "schema.yaml") as pproc_schema:
         return Schema.from_file(str(pproc_schema), matching_cache_size=cache_size)
 
 
@@ -251,9 +253,9 @@ class CustomThresholdProbability(Product):
         return contains(other, ENSEMBLE) and len(axes(other)[ENSEMBLE]) > 1 and contains(other, PARAM)
 
 
-class ThermalIndices(Product):
-    title: str = "Thermal Indices"
-    description: str = "Computes thermal indices"
+class DerivedSurfaceParameters(Product):
+    title: str = "Derived Parameters"
+    description: str = "Computes derived parameters from input datasets"
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         PARAM: BlockConfigurationOption(
             title="Parameters",
@@ -262,20 +264,11 @@ class ThermalIndices(Product):
         ),
     }
     inputs: list[str] = ["dataset"]
-    thermo_params: list[str] = [
-        "261001",
-        "261014",
-        "261015",
-        "260004",
-        "260242",
-        "261016",
-        "260005",
-        "260255",
-        "261018",
-        "261002",
-        "261023",
-    ]
     stat_type: list[str] = ["cf", "pf", "fc"]
+
+    @property
+    def derived_params(self) -> list[str]:
+        raise NotImplementedError()
 
     def validate(
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
@@ -283,16 +276,16 @@ class ThermalIndices(Product):
         input_dataset = _extract_dataset(inputs, "dataset")
         surface_cubes = select(input_dataset, {"levtype": "sfc"})
         coords = {dim: list(values) for dim, values in axes(surface_cubes).items() if len(values) == 1}
-        thermo_qube = Qube.empty()
+        derived_qube = Qube.empty()
         for output, _ in PPROC_SCHEMA.outputs_from_inputs(
             forecast=ForecastDefinition(datacubes=list(datacubes(surface_cubes))),
-            output_template={**coords, PARAM: self.thermo_params, TYPE: list(axes(surface_cubes)[TYPE])},
+            output_template={**coords, PARAM: self.derived_params, TYPE: list(axes(surface_cubes)[TYPE])},
         ):
-            thermo_qube = thermo_qube | Qube.from_datacube(output)
+            derived_qube = derived_qube | Qube.from_datacube(output)
 
-        restrictions[PARAM] = ListType(ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(thermo_qube)[PARAM]]))
+        restrictions[PARAM] = ListType(ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(derived_qube)[PARAM]]))
         selected_param_ids = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
-        param_qube = thermo_qube.select({PARAM: selected_param_ids})
+        param_qube = derived_qube.select({PARAM: selected_param_ids})
         # Compute for all steps available for all selected parameters
         allowed_steps = set.intersection(*[set(x[STEP]) for x in datacubes(param_qube)])
 
@@ -323,7 +316,6 @@ class ThermalIndices(Product):
 
     def intersect(self, other: QubedOutput) -> bool:
         surface_cubes = select(other, {"levtype": "sfc"})
-        # Thermal indices can only be computed from forecast outputs
         fc_types = set.intersection(axes(surface_cubes).get(TYPE, set()), self.stat_type)
         if len(fc_types) == 0:
             return False
@@ -332,7 +324,7 @@ class ThermalIndices(Product):
         try:
             for _ in PPROC_SCHEMA.outputs_from_inputs(
                 forecast=ForecastDefinition(datacubes=list(datacubes(surface_cubes))),
-                output_template={**coords, PARAM: self.thermo_params, TYPE: list(fc_types)},
+                output_template={**coords, PARAM: self.derived_params, TYPE: list(fc_types)},
                 method="dfs",
             ):
                 return True
@@ -340,3 +332,89 @@ class ThermalIndices(Product):
             logger.debug(e)
             pass
         return False
+
+
+class ThermalIndices(DerivedSurfaceParameters):
+    title: str = "Thermal Indices"
+    description: str = "Computes thermal indices"
+
+    @property
+    def derived_params(self) -> list[str]:
+        return [
+            "261001",
+            "261014",
+            "261015",
+            "260004",
+            "260242",
+            "261016",
+            "260005",
+            "260255",
+            "261018",
+            "261002",
+            "261023",
+        ]
+
+
+class WindSpeed(DerivedSurfaceParameters):
+    title: str = "Wind Speed"
+    description: str = "Computes wind speed from u and v wind components"
+
+    @property
+    def derived_params(self) -> list[str]:
+        """
+        Returns a list of parameter IDs for wind speeds ws, 10m ws, 100m ws, 200m ws.
+        """
+        return [
+            "10",
+            "207",
+            "228249",
+            "228241",
+        ]
+
+
+class Quantiles(Product):
+    title: str = "Quantiles"
+    description: str = "Computes quantiles over ensemble members"
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        QUANTILE: BlockConfigurationOption(
+            title="Quantiles",
+            description="Number of quantiles to compute over the ensemble",
+            value_type=IntType(),
+            default_value="100",
+        ),
+    }
+    inputs: list[str] = ["dataset"]
+    stat_type: str = "pb"
+
+    def validate(
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
+        input_dataset = _extract_dataset(inputs, "dataset")
+        quantile = block.config_as_int(QUANTILE)
+        coords = axes(input_dataset)
+        output = coxpand(
+            select(input_dataset, {ENSEMBLE: 1}),
+            [dim for dim in [ENSEMBLE, TYPE] if dim in coords],
+            {TYPE: [self.stat_type], QUANTILE: [f"{q}:{quantile}" for q in range(quantile + 1)]},
+        )
+        return output
+
+    def compile(
+        self,
+        inputs: ActionLookup,
+        block: BlockInstanceRich,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+        input_task_action = inputs[input_task]
+        output_qube = self.validate(
+            block, {"dataset": QubedOutput(dataqube=from_datacubes(nodetree_datacubes(input_task_action.nodes)))}, {}
+        )
+        action = action_from_outputs(
+            requests=list(datacubes(output_qube)),
+            pproc_schema=PPROC_SCHEMA,
+            forecast=input_task_action.as_action(PProcAction),
+        )
+        return Either.ok(action)
+
+    def intersect(self, other: QubedOutput) -> bool:
+        return contains(other, ENSEMBLE) and len(axes(other)[ENSEMBLE]) > 1 and contains(other, PARAM)

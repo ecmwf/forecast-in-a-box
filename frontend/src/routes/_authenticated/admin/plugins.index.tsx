@@ -46,6 +46,7 @@ import { PluginsList } from '@/features/plugins/components/PluginsList'
 import { UninstalledPluginsSection } from '@/features/plugins/components/UninstalledPluginsSection'
 import { UpdatesAvailableSection } from '@/features/plugins/components/UpdatesAvailableSection'
 import { pluginFailureDescription } from '@/features/plugins/utils/plugin-activity'
+import { compareInstalledPlugins } from '@/features/plugins/utils/plugin-sort'
 import { useActivityStore } from '@/stores/activityStore'
 import { useUiStore } from '@/stores/uiStore'
 import { getPluginStatusError } from '@/types/status.types'
@@ -57,8 +58,6 @@ export const Route = createFileRoute('/_authenticated/admin/plugins/')({
 function PluginsPage() {
   const { t } = useTranslation('plugins')
   const navigate = useNavigate()
-  const dashboardVariant = useUiStore((state) => state.dashboardVariant)
-  const panelShadow = useUiStore((state) => state.panelShadow)
   const pluginsViewMode = useUiStore((state) => state.pluginsViewMode)
 
   // Filter state
@@ -154,16 +153,7 @@ function PluginsPage() {
     const withUpdates = filteredPlugins.filter((p) => p.hasUpdate)
     const installed = filteredPlugins
 
-    // Sort: updatable first, then enabled, then by name
-    installed.sort((a, b) => {
-      if (a.hasUpdate !== b.hasUpdate) {
-        return a.hasUpdate ? -1 : 1
-      }
-      if (a.isEnabled !== b.isEnabled) {
-        return a.isEnabled ? -1 : 1
-      }
-      return a.name.localeCompare(b.name)
-    })
+    installed.sort(compareInstalledPlugins)
 
     return {
       pluginsWithUpdates: filteringAvailable ? [] : withUpdates,
@@ -354,8 +344,6 @@ function PluginsPage() {
             onUninstall={handleUninstall}
             onUpdate={handleUpdate}
             onViewDetails={handleViewDetails}
-            variant={dashboardVariant}
-            shadow={panelShadow}
           />
         </div>
       )}
@@ -368,8 +356,6 @@ function PluginsPage() {
         installingId={
           installPlugin.isPending ? installPlugin.variables : undefined
         }
-        variant={dashboardVariant}
-        shadow={panelShadow}
       />
     </ListPageContainer>
   )

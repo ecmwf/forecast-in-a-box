@@ -19,8 +19,9 @@ from forecastbox.domain.artifact.base import CompositeArtifactId, MlModelDetail,
 from forecastbox.domain.artifact.manager import delete_model, get_model_details, list_models, submit_artifact_download
 from forecastbox.domain.auth.users import UserRead
 from forecastbox.routes.admin import get_admin_user
+from forecastbox.utility.config import ROUTE_PREFIX
 
-PREFIX = "/api/v1/artifacts"
+PREFIX = f"{ROUTE_PREFIX}/artifacts"
 
 router = APIRouter(
     tags=["artifacts"],
