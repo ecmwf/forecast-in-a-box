@@ -20,6 +20,7 @@ import logging
 import os
 import socket
 import subprocess
+import sys
 import threading
 import uuid
 from dataclasses import dataclass
@@ -141,6 +142,7 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             # shifting advertised times by the host's UTC offset — we explicitly
             # use the backend-wide default tz
             "TZ": default_tz_fallback(),
+            "MAGICS_STYLE_PATH": sys.prefix + "/share/magics/styles/dccms",
         }
         log_directory = os.environ[BACKEND_LOG_DIRECTORY_ENV]
         stdout_path = os.path.join(log_directory, f"lens.{instance_id}.stdout.txt")
