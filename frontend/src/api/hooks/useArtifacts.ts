@@ -202,7 +202,7 @@ export function wakeDownloadPolling(compositeId: CompositeArtifactId): void {
  */
 async function startDownloadPolling(
   compositeId: CompositeArtifactId,
-  onComplete?: () => void,
+  onComplete?: () => Promise<unknown>,
 ) {
   const key = encodeArtifactId(compositeId)
 
@@ -234,7 +234,8 @@ async function startDownloadPolling(
       },
       onWake: (wake) => downloadWakers.set(key, wake),
     })
-    onComplete?.()
+    // Keep the progress entry until the list shows the model as downloaded.
+    await onComplete?.()
     return response
   } finally {
     abortControllers.delete(key)
@@ -267,23 +268,27 @@ export function useDownloadActions() {
       if (!compositeId.artifact_store_id || !compositeId.artifact_local_id)
         continue
 
-      startDownloadPolling(compositeId, () => {
-        queryClient.invalidateQueries({ queryKey: artifactKeys.list() })
-        queryClient.invalidateQueries({
-          queryKey: artifactKeys.detail(compositeId),
-        })
-      }).catch(handleDownloadError)
+      startDownloadPolling(compositeId, () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
+          queryClient.invalidateQueries({
+            queryKey: artifactKeys.detail(compositeId),
+          }),
+        ]),
+      ).catch(handleDownloadError)
     }
   }, [queryClient])
 
   const mutate = useCallback(
     (compositeId: CompositeArtifactId) => {
-      startDownloadPolling(compositeId, () => {
-        queryClient.invalidateQueries({ queryKey: artifactKeys.list() })
-        queryClient.invalidateQueries({
-          queryKey: artifactKeys.detail(compositeId),
-        })
-      }).catch(handleDownloadError)
+      startDownloadPolling(compositeId, () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
+          queryClient.invalidateQueries({
+            queryKey: artifactKeys.detail(compositeId),
+          }),
+        ]),
+      ).catch(handleDownloadError)
     },
     [queryClient],
   )
