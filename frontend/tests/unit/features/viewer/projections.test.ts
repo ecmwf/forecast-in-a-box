@@ -26,7 +26,9 @@ import {
 } from '@/features/viewer/projections'
 import { createViewerView } from '@/features/viewer/hooks/useOlMapBase'
 import {
+  FLAT_PROJECTION_IDS,
   PROJECTION_IDS,
+  isFlatProjectionId,
   isProjectionId,
 } from '@/features/viewer/projection-ids'
 
@@ -77,7 +79,11 @@ describe('projection registry', () => {
   })
 
   it('exposes the toolbar order and validates ids', () => {
-    expect(PROJECTIONS.map((p) => p.id)).toEqual([...PROJECTION_IDS])
+    // The globe is a URL id but not an OpenLayers projection.
+    expect(PROJECTIONS.map((p) => p.id)).toEqual([...FLAT_PROJECTION_IDS])
+    expect(PROJECTION_IDS).toEqual([...FLAT_PROJECTION_IDS, 'globe'])
+    expect(isProjectionId('globe')).toBe(true)
+    expect(isFlatProjectionId('globe')).toBe(false)
     expect(isProjectionId('npole')).toBe(true)
     expect(isProjectionId('EPSG:3857')).toBe(false)
     expect(getViewerProjection(undefined).id).toBe('merc')

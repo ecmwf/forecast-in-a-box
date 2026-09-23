@@ -218,14 +218,19 @@
     "npole": "Arctic — polar stereographic",
     "spole": "Antarctic — polar stereographic",
     "laea": "Europe — equal-area (LAEA)",
+    "globe": "3D globe",
     "blockedBy": "{{source}} does not serve this projection",
     "snappedBack": "{{source}} does not serve the {{projection}} projection — back to Web Mercator",
+    "blockedMode": "Only one source or side-by-side",
+    "snappedBackMode": "The 3D globe shows one source or side-by-side, back to the flat map",
+    "autoGlobe": "Bend into a globe when zooming out",
     "short": {
       "merc": "Mercator",
       "geo": "Equirectangular",
       "npole": "Arctic",
       "spole": "Antarctic",
-      "laea": "Europe LAEA"
+      "laea": "Europe LAEA",
+      "globe": "Globe"
     }
   },
   "wmsParams": {
@@ -383,7 +388,7 @@
       },
       "tools": {
         "title": "Tools",
-        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The annotate tool (N) records numbered findings pinned to the map — per panel in side-by-side — and they are baked into exports. The layers icon (P) switches the map projection — Web Mercator, an equirectangular globe, Arctic and Antarctic polar views, or an equal-area Europe — and the basemap and its opacity. Data is rendered natively by each server, so a projection is offered only when every active source supports it; web basemaps need Web Mercator, elsewhere the built-in outline map takes over. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
+        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The annotate tool (N) records numbered findings pinned to the map — per panel in side-by-side — and they are baked into exports. The layers icon (P) switches the map projection — Web Mercator, an equirectangular globe, Arctic and Antarctic polar views, an equal-area Europe, or a 3D globe (zooming far out bends the map into it) — and the basemap and its opacity. Data is rendered natively by each server, so a projection is offered only when every active source supports it; web basemaps need Web Mercator, elsewhere the built-in outline map takes over. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
       },
       "export": {
         "title": "Export",
@@ -471,5 +476,11 @@
     "activeTail": "ending in …{{tail}}",
     "replaceLabel": "Replace key",
     "replace": "Replace"
+  },
+  "globe": {
+    "toolUnavailable": "Not available on the 3D globe",
+    "contextLost": "The 3D globe stopped (graphics context lost), back to the flat map",
+    "failed": "The 3D globe could not start, staying on the flat map",
+    "unsupported": "This browser cannot show the 3D globe, showing the flat map"
   }
 }

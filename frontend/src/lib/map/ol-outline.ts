@@ -87,6 +87,11 @@ const PALETTES: Record<OutlineTheme, Palette> = {
   },
 }
 
+/** Stroke colours per theme (the globe draws the same outline). */
+export function outlinePalette(theme: OutlineTheme): Readonly<Palette> {
+  return PALETTES[theme]
+}
+
 /** Reprojected features, minus any that hit a singularity (antipode). */
 function readFeatures(json: object, projection: string): Array<Feature> {
   // dataProjection pins the source: a `crs` alias (CRS84) has no proj4 link.

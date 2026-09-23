@@ -140,7 +140,7 @@ export const STORAGE_KEYS = {
  * ```
  */
 export const STORE_VERSIONS = {
-  ui: 7, // v7: Removed layoutMode, dashboardVariant, panelShadow
+  ui: 8, // v8: Added globeAutoTransition
   config: 1,
   fableBuilder: 3, // v3: Removed mode, edgeStyle, autoLayout
   activity: 2, // v2: navigateTo rewritten for /executions→/execute, /dashboard→/overview

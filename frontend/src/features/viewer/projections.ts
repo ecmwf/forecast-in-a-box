@@ -33,21 +33,21 @@ import {
   getIntersection,
 } from 'ol/extent'
 import { isWorldBbox } from './wms-capabilities'
-import { DEFAULT_PROJECTION_ID, PROJECTION_IDS } from './projection-ids'
+import { DEFAULT_PROJECTION_ID, FLAT_PROJECTION_IDS } from './projection-ids'
 import type { Extent } from 'ol/extent'
 import type View from 'ol/View'
-import type { ProjectionId } from './projection-ids'
+import type { FlatProjectionId, ProjectionId } from './projection-ids'
 import type { Bbox } from './wms-capabilities'
 import type { PolarGraticule } from '@/lib/map/ol-outline'
 
-export type { ProjectionId }
+export type { FlatProjectionId, ProjectionId }
 
 export interface ViewerProjection {
-  id: ProjectionId
+  id: FlatProjectionId
   /** WMS CRS code (also the OL projection code). */
   code: string
   /** `visualise`-namespace label key. */
-  labelKey: `projections.${ProjectionId}`
+  labelKey: `projections.${FlatProjectionId}`
   /** proj4 definition; absent for OL built-ins. */
   proj4?: string
   /** Navigable extent (View constraint), projection units. */
@@ -156,13 +156,14 @@ export const PROJECTIONS: ReadonlyArray<ViewerProjection> = [
 const BY_ID = new Map(PROJECTIONS.map((p) => [p.id, p]))
 
 export function getViewerProjection(
-  id?: ProjectionId | null,
+  id?: FlatProjectionId | null,
 ): ViewerProjection {
   return BY_ID.get(id ?? DEFAULT_PROJECTION_ID) ?? BY_ID.get('merc')!
 }
 
 /** Toolbar order, as ids. */
-export const PROJECTION_ORDER: ReadonlyArray<ProjectionId> = PROJECTION_IDS
+export const PROJECTION_ORDER: ReadonlyArray<FlatProjectionId> =
+  FLAT_PROJECTION_IDS
 
 /** Polar graticule geometry for the Outline basemap; undefined elsewhere. */
 export function polarGraticuleFor(

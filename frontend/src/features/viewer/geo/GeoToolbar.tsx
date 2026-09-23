@@ -68,11 +68,12 @@ import { cn } from '@/lib/utils'
 
 const log = createLogger('GeoToolbar')
 
-/** A projection entry; `blockedBy` names the source lacking its CRS. */
+/** A projection entry; `blockedBy` names the blocking source, or the reason (mode). */
 export interface ProjectionOption {
   id: ProjectionId
-  labelKey: ViewerProjection['labelKey']
+  labelKey: `projections.${ProjectionId}`
   blockedBy: string | null
+  blockedReason?: 'crs' | 'mode'
 }
 
 /** Shortcut badge shown while ⌘/Ctrl is held. */
@@ -136,8 +137,11 @@ export function GeoToolbar({
   basemapOpacity,
   onBasemapOpacityChange,
   projection,
+  projectionId,
   projections,
   onProjectionChange,
+  globeActive = false,
+  globeAuto = null,
 }: {
   /** Single-source: comparison modes + link toggle hidden. */
   solo?: boolean
@@ -172,9 +176,16 @@ export function GeoToolbar({
   availableBasemaps: ReadonlyArray<BasemapOption>
   basemapOpacity: number
   onBasemapOpacityChange: (opacity: number) => void
+  /** The flat projection (basemap fit). */
   projection: ViewerProjection
+  /** What the map shows — the flat projection or the globe. */
+  projectionId: ProjectionId
   projections: ReadonlyArray<ProjectionOption>
   onProjectionChange: (id: ProjectionId) => void
+  /** On the 3D globe: map-click tools are unavailable. */
+  globeActive?: boolean
+  /** Auto-globe switch; null when the globe is not offered. */
+  globeAuto?: { enabled: boolean; onChange: (enabled: boolean) => void } | null
 }) {
   const { t } = useTranslation('visualise')
   const annotationFileRef = useRef<HTMLInputElement>(null)
@@ -330,7 +341,7 @@ export function GeoToolbar({
               />
               <Layers className="h-4 w-4" />
               <span className="text-xs">
-                {t(`projections.short.${projection.id}`)}
+                {t(`projections.short.${projectionId}`)}
               </span>
               <ChevronDown className="h-3 w-3 opacity-60" />
             </PopoverTrigger>
@@ -344,11 +355,13 @@ export function GeoToolbar({
                 aria-label={t('projections.title')}
               >
                 {projections.map((p) => {
-                  const selected = p.id === projection.id
+                  const selected = p.id === projectionId
                   const hint =
-                    p.blockedBy !== null
-                      ? t('projections.blockedBy', { source: p.blockedBy })
-                      : null
+                    p.blockedBy === null
+                      ? null
+                      : p.blockedReason === 'mode'
+                        ? p.blockedBy
+                        : t('projections.blockedBy', { source: p.blockedBy })
                   return (
                     <button
                       key={p.id}
@@ -378,13 +391,28 @@ export function GeoToolbar({
                   )
                 })}
               </div>
+              {globeAuto && (
+                <label className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm">
+                  {t('projections.autoGlobe')}
+                  <Switch
+                    size="sm"
+                    checked={globeAuto.enabled}
+                    onCheckedChange={globeAuto.onChange}
+                  />
+                </label>
+              )}
               <P className="mt-1 border-t border-border px-2 pt-2 pb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {tExec('lens.basemap')}
               </P>
               <div className="flex flex-col">
                 {availableBasemaps.map((b) => {
                   // Web basemaps are Mercator-only; the Outline stands in.
-                  const fits = basemapFitsProjection(b, projection)
+                  const fits = globeActive
+                    ? b.type === 'outline'
+                    : basemapFitsProjection(b, projection)
+                  const unfitHint = globeActive
+                    ? t('globe.toolUnavailable')
+                    : t('basemaps.mercatorOnly')
                   return (
                     <button
                       key={b.id}
@@ -392,7 +420,7 @@ export function GeoToolbar({
                       onClick={() => onBasemapChange(b.id)}
                       aria-pressed={b.id === basemapId}
                       disabled={!fits}
-                      title={fits ? undefined : t('basemaps.mercatorOnly')}
+                      title={fits ? undefined : unfitHint}
                       className={cn(
                         'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
                         b.id === basemapId && 'bg-accent font-medium',
@@ -402,7 +430,7 @@ export function GeoToolbar({
                         <span>{t(b.labelKey)}</span>
                         {!fits && (
                           <span className="text-xs font-normal text-muted-foreground">
-                            {t('basemaps.mercatorOnly')}
+                            {unfitHint}
                           </span>
                         )}
                       </span>
@@ -438,10 +466,11 @@ export function GeoToolbar({
             size="icon"
             className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
             aria-pressed={measureMode === 'line'}
+            disabled={globeActive}
             onClick={() =>
               onMeasureMode(measureMode === 'line' ? 'none' : 'line')
             }
-            title={t('measure.line')}
+            title={globeActive ? t('globe.toolUnavailable') : t('measure.line')}
             aria-label={t('measure.line')}
           >
             <Ruler className="h-4 w-4" />
@@ -457,6 +486,7 @@ export function GeoToolbar({
               size="icon"
               className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
               aria-pressed={measureMode === 'area' || measureMode === 'box'}
+              disabled={globeActive}
               onClick={() =>
                 onMeasureMode(
                   measureMode === 'area' || measureMode === 'box'
@@ -464,7 +494,9 @@ export function GeoToolbar({
                     : 'area',
                 )
               }
-              title={t('measure.area')}
+              title={
+                globeActive ? t('globe.toolUnavailable') : t('measure.area')
+              }
               aria-label={t('measure.area')}
             >
               <SquareDashed className="h-4 w-4" />
@@ -476,6 +508,7 @@ export function GeoToolbar({
                     variant="ghost"
                     size="icon"
                     className="-ml-1 h-7 w-6"
+                    disabled={globeActive}
                     title={t('measure.shapeMenu')}
                     aria-label={t('measure.shapeMenu')}
                   />
@@ -497,6 +530,7 @@ export function GeoToolbar({
             variant="ghost"
             size="icon"
             className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+            disabled={globeActive}
             onClick={onMeasureClear}
             title={t('measure.clear')}
             aria-label={t('measure.clear')}
@@ -509,8 +543,13 @@ export function GeoToolbar({
               size="icon"
               className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
               aria-pressed={annotateArmed}
+              disabled={globeActive}
               onClick={onAnnotateToggle}
-              title={`${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`}
+              title={
+                globeActive
+                  ? t('globe.toolUnavailable')
+                  : `${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`
+              }
               aria-label={t('annotations.tool')}
             >
               <KeyBadge label={keyLabel(COMPARE_KEYS.annotate)} show={reveal} />
@@ -613,10 +652,15 @@ export function GeoToolbar({
               size="icon"
               className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
               aria-pressed={options.loupeLatched}
+              disabled={globeActive}
               onClick={() =>
                 onOptionsChange({ loupeLatched: !options.loupeLatched })
               }
-              title={`${t('modes.loupeLatch')} (${keyLabel(COMPARE_KEYS.loupe)})`}
+              title={
+                globeActive
+                  ? t('globe.toolUnavailable')
+                  : `${t('modes.loupeLatch')} (${keyLabel(COMPARE_KEYS.loupe)})`
+              }
               aria-label={t('modes.loupeLatch')}
             >
               <KeyBadge label={keyLabel(COMPARE_KEYS.loupe)} show={reveal} />

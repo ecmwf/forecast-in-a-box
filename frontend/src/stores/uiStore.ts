@@ -65,6 +65,10 @@ interface UiState {
   journalShowFlow: boolean
   setJournalShowFlow: (value: boolean) => void
 
+  // Visualise: zooming out past the world bends the map into the 3D globe.
+  globeAutoTransition: boolean
+  setGlobeAutoTransition: (value: boolean) => void
+
   // Reset store
   reset: () => void
 }
@@ -83,6 +87,7 @@ const initialState = {
   paletteCompact: false,
   timeZone: 'UTC',
   journalShowFlow: false,
+  globeAutoTransition: true,
 }
 
 export const useUiStore = create<UiState>()(
@@ -132,6 +137,9 @@ export const useUiStore = create<UiState>()(
 
         // Forecast Journal flow preview (session-only — not persisted)
         setJournalShowFlow: (journalShowFlow) => set({ journalShowFlow }),
+
+        setGlobeAutoTransition: (globeAutoTransition) =>
+          set({ globeAutoTransition }),
 
         // Reset to initial state
         reset: () => set(initialState),
@@ -192,12 +200,18 @@ export const useUiStore = create<UiState>()(
             delete state.panelShadow
           }
 
+          // v8: automatic globe transition (default on).
+          if (version < 8) {
+            state.globeAutoTransition = true
+          }
+
           return state as {
             theme: Theme
             pluginsViewMode: AdminViewMode
             modelsViewMode: AdminViewMode
             artifactsViewMode: AdminViewMode
             timeZone: string
+            globeAutoTransition: boolean
           }
         },
         partialize: (state) => ({
@@ -211,6 +225,7 @@ export const useUiStore = create<UiState>()(
           paletteUsableOnly: state.paletteUsableOnly,
           paletteCompact: state.paletteCompact,
           timeZone: state.timeZone,
+          globeAutoTransition: state.globeAutoTransition,
         }),
       },
     ),

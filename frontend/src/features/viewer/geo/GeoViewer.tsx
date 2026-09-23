@@ -25,6 +25,8 @@
  */
 
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -53,7 +55,13 @@ import {
   getViewerProjection,
   groundResolution,
   viewResolutionFor,
+  viewerProjectionOf,
 } from '../projections'
+import { ACTIVE_GLOBE_ENGINE } from '../globe/engines/registry'
+import { flatKindOf, panGlobeCamera } from '../globe/globe-camera'
+import { useGlobeMode } from '../globe/useGlobeMode'
+import { useZoomOutPastWorld } from '../globe/useZoomOutPastWorld'
+import { disableGlobe, supportsGlobe } from '../globe/webgl-support'
 import {
   activeLayersBbox,
   isLensProxyUrl,
@@ -94,7 +102,8 @@ import type { GeoPanelSide } from './useGeoPanelWidths'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
-import type { ProjectionId } from '../projection-ids'
+import type { FlatProjectionId, ProjectionId } from '../projection-ids'
+import type { GlobeOutlineSpec } from '../globe/engine'
 import type { BboxAxisOrder } from '../projections'
 import type { ProjectionOption } from './GeoToolbar'
 import type { SourceSlot } from './layer-pairing'
@@ -128,6 +137,15 @@ import {
   useStylePinsStore,
 } from '@/stores/stylePinsStore'
 import { preloadOutlineData } from '@/lib/map/ol-outline'
+import { createLogger } from '@/lib/logger'
+import { useUiStore } from '@/stores/uiStore'
+
+const log = createLogger('GeoViewer')
+
+// Lazy: the globe chunk loads only when the globe is first shown.
+const GlobeView = lazy(() =>
+  import('../globe/GlobeView').then((m) => ({ default: m.GlobeView })),
+)
 
 export interface GeoViewerSource {
   /** Stable source identity (basket entry ref) — annotations bind to it. */
@@ -204,15 +222,26 @@ export function GeoViewer({
   // Mount snapshot — restoration must not react to later URL rewrites.
   const initialViewRef = useRef(initialViewState ?? null)
 
-  // One View per projection; a switch swaps in a new View, camera carried.
-  const [projectionId, setProjectionId] = useState<ProjectionId>(
-    () => initialViewRef.current?.projection ?? DEFAULT_PROJECTION_ID,
+  // Globe needs hardware WebGL; a lost context withdraws it for the session.
+  const [globeAvailable, setGlobeAvailable] = useState(supportsGlobe)
+  const [startOnGlobe] = useState(
+    () => initialViewRef.current?.projection === 'globe' && globeAvailable,
   )
+  useEffect(() => {
+    if (initialViewRef.current?.projection === 'globe' && !startOnGlobe) {
+      showToast.info(t('globe.unsupported'))
+    }
+  }, [])
+
+  // One View per flat projection (camera carried); kept while on the globe.
   const [view, setView] = useState<View>(() => {
-    const projection = getViewerProjection(projectionId)
+    const restored = initialViewRef.current?.projection
+    const projection = getViewerProjection(
+      restored === 'globe' ? DEFAULT_PROJECTION_ID : restored,
+    )
     const next = createViewerView(projection)
     const cam = initialViewRef.current?.camera
-    if (cam) {
+    if (cam && !startOnGlobe) {
       next.setCenter(fromLonLat([cam.lon, cam.lat], projection.code))
       next.setZoom(cam.zoom)
       // A restored camera outranks the initial auto-fit.
@@ -225,18 +254,79 @@ export function GeoViewer({
   // Imperative users (pan, zoom, locate) read the live instance.
   const viewRef = useRef(view)
   viewRef.current = view
-  const projection = getViewerProjection(projectionId)
-  const changeProjection = useCallback((id: ProjectionId) => {
-    const current = viewRef.current
-    const target = getViewerProjection(id)
-    if (current.getProjection().getCode() === target.code) return
-    const next = createViewerView(target)
-    carryCamera(current, next, target)
-    next.set(AUTOFIT_KEY, true, true)
+  const projection = viewerProjectionOf(view)
+  const flatId = projection.id
+  const adoptFlatView = useCallback((next: View) => {
     viewRef.current = next
     setView(next)
-    setProjectionId(id)
   }, [])
+  const changeFlatProjection = useCallback(
+    (id: FlatProjectionId) => {
+      const current = viewRef.current
+      const target = getViewerProjection(id)
+      if (current.getProjection().getCode() === target.code) return
+      const next = createViewerView(target)
+      carryCamera(current, next, target)
+      next.set(AUTOFIT_KEY, true, true)
+      adoptFlatView(next)
+    },
+    [adoptFlatView],
+  )
+
+  // Source focus: a slot views only that source (UI collapses to it); null compares both.
+  const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
+
+  // -------- 3D globe (flat ↔ globe handoff) --------
+  const globeAutoTransition = useUiStore((s) => s.globeAutoTransition)
+  const setGlobeAutoTransition = useUiStore((s) => s.setGlobeAutoTransition)
+  const reducedMotion = useMedia('(prefers-reduced-motion: reduce)')
+  const globePanels = hasB && focusSlot === null && mode === 'side' ? 2 : 1
+  // Back from the globe: the flat map it bent from, else Mercator.
+  const globeExitTarget: FlatProjectionId =
+    flatKindOf(flatId) !== null ? flatId : DEFAULT_PROJECTION_ID
+  const globe = useGlobeMode({
+    viewRef,
+    onFlatView: adoptFlatView,
+    panelCount: globePanels,
+    reducedMotion,
+    autoExit: globeAutoTransition,
+    exitTarget: globeExitTarget,
+    initialCamera: startOnGlobe
+      ? (initialViewRef.current?.camera ?? { lon: 10, lat: 30, zoom: 1.5 })
+      : null,
+    onFailure: (err) => {
+      log.error('Globe failed to start', { error: err })
+      showToast.error(t('globe.failed'))
+    },
+  })
+  const globePhaseRef = useRef(globe.phase)
+  globePhaseRef.current = globe.phase
+  const onGlobeFailure = useCallback(
+    (err: unknown) => {
+      log.error('Globe engine failed', { error: err })
+      showToast.error(t('globe.failed'))
+      globe.fail()
+    },
+    [globe.fail, t],
+  )
+  const onGlobeContextLost = useCallback(() => {
+    log.warn('Globe WebGL context lost')
+    disableGlobe()
+    setGlobeAvailable(false)
+    showToast.error(t('globe.contextLost'))
+    globe.fail()
+  }, [globe.fail, t])
+  // What the map shows: the globe from the moment it starts bending in.
+  const projectionId: ProjectionId =
+    globe.phase === 'entering' || globe.phase === 'globe' ? 'globe' : flatId
+  const changeProjection = useCallback(
+    (id: ProjectionId) => {
+      if (id === 'globe') return globe.enter()
+      if (globePhaseRef.current !== 'flat') return globe.leave(id)
+      changeFlatProjection(id)
+    },
+    [globe.enter, globe.leave, changeFlatProjection],
+  )
 
   // -------- Pairing + selection --------
   const pairing = useMemo(
@@ -472,13 +562,14 @@ export function GeoViewer({
       setBasemapId(DEFAULT_BASEMAP_ID)
     }
   }, [availableBasemaps, basemapId, sourceA.loadingLayers])
-  // Off-Mercator the Outline stands in; the Carto choice is kept.
+  // Off-Mercator (and on the globe) the Outline stands in; the choice is kept.
+  const onGlobe = projectionId === 'globe'
   const effectiveBasemapId = useMemo(() => {
     const opt = availableBasemaps.find((o) => o.id === basemapId)
-    return opt && !basemapFitsProjection(opt, projection)
+    return onGlobe || (opt && !basemapFitsProjection(opt, projection))
       ? OUTLINE_BASEMAP.id
       : basemapId
-  }, [availableBasemaps, basemapId, projection])
+  }, [availableBasemaps, basemapId, projection, onGlobe])
 
   // Offered only when every loaded source advertises the CRS.
   const projectionOptions = useMemo<ReadonlyArray<ProjectionOption>>(() => {
@@ -486,20 +577,33 @@ export function GeoViewer({
       { src: sourceA, label: `A · ${a.label}` },
       ...(b ? [{ src: sourceB, label: `B · ${b.label}` }] : []),
     ]
-    return PROJECTIONS.map((p) => ({
+    const lacking = (code: string) =>
+      sources.find(
+        ({ src }) =>
+          !src.loadingLayers &&
+          src.error === null &&
+          !supportsCrs(src.crs, code),
+      )?.label ?? null
+    const flat: Array<ProjectionOption> = PROJECTIONS.map((p) => ({
       id: p.id,
       labelKey: p.labelKey,
       // Mercator is never blocked: every server answers it in practice.
-      blockedBy:
-        p.id === DEFAULT_PROJECTION_ID
-          ? null
-          : (sources.find(
-              ({ src }) =>
-                !src.loadingLayers &&
-                src.error === null &&
-                !supportsCrs(src.crs, p.code),
-            )?.label ?? null),
+      blockedBy: p.id === DEFAULT_PROJECTION_ID ? null : lacking(p.code),
     }))
+    if (!globeAvailable) return flat
+    // The globe shows one source, or two side by side.
+    const crsBlock = lacking(ACTIVE_GLOBE_ENGINE.requiredCrs)
+    const modeBlock = hasB && focusSlot === null && mode !== 'side'
+    return [
+      ...flat,
+      {
+        id: 'globe',
+        labelKey: 'projections.globe',
+        blockedBy:
+          crsBlock ?? (modeBlock ? t('projections.blockedMode') : null),
+        blockedReason: crsBlock ? 'crs' : modeBlock ? 'mode' : undefined,
+      },
+    ]
     // Keyed on the meaningful bits — the source objects churn every render.
   }, [
     sourceA.crs,
@@ -510,9 +614,32 @@ export function GeoViewer({
     sourceB.error,
     a.label,
     b,
+    globeAvailable,
+    hasB,
+    focusSlot,
+    mode,
+    t,
   ])
-  // A source that lacks the current CRS (e.g. B just added) → Mercator.
+  // Snap back when a source lacks the CRS or the layout cannot show the globe.
+  const leaveGlobe = globe.leave
   useEffect(() => {
+    if (projectionId === 'globe') {
+      if (globe.phase !== 'globe') return
+      const current = projectionOptions.find((p) => p.id === 'globe')
+      if (!current) return leaveGlobe(DEFAULT_PROJECTION_ID, true)
+      if (!current.blockedBy) return
+      if (current.blockedReason === 'mode') {
+        showToast.info(t('projections.snappedBackMode'))
+        return leaveGlobe(globeExitTarget)
+      }
+      showToast.info(
+        t('projections.snappedBack', {
+          source: current.blockedBy,
+          projection: t(current.labelKey),
+        }),
+      )
+      return leaveGlobe(DEFAULT_PROJECTION_ID)
+    }
     const current = projectionOptions.find((p) => p.id === projectionId)
     if (!current?.blockedBy) return
     showToast.info(
@@ -522,7 +649,15 @@ export function GeoViewer({
       }),
     )
     changeProjection(DEFAULT_PROJECTION_ID)
-  }, [projectionOptions, projectionId, changeProjection, t])
+  }, [
+    projectionOptions,
+    projectionId,
+    changeProjection,
+    t,
+    globe.phase,
+    leaveGlobe,
+    globeExitTarget,
+  ])
   const cycleProjection = useCallback(() => {
     const open = projectionOptions.filter((p) => p.blockedBy === null)
     const idx = open.findIndex((p) => p.id === projectionId)
@@ -547,6 +682,7 @@ export function GeoViewer({
     timeLinkMode,
     offsetMs,
     basemapId,
+    globeCamera: globe.phase === 'globe' ? globe.camera : null,
   })
 
   // Time-step prefetch (default off — bandwidth-heavy).
@@ -609,9 +745,6 @@ export function GeoViewer({
       }),
     [],
   )
-
-  // Source focus: a slot views only that source (UI collapses to it); null compares both.
-  const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
 
   // Swap: slot-keyed state follows the content. Replacement: pair-tuned
   // time linking resets (re-adding the SAME B keeps its settings).
@@ -758,6 +891,12 @@ export function GeoViewer({
     },
     [disarmAnnotate],
   )
+  // Map-click tools have no globe counterpart.
+  useEffect(() => {
+    if (globe.phase === 'flat') return
+    disarmAnnotate()
+    setMeasureMode('none')
+  }, [globe.phase, disarmAnnotate])
   // Sidebar attribution is derived, so a swap flips the shown letters.
   const annotationAttribution = useCallback(
     (ann: MapAnnotation) => {
@@ -774,19 +913,32 @@ export function GeoViewer({
 
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
-  const onPan = useCallback((dx: number, dy: number) => {
-    const current = viewRef.current
-    const center = current.getCenter()
-    const resolution = current.getResolution()
-    if (!center || resolution === undefined) return
-    const target: [number, number] = [
-      center[0] + dx * resolution,
-      center[1] - dy * resolution,
-    ]
-    current.setCenter(
-      current.getConstrainedCenter(target, resolution) ?? target,
-    )
-  }, [])
+  const globeCamera = globe.camera
+  const onPan = useCallback(
+    (dx: number, dy: number) => {
+      if (globePhaseRef.current === 'globe') {
+        // Keys pan the view; the globe pans like the opposite drag.
+        globeCamera.set(
+          panGlobeCamera(globeCamera.get(), -dx, -dy),
+          'program',
+          'keys',
+        )
+        return
+      }
+      const current = viewRef.current
+      const center = current.getCenter()
+      const resolution = current.getResolution()
+      if (!center || resolution === undefined) return
+      const target: [number, number] = [
+        center[0] + dx * resolution,
+        center[1] - dy * resolution,
+      ]
+      current.setCenter(
+        current.getConstrainedCenter(target, resolution) ?? target,
+      )
+    },
+    [globeCamera],
+  )
 
   // Live ground resolution (m/px) drives the panel's scale-band hints.
   const [viewResolution, setViewResolution] = useState<number | null>(null)
@@ -978,6 +1130,30 @@ export function GeoViewer({
       }
     : null
 
+  // -------- Globe wiring --------
+  const resolvedTheme = useUiStore((s) => s.resolvedTheme)
+  const globeOutline = useMemo<GlobeOutlineSpec>(
+    () => ({ theme: resolvedTheme, opacity: basemapOpacity }),
+    [resolvedTheme, basemapOpacity],
+  )
+  // Zooming out past the whole world bends the flat map into the globe.
+  const mapAreaRef = useRef<HTMLDivElement>(null)
+  const globeOption = projectionOptions.find((p) => p.id === 'globe')
+  const enterGlobe = globe.enter
+  const globeAutoReady = globe.autoReady
+  useZoomOutPastWorld(mapAreaRef, viewRef, {
+    enabled:
+      globeAutoTransition &&
+      globe.phase === 'flat' &&
+      globeOption !== undefined &&
+      globeOption.blockedBy === null &&
+      flatKindOf(flatId) !== null,
+    panelCount: globePanels,
+    onTrigger: () => {
+      if (globeAutoReady()) enterGlobe()
+    },
+  })
+
   // -------- Capabilities load/error surface --------
   // Only A gates the whole viewer; a failing/loading B must not blank a
   // working solo view.
@@ -1089,8 +1265,18 @@ export function GeoViewer({
         onBasemapChange={setBasemapId}
         availableBasemaps={availableBasemaps}
         projection={projection}
+        projectionId={projectionId}
         projections={projectionOptions}
         onProjectionChange={changeProjection}
+        globeActive={globe.phase !== 'flat'}
+        globeAuto={
+          globeAvailable
+            ? {
+                enabled: globeAutoTransition,
+                onChange: setGlobeAutoTransition,
+              }
+            : null
+        }
         basemapOpacity={basemapOpacity}
         onBasemapOpacityChange={setBasemapOpacity}
       />
@@ -1234,11 +1420,42 @@ export function GeoViewer({
           />
         )}
         <div
+          ref={mapAreaRef}
           className="relative min-h-0 min-w-0 flex-1"
           {...tourAttr(TOUR.visualise.map)}
         >
           {startup && <StartupStatusPill {...startup} />}
-          {focusSlot === null && mode === 'side' && mapSourceB ? (
+          {globe.phase !== 'flat' && (
+            <Suspense fallback={null}>
+              <GlobeView
+                layout={globePanels === 2 ? 'side' : 'single'}
+                sources={
+                  globePanels === 2 && mapSourceB
+                    ? [mapSourceA, mapSourceB]
+                    : [
+                        focusSlot === 'b' && mapSourceB
+                          ? mapSourceB
+                          : mapSourceA,
+                      ]
+                }
+                camera={globe.camera}
+                visible={globe.overlayVisible}
+                active={globe.phase === 'globe'}
+                outline={globeOutline}
+                pinnedLegends={pinnedLegendItems}
+                onUnpinLegend={unpinLegend}
+                registerEngine={globe.registerEngine}
+                onFailure={onGlobeFailure}
+                onContextLost={onGlobeContextLost}
+                onRegisterFit={onRegisterFit}
+                onRegisterFitBbox={onRegisterFitBbox}
+                onRegisterCapture={onRegisterCapture}
+              />
+            </Suspense>
+          )}
+          {globe.phase === 'globe' ? null : focusSlot === null &&
+            mode === 'side' &&
+            mapSourceB ? (
             <DualMapView
               view={view}
               a={mapSourceA}
