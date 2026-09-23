@@ -1,6 +1,7 @@
 import logging
 import os
 import platform
+import re
 import subprocess
 from dataclasses import dataclass
 
@@ -20,40 +21,88 @@ class PlatformInfo:
     gpu_memory_mib: int | None
 
 
+def _linux_list_gpus() -> list[str]:
+    output = subprocess.check_output(["nvidia-smi", "-L"], encoding="utf-8")
+    return output.splitlines()
+
+
+def _linux_query_gpu_memory() -> list[str]:
+    cmd = ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,nounits,noheader"]
+    output = subprocess.check_output(cmd, encoding="utf-8")
+    return output.splitlines()
+
+
+def _linux_total_memory() -> int:
+    gpus = _linux_list_gpus()
+    gpu_lines = [line for line in gpus if line.startswith("GPU ")]
+    if not gpu_lines:
+        return 0
+
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if visible == "":
+        return 0
+
+    partition_lines = [line for line in gpus if re.match(r"\s*MIG\b", line)]
+    if partition_lines:
+        gpu_memory: list[int] = []
+        device_uuids: list[str | None] = []
+        for line in partition_lines:
+            match = re.search(r"\bMIG\s+\d+g\.(\d+(?:\.\d+)?)gb\b", line, re.IGNORECASE)
+            if match is None:
+                raise ValueError(f"Unable to parse GPU partition memory from nvidia-smi output: {line}")
+            gpu_memory.append(int(float(match.group(1)) * 1024))
+            uuid_match = re.search(r"\(UUID:\s*([^)]+)\)", line)
+            device_uuids.append(uuid_match.group(1) if uuid_match is not None else None)
+
+        return _sum_visible_gpu_memory(gpu_memory, visible, device_uuids)
+
+    memory_output = _linux_query_gpu_memory()
+    if any(value.strip().casefold() in {"n/a", "not supported"} for value in memory_output):
+        logger.warning("assuming unified memory")
+        with open("/proc/meminfo", encoding="utf-8") as meminfo:
+            for line in meminfo:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) // 1024
+        raise ValueError("MemTotal was not found in /proc/meminfo")
+
+    gpu_memory = [int(value.strip()) for value in memory_output]
+    return _sum_visible_gpu_memory(gpu_memory, visible)
+
+
+def _sum_visible_gpu_memory(gpu_memory: list[int], visible: str | None, device_uuids: list[str | None] | None = None) -> int:
+    if visible is None:
+        return sum(gpu_memory)
+
+    selectors = [selector.strip() for selector in visible.split(",")]
+    selected_memory = 0
+    for index, memory in enumerate(gpu_memory):
+        device_uuid = device_uuids[index] if device_uuids is not None else None
+        if str(index) in selectors or (device_uuid is not None and device_uuid in selectors):
+            selected_memory += memory
+    return selected_memory
+
+
+def _macos_total_memory() -> int:
+    # sysctl reports bytes; convert to MiB.
+    cmd = ["sysctl", "-n", "hw.memsize"]
+    mem_bytes = int(subprocess.check_output(cmd).strip())
+    return mem_bytes // (1024**2)
+
+
 def get_platform_info() -> PlatformInfo | None:
     system = platform.system()
 
-    # --- macOS Logic (Unified Memory) ---
     if system == "Darwin":
         try:
-            # sysctl reports bytes; we convert to MiB
-            cmd = ["sysctl", "-n", "hw.memsize"]
-            mem_bytes = int(subprocess.check_output(cmd).strip())
-            return PlatformInfo(platform_name="macos", gpu_memory_mib=mem_bytes // (1024**2))
+            return PlatformInfo(platform_name="macos", gpu_memory_mib=_macos_total_memory())
         except Exception as e:
             logger.error(f"Error fetching macOS memory: {e}")
             return PlatformInfo(platform_name="macos", gpu_memory_mib=None)
 
-    # --- Linux Logic (NVIDIA VRAM) ---
     elif system == "Linux":
         try:
-            # Query nvidia-smi specifically for memory.total
-            # format=csv,nounits,noheader makes parsing trivial
-            cmd = ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,nounits,noheader"]
-            output = subprocess.check_output(cmd, encoding="utf-8").strip()
-
-            # If multiple GPUs exist, this returns multiple lines
-            gpu_memory_mib = (int(x) for x in output.split("\n"))
-            visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
-            if visible is None:
-                gpu_memory_mib = sum(gpu_memory_mib)
-            else:
-                if visible:
-                    available = set(int(e) for e in visible.split(","))
-                    gpu_memory_mib = sum(e for (i, e) in enumerate(gpu_memory_mib) if i in available)
-                else:
-                    gpu_memory_mib = None
-            return PlatformInfo(platform_name="linux", gpu_memory_mib=gpu_memory_mib)
+            gpu_memory_mib = _linux_total_memory()
+            return PlatformInfo(platform_name="linux", gpu_memory_mib=gpu_memory_mib or None)
         except FileNotFoundError:
             logger.debug("nvidia-smi not found. Ensure NVIDIA drivers are installed.")
             return PlatformInfo(platform_name="linux", gpu_memory_mib=None)
