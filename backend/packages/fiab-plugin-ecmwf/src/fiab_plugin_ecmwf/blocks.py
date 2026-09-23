@@ -159,15 +159,13 @@ class OperationalForecastSource(Source):
                                     "fiab_plugin_ecmwf.runtime.source.earthkit_source",
                                     static_input_ps=[
                                         source,
-                                        {
-                                            "requests": [
-                                                dict(
-                                                    {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
-                                                    param=ParamDBInstance.param_id_to_shortname(int(p)),
-                                                    step=step,
-                                                )
-                                            ],
-                                        },
+                                        [
+                                            dict(
+                                                {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
+                                                param=ParamDBInstance.param_id_to_shortname(int(p)),
+                                                step=step,
+                                            )
+                                        ],
                                     ],
                                 )
                                 for p in datacube[PARAM]
