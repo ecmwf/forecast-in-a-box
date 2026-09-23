@@ -42,8 +42,6 @@ from fiab_plugin_ecmwf.block_utils import (
     TYPE,
     _axis_value_strings,
     _extract_dataset,
-    _param_id_to_param_key,
-    _param_key_to_param_id,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, from_datacubes, select
 
@@ -153,9 +151,9 @@ class PredefinedThresholdProbability(Product):
             output_template={**coords, TYPE: self.stat_type, "selection": "default"},
         ):
             prob_qube = prob_qube | Qube.from_datacube(output)
-        restrictions[PARAM] = ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(prob_qube)[PARAM]])
+        restrictions[PARAM] = ClosedEnumType(list(axes(prob_qube)[PARAM]), subtype=ParameterType())
 
-        selected_param_id = _param_key_to_param_id(block.config_as_str(PARAM))
+        selected_param_id = block.config_as_str(PARAM)
         return QubedOutput(dataqube=prob_qube.select({PARAM: selected_param_id}))
 
     def compile(
@@ -284,9 +282,9 @@ class DerivedParameters(Product):
         ):
             derived_qube = derived_qube | Qube.from_datacube(output)
 
-        restrictions[PARAM] = ListType(ClosedEnumType([_param_id_to_param_key(paramid) for paramid in axes(derived_qube)[PARAM]]))
-        selected_param_ids = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
-        param_qube = derived_qube.select({PARAM: selected_param_ids})
+        restrictions[PARAM] = ListType(ClosedEnumType(list(axes(derived_qube)[PARAM]), subtype=ParameterType()))
+        selected_params = block.config_as_list(PARAM, str, allow_empty=False)
+        param_qube = derived_qube.select({PARAM: selected_params})
         # Compute for all steps available for all selected parameters
         allowed_steps = set.intersection(*[set(x[STEP]) for x in datacubes(param_qube)])
 
