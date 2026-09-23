@@ -43,7 +43,7 @@
     "recentRuns": "Recent runs with stored outputs",
     "runningLenses": "Running lens servers",
     "external": "External data",
-    "empty": "No runs with stored geographic outputs yet. Run a forecast with a GRIB sink, or add external data below.",
+    "empty": "No runs with stored geographic outputs yet. Run a forecast with a GRIB sink, or add an external WMS server or a host folder instead.",
     "searchEmpty": "Nothing matches the search.",
     "layersError": "Could not load this server's layers — {{error}}",
     "add": "Add",
@@ -71,7 +71,7 @@
       "restrictedHint": "This FIAB instance runs on a remote host — in cloud mode, local paths are currently not available.",
       "placeholder": "/path/to/grib/output"
     },
-    "collected": "Collected sources",
+    "collected": "Added sources",
     "loadMore": "Load more runs",
     "curated": {
       "title": "Known WMS servers",
@@ -82,7 +82,14 @@
       "interrupted": "{{name}} dropped the connection while sending its catalog — try again, or later",
       "ecmwfKeyHint": "Use your ECMWF key for more layers",
       "ecmwfKeyActive": "Using your ECMWF key"
-    }
+    },
+    "tabs": {
+      "runs": "Runs",
+      "wms": "WMS servers",
+      "folder": "Host folder"
+    },
+    "collectedCount": "{{count}} of {{max}}",
+    "collectedEmpty": "Nothing added yet. Pick a source on the left; added sources can be shown as A or B on the map."
   },
   "viewerError": {
     "title": "The map viewer failed",

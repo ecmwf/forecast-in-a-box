@@ -100,10 +100,13 @@ function showMeSlotA(): ShowMeAction {
     }
   }
   const row = { within: TOUR.visualise.knownWms, selector: addSelector(name) }
-  // Mid-session the list sits in the Manage-sources dialog: open it first.
+  // Mid-session the list sits on the dialog's WMS tab: open both first.
   return findTourElement(TOUR.visualise.knownWms) !== null
     ? row
-    : { within: TOUR.visualise.addSource, then: row }
+    : {
+        within: TOUR.visualise.addSource,
+        then: { within: TOUR.visualise.sourceTabWms, then: row },
+      }
 }
 
 /** Preferred server now, first reachable as probes land; frozen once added. */
@@ -271,10 +274,13 @@ export const firstMapDefinition: TutorialDefinition<FirstMapLaunch> = {
           within: TOUR.visualise.knownWms,
           selector: addSelector(name),
         }
-        // Dialog already open → press the row; else open it, then press.
+        // List visible → press the row; else open the dialog's WMS tab first.
         return findTourElement(TOUR.visualise.knownWms) !== null
           ? row
-          : { within: TOUR.visualise.addSource, then: row }
+          : {
+              within: TOUR.visualise.addSource,
+              then: { within: TOUR.visualise.sourceTabWms, then: row },
+            }
       },
     },
     {
