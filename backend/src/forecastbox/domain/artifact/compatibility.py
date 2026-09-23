@@ -42,7 +42,7 @@ def _linux_total_memory() -> int:
     if visible == "":
         return 0
 
-    partition_lines = [line for line in gpus if re.match(r"\s*MIG\b", line)]
+    partition_lines = [line for line in gpus if re.search(r"^\s*MIG\b", line)]
     if partition_lines:
         gpu_memory: list[int] = []
         device_uuids: list[str | None] = []
@@ -59,10 +59,15 @@ def _linux_total_memory() -> int:
     memory_output = _linux_query_gpu_memory()
     if any(value.strip().casefold() in {"n/a", "not supported"} for value in memory_output):
         logger.warning("assuming unified memory")
+        memory_unit_dividers = {"kB": 1024, "mB": 1}
         with open("/proc/meminfo", encoding="utf-8") as meminfo:
             for line in meminfo:
                 if line.startswith("MemTotal:"):
-                    return int(line.split()[1]) // 1024
+                    try:
+                        memory_info = line.split()
+                        return int(memory_info[1]) // memory_unit_dividers[memory_info[2]]
+                    except (IndexError, KeyError, ValueError) as e:
+                        raise ValueError(f"unparseable line: {line.rstrip()}") from e
         raise ValueError("MemTotal was not found in /proc/meminfo")
 
     gpu_memory = [int(value.strip()) for value in memory_output]
@@ -73,7 +78,7 @@ def _sum_visible_gpu_memory(gpu_memory: list[int], visible: str | None, device_u
     if visible is None:
         return sum(gpu_memory)
 
-    selectors = [selector.strip() for selector in visible.split(",")]
+    selectors = {selector.strip() for selector in visible.split(",")}
     selected_memory = 0
     for index, memory in enumerate(gpu_memory):
         device_uuid = device_uuids[index] if device_uuids is not None else None
