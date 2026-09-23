@@ -44,7 +44,6 @@ from fiab_plugin_ecmwf.block_utils import (
     STEP,
     THRESHOLD,
     TYPE,
-    _param_id_to_param_key,
 )
 from fiab_plugin_ecmwf.blocks import OperationalForecastSource
 from fiab_plugin_ecmwf.products.blocks import (
@@ -84,7 +83,7 @@ def predefined_threshold_prob_configuration() -> BlockInstance:
         BlockInstanceBase(
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
-                PARAM: _param_id_to_param_key("131073"),
+                PARAM: "131073",
             },
         ),
         PredefinedThresholdProbability.configuration_options,
@@ -113,7 +112,7 @@ def thermal_indices_configuration() -> BlockInstance:
         BlockInstanceBase(
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
-                PARAM: [_param_id_to_param_key(id) for id in ["261023", "260242"]],
+                PARAM: ["261023", "260242"],
             },
         ),
         ThermalIndices.configuration_options,
@@ -127,7 +126,7 @@ def wind_speed_configuration() -> BlockInstance:
         BlockInstanceBase(
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
-                PARAM: [_param_id_to_param_key(id) for id in ["10", "207", "228249"]],
+                PARAM: ["10", "207", "228249"],
             },
         ),
         WindSpeed.configuration_options,
@@ -272,7 +271,7 @@ class TestPredefinedThresholdProb:
             )
             .restrictions
         )
-        assert restrictions[PARAM].serialize() == f"enumClosed[str]('{_param_id_to_param_key('131073')}')"
+        assert restrictions[PARAM].serialize() == "enumClosed[param]('2 metre temperature less than 273.15 K [%] (2tl273)')"
 
     @pytest.mark.parametrize(
         "forecast_output, source_action, expected, identical_qubes",
@@ -535,9 +534,9 @@ class TestThermalIndices:
     @pytest.mark.parametrize(
         "param_config, expected_steps",
         [
-            [[_param_id_to_param_key("260242")], [0, 6, 12]],
-            [[_param_id_to_param_key("261001")], [6, 12]],
-            [[_param_id_to_param_key("260242"), _param_id_to_param_key("261001")], [6, 12]],
+            [["260242"], [0, 6, 12]],
+            [["261001"], [6, 12]],
+            [["260242", "261001"], [6, 12]],
         ],
         ids=["no-accum", "accum", "mixed"],
     )
@@ -617,9 +616,9 @@ class TestThermalIndices:
             )
             .restrictions
         )
-        for param in ["260004", "260242", "261016", "260005", "260255", "261018", "261023"]:
-            assert _param_id_to_param_key(param) in restrictions[PARAM].serialize()
-        assert _param_id_to_param_key("261001") not in restrictions[PARAM].serialize()
+        for param in ["2r", "nefft", "wcf", "wbt", "heatx", "hmdx", "aptmp"]:
+            assert param in restrictions[PARAM].serialize()
+        assert "utci" not in restrictions[PARAM].serialize()
 
 
 class TestWindSpeed:

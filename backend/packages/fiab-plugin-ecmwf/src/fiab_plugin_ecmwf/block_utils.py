@@ -36,21 +36,6 @@ QUANTILE = ConfigurationOptionId("quantile")
 ParamDBInstance = ParamDB()
 
 
-def _param_id_to_param_key(param_id: str) -> str:
-    # TODO: Improve efficiency due to repeated calls in block validation
-    try:
-        param_id_int = int(param_id)
-    except ValueError:
-        return param_id
-    shortname = ParamDBInstance.param_id_to_shortname(param_id_int)
-    return f"{shortname}-{param_id}"
-
-
-def _param_key_to_param_id(param_key: str) -> str:
-    idx = param_key.find("-")
-    return param_key[idx + 1 :] if idx != -1 else param_key
-
-
 def _extract_dataset(inputs: dict[str, QubedOutput], name: str) -> QubedOutput:
     input_dataset = inputs.get(name)
     if not isinstance(input_dataset, QubedOutput):
