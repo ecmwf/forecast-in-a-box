@@ -424,7 +424,7 @@ class ParameterType(StringType):
 
     def validate_convert(self, value: Any) -> str:
         try:
-            import pymetkit.paramdb # type: ignore[import]
+            import pymetkit.paramdb  # type: ignore[import]
 
             paramdb = pymetkit.paramdb.ParamDB()
             paramid = int(value)
