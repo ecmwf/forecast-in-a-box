@@ -29,18 +29,6 @@ buildDev:
 run tag="release":
     docker run --rm -it -p 8000:8000 --shm-size=6gb fiab-slim:"{{tag}}"
 
-publish tag="":
-    #!/usr/bin/env bash
-    tag="{{tag}}"
-    if [ -z "$tag" ]; then
-        tag=$(git tag -l 'v*' | sed 's/^.//' | sort -V | tail -n1)
-    else
-        tag="${tag#v}"
-    fi
-    registry="eccr.ecmwf.int/forecast-in-a-box/fiab-slim"
-    docker tag "fiab-slim:${tag}" "${registry}:${tag}"
-    docker tag "fiab-slim:${tag}" "${registry}:latest"
-    docker push "${registry}:${tag}"
-    docker push "${registry}:latest"
-
 # TODO add command for integration test
+
+# NOTE publish action not here, too matrix-specific
