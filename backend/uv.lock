@@ -1254,7 +1254,7 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows"
-version = "0.17.5"
+version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "array-api-compat", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -1270,9 +1270,9 @@ dependencies = [
     { name = "sortedcontainers", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "xarray", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0b/e5/3bcdf51ca1320e1c28e741bd4d4fb037834db9e6aa030e590d29fc0b906c/earthkit_workflows-0.17.5.tar.gz", hash = "sha256:3e4ef74337d556cbd4aac9c6f40ef1510fda76612b5193193b104a356c441ed8", size = 10867499, upload-time = "2026-09-23T13:47:56.911Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/8b/1b79dc18405f347b3366e95efba26b18711279ea2f425b3c49d545152a41/earthkit_workflows-0.18.0.tar.gz", hash = "sha256:6204c93d6926b900079fdc92eecba2b9d970f9ab8e1f4fe5bf2e1e136393f7a0", size = 10870975, upload-time = "2026-09-23T14:58:50.152Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/90/1b/a8ca956dca46e5e9b127bc029ebf8cdaab57570d5addd0f5bef8259f2dcb/earthkit_workflows-0.17.5-py3-none-any.whl", hash = "sha256:7ff24d1003bfa6e7a3964ad87dda881667d02b761cffc38aa9e64036daf4b82e", size = 216577, upload-time = "2026-09-23T13:47:55.573Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/8b/cbf3246d44d52ab16deb07d87c7ab86bebf06d0f1b686dae6b842875374e/earthkit_workflows-0.18.0-py3-none-any.whl", hash = "sha256:5ca4afb12c500725e5d820fd535bc890f6e45322f22d9562ea2761c077b6f9dd", size = 219146, upload-time = "2026-09-23T14:58:48.914Z" },
 ]
 
 [[package]]
@@ -1618,11 +1618,11 @@ requires-dist = [
     { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
     { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2,<1" },
     { name = "earthkit-plots", marker = "extra == 'runtime'", specifier = ">=0.3.5,<1.0" },
-    { name = "earthkit-workflows", specifier = ">=0.15.6" },
-    { name = "earthkit-workflows-anemoi", specifier = ">=0.7.2" },
+    { name = "earthkit-workflows", specifier = ">=0.18.0" },
+    { name = "earthkit-workflows-anemoi", specifier = ">=0.8.0" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
-    { name = "pproc-core", specifier = "<0.4.0" },
+    { name = "pproc-core", specifier = ">=0.4.0" },
     { name = "pymetkit", specifier = ">=1.21.0.28" },
 ]
 provides-extras = ["runtime"]
