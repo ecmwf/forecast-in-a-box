@@ -49,8 +49,6 @@ from fiab_plugin_ecmwf.block_utils import (
     _axis_value_strings,
     _extract_dataset,
     _is_empty_qube,
-    _param_id_to_param_key,
-    _param_key_to_param_id,
     _parse_axis_value,
 )
 from fiab_plugin_ecmwf.datasets import load_datasets
@@ -284,20 +282,16 @@ class Select(Transform):
             raise ValueError(f"dimension {dimension} is not in the input dimensions: {input_dimensions}")
 
         input_values = _axis_value_strings(axis_values)
-        if dimension == PARAM:
-            axis_values = [_param_id_to_param_key(paramid) for paramid in axis_values]
-            input_values = axis_values
         if input_values:
-            restrictions[VALUES] = ListType(ClosedEnumType(input_values))
-
-        selected_values = [_parse_axis_value(value) for value in self._selected_values(block)]
+            subtype = ParameterType() if dimension == PARAM else StringType()
+            restrictions[VALUES] = ListType(ClosedEnumType(input_values, subtype=subtype))
+        axis_value_type = type(list(axis_values)[0]) if axis_values else _parse_axis_value
+        selected_values = [axis_value_type(value) for value in self._selected_values(block)]
 
         missing_values = [value for value in selected_values if value not in axis_values]
         if missing_values:
             raise ValueError(f"values {missing_values} are not in dimension {dimension}: {input_values}")
 
-        if dimension == PARAM:
-            selected_values = [_param_key_to_param_id(str(value)) for value in selected_values]
         output = select(input_dataset, {dimension: selected_values})
         if output.dataqube is None or _is_empty_qube(output.dataqube):
             raise ValueError(f"selection of values {selected_values} from dimension {dimension} produced an empty dataset")
@@ -312,7 +306,7 @@ class Select(Transform):
         input_task = block.input_ids["dataset"]
         dimension = self._selected_dimension(block)
         if dimension == PARAM:
-            values = [_param_key_to_param_id(value) for value in self._selected_values(block)]
+            values = [str(value) for value in self._selected_values(block)]
             selected = inputs[input_task].select({dimension: values}, expand=True)
         else:
             values = [_parse_axis_value(value) for value in self._selected_values(block)]
@@ -431,9 +425,8 @@ class MapPlotSink(Sink):
 
         input_axes = axes(input_dataset)
         input_param_values = input_axes.get(PARAM, set())
-        param_values = [_param_id_to_param_key(x) for x in input_param_values]
-        if param_values:
-            restrictions[PARAM] = ListType(ClosedEnumType(sorted(param_values), subtype=ParameterType()))
+        if input_param_values:
+            restrictions[PARAM] = ListType(ClosedEnumType(sorted(input_param_values), subtype=ParameterType()))
 
         common = common_dimensions(input_dataset).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
         splitby = [x for x in common if len(input_axes[x]) > 1]
@@ -443,9 +436,9 @@ class MapPlotSink(Sink):
         splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
         fmt = block.config_as_str(FORMAT)
 
-        missing_params = [param for param in params if param not in param_values]
+        missing_params = [param for param in params if param not in input_param_values]
         if missing_params:
-            raise ValueError(f"params {missing_params} are not in the input parameters: {param_values}")
+            raise ValueError(f"params {missing_params} are not in the input parameters: {input_param_values}")
 
         if "none" in splitby_value and len(splitby_value) != 1:
             raise ValueError("Invalid splitby value: if none is selected, no other dimensions can be present")
@@ -461,7 +454,7 @@ class MapPlotSink(Sink):
         block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        params = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
+        params = block.config_as_list(PARAM, str, allow_empty=False)
         groupby = block.config_as_str(GROUPBY)
         splitby = block.config_as_list(SPLITBY, str, allow_empty=True)
         if "none" in splitby:

@@ -418,16 +418,22 @@ class ArtifactType(FableType):
 
 
 class ParameterType(StringType):
-    """A string representing a parameter name, like 2t or u or v. Utilized by the frontend
+    """A string representing a parameter  or id, like 2t or u or v. Utilized by the frontend
     to perform param lookup to build a better UI form, displaying additional info,
     name conversion, etc"""
 
     def validate_convert(self, value: Any) -> str:
-        raw: str = super().validate_convert(value)
-        # TODO here we should do some "param lookup into metkit" but:
-        # a/ must be opportunistic -- we dont want a metkit dependency
-        # b/ that code may not yet exist?
-        return raw
+        try:
+            import pymetkit.paramdb  # type: ignore[import]
+
+            paramdb = pymetkit.paramdb.ParamDB()
+            paramid = int(value)
+            shortname = paramdb.param_id_to_shortname(paramid)
+            longname = paramdb.param_id_to_longname(paramid)
+            units = paramdb.get_units(paramid)
+            return f"{longname} [{units}] ({shortname})"
+        except:
+            return value
 
     def serialize(self) -> str:
         return "param"
