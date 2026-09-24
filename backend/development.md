@@ -3,6 +3,7 @@
   * when adding new functionality, try to add both unit tests and integration tests
   * there are additionally `tests/largeE2E` -- you are not expected to run or modify these during regular work, those are for releases
 * project is managed by `uv` -- utilize that for running any python-related subcommands like `uv run pytest` or `uv run ty`
+  * keep the pyproject.toml in sync with uv.lock -- when you add a new dependency or update a constraint in pyproject, run the corresponding `uv lock` command
 * utilize `just` for command running -- `just val` is the "all typechecking and testing". Always run this prior to a commit, as well as utilizing pre-commit with prek
   * during development, utilize granular validation -- first, run type checking, then unit tests for the code you have created or changed, then all integration tests
   * don't change formatting on a whim. When you notice a bug or breach of guidelines that is not related or affecting your current task, ignore it.
