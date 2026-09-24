@@ -231,6 +231,7 @@ async def test_update_without_version_rejects_when_no_compatible_version_exists(
 @pytest.mark.asyncio
 async def test_install_plugin_awaits_submit_install_single() -> None:
     with patch("forecastbox.routes.plugins.submit_install_single", new=AsyncMock()) as mock_submit:
+        mock_submit.return_value = ""
         await install_plugin(_COMPOSITE_ID)
     mock_submit.assert_awaited_once_with(_COMPOSITE_ID)
 
