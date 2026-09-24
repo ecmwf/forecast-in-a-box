@@ -1181,6 +1181,14 @@ wheels = [
 ]
 
 [[package]]
+name = "earthkit-plots-dccms-styles"
+version = "0.1.dev8+g6dbd8cdef"
+source = { git = "https://github.com/metno/earthkit-plots-dccms-styles#6dbd8cdef1761ab3fa45602c646d145137243804" }
+dependencies = [
+    { name = "earthkit-plots", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+]
+
+[[package]]
 name = "earthkit-plots-default-styles"
 version = "0.1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1797,6 +1805,7 @@ dependencies = [
     { name = "aiosqlite", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "apscheduler", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "cloudpickle", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "earthkit-plots-dccms-styles", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "earthkit-workflows", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "fastapi", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "fastapi-users", extra = ["oauth"], marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -1806,12 +1815,13 @@ dependencies = [
     { name = "httpx", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "httpx-oauth", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "jinja2", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "magics", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "orjson", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "psutil", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pydantic-settings", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pyrsistent", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "python-multipart", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
-    { name = "skinnywms", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "skinnywms", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "sse-starlette", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "starlette", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "toml", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -1836,6 +1846,7 @@ requires-dist = [
     { name = "aiosqlite" },
     { name = "apscheduler" },
     { name = "cloudpickle" },
+    { name = "earthkit-plots-dccms-styles", git = "https://github.com/metno/earthkit-plots-dccms-styles" },
     { name = "earthkit-workflows", specifier = ">=0.14.1,<1.0.0" },
     { name = "fastapi" },
     { name = "fastapi-users", extras = ["oauth"] },
@@ -1845,12 +1856,13 @@ requires-dist = [
     { name = "httpx", specifier = "<1" },
     { name = "httpx-oauth" },
     { name = "jinja2" },
+    { name = "magics" },
     { name = "orjson" },
     { name = "psutil" },
     { name = "pydantic-settings" },
     { name = "pyrsistent" },
     { name = "python-multipart" },
-    { name = "skinnywms", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'" },
+    { name = "skinnywms", specifier = ">=0.8.0" },
     { name = "sse-starlette" },
     { name = "starlette", specifier = ">=1.0" },
     { name = "toml" },
