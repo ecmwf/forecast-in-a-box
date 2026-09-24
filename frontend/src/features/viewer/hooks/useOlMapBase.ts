@@ -158,7 +158,7 @@ export function useOlMapBase(
     // Mount with the projection's default basemap; the basemap-swap
     // effect (useBasemap) adopts the user's choice afterwards.
     const basemap: BasemapLayer = projection.mercator
-      ? makeBasemapLayer(BASEMAPS[0])
+      ? makeBasemapLayer(BASEMAPS[0], themeRef.current)
       : makeOutlineBasemapLayer(
           projection.code,
           projection.extent,

@@ -30,6 +30,7 @@ import type Projection from 'ol/proj/Projection'
 import type VectorTileLayer from 'ol/layer/VectorTile'
 import type { ViewerProjection } from './projections'
 import {
+  CARTO_DARK_MATTER_STYLE_URL,
   CARTO_POSITRON_STYLE_URL,
   makeVectorBasemapLayer,
 } from '@/lib/map/ol-basemap'
@@ -42,6 +43,8 @@ export interface ExternalBasemapOption {
   // Mapbox-style JSON URL; ol-mapbox-style fetches it, builds the
   // source from its `sources` block, and applies styling.
   styleUrl: string
+  /** Dark-theme variant; absent = `styleUrl` in both themes. */
+  darkStyleUrl?: string
 }
 
 /** `visualise`-namespace keys — resolved with `t()` at render. */
@@ -81,6 +84,7 @@ export const BASEMAPS: ReadonlyArray<ExternalBasemapOption> = [
     id: 'carto-positron-vector',
     labelKey: 'basemaps.cartoPositron',
     styleUrl: CARTO_POSITRON_STYLE_URL,
+    darkStyleUrl: CARTO_DARK_MATTER_STYLE_URL,
   },
 ]
 
@@ -111,10 +115,19 @@ export type ExternalBasemapLayer = VectorTileLayer
 export type BasemapLayer =
   ExternalBasemapLayer | LayerGroup | ImageLayer<ImageWMS>
 
+/** The style URL for the app theme. */
+export function vectorStyleUrl(
+  opt: ExternalBasemapOption,
+  theme: 'light' | 'dark',
+): string {
+  return theme === 'dark' ? (opt.darkStyleUrl ?? opt.styleUrl) : opt.styleUrl
+}
+
 export function makeBasemapLayer(
   opt: ExternalBasemapOption,
+  theme: 'light' | 'dark',
 ): ExternalBasemapLayer {
-  return makeVectorBasemapLayer(opt.styleUrl)
+  return makeVectorBasemapLayer(vectorStyleUrl(opt, theme))
 }
 
 /**
