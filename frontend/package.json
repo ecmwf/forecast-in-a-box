@@ -46,6 +46,7 @@
     "i18next": "^26.4.2",
     "lucide-react": "^1.45.0",
     "lz-string": "^1.5.0",
+    "maplibre-gl": "^6.10.0",
     "ol": "^10.10.0",
     "ol-mapbox-style": "^13.4.3",
     "pdfjs-dist": "^6.3.289",
