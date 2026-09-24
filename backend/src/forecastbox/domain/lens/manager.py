@@ -138,6 +138,9 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
             # call the lens directly on its own port, i.e. cross-origin.
             # SkinnyWMS honours this via flask-cors on all endpoints.
             "SKINNYWMS_CORS_ORIGINS": "*",
+            # Equivalent of --enable-reference-time-dimension: fields from different
+            # forecast runs sharing a validity time are exposed via DIM_REFERENCE_TIME
+            "SKINNYWMS_ENABLE_REFERENCE_TIME_DIMENSION": "1",
             # SkinnyWMS localizes naive UTC GRIB datetimes via astimezone(),
             # shifting advertised times by the host's UTC offset — we explicitly
             # use the backend-wide default tz
