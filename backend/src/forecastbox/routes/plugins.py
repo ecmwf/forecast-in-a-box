@@ -151,7 +151,9 @@ async def get_plugin_versions(pluginCompositeId: Annotated[PluginCompositeId, De
 @router.post("/install")
 async def install_plugin(pluginCompositeId: PluginCompositeId, admin: UserRead | None = Depends(get_admin_user)) -> Response:
     # TODO possibly add optional version parameter
-    await submit_install_single(pluginCompositeId)
+    result = await submit_install_single(pluginCompositeId)
+    if result:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result)
     return Accepted
 
 

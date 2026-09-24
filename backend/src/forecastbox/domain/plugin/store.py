@@ -192,8 +192,8 @@ def resolve_plugin_from_store(plugin_composite_key: PluginCompositeId) -> Plugin
     )
 
 
-async def submit_install_single(plugin_composite_key: PluginCompositeId) -> None:
+async def submit_install_single(plugin_composite_key: PluginCompositeId) -> str:
     """Retrieves the information from the store, then submits the actual pip operation via
     `plugins.submit`"""
     settings = resolve_plugin_from_store(plugin_composite_key)
-    await submit_update_single(plugin_composite_key, install=True, version=None, settings=settings)
+    return await submit_update_single(plugin_composite_key, install=True, version=None, settings=settings)
