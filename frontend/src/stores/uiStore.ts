@@ -17,7 +17,12 @@
 
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
+import type { GlobeEngineId } from '@/features/viewer/globe/engine-ids'
 import { STORAGE_KEYS, STORE_VERSIONS } from '@/lib/storage-keys'
+import {
+  DEFAULT_GLOBE_ENGINE,
+  isGlobeEngineId,
+} from '@/features/viewer/globe/engine-ids'
 
 export type Theme = 'light' | 'dark' | 'system'
 export type AdminViewMode = 'table' | 'card'
@@ -68,6 +73,9 @@ interface UiState {
   // Visualise: zooming out past the world bends the map into the 3D globe.
   globeAutoTransition: boolean
   setGlobeAutoTransition: (value: boolean) => void
+  // Visualise: which engine renders the 3D globe.
+  globeEngine: GlobeEngineId
+  setGlobeEngine: (engine: GlobeEngineId) => void
 
   // Reset store
   reset: () => void
@@ -88,6 +96,7 @@ const initialState = {
   timeZone: 'UTC',
   journalShowFlow: false,
   globeAutoTransition: true,
+  globeEngine: DEFAULT_GLOBE_ENGINE,
 }
 
 export const useUiStore = create<UiState>()(
@@ -140,6 +149,7 @@ export const useUiStore = create<UiState>()(
 
         setGlobeAutoTransition: (globeAutoTransition) =>
           set({ globeAutoTransition }),
+        setGlobeEngine: (globeEngine) => set({ globeEngine }),
 
         // Reset to initial state
         reset: () => set(initialState),
@@ -205,6 +215,11 @@ export const useUiStore = create<UiState>()(
             state.globeAutoTransition = true
           }
 
+          // v9: globe renderer choice.
+          if (version < 9 || !isGlobeEngineId(state.globeEngine)) {
+            state.globeEngine = DEFAULT_GLOBE_ENGINE
+          }
+
           return state as {
             theme: Theme
             pluginsViewMode: AdminViewMode
@@ -212,6 +227,7 @@ export const useUiStore = create<UiState>()(
             artifactsViewMode: AdminViewMode
             timeZone: string
             globeAutoTransition: boolean
+            globeEngine: GlobeEngineId
           }
         },
         partialize: (state) => ({
@@ -226,6 +242,7 @@ export const useUiStore = create<UiState>()(
           paletteCompact: state.paletteCompact,
           timeZone: state.timeZone,
           globeAutoTransition: state.globeAutoTransition,
+          globeEngine: state.globeEngine,
         }),
       },
     ),

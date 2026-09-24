@@ -11,6 +11,7 @@
 /** Globe engines: static gating metadata, lazily loaded implementations. */
 
 import type { GlobeEngineCapabilities, GlobeEngineFactory } from '../engine'
+import type { GlobeEngineId } from '../engine-ids'
 
 export interface GlobeEngineEntry {
   /** CRS every source must advertise for the globe to be offered. */
@@ -19,20 +20,27 @@ export interface GlobeEngineEntry {
   load: () => Promise<GlobeEngineFactory>
 }
 
+// Both drape EPSG:4326 layer textures on the sphere.
+const SPHERE_CAPABILITIES: Omit<GlobeEngineCapabilities, 'vectorBasemap'> = {
+  morphFrom: ['merc', 'geo'],
+  poles: true,
+  minZoom: -2,
+  maxZoom: 6,
+}
+
 export const GLOBE_ENGINES = {
   three: {
     requiredCrs: 'EPSG:4326',
-    capabilities: {
-      morphFrom: ['merc', 'geo'],
-      poles: true,
-      minZoom: -2,
-      maxZoom: 6,
-    },
+    capabilities: { ...SPHERE_CAPABILITIES, vectorBasemap: false },
     load: () =>
       import('./three/ThreeGlobeEngine').then((m) => m.createThreeGlobeEngine),
   },
-} as const satisfies Record<string, GlobeEngineEntry>
-
-export type GlobeEngineId = keyof typeof GLOBE_ENGINES
-
-export const ACTIVE_GLOBE_ENGINE: GlobeEngineEntry = GLOBE_ENGINES.three
+  maplibre: {
+    requiredCrs: 'EPSG:4326',
+    capabilities: { ...SPHERE_CAPABILITIES, vectorBasemap: true },
+    load: () =>
+      import('./maplibre/MapLibreGlobeEngine').then(
+        (m) => m.createMapLibreGlobeEngine,
+      ),
+  },
+} as const satisfies Record<GlobeEngineId, GlobeEngineEntry>

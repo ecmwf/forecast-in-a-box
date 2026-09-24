@@ -17,7 +17,7 @@ import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
 import { PointerReadoutBadge } from '../components/PointerReadoutBadge'
 import { CompareSlotTag } from '../geo/CompareSlotTag'
 import { LoadErrorBadge, erroredTitles } from '../geo/SingleMapView'
-import { ACTIVE_GLOBE_ENGINE } from './engines/registry'
+import { LoupeOverlay } from '../geo/LoupeOverlay'
 import { globeCameraForBbox, globeFitZoom } from './globe-camera'
 import { globeLayerSpecs } from './globe-layer-specs'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
@@ -27,12 +27,23 @@ import type {
   CompareMapSource,
   FitBboxAction,
 } from '../geo/types'
-import type { GlobeEngine, GlobeOutlineSpec } from './engine'
+import type { GlobeBasemapSpec, GlobeEngine, ViewportDraw } from './engine'
+import type { GlobeEngineEntry } from './engines/registry'
 import type { SharedGlobeCamera } from './globe-camera'
 
 type CrossPosition = { x: number; y: number } | null
 
+export interface GlobeLoupe {
+  sizePx: number
+  zoom: number
+  latched: boolean
+  /** Side-by-side: mirror onto both panels. */
+  mirror: boolean
+}
+
 export interface GlobeViewProps {
+  /** Renderer; a change remounts the panels. */
+  engine: GlobeEngineEntry
   layout: 'single' | 'side'
   /** One source per panel. */
   sources: ReadonlyArray<CompareMapSource>
@@ -41,7 +52,9 @@ export interface GlobeViewProps {
   visible: boolean
   /** Settled on the globe: show chrome, own fit/capture. */
   active: boolean
-  outline: GlobeOutlineSpec
+  basemap: GlobeBasemapSpec
+  /** Hold-Z magnifier settings (toolbar). */
+  loupe: GlobeLoupe
   pinnedLegends: ReadonlyArray<PinnedLegendItem & { slot?: string }>
   onUnpinLegend: (key: string) => void
   registerEngine: (panel: string, engine: GlobeEngine | null) => void
@@ -55,12 +68,14 @@ export interface GlobeViewProps {
 }
 
 export function GlobeView({
+  engine: entry,
   layout,
   sources,
   camera,
   visible,
   active,
-  outline,
+  basemap,
+  loupe,
   pinnedLegends,
   onUnpinLegend,
   registerEngine,
@@ -88,17 +103,12 @@ export function GlobeView({
       if (!engine) return
       const [w, h] = engine.size()
       camera.set(
-        globeCameraForBbox(
-          bbox,
-          w,
-          h,
-          ACTIVE_GLOBE_ENGINE.capabilities.maxZoom,
-        ),
+        globeCameraForBbox(bbox, w, h, entry.capabilities.maxZoom),
         'program',
         'fit',
       )
     },
-    [camera],
+    [camera, entry],
   )
   const bbox = sources[0]?.bbox ?? null
   useEffect(() => {
@@ -145,10 +155,12 @@ export function GlobeView({
   const panels = sources.map((source) => (
     <GlobePanel
       key={source.slot}
+      engine={entry}
       source={source}
       camera={camera}
       active={active}
-      outline={outline}
+      basemap={basemap}
+      loupe={loupe}
       pinnedLegends={pinnedLegends.filter(
         (item) => !side || item.slot === source.slot,
       )}
@@ -157,6 +169,7 @@ export function GlobeView({
       onFailure={onFailure}
       onContextLost={onContextLost}
       cross={side ? cross : null}
+      loupeMirror={side && loupe.mirror ? cross : null}
       onCross={side ? setCross : undefined}
     />
   ))
@@ -181,28 +194,34 @@ export function GlobeView({
 }
 
 function GlobePanel({
+  engine: entry,
   source,
   camera,
   active,
-  outline,
+  basemap,
+  loupe,
   pinnedLegends,
   onUnpinLegend,
   register,
   onFailure,
   onContextLost,
   cross,
+  loupeMirror,
   onCross,
 }: {
+  engine: GlobeEngineEntry
   source: CompareMapSource
   camera: SharedGlobeCamera
   active: boolean
-  outline: GlobeOutlineSpec
+  basemap: GlobeBasemapSpec
+  loupe: GlobeLoupe
   pinnedLegends: ReadonlyArray<PinnedLegendItem>
   onUnpinLegend: (key: string) => void
   register: (panel: string, engine: GlobeEngine | null) => void
   onFailure: (err: unknown) => void
   onContextLost: () => void
   cross: CrossPosition
+  loupeMirror: CrossPosition
   onCross?: (position: CrossPosition) => void
 }) {
   const { t } = useTranslation('visualise')
@@ -224,7 +243,8 @@ function GlobePanel({
     // Read via a function: TS keeps narrowing across the await.
     const isCancelled = () => cancelled
     let mounted: GlobeEngine | null = null
-    ACTIVE_GLOBE_ENGINE.load()
+    entry
+      .load()
       .then(async (create) => {
         if (cancelled) return
         mounted = create()
@@ -257,7 +277,7 @@ function GlobePanel({
       register(slot, null)
       mounted?.destroy()
     }
-  }, [camera, register, slot])
+  }, [entry, camera, register, slot])
 
   useEffect(() => {
     if (!engine) return
@@ -274,8 +294,17 @@ function GlobePanel({
   }, [engine, specsKey])
 
   useEffect(() => {
-    engine?.setOutline(outline)
-  }, [engine, outline])
+    engine?.setBasemap(basemap)
+  }, [engine, basemap])
+
+  const drawLoupe = useMemo(
+    () =>
+      engine
+        ? (ctx: CanvasRenderingContext2D, opts: ViewportDraw) =>
+            engine.drawViewport(ctx, opts)
+        : undefined,
+    [engine],
+  )
 
   const erroredNames = useMemo(
     () => source.activeOrder.filter((name) => errored.has(name)),
@@ -296,15 +325,16 @@ function GlobePanel({
   }
 
   return (
+    // Pointer tracking on the root: the loupe shield sits above the canvas.
     <div
       className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/20"
       data-globe-panel={slot}
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
     >
       <div
         ref={containerRef}
         className="absolute inset-0 cursor-grab active:cursor-grabbing"
-        onPointerMove={onPointerMove}
-        onPointerLeave={onPointerLeave}
       />
       {active && (
         <>
@@ -339,6 +369,14 @@ function GlobePanel({
               })}
             </div>
           )}
+          <LoupeOverlay
+            containerRef={containerRef}
+            mirror={loupeMirror}
+            sizePx={loupe.sizePx}
+            zoom={loupe.zoom}
+            latched={loupe.latched}
+            drawSource={drawLoupe}
+          />
           <PinnedLegendsBar items={pinnedLegends} onUnpin={onUnpinLegend} />
           {pointer && (
             <PointerReadoutBadge

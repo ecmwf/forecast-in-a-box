@@ -22,13 +22,14 @@ import {
   OneMinusSrcAlphaFactor,
   RawShaderMaterial,
   Vector3,
+  Vector4,
 } from 'three'
 import {
   lonLatToEquirectUnit,
   lonLatToMercatorUnit,
   lonLatToUnitSphere,
 } from '../../sphere-math'
-import type { Texture, Vector4 } from 'three'
+import type { Texture } from 'three'
 
 /** Uniforms every globe material shares (one object, many materials). */
 export interface MorphUniforms {
@@ -92,10 +93,14 @@ const LAYER_FRAGMENT = /* glsl */ `
 precision highp float;
 uniform sampler2D uTex;
 uniform float uOpacity;
+// Texture area in unit equirect coordinates: x0, y0, width, height.
+uniform vec4 uBox;
 ${VISIBILITY}
 void main() {
+  vec2 uv = (vUv - uBox.xy) / uBox.zw;
+  if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) discard;
   // Premultiplied texels, passed through untouched (legend colours).
-  fragColor = texture(uTex, vUv) * (uOpacity * visibility());
+  fragColor = texture(uTex, uv) * (uOpacity * visibility());
 }
 `
 
@@ -218,6 +223,7 @@ export function createLayerMesh(
   const material = morphMaterial(shared, LAYER_FRAGMENT, {
     uTex: { value: texture },
     uOpacity: { value: 1 },
+    uBox: { value: new Vector4(0, 0, 1, 1) },
   })
   return surfaceMesh(geometry, material, renderOrder)
 }

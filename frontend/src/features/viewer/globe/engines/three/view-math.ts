@@ -97,9 +97,3 @@ export function pickLonLat(
   )
   return { lon, lat }
 }
-
-/** Texture width for a globe of `radiusPx`: one texel per screen px, pow2. */
-export function textureWidthFor(radiusPx: number, maxWidth: number): number {
-  const wanted = 2 ** Math.ceil(Math.log2(Math.max(1, 2 * Math.PI * radiusPx)))
-  return Math.max(1024, Math.min(wanted, maxWidth))
-}

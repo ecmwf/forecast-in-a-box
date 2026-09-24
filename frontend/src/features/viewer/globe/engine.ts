@@ -57,6 +57,12 @@ export interface GlobeOutlineSpec {
   opacity: number
 }
 
+/** Outline strokes, or a Mapbox-style vector basemap (`vectorBasemap` engines). */
+export interface GlobeBasemapSpec extends GlobeOutlineSpec {
+  kind: 'outline' | 'vector'
+  styleUrl?: string
+}
+
 export interface GlobeEngineCapabilities {
   /** Flat kinds the engine can morph from; others crossfade. */
   morphFrom: ReadonlyArray<FlatKind>
@@ -64,6 +70,8 @@ export interface GlobeEngineCapabilities {
   poles: boolean
   minZoom: number
   maxZoom: number
+  /** Can draw a vector (Mapbox-style) basemap on the globe. */
+  vectorBasemap: boolean
 }
 
 export type CameraOrigin = 'user' | 'program'
@@ -78,7 +86,7 @@ export interface GlobeEngineEvents {
 export interface GlobeEngine {
   mount: (container: HTMLElement, events: GlobeEngineEvents) => Promise<void>
   setLayers: (specs: ReadonlyArray<GlobeLayerSpec>) => void
-  setOutline: (spec: GlobeOutlineSpec | null) => void
+  setBasemap: (spec: GlobeBasemapSpec) => void
   getCamera: () => GlobeCamera
   setCamera: (camera: GlobeCamera) => void
   /** Resolves when layers already set have a first image (or failed). */
@@ -95,9 +103,18 @@ export interface GlobeEngine {
   pick: (px: readonly [number, number]) => { lon: number; lat: number } | null
   /** Render now and copy the frame into a 2D canvas. */
   capture: () => HTMLCanvasElement
+  /** Render now and draw the CSS-px region from `origin` at `scale` (loupe). */
+  drawViewport: (ctx: CanvasRenderingContext2D, opts: ViewportDraw) => void
   /** Container size in CSS px. */
   size: () => readonly [number, number]
   destroy: () => void
+}
+
+export interface ViewportDraw {
+  originX: number
+  originY: number
+  /** Destination px per CSS px. */
+  scale: number
 }
 
 export type GlobeEngineFactory = () => GlobeEngine

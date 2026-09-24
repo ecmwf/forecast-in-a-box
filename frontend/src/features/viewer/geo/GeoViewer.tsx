@@ -47,6 +47,7 @@ import {
   OUTLINE_BASEMAP,
   SKINNYWMS_BASEMAP,
   basemapFitsProjection,
+  vectorStyleUrl,
 } from '../ol-layers'
 import { DEFAULT_PROJECTION_ID } from '../projection-ids'
 import {
@@ -57,7 +58,7 @@ import {
   viewResolutionFor,
   viewerProjectionOf,
 } from '../projections'
-import { ACTIVE_GLOBE_ENGINE } from '../globe/engines/registry'
+import { GLOBE_ENGINES } from '../globe/engines/registry'
 import { flatKindOf, panGlobeCamera } from '../globe/globe-camera'
 import { useGlobeMode } from '../globe/useGlobeMode'
 import { useZoomOutPastWorld } from '../globe/useZoomOutPastWorld'
@@ -103,7 +104,7 @@ import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
 import type { FlatProjectionId, ProjectionId } from '../projection-ids'
-import type { GlobeOutlineSpec } from '../globe/engine'
+import type { GlobeBasemapSpec } from '../globe/engine'
 import type { BboxAxisOrder } from '../projections'
 import type { ProjectionOption } from './GeoToolbar'
 import type { SourceSlot } from './layer-pairing'
@@ -279,6 +280,9 @@ export function GeoViewer({
   // -------- 3D globe (flat ↔ globe handoff) --------
   const globeAutoTransition = useUiStore((s) => s.globeAutoTransition)
   const setGlobeAutoTransition = useUiStore((s) => s.setGlobeAutoTransition)
+  const globeEngineId = useUiStore((s) => s.globeEngine)
+  const setGlobeEngineId = useUiStore((s) => s.setGlobeEngine)
+  const globeEngine = GLOBE_ENGINES[globeEngineId]
   const reducedMotion = useMedia('(prefers-reduced-motion: reduce)')
   const globePanels = hasB && focusSlot === null && mode === 'side' ? 2 : 1
   // Back from the globe: the flat map it bent from, else Mercator.
@@ -562,14 +566,20 @@ export function GeoViewer({
       setBasemapId(DEFAULT_BASEMAP_ID)
     }
   }, [availableBasemaps, basemapId, sourceA.loadingLayers])
-  // Off-Mercator (and on the globe) the Outline stands in; the choice is kept.
+  // Where the choice cannot be drawn the Outline stands in; the choice is kept.
   const onGlobe = projectionId === 'globe'
+  const globeVectorBasemap = globeEngine.capabilities.vectorBasemap
   const effectiveBasemapId = useMemo(() => {
     const opt = availableBasemaps.find((o) => o.id === basemapId)
-    return onGlobe || (opt && !basemapFitsProjection(opt, projection))
-      ? OUTLINE_BASEMAP.id
-      : basemapId
-  }, [availableBasemaps, basemapId, projection, onGlobe])
+    const fits = onGlobe
+      ? opt?.type === 'outline' ||
+        (opt?.type === 'vector' && globeVectorBasemap)
+      : !opt || basemapFitsProjection(opt, projection)
+    return fits ? basemapId : OUTLINE_BASEMAP.id
+  }, [availableBasemaps, basemapId, projection, onGlobe, globeVectorBasemap])
+  // Flat maps under a globe handoff match the globe's mid-morph outline.
+  const flatBasemapId =
+    globe.phase === 'flat' ? effectiveBasemapId : OUTLINE_BASEMAP.id
 
   // Offered only when every loaded source advertises the CRS.
   const projectionOptions = useMemo<ReadonlyArray<ProjectionOption>>(() => {
@@ -592,7 +602,7 @@ export function GeoViewer({
     }))
     if (!globeAvailable) return flat
     // The globe shows one source, or two side by side.
-    const crsBlock = lacking(ACTIVE_GLOBE_ENGINE.requiredCrs)
+    const crsBlock = lacking(globeEngine.requiredCrs)
     const modeBlock = hasB && focusSlot === null && mode !== 'side'
     return [
       ...flat,
@@ -615,6 +625,7 @@ export function GeoViewer({
     a.label,
     b,
     globeAvailable,
+    globeEngine,
     hasB,
     focusSlot,
     mode,
@@ -1132,10 +1143,17 @@ export function GeoViewer({
 
   // -------- Globe wiring --------
   const resolvedTheme = useUiStore((s) => s.resolvedTheme)
-  const globeOutline = useMemo<GlobeOutlineSpec>(
-    () => ({ theme: resolvedTheme, opacity: basemapOpacity }),
-    [resolvedTheme, basemapOpacity],
-  )
+  const globeBasemap = useMemo<GlobeBasemapSpec>(() => {
+    const opt = availableBasemaps.find((o) => o.id === effectiveBasemapId)
+    return opt?.type === 'vector'
+      ? {
+          kind: 'vector',
+          styleUrl: vectorStyleUrl(opt, resolvedTheme),
+          theme: resolvedTheme,
+          opacity: basemapOpacity,
+        }
+      : { kind: 'outline', theme: resolvedTheme, opacity: basemapOpacity }
+  }, [availableBasemaps, effectiveBasemapId, resolvedTheme, basemapOpacity])
   // Zooming out past the whole world bends the flat map into the globe.
   const mapAreaRef = useRef<HTMLDivElement>(null)
   const globeOption = projectionOptions.find((p) => p.id === 'globe')
@@ -1269,11 +1287,14 @@ export function GeoViewer({
         projections={projectionOptions}
         onProjectionChange={changeProjection}
         globeActive={globe.phase !== 'flat'}
+        globeVectorBasemap={globeVectorBasemap}
         globeAuto={
           globeAvailable
             ? {
                 enabled: globeAutoTransition,
                 onChange: setGlobeAutoTransition,
+                engine: globeEngineId,
+                onEngineChange: setGlobeEngineId,
               }
             : null
         }
@@ -1428,6 +1449,7 @@ export function GeoViewer({
           {globe.phase !== 'flat' && (
             <Suspense fallback={null}>
               <GlobeView
+                engine={globeEngine}
                 layout={globePanels === 2 ? 'side' : 'single'}
                 sources={
                   globePanels === 2 && mapSourceB
@@ -1441,7 +1463,13 @@ export function GeoViewer({
                 camera={globe.camera}
                 visible={globe.overlayVisible}
                 active={globe.phase === 'globe'}
-                outline={globeOutline}
+                basemap={globeBasemap}
+                loupe={{
+                  sizePx: modeOptions.loupeSizePx,
+                  zoom: modeOptions.loupeZoom,
+                  latched: modeOptions.loupeLatched,
+                  mirror: modeOptions.loupeMirror,
+                }}
                 pinnedLegends={pinnedLegendItems}
                 onUnpinLegend={unpinLegend}
                 registerEngine={globe.registerEngine}
@@ -1476,7 +1504,7 @@ export function GeoViewer({
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
               onAnnotationMove={moveAnnotation}
-              basemapId={effectiveBasemapId}
+              basemapId={flatBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
               onRegisterFitBbox={onRegisterFitBbox}
@@ -1505,7 +1533,7 @@ export function GeoViewer({
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
               onAnnotationMove={moveAnnotation}
-              basemapId={effectiveBasemapId}
+              basemapId={flatBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
               onRegisterFitBbox={onRegisterFitBbox}

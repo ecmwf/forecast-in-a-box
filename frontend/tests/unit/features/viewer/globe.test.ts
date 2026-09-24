@@ -30,9 +30,14 @@ import {
 import {
   flatClipTransform,
   pickLonLat,
-  textureWidthFor,
 } from '@/features/viewer/globe/engines/three/view-math'
-import { worldGetMapUrl } from '@/features/viewer/globe/world-getmap'
+import {
+  WORLD_REGION,
+  layerRegion,
+  regionGetMapUrl,
+  regionScale,
+  regionSize,
+} from '@/features/viewer/globe/globe-getmap'
 import { globeLayerSpecs } from '@/features/viewer/globe/globe-layer-specs'
 import { createViewerView } from '@/features/viewer/hooks/useOlMapBase'
 import { getViewerProjection } from '@/features/viewer/projections'
@@ -132,12 +137,6 @@ describe('three engine view math', () => {
     expect(hit?.lat).toBeCloseTo(-20, 6)
     expect(pickLonLat([2, 2], [800, 600], { ...camera, zoom: 0.5 })).toBeNull()
   })
-
-  it('sizes textures to the globe, clamped to the device limit', () => {
-    expect(textureWidthFor(10, 4096)).toBe(1024)
-    expect(textureWidthFor(400, 4096)).toBe(4096)
-    expect(textureWidthFor(400, 2048)).toBe(2048)
-  })
 })
 
 const spec: GlobeLayerSpec = {
@@ -158,15 +157,47 @@ const spec: GlobeLayerSpec = {
   zIndex: 101,
 }
 
-describe('world GetMap', () => {
+describe('globe GetMap', () => {
   it('requests the whole world lat-first in EPSG:4326, TIME kept', () => {
-    const url = new URL(worldGetMapUrl(spec, 2048))
+    const url = new URL(regionGetMapUrl(spec, WORLD_REGION, [2048, 1024]))
     const q = url.searchParams
     expect(q.get('REQUEST')).toBe('GetMap')
     expect(q.get('CRS')).toBe('EPSG:4326')
     expect(q.get('BBOX')).toBe('-90,-180,90,180')
     expect([q.get('WIDTH'), q.get('HEIGHT')]).toEqual(['2048', '1024'])
     expect(q.get('TIME')).toBe('2026-07-06T00:00:00Z')
+  })
+
+  it("requests only a regional layer's own box", () => {
+    const region = layerRegion({ ...spec, bbox: [0, 50, 40, 72] })
+    expect(region).toEqual([0, 50, 40, 72])
+    const q = new URL(regionGetMapUrl(spec, region, [400, 220])).searchParams
+    expect(q.get('BBOX')).toBe('50,0,72,40')
+    // Global and dateline-crossing boxes fall back to the world.
+    expect(layerRegion({ ...spec, bbox: [-180, -90, 180, 90] })).toBe(
+      WORLD_REGION,
+    )
+    expect(layerRegion({ ...spec, bbox: [170, -10, -170, 10] })).toBe(
+      WORLD_REGION,
+    )
+    // 0-360 longitudes (e.g. DWD ICON) and half-cell overhangs are global.
+    expect(layerRegion({ ...spec, bbox: [0, -90, 360, 90] })).toBe(WORLD_REGION)
+    expect(layerRegion({ ...spec, bbox: [-180.125, -90, 179.875, 90] })).toBe(
+      WORLD_REGION,
+    )
+  })
+
+  it('sizes a region to the wanted detail, capped per side', () => {
+    const region = [0, 50, 40, 72] as const
+    // 10 px/deg fits; 400 px/deg would exceed 4096 px across 40 degrees.
+    expect(regionSize(region, regionScale(region, 10, 4096))).toEqual([
+      400, 220,
+    ])
+    expect(regionScale(region, 400, 4096)).toBeCloseTo(4096 / 40)
+    // The world at the old maximum: 4096 x 2048.
+    expect(
+      regionSize(WORLD_REGION, regionScale(WORLD_REGION, 100, 4096)),
+    ).toEqual([4096, 2048])
   })
 })
 

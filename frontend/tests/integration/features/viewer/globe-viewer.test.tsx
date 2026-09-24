@@ -15,7 +15,7 @@
  */
 
 import { useState } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -37,6 +37,7 @@ import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
 import i18n from '@/lib/i18n'
+import { useUiStore } from '@/stores/uiStore'
 
 const engineCalls = vi.hoisted(() => ({
   layers: [] as Array<ReadonlyArray<GlobeLayerSpec>>,
@@ -62,7 +63,7 @@ vi.mock('@/features/viewer/globe/engines/registry', () => {
         return Promise.resolve()
       },
       setLayers: (specs) => engineCalls.layers.push(specs),
-      setOutline: () => {},
+      setBasemap: () => {},
       getCamera: () => camera,
       setCamera: (next) => {
         camera = next
@@ -75,6 +76,7 @@ vi.mock('@/features/viewer/globe/engines/registry', () => {
       morphOut: () => Promise.resolve(),
       pick: () => null,
       capture: () => document.createElement('canvas'),
+      drawViewport: () => {},
       size: () => [800, 600],
       destroy: () => {
         engineCalls.destroyed++
@@ -89,13 +91,18 @@ vi.mock('@/features/viewer/globe/engines/registry', () => {
       poles: true,
       minZoom: -2,
       maxZoom: 6,
+      vectorBasemap: false,
     },
     load: () => Promise.resolve(fakeEngine),
   }
-  return { GLOBE_ENGINES: { three: entry }, ACTIVE_GLOBE_ENGINE: entry }
+  return { GLOBE_ENGINES: { three: { ...entry }, maplibre: { ...entry } } }
 })
 
 let nextPort = 19950
+
+beforeEach(() => {
+  useUiStore.setState({ globeEngine: 'three', globeAutoTransition: true })
+})
 
 function Harness({
   portA,
@@ -199,6 +206,23 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByTestId('globe-view'))
       .not.toBeInTheDocument()
+  })
+
+  it('remounts the globe when the renderer changes', async () => {
+    const screen = await render(<Harness portA={registerServer()} />)
+    await expect
+      .element(screen.getByText('2 m temperature').first())
+      .toBeVisible()
+    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    await screen.getByRole('radio', { name: '3D globe' }).click()
+    await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+
+    const { mounted, destroyed } = engineCalls
+    await screen.getByRole('radio', { name: 'MapLibre' }).click()
+    await expect.poll(() => engineCalls.destroyed).toBe(destroyed + 1)
+    await expect.poll(() => engineCalls.mounted).toBe(mounted + 1)
+    await screen.getByRole('radio', { name: 'three.js' }).click()
+    await expect.poll(() => engineCalls.mounted).toBe(mounted + 2)
   })
 
   it('is blocked in single-map comparison modes', async () => {
