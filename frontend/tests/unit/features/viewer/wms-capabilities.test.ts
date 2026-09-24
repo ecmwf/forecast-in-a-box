@@ -971,6 +971,14 @@ describe('parseBbox fallbacks', () => {
     ).layers[0]
     expect(layer.bbox).toEqual([-23.53125, 29.46875, 62.53125, 70.53125])
   })
+  it('keeps latitude first despite a half-cell overhang (DWD ICON)', () => {
+    const layer = parseCapabilities(
+      caps(
+        '<Layer><Name>icon</Name><Title>icon</Title><CRS>EPSG:4326</CRS><BoundingBox CRS="EPSG:4326" minx="-90.125" miny="-180.125" maxx="90.125" maxy="179.875"/></Layer>',
+      ),
+    ).layers[0]
+    expect(layer.bbox).toEqual([-180.125, -90.125, 179.875, 90.125])
+  })
   it('accepts CRS:84 and lon-first EPSG:4326 as written', () => {
     const a = parseCapabilities(
       caps(

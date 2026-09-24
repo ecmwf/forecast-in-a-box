@@ -529,11 +529,11 @@ function parseBbox(
     Number(geo.getAttribute(a)),
   )
   if (!box.every(Number.isFinite)) return null
-  // 1.3.0 EPSG:4326 is latitude-first; a |lat| > 90 betrays lon-first.
+  // 1.3.0 EPSG:4326 is latitude-first; |x| > 91 betrays lon-first (1° for half-cell overhangs).
   const latFirst =
     geo.getAttribute('CRS') === 'EPSG:4326' &&
-    Math.abs(box[0]) <= 90 &&
-    Math.abs(box[2]) <= 90
+    Math.abs(box[0]) <= 91 &&
+    Math.abs(box[2]) <= 91
   return latFirst
     ? [box[1], box[0], box[3], box[2]]
     : (box as [number, number, number, number])
