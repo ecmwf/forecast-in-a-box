@@ -1622,7 +1622,7 @@ requires-dist = [
     { name = "earthkit-workflows-anemoi", specifier = ">=0.7.2" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
-    { name = "pproc-core", specifier = ">=0.3.1" },
+    { name = "pproc-core", specifier = "<0.4.0" },
     { name = "pymetkit", specifier = ">=1.21.0.28" },
 ]
 provides-extras = ["runtime"]
