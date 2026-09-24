@@ -153,7 +153,11 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
         job=JobSpec(
             infra_spec=infra_spec,
             envvars=spec.environment.environment_variables,
-            job_instance=JobInstanceRich(jobInstance=job, checkpointSpec=None),
+            job_instance=JobInstanceRich(
+                jobInstance=job,
+                checkpointSpec=None,
+                custom_pip_indices=config.cascade.constraints.custom_pip_indices,
+            ),
         )
     )
     try:
