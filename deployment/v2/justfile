@@ -8,6 +8,7 @@ set tempdir := "."
 
 buildRelease release_tag="":
     #!/usr/bin/env bash
+    set -euo pipefail
     docker build -t fiab-base:latest -f Dockerfile-base .
     release_tag="{{release_tag}}"
     if [ -z "$release_tag" ]; then

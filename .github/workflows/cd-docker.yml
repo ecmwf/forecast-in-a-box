@@ -42,6 +42,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
         run: |
+          set -euo pipefail
           just buildRelease "$RELEASE_TAG"
 
       - name: Publish single image
@@ -50,6 +51,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
         run: |
+          set -euo pipefail
           # NOTE unhealthily coupled with the justfile -- perhaps expose an action to obtain the built image tags?
           if [[ "${{ matrix.registry }}" == "eccr" ]] ; then
             registry="eccr.ecmwf.int/forecast-in-a-box/fiab-slim"
@@ -79,13 +81,17 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
         run: |
+          set -euo pipefail
+          set -x
           if [[ "${{ matrix.registry }}" == "eccr" ]] ; then
             registry="eccr.ecmwf.int/forecast-in-a-box/fiab-slim"
           else
             registry="ghcr.io/${{ github.repository }}/fiab-slim"
           fi
           target="${registry}:${RELEASE_TAG}"
-          docker manifest create "${target}" \
+          # NOTE manifest may not be necessary, esp given that the --amend was necessary
+          # But we are not in control of the docker buildx version, so we rather do it manually
+          docker manifest create --amend "${target}" \
             "${target}-x86" \
-            "${target}-arm64
+            "${target}-aarch64"
           docker manifest push "${target}"
