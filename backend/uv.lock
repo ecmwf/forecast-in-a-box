@@ -1862,7 +1862,7 @@ requires-dist = [
     { name = "pydantic-settings" },
     { name = "pyrsistent" },
     { name = "python-multipart" },
-    { name = "skinnywms", specifier = ">=0.8.0" },
+    { name = "skinnywms", specifier = ">=0.13.1" },
     { name = "sse-starlette" },
     { name = "starlette", specifier = ">=1.0" },
     { name = "toml" },
@@ -4292,7 +4292,7 @@ wheels = [
 
 [[package]]
 name = "skinnywms"
-version = "0.13.0"
+version = "0.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dask", extra = ["array"], marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -4307,9 +4307,9 @@ dependencies = [
     { name = "python-dateutil", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "xarray", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/f3/f092e9217a5b5e728b0e497b16515e1d6413b543ed35fa81b482f8778a6e/skinnywms-0.13.0.tar.gz", hash = "sha256:864e7ef78e92aab6ba416747c9d903d900c594b7d5ee3fb843a9546768738034", size = 18538039, upload-time = "2026-04-22T13:40:30.39Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/e4/ef21e2bca214b7c88d5813edead9ca9143013860c39a8a5f2baf563efba4/skinnywms-0.13.1.tar.gz", hash = "sha256:b0b96ccd7a43a4371ea2d9f5c15cfe360644433f03443630ed98077f71ddf303", size = 18547712, upload-time = "2026-09-24T09:12:55.677Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/1d/5d311099c129ad817da786a5e8ce18022c4a634a73d42062a927d3c7f066/skinnywms-0.13.0-py3-none-any.whl", hash = "sha256:f15f118fb478f77f1a72f3d8cb336c4653fe481edc12a44477a10d75efa136b1", size = 19020821, upload-time = "2026-04-22T13:40:28.075Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/a2/501eeb5875207beb10c63785ed4b23887763e30af8b0a5a6161f6c154881/skinnywms-0.13.1-py3-none-any.whl", hash = "sha256:e0615439fff1b4ed6b418a2a16525c19e661a5996dca19ab69576a029467dd32", size = 19027702, upload-time = "2026-09-24T09:12:53.083Z" },
 ]
 
 [[package]]
