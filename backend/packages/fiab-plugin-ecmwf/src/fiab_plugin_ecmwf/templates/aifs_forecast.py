@@ -49,7 +49,7 @@ template = BlueprintTemplate(
             factory_id=BlockFactoryId("mapPlotSink"),
             instance=BlockInstance(
                 configuration_values={
-                    ConfigurationOptionId("param"): "2t,msl",
+                    ConfigurationOptionId("param"): "2t-167,msl-151",
                     ConfigurationOptionId("domain"): "${area}",
                     ConfigurationOptionId("format"): "${plotFormat}",
                     ConfigurationOptionId("groupby"): "none",
