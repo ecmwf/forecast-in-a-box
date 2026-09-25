@@ -76,6 +76,8 @@ export default function PdfViewer({
           return
         }
         setDoc(loaded)
+        setPageNumber(1)
+        setScale(1)
       } catch (err) {
         log.error('Failed to load PDF', { taskId: item.taskId, error: err })
         showToast.error(err instanceof Error ? err.message : String(err))
@@ -83,6 +85,8 @@ export default function PdfViewer({
     })()
     return () => {
       state.cancelled = true
+      // Cancels the old render; the canvas keeps its pixels.
+      setDoc(null)
       // Fire-and-forget: destroying the task tears down the document + worker.
       void state.task?.destroy()
     }
@@ -97,20 +101,29 @@ export default function PdfViewer({
     void (async () => {
       try {
         const page = await doc.getPage(pageNumber)
-
         if (state.cancelled) return
-        const canvas = canvasRef.current
-        if (!canvas) return
+        // Off-screen: resizing the visible canvas blanks it.
         const dpr = window.devicePixelRatio || 1
         const viewport = page.getViewport({ scale: scale * dpr })
+        const offscreen = document.createElement('canvas')
+        offscreen.width = viewport.width
+        offscreen.height = viewport.height
+        const offCtx = offscreen.getContext('2d')
+        if (!offCtx) return
+        state.renderTask = page.render({
+          canvasContext: offCtx,
+          viewport,
+          canvas: offscreen,
+        })
+        await state.renderTask.promise
+        const canvas = canvasRef.current
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- mutated by cleanup
+        if (state.cancelled || !canvas) return
         canvas.width = viewport.width
         canvas.height = viewport.height
         canvas.style.width = `${viewport.width / dpr}px`
         canvas.style.height = `${viewport.height / dpr}px`
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-        state.renderTask = page.render({ canvasContext: ctx, viewport, canvas })
-        await state.renderTask.promise
+        canvas.getContext('2d')?.drawImage(offscreen, 0, 0)
       } catch (err) {
         // Expected on .cancel() during rapid output nav — swallow it.
         if (
