@@ -1,7 +1,7 @@
 {
   "page": {
-    "title": "Scheduled runs",
-    "description": "Manage your scheduled forecast runs",
+    "title": "Schedules",
+    "description": "Workflows that run automatically on a schedule",
     "runsLink": "Runs"
   },
   "detail": {
@@ -45,8 +45,8 @@
     "scheduleUpdated": "Schedule updated successfully"
   },
   "empty": {
-    "title": "No scheduled runs",
-    "description": "You haven't scheduled any runs yet. Create one from the forecast builder."
+    "title": "No schedules yet",
+    "description": "You haven't scheduled a workflow yet. In Configure, open the menu next to Run Once and choose Run on Schedule."
   },
   "list": {
     "loading": "Loading schedules...",

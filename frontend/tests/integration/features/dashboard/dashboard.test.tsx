@@ -86,9 +86,7 @@ describe('Dashboard', () => {
       await expect.element(screen.getByText('Manage Plugins')).toBeVisible()
       await expect.element(screen.getByText('Manage Runs')).toBeVisible()
       await expect.element(screen.getByText('Manage Workflows')).toBeVisible()
-      await expect
-        .element(screen.getByText('Manage Scheduled Runs'))
-        .toBeVisible()
+      await expect.element(screen.getByText('Manage Schedules')).toBeVisible()
     })
 
     it('shows error status when status API fails', async () => {
