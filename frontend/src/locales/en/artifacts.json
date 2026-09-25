@@ -1,5 +1,5 @@
 {
-  "title": "ML Models",
+  "title": "ML models",
   "subtitle": "Browse and manage machine learning models. Download a model to make it available for forecasting.",
   "actions": {
     "refresh": "Refresh",
@@ -7,8 +7,8 @@
     "downloading": "Downloading",
     "cancelDownload": "Cancel",
     "delete": "Delete",
-    "viewDetails": "View Details",
-    "backToArtifacts": "Back to Models",
+    "viewDetails": "View details",
+    "backToArtifacts": "Back to models",
     "downloadFailed": "Model download failed",
     "deleting": "Deleting"
   },
@@ -32,20 +32,20 @@
   },
   "detail": {
     "description": "Description",
-    "platforms": "Supported Platforms",
-    "diskSize": "Disk Size",
+    "platforms": "Supported platforms",
+    "diskSize": "Disk size",
     "author": "Author",
     "url": "URL",
-    "pipConstraints": "Pip Package Constraints",
-    "inputStructure": "Input Structure",
-    "outputStructure": "Output Structure",
-    "inputCharacteristics": "Input Characteristics",
+    "pipConstraints": "Pip package constraints",
+    "inputStructure": "Input structure",
+    "outputStructure": "Output structure",
+    "inputCharacteristics": "Input characteristics",
     "noConstraints": "No package constraints",
     "noCharacteristics": "No characteristics available",
     "noInputStructure": "No input structure available",
     "noOutputStructure": "No output structure available",
-    "qubeMatrixTitle": "Data Qube Matrix",
-    "qubeTreeTitle": "Data Qube Tree",
+    "qubeMatrixTitle": "Data Qube matrix",
+    "qubeTreeTitle": "Data Qube tree",
     "qubePivotLabel": "Levels as rows",
     "qubeAxisParam": "param",
     "qubeAxisLevel": "level",
@@ -71,7 +71,7 @@
     "noModelsDescription": "No ML models are currently available in the model catalogue."
   },
   "confirmDelete": {
-    "title": "Delete Model",
+    "title": "Delete model",
     "description": "Are you sure you want to delete {{name}}? This will remove the downloaded model files.",
     "confirm": "Delete",
     "cancel": "Cancel"

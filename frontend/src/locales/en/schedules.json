@@ -6,7 +6,7 @@
   },
   "detail": {
     "backLink": "Schedules",
-    "untitledSchedule": "Untitled Schedule",
+    "untitledSchedule": "Untitled schedule",
     "enabled": "Enabled",
     "disabled": "Disabled",
     "createdBy": "Created by",
@@ -35,13 +35,13 @@
   "actions": {
     "enable": "Enable",
     "disable": "Disable",
-    "viewRuns": "View Runs",
-    "viewDetails": "View Details",
+    "viewRuns": "View runs",
+    "viewDetails": "View details",
     "rerun": "Re-run",
     "rerunSuccess": "Run re-triggered successfully",
     "enableSuccess": "Schedule enabled",
     "disableSuccess": "Schedule disabled",
-    "editSchedule": "Edit Schedule",
+    "editSchedule": "Edit schedule",
     "scheduleUpdated": "Schedule updated successfully"
   },
   "empty": {

@@ -2,17 +2,17 @@
   "title": "Plugins",
   "subtitle": "Manage installed AI models, data connectors, and processing extensions. Browse the ECMWF plugin store to expand your capabilities.",
   "actions": {
-    "checkUpdates": "Check Updates",
+    "checkUpdates": "Check updates",
     "install": "Install",
     "uninstall": "Uninstall",
     "enable": "Enable",
     "disable": "Disable",
     "update": "Update",
-    "viewDetails": "View Details",
+    "viewDetails": "View details",
     "viewDocs": "Documentation",
     "viewOnPyPI": "View on PyPI",
-    "reportIssue": "Report Issue",
-    "releaseNotes": "Release Notes",
+    "reportIssue": "Report issue",
+    "releaseNotes": "Release notes",
     "details": "Details",
     "pypi": "PyPI"
   },
@@ -35,7 +35,7 @@
     "updates": "Updates",
     "available": "Available",
     "capability": {
-      "all": "All Capabilities",
+      "all": "All capabilities",
       "source": "Source",
       "transform": "Transform",
       "product": "Product",
@@ -58,9 +58,9 @@
     "available": "Available",
     "errored": "Errored",
     "warning": "Warning",
-    "updateAvailable": "Update Available",
+    "updateAvailable": "Update available",
     "incompatible": "Incompatible",
-    "error": "Plugin System Error"
+    "error": "Plugin system error"
   },
   "diagnostics": {
     "seeDetails": "See the details page for the full text",
@@ -82,7 +82,7 @@
     "noPluginsDescription": "The plugin store did not return any plugins."
   },
   "confirmRemove": {
-    "title": "Remove Plugin",
+    "title": "Remove plugin",
     "description": "Are you sure you want to remove {{name}}? This action cannot be undone.",
     "confirm": "Remove",
     "cancel": "Cancel"
@@ -92,7 +92,7 @@
     "installedAgo": "Installed {{time}}"
   },
   "blockFactory": {
-    "useInConfig": "Use {{kind}} in a Workflow",
+    "useInConfig": "Use {{kind}} in a workflow",
     "sourceOnlyTooltip": "Workflows must start with a source block",
     "configOptions_one": "{{count}} config option",
     "configOptions_other": "{{count}} config options",
@@ -101,9 +101,9 @@
     "noConfigRequired": "No configuration required"
   },
   "detail": {
-    "backToPlugins": "Back to Plugins",
-    "useAllBlocks": "Use All Blocks ({{count}})",
-    "blockFactories": "Block Factories",
+    "backToPlugins": "Back to plugins",
+    "useAllBlocks": "Use all blocks ({{count}})",
+    "blockFactories": "Block factories",
     "searchBlocks": "Search blocks...",
     "noMatchingBlocks": "No blocks match your search.",
     "noBlocks": "This plugin does not provide any block factories.",

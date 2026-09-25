@@ -131,7 +131,7 @@ describe('welcome tour', () => {
       .element(screen.getByRole('button', { name: 'Done' }))
       .toBeVisible()
 
-    await screen.getByRole('button', { name: 'Start from Scratch' }).click()
+    await screen.getByRole('button', { name: 'Start from scratch' }).click()
 
     await expect.poll(() => useTutorialsStore.getState().active).toBeNull()
     expect(router.state.location.pathname).toBe('/configure')

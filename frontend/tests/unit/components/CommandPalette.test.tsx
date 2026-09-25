@@ -40,7 +40,7 @@ const PLACEHOLDER = 'Search pages, workflows, runs and blocks...'
 
 /** Every command label, grouped, for exhaustive presence checks. */
 const ALL_COMMANDS = [
-  'New Workflow',
+  'New workflow',
   'Overview',
   'Configure',
   'Execute',
@@ -89,7 +89,7 @@ describe('CommandPalette', () => {
     await expect.element(screen.getByPlaceholder(PLACEHOLDER)).toBeVisible()
 
     // Both category headings render.
-    await expect.element(screen.getByText('Getting Started')).toBeVisible()
+    await expect.element(screen.getByText('Getting started')).toBeVisible()
     await expect.element(screen.getByText('Navigation')).toBeVisible()
 
     // Every command is present as a selectable option.
@@ -135,7 +135,7 @@ describe('CommandPalette', () => {
       .element(screen.getByRole('option', { name: /Overview/ }))
       .toBeVisible()
     await expect
-      .element(screen.getByRole('option', { name: /New Workflow/ }))
+      .element(screen.getByRole('option', { name: /New workflow/ }))
       .not.toBeInTheDocument()
   })
 
@@ -179,7 +179,7 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    await screen.getByRole('option', { name: /New Workflow/ }).click()
+    await screen.getByRole('option', { name: /New workflow/ }).click()
 
     // Explicit fresh intent — a bench holding unsaved work asks first.
     expect(mockNavigate).toHaveBeenCalledWith({

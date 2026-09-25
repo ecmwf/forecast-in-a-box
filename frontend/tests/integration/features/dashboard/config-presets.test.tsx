@@ -140,7 +140,7 @@ describe('ConfigPresetsSection', () => {
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
     await expect
-      .element(screen.getByText('My Workflows'))
+      .element(screen.getByText('My workflows'))
       .not.toBeInTheDocument()
   })
 
@@ -149,7 +149,7 @@ describe('ConfigPresetsSection', () => {
 
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
-    await expect.element(screen.getByText('My Workflows')).toBeVisible()
+    await expect.element(screen.getByText('My workflows')).toBeVisible()
   })
 
   it('shows "View all workflows" link', async () => {
@@ -174,7 +174,7 @@ describe('ConfigPresetsSection', () => {
 
     const screen = await renderWithRouter(<ConfigPresetsSection />)
 
-    await expect.element(screen.getByText('My Workflows')).toBeVisible()
+    await expect.element(screen.getByText('My workflows')).toBeVisible()
   })
 
   it('excludes one-off runs and plugin templates from the presets list', async () => {

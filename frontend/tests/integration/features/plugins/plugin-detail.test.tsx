@@ -206,14 +206,14 @@ describe('Plugin Detail Page', () => {
     })
   })
 
-  describe('Back to Plugins Button', () => {
+  describe('Back to plugins Button', () => {
     it('renders Back to Plugins button', async () => {
       const screen = await renderWithRouter(
         <PluginDetailPage plugin={mockPlugin} catalogue={mockCatalogue} />,
       )
 
       await expect
-        .element(screen.getByRole('button', { name: /Back to Plugins/i }))
+        .element(screen.getByRole('button', { name: /Back to plugins/i }))
         .toBeVisible()
     })
   })

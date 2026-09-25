@@ -25,11 +25,11 @@
   "yes": "Yes",
   "no": "No",
   "appName": "Forecast-in-a-Box",
-  "logoAlt": "Forecast In a Box Logo",
+  "logoAlt": "Forecast-in-a-Box logo",
   "spinnerLabel": "Loading",
   "activity": {
-    "label": "Notification Centre",
-    "title": "Notification Centre",
+    "label": "Notification centre",
+    "title": "Notification centre",
     "help": "Shows long-running tasks such as model downloads, plugin installations, and forecast runs. Completed items stay here until you dismiss them.",
     "clear": "Clear",
     "clearAll": "Clear all",
@@ -58,21 +58,21 @@
     "visualise": "Visualise"
   },
   "status": {
-    "title": "System Status",
-    "allSystemsNormal": "All Systems Normal",
-    "partialOutage": "Partial Outage",
-    "systemOutage": "System Outage",
+    "title": "System status",
+    "allSystemsNormal": "All systems normal",
+    "partialOutage": "Partial outage",
+    "systemOutage": "System outage",
     "components": "Components",
     "componentUp": "Online",
     "componentDown": "Offline",
     "componentOff": "Disabled",
-    "apiServer": "API Server",
+    "apiServer": "API server",
     "cascade": "Cascade",
-    "ecmwfData": "ECMWF Data",
+    "ecmwfData": "ECMWF data",
     "scheduler": "Scheduler",
     "plugins": "Plugins",
     "concurrency": "Concurrency",
-    "refresh": "Refresh Status",
+    "refresh": "Refresh status",
     "lastUpdated": "Last updated",
     "componentInitializing": "Loading"
   },
@@ -86,18 +86,18 @@
   "splash": {
     "loading": "Loading configuration",
     "loadingHint": "Please wait while we set up the application",
-    "errorTitle": "Configuration Error",
+    "errorTitle": "Configuration error",
     "errorIntro": "Failed to load application configuration:",
     "errorHint": "If the problem persists, please contact support."
   },
   "header": {
     "home": "home",
     "about": "About",
-    "openMenu": "Open Menu",
-    "closeMenu": "Close Menu",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
     "login": "Sign in",
     "logout": "Sign out",
-    "getStarted": "Get Started"
+    "getStarted": "Get started"
   },
   "footer": {
     "copyright": "© European Centre for Medium-Range Weather Forecasts",
@@ -118,7 +118,7 @@
     "themeSystem": "System",
     "timezone": "Timezone",
     "welcomeTour": "Show welcome tour",
-    "helpSupport": "Help & Support",
+    "helpSupport": "Help & support",
     "documentation": "Documentation",
     "account": "Account",
     "profile": "Profile",
@@ -126,8 +126,8 @@
     "administration": "Administration",
     "plugins": "Plugins",
     "artifacts": "ML models",
-    "globalVariables": "Global Variables",
-    "signOut": "Sign Out",
+    "globalVariables": "Global variables",
+    "signOut": "Sign out",
     "timezoneDialogTitle": "Application timezone",
     "timezoneDialogDescription": "All dates and times — including forecast base times — are shown and entered in this timezone. Defaults to UTC.",
     "schedules": "Schedules",
@@ -135,7 +135,7 @@
     "ecmwfKeySet": "set"
   },
   "commandPalette": {
-    "title": "Command Palette",
+    "title": "Command palette",
     "description": "Search for a command to run...",
     "placeholder": "Search pages, workflows, runs and blocks...",
     "empty": "No results found.",
@@ -147,10 +147,10 @@
   },
   "commands": {
     "newConfiguration": {
-      "label": "New Workflow",
+      "label": "New workflow",
       "description": "Start from a blank canvas"
     },
-    "categoryGettingStarted": "Getting Started",
+    "categoryGettingStarted": "Getting started",
     "categoryNavigation": "Navigation",
     "dashboard": {
       "label": "Overview",

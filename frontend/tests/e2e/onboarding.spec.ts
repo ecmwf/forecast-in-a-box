@@ -87,7 +87,7 @@ test.describe('First-run onboarding', () => {
       await expect(card.getByRole('heading', { name: title })).toBeVisible()
     }
 
-    await page.getByRole('button', { name: 'Start from Scratch' }).click()
+    await page.getByRole('button', { name: 'Start from scratch' }).click()
     await page.waitForURL(/configure\?.*fresh=true/, { timeout: 15000 })
     await expect(card).not.toBeVisible()
     expect(await readOnboardingStatus(page)).toBe('active')

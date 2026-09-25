@@ -51,14 +51,14 @@ test.describe('Dashboard Content', () => {
       timeout: 10000,
     })
     await expect(
-      page.getByRole('button', { name: 'Start from Scratch' }),
+      page.getByRole('button', { name: 'Start from scratch' }),
     ).toBeVisible()
   })
 
   test('clicking the scratch card navigates to a blank configure', async ({
     page,
   }) => {
-    await page.getByRole('button', { name: 'Start from Scratch' }).click()
+    await page.getByRole('button', { name: 'Start from scratch' }).click()
 
     // Scratch routes through the guarded fresh intent (workbench model).
     await expect(page).toHaveURL(/\/configure\?fresh=true$/)
@@ -82,8 +82,8 @@ test.describe('Dashboard Content', () => {
 
   test('stat cards display system information', async ({ page }) => {
     // Look for stat card labels
-    const systemStatus = page.getByText('System Status')
-    const availableModels = page.getByText('Available Models')
+    const systemStatus = page.getByText('System status')
+    const availableModels = page.getByText('Available models')
 
     if (
       await systemStatus
@@ -105,7 +105,7 @@ test.describe('Dashboard Content', () => {
   })
 
   test('quick action buttons are visible', async ({ page }) => {
-    const managePlugins = page.getByText('Manage Plugins')
+    const managePlugins = page.getByText('Manage plugins')
     const manageSources = page.getByText('Manage Sources')
 
     if (
@@ -128,7 +128,7 @@ test.describe('Dashboard Content', () => {
   })
 })
 
-test.describe('System Status', () => {
+test.describe('System status', () => {
   test.beforeEach(async ({ page }) => {
     await navigateTo(page, '/overview')
   })
@@ -157,7 +157,7 @@ test.describe('System Status', () => {
         await page.waitForTimeout(500)
 
         // Popover should show service statuses
-        const apiServer = page.getByText('API Server')
+        const apiServer = page.getByText('API server')
         if (await apiServer.isVisible({ timeout: 3000 }).catch(() => false)) {
           await expect(apiServer).toBeVisible()
         }
@@ -172,7 +172,7 @@ test.describe('Cross-Page Navigation', () => {
   }) => {
     await navigateTo(page, '/overview')
 
-    const managePlugins = page.getByText('Manage Plugins')
+    const managePlugins = page.getByText('Manage plugins')
     if (
       await managePlugins
         .first()

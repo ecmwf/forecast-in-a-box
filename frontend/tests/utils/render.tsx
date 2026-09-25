@@ -96,7 +96,7 @@ interface RenderWithRouterOptions {
  * @example
  * ```tsx
  * const { getByText } = renderWithRouter(<FableBuilderPage />)
- * await expect.element(getByText('Block Palette')).toBeVisible()
+ * await expect.element(getByText('Block palette')).toBeVisible()
  * ```
  */
 export function renderWithRouter(

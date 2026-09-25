@@ -1,6 +1,6 @@
 {
   "page": {
-    "title": "Global Variables",
+    "title": "Global variables",
     "description": "Manage global variable definitions used in workflow interpolation."
   },
   "list": {
@@ -24,7 +24,7 @@
     "label": "by"
   },
   "actions": {
-    "create": "Create Variable",
+    "create": "Create variable",
     "edit": "Edit",
     "save": "Save",
     "saving": "Saving...",
@@ -37,8 +37,8 @@
     "deleteFailed": "Could not delete the variable"
   },
   "form": {
-    "title": "Create Global Variable",
-    "editTitle": "Edit Global Variable",
+    "title": "Create global variable",
+    "editTitle": "Edit global variable",
     "key": "Key",
     "keyPlaceholder": "e.g. myVariable",
     "keyHelp": "Used as ${key} in workflows",

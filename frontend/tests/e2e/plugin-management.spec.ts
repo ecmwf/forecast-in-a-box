@@ -253,7 +253,7 @@ test.describe('Plugin Detail Page', () => {
   }) => {
     await navigateTo(page, '/admin/plugins')
 
-    // Find a "View Details" button on an installed plugin
+    // Find a "View details" button on an installed plugin
     const viewDetailsButtons = page.getByRole('button', {
       name: /view details/i,
     })
@@ -378,7 +378,7 @@ test.describe('Plugin Detail Page', () => {
     }
   })
 
-  test('Back to Plugins button navigates back to plugin list', async ({
+  test('Back to plugins button navigates back to plugin list', async ({
     page,
   }) => {
     await navigateTo(page, '/admin/plugins')
@@ -395,7 +395,7 @@ test.describe('Plugin Detail Page', () => {
       await viewDetailsButtons.first().click()
       await page.waitForTimeout(2000)
 
-      // Click "Back to Plugins"
+      // Click "Back to plugins"
       const backButton = page.getByRole('link', { name: /back to plugins/i })
       if (await backButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         await backButton.click()

@@ -4,22 +4,22 @@
     "titleAnonymous": "Welcome back",
     "userFallback": "User",
     "stats": {
-      "systemStatus": "System Status",
+      "systemStatus": "System status",
       "checking": "Checking...",
       "loadingStatus": "Loading status",
       "allOk": "All OK",
       "operational": "Operational",
-      "partialOutage": "Partial Outage",
+      "partialOutage": "Partial outage",
       "someIssues": "Some services unavailable",
-      "systemDown": "System Down",
+      "systemDown": "System down",
       "notOperational": "Not operational",
       "currently": {
-        "running": "Currently Running",
-        "preparing": "Currently Preparing",
-        "submitted": "Currently Submitted"
+        "running": "Currently running",
+        "preparing": "Currently preparing",
+        "submitted": "Currently submitted"
       },
       "activeForecasts": "Active runs",
-      "availableModels": "Available Models",
+      "availableModels": "Available models",
       "of": "of {{total}}",
       "downloadedModels": "Downloaded models",
       "totalForecasts": "Total runs",
@@ -44,29 +44,29 @@
       "manage": "Manage models"
     },
     "actions": {
-      "managePlugins": "Manage Plugins",
-      "manageExecutions": "Manage Runs",
-      "myPresets": "Manage Workflows",
-      "scheduledForecasts": "Manage Schedules"
+      "managePlugins": "Manage plugins",
+      "manageExecutions": "Manage runs",
+      "myPresets": "Manage workflows",
+      "scheduledForecasts": "Manage schedules"
     }
   },
   "community": {
-    "title": "Forecast-in-a-Box Community News",
+    "title": "Forecast-in-a-Box community news",
     "press": "Press and articles",
     "materials": "Presentations and materials",
     "softwareAndCommunity": "Software and community",
     "unavailable": "The news list could not be loaded."
   },
   "gettingStarted": {
-    "title": "Workflow Templates",
+    "title": "Workflow templates",
     "subtitle": "Start from a ready-made workflow",
     "recommended": "Recommended",
     "startFromScratch": {
-      "title": "Start from Scratch",
+      "title": "Start from scratch",
       "description": "Build a forecast from scratch with full control over every parameter.",
       "tags": {
-        "canvas": "Blank Canvas",
-        "control": "Full Control"
+        "canvas": "Blank canvas",
+        "control": "Full control"
       }
     },
     "templates": {
@@ -80,14 +80,14 @@
     "viewAllTemplates": "View all templates"
   },
   "presets": {
-    "title": "My Workflows",
+    "title": "My workflows",
     "subtitle": "Your saved workflows",
     "viewAll": "View all workflows",
     "load": "Use this Workflow",
     "delete": "Delete",
     "bookmark": "Bookmark",
     "rename": "Rename",
-    "renameTitle": "Rename Workflow",
+    "renameTitle": "Rename workflow",
     "renameDescription": "Update the title and comments for this workflow.",
     "searchPlaceholder": "Search workflows...",
     "filters": {

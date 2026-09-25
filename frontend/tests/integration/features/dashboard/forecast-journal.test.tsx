@@ -76,12 +76,12 @@ describe('ForecastJournal Integration', () => {
 
     it('links completed runs to their results', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('View Results')).toBeVisible()
+      await expect.element(screen.getByText('View results')).toBeVisible()
     })
 
     it('links failed runs to their error', async () => {
       const screen = await renderJournal()
-      await expect.element(screen.getByText('View Error')).toBeVisible()
+      await expect.element(screen.getByText('View error')).toBeVisible()
     })
   })
 

@@ -78,7 +78,7 @@ describe('Fable Builder Save & Load', () => {
       const screen = await renderWithRouter(<FableBuilderPage />)
 
       // Wait for catalogue to load
-      await expect.element(screen.getByText('Block Palette')).toBeVisible()
+      await expect.element(screen.getByText('Block palette')).toBeVisible()
 
       // Set up a fable with blocks and mark dirty
       setupFableWithSource()
@@ -86,8 +86,8 @@ describe('Fable Builder Save & Load', () => {
       // Verify fable is dirty
       expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
-      // Click "Save Workflow" to open save popover
-      await screen.getByRole('button', { name: /Save Workflow/i }).click()
+      // Click "Save workflow" to open save popover
+      await screen.getByRole('button', { name: /Save workflow/i }).click()
 
       // Fill in a title
       const titleInput = screen.getByLabelText('Title')
@@ -122,7 +122,7 @@ describe('Fable Builder Save & Load', () => {
       const screen = await renderWithRouter(<FableBuilderPage />)
 
       // Wait for catalogue to load
-      await expect.element(screen.getByText('Block Palette')).toBeVisible()
+      await expect.element(screen.getByText('Block palette')).toBeVisible()
 
       // Set up a fable that is already saved (has fableId)
       setupFableWithSource()
@@ -136,8 +136,8 @@ describe('Fable Builder Save & Load', () => {
         .updateBlockConfig('source1', 'lead_time', '48')
       expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
-      // Button should say "Update Workflow" since this is an existing workflow
-      await screen.getByRole('button', { name: /Update Workflow/i }).click()
+      // Button should say "Update workflow" since this is an existing workflow
+      await screen.getByRole('button', { name: /Update workflow/i }).click()
 
       // Click "Update" in the popover
       await screen.getByRole('button', { name: 'Update', exact: true }).click()
@@ -155,7 +155,7 @@ describe('Fable Builder Save & Load', () => {
       const screen = await renderWithRouter(<FableBuilderPage />)
 
       // Wait for catalogue to load
-      await expect.element(screen.getByText('Block Palette')).toBeVisible()
+      await expect.element(screen.getByText('Block palette')).toBeVisible()
 
       // Set up a fable with blocks
       setupFableWithSource()
@@ -170,8 +170,8 @@ describe('Fable Builder Save & Load', () => {
         }),
       )
 
-      // Click "Save Workflow" to open save popover
-      await screen.getByRole('button', { name: /Save Workflow/i }).click()
+      // Click "Save workflow" to open save popover
+      await screen.getByRole('button', { name: /Save workflow/i }).click()
 
       // Click "Save" in the popover
       await screen.getByRole('button', { name: 'Save', exact: true }).click()
@@ -193,7 +193,7 @@ describe('Fable Builder Save & Load', () => {
       const screen = await renderWithRouter(<FableBuilderPage />)
 
       // Wait for catalogue to load
-      await expect.element(screen.getByText('Block Palette')).toBeVisible()
+      await expect.element(screen.getByText('Block palette')).toBeVisible()
 
       // Simulate loading a saved fable (as if retrieved from the backend)
       const savedFable = mockSavedFables['fable-001'].fable
@@ -263,7 +263,7 @@ describe('Fable Builder Save & Load', () => {
       const screen = await renderWithRouter(<FableBuilderPage />)
 
       // Wait for palette to load
-      await expect.element(screen.getByText('Block Palette')).toBeVisible()
+      await expect.element(screen.getByText('Block palette')).toBeVisible()
 
       // Programmatically set a loaded fable (simulating file load via setFable)
       const fileContent = mockSavedFables['fable-002'].fable
@@ -285,7 +285,7 @@ describe('Fable Builder Save & Load', () => {
       const screen = await renderWithRouter(<FableBuilderPage />)
 
       // Wait for palette to load
-      await expect.element(screen.getByText('Block Palette')).toBeVisible()
+      await expect.element(screen.getByText('Block palette')).toBeVisible()
 
       // Load a saved fable
       const savedFable = mockSavedFables['fable-001'].fable
@@ -318,7 +318,7 @@ describe('Fable Builder Save & Load', () => {
       const screen = await renderWithRouter(<FableBuilderPage />)
 
       // Wait for palette to load
-      await expect.element(screen.getByText('Block Palette')).toBeVisible()
+      await expect.element(screen.getByText('Block palette')).toBeVisible()
 
       // Load a saved fable first
       const savedFable = mockSavedFables['fable-001'].fable
@@ -351,7 +351,7 @@ describe('Fable Builder Save & Load', () => {
       const screen = await renderWithRouter(<FableBuilderPage />)
 
       // 1. Wait for initial load
-      await expect.element(screen.getByText('Block Palette')).toBeVisible()
+      await expect.element(screen.getByText('Block palette')).toBeVisible()
 
       // 2. Add and configure a source block via palette
       await screen
@@ -360,7 +360,7 @@ describe('Fable Builder Save & Load', () => {
       await screen.getByLabelText('Base time').fill('2026-01-15')
 
       // 3. First save
-      await screen.getByRole('button', { name: /Save Workflow/i }).click()
+      await screen.getByRole('button', { name: /Save workflow/i }).click()
       await screen.getByRole('button', { name: 'Save', exact: true }).click()
 
       // Wait for save to complete
@@ -376,7 +376,7 @@ describe('Fable Builder Save & Load', () => {
       expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
       // 5. Re-save (should update existing)
-      await screen.getByRole('button', { name: /Update Workflow/i }).click()
+      await screen.getByRole('button', { name: /Update workflow/i }).click()
       await screen.getByRole('button', { name: 'Update', exact: true }).click()
 
       // Wait for re-save to complete

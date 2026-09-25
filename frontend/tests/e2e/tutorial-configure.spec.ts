@@ -35,7 +35,7 @@ async function openConfigure(page: Page, search = '') {
   await page.goto('/')
   await page.waitForURL(/overview/, { timeout: 15000 })
   await page.goto(`/configure${search}`)
-  await expect(page.getByText('Block Palette')).toBeVisible({ timeout: 10000 })
+  await expect(page.getByText('Block palette')).toBeVisible({ timeout: 10000 })
 }
 
 test.describe('Configure guided tour', () => {

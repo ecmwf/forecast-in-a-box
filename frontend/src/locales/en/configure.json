@@ -1,9 +1,9 @@
 {
   "save": {
-    "triggerUpdate": "Update Workflow",
-    "triggerSave": "Save Workflow",
-    "titleUpdate": "Update Workflow",
-    "titleSave": "Save Workflow",
+    "triggerUpdate": "Update workflow",
+    "triggerSave": "Save workflow",
+    "titleUpdate": "Update workflow",
+    "titleSave": "Save workflow",
     "titleLabel": "Title",
     "titlePlaceholder": "e.g. European forecast run",
     "commentsLabel": "Comments",
@@ -14,7 +14,7 @@
     "savedAsNew": "Workflow saved as new",
     "saved": "Workflow saved",
     "saveFailed": "Failed to save workflow",
-    "saveAsNew": "Save as New",
+    "saveAsNew": "Save as new",
     "update": "Update",
     "save": "Save"
   },
@@ -37,17 +37,17 @@
     "catalogueLoadFailed": "Failed to load block catalogue",
     "noPluginsTitle": "No plugins enabled",
     "noPluginsDescription": "At least one plugin must be enabled to build workflows.",
-    "managePlugins": "Manage Plugins",
-    "validationErrorTitle": "Validation Error",
+    "managePlugins": "Manage plugins",
+    "validationErrorTitle": "Validation error",
     "validationError422": "Invalid workflow. Please fill in all required fields.",
     "validationErrorGeneric": "Failed to validate workflow. Please check your block settings.",
-    "untitledConfiguration": "Untitled Workflow"
+    "untitledConfiguration": "Untitled workflow"
   },
   "header": {
     "graph": "Graph",
     "form": "Form",
-    "exportConfig": "Export Workflow",
-    "loadConfig": "Load Workflow",
+    "exportConfig": "Export workflow",
+    "loadConfig": "Load workflow",
     "newConfiguration": "New workflow",
     "exportFailed": "Failed to export workflow",
     "configLoaded": "Workflow loaded",
@@ -58,12 +58,12 @@
     "parseFailed": "Failed to parse workflow file",
     "readFailed": "Failed to read file",
     "readUnknownError": "Unknown read error",
-    "reviewSubmit": "Review & Submit",
-    "runOnce": "Run Once",
-    "runOnSchedule": "Run on Schedule",
+    "reviewSubmit": "Review & submit",
+    "runOnce": "Run once",
+    "runOnSchedule": "Run on schedule",
     "submitOptions": "More submit options",
-    "backToEdit": "Back to Edit",
-    "submitJob": "Start Run",
+    "backToEdit": "Back to edit",
+    "submitJob": "Start run",
     "reviewTooltipNoBlocks": "Add blocks to your workflow",
     "reviewTooltipNoSink": "Add at least one output block",
     "reviewTooltipInvalid": "Fix validation errors before submitting",
@@ -87,7 +87,7 @@
     "issues_other": "{{count}} issues to fix",
     "globalIssueLabel": "Workflow",
     "validatingConfiguration": "Validating workflow...",
-    "configurationIssues": "Workflow Issues",
+    "configurationIssues": "Workflow issues",
     "hints": {
       "invalidValue": "Open the block and pick a valid value for this option.",
       "missingConfig": "Fill in the required options in the configuration panel.",
@@ -110,26 +110,26 @@
     "resizeSidebar": "Resize sidebar"
   },
   "mobile": {
-    "addBlock": "Add Block",
-    "blockConfiguration": "Block Configuration"
+    "addBlock": "Add block",
+    "blockConfiguration": "Block configuration"
   },
   "configPanel": {
     "emptyTitle": "Nothing selected",
     "emptyDescription": "Pick a block on the canvas to configure it, or start here.",
     "addSource": "Add a source",
     "startFromPreset": "Open a workflow",
-    "inputConnections": "Input Connections",
+    "inputConnections": "Input connections",
     "configuration": "Configuration",
     "noConfigOptions": "No configuration options",
     "noCompatibleSources": "No compatible sources",
     "selectSource": "Select source...",
-    "deleteBlock": "Delete Block",
+    "deleteBlock": "Delete block",
     "deleteConfirm": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone.",
     "cancel": "Cancel",
     "delete": "Delete"
   },
   "palette": {
-    "title": "Block Palette",
+    "title": "Block palette",
     "searchPlaceholder": "Search blocks...",
     "noBlocksAvailable": "No {{kind}} blocks available",
     "notAvailableAtStep": "Not available at this step",
@@ -155,8 +155,8 @@
     "showMinimap": "Show minimap",
     "layout": "Layout",
     "direction": "Direction",
-    "topToBottom": "↓ Top to Bottom",
-    "leftToRight": "→ Left to Right"
+    "topToBottom": "↓ Top to bottom",
+    "leftToRight": "→ Left to right"
   },
   "canvasStatus": {
     "zoom": "{{value}}%",
@@ -193,7 +193,7 @@
   },
   "blockNode": {
     "configureBlock": "Configure block",
-    "deleteBlock": "Delete Block",
+    "deleteBlock": "Delete block",
     "deleteConfirm": "Are you sure you want to delete \"{{title}}\" and all connected downstream blocks? This action cannot be undone.",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -201,21 +201,21 @@
     "outputHandle": "Output"
   },
   "review": {
-    "title": "Review Workflow",
+    "title": "Review workflow",
     "subtitle": "Review your workflow before submitting.",
-    "validatingTitle": "Validating Workflow",
+    "validatingTitle": "Validating workflow",
     "validatingDescription": "Please wait while we validate your workflow...",
-    "hasErrorsTitle": "Workflow Has Errors",
+    "hasErrorsTitle": "Workflow has errors",
     "fixIssues": "Please fix the following issues before submitting:",
     "blockLevelErrors_one": "{{count}} block-level error found.",
     "blockLevelErrors_other": "{{count}} block-level errors found.",
-    "readyTitle": "Ready to Submit",
+    "readyTitle": "Ready to submit",
     "readyDescription": "Your workflow is valid and ready to be submitted.",
-    "summaryTitle": "Workflow Summary",
+    "summaryTitle": "Workflow summary",
     "summaryDescription_one": "{{count}} block configured",
     "summaryDescription_other": "{{count}} blocks configured",
-    "backToEdit": "Back to Edit",
-    "submitJob": "Start Run",
+    "backToEdit": "Back to edit",
+    "submitJob": "Start run",
     "kindHeading": "{{label}}s"
   },
   "configSummary": {

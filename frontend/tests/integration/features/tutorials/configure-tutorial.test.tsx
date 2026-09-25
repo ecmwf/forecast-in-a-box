@@ -274,9 +274,9 @@ describe('configure first-run tutorial', () => {
       .toBeVisible()
     await screen.getByRole('button', { name: 'Show me', exact: true }).click()
     await expect
-      .element(screen.getByRole('heading', { name: 'Run Forecast' }))
+      .element(screen.getByRole('heading', { name: 'Run forecast' }))
       .toBeVisible()
-    await screen.getByRole('button', { name: 'Start Run' }).click()
+    await screen.getByRole('button', { name: 'Start run' }).click()
 
     // The expected navigation completes the tour instead of ending it.
     await expect
