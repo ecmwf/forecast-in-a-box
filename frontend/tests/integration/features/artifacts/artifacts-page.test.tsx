@@ -11,7 +11,10 @@
 /** Mutating tests run last: MSW artifact state persists within the file. */
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { HttpResponse, http } from 'msw'
+import { worker } from '@tests/test-extend'
 import { renderWithRouter } from '@tests/utils/render'
+import { API_ENDPOINTS } from '@/api/endpoints'
 import { Route } from '@/routes/_authenticated/admin/artifacts.index'
 import { useUiStore } from '@/stores/uiStore'
 
@@ -89,19 +92,38 @@ describe('Models page', () => {
     })
   })
 
-  it('shows download progress in place and returns on cancel', async () => {
+  it('blocks incompatible downloads; shows progress in place and cancels', async () => {
+    const overview = (id: string, name: string, compatible: boolean) => ({
+      composite_id: { artifact_store_id: 'ecmwf', artifact_local_id: id },
+      display_name: name,
+      display_author: 'ECMWF',
+      disk_size_bytes: 1_000_000,
+      supported_platforms: ['linux'],
+      tags: {},
+      is_available: false,
+      is_locally_compatible: compatible,
+      local_compatibility_detail: compatible ? null : 'No GPU on this host.',
+    })
+    worker.use(
+      http.get(API_ENDPOINTS.artifacts.listModels, () =>
+        HttpResponse.json([
+          overview('aifs-ens-v0.3.0', 'AIFS ENS', false),
+          overview('aifs-single-mse-1.1_w_sdpa', 'AIFS Single MSE 1.1', true),
+        ]),
+      ),
+    )
     const screen = await renderPage()
+    const downloads = screen.getByRole('button', { name: 'Download' })
 
-    await screen.getByRole('button', { name: 'Download' }).first().click()
+    await expect.element(downloads.first()).toBeDisabled()
+    await downloads.last().click()
     await expect
       .element(screen.getByRole('button', { name: 'Cancel' }))
       .toBeVisible()
     await expect.element(screen.getByText('Downloading').first()).toBeVisible()
 
     await screen.getByRole('button', { name: 'Cancel' }).click()
-    await expect
-      .poll(() => screen.getByRole('button', { name: 'Download' }).all().length)
-      .toBe(2)
+    await expect.element(downloads.last()).toBeEnabled()
   })
 
   // Mutating test: keep last.

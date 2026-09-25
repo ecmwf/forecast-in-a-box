@@ -15,6 +15,11 @@ import type {
   CompositeArtifactId,
 } from '@/api/types/artifacts.types'
 import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { CatalogueBusy } from '@/components/common/catalogue/CatalogueBusy'
 import { cn } from '@/lib/utils'
 
@@ -61,6 +66,18 @@ export function ArtifactActions({
     return <CatalogueBusy className="w-full" label={t('actions.deleting')} />
   }
 
+  const downloadButton = (
+    <Button
+      variant="outline"
+      className="border-primary/40 text-primary hover:bg-primary/5"
+      onClick={() => onDownload(artifact.id)}
+      disabled={!artifact.isLocallyCompatible}
+    >
+      <Download className="h-4 w-4" />
+      {t('actions.download')}
+    </Button>
+  )
+
   return (
     <div
       className={cn(
@@ -87,15 +104,22 @@ export function ArtifactActions({
           >
             <Trash2 className="h-4 w-4" />
           </Button>
+        ) : artifact.isLocallyCompatible ? (
+          downloadButton
         ) : (
-          <Button
-            variant="outline"
-            className="border-primary/40 text-primary hover:bg-primary/5"
-            onClick={() => onDownload(artifact.id)}
-          >
-            <Download className="h-4 w-4" />
-            {t('actions.download')}
-          </Button>
+          // Runs can't use incompatible checkpoints.
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex" />}>
+              {downloadButton}
+            </TooltipTrigger>
+            <TooltipContent>
+              {artifact.localCompatibilityDetail
+                ? t('compatibility.notCompatibleDetail', {
+                    detail: artifact.localCompatibilityDetail,
+                  })
+                : t('compatibility.notCompatible')}
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
     </div>
