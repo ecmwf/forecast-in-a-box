@@ -152,3 +152,43 @@ describe('templateConfigureSearch', () => {
     )
   })
 })
+
+describe('selectStarterTemplates with bookmarks', () => {
+  const official = [template('A'), template('B'), template('C'), template('D')]
+  const order = { [ECMWF]: ['A', 'B', 'C', 'D'] }
+  const key = (name: string, pluginId = ECMWF) => `${pluginId}::${name}`
+
+  it('puts bookmarks first, in bookmark order, then fills with defaults', () => {
+    const result = selectStarterTemplates(official, order, 3, [
+      key('D'),
+      key('C'),
+    ])
+    expect(names(result)).toEqual(['D', 'C', 'A'])
+  })
+
+  it('shows bookmarks from any plugin, not only the official one', () => {
+    const other = template('X', { pluginId: 'local:other' })
+    const result = selectStarterTemplates([...official, other], order, 3, [
+      key('X', 'local:other'),
+    ])
+    expect(names(result)).toEqual(['X', 'A', 'B'])
+  })
+
+  it('skips bookmarks whose template no longer exists', () => {
+    const result = selectStarterTemplates(official, order, 3, [
+      key('Gone'),
+      key('B'),
+    ])
+    expect(names(result)).toEqual(['B', 'A', 'C'])
+  })
+
+  it('shows only the first bookmarks when more than the limit exist', () => {
+    const result = selectStarterTemplates(official, order, 3, [
+      key('D'),
+      key('C'),
+      key('B'),
+      key('A'),
+    ])
+    expect(names(result)).toEqual(['D', 'C', 'B'])
+  })
+})

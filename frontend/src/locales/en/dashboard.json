@@ -77,7 +77,8 @@
       "errorTitle": "Couldn't load templates",
       "errorDescription": "The template list is temporarily unavailable."
     },
-    "viewAllTemplates": "View all templates"
+    "viewAllTemplates": "View all templates",
+    "bookmarkHint": "Bookmark templates on the Workflows page to show them here first."
   },
   "presets": {
     "title": "My workflows",
@@ -119,6 +120,7 @@
       }
     },
     "basedOn": "Based on: {{name}}",
-    "deleted": "Workflow deleted"
+    "deleted": "Workflow deleted",
+    "removeBookmark": "Remove bookmark"
   }
 }

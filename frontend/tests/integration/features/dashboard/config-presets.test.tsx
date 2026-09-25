@@ -24,6 +24,7 @@ import { renderWithRouter } from '@tests/utils/render'
 import { worker } from '@tests/test-extend'
 import { ConfigPresetsSection } from '@/features/dashboard/components/ConfigPresetsSection'
 import { PresetsPage } from '@/features/dashboard/components/PresetsPage'
+import { useTemplateBookmarksStore } from '@/stores/templateBookmarksStore'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import { ToastProvider } from '@/providers/ToastProvider'
 import { ONEOFF_TAG } from '@/lib/system-tags'
@@ -323,6 +324,26 @@ describe('PresetsPage — Templates tab', () => {
     await expect
       .element(screen.getByText('European Forecast'))
       .not.toBeInTheDocument()
+  })
+
+  it('bookmarks a template so it also shows under Bookmarked', async () => {
+    useTemplateBookmarksStore.setState({ keys: [] })
+    useSourceAwareListHandler([...mockBlueprints, ...mockTemplates])
+
+    const screen = await renderWithRouter(<PresetsPage />)
+
+    await screen.getByRole('button', { name: 'Templates' }).click()
+    await expect.element(screen.getByText('Fast Map')).toBeVisible()
+    await screen.getByRole('button', { name: 'Bookmark', exact: true }).click()
+    await expect
+      .element(screen.getByRole('button', { name: 'Remove bookmark' }))
+      .toHaveAttribute('aria-pressed', 'true')
+
+    await screen.getByRole('button', { name: 'Bookmarked' }).click()
+    await expect.element(screen.getByText('Fast Map')).toBeVisible()
+    expect(useTemplateBookmarksStore.getState().keys).toEqual([
+      'local:plugin-test::Fast Map',
+    ])
   })
 
   it('does not leak templates into the All tab', async () => {

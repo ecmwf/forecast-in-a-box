@@ -118,6 +118,8 @@ export const STORAGE_KEYS = {
     stylePins: 'fiab.store.style-pins',
     /** The user's ECMWF API key for entitled ecCharts layers */
     ecmwfKey: 'fiab.store.ecmwf-key',
+    /** Bookmarked plugin templates (shown first on the Overview) */
+    templateBookmarks: 'fiab.store.template-bookmarks',
   },
 } as const
 
@@ -147,6 +149,7 @@ export const STORE_VERSIONS = {
   tutorials: 1,
   stylePins: 1,
   ecmwfKey: 1,
+  templateBookmarks: 1,
 } as const
 
 /**

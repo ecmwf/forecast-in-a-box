@@ -26,6 +26,7 @@ import { mockCommunityNews } from '../../../../mocks/handlers/news.handlers'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { CommunityNewsCard } from '@/features/dashboard/components/CommunityNewsCard'
 import { GettingStartedSection } from '@/features/dashboard/components/GettingStartedSection'
+import { useTemplateBookmarksStore } from '@/stores/templateBookmarksStore'
 import { WelcomeCard } from '@/features/dashboard/components/WelcomeCard'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { API_ENDPOINTS, STATIC_FILES } from '@/api/endpoints'
@@ -160,6 +161,39 @@ describe('Dashboard', () => {
         'testBasic',
         'testThird',
       ])
+    })
+
+    it('shows bookmarked templates first and drops the bookmark hint', async () => {
+      useTemplateBookmarksStore.setState({
+        keys: ['ecmwf:ecmwf-base::testFourth'],
+      })
+      const screen = await renderSection()
+
+      await expect
+        .element(screen.getByRole('button', { name: 'testFourth' }))
+        .toBeVisible()
+      const titles = Array.from(
+        screen.container.querySelectorAll('[role="button"] h3'),
+      ).map((node) => node.textContent)
+      expect(titles).toEqual([
+        'Start from scratch',
+        'testFourth',
+        'testTyped',
+        'testBasic',
+      ])
+      await expect
+        .element(screen.getByText(/Bookmark templates on the Workflows page/))
+        .not.toBeInTheDocument()
+      useTemplateBookmarksStore.setState({ keys: [] })
+    })
+
+    it('hints at bookmarking while no template is bookmarked', async () => {
+      useTemplateBookmarksStore.setState({ keys: [] })
+      const screen = await renderSection()
+
+      await expect
+        .element(screen.getByText(/Bookmark templates on the Workflows page/))
+        .toBeVisible()
     })
 
     it('renders the plugin-authored tags as chips', async () => {

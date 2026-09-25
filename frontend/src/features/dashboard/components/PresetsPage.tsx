@@ -11,7 +11,7 @@
 /** The Workflows page — search and filter saved workflows and templates. */
 
 import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react'
-import { Bookmark, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react'
+import { Bookmark, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearch } from '@tanstack/react-router'
 import { useConfigPresets } from '../hooks/useConfigPresets'
@@ -19,6 +19,7 @@ import {
   templateConfigureSearch,
   useTemplatePresets,
 } from '../hooks/useTemplatePresets'
+import { BookmarkToggle } from './BookmarkToggle'
 import type { PresetEntry } from '../hooks/useConfigPresets'
 import type { TemplateEntry } from '../hooks/useTemplatePresets'
 import type {
@@ -48,6 +49,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
 import { useUiStore } from '@/stores/uiStore'
+import {
+  templateBookmarkKey,
+  useTemplateBookmarksStore,
+} from '@/stores/templateBookmarksStore'
 import { cn } from '@/lib/utils'
 
 /**
@@ -167,22 +172,10 @@ const PresetRow = memo(function ({
           </Button>
 
           <div className="flex items-center gap-2 text-muted-foreground">
-            <button
-              type="button"
-              onClick={() => onToggleFavourite(preset.blueprintId)}
-              className={cn(
-                'hit-target-y transition-colors hover:text-yellow-500',
-                preset.isFavourite && 'text-yellow-500',
-              )}
-              aria-label={t('dashboard:presets.bookmark')}
-            >
-              <Star
-                className={cn(
-                  'h-5 w-5',
-                  preset.isFavourite && 'fill-yellow-500',
-                )}
-              />
-            </button>
+            <BookmarkToggle
+              bookmarked={preset.isFavourite}
+              onToggle={() => onToggleFavourite(preset.blueprintId)}
+            />
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -220,9 +213,17 @@ const PresetRow = memo(function ({
 
 /**
  * One plugin-template row — a starting point offered by a plugin. Read-only:
- * no favourite/edit/delete; the only action is forking it into the builder.
+ * it can be bookmarked and forked into the builder, not edited or deleted.
  */
-const TemplateRow = memo(function ({ template }: { template: TemplateEntry }) {
+const TemplateRow = memo(function ({
+  template,
+  bookmarked,
+  onToggleBookmark,
+}: {
+  template: TemplateEntry
+  bookmarked: boolean
+  onToggleBookmark: (template: TemplateEntry) => void
+}) {
   const { t } = useTranslation(['dashboard', 'journal'])
   const showFlow = useUiStore((state) => state.journalShowFlow)
   const { data: blueprint } = useFableRetrieve(template.blueprintId)
@@ -274,7 +275,7 @@ const TemplateRow = memo(function ({ template }: { template: TemplateEntry }) {
           />
         )}
 
-        <div className="mt-2 flex w-full items-center justify-end sm:mt-0 sm:w-auto">
+        <div className="mt-2 flex w-full items-center justify-end gap-3 sm:mt-0 sm:w-auto">
           <Button
             variant="outline"
             size="sm"
@@ -283,6 +284,12 @@ const TemplateRow = memo(function ({ template }: { template: TemplateEntry }) {
           >
             {t('presets.templates.use')}
           </Button>
+          {templateBookmarkKey(template) && (
+            <BookmarkToggle
+              bookmarked={bookmarked}
+              onToggle={() => onToggleBookmark(template)}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -292,6 +299,10 @@ const TemplateRow = memo(function ({ template }: { template: TemplateEntry }) {
 const PAGE_SIZE = 10
 
 type PresetFilter = 'all' | 'bookmarked' | 'templates'
+
+type ListRow =
+  | { kind: 'preset'; preset: PresetEntry }
+  | { kind: 'template'; template: TemplateEntry }
 const PRESET_FILTERS: ReadonlyArray<PresetFilter> = [
   'all',
   'bookmarked',
@@ -345,6 +356,22 @@ export function PresetsPage() {
 
   const { presets, deletePreset, toggleFavourite } = useConfigPresets()
   const { templates } = useTemplatePresets()
+  const bookmarkKeys = useTemplateBookmarksStore((state) => state.keys)
+  const toggleTemplateKey = useTemplateBookmarksStore((state) => state.toggle)
+  const isTemplateBookmarked = useCallback(
+    (template: TemplateEntry) => {
+      const key = templateBookmarkKey(template)
+      return key !== null && bookmarkKeys.includes(key)
+    },
+    [bookmarkKeys],
+  )
+  const toggleTemplateBookmark = useCallback(
+    (template: TemplateEntry) => {
+      const key = templateBookmarkKey(template)
+      if (key) toggleTemplateKey(key)
+    },
+    [toggleTemplateKey],
+  )
   const [query, setQuery] = useState('')
   // Non-strict: the page also renders outside its route in tests.
   const search = useSearch({ strict: false })
@@ -377,16 +404,37 @@ export function PresetsPage() {
   }, [])
 
   const showTemplates = filter === 'templates'
-  const activeCount = showTemplates
-    ? filteredTemplates.length
-    : filteredPresets.length
+  // "Bookmarked" lists both kinds: workflows first, then templates.
+  const rows = useMemo<Array<ListRow>>(
+    () =>
+      showTemplates
+        ? filteredTemplates.map((template) => ({ kind: 'template', template }))
+        : [
+            ...filteredPresets.map((preset) => ({
+              kind: 'preset' as const,
+              preset,
+            })),
+            ...(filter === 'bookmarked'
+              ? filteredTemplates
+                  .filter(isTemplateBookmarked)
+                  .map((template) => ({ kind: 'template' as const, template }))
+              : []),
+          ],
+    [
+      showTemplates,
+      filter,
+      filteredPresets,
+      filteredTemplates,
+      isTemplateBookmarked,
+    ],
+  )
+  const activeCount = rows.length
   const totalPages = Math.max(1, Math.ceil(activeCount / PAGE_SIZE))
   // Clamp: a delete (or any list shrink) can leave `page` past the last page.
   const currentPage = Math.min(page, totalPages)
   const pageSlice = <T,>(items: Array<T>) =>
     items.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-  const paginatedPresets = pageSlice(filteredPresets)
-  const paginatedTemplates = pageSlice(filteredTemplates)
+  const paginatedRows = pageSlice(rows)
 
   return (
     <ListPageContainer>
@@ -446,32 +494,33 @@ export function PresetsPage() {
 
         {/* List */}
         <div className="divide-y divide-border">
-          {showTemplates ? (
-            paginatedTemplates.length > 0 ? (
-              paginatedTemplates.map((template) => (
-                <TemplateRow key={template.blueprintId} template={template} />
-              ))
-            ) : query ? (
-              <EmptyState icon={Bookmark} title={t('presets.empty.filtered')} />
-            ) : (
-              <EmptyState
-                icon={Bookmark}
-                title={t('presets.templates.empty.title')}
-                description={t('presets.templates.empty.description')}
-              />
+          {paginatedRows.length > 0 ? (
+            paginatedRows.map((row) =>
+              row.kind === 'template' ? (
+                <TemplateRow
+                  key={row.template.blueprintId}
+                  template={row.template}
+                  bookmarked={isTemplateBookmarked(row.template)}
+                  onToggleBookmark={toggleTemplateBookmark}
+                />
+              ) : (
+                <PresetRow
+                  key={row.preset.blueprintId}
+                  preset={row.preset}
+                  onDelete={deletePreset}
+                  onToggleFavourite={toggleFavourite}
+                  onAddFacet={handleAddFacet}
+                />
+              ),
             )
-          ) : paginatedPresets.length > 0 ? (
-            paginatedPresets.map((preset) => (
-              <PresetRow
-                key={preset.blueprintId}
-                preset={preset}
-                onDelete={deletePreset}
-                onToggleFavourite={toggleFavourite}
-                onAddFacet={handleAddFacet}
-              />
-            ))
-          ) : query || filter !== 'all' ? (
+          ) : query || filter === 'bookmarked' ? (
             <EmptyState icon={Bookmark} title={t('presets.empty.filtered')} />
+          ) : showTemplates ? (
+            <EmptyState
+              icon={Bookmark}
+              title={t('presets.templates.empty.title')}
+              description={t('presets.templates.empty.description')}
+            />
           ) : (
             <EmptyState
               icon={Bookmark}
