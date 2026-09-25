@@ -341,7 +341,10 @@ export function FableBuilderHeader({
                       {t('header.file')}
                       <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-37.5">
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-auto min-w-37.5"
+                    >
                       <DropdownMenuItem
                         onClick={handleExportConfig}
                         disabled={!hasBlocks}
@@ -432,7 +435,7 @@ export function FableBuilderHeader({
                   >
                     <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-40">
+                  <DropdownMenuContent align="end" className="w-auto min-w-40">
                     <DropdownMenuItem onClick={undo} disabled={!canUndo}>
                       <Undo2 className="mr-2 h-4 w-4 shrink-0" />
                       <span className="whitespace-nowrap">
