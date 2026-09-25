@@ -4,17 +4,17 @@
   "actions": {
     "checkUpdates": "Check Updates",
     "install": "Install",
-    "installing": "Installing...",
     "uninstall": "Uninstall",
     "enable": "Enable",
     "disable": "Disable",
     "update": "Update",
-    "updateNow": "Update Now",
     "viewDetails": "View Details",
     "viewDocs": "Documentation",
     "viewOnPyPI": "View on PyPI",
     "reportIssue": "Report Issue",
-    "releaseNotes": "Release Notes"
+    "releaseNotes": "Release Notes",
+    "details": "Details",
+    "pypi": "PyPI"
   },
   "stats": {
     "installed": "Installed",
@@ -27,18 +27,13 @@
     "errored": "Errored"
   },
   "filters": {
-    "searchPlaceholder": "Search installed plugins by name, ID or author...",
-    "status": {
-      "all": "All Statuses",
-      "active": "Active",
-      "loaded": "Loaded",
-      "disabled": "Disabled",
-      "warning": "Warning",
-      "updates": "Updates Available",
-      "uninstalled": "Uninstalled",
-      "available": "Available",
-      "errored": "Errored"
-    },
+    "searchPlaceholder": "Search plugins",
+    "statusLabel": "Filter by status",
+    "capabilityLabel": "Filter by capability",
+    "all": "All",
+    "installed": "Installed",
+    "updates": "Updates",
+    "available": "Available",
     "capability": {
       "all": "All Capabilities",
       "source": "Source",
@@ -49,8 +44,8 @@
   },
   "table": {
     "headers": {
-      "plugin": "Plugin Details",
-      "author": "Author",
+      "plugin": "Plugin",
+      "version": "Version",
       "status": "Status",
       "actions": "Actions"
     }
@@ -82,32 +77,9 @@
       "critical": "Critical"
     }
   },
-  "updatesSection": {
-    "title": "Updates Available",
-    "description": "The following plugins have updates available.",
-    "updateAll": "Update All",
-    "currentVersion": "Current: v{{version}}"
-  },
-  "installedSection": {
-    "title": "Installed plugins",
-    "total": "Total: {{count}}"
-  },
-  "uninstalledSection": {
-    "title": "Available plugins",
-    "description": "Browse and install plugins from the ECMWF Plugin Store.",
-    "total": "Total: {{count}}",
-    "searchPlaceholder": "Search available plugins...",
-    "incompatibleMessage": "This plugin requires FIAB {{version}} or higher",
-    "releasedAgo": "Released {{time}}",
-    "new": "New"
-  },
   "emptyState": {
-    "title": "No plugins found",
-    "description": "Try adjusting your search or filter criteria.",
-    "noInstalled": "No plugins installed",
-    "noInstalledDescription": "Browse the available plugins to discover and install plugins.",
-    "noUninstalled": "No available plugins",
-    "noUninstalledDescription": "All plugins are already installed."
+    "noPlugins": "No plugins in the store",
+    "noPluginsDescription": "The plugin store did not return any plugins."
   },
   "confirmRemove": {
     "title": "Remove Plugin",
@@ -118,11 +90,6 @@
   "item": {
     "version": "v{{version}}",
     "installedAgo": "Installed {{time}}"
-  },
-  "pagination": {
-    "showing": "Showing {{start}}-{{end}} of {{total}} plugins",
-    "previous": "Previous",
-    "next": "Next"
   },
   "blockFactory": {
     "useInConfig": "Use {{kind}} in Configuration",
@@ -152,12 +119,7 @@
   },
   "row": {
     "moreOptions": "More options",
-    "updatedAgoSuffix": " · Updated {{time}}"
-  },
-  "updateBadge": "UPDATE v{{version}}",
-  "viewToggle": {
-    "table": "Table view",
-    "card": "Card view"
+    "byline": "{{author}} · {{description}}"
   },
   "activity": {
     "installing": "Installing",
