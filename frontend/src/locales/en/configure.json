@@ -26,14 +26,14 @@
   "fieldErrors": {
     "unknownConfigKey": "Unknown configuration key",
     "missingRequiredValue": "Missing required value",
-    "unknownGlyph": "Unknown glyph: {{glyph}}",
+    "unknownGlyph": "Unknown variable: {{glyph}}",
     "jinjaReservedReference": "'{{name}}' clashes with a Jinja filter or function and cannot be used as a variable — choose a different name."
   },
   "page": {
     "notFoundTitle": "The requested workflow was not found.",
     "loadFailedTitle": "Failed to load workflow. Please try again later.",
     "notFoundDescription": "It may have been deleted or the link is no longer valid.",
-    "backToDashboard": "Back to Dashboard",
+    "backToDashboard": "Back to Overview",
     "catalogueLoadFailed": "Failed to load block catalogue",
     "noPluginsTitle": "No plugins enabled",
     "noPluginsDescription": "At least one plugin must be enabled to build workflows.",

@@ -170,7 +170,7 @@
   "welcome": {
     "steps": {
       "dashboard": {
-        "title": "Your dashboard, at a glance",
+        "title": "Your overview, at a glance",
         "body": "<v>Overview</v> surfaces system status, downloaded models, and your recent and scheduled runs — plus ready-made starting points for your first run."
       },
       "blocks": {
@@ -179,7 +179,7 @@
       },
       "execution": {
         "title": "Run it, then inspect results in place",
-        "body": "<v>Execute</v> keeps every submitted workflow as an execution record: the resolved workflow graph on the left, with outputs, logs, task graph, and the full run specification in tabs on the right."
+        "body": "<v>Execute</v> keeps every submitted workflow as a run record: the resolved workflow graph on the left, with outputs, logs, task graph, and the full run specification in tabs on the right."
       },
       "viewer": {
         "title": "Visualise and compare on the map",

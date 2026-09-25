@@ -100,7 +100,7 @@ describe('welcome tour', () => {
 
     await expect
       .element(
-        screen.getByRole('heading', { name: 'Your dashboard, at a glance' }),
+        screen.getByRole('heading', { name: 'Your overview, at a glance' }),
       )
       .toBeVisible()
     await expect
@@ -156,7 +156,7 @@ describe('welcome tour', () => {
 
     await expect
       .element(
-        screen.getByRole('heading', { name: 'Your dashboard, at a glance' }),
+        screen.getByRole('heading', { name: 'Your overview, at a glance' }),
       )
       .toBeVisible()
     expect(router.state.location.pathname).toBe('/overview')

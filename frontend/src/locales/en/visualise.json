@@ -366,7 +366,7 @@
   },
   "help": {
     "open": "Help & shortcuts",
-    "title": "Compare viewer",
+    "title": "Visualise",
     "intro": "Two sources — A (blue) and B (orange) — are shown on synchronized maps. Pick sources in the header, choose layers on the right, and control what is on the map from the left.",
     "sections": {
       "modes": {

@@ -1,6 +1,6 @@
 {
   "title": "ML Models",
-  "subtitle": "Browse and manage machine learning model artifacts. Download models to make them available for forecasting.",
+  "subtitle": "Browse and manage machine learning models. Download a model to make it available for forecasting.",
   "actions": {
     "refresh": "Refresh",
     "download": "Download",
@@ -68,7 +68,7 @@
   },
   "emptyState": {
     "noModels": "No models available",
-    "noModelsDescription": "No ML models are currently available in the artifact store."
+    "noModelsDescription": "No ML models are currently available in the model catalogue."
   },
   "confirmDelete": {
     "title": "Delete Model",

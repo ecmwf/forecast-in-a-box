@@ -21,7 +21,7 @@
     "scheduledAt": "Scheduled at",
     "trigger": "Trigger",
     "status": "Status",
-    "jobId": "Job ID",
+    "jobId": "Run ID",
     "attempts": "Attempts",
     "rerun": "Re-run",
     "configuration": "Workflow"

@@ -24,7 +24,7 @@ const PluginsPage = Route.options.component!
 async function renderPage() {
   const screen = await renderWithRouter(<PluginsPage />)
   await expect
-    .element(screen.getByRole('heading', { name: 'Plugin Store' }))
+    .element(screen.getByRole('heading', { name: 'Plugins' }))
     .toBeVisible()
   return screen
 }

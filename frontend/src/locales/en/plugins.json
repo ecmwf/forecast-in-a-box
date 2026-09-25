@@ -1,6 +1,6 @@
 {
-  "title": "Plugin Store",
-  "subtitle": "Manage installed AI models, data connectors, and processing extensions. Browse the ECMWF Plugin Store to expand your capabilities.",
+  "title": "Plugins",
+  "subtitle": "Manage installed AI models, data connectors, and processing extensions. Browse the ECMWF plugin store to expand your capabilities.",
   "actions": {
     "checkUpdates": "Check Updates",
     "install": "Install",

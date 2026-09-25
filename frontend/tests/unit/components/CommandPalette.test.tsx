@@ -41,7 +41,7 @@ const PLACEHOLDER = 'Search pages, workflows, runs and blocks...'
 /** Every command label, grouped, for exhaustive presence checks. */
 const ALL_COMMANDS = [
   'New Workflow',
-  'Dashboard',
+  'Overview',
   'Configure',
   'Execute',
   'Visualise',
@@ -104,14 +104,10 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    // Dashboard is bound to `g d` — shown as two keycaps within its option.
-    const dashboard = screen.getByRole('option', { name: /Dashboard/ })
-    await expect
-      .element(dashboard.getByText('G', { exact: true }))
-      .toBeVisible()
-    await expect
-      .element(dashboard.getByText('D', { exact: true }))
-      .toBeVisible()
+    // Overview is bound to `g o` — shown as two keycaps within its option.
+    const overview = screen.getByRole('option', { name: /Overview/ })
+    await expect.element(overview.getByText('G', { exact: true })).toBeVisible()
+    await expect.element(overview.getByText('O', { exact: true })).toBeVisible()
   })
 
   it('shows a footer with the palette controls', async () => {
@@ -133,10 +129,10 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    await screen.getByPlaceholder(PLACEHOLDER).fill('dashboard')
+    await screen.getByPlaceholder(PLACEHOLDER).fill('overview')
 
     await expect
-      .element(screen.getByRole('option', { name: /Dashboard/ }))
+      .element(screen.getByRole('option', { name: /Overview/ }))
       .toBeVisible()
     await expect
       .element(screen.getByRole('option', { name: /New Workflow/ }))
@@ -155,7 +151,7 @@ describe('CommandPalette', () => {
       .element(screen.getByRole('option', { name: /Execute/ }))
       .toBeVisible()
     await expect
-      .element(screen.getByRole('option', { name: /Dashboard/ }))
+      .element(screen.getByRole('option', { name: /Overview/ }))
       .not.toBeInTheDocument()
   })
 
@@ -173,7 +169,7 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    await screen.getByRole('option', { name: /Dashboard/ }).click()
+    await screen.getByRole('option', { name: /Overview/ }).click()
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/overview' })
     expect(useCommandStore.getState().isOpen).toBe(false)

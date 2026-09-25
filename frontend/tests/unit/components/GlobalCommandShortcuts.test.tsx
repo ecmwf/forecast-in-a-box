@@ -38,14 +38,14 @@ describe('GlobalCommandShortcuts', () => {
     mockNavigate.mockClear()
   })
 
-  it('navigates to the dashboard on the "g d" sequence', async () => {
+  it('navigates to the overview on the "g o" sequence', async () => {
     await renderWithRouter(
       <HotkeysProvider>
         <GlobalCommandShortcuts />
       </HotkeysProvider>,
     )
 
-    await userEvent.keyboard('gd')
+    await userEvent.keyboard('go')
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/overview' })
   })
@@ -72,7 +72,7 @@ describe('GlobalCommandShortcuts', () => {
 
     // Focus the field, then type the sequence into it — it must not navigate.
     await screen.getByLabelText('probe').click()
-    await userEvent.keyboard('gd')
+    await userEvent.keyboard('go')
 
     expect(mockNavigate).not.toHaveBeenCalled()
   })

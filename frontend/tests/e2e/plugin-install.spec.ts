@@ -57,7 +57,7 @@ test.describe('Plugin Install Flow', () => {
     })
 
     // Wait for the page to fully load
-    const heading = page.getByRole('heading', { name: /plugin store/i })
+    const heading = page.getByRole('heading', { name: /^plugins$/i })
     await expect(heading).toBeVisible({ timeout: 10000 })
 
     // Switch to card view so each plugin has its own Card element

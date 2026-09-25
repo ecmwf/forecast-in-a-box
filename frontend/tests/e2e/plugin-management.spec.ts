@@ -404,7 +404,7 @@ test.describe('Plugin Detail Page', () => {
         // Should be back on the plugins list page
         expect(page.url()).toMatch(/\/admin\/plugins\/?$/)
 
-        // Plugin Store heading should be visible
+        // Plugins heading should be visible
         const heading = page.getByRole('heading', { name: /plugin/i })
         if (
           await heading

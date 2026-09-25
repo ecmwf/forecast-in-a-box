@@ -45,7 +45,7 @@
     "downloadStarting": "Starting download...",
     "downloadProgress": "Downloading {{progress}}%",
     "downloadComplete": "Download complete",
-    "jobLabel": "Job {{id}}",
+    "jobLabel": "Run {{id}}",
     "jobCompleted": "Completed",
     "jobFailed": "Failed: {{error}}",
     "unknownError": "Unknown error"
@@ -95,8 +95,8 @@
     "about": "About",
     "openMenu": "Open Menu",
     "closeMenu": "Close Menu",
-    "login": "Login",
-    "logout": "Logout",
+    "login": "Sign in",
+    "logout": "Sign out",
     "getStarted": "Get Started"
   },
   "footer": {
@@ -108,7 +108,7 @@
     "memberStates": "Flags of the ECMWF member and co-operating states"
   },
   "userMenu": {
-    "dashboard": "Dashboard",
+    "dashboard": "Overview",
     "help": "Help",
     "settings": "Settings",
     "view": "View",
@@ -125,7 +125,7 @@
     "userFallback": "User",
     "administration": "Administration",
     "plugins": "Plugins",
-    "artifacts": "Artifacts",
+    "artifacts": "ML models",
     "globalVariables": "Global Variables",
     "signOut": "Sign Out",
     "timezoneDialogTitle": "Application timezone",
@@ -153,8 +153,8 @@
     "categoryGettingStarted": "Getting Started",
     "categoryNavigation": "Navigation",
     "dashboard": {
-      "label": "Dashboard",
-      "description": "Go to dashboard"
+      "label": "Overview",
+      "description": "Go to the overview"
     },
     "configure": {
       "label": "Configure",
@@ -165,7 +165,7 @@
       "description": "Monitor forecast runs"
     },
     "admin": {
-      "label": "Admin",
+      "label": "Administration",
       "description": "Manage plugins and models"
     },
     "visualise": {

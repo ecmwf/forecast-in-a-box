@@ -249,7 +249,7 @@ describe('Fable Builder Save & Load', () => {
         .toBeVisible()
 
       // Should show a link back to the dashboard
-      await expect.element(screen.getByText('Back to Dashboard')).toBeVisible()
+      await expect.element(screen.getByText('Back to Overview')).toBeVisible()
 
       // Store should not have been populated
       const state = useFableBuilderStore.getState()

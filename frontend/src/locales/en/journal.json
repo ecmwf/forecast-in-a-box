@@ -93,7 +93,7 @@
   },
   "deleteRun": {
     "title": "Delete this run?",
-    "description": "This permanently deletes the execution and its outputs. This cannot be undone.",
+    "description": "This permanently deletes the run and its outputs. This cannot be undone.",
     "cancel": "Cancel",
     "confirm": "Delete run"
   },
