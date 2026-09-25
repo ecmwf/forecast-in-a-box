@@ -14,6 +14,7 @@ from typing import Any
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
+from earthkit.workflows.metadata import Artifacts
 from earthkit.workflows.nodetree import nodetree_arrays, nodetree_dimensions, nodetree_from_dict
 from earthkit.workflows.plugins.anemoi.fluent import Inference, get_initial_conditions  # ty: ignore[unresolved-import]
 from fiab_core.artifacts import CompositeArtifactId
@@ -130,14 +131,16 @@ class AnemoiBuilder:
             date=strip_timezone(date),
             lead_time=lead_time,
             ensemble_members=ensemble,
+            artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
             **k,
-            payload_metadata={"artifacts": [self.artifact_id]},
         )
         return self._add_extra_output_keys(action)
 
     def from_initial_conditions(self, initial_conditions: Any, lead_time: int, **k: Any) -> Action:
         action = self.inference(lead_time=lead_time).from_initial_conditions(
-            initial_conditions, **k, payload_metadata={"artifacts": [self.artifact_id]}
+            initial_conditions,
+            **k,
+            artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
         )
         return self._add_extra_output_keys(action)
 
@@ -151,7 +154,7 @@ class AnemoiBuilder:
             date=strip_timezone(date),
             environment=env,
             ensemble_members=ensemble,
-            payload_metadata={"artifacts": [self.artifact_id]},
+            artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
             **k,
             **self.checkpoint.get_additional_kwargs(),
         )
