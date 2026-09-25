@@ -43,11 +43,11 @@ test.describe('Dashboard Content', () => {
     await expect(welcomeHeading.first()).toBeVisible({ timeout: 10000 })
   })
 
-  test('getting started section visible with the scratch card', async ({
+  test('workflow templates section visible with the scratch card', async ({
     page,
   }) => {
     // Both are hardcoded in the frontend, so they exist in every environment.
-    await expect(page.getByText(/getting started/i).first()).toBeVisible({
+    await expect(page.getByText(/workflow templates/i).first()).toBeVisible({
       timeout: 10000,
     })
     await expect(

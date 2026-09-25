@@ -125,7 +125,7 @@ describe('Fable Builder workbench', () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
     await expect.element(screen.getByText('Block Palette')).toBeVisible()
 
-    await screen.getByRole('button', { name: 'New configuration' }).click()
+    await screen.getByRole('button', { name: 'New workflow' }).click()
 
     expect(mockNavigate).toHaveBeenCalledWith({
       to: '/configure',
@@ -330,7 +330,7 @@ describe('Fable Builder workbench', () => {
       .toBeVisible()
 
     await screen
-      .getByRole('button', { name: 'Discard set-aside configuration' })
+      .getByRole('button', { name: 'Discard set-aside workflow' })
       .click()
 
     expect(shelfName()).toBeUndefined()

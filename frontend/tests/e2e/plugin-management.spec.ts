@@ -322,9 +322,9 @@ test.describe('Plugin Detail Page', () => {
         await expect(statusBadge.first()).toBeVisible()
       }
 
-      // Block factory cards should have "Use ... in Configuration" buttons
+      // Block factory cards should have "Use ... in a Workflow" buttons
       const configButtons = page.getByRole('button', {
-        name: /in Configuration/i,
+        name: /in a Workflow/i,
       })
       const configCount = await configButtons.count()
       if (configCount > 0) {
@@ -352,7 +352,7 @@ test.describe('Plugin Detail Page', () => {
 
       // Source buttons should be enabled
       const sourceButtons = page.getByRole('button', {
-        name: /Use Source in Configuration/i,
+        name: /Use Source in a Workflow/i,
       })
       if (
         await sourceButtons
@@ -365,7 +365,7 @@ test.describe('Plugin Detail Page', () => {
 
       // Product/Sink buttons should be disabled
       const productButtons = page.getByRole('button', {
-        name: /Use Product in Configuration/i,
+        name: /Use Product in a Workflow/i,
       })
       if (
         await productButtons

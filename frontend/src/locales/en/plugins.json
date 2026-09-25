@@ -92,8 +92,8 @@
     "installedAgo": "Installed {{time}}"
   },
   "blockFactory": {
-    "useInConfig": "Use {{kind}} in Configuration",
-    "sourceOnlyTooltip": "Configurations must start with a source block",
+    "useInConfig": "Use {{kind}} in a Workflow",
+    "sourceOnlyTooltip": "Workflows must start with a source block",
     "configOptions_one": "{{count}} config option",
     "configOptions_other": "{{count}} config options",
     "inputs_one": "{{count}} input",

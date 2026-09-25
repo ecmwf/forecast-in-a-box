@@ -137,7 +137,7 @@
   "commandPalette": {
     "title": "Command Palette",
     "description": "Search for a command to run...",
-    "placeholder": "Search pages, presets, runs and blocks...",
+    "placeholder": "Search pages, workflows, runs and blocks...",
     "empty": "No results found.",
     "navigate": "navigate",
     "select": "select",
@@ -147,7 +147,7 @@
   },
   "commands": {
     "newConfiguration": {
-      "label": "New Forecast Configuration",
+      "label": "New Workflow",
       "description": "Start from a blank canvas"
     },
     "categoryGettingStarted": "Getting Started",
@@ -158,7 +158,7 @@
     },
     "configure": {
       "label": "Configure",
-      "description": "Create a new forecast configuration"
+      "description": "Build a new workflow"
     },
     "executions": {
       "label": "Execute",
@@ -172,14 +172,14 @@
       "label": "Visualise",
       "description": "View and compare geo outputs on a map"
     },
-    "categoryPresets": "Presets",
+    "categoryPresets": "Workflows",
     "categoryRuns": "Recent runs",
     "categoryBlocks": "Blocks",
     "preset": {
       "description": "Open in Configure"
     },
     "template": {
-      "description": "Plugin template"
+      "description": "Workflow template"
     },
     "run": {
       "untitled": "Untitled run"
@@ -233,7 +233,7 @@
   "coreVersionMismatch": {
     "label": "Core version mismatch",
     "detail": "Built with fiab-core v{{stored}}; you're running v{{current}}. It should still work, but may behave unexpectedly.",
-    "detailUnknown": "This configuration was created with a different fiab-core major version. It should still work, but may behave unexpectedly."
+    "detailUnknown": "This workflow was created with a different fiab-core major version. It should still work, but may behave unexpectedly."
   },
   "catalogue": {
     "viewTable": "Table view",

@@ -24,7 +24,7 @@
     "jobId": "Job ID",
     "attempts": "Attempts",
     "rerun": "Re-run",
-    "configuration": "Configuration"
+    "configuration": "Workflow"
   },
   "filter": {
     "all": "All",

@@ -83,7 +83,7 @@ describe('Fable Builder — base time wire contract', () => {
       .updateBlockConfig('source1', 'base_time', '2026-05-15T00:00:00')
 
     const body = captureUpsert()
-    await screen.getByRole('button', { name: /Save Config/i }).click()
+    await screen.getByRole('button', { name: /Save Workflow/i }).click()
     await screen.getByLabelText('Title').fill('Timezone Test UTC')
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
     await expect
@@ -115,7 +115,7 @@ describe('Fable Builder — base time wire contract', () => {
       .updateBlockConfig('source1', 'base_time', '2026-05-14T22:00:00')
 
     const body = captureUpsert()
-    await screen.getByRole('button', { name: /Save Config/i }).click()
+    await screen.getByRole('button', { name: /Save Workflow/i }).click()
     await screen.getByLabelText('Title').fill('Timezone Test Berlin')
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
     await expect

@@ -36,11 +36,11 @@ vi.mock('@tanstack/react-router', async () => {
   }
 })
 
-const PLACEHOLDER = 'Search pages, presets, runs and blocks...'
+const PLACEHOLDER = 'Search pages, workflows, runs and blocks...'
 
 /** Every command label, grouped, for exhaustive presence checks. */
 const ALL_COMMANDS = [
-  'New Forecast Configuration',
+  'New Workflow',
   'Dashboard',
   'Configure',
   'Execute',
@@ -139,9 +139,7 @@ describe('CommandPalette', () => {
       .element(screen.getByRole('option', { name: /Dashboard/ }))
       .toBeVisible()
     await expect
-      .element(
-        screen.getByRole('option', { name: /New Forecast Configuration/ }),
-      )
+      .element(screen.getByRole('option', { name: /New Workflow/ }))
       .not.toBeInTheDocument()
   })
 
@@ -185,9 +183,7 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    await screen
-      .getByRole('option', { name: /New Forecast Configuration/ })
-      .click()
+    await screen.getByRole('option', { name: /New Workflow/ }).click()
 
     // Explicit fresh intent — a bench holding unsaved work asks first.
     expect(mockNavigate).toHaveBeenCalledWith({
@@ -221,13 +217,13 @@ describe('CommandPalette', () => {
     expect(useCommandStore.getState().isOpen).toBe(false)
   })
 
-  it('lists plugin templates under Presets once loaded', async () => {
+  it('lists plugin templates under Workflows once loaded', async () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
     // The mock list marks only its templates with a source; saved presets
     // need `user_defined`, which the seeded fables do not carry.
-    await expect.element(screen.getByText('Presets')).toBeVisible()
+    await expect.element(screen.getByText('Workflows')).toBeVisible()
     await expect
       .element(screen.getByRole('option', { name: /testBasic/ }))
       .toBeVisible()

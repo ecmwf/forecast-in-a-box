@@ -85,9 +85,7 @@ describe('Dashboard', () => {
 
       await expect.element(screen.getByText('Manage Plugins')).toBeVisible()
       await expect.element(screen.getByText('Manage Runs')).toBeVisible()
-      await expect
-        .element(screen.getByText('Manage Configuration Presets'))
-        .toBeVisible()
+      await expect.element(screen.getByText('Manage Workflows')).toBeVisible()
       await expect
         .element(screen.getByText('Manage Scheduled Runs'))
         .toBeVisible()
@@ -123,9 +121,7 @@ describe('Dashboard', () => {
     it('renders getting started section', async () => {
       const screen = await renderSection()
 
-      await expect
-        .element(screen.getByText('Getting Started Presets'))
-        .toBeVisible()
+      await expect.element(screen.getByText('Workflow Templates')).toBeVisible()
     })
 
     it('offers the blank canvas plus three plugin templates', async () => {
@@ -200,7 +196,7 @@ describe('Dashboard', () => {
       const screen = await renderSection()
 
       await expect
-        .element(screen.getByText('No plugin templates available'))
+        .element(screen.getByText('No workflow templates available'))
         .toBeVisible()
       await expect.element(screen.getByText('Manage plugins')).toBeVisible()
       // The one card that needs no backend stays.

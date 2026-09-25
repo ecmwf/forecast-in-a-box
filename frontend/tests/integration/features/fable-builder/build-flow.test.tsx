@@ -217,8 +217,8 @@ describe('Fable Builder Integration', () => {
     // Verify fable is dirty
     expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
-    // Click "Save Config" to open save popover
-    await screen.getByRole('button', { name: /Save Config/i }).click()
+    // Click "Save Workflow" to open save popover
+    await screen.getByRole('button', { name: /Save Workflow/i }).click()
 
     // Click "Save" in the popover to submit
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
@@ -409,7 +409,7 @@ describe('Fable Builder Integration', () => {
     // Source + sink configuration completed above
 
     // 5. Save (open popover, then click Save)
-    await screen.getByRole('button', { name: /Save Config/i }).click()
+    await screen.getByRole('button', { name: /Save Workflow/i }).click()
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
 
     // Wait for save to complete

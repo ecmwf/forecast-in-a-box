@@ -46,7 +46,7 @@ test.describe('Configure guided tour', () => {
 
     await page.getByRole('button', { name: 'Help & shortcuts' }).click()
     await expect(
-      page.getByRole('dialog', { name: 'Configuration canvas' }),
+      page.getByRole('dialog', { name: 'Workflow canvas' }),
     ).toBeVisible()
     await page
       .getByRole('button', { name: 'Take the interactive tour' })

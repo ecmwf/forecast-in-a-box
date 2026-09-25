@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** The standalone Configuration Presets page — search, filter and manage saved presets. */
+/** The Workflows page — search and filter saved workflows and templates. */
 
 import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { Bookmark, MoreVertical, Pencil, Star, Trash2 } from 'lucide-react'

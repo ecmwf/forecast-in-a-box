@@ -84,9 +84,9 @@
   },
   "firstRun": {
     "title": "Build and run your first forecast",
-    "description": "Assemble a four-block pipeline from a clean canvas — source, transform, product, output — fix its validation issues, and submit it as a run. About 5 minutes.",
+    "description": "Assemble a four-block workflow from a clean canvas — source, transform, product, output — fix its validation issues, and submit it as a run. About 5 minutes.",
     "rails": {
-      "stray": "Not yet — remove <v>{{block}}</v>; it is not part of this tour's pipeline. Show me removes it.",
+      "stray": "Not yet — remove <v>{{block}}</v>; it is not part of this tour's workflow. Show me removes it.",
       "unwired": "Not yet — connect <v>{{block}}</v> to <v>{{upstream}}</v>: drag from the + handle to its input, or press Show me.",
       "invalid": "Values are right — the block still reports issues; see the badge.",
       "source": {
@@ -113,13 +113,13 @@
     "steps": {
       "orient": {
         "title": "Build and run your first forecast",
-        "body": "This canvas holds a forecast configuration: a pipeline of blocks that data flows through from left to right. In the next five minutes you'll build one from scratch — fetch a forecast, narrow it, compute a statistic, plot it — and submit it as a run.",
+        "body": "This canvas holds a workflow: a chain of blocks that data flows through from left to right. In the next five minutes you'll build one from scratch — fetch a forecast, narrow it, compute a statistic, plot it — and submit it as a run.",
         "midSessionTitle": "Take the tour from the top",
-        "midSessionBody": "There is already work on the canvas. The tour builds its pipeline from a clean canvas, so the next step parks what's here on the workbench shelf — nothing is lost, and you can bring it back any time."
+        "midSessionBody": "There is already work on the canvas. The tour builds its workflow from a clean canvas, so the next step parks what's here on the workbench shelf — nothing is lost, and you can bring it back any time."
       },
       "fresh": {
         "title": "Start from a clean canvas",
-        "body": "Press \"New configuration\". Anything unsaved is parked on the workbench shelf — a banner offers to restore it — and you get an empty canvas to build on."
+        "body": "Press \"New workflow\". Anything unsaved is parked on the workbench shelf — a banner offers to restore it — and you get an empty canvas to build on."
       },
       "palette": {
         "title": "Blocks come in four kinds",
@@ -163,7 +163,7 @@
       },
       "run": {
         "title": "Run it",
-        "body": "Press \"Run Once\", give the run a name, and submit. You land on the run's page, where every block reports its progress and outputs appear as they finish. The caret next to the button repeats the same configuration on a schedule."
+        "body": "Press \"Run Once\", give the run a name, and submit. You land on the run's page, where every block reports its progress and outputs appear as they finish. The caret next to the button repeats the same workflow on a schedule."
       }
     }
   },
@@ -179,7 +179,7 @@
       },
       "execution": {
         "title": "Run it, then inspect results in place",
-        "body": "<v>Execute</v> keeps every submitted workflow as an execution record: the resolved configuration graph on the left, with outputs, logs, task graph, and the full run specification in tabs on the right."
+        "body": "<v>Execute</v> keeps every submitted workflow as an execution record: the resolved workflow graph on the left, with outputs, logs, task graph, and the full run specification in tabs on the right."
       },
       "viewer": {
         "title": "Visualise and compare on the map",

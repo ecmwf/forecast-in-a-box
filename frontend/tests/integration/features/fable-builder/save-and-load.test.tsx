@@ -86,8 +86,8 @@ describe('Fable Builder Save & Load', () => {
       // Verify fable is dirty
       expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
-      // Click "Save Config" to open save popover
-      await screen.getByRole('button', { name: /Save Config/i }).click()
+      // Click "Save Workflow" to open save popover
+      await screen.getByRole('button', { name: /Save Workflow/i }).click()
 
       // Fill in a title
       const titleInput = screen.getByLabelText('Title')
@@ -136,8 +136,8 @@ describe('Fable Builder Save & Load', () => {
         .updateBlockConfig('source1', 'lead_time', '48')
       expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
-      // Button should say "Update Config" since this is an existing config
-      await screen.getByRole('button', { name: /Update Config/i }).click()
+      // Button should say "Update Workflow" since this is an existing workflow
+      await screen.getByRole('button', { name: /Update Workflow/i }).click()
 
       // Click "Update" in the popover
       await screen.getByRole('button', { name: 'Update', exact: true }).click()
@@ -170,8 +170,8 @@ describe('Fable Builder Save & Load', () => {
         }),
       )
 
-      // Click "Save Config" to open save popover
-      await screen.getByRole('button', { name: /Save Config/i }).click()
+      // Click "Save Workflow" to open save popover
+      await screen.getByRole('button', { name: /Save Workflow/i }).click()
 
       // Click "Save" in the popover
       await screen.getByRole('button', { name: 'Save', exact: true }).click()
@@ -245,7 +245,7 @@ describe('Fable Builder Save & Load', () => {
 
       // When retrieve returns 404, the component shows a not-found message
       await expect
-        .element(screen.getByText('The requested configuration was not found.'))
+        .element(screen.getByText('The requested workflow was not found.'))
         .toBeVisible()
 
       // Should show a link back to the dashboard
@@ -360,7 +360,7 @@ describe('Fable Builder Save & Load', () => {
       await screen.getByLabelText('Base time').fill('2026-01-15')
 
       // 3. First save
-      await screen.getByRole('button', { name: /Save Config/i }).click()
+      await screen.getByRole('button', { name: /Save Workflow/i }).click()
       await screen.getByRole('button', { name: 'Save', exact: true }).click()
 
       // Wait for save to complete
@@ -376,7 +376,7 @@ describe('Fable Builder Save & Load', () => {
       expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
       // 5. Re-save (should update existing)
-      await screen.getByRole('button', { name: /Update Config/i }).click()
+      await screen.getByRole('button', { name: /Update Workflow/i }).click()
       await screen.getByRole('button', { name: 'Update', exact: true }).click()
 
       // Wait for re-save to complete

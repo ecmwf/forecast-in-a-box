@@ -46,7 +46,7 @@
     "actions": {
       "managePlugins": "Manage Plugins",
       "manageExecutions": "Manage Runs",
-      "myPresets": "Manage Configuration Presets",
+      "myPresets": "Manage Workflows",
       "scheduledForecasts": "Manage Scheduled Runs"
     }
   },
@@ -58,8 +58,8 @@
     "unavailable": "The news list could not be loaded."
   },
   "gettingStarted": {
-    "title": "Getting Started Presets",
-    "subtitle": "Choose how to start your forecast configuration",
+    "title": "Workflow Templates",
+    "subtitle": "Start from a ready-made workflow",
     "recommended": "Recommended",
     "startFromScratch": {
       "title": "Start from Scratch",
@@ -71,7 +71,7 @@
     },
     "templates": {
       "loading": "Loading templates",
-      "emptyTitle": "No plugin templates available",
+      "emptyTitle": "No workflow templates available",
       "emptyDescription": "Install a plugin that ships templates, such as the ECMWF plugin, to see ready-made starting points.",
       "managePlugins": "Manage plugins",
       "errorTitle": "Couldn't load templates",
@@ -80,29 +80,29 @@
     "viewAllTemplates": "View all templates"
   },
   "presets": {
-    "title": "My Configuration Presets",
-    "subtitle": "Your saved forecast configurations",
-    "viewAll": "View all presets",
-    "load": "Use this Preset",
+    "title": "My Workflows",
+    "subtitle": "Your saved workflows",
+    "viewAll": "View all workflows",
+    "load": "Use this Workflow",
     "delete": "Delete",
     "bookmark": "Bookmark",
     "rename": "Rename",
-    "renameTitle": "Rename Preset",
-    "renameDescription": "Update the title and comments for this preset.",
-    "searchPlaceholder": "Search presets...",
+    "renameTitle": "Rename Workflow",
+    "renameDescription": "Update the title and comments for this workflow.",
+    "searchPlaceholder": "Search workflows...",
     "filters": {
       "all": "All",
       "bookmarked": "Bookmarked",
       "templates": "Templates"
     },
     "page": {
-      "title": "Configuration Presets",
-      "description": "Manage your saved forecast configurations"
+      "title": "Workflows",
+      "description": "Your saved workflows and plugin templates"
     },
     "empty": {
-      "title": "No saved presets yet",
-      "description": "Save a configuration from the Fable Builder to see it here.",
-      "filtered": "No presets match your search."
+      "title": "No saved workflows yet",
+      "description": "Save a workflow from Configure to see it here.",
+      "filtered": "No workflows match your search."
     },
     "pagination": {
       "previous": "Previous",
@@ -115,10 +115,10 @@
       "use": "Use template",
       "empty": {
         "title": "No templates available",
-        "description": "Installed plugins can ship blueprint templates as ready-made starting points."
+        "description": "Installed plugins can ship workflow templates as ready-made starting points."
       }
     },
     "basedOn": "Based on: {{name}}",
-    "deleted": "Preset deleted"
+    "deleted": "Workflow deleted"
   }
 }
