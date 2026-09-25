@@ -326,6 +326,16 @@
   },
   "attempts": {
     "title": "Attempts",
-    "attempt": "Attempt {{number}}"
+    "attempt": "Attempt {{number}}",
+    "count_one": "{{count}} attempt",
+    "count_other": "{{count}} attempts",
+    "failedCount_one": "· {{count}} failed",
+    "failedCount_other": "· {{count}} failed",
+    "duration": {
+      "days": "{{a}} d {{b}} h",
+      "hours": "{{a}} h {{b}} m",
+      "minutes": "{{a}} m {{b}} s",
+      "seconds": "{{a}} s"
+    }
   }
 }

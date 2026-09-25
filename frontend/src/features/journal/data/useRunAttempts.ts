@@ -13,17 +13,19 @@ import type { JobExecutionDetail } from '@/api/types/job.types'
 import { jobKeys } from '@/api/hooks/useJobs'
 import { getJobStatus } from '@/api/endpoints/job'
 
-/**
- * Fetch every attempt (1…attemptCount) of a run. `enabled` gates the requests
- * so the attempt history only loads once its row is expanded.
- */
+/** A run's attempts, all or the `latest` few; `enabled` gates fetching. */
 export function useRunAttempts(
   runId: string,
   attemptCount: number,
   enabled: boolean,
+  latest?: number,
 ): Array<JobExecutionDetail> {
+  const first = latest ? Math.max(1, attemptCount - latest + 1) : 1
   const numbers = enabled
-    ? Array.from({ length: attemptCount }, (_, index) => index + 1)
+    ? Array.from(
+        { length: attemptCount - first + 1 },
+        (_, index) => first + index,
+      )
     : []
 
   return useQueries({

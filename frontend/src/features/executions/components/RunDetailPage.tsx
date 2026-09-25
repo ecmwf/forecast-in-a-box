@@ -273,9 +273,13 @@ export function RunDetailPage() {
         isDeletePending={deleteMutation.isPending}
         completedBlockCount={jobData.completed_block_ids?.length ?? null}
         plannedBlockCount={jobData.planned_block_ids?.length ?? null}
+        idLineExtra={
+          <RunAttemptTimeline
+            jobId={jobId}
+            attemptCount={jobData.attempt_count}
+          />
+        }
       />
-
-      <RunAttemptTimeline jobId={jobId} attemptCount={jobData.attempt_count} />
 
       {fableData?.coreVersionMismatch && (
         <CoreVersionMismatchBadge detail={fableData.coreVersionMismatch} />
