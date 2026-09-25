@@ -4,43 +4,31 @@
   "actions": {
     "refresh": "Refresh",
     "download": "Download",
-    "downloading": "Downloading...",
+    "downloading": "Downloading",
     "cancelDownload": "Cancel",
     "delete": "Delete",
     "viewDetails": "View Details",
     "backToArtifacts": "Back to Models",
-    "downloadFailed": "Model download failed"
+    "downloadFailed": "Model download failed",
+    "deleting": "Deleting"
   },
   "filters": {
-    "searchPlaceholder": "Search models by name or author..."
-  },
-  "viewToggle": {
-    "table": "Table view",
-    "card": "Card view"
+    "searchPlaceholder": "Search models",
+    "statusLabel": "Filter by status",
+    "all": "All",
+    "downloaded": "Downloaded",
+    "available": "Available"
   },
   "status": {
     "downloaded": "Downloaded",
-    "notDownloaded": "Not Downloaded",
-    "downloading": "Downloading {{progress}}%"
-  },
-  "downloadedSection": {
-    "title": "Downloaded Models",
-    "total": "{{count}} models"
-  },
-  "availableSection": {
-    "title": "Available Models",
-    "total": "{{count}} models",
-    "searchPlaceholder": "Search available models...",
-    "description": "These models are available for download. Once downloaded, they can be used for forecasting."
+    "downloading": "Downloading {{progress}}%",
+    "available": "Available"
   },
   "table": {
     "model": "Model",
     "size": "Size",
     "status": "Status",
     "actions": "Actions"
-  },
-  "pagination": {
-    "showing": "Showing {{start}}-{{end}} of {{total}}"
   },
   "detail": {
     "description": "Description",
@@ -79,8 +67,6 @@
     "notCompatibleDetail": "Not compatible: {{detail}}"
   },
   "emptyState": {
-    "title": "No models found",
-    "description": "Try adjusting your search or filter criteria.",
     "noModels": "No models available",
     "noModelsDescription": "No ML models are currently available in the artifact store."
   },

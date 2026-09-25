@@ -8,16 +8,10 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * Artifacts List Page Route
- *
- * Browse and manage ML model artifacts.
- * Follows the plugins page pattern: downloaded models in a table,
- * available models in a card grid below.
- */
+/** One model catalogue; status is a filter, so items never move. */
 
 import { useMemo, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { Package, RefreshCw } from 'lucide-react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
@@ -26,16 +20,20 @@ import { encodeArtifactId } from '@/api/types/artifacts.types'
 import {
   useArtifacts,
   useDeleteModel,
-  useDownloadModel,
+  useDeletingKeys,
+  useDownloadActions,
+  useDownloadingKeys,
 } from '@/api/hooks/useArtifacts'
-import { H3 } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/common/EmptyState'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { PageHeader } from '@/components/common/PageHeader'
-import { ArtifactsFilters } from '@/features/artifacts/components/ArtifactsFilters'
-import { ArtifactsList } from '@/features/artifacts/components/ArtifactsList'
-import { AvailableModelsSection } from '@/features/artifacts/components/AvailableModelsSection'
+import { CatalogueToolbar } from '@/components/common/catalogue/CatalogueToolbar'
+import { CatalogueView } from '@/components/common/catalogue/CatalogueView'
+import { useHeldKeys } from '@/components/common/catalogue/useHeldKeys'
+import { ArtifactCard } from '@/features/artifacts/components/ArtifactCard'
+import { ArtifactRow } from '@/features/artifacts/components/ArtifactRow'
 import { ConfirmDeleteArtifactDialog } from '@/features/artifacts/components/ConfirmDeleteArtifactDialog'
 import { useUiStore } from '@/stores/uiStore'
 
@@ -43,54 +41,69 @@ export const Route = createFileRoute('/_authenticated/admin/artifacts/')({
   component: ArtifactsPage,
 })
 
-function ArtifactsPage() {
-  const { t } = useTranslation('artifacts')
-  const navigate = useNavigate()
-  const artifactsViewMode = useUiStore((state) => state.artifactsViewMode)
+type ArtifactFilter = 'all' | 'downloaded' | 'available'
 
-  // Filter state
+const GRID =
+  'sm:grid-cols-[minmax(0,1fr)_9rem_15rem] lg:grid-cols-[minmax(0,1fr)_6rem_9rem_16rem]'
+
+function matchesFilter(artifact: ArtifactInfo, filter: ArtifactFilter) {
+  if (filter === 'all') return true
+  return artifact.isAvailable === (filter === 'downloaded')
+}
+
+function ArtifactsPage() {
+  const { t } = useTranslation(['artifacts', 'common'])
+  const navigate = useNavigate()
+  const viewMode = useUiStore((state) => state.artifactsViewMode)
+  const setViewMode = useUiStore((state) => state.setArtifactsViewMode)
+
   const [searchQuery, setSearchQuery] = useState('')
+  const [filter, setFilter] = useState<ArtifactFilter>('all')
   const [pendingDelete, setPendingDelete] =
     useState<DeleteArtifactTarget | null>(null)
 
-  // Queries & mutations
   const { artifacts, isLoading, refetch } = useArtifacts()
-  const downloadModel = useDownloadModel()
+  const { mutate: download, cancel: cancelDownload } = useDownloadActions()
   const deleteModel = useDeleteModel()
+  const downloadingKeys = useDownloadingKeys()
+  const deletingKeys = useDeletingKeys()
 
-  // Separate artifacts into downloaded and available
-  const { downloadedArtifacts, availableArtifacts } = useMemo(() => {
+  const searched = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    const matchesSearch = (a: ArtifactInfo) =>
-      !query ||
-      a.displayName.toLowerCase().includes(query) ||
-      a.author.toLowerCase().includes(query)
-
-    const downloaded = artifacts
-      .filter((a) => a.isAvailable)
-      .filter(matchesSearch)
+    return artifacts
+      .filter(
+        (a) =>
+          !query ||
+          a.displayName.toLowerCase().includes(query) ||
+          a.author.toLowerCase().includes(query),
+      )
       .sort((a, b) => a.displayName.localeCompare(b.displayName))
-
-    const available = artifacts
-      .filter((a) => !a.isAvailable)
-      .filter(matchesSearch)
-
-    return {
-      downloadedArtifacts: downloaded,
-      availableArtifacts: available,
-    }
   }, [artifacts, searchQuery])
 
-  // Handlers
-  const handleViewDetails = (artifact: ArtifactInfo) => {
-    navigate({
-      to: '/admin/artifacts/$artifactId',
-      params: { artifactId: encodeArtifactId(artifact.id) },
-    })
-  }
+  const held = useHeldKeys(
+    [...downloadingKeys, ...deletingKeys],
+    `${filter}|${searchQuery}`,
+  )
+  const visible = searched.filter(
+    (a) => matchesFilter(a, filter) || held.has(a.encodedId),
+  )
+  const count = (f: ArtifactFilter) =>
+    searched.filter((a) => matchesFilter(a, f)).length
 
-  const handleRefresh = () => {
-    refetch()
+  const handlers = {
+    onDownload: download,
+    onCancelDownload: cancelDownload,
+    onDelete: (id: ArtifactInfo['id']) => {
+      const artifact = artifacts.find(
+        (a) => a.encodedId === encodeArtifactId(id),
+      )
+      setPendingDelete({ id, name: artifact?.displayName ?? '' })
+    },
+    onViewDetails: (artifact: ArtifactInfo) =>
+      navigate({
+        to: '/admin/artifacts/$artifactId',
+        params: { artifactId: artifact.encodedId },
+      }),
   }
 
   if (isLoading) {
@@ -101,51 +114,98 @@ function ArtifactsPage() {
     )
   }
 
+  const isFiltered = filter !== 'all' || searchQuery.trim() !== ''
+
   return (
     <ListPageContainer>
       <PageHeader
         title={t('title')}
         description={t('subtitle')}
         actions={
-          <Button variant="outline" onClick={handleRefresh}>
+          <Button variant="outline" onClick={() => refetch()}>
             <RefreshCw className="mr-2 h-4 w-4" />
             {t('actions.refresh')}
           </Button>
         }
       />
 
-      {/* Search & View Mode */}
-      <ArtifactsFilters
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-      />
-
-      {/* Downloaded Models Section */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between px-1">
-          <H3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-            {t('downloadedSection.title')}
-          </H3>
-          <span className="font-mono text-sm text-muted-foreground">
-            {t('downloadedSection.total', {
-              count: downloadedArtifacts.length,
-            })}
-          </span>
-        </div>
+        <CatalogueToolbar
+          segments={[
+            { value: 'all', label: t('filters.all'), count: count('all') },
+            {
+              value: 'downloaded',
+              label: t('filters.downloaded'),
+              count: count('downloaded'),
+            },
+            {
+              value: 'available',
+              label: t('filters.available'),
+              count: count('available'),
+            },
+          ]}
+          segment={filter}
+          onSegmentChange={setFilter}
+          segmentsLabel={t('filters.statusLabel')}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder={t('filters.searchPlaceholder')}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+        />
 
-        <ArtifactsList
-          artifacts={downloadedArtifacts}
-          viewMode={artifactsViewMode}
-          onDelete={(id) => {
-            const artifact = downloadedArtifacts.find(
-              (a) =>
-                a.id.artifact_store_id === id.artifact_store_id &&
-                a.id.artifact_local_id === id.artifact_local_id,
+        <CatalogueView
+          items={visible}
+          getKey={(a) => a.encodedId}
+          viewMode={viewMode}
+          gridClassName={GRID}
+          columns={[
+            { label: t('table.model') },
+            { label: t('table.size'), className: 'hidden lg:block' },
+            { label: t('table.status') },
+            { label: t('table.actions'), className: 'text-right' },
+          ]}
+          isHeld={(a) => !matchesFilter(a, filter)}
+          renderCard={(artifact) => (
+            <ArtifactCard
+              artifact={artifact}
+              isDeleting={deletingKeys.includes(artifact.encodedId)}
+              {...handlers}
+            />
+          )}
+          renderRow={(artifact) => (
+            <ArtifactRow
+              artifact={artifact}
+              isDeleting={deletingKeys.includes(artifact.encodedId)}
+              {...handlers}
+            />
+          )}
+          empty={
+            isFiltered ? (
+              <EmptyState
+                icon={Package}
+                title={t('common:catalogue.noMatches')}
+                description={t('common:catalogue.noMatchesHint')}
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setFilter('all')
+                      setSearchQuery('')
+                    }}
+                  >
+                    {t('common:catalogue.clearFilters')}
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={Package}
+                title={t('emptyState.noModels')}
+                description={t('emptyState.noModelsDescription')}
+              />
             )
-            setPendingDelete({ id, name: artifact?.displayName ?? '' })
-          }}
-          onViewDetails={handleViewDetails}
-          deletingId={deleteModel.isPending ? deleteModel.variables : undefined}
+          }
         />
       </div>
 
@@ -156,16 +216,6 @@ function ArtifactsPage() {
           setPendingDelete(null)
           deleteModel.mutate(id)
         }}
-      />
-
-      {/* Available Models Section */}
-      <AvailableModelsSection
-        artifacts={availableArtifacts}
-        onDownload={downloadModel.mutate}
-        onCancelDownload={downloadModel.cancel}
-        onViewDetails={handleViewDetails}
-        isDownloading={downloadModel.isDownloading}
-        getDownloadProgress={downloadModel.getProgress}
       />
     </ListPageContainer>
   )
