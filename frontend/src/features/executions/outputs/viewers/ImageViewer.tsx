@@ -30,6 +30,13 @@ const MIN_SCALE = 0.25
 const MAX_SCALE = 32
 const ZOOM_STEP = 1.2
 const MIN_MARQUEE_PX = 12
+// Zoom per wheel px; pinch sends much smaller deltas.
+const WHEEL_ZOOM_RATE = 0.002
+const PINCH_ZOOM_RATE = 0.01
+// Caps zoom per wheel event.
+const MAX_WHEEL_DELTA = 100
+// Screen px per source px before rendering turns pixelated.
+const PIXELATED_FROM = 2
 
 interface Point {
   x: number
@@ -41,6 +48,13 @@ interface Marquee {
   end: Point
 }
 
+interface View {
+  scale: number
+  offset: Point
+}
+
+const INITIAL_VIEW: View = { scale: 1, offset: { x: 0, y: 0 } }
+
 export default function ImageViewer({
   item,
   adapter,
@@ -50,12 +64,16 @@ export default function ImageViewer({
   navIndex,
 }: ViewerProps) {
   const { t } = useTranslation('executions')
-  const [blobUrl, setBlobUrl] = useState<string | null>(null)
-  const [scale, setScale] = useState(1)
-  const [offset, setOffset] = useState<Point>({ x: 0, y: 0 })
+  const [shownUrl, setShownUrl] = useState<string | null>(null)
+  const [view, setView] = useState<View>(INITIAL_VIEW)
   const [marquee, setMarquee] = useState<Marquee | null>(null)
+  const [dragging, setDragging] = useState(false)
+  // Displayed px per source px at scale 1.
+  const [fitRatio, setFitRatio] = useState(1)
   const dragRef = useRef<Point | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
+  const shownUrlRef = useRef<string | null>(null)
+  const { scale, offset } = view
 
   // SVG needs an explicit mime tag — `<img>` strict-checks it where it
   // sniffs raster. For raster, trust item.mimeType when the adapter
@@ -71,13 +89,39 @@ export default function ImageViewer({
   const { data, error } = useJobResultBlob(item.jobId, item.taskId)
   const blob = data?.blob
 
+  // Swap images only once the next one is decoded.
   useEffect(() => {
     if (!blob) return
-    const tagged = new Blob([blob], { type: renderMime })
-    const createdUrl = URL.createObjectURL(tagged)
-    setBlobUrl(createdUrl)
-    return () => URL.revokeObjectURL(createdUrl)
+    const url = URL.createObjectURL(new Blob([blob], { type: renderMime }))
+    const probe = new Image()
+    probe.src = url
+    let cancelled = false
+    void probe
+      .decode()
+      .catch(() => undefined)
+      .then(() => {
+        // Revoke after decode; earlier logs a failed load.
+        if (cancelled) {
+          URL.revokeObjectURL(url)
+          return
+        }
+        if (shownUrlRef.current) URL.revokeObjectURL(shownUrlRef.current)
+        shownUrlRef.current = url
+        setShownUrl(url)
+        setView(INITIAL_VIEW)
+        setMarquee(null)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [blob, renderMime])
+
+  useEffect(
+    () => () => {
+      if (shownUrlRef.current) URL.revokeObjectURL(shownUrlRef.current)
+    },
+    [],
+  )
 
   useEffect(() => {
     if (error) showToast.error(error.message)
@@ -91,10 +135,24 @@ export default function ImageViewer({
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onClose])
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    const direction = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP
-    setScale((s) => clamp(s * direction, MIN_SCALE, MAX_SCALE))
+  // Native listener: React's onWheel is passive.
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+    function onWheel(e: WheelEvent) {
+      e.preventDefault()
+      const rate = e.ctrlKey ? PINCH_ZOOM_RATE : WHEEL_ZOOM_RATE
+      const delta = clamp(wheelPixels(e), -MAX_WHEEL_DELTA, MAX_WHEEL_DELTA)
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      setView((v) =>
+        zoomAt(v, Math.exp(-delta * rate), {
+          x: e.clientX - rect.left - rect.width / 2,
+          y: e.clientY - rect.top - rect.height / 2,
+        }),
+      )
+    }
+    stage.addEventListener('wheel', onWheel, { passive: false })
+    return () => stage.removeEventListener('wheel', onWheel)
   }, [])
 
   const stageLocal = (e: { clientX: number; clientY: number }): Point => {
@@ -115,6 +173,7 @@ export default function ImageViewer({
         x: e.clientX - offset.x,
         y: e.clientY - offset.y,
       }
+      setDragging(true)
     },
     [offset],
   )
@@ -125,18 +184,18 @@ export default function ImageViewer({
         setMarquee({ start: marquee.start, end: stageLocal(e) })
         return
       }
-      if (!dragRef.current) return
-      setOffset({
-        x: e.clientX - dragRef.current.x,
-        y: e.clientY - dragRef.current.y,
-      })
+      const drag = dragRef.current
+      if (!drag) return
+      setView((v) => ({
+        ...v,
+        offset: { x: e.clientX - drag.x, y: e.clientY - drag.y },
+      }))
     },
     [marquee],
   )
 
   const finalizeMarquee = useCallback(() => {
     if (!marquee || !stageRef.current) {
-      dragRef.current = null
       setMarquee(null)
       return
     }
@@ -168,10 +227,12 @@ export default function ImageViewer({
 
     // The image is positioned at the stage center plus `offset`, scaled.
     // Solve for the new offset that puts the marquee center at stage center.
-    setScale(nextScale)
-    setOffset({
-      x: ratio * (offset.x + (vcx - mcx)),
-      y: ratio * (offset.y + (vcy - mcy)),
+    setView({
+      scale: nextScale,
+      offset: {
+        x: ratio * (offset.x + (vcx - mcx)),
+        y: ratio * (offset.y + (vcy - mcy)),
+      },
     })
     setMarquee(null)
   }, [marquee, offset, scale])
@@ -182,18 +243,17 @@ export default function ImageViewer({
       return
     }
     dragRef.current = null
+    setDragging(false)
   }, [marquee, finalizeMarquee])
 
-  const reset = useCallback(() => {
-    setScale(1)
-    setOffset({ x: 0, y: 0 })
-  }, [])
+  const reset = useCallback(() => setView(INITIAL_VIEW), [])
+  // Buttons zoom about the stage center.
   const zoomIn = useCallback(
-    () => setScale((s) => clamp(s * ZOOM_STEP, MIN_SCALE, MAX_SCALE)),
+    () => setView((v) => zoomAt(v, ZOOM_STEP, { x: 0, y: 0 })),
     [],
   )
   const zoomOut = useCallback(
-    () => setScale((s) => clamp(s / ZOOM_STEP, MIN_SCALE, MAX_SCALE)),
+    () => setView((v) => zoomAt(v, 1 / ZOOM_STEP, { x: 0, y: 0 })),
     [],
   )
 
@@ -312,26 +372,29 @@ export default function ImageViewer({
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose()
         }}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        {blobUrl && (
+        {shownUrl && (
           <img
-            src={blobUrl}
+            src={shownUrl}
             alt={item.originalBlock}
             draggable={false}
             onClick={(e) => e.stopPropagation()}
-            className="absolute top-1/2 left-1/2 max-h-[85vh] max-w-[85vw] origin-center object-contain select-none [image-rendering:pixelated]"
+            onLoad={(e) => {
+              const img = e.currentTarget
+              if (img.naturalWidth > 0) {
+                setFitRatio(img.clientWidth / img.naturalWidth)
+              }
+            }}
+            className="absolute top-1/2 left-1/2 max-h-[85vh] max-w-[85vw] origin-center object-contain select-none"
             style={{
               transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-              cursor: marquee
-                ? 'crosshair'
-                : dragRef.current
-                  ? 'grabbing'
-                  : 'grab',
+              imageRendering:
+                scale * fitRatio >= PIXELATED_FROM ? 'pixelated' : 'auto',
+              cursor: marquee ? 'crosshair' : dragging ? 'grabbing' : 'grab',
             }}
           />
         )}
@@ -358,4 +421,24 @@ export default function ImageViewer({
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
+}
+
+/** Zooms by `factor` around `anchor` (relative to the stage center). */
+function zoomAt(view: View, factor: number, anchor: Point): View {
+  const scale = clamp(view.scale * factor, MIN_SCALE, MAX_SCALE)
+  const ratio = scale / view.scale
+  return {
+    scale,
+    offset: {
+      x: anchor.x - (anchor.x - view.offset.x) * ratio,
+      y: anchor.y - (anchor.y - view.offset.y) * ratio,
+    },
+  }
+}
+
+/** Wheel delta in pixels, for any delta mode. */
+function wheelPixels(e: WheelEvent): number {
+  if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) return e.deltaY * 16
+  if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) return e.deltaY * 800
+  return e.deltaY
 }

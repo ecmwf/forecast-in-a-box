@@ -527,8 +527,8 @@ function ActiveViewerHost({
   return (
     <Suspense fallback={null}>
       <ActiveViewer
-        // Fresh mount per item resets pan/zoom/page.
-        key={activeViewer.item.taskId}
+        // Keyed by type, so the viewer stays up across items.
+        key={activeViewer.adapter.id}
         item={activeViewer.item}
         adapter={activeViewer.adapter}
         onClose={() => {
