@@ -13,7 +13,7 @@
  * that decides icon, label, thumbnail, viewer, and per-output actions.
  */
 
-import type { ComponentType, LazyExoticComponent } from 'react'
+import type { ComponentType, LazyExoticComponent, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { TFunction } from 'i18next'
 
@@ -74,6 +74,8 @@ export interface ViewerProps {
   onNext?: () => void
   /** 1-based position for the header indicator. */
   navIndex?: { current: number; total: number }
+  /** Rendered below the stage, e.g. the output filmstrip. */
+  footer?: ReactNode
 }
 
 export interface OutputAdapter {

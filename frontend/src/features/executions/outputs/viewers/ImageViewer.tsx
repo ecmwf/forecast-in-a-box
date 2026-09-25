@@ -71,6 +71,7 @@ export default function ImageViewer({
   onPrev,
   onNext,
   navIndex,
+  footer,
 }: ViewerProps) {
   const { t } = useTranslation('executions')
   const [shownUrl, setShownUrl] = useState<string | null>(null)
@@ -490,6 +491,8 @@ export default function ImageViewer({
           {t('outputs.viewer.zoomHint')}
         </div>
       </div>
+
+      {footer}
     </div>
   )
 }

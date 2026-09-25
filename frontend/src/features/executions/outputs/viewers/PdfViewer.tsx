@@ -41,6 +41,7 @@ export default function PdfViewer({
   onPrev,
   onNext,
   navIndex,
+  footer,
 }: ViewerProps) {
   const { t } = useTranslation('executions')
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
@@ -305,6 +306,8 @@ export default function PdfViewer({
           />
         </div>
       </div>
+
+      {footer}
     </div>
   )
 }

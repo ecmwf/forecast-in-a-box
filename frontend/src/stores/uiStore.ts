@@ -47,6 +47,10 @@ interface UiState {
   artifactsSort: CatalogueSortSetting
   setArtifactsSort: (sort: CatalogueSortSetting) => void
 
+  // Filmstrip under the full-screen output viewers.
+  outputFilmstrip: boolean
+  setOutputFilmstrip: (value: boolean) => void
+
   // Application timezone (IANA id) — governs all date/time entry and display.
   timeZone: string
   setTimeZone: (timeZone: string) => void
@@ -68,6 +72,7 @@ const initialState = {
   artifactsViewMode: 'table' as AdminViewMode,
   pluginsSort: { key: 'name', dir: 'asc' } as CatalogueSortSetting,
   artifactsSort: { key: 'name', dir: 'asc' } as CatalogueSortSetting,
+  outputFilmstrip: true,
   timeZone: 'UTC',
   journalShowFlow: false,
 }
@@ -110,6 +115,7 @@ export const useUiStore = create<UiState>()(
         setArtifactsViewMode: (artifactsViewMode) => set({ artifactsViewMode }),
         setPluginsSort: (pluginsSort) => set({ pluginsSort }),
         setArtifactsSort: (artifactsSort) => set({ artifactsSort }),
+        setOutputFilmstrip: (outputFilmstrip) => set({ outputFilmstrip }),
 
         // Application timezone management
         setTimeZone: (timeZone) => set({ timeZone }),
@@ -191,6 +197,7 @@ export const useUiStore = create<UiState>()(
           artifactsViewMode: state.artifactsViewMode,
           pluginsSort: state.pluginsSort,
           artifactsSort: state.artifactsSort,
+          outputFilmstrip: state.outputFilmstrip,
           timeZone: state.timeZone,
         }),
       },

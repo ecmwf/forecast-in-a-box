@@ -23,6 +23,7 @@ import { MimeFilterChips } from './MimeFilterChips'
 import { OutputCard } from './OutputCard'
 import { resolveAdapter } from './registry'
 import { SkeletonOutputCard } from './SkeletonOutputCard'
+import { Filmstrip } from './viewers/Filmstrip'
 import { needsSniff, useResolvedMimes } from './useResolvedMimes'
 import { classifyOutput } from './availability'
 import type { LostTaskIds } from './availability'
@@ -38,6 +39,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { groupByKey } from '@/lib/group-by'
 import { cn } from '@/lib/utils'
+import { useUiStore } from '@/stores/uiStore'
 import {
   Select,
   SelectContent,
@@ -485,7 +487,7 @@ interface ActiveViewerHostProps {
   ) => void
 }
 
-/** Wires prev/next/hotkeys; mounts only while a viewer is open. */
+/** Wires prev/next/hotkeys and the filmstrip; mounts only while open. */
 function ActiveViewerHost({
   ActiveViewer,
   activeViewer,
@@ -493,22 +495,29 @@ function ActiveViewerHost({
   effectiveMime,
   setActiveViewer,
 }: ActiveViewerHostProps) {
-  const activeIndex = visibleItems.findIndex(
+  const showFilmstrip = useUiStore((state) => state.outputFilmstrip)
+  const setShowFilmstrip = useUiStore((state) => state.setOutputFilmstrip)
+  const adapterFor = useCallback(
+    (item: OutputItem) => resolveAdapter(effectiveMime(item)),
+    [effectiveMime],
+  )
+  // Pending outputs and ones without a viewer (GRIB) would close it.
+  const viewable = useMemo(
+    () => visibleItems.filter((it) => it.isAvailable && adapterFor(it).Viewer),
+    [visibleItems, adapterFor],
+  )
+  const activeIndex = viewable.findIndex(
     (it) => it.taskId === activeViewer.item.taskId,
   )
-  const prevItem = activeIndex > 0 ? visibleItems[activeIndex - 1] : null
+  const prevItem = activeIndex > 0 ? viewable[activeIndex - 1] : null
   const nextItem =
-    activeIndex >= 0 && activeIndex < visibleItems.length - 1
-      ? visibleItems[activeIndex + 1]
+    activeIndex >= 0 && activeIndex < viewable.length - 1
+      ? viewable[activeIndex + 1]
       : null
 
   const stepTo = useCallback(
-    (item: OutputItem) =>
-      setActiveViewer({
-        item,
-        adapter: resolveAdapter(effectiveMime(item)),
-      }),
-    [setActiveViewer, effectiveMime],
+    (item: OutputItem) => setActiveViewer({ item, adapter: adapterFor(item) }),
+    [setActiveViewer, adapterFor],
   )
 
   const goPrev = useCallback(() => {
@@ -523,6 +532,10 @@ function ActiveViewerHost({
   useHotkey('K', goPrev, { enabled: !!prevItem, ignoreInputs: true })
   useHotkey('ArrowRight', goNext, { enabled: !!nextItem, ignoreInputs: true })
   useHotkey('J', goNext, { enabled: !!nextItem, ignoreInputs: true })
+  useHotkey('T', () => setShowFilmstrip(!showFilmstrip), {
+    enabled: viewable.length > 1,
+    ignoreInputs: true,
+  })
 
   return (
     <Suspense fallback={null}>
@@ -538,8 +551,18 @@ function ActiveViewerHost({
         onNext={nextItem ? goNext : undefined}
         navIndex={
           activeIndex >= 0
-            ? { current: activeIndex + 1, total: visibleItems.length }
+            ? { current: activeIndex + 1, total: viewable.length }
             : undefined
+        }
+        footer={
+          showFilmstrip && viewable.length > 1 ? (
+            <Filmstrip
+              items={viewable}
+              activeTaskId={activeViewer.item.taskId}
+              adapterFor={adapterFor}
+              onSelect={stepTo}
+            />
+          ) : undefined
         }
       />
     </Suspense>
