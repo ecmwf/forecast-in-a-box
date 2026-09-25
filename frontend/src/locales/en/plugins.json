@@ -45,7 +45,7 @@
   "table": {
     "headers": {
       "plugin": "Plugin",
-      "version": "Version",
+      "updated": "Updated",
       "status": "Status",
       "actions": "Actions"
     }

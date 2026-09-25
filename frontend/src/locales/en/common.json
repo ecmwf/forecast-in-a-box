@@ -240,6 +240,9 @@
     "viewCard": "Card view",
     "noMatches": "Nothing matches these filters",
     "noMatchesHint": "Try another search term or status.",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "sortBy": "Sort by",
+    "sortedAsc": "Sorted ascending",
+    "sortedDesc": "Sorted descending"
   }
 }

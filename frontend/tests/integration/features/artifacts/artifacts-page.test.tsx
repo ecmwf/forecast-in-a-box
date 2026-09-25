@@ -40,6 +40,7 @@ describe('Models page', () => {
   beforeEach(() => {
     localStorage.clear()
     useUiStore.getState().setArtifactsViewMode('table')
+    useUiStore.getState().setArtifactsSort({ key: 'name', dir: 'asc' })
   })
 
   it('lists downloaded and available models together, with counts', async () => {
@@ -61,6 +62,31 @@ describe('Models page', () => {
       .element(screen.getByText('AIFS Single MSE 1.1'))
       .not.toBeInTheDocument()
     await expect.element(screen.getByText('AIFS ENS CRPS 1.0')).toBeVisible()
+  })
+
+  it('sorts by a column header, reversing on a second click', async () => {
+    const screen = await renderPage()
+    const rowNames = () =>
+      screen
+        .getByRole('heading', { level: 4 })
+        .all()
+        .map((h) => h.element().textContent)
+
+    await screen.getByRole('button', { name: /^Size/ }).click()
+    await expect
+      .poll(rowNames)
+      .toEqual([
+        'AIFS ENS',
+        'AIFS Single',
+        'AIFS Single MSE 1.1',
+        'AIFS ENS CRPS 1.0',
+      ])
+    await screen.getByRole('button', { name: /^Size/ }).click()
+    await expect.poll(() => rowNames()[0]).toBe('AIFS ENS CRPS 1.0')
+    expect(useUiStore.getState().artifactsSort).toEqual({
+      key: 'size',
+      dir: 'asc',
+    })
   })
 
   it('shows download progress in place and returns on cancel', async () => {

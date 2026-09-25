@@ -117,6 +117,9 @@ export function PluginRow({ plugin, operation, ...handlers }: PluginRowProps) {
       </div>
 
       <div className="hidden min-w-0 lg:block">
+        {updatedTimeAgo && (
+          <div className="truncate text-sm">{updatedTimeAgo}</div>
+        )}
         {version && (
           <div className="font-mono text-sm text-muted-foreground">
             {t('item.version', { version })}
@@ -125,11 +128,6 @@ export function PluginRow({ plugin, operation, ...handlers }: PluginRowProps) {
                 {t('card.versionArrow', { version: plugin.latestVersion })}
               </span>
             )}
-          </div>
-        )}
-        {updatedTimeAgo && (
-          <div className="truncate text-sm text-muted-foreground">
-            {updatedTimeAgo}
           </div>
         )}
       </div>

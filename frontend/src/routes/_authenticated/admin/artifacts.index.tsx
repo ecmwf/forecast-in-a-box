@@ -16,6 +16,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
 import type { DeleteArtifactTarget } from '@/features/artifacts/components/ConfirmDeleteArtifactDialog'
+import type { SortOption } from '@/components/common/catalogue/useStableOrder'
 import { encodeArtifactId } from '@/api/types/artifacts.types'
 import {
   useArtifacts,
@@ -32,6 +33,10 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { CatalogueToolbar } from '@/components/common/catalogue/CatalogueToolbar'
 import { CatalogueView } from '@/components/common/catalogue/CatalogueView'
 import { useHeldKeys } from '@/components/common/catalogue/useHeldKeys'
+import {
+  resolveCatalogueSort,
+  useStableOrder,
+} from '@/components/common/catalogue/useStableOrder'
 import { ArtifactCard } from '@/features/artifacts/components/ArtifactCard'
 import { ArtifactRow } from '@/features/artifacts/components/ArtifactRow'
 import { ConfirmDeleteArtifactDialog } from '@/features/artifacts/components/ConfirmDeleteArtifactDialog'
@@ -51,11 +56,16 @@ function matchesFilter(artifact: ArtifactInfo, filter: ArtifactFilter) {
   return artifact.isAvailable === (filter === 'downloaded')
 }
 
+const byName = (a: ArtifactInfo, b: ArtifactInfo) =>
+  a.displayName.localeCompare(b.displayName)
+
 function ArtifactsPage() {
   const { t } = useTranslation(['artifacts', 'common'])
   const navigate = useNavigate()
   const viewMode = useUiStore((state) => state.artifactsViewMode)
   const setViewMode = useUiStore((state) => state.setArtifactsViewMode)
+  const storedSort = useUiStore((state) => state.artifactsSort)
+  const setStoredSort = useUiStore((state) => state.setArtifactsSort)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState<ArtifactFilter>('all')
@@ -70,22 +80,43 @@ function ArtifactsPage() {
 
   const searched = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
-    return artifacts
-      .filter(
-        (a) =>
-          !query ||
-          a.displayName.toLowerCase().includes(query) ||
-          a.author.toLowerCase().includes(query),
-      )
-      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    return artifacts.filter(
+      (a) =>
+        !query ||
+        a.displayName.toLowerCase().includes(query) ||
+        a.author.toLowerCase().includes(query),
+    )
   }, [artifacts, searchQuery])
 
-  const held = useHeldKeys(
-    [...downloadingKeys, ...deletingKeys],
-    `${filter}|${searchQuery}`,
+  const sortOptions: Array<SortOption<ArtifactInfo>> = [
+    { key: 'name', label: t('table.model'), compare: byName },
+    {
+      key: 'size',
+      label: t('table.size'),
+      compare: (a, b) => a.diskSizeBytes - b.diskSizeBytes,
+      defaultDir: 'desc',
+    },
+    {
+      key: 'status',
+      label: t('table.status'),
+      compare: (a, b) => Number(b.isAvailable) - Number(a.isAvailable),
+    },
+  ]
+  const sorting = resolveCatalogueSort(
+    sortOptions,
+    storedSort,
+    setStoredSort,
+    byName,
   )
-  const visible = searched.filter(
-    (a) => matchesFilter(a, filter) || held.has(a.encodedId),
+
+  // Only user actions re-sort or release held items.
+  const viewKey = `${filter}|${searchQuery}|${sorting.sort.key}|${sorting.sort.dir}`
+  const held = useHeldKeys([...downloadingKeys, ...deletingKeys], viewKey)
+  const visible = useStableOrder(
+    searched.filter((a) => matchesFilter(a, filter) || held.has(a.encodedId)),
+    (a) => a.encodedId,
+    sorting.compare,
+    viewKey,
   )
   const count = (f: ArtifactFilter) =>
     searched.filter((a) => matchesFilter(a, f)).length
@@ -152,6 +183,10 @@ function ArtifactsPage() {
           searchPlaceholder={t('filters.searchPlaceholder')}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          sortOptions={sortOptions}
+          sort={sorting.sort}
+          onSortChange={sorting.onSortSelect}
+          onSortDirToggle={sorting.onSortDirToggle}
         />
 
         <CatalogueView
@@ -159,10 +194,16 @@ function ArtifactsPage() {
           getKey={(a) => a.encodedId}
           viewMode={viewMode}
           gridClassName={GRID}
+          sort={sorting.sort}
+          onSortChange={sorting.onSortChange}
           columns={[
-            { label: t('table.model') },
-            { label: t('table.size'), className: 'hidden lg:block' },
-            { label: t('table.status') },
+            { label: t('table.model'), sortKey: 'name' },
+            {
+              label: t('table.size'),
+              className: 'hidden lg:block',
+              sortKey: 'size',
+            },
+            { label: t('table.status'), sortKey: 'status' },
             { label: t('table.actions'), className: 'text-right' },
           ]}
           isHeld={(a) => !matchesFilter(a, filter)}

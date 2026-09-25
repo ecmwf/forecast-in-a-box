@@ -10,12 +10,26 @@
 
 /** Status segments with counts, search, extra filters and view mode. */
 
-import { LayoutGrid, List, Search } from 'lucide-react'
+import {
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
+  LayoutGrid,
+  List,
+  Search,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
+import type { CatalogueSort } from './useStableOrder'
 import type { AdminViewMode } from '@/stores/uiStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 export interface CatalogueSegment<TValue extends string> {
@@ -36,6 +50,10 @@ interface CatalogueToolbarProps<TValue extends string> {
   searchPlaceholder: string
   viewMode: AdminViewMode
   onViewModeChange: (mode: AdminViewMode) => void
+  sortOptions: Array<{ key: string; label: string }>
+  sort: CatalogueSort
+  onSortChange: (key: string) => void
+  onSortDirToggle: () => void
   /** Extra filters between search and the view toggle. */
   children?: ReactNode
 }
@@ -50,6 +68,10 @@ export function CatalogueToolbar<TValue extends string>({
   searchPlaceholder,
   viewMode,
   onViewModeChange,
+  sortOptions,
+  sort,
+  onSortChange,
+  onSortDirToggle,
   children,
 }: CatalogueToolbarProps<TValue>) {
   const { t } = useTranslation('common')
@@ -106,6 +128,52 @@ export function CatalogueToolbar<TValue extends string>({
           />
         </div>
         {children}
+        {/* Cards only: tables sort via their headers. */}
+        <div
+          className={cn(
+            'items-center gap-1',
+            viewMode === 'card' ? 'flex' : 'flex sm:hidden',
+          )}
+        >
+          <Select
+            value={sort.key}
+            onValueChange={(key) => key !== null && onSortChange(key)}
+            items={sortOptions.map((o) => ({ value: o.key, label: o.label }))}
+          >
+            <SelectTrigger
+              className="min-w-44"
+              aria-label={t('catalogue.sortBy')}
+            >
+              <span className="text-muted-foreground">
+                {t('catalogue.sortBy')}
+              </span>
+              <SelectValue className="flex-1 text-left" />
+            </SelectTrigger>
+            <SelectContent>
+              {sortOptions.map((o) => (
+                <SelectItem key={o.key} value={o.key}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onSortDirToggle}
+            aria-label={t(
+              sort.dir === 'asc'
+                ? 'catalogue.sortedAsc'
+                : 'catalogue.sortedDesc',
+            )}
+          >
+            {sort.dir === 'asc' ? (
+              <ArrowUpNarrowWide className="h-4 w-4" />
+            ) : (
+              <ArrowDownWideNarrow className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
         {/* Hidden on mobile, where only the card view is used. */}
         <div className="hidden items-center rounded-md border sm:flex">
           <Button

@@ -70,6 +70,7 @@ describe('Plugins page', () => {
     // Don't sit out the production 2 s catalogue-recovery poll.
     setPollIntervalsForTests({ pluginCatalogue: 50 })
     useUiStore.getState().setPluginsViewMode('table')
+    useUiStore.getState().setPluginsSort({ key: 'name', dir: 'asc' })
   })
 
   it('lists installed and available plugins together, with status counts', async () => {

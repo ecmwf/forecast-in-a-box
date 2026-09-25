@@ -15,10 +15,12 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { AlertCircle, Puzzle, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
+  PluginBadgeKind,
   PluginCapability,
   PluginCompositeId,
   PluginInfo,
 } from '@/api/types/plugins.types'
+import type { SortOption } from '@/components/common/catalogue/useStableOrder'
 import { useBlockCatalogue } from '@/api/hooks/useFable'
 import {
   useDisablePlugin,
@@ -31,7 +33,7 @@ import {
   useUpdatePlugin,
 } from '@/api/hooks/usePlugins'
 import { useStatus } from '@/api/hooks/useStatus'
-import { encodePluginId } from '@/api/types/plugins.types'
+import { encodePluginId, pluginBadgeKind } from '@/api/types/plugins.types'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ListPageContainer } from '@/components/common/ListPageContainer'
@@ -48,6 +50,10 @@ import {
 import { CatalogueToolbar } from '@/components/common/catalogue/CatalogueToolbar'
 import { CatalogueView } from '@/components/common/catalogue/CatalogueView'
 import { useHeldKeys } from '@/components/common/catalogue/useHeldKeys'
+import {
+  resolveCatalogueSort,
+  useStableOrder,
+} from '@/components/common/catalogue/useStableOrder'
 import { PluginCard } from '@/features/plugins/components/PluginCard'
 import { PluginRow } from '@/features/plugins/components/PluginRow'
 import { pluginFailureDescription } from '@/features/plugins/utils/plugin-activity'
@@ -87,11 +93,28 @@ function matchesFilter(plugin: PluginInfo, filter: PluginFilter) {
   }
 }
 
+const byName = (a: PluginInfo, b: PluginInfo) => a.name.localeCompare(b.name)
+
+// Needs attention first when sorting by status.
+const STATUS_RANK: Record<PluginBadgeKind, number> = {
+  errored: 0,
+  warning: 1,
+  update: 2,
+  loaded: 3,
+  disabled: 4,
+  available: 5,
+}
+
+const updatedTime = (p: PluginInfo) =>
+  p.updatedAt ? new Date(p.updatedAt).getTime() : 0
+
 function PluginsPage() {
   const { t } = useTranslation(['plugins', 'common'])
   const navigate = useNavigate()
   const viewMode = useUiStore((state) => state.pluginsViewMode)
   const setViewMode = useUiStore((state) => state.setPluginsViewMode)
+  const storedSort = useUiStore((state) => state.pluginsSort)
+  const setStoredSort = useUiStore((state) => state.setPluginsSort)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState<PluginFilter>('all')
@@ -130,15 +153,38 @@ function PluginsPage() {
           p.author.toLowerCase().includes(query) ||
           p.description.toLowerCase().includes(query),
       )
-      .sort((a, b) => a.name.localeCompare(b.name))
   }, [plugins, searchQuery, capabilityFilter])
 
-  const held = useHeldKeys(
-    [...operations.keys()],
-    `${filter}|${capabilityFilter}|${searchQuery}`,
+  const sortOptions: Array<SortOption<PluginInfo>> = [
+    { key: 'name', label: t('table.headers.plugin'), compare: byName },
+    {
+      key: 'updated',
+      label: t('table.headers.updated'),
+      compare: (a, b) => updatedTime(a) - updatedTime(b),
+      defaultDir: 'desc',
+    },
+    {
+      key: 'status',
+      label: t('table.headers.status'),
+      compare: (a, b) =>
+        STATUS_RANK[pluginBadgeKind(a)] - STATUS_RANK[pluginBadgeKind(b)],
+    },
+  ]
+  const sorting = resolveCatalogueSort(
+    sortOptions,
+    storedSort,
+    setStoredSort,
+    byName,
   )
-  const visible = searched.filter(
-    (p) => matchesFilter(p, filter) || held.has(pluginKey(p)),
+
+  // Only user actions re-sort or release held items.
+  const viewKey = `${filter}|${capabilityFilter}|${searchQuery}|${sorting.sort.key}|${sorting.sort.dir}`
+  const held = useHeldKeys([...operations.keys()], viewKey)
+  const visible = useStableOrder(
+    searched.filter((p) => matchesFilter(p, filter) || held.has(pluginKey(p))),
+    pluginKey,
+    sorting.compare,
+    viewKey,
   )
   const count = (f: PluginFilter) =>
     searched.filter((p) => matchesFilter(p, f)).length
@@ -298,6 +344,10 @@ function PluginsPage() {
           searchPlaceholder={t('filters.searchPlaceholder')}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          sortOptions={sortOptions}
+          sort={sorting.sort}
+          onSortChange={sorting.onSortSelect}
+          onSortDirToggle={sorting.onSortDirToggle}
         >
           <Select
             value={capabilityFilter}
@@ -327,10 +377,16 @@ function PluginsPage() {
           getKey={pluginKey}
           viewMode={viewMode}
           gridClassName={GRID}
+          sort={sorting.sort}
+          onSortChange={sorting.onSortChange}
           columns={[
-            { label: t('table.headers.plugin') },
-            { label: t('table.headers.version'), className: 'hidden lg:block' },
-            { label: t('table.headers.status') },
+            { label: t('table.headers.plugin'), sortKey: 'name' },
+            {
+              label: t('table.headers.updated'),
+              className: 'hidden lg:block',
+              sortKey: 'updated',
+            },
+            { label: t('table.headers.status'), sortKey: 'status' },
             { label: t('table.headers.actions'), className: 'text-right' },
           ]}
           isHeld={(p) => !matchesFilter(p, filter)}

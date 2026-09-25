@@ -11,7 +11,10 @@
 /** One catalogue list, as a card grid or a table sharing a column template. */
 
 import { createContext, useContext } from 'react'
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { ComponentProps, ReactNode } from 'react'
+import type { CatalogueSort } from './useStableOrder'
 import type { AdminViewMode } from '@/stores/uiStore'
 import { Card } from '@/components/ui/card'
 import { useMedia } from '@/hooks/useMedia'
@@ -25,7 +28,9 @@ interface CatalogueViewProps<T> {
   viewMode: AdminViewMode
   /** Column template for the header and rows. */
   gridClassName: string
-  columns: Array<{ label: string; className?: string }>
+  columns: Array<{ label: string; className?: string; sortKey?: string }>
+  sort: CatalogueSort
+  onSortChange: (key: string) => void
   renderCard: (item: T) => ReactNode
   renderRow: (item: T) => ReactNode
   /** No longer matches the filter; tinted. */
@@ -42,11 +47,14 @@ export function CatalogueView<T>({
   viewMode,
   gridClassName,
   columns,
+  sort,
+  onSortChange,
   renderCard,
   renderRow,
   isHeld,
   empty,
 }: CatalogueViewProps<T>) {
+  const { t } = useTranslation('common')
   const isMobile = useMedia('(max-width: 639px)')
 
   if (items.length === 0) {
@@ -78,11 +86,52 @@ export function CatalogueView<T>({
             gridClassName,
           )}
         >
-          {columns.map((c) => (
-            <div key={c.label} className={c.className}>
-              {c.label}
-            </div>
-          ))}
+          {columns.map((c) => {
+            const sortKey = c.sortKey
+            if (!sortKey) {
+              return (
+                <div key={c.label} className={c.className}>
+                  {c.label}
+                </div>
+              )
+            }
+            const active = sort.key === sortKey
+            const Icon = !active
+              ? ChevronsUpDown
+              : sort.dir === 'asc'
+                ? ArrowUp
+                : ArrowDown
+            return (
+              <div key={c.label} className={c.className}>
+                <button
+                  type="button"
+                  onClick={() => onSortChange(sortKey)}
+                  className={cn(
+                    'group/sort -mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+                    active && 'text-foreground',
+                  )}
+                >
+                  {c.label}
+                  <Icon
+                    className={cn(
+                      'h-3.5 w-3.5',
+                      !active &&
+                        'opacity-0 group-hover/sort:opacity-60 group-focus-visible/sort:opacity-60',
+                    )}
+                  />
+                  {active && (
+                    <span className="sr-only">
+                      {t(
+                        sort.dir === 'asc'
+                          ? 'catalogue.sortedAsc'
+                          : 'catalogue.sortedDesc',
+                      )}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )
+          })}
         </div>
         <div className="divide-y divide-border">
           {items.map((item) => (
