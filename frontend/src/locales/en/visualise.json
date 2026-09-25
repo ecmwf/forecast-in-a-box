@@ -63,7 +63,7 @@
       "errorHttp": "The server responded with HTTP {{status}} — check the URL path and any token",
       "errorParse": "The server responded, but not with a readable WMS capabilities document",
       "errorTimeout": "Timed out — the server may be slow, try again",
-      "errorInterrupted": "The server dropped the connection while sending its catalog — try again, or later"
+      "errorInterrupted": "The server dropped the connection while sending its catalogue — try again, or later"
     },
     "hostPath": {
       "title": "GRIB directory on this host",
@@ -79,7 +79,7 @@
       "failed": "Could not reach {{name}}",
       "checking": "Checking WMS capabilities…",
       "timedOut": "{{name}} timed out — the server may be slow, try again",
-      "interrupted": "{{name}} dropped the connection while sending its catalog — try again, or later",
+      "interrupted": "{{name}} dropped the connection while sending its catalogue — try again, or later",
       "ecmwfKeyHint": "Use your ECMWF key for more layers",
       "ecmwfKeyActive": "Using your ECMWF key"
     },
@@ -367,7 +367,7 @@
   "help": {
     "open": "Help & shortcuts",
     "title": "Visualise",
-    "intro": "Two sources — A (blue) and B (orange) — are shown on synchronized maps. Pick sources in the header, choose layers on the right, and control what is on the map from the left.",
+    "intro": "Two sources — A (blue) and B (orange) — are shown on synchronised maps. Pick sources in the header, choose layers on the right, and control what is on the map from the left.",
     "sections": {
       "modes": {
         "title": "Comparison modes",
@@ -413,7 +413,7 @@
     "editorNew": "New annotation",
     "editorEdit": "Edit annotation",
     "labelField": "Label",
-    "colorField": "Pin color",
+    "colorField": "Pin colour",
     "colors": {
       "blue": "Blue",
       "orange": "Orange",

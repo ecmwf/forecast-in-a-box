@@ -28,8 +28,8 @@
   "logoAlt": "Forecast In a Box Logo",
   "spinnerLabel": "Loading",
   "activity": {
-    "label": "Notification Center",
-    "title": "Notification Center",
+    "label": "Notification Centre",
+    "title": "Notification Centre",
     "help": "Shows long-running tasks such as model downloads, plugin installations, and forecast runs. Completed items stay here until you dismiss them.",
     "clear": "Clear",
     "clearAll": "Clear all",

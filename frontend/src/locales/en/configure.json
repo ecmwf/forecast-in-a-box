@@ -237,7 +237,7 @@
     },
     "sink": {
       "label": "Output",
-      "description": "Store or visualize results"
+      "description": "Store or visualise results"
     }
   },
   "template": {

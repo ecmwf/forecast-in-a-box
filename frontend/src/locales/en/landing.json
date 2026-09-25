@@ -17,7 +17,7 @@
       "description": "Track forecast execution in real-time with progress updates and live logs"
     },
     "visualize": {
-      "title": "Visualize",
+      "title": "Visualise",
       "description": "View and download forecast results including images, plots, and data files"
     }
   },
