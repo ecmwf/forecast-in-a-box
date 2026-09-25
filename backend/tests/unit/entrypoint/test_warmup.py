@@ -25,7 +25,7 @@ from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 
 import forecastbox.entrypoint.warmup as warmup_module
 from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
-from forecastbox.utility.config import PluginSettings
+from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.utility.packages import PackagesError
 
 _ALPHA = PluginCompositeId(store=PluginStoreId("store"), local=PluginId("alpha"))
@@ -70,7 +70,7 @@ def warmup_mocks() -> Iterator[dict[str, MagicMock]]:
         patch.object(warmup_module, "submit_refresh_catalog", parent.submit_refresh_catalog),
         patch.object(warmup_module, "initialize_stores", parent.initialize_stores),
         patch.object(warmup_module, "join_artifact_manager", parent.join_artifact_manager),
-        patch.object(warmup_module, "register_plugin_from_store", parent.register_plugin_from_store),
+        patch.object(warmup_module, "resolve_plugin_from_store", parent.resolve_plugin_from_store),
         patch.object(warmup_module, "update_single", parent.update_single),
         # NOTE see `_run_coro_without_touching_global_loop` for why we do not let the real
         # `asyncio.run` execute here
@@ -82,13 +82,13 @@ def warmup_mocks() -> Iterator[dict[str, MagicMock]]:
 
         parent.start_db_schema.side_effect = lambda: _noop()
         parent.submit_refresh_catalog.return_value = catalog_future
-        parent.register_plugin_from_store.return_value = _SETTINGS
+        parent.resolve_plugin_from_store.return_value = _SETTINGS
         yield {"parent": parent}
 
 
 def test_defaults_to_configured_default_plugins(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    with patch.object(warmup_module, "_default_plugins", lambda: {_ALPHA: _SETTINGS}):
+    with patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]):
         warmup_module.warmup()
     parent.update_single.assert_called_once_with(_ALPHA, _SETTINGS, install=True, version=None)
 
@@ -120,19 +120,22 @@ def test_invalid_plugin_id_is_rejected(warmup_mocks: dict[str, MagicMock], raw: 
     parent.update_single.assert_not_called()
 
 
-def test_unknown_to_store_falls_back_to_config(warmup_mocks: dict[str, MagicMock]) -> None:
+def test_unknown_to_store_falls_back_to_db(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    parent.register_plugin_from_store.side_effect = ValueError("plugin with id alpha not known to store store")
-    with patch.dict(warmup_module.config.external.plugins, {_ALPHA: _SETTINGS}, clear=False):
+    parent.resolve_plugin_from_store.side_effect = ValueError("plugin with id alpha not known to store store")
+    db_state = MagicMock()
+    db_state.to_settings.return_value = _SETTINGS
+    with patch.object(warmup_module, "get_plugin_state", return_value=db_state):
         warmup_module.warmup(plugin="store:alpha")
     parent.update_single.assert_called_once_with(_ALPHA, _SETTINGS, install=True, version=None)
 
 
 def test_unknown_plugin_fails(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    parent.register_plugin_from_store.side_effect = ValueError("plugin with id alpha not known to store store")
-    with pytest.raises(SystemExit):
-        warmup_module.warmup(plugin="store:alpha")
+    parent.resolve_plugin_from_store.side_effect = ValueError("plugin with id alpha not known to store store")
+    with patch.object(warmup_module, "get_plugin_state", return_value=None):
+        with pytest.raises(SystemExit):
+            warmup_module.warmup(plugin="store:alpha")
     parent.update_single.assert_not_called()
 
 

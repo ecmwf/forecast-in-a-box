@@ -99,12 +99,32 @@ def install_default_plugins(config: FIABConfig, attempts: int = 20) -> None:
     try:
         with httpx.Client(follow_redirects=True) as client:
             _wait_for(client, config.backend.local_url() + f"{ROUTE_PREFIX}/status", attempts, _plugins_ready)
-            for pluginId in _default_plugins().keys():
+            for pluginId in config.external.default_plugins:
                 url = config.backend.local_url() + f"{ROUTE_PREFIX}/plugin/install"
-                try:
-                    client.post(url, json=pluginId.model_dump()).raise_for_status()
-                except Exception:
-                    logger.exception(f"failed to install default plugin {pluginId}")
+                # TODO after the plugin queuing system work, remove the inner loop; this is a hotfix only
+                i = 4
+                while i > 0:
+                    try:
+                        response = client.post(url, json=pluginId.model_dump())
+                        if response.status_code == 500 and response.text == '{"detail":"plugin operation is not idle"}':
+                            if i > 1:
+                                logger.warning("plugin operation in progress -- sleep for 5 secs, then retry")
+                                time.sleep(5.0)
+                            i -= 1
+                            continue
+                        else:
+                            response.raise_for_status()
+                        i = 3
+                        break
+                    except httpx.HTTPStatusError:
+                        # NOTE sadly the status error does *not* preserve the text, hence the branched except
+                        logger.error(f"failed to install default plugin {pluginId}: {response!r} => {response.text}")
+                        break
+                    except Exception as e:
+                        logger.error(f"failed to install default plugin {pluginId}: {e!r}")
+                        break
+                if i == 0:
+                    logger.error(f"failed to install default plugin {pluginId} in time, system too busy")
     except Exception:
         logger.exception(f"failed to install default plugins")
     # TODO here we should, in a finally, touch the first run marker, instead of fiab launcher doing it. And rename the top entry function 'first_run_setup' instead of 'default_plugin_install'
