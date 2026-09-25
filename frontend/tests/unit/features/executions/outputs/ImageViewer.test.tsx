@@ -10,7 +10,7 @@
 
 import { useState } from 'react'
 import { HttpResponse, delay, http } from 'msw'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { worker } from '@tests/test-extend'
 import { renderWithProviders } from '@tests/utils/render'
 import type { OutputItem } from '@/features/executions/outputs/types'
@@ -57,15 +57,34 @@ async function renderViewer(taskId = 'a') {
   return screen
 }
 
-const zoomLabel = () =>
-  [...document.querySelectorAll('[role=dialog] header span')]
-    .map((s) => s.textContent)
-    .find((text) => text.endsWith('%'))
+const image = () => document.querySelector('[role=dialog] img') as HTMLElement
+
+const scaleOf = () =>
+  Number(/scale\(([\d.]+)\)/.exec(image().style.transform)?.[1])
+
+const offsetOf = () =>
+  /translate\((-?[\d.]+)px, (-?[\d.]+)px\) scale/
+    .exec(image().style.transform)
+    ?.slice(1)
+    .map(Number)
+
+const press = (key: string) =>
+  document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
 
 const stage = () =>
   document.querySelector('[role=dialog] img')?.parentElement as HTMLElement
 
 describe('ImageViewer', () => {
+  // No app CSS: give the stage a real size so "fit" is meaningful.
+  beforeAll(() => {
+    const style = document.createElement('style')
+    style.textContent =
+      '[role=dialog]{position:fixed;inset:0;display:flex;flex-direction:column}' +
+      '[role=dialog]>.flex-1{flex:1;position:relative;overflow:hidden}' +
+      '[role=dialog] img{position:absolute;top:50%;left:50%}'
+    document.head.appendChild(style)
+  })
+
   beforeEach(() => serveImages())
 
   it('handles the wheel itself so the page behind neither scrolls nor zooms', async () => {
@@ -81,6 +100,7 @@ describe('ImageViewer', () => {
 
   it('zooms in proportion to the wheel delta, not per event', async () => {
     await renderViewer()
+    const before = scaleOf()
     // One pinch: many tiny ctrl+wheel deltas.
     for (let i = 0; i < 40; i++) {
       stage().dispatchEvent(
@@ -92,7 +112,7 @@ describe('ImageViewer', () => {
         }),
       )
     }
-    await expect.poll(zoomLabel).toBe('223%')
+    await expect.poll(() => scaleOf() / before).toBeCloseTo(Math.exp(0.8), 3)
   })
 
   it('keeps the point under the cursor fixed while zooming', async () => {
@@ -109,22 +129,29 @@ describe('ImageViewer', () => {
         cancelable: true,
       }),
     )
-    const img = document.querySelector('[role=dialog] img') as HTMLElement
-    // Scale e^0.2; the offset keeps the cursor point fixed.
-    await expect
-      .poll(() => img.style.transform)
-      .toMatch(/translate\(-22\.14\d*px, 0px\) scale\(1\.2214/)
+    // Scale e^0.2 from the fitted view; the offset keeps the point fixed.
+    await expect.poll(() => offsetOf()?.[0]).toBeCloseTo(-22.14, 1)
+  })
+
+  it('opens fitted; 0 fits and 1 shows native pixels', async () => {
+    await renderViewer()
+    const fitted = scaleOf()
+    expect(fitted).not.toBe(1)
+    press('1')
+    await expect.poll(scaleOf).toBe(1)
+    press('0')
+    await expect.poll(scaleOf).toBe(fitted)
   })
 
   it('shows hard pixel edges only once pixels are enlarged', async () => {
     const screen = await renderViewer()
-    const img = document.querySelector('[role=dialog] img') as HTMLElement
-    await expect.poll(() => img.style.imageRendering).toBe('auto')
+    press('1')
+    await expect.poll(() => image().style.imageRendering).toBe('auto')
 
     // Unstyled overlay fails actionability checks; click via the DOM.
     const zoomIn = screen.getByRole('button', { name: 'Zoom in' }).element()
     for (let i = 0; i < 4; i++) (zoomIn as HTMLElement).click()
-    await expect.poll(() => img.style.imageRendering).toBe('pixelated')
+    await expect.poll(() => image().style.imageRendering).toBe('pixelated')
   })
 
   it('keeps the current image up until the next one is ready', async () => {
@@ -158,5 +185,37 @@ describe('ImageViewer', () => {
     await expect
       .poll(() => img.element().getAttribute('src'), { timeout: 3000 })
       .not.toBe(firstSrc)
+  })
+
+  it('keeps the zoomed region when stepping to the next output', async () => {
+    function Harness() {
+      const [taskId, setTaskId] = useState('a')
+      return (
+        <>
+          <button type="button" onClick={() => setTaskId('b')}>
+            next
+          </button>
+          <ImageViewer
+            item={item(taskId)}
+            adapter={imageRasterAdapter}
+            onClose={() => {}}
+          />
+        </>
+      )
+    }
+    const screen = await renderWithProviders(<Harness />)
+    await expect.element(screen.getByRole('img')).toBeInTheDocument()
+    await expect.poll(scaleOf).toBeGreaterThan(0)
+    press('+')
+    press('+')
+    await expect.poll(scaleOf).toBeGreaterThan(1)
+    const zoomed = image().style.transform
+    const firstSrc = image().getAttribute('src')
+
+    ;(
+      screen.getByRole('button', { name: 'next' }).element() as HTMLElement
+    ).click()
+    await expect.poll(() => image().getAttribute('src')).not.toBe(firstSrc)
+    expect(image().style.transform).toBe(zoomed)
   })
 })

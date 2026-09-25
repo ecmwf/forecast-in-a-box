@@ -165,10 +165,10 @@
     },
     "noMatch": "No outputs match the current filter.",
     "viewer": {
-      "zoomHint": "Wheel to zoom · Drag to pan · Shift+drag to zoom into a region",
+      "zoomHint": "Wheel to zoom · Drag or W A S D to pan · Shift+drag to zoom into a region · 0 fit · 1 actual size",
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
-      "resetZoom": "Reset zoom",
+      "resetZoom": "Fit to screen",
       "close": "Close",
       "previousPage": "Previous page",
       "nextPage": "Next page",
@@ -176,7 +176,8 @@
       "nextOutput": "Next output",
       "pageOfTotal": "{{page}} / {{total}}",
       "pdfPageCount_one": "{{count}} page",
-      "pdfPageCount_other": "{{count}} pages"
+      "pdfPageCount_other": "{{count}} pages",
+      "keepView": "Keep zoom and position between outputs"
     },
     "adapters": {
       "generic": {

@@ -11,6 +11,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Download,
+  Lock,
+  LockOpen,
   Maximize2,
   SkipBack,
   SkipForward,
@@ -23,10 +25,11 @@ import { downloadAction } from '../actions/download'
 import { useJobResultBlob } from '../useJobResult'
 import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
 import type { ViewerProps } from '../types'
+import { useHoldPan } from '@/hooks/useHoldPan'
 import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
-const MIN_SCALE = 0.25
+const MIN_SCALE = 0.05
 const MAX_SCALE = 32
 const ZOOM_STEP = 1.2
 const MIN_MARQUEE_PX = 12
@@ -37,6 +40,8 @@ const PINCH_ZOOM_RATE = 0.01
 const MAX_WHEEL_DELTA = 100
 // Screen px per source px before rendering turns pixelated.
 const PIXELATED_FROM = 2
+// Gap kept around a fitted image.
+const FIT_MARGIN_PX = 24
 
 interface Point {
   x: number
@@ -48,12 +53,16 @@ interface Marquee {
   end: Point
 }
 
+/** `scale` is screen px per image px; `offset` moves the image center. */
 interface View {
   scale: number
   offset: Point
 }
 
-const INITIAL_VIEW: View = { scale: 1, offset: { x: 0, y: 0 } }
+interface Size {
+  width: number
+  height: number
+}
 
 export default function ImageViewer({
   item,
@@ -65,14 +74,18 @@ export default function ImageViewer({
 }: ViewerProps) {
   const { t } = useTranslation('executions')
   const [shownUrl, setShownUrl] = useState<string | null>(null)
-  const [view, setView] = useState<View>(INITIAL_VIEW)
+  const [imageSize, setImageSize] = useState<Size | null>(null)
+  const [view, setView] = useState<View>({ scale: 1, offset: { x: 0, y: 0 } })
   const [marquee, setMarquee] = useState<Marquee | null>(null)
   const [dragging, setDragging] = useState(false)
-  // Displayed px per source px at scale 1.
-  const [fitRatio, setFitRatio] = useState(1)
+  // Keep the zoomed region when stepping, like a flip-book.
+  const [keepView, setKeepView] = useState(true)
   const dragRef = useRef<Point | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const shownUrlRef = useRef<string | null>(null)
+  const imageSizeRef = useRef<Size | null>(null)
+  const keepViewRef = useRef(keepView)
+  keepViewRef.current = keepView
   const { scale, offset } = view
 
   // SVG needs an explicit mime tag — `<img>` strict-checks it where it
@@ -107,8 +120,17 @@ export default function ImageViewer({
         }
         if (shownUrlRef.current) URL.revokeObjectURL(shownUrlRef.current)
         shownUrlRef.current = url
+        const size = { width: probe.naturalWidth, height: probe.naturalHeight }
+        const prev = imageSizeRef.current
+        const stage = stageRef.current
+        imageSizeRef.current = size
         setShownUrl(url)
-        setView(INITIAL_VIEW)
+        setImageSize(size)
+        setView((v) =>
+          keepViewRef.current && prev
+            ? carryView(v, stage, prev, size)
+            : fitView(stage, size),
+        )
         setMarquee(null)
       })
     return () => {
@@ -129,11 +151,37 @@ export default function ImageViewer({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') return onClose()
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const center = { x: 0, y: 0 }
+      switch (e.key) {
+        case '+':
+        case '=':
+          return setView((v) => zoomAt(v, ZOOM_STEP, center))
+        case '-':
+          return setView((v) => zoomAt(v, 1 / ZOOM_STEP, center))
+        case '0':
+          return setView(fitView(stageRef.current, imageSizeRef.current))
+        case '1':
+          return setView((v) => zoomAt(v, 1 / v.scale, center))
+        case 'l':
+        case 'L':
+          return setKeepView((k) => !k)
+      }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onClose])
+
+  const pan = useCallback(
+    (dx: number, dy: number) =>
+      setView((v) => ({
+        ...v,
+        offset: { x: v.offset.x - dx, y: v.offset.y - dy },
+      })),
+    [],
+  )
+  useHoldPan(pan, { arrows: false })
 
   // Native listener: React's onWheel is passive.
   useEffect(() => {
@@ -246,7 +294,24 @@ export default function ImageViewer({
     setDragging(false)
   }, [marquee, finalizeMarquee])
 
-  const reset = useCallback(() => setView(INITIAL_VIEW), [])
+  const reset = useCallback(
+    () => setView(fitView(stageRef.current, imageSizeRef.current)),
+    [],
+  )
+  // Double-click: 2x at the cursor when fitted, else fit.
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    const fitted = fitView(stageRef.current, imageSizeRef.current)
+    const rect = stageRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setView((v) =>
+      Math.abs(v.scale - fitted.scale) < 1e-3
+        ? zoomAt(v, 2, {
+            x: e.clientX - rect.left - rect.width / 2,
+            y: e.clientY - rect.top - rect.height / 2,
+          })
+        : fitted,
+    )
+  }, [])
   // Buttons zoom about the stage center.
   const zoomIn = useCallback(
     () => setView((v) => zoomAt(v, ZOOM_STEP, { x: 0, y: 0 })),
@@ -344,6 +409,20 @@ export default function ImageViewer({
           >
             <Maximize2 className="h-4 w-4" />
           </button>
+          <button
+            type="button"
+            aria-label={t('outputs.viewer.keepView')}
+            aria-pressed={keepView}
+            title={t('outputs.viewer.keepView')}
+            className={cn(viewerHeaderBtn, keepView && 'bg-white/15')}
+            onClick={() => setKeepView((k) => !k)}
+          >
+            {keepView ? (
+              <Lock className="h-4 w-4" />
+            ) : (
+              <LockOpen className="h-4 w-4" />
+            )}
+          </button>
         </div>
         <div className="h-5 w-px bg-white/15" />
         <button
@@ -376,6 +455,7 @@ export default function ImageViewer({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
       >
         {shownUrl && (
           <img
@@ -383,17 +463,12 @@ export default function ImageViewer({
             alt={item.originalBlock}
             draggable={false}
             onClick={(e) => e.stopPropagation()}
-            onLoad={(e) => {
-              const img = e.currentTarget
-              if (img.naturalWidth > 0) {
-                setFitRatio(img.clientWidth / img.naturalWidth)
-              }
-            }}
-            className="absolute top-1/2 left-1/2 max-h-[85vh] max-w-[85vw] origin-center object-contain select-none"
+            width={imageSize?.width}
+            height={imageSize?.height}
+            className="absolute top-1/2 left-1/2 max-w-none origin-center select-none"
             style={{
               transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-              imageRendering:
-                scale * fitRatio >= PIXELATED_FROM ? 'pixelated' : 'auto',
+              imageRendering: scale >= PIXELATED_FROM ? 'pixelated' : 'auto',
               cursor: marquee ? 'crosshair' : dragging ? 'grabbing' : 'grab',
             }}
           />
@@ -417,6 +492,36 @@ export default function ImageViewer({
       </div>
     </div>
   )
+}
+
+/** Largest scale showing the whole image, centered. */
+function fitView(stage: HTMLElement | null, size: Size | null): View {
+  const rect = stage?.getBoundingClientRect()
+  const offset = { x: 0, y: 0 }
+  if (!rect || !size || !size.width || !size.height) return { scale: 1, offset }
+  const scale = Math.min(
+    (rect.width - 2 * FIT_MARGIN_PX) / size.width,
+    (rect.height - 2 * FIT_MARGIN_PX) / size.height,
+  )
+  return { scale: clamp(scale, MIN_SCALE, MAX_SCALE), offset }
+}
+
+/** Carries zoom (relative to fit) and position over to a new image. */
+function carryView(
+  view: View,
+  stage: HTMLElement | null,
+  from: Size,
+  to: Size,
+): View {
+  const zoom = view.scale / fitView(stage, from).scale
+  const scale = clamp(fitView(stage, to).scale * zoom, MIN_SCALE, MAX_SCALE)
+  return {
+    scale,
+    offset: {
+      x: (view.offset.x / (from.width * view.scale)) * to.width * scale,
+      y: (view.offset.y / (from.height * view.scale)) * to.height * scale,
+    },
+  }
 }
 
 function clamp(v: number, min: number, max: number): number {
