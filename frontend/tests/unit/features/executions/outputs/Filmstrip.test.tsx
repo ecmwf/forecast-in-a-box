@@ -19,6 +19,7 @@ const items: Array<OutputItem> = ['a', 'b', 'c'].map((taskId) => ({
   taskId,
   mimeType: 'application/grib',
   originalBlock: `plot-${taskId}`,
+  blockName: `plot-${taskId}`,
   isAvailable: true,
 }))
 

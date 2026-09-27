@@ -14,6 +14,10 @@ import { useTranslation } from 'react-i18next'
 import type { NavigateFn } from '@tanstack/react-router'
 import type { Command } from './registry'
 import type { JobExecutionDetail } from '@/api/types/job.types'
+import {
+  collidingTitles,
+  qualifiedFactoryTitle,
+} from '@/features/fable-builder/utils/block-names'
 import { useRecentRuns } from '@/api/hooks/useJobs'
 import { useBlockCatalogue } from '@/api/hooks/useFable'
 import {
@@ -105,6 +109,7 @@ export function useBlockCommands(active: boolean): Array<Command> {
 
   return useMemo<Array<Command>>(() => {
     if (!active || !catalogue) return []
+    const colliding = collidingTitles(catalogue)
     const commands: Array<Command> = []
     for (const { pluginId, factoryId, factory } of flattenCatalogue(
       catalogue,
@@ -115,11 +120,11 @@ export function useBlockCommands(active: boolean): Array<Command> {
       const Icon = getBlockKindIcon(factory.kind)
       commands.push({
         id: `block-${key}`,
-        label: factory.title,
+        label: qualifiedFactoryTitle(factory.title, pluginId, colliding),
         description: t('commands.addBlock.description'),
         icon: <Icon className="h-4 w-4" />,
         category: 'Blocks',
-        keywords: ['add', 'block', factory.kind, factory.description],
+        keywords: ['add', 'block', factory.kind, factory.description, pluginId],
         searchOnly: true,
         action: () => addBlock(id, factory),
       })

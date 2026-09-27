@@ -347,7 +347,7 @@ export default function ImageViewer({
         onClick={(e) => e.stopPropagation()}
       >
         <span className="truncate font-mono text-sm text-white/80">
-          {item.originalBlock}
+          {item.blockName}
         </span>
         {navIndex && (
           <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
@@ -461,7 +461,7 @@ export default function ImageViewer({
         {shownUrl && (
           <img
             src={shownUrl}
-            alt={item.originalBlock}
+            alt={item.blockName}
             draggable={false}
             onClick={(e) => e.stopPropagation()}
             width={imageSize?.width}

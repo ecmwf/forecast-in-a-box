@@ -57,7 +57,7 @@ export function Filmstrip({
               aria-current={active || undefined}
               aria-label={t('outputs.viewer.filmstripItem', {
                 index: index + 1,
-                name: item.originalBlock,
+                name: item.blockName,
               })}
               onClick={() => onSelect(item)}
               className={cn(

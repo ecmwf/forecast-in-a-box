@@ -53,7 +53,7 @@ export function ImageThumbnail({ item, adapter }: ThumbnailProps) {
       {url ? (
         <img
           src={url}
-          alt={item.originalBlock}
+          alt={item.blockName}
           className="h-full w-full object-cover"
         />
       ) : (

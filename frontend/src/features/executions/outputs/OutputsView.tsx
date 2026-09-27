@@ -70,6 +70,8 @@ interface OutputsViewProps {
   completedBlockIds?: ReadonlyArray<string> | null
   /** Surfaces block-level skeletons before any outputs payload arrives. */
   plannedBlockIds?: ReadonlyArray<string> | null
+  /** Display name per block id, from the run's workflow. */
+  blockNames?: Readonly<Record<string, string>>
   /** Portal target for the toolbar; falls back to inline. */
   toolbarSlot?: HTMLElement | null
   /** Switches to the Logs tab from the failed-run notice. */
@@ -83,6 +85,7 @@ export function OutputsView({
   lostTaskIds = {},
   completedBlockIds,
   plannedBlockIds,
+  blockNames,
   toolbarSlot,
   onViewLogs,
 }: OutputsViewProps) {
@@ -114,12 +117,16 @@ export function OutputsView({
           taskId,
           mimeType: meta.mime_type,
           originalBlock: meta.original_block,
+          blockName: blockNames?.[meta.original_block] ?? meta.original_block,
           isAvailable: meta.is_available,
           lostReason:
             availability.state === 'lost' ? availability.reason : undefined,
         }
       })
     list.sort((a, b) => {
+      if (a.blockName !== b.blockName) {
+        return a.blockName.localeCompare(b.blockName)
+      }
       if (a.originalBlock !== b.originalBlock) {
         return a.originalBlock < b.originalBlock ? -1 : 1
       }
@@ -127,7 +134,7 @@ export function OutputsView({
       return a.taskId < b.taskId ? -1 : 1
     })
     return list
-  }, [jobId, outputs, lostTaskIds])
+  }, [jobId, outputs, lostTaskIds, blockNames])
 
   /** GRIB markers aren't grid cards, but still count toward the header tally
    * and block count. */
@@ -227,11 +234,12 @@ export function OutputsView({
           jobId,
           taskId: `__planned__:${blockId}`,
           mimeType: 'application/octet-stream',
+          blockName: blockNames?.[blockId] ?? blockId,
           originalBlock: blockId,
           isAvailable: false,
         }))
     )
-  }, [items.length, plannedBlockIds, jobId, status, storedStats])
+  }, [items.length, plannedBlockIds, jobId, status, storedStats, blockNames])
 
   /** Distinct source blocks in the run. The group-by control only earns its
    * place — and is only shown — when there's more than one. */
@@ -424,7 +432,7 @@ export function OutputsView({
               {pendingSniffItems.map((item) => (
                 <SkeletonOutputCard
                   key={item.taskId}
-                  originalBlock={item.originalBlock}
+                  blockName={item.blockName}
                 />
               ))}
             </div>
@@ -602,7 +610,7 @@ function GroupedGrid({
         {groups.map(([block, groupItems]) => (
           <Section
             key={block}
-            title={block}
+            title={groupItems[0].blockName}
             count={groupItems.length}
             blockId={block}
           >
@@ -649,7 +657,7 @@ function GroupedGrid({
         return (
           <Section
             key={block}
-            title={block}
+            title={blockItems[0].blockName}
             count={blockItems.length}
             blockId={block}
           >
@@ -733,10 +741,7 @@ function FlexGridItem({
           onOpenViewer={onOpenViewer}
         />
       ) : (
-        <SkeletonOutputCard
-          originalBlock={item.originalBlock}
-          isRunning={isRunning}
-        />
+        <SkeletonOutputCard blockName={item.blockName} isRunning={isRunning} />
       )}
     </div>
   )

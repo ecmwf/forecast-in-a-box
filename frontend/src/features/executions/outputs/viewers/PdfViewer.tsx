@@ -181,7 +181,7 @@ export default function PdfViewer({
         onClick={(e) => e.stopPropagation()}
       >
         <span className="truncate font-mono text-sm text-white/80">
-          {item.originalBlock}
+          {item.blockName}
         </span>
         {navIndex && (
           <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-1">

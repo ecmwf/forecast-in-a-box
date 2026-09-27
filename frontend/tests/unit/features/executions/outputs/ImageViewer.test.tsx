@@ -23,6 +23,7 @@ const item = (taskId: string): OutputItem => ({
   taskId,
   mimeType: 'image/png',
   originalBlock: `block-${taskId}`,
+  blockName: `block-${taskId}`,
   isAvailable: true,
 })
 
