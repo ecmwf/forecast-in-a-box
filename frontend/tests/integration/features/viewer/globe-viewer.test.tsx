@@ -15,7 +15,7 @@
  */
 
 import { useState } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -37,10 +37,10 @@ import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
 import i18n from '@/lib/i18n'
-import { useUiStore } from '@/stores/uiStore'
 
 const engineCalls = vi.hoisted(() => ({
   layers: [] as Array<ReadonlyArray<GlobeLayerSpec>>,
+  seeds: [] as Array<boolean>,
   mounted: 0,
   destroyed: 0,
 }))
@@ -69,8 +69,9 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
         camera = next
       },
       whenLoaded: () => Promise.resolve(),
-      morphIn: (_from, to) => {
+      morphIn: (_from, to, _ms, seed) => {
         camera = to
+        engineCalls.seeds.push(seed !== null)
         return Promise.resolve()
       },
       morphOut: () => Promise.resolve(),
@@ -94,10 +95,6 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
 })
 
 let nextPort = 19950
-
-beforeEach(() => {
-  useUiStore.setState({ globeAutoTransition: true })
-})
 
 function Harness({
   portA,
@@ -183,9 +180,15 @@ describe('GeoViewer 3D globe', () => {
     await screen.getByText('2 m temperature').first().click()
 
     await screen.getByRole('button', { name: 'Projection & basemap' }).click()
-    await screen.getByRole('radio', { name: '3D globe' }).click()
-
+    // Opening the menu warms the globe: mounted, hidden, before any choice.
     await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+    const seeds = engineCalls.seeds.length
+    await screen.getByRole('radio', { name: /^3D globe/ }).click()
+
+    // The bend is asked for (the unstyled test map has no pixels to seed).
+    await expect
+      .poll(() => engineCalls.seeds.length, { timeout: 5000 })
+      .toBe(seeds + 1)
     // Server-drawn symbols are squeezed on the globe; the menu says so there.
     await expect
       .element(screen.getByText(/directions are approximate at high latitudes/))
@@ -199,12 +202,12 @@ describe('GeoViewer 3D globe', () => {
       .element(screen.getByRole('button', { name: 'Measure distance' }))
       .toBeDisabled()
 
-    const destroyed = engineCalls.destroyed
     await screen.getByRole('radio', { name: /^Web Mercator/ }).click()
-    await expect.poll(() => engineCalls.destroyed).toBe(destroyed + 1)
+    // Back on the flat map the globe stays warm: hidden, not torn down.
     await expect
       .element(screen.getByTestId('globe-view'))
-      .not.toBeInTheDocument()
+      .toHaveStyle({ opacity: '0' })
+    expect(engineCalls.destroyed).toBe(0)
   })
 
   it('is blocked in single-map comparison modes', async () => {

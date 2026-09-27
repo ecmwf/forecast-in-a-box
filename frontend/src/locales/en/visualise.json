@@ -214,16 +214,16 @@
     "title": "Map projection",
     "popover": "Projection & basemap",
     "merc": "Web Mercator",
-    "geo": "Equirectangular (whole globe)",
+    "geo": "Equirectangular (lat/lon grid)",
     "npole": "Arctic — polar stereographic",
     "spole": "Antarctic — polar stereographic",
     "laea": "Europe — equal-area (LAEA)",
     "globe": "3D globe",
+    "globeCode": "sphere",
     "blockedBy": "{{source}} does not serve this projection",
     "snappedBack": "{{source}} does not serve the {{projection}} projection — back to Web Mercator",
     "blockedMode": "Only one source or side-by-side",
     "snappedBackMode": "The 3D globe shows one source or side-by-side, back to the flat map",
-    "autoGlobe": "Bend into a globe when zooming out",
     "globeSymbolsNote": "On the globe, wind barbs, arrows and labels drawn by the map server are squeezed east–west towards the poles, so their directions are approximate at high latitudes.",
     "short": {
       "merc": "Mercator",
@@ -381,7 +381,7 @@
       },
       "layers": {
         "title": "Layers & opacity",
-        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer. Layers advertising several styles get a Style button: the list shows each style with its legend, and the pane beside it previews the highlighted one on the current view before you pick. Layers advertising model runs (reference time) get a Run select per side — Latest follows the server, or hold one run while the timeline moves. Regional layers get a frame button that zooms to their extent, are only requested while on screen, and Fit to globe (F) frames the active layers together. The pin in that pane makes a style your default for the layer on this server; a style in a shared link still wins."
+        "body": "The right sidebar lists what each source offers — search, filter by availability (All | A | B | A∩B), or narrow pressure levels. Linked mode adds the same parameter to both sides at once; unlink to pick per side. The left sidebar holds active layers with legends and a three-tier opacity: global × per-source × per-layer. Layers advertising several styles get a Style button: the list shows each style with its legend, and the pane beside it previews the highlighted one on the current view before you pick. Layers advertising model runs (reference time) get a Run select per side — Latest follows the server, or hold one run while the timeline moves. Regional layers get a frame button that zooms to their extent, are only requested while on screen, and Fit view (F) frames the active layers together. The pin in that pane makes a style your default for the layer on this server; a style in a shared link still wins."
       },
       "time": {
         "title": "Valid time",
@@ -389,7 +389,7 @@
       },
       "tools": {
         "title": "Tools",
-        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The annotate tool (N) records numbered findings pinned to the map — per panel in side-by-side — and they are baked into exports. The layers icon (P) switches the map projection — Web Mercator, an equirectangular globe, Arctic and Antarctic polar views, an equal-area Europe, or a 3D globe (zooming far out bends the map into it) — and the basemap and its opacity. Data is rendered natively by each server, so a projection is offered only when every active source supports it; web basemaps need Web Mercator, elsewhere the built-in outline map takes over. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
+        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The annotate tool (N) records numbered findings pinned to the map — per panel in side-by-side — and they are baked into exports. The layers icon (P) switches the map projection — Web Mercator, an equirectangular globe, Arctic and Antarctic polar views, an equal-area Europe, or a 3D globe — and the basemap and its opacity. Data is rendered natively by each server, so a projection is offered only when every active source supports it; web basemaps need Web Mercator, elsewhere the built-in outline map takes over. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
       },
       "export": {
         "title": "Export",
@@ -401,7 +401,7 @@
       "revealHint": "Hold {{key}} to see shortcut badges on the toolbar.",
       "sidebars": "Toggle both sidebars",
       "modes": "Switch comparison mode",
-      "fit": "Fit to globe",
+      "fit": "Fit view",
       "projection": "Cycle the map projection",
       "copy": "Copy the view to the clipboard",
       "export": "Export / report",

@@ -262,6 +262,30 @@ describe('globe registration', () => {
     expect(bad).toEqual([])
   })
 
+  it("bends the flat map's own pixels first", async () => {
+    engine.setLayers([spec('solid', 1)])
+    await engine.whenLoaded()
+    const image = document.createElement('canvas')
+    image.width = WIDTH
+    image.height = HEIGHT
+    const ctx = image.getContext('2d')!
+    ctx.fillStyle = 'rgb(255,0,255)'
+    ctx.fillRect(0, 0, WIDTH, HEIGHT)
+    const from = {
+      projection: 'merc' as const,
+      lon: -35,
+      lat: 10,
+      resolution: 20000,
+    }
+    await engine.morphIn(from, CAMERA, 0, { image })
+    // The seed covers the live layer until it fades.
+    expect(
+      near(frame(engine).at(WIDTH / 2, HEIGHT / 2), [255, 0, 255], 2),
+    ).toBe(true)
+    await new Promise((r) => setTimeout(r, 600))
+    expect(near(frame(engine).at(WIDTH / 2, HEIGHT / 2), SOLID, 2)).toBe(true)
+  })
+
   it('shows only server colours when magnified', async () => {
     engine.setLayers([spec('world', 1)])
     await engine.whenLoaded()

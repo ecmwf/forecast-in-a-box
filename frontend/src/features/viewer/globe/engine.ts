@@ -65,6 +65,11 @@ export interface GlobeBasemapSpec extends GlobeOutlineSpec {
 
 export type CameraOrigin = 'user' | 'program'
 
+/** The flat map's pixels at the handoff; the bend starts from them. */
+export interface GlobeSeed {
+  image: HTMLCanvasElement
+}
+
 export interface GlobeEngineEvents {
   onCameraChange: (camera: GlobeCamera, origin: CameraOrigin) => void
   onLayerLoad: (key: string, time: string | null, ok: boolean) => void
@@ -80,11 +85,12 @@ export interface GlobeEngine {
   setCamera: (camera: GlobeCamera) => void
   /** Resolves when layers already set have a first image (or failed). */
   whenLoaded: () => Promise<void>
-  /** Animate from the OL view onto the globe camera. */
+  /** Animate from the OL view onto the globe camera; `seed` bends the flat pixels. */
   morphIn: (
     from: FlatCamera,
     to: GlobeCamera,
     durationMs: number,
+    seed: GlobeSeed | null,
   ) => Promise<void>
   /** Animate from the current globe onto the OL view. */
   morphOut: (to: FlatCamera, durationMs: number) => Promise<void>

@@ -113,7 +113,7 @@ export function deleteMesh(gl: WebGL2RenderingContext, mesh: Mesh): void {
 /** Premultiplied RGBA, nearest at every scale: only colours the server drew. */
 export function createTexture(
   gl: WebGL2RenderingContext,
-  bitmap: ImageBitmap,
+  bitmap: TexImageSource,
 ): WebGLTexture {
   const texture = gl.createTexture()
   gl.bindTexture(gl.TEXTURE_2D, texture)

@@ -18,6 +18,7 @@ import { PointerReadoutBadge } from '../components/PointerReadoutBadge'
 import { CompareSlotTag } from '../geo/CompareSlotTag'
 import { LoadErrorBadge, erroredTitles } from '../geo/SingleMapView'
 import { LoupeOverlay } from '../geo/LoupeOverlay'
+import { isWorldBbox } from '../wms-capabilities'
 import { GLOBE_ENGINE } from './engine-entry'
 import { globeCameraForBbox, globeFitZoom } from './globe-camera'
 import { globeLayerSpecs } from './globe-layer-specs'
@@ -30,6 +31,7 @@ import type {
 } from '../geo/types'
 import type { GlobeBasemapSpec, GlobeEngine, ViewportDraw } from './engine'
 import type { SharedGlobeCamera } from './globe-camera'
+import { cn } from '@/lib/utils'
 
 type CrossPosition = { x: number; y: number } | null
 
@@ -113,7 +115,8 @@ export function GlobeView({
     onRegisterFit(() => {
       const engine = firstEngine()
       if (!engine) return
-      if (bbox) return fitBbox(bbox)
+      // Regional layers turn the globe to them; a world extent only resets the zoom.
+      if (bbox && !isWorldBbox(bbox)) return fitBbox(bbox)
       const [w, h] = engine.size()
       camera.set(
         { ...camera.get(), zoom: globeFitZoom(w, h) },
@@ -173,7 +176,10 @@ export function GlobeView({
   return (
     <div
       data-testid="globe-view"
-      className="absolute inset-0 z-30 bg-background transition-opacity duration-200 motion-reduce:transition-none"
+      className={cn(
+        'absolute inset-0 z-30 bg-background transition-opacity duration-200 motion-reduce:transition-none',
+        !visible && 'pointer-events-none',
+      )}
       style={{ opacity: visible ? 1 : 0 }}
     >
       {side ? (
@@ -377,7 +383,8 @@ function GlobePanel({
           {pointer && (
             <PointerReadoutBadge
               pointer={pointer}
-              crs={t('projections.globe')}
+              label={t('projections.short.globe')}
+              crs={t('projections.globeCode')}
               metres={false}
             />
           )}

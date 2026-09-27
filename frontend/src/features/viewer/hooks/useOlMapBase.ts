@@ -123,7 +123,7 @@ export function useOlMapBase(
     // Skip while smaller than the fit padding — the fit would go negative.
     const size = map.getSize()
     if (!size || size[0] <= 96 || size[1] <= 96) return
-    // Forced ("Fit to globe") = WMS bbox; unforced = the projection's home.
+    // Forced ("Fit view") = WMS bbox; unforced = the projection's home.
     olView.set(AUTOFIT_KEY, true, true)
     const extent = homeExtentFor(
       viewerProjectionOf(olView),

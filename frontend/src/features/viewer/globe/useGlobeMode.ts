@@ -10,7 +10,7 @@
 
 /** Flat ↔ globe handoff: flat → entering → globe → leaving → flat. */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { getViewerProjection, viewerProjectionOf } from '../projections'
 import {
@@ -18,25 +18,24 @@ import {
   createSharedGlobeCamera,
   flatCameraOf,
   flatKindOf,
-  globeExitZoom,
   globeFitZoom,
 } from './globe-camera'
 import type { RefObject } from 'react'
 import type View from 'ol/View'
 import type { FlatProjectionId } from '../projection-ids'
+import type { CaptureResult } from '../geo/types'
 import type { GlobeCamera, GlobeEngine } from './engine'
 import type { SharedGlobeCamera } from './globe-camera'
 
 export type GlobePhase = 'flat' | 'entering' | 'globe' | 'leaving'
 
-const MORPH_MS = 700
+/** The wrap; the engine flies to the wrap scale first. */
+const MORPH_MS = 500
 /** Globe overlay fade (CSS) — keep in step with GlobeView. */
 export const GLOBE_FADE_MS = 200
-/** Longest wait for first textures before bending anyway. */
-const FIRST_LOAD_CAP_MS = 1500
 const ENGINE_READY_CAP_MS = 10000
-/** Quiet time after a transition before auto-enter may fire again. */
-const AUTO_LOCKOUT_MS = 600
+/** Longest wait for the flat map's pixels; without them the bend starts bare. */
+const SEED_CAP_MS = 1000
 
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => window.setTimeout(resolve, ms))
@@ -53,8 +52,6 @@ export interface GlobeMode {
   leave: (target: FlatProjectionId, instant?: boolean) => void
   /** Drop back to the flat map now (engine failure, lost context). */
   fail: () => void
-  /** Auto-enter may fire (not mid-transition, not just after one). */
-  autoReady: () => boolean
 }
 
 export function useGlobeMode({
@@ -62,10 +59,10 @@ export function useGlobeMode({
   onFlatView,
   panelCount,
   reducedMotion,
-  autoExit,
   exitTarget,
   initialCamera,
   onFailure,
+  captureFlat,
 }: {
   viewRef: RefObject<View>
   /** Adopt a new flat View (GeoViewer's view + projection state). */
@@ -73,13 +70,14 @@ export function useGlobeMode({
   /** Globe panels the current layout mounts (1 or 2). */
   panelCount: number
   reducedMotion: boolean
-  /** Zooming in past the flat-looking point leaves to `exitTarget`. */
-  autoExit: boolean
+  /** Flat projection to leave to. */
   exitTarget: FlatProjectionId
   /** Start on the globe (URL restore); null starts flat. */
   initialCamera: GlobeCamera | null
   /** Engines never came up while entering. */
   onFailure: (err: unknown) => void
+  /** The flat map's pixels per slot: the bend starts from them. */
+  captureFlat: () => Promise<ReadonlyArray<CaptureResult>>
 }): GlobeMode {
   const [phase, setPhase] = useState<GlobePhase>(
     initialCamera ? 'globe' : 'flat',
@@ -94,18 +92,31 @@ export function useGlobeMode({
   const readyWaitersRef = useRef<Array<() => void>>([])
   const panelCountRef = useRef(panelCount)
   panelCountRef.current = panelCount
-  const lastSettledRef = useRef(0)
   const runRef = useRef(0)
 
   const registerEngine = useCallback(
     (panel: string, engine: GlobeEngine | null) => {
-      if (engine) enginesRef.current.set(panel, engine)
-      else enginesRef.current.delete(panel)
+      if (engine) {
+        enginesRef.current.set(panel, engine)
+        // Warm: rest the hidden globe where the bend will end, so its tiles load.
+        if (phaseRef.current === 'flat') {
+          const flat = flatCameraOf(viewRef.current, 'merc')
+          const [w, h] = engine.size()
+          if (flat)
+            camera.set(
+              { lon: flat.lon, lat: flat.lat, zoom: globeFitZoom(w, h) },
+              'program',
+              'warm',
+            )
+        }
+      } else {
+        enginesRef.current.delete(panel)
+      }
       if (enginesRef.current.size >= panelCountRef.current) {
         for (const resolve of readyWaitersRef.current.splice(0)) resolve()
       }
     },
-    [],
+    [camera, viewRef],
   )
 
   const engines = useCallback(
@@ -122,10 +133,7 @@ export function useGlobeMode({
     [],
   )
 
-  const settle = useCallback((next: GlobePhase) => {
-    lastSettledRef.current = performance.now()
-    setPhase(next)
-  }, [])
+  const settle = useCallback((next: GlobePhase) => setPhase(next), [])
 
   const onFlatViewRef = useRef(onFlatView)
   onFlatViewRef.current = onFlatView
@@ -133,18 +141,21 @@ export function useGlobeMode({
   onFailureRef.current = onFailure
   const reducedRef = useRef(reducedMotion)
   reducedRef.current = reducedMotion
+  const captureFlatRef = useRef(captureFlat)
+  captureFlatRef.current = captureFlat
 
   const enter = useCallback(() => {
     if (phaseRef.current !== 'flat') return
     const view = viewRef.current
     const flatId = viewerProjectionOf(view).id
-    const from = flatCameraOf(view, flatId)
-    if (!from) return
+    const start = flatCameraOf(view, flatId)
+    if (!start) return
     const run = ++runRef.current
     phaseRef.current = 'entering'
     setPhase('entering')
     void (async () => {
       try {
+        const from = start
         const list = await engines()
         if (run !== runRef.current) return
         const [w, h] = list[0].size()
@@ -153,16 +164,29 @@ export function useGlobeMode({
           lat: Math.max(-85, Math.min(85, from.lat)),
           zoom: globeFitZoom(w, h),
         }
-        camera.set(target, 'program', 'mode')
-        await Promise.race([
-          Promise.all(list.map((e) => e.whenLoaded())),
-          sleep(FIRST_LOAD_CAP_MS),
+        const morph = flatKindOf(flatId) !== null && !reducedRef.current
+        const captures = await Promise.race([
+          captureFlatRef.current().catch(() => []),
+          sleep(SEED_CAP_MS).then((): Array<CaptureResult> => []),
         ])
         if (run !== runRef.current) return
+        camera.set(target, 'program', 'mode')
         setOverlayVisible(true)
-        const morph = flatKindOf(flatId) !== null && !reducedRef.current
+        const panels = [...enginesRef.current]
         await Promise.all(
-          list.map((e) => e.morphIn(from, target, morph ? MORPH_MS : 0)),
+          panels.map(([panel, e]) => {
+            // One capture and one panel pair up whatever the slot says.
+            const capture =
+              captures.length === 1 && panels.length === 1
+                ? captures[0]
+                : captures.find((c) => c.slot === panel)
+            return e.morphIn(
+              from,
+              target,
+              morph ? MORPH_MS : 0,
+              capture ? { image: capture.canvas } : null,
+            )
+          }),
         )
         if (run !== runRef.current) return
         settle('globe')
@@ -208,22 +232,10 @@ export function useGlobeMode({
     [camera, settle],
   )
 
-  // Auto exit: zoomed in until the surface reads as flat.
   const leaveRef = useRef(leave)
   leaveRef.current = leave
   const exitTargetRef = useRef(exitTarget)
   exitTargetRef.current = exitTarget
-  useEffect(() => {
-    if (!autoExit) return
-    return camera.subscribe((cam, origin) => {
-      if (origin !== 'user' || phaseRef.current !== 'globe') return
-      const engine = enginesRef.current.values().next().value
-      if (!engine) return
-      const [w, h] = engine.size()
-      if (cam.zoom >= globeExitZoom(w, h))
-        leaveRef.current(exitTargetRef.current)
-    })
-  }, [autoExit, camera])
 
   const fail = useCallback(() => {
     if (phaseRef.current === 'globe') {
@@ -237,13 +249,6 @@ export function useGlobeMode({
     settle('flat')
   }, [settle])
 
-  const autoReady = useCallback(
-    () =>
-      phaseRef.current === 'flat' &&
-      performance.now() - lastSettledRef.current > AUTO_LOCKOUT_MS,
-    [],
-  )
-
   return {
     phase,
     overlayVisible,
@@ -252,6 +257,5 @@ export function useGlobeMode({
     enter,
     leave,
     fail,
-    autoReady,
   }
 }

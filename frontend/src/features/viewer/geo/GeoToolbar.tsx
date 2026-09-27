@@ -20,10 +20,10 @@ import {
   Copy,
   Download,
   Eraser,
-  Globe2,
   Layers,
   MessageSquarePlus,
   Ruler,
+  Scan,
   SquareDashed,
   Upload,
   ZoomIn,
@@ -141,7 +141,7 @@ export function GeoToolbar({
   projections,
   onProjectionChange,
   globeActive = false,
-  globeAuto = null,
+  onGlobeIntent,
 }: {
   /** Single-source: comparison modes + link toggle hidden. */
   solo?: boolean
@@ -184,11 +184,8 @@ export function GeoToolbar({
   onProjectionChange: (id: ProjectionId) => void
   /** On the 3D globe: map-click tools are unavailable. */
   globeActive?: boolean
-  /** Auto-bend setting; null when the globe is not offered. */
-  globeAuto?: {
-    enabled: boolean
-    onChange: (enabled: boolean) => void
-  } | null
+  /** The projection menu opened and the globe is offered: warm it up. */
+  onGlobeIntent?: () => void
 }) {
   const { t } = useTranslation('visualise')
   const annotationFileRef = useRef<HTMLInputElement>(null)
@@ -322,9 +319,9 @@ export function GeoToolbar({
             aria-label={tExec('lens.fitGlobe')}
           >
             <KeyBadge label={keyLabel(COMPARE_KEYS.fit)} show={reveal} />
-            <Globe2 className="h-4 w-4" />
+            <Scan className="h-4 w-4" />
           </Button>
-          <Popover>
+          <Popover onOpenChange={(open) => open && onGlobeIntent?.()}>
             {/* Reads the current projection so the control is findable. */}
             <PopoverTrigger
               render={
@@ -394,16 +391,6 @@ export function GeoToolbar({
                   )
                 })}
               </div>
-              {globeAuto && (
-                <label className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm">
-                  {t('projections.autoGlobe')}
-                  <Switch
-                    size="sm"
-                    checked={globeAuto.enabled}
-                    onCheckedChange={globeAuto.onChange}
-                  />
-                </label>
-              )}
               {globeActive && (
                 <P className="px-2 pb-1.5 text-xs text-muted-foreground">
                   {t('projections.globeSymbolsNote')}

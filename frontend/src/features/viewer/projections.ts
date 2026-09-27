@@ -54,7 +54,7 @@ export interface ViewerProjection {
   extent: Extent
   /** Geographic coverage [W, S, E, N] — graticule + bbox-fit guard. */
   worldExtent: Extent
-  /** "Fit to globe" target, projection units. */
+  /** "Fit view" target, projection units. */
   homeExtent: Extent
   /** View zoom floor. */
   minZoom: number

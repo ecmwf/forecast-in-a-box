@@ -12,6 +12,11 @@
 
 import { flatClipTransform, globeRadiusPx } from './globe-camera'
 import {
+  MERCATOR_WORLD_M,
+  lonLatToEquirectUnit,
+  lonLatToMercatorUnit,
+} from './sphere-math'
+import {
   layerRegion,
   regionGetMapUrl,
   regionScale,
@@ -45,6 +50,7 @@ import type {
   GlobeEngineEvents,
   GlobeLayerSpec,
   GlobeOutlineSpec,
+  GlobeSeed,
   ViewportDraw,
 } from './engine'
 import { createLogger } from '@/lib/logger'
@@ -95,6 +101,13 @@ interface LayerEntry {
   settled: boolean
 }
 
+interface SeedEntry {
+  pending: HTMLCanvasElement | null
+  texture: WebGLTexture | null
+  box: Vec4
+  opacity: number
+}
+
 interface LineGroup {
   geometry: Geometry
   color: Vec4
@@ -123,6 +136,8 @@ function cssColor(css: string): Vec4 {
 export const easeInOutCubic = (p: number) =>
   p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2
 
+export const easeOutCubic = (p: number) => 1 - (1 - p) ** 3
+
 /** rAF tween of `step(0→1)`; resolves even where rAF is throttled. */
 export function tween(
   durationMs: number,
@@ -133,7 +148,8 @@ export function tween(
     return Promise.resolve()
   }
   return new Promise((resolve) => {
-    const start = performance.now()
+    // The clock starts on the first drawn frame, not on the call.
+    let start = -1
     let done = false
     const finish = () => {
       if (done) return
@@ -143,14 +159,33 @@ export function tween(
     }
     const frame = (now: number) => {
       if (done) return
+      if (start < 0) start = now
       const p = Math.min(1, (now - start) / durationMs)
       if (p >= 1) return finish()
       step(p)
       requestAnimationFrame(frame)
     }
     requestAnimationFrame(frame)
-    window.setTimeout(finish, durationMs + 500)
+    window.setTimeout(finish, durationMs + 1500)
   })
+}
+
+/** The viewport of a flat camera in unit flat-world coordinates. */
+function flatViewportBox(flat: FlatCamera, w: number, h: number): Vec4 | null {
+  let world: [number, number]
+  let c: [number, number]
+  if (flat.projection === 'merc') {
+    world = [MERCATOR_WORLD_M, MERCATOR_WORLD_M]
+    c = lonLatToMercatorUnit(flat.lon, flat.lat)
+  } else if (flat.projection === 'geo') {
+    world = [360, 180]
+    c = lonLatToEquirectUnit(flat.lon, flat.lat)
+  } else {
+    return null
+  }
+  const bw = (w * flat.resolution) / world[0]
+  const bh = (h * flat.resolution) / world[1]
+  return [c[0] - bw / 2, c[1] - bh / 2, bw, bh]
 }
 
 /** Draw a WebGL canvas region (CSS px) into a 2D context, right after rendering. */
@@ -190,11 +225,21 @@ export interface GlobeContent {
   uniforms: MorphUniforms
   setLayers: (specs: ReadonlyArray<GlobeLayerSpec>) => void
   setOutline: (spec: GlobeOutlineSpec | null) => void
+  /** Bend the flat map's own pixels; null drops them. */
+  setSeed: (
+    seed: GlobeSeed | null,
+    flat: FlatCamera,
+    w: number,
+    h: number,
+  ) => void
+  setSeedOpacity: (opacity: number) => void
   whenLoaded: () => Promise<void>
   /** Refetch sharper textures once the camera rests. */
   scheduleUpgrade: () => void
   /** Draw everything with the current uniforms into `gl` (host-owned state). */
   draw: (gl: WebGL2RenderingContext) => void
+  /** Draw the seed image (above the host's own layers). */
+  drawSeed: (gl: WebGL2RenderingContext) => void
   dispose: () => void
 }
 
@@ -220,6 +265,7 @@ export function createGlobeContent({
   let res: GlResources | null = null
   let baseColor = BASE_COLOR.light
   let lineGroups: Array<LineGroup> = []
+  let seed: SeedEntry | null = null
   let outline: GlobeOutlineSpec | null = null
   let inFlight = 0
   let upgradeTimer = 0
@@ -330,6 +376,11 @@ export function createGlobeContent({
     dropTexture(entry)
   }
 
+  function clearSeed() {
+    if (seed?.texture && res) res.gl.deleteTexture(seed.texture)
+    seed = null
+  }
+
   function clearLines() {
     for (const group of lineGroups) {
       if (group.mesh && res) deleteMesh(res.gl, group.mesh)
@@ -376,6 +427,7 @@ export function createGlobeContent({
       // A new context: the old resources died with the old one.
       for (const entry of layers.values()) entry.texture = null
       for (const group of lineGroups) group.mesh = null
+      if (seed) seed.texture = null
     }
     res = {
       gl,
@@ -402,9 +454,7 @@ export function createGlobeContent({
     gl.uniform3fv(p.uniforms.uCamModel, uniforms.camModel)
   }
 
-  function draw(gl: WebGL2RenderingContext) {
-    if (disposed) return
-    const r = attach(gl)
+  function setState(gl: WebGL2RenderingContext) {
     gl.disable(gl.DEPTH_TEST)
     gl.disable(gl.CULL_FACE)
     gl.disable(gl.STENCIL_TEST)
@@ -415,6 +465,34 @@ export function createGlobeContent({
       gl.ONE,
       gl.ONE_MINUS_SRC_ALPHA,
     )
+  }
+
+  function drawSeed(gl: WebGL2RenderingContext) {
+    if (disposed || !seed || seed.opacity <= 0) return
+    const r = attach(gl)
+    setState(gl)
+    const layer = r.layerProgram
+    setShared(gl, layer)
+    if (seed.pending) {
+      seed.texture = createTexture(gl, seed.pending)
+      seed.pending = null
+    }
+    if (!seed.texture) return
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, seed.texture)
+    gl.uniform1i(layer.uniforms.uTex, 0)
+    gl.uniform1f(layer.uniforms.uFlatUv, 1)
+    gl.uniform1f(layer.uniforms.uOpacity, seed.opacity)
+    gl.uniform4fv(layer.uniforms.uBox, seed.box)
+    drawMesh(gl, r.surface)
+    gl.bindTexture(gl.TEXTURE_2D, null)
+    gl.useProgram(null)
+  }
+
+  function draw(gl: WebGL2RenderingContext) {
+    if (disposed) return
+    const r = attach(gl)
+    setState(gl)
 
     // Base fill only shows once round; while flat, OL shows no fill there.
     const color = r.colorProgram
@@ -429,6 +507,7 @@ export function createGlobeContent({
     setShared(gl, layer)
     gl.activeTexture(gl.TEXTURE0)
     gl.uniform1i(layer.uniforms.uTex, 0)
+    gl.uniform1f(layer.uniforms.uFlatUv, 0)
     const ordered = [...layers.values()].sort(
       (a, b) => a.spec.zIndex - b.spec.zIndex,
     )
@@ -510,6 +589,19 @@ export function createGlobeContent({
       buildOutline()
     },
 
+    setSeed: (next, flat, w, h) => {
+      clearSeed()
+      const box = flatViewportBox(flat, w, h)
+      if (next && box) {
+        seed = { pending: next.image, texture: null, box, opacity: 1 }
+      }
+      if (!disposed) invalidate()
+    },
+
+    setSeedOpacity: (opacity) => {
+      if (seed) seed.opacity = opacity
+    },
+
     whenLoaded: () =>
       new Promise<void>((resolve) => {
         loadWaiters.push(resolve)
@@ -520,6 +612,8 @@ export function createGlobeContent({
 
     draw,
 
+    drawSeed,
+
     dispose: () => {
       disposed = true
       window.clearTimeout(upgradeTimer)
@@ -527,6 +621,7 @@ export function createGlobeContent({
       layers.clear()
       outline = null
       clearLines()
+      clearSeed()
       if (res) {
         deleteMesh(res.gl, res.surface)
         res.gl.deleteProgram(res.layerProgram.program)

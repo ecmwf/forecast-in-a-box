@@ -24,6 +24,7 @@ import {
   createGlobeContent,
   drawCanvasViewport,
   easeInOutCubic,
+  easeOutCubic,
   tween,
 } from './globe-content'
 import { EARTH_RADIUS_M, MERCATOR_WORLD_M } from './sphere-math'
@@ -40,6 +41,17 @@ import type {
 const MAX_ZOOM = GLOBE_ENGINE.maxZoom
 /** The wheel gesture that bent the map in is not globe input. */
 const WHEEL_SETTLE_MS = 400
+/** Fly to the wrap scale (world width = globe circumference) before wrapping. */
+const FLY_MS = 400
+/** Longest hold of the seed image after the bend while live layers load. */
+const SEED_HOLD_CAP_MS = 4000
+const SEED_FADE_MS = 250
+const EMPTY_FLAT: FlatCamera = {
+  projection: 'merc',
+  lon: 0,
+  lat: 0,
+  resolution: 1,
+}
 
 // Same-origin module worker: the CSP has no blob: worker source.
 setWorkerUrl(workerUrl)
@@ -150,6 +162,7 @@ function scaleOpacity(value: unknown, f: number): unknown {
 
 interface StyleLayerState {
   id: string
+  type: string
   visibility: 'visible' | 'none'
   paint: Array<[PaintProp, unknown]>
 }
@@ -171,6 +184,10 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   let attribution: AttributionControl | null = null
   /** Our clip-space bend runs (non-Mercator flat); else MapLibre bends. */
   let ownBend = false
+  /** Labels off from the unbend until the next bend settles. */
+  let labelsHidden = false
+  /** Carto layers spike at the poles mid-bend: off while bending. */
+  let bending = false
   let globeness = 1
   let styleReady = false
   const detach: Array<() => void> = []
@@ -262,16 +279,13 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       if (map !== m || styleUrl !== url) return
       styleReady = true
       setGlobeness(m, globeness)
-      // Data under the trailing label band; roads and borders sit above early labels.
-      const layers = m.getStyle().layers
-      let band = layers.length
-      while (band > 0 && layers[band - 1].type === 'symbol') band--
-      if (!m.getLayer(layer.id)) m.addLayer(layer, layers[band]?.id)
+      addLayers(m)
       styleLayers = m
         .getStyle()
         .layers.filter((l) => l.id !== layer.id)
         .map((l) => ({
           id: l.id,
+          type: l.type,
           visibility:
             m.getLayoutProperty(l.id, 'visibility') === 'none'
               ? 'none'
@@ -296,7 +310,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     if (wanted && styleLayers.length === 0) return
     // MapLibre's basemap follows its own bend, not ours: outline then.
     const vector = wanted !== null && !ownBend
-    const key = `${vector}|${basemap.theme}|${basemap.opacity}`
+    const key = `${vector}|${basemap.theme}|${basemap.opacity}|${labelsHidden}|${bending}`
     if (key === shownKey) return
     shownKey = key
     content.setOutline(
@@ -305,8 +319,9 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     const f = basemap.opacity
     for (const l of styleLayers) {
       m.setLayoutProperty(l.id, 'visibility', vector ? l.visibility : 'none')
+      const lf = bending || (labelsHidden && l.type === 'symbol') ? 0 : f
       for (const [prop, value] of l.paint) {
-        const next = f === 1 ? value : scaleOpacity(value, f)
+        const next = lf === 1 ? value : scaleOpacity(value, lf)
         m.setPaintProperty(l.id, prop, next as PaintValue)
       }
     }
@@ -321,48 +336,103 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
 
   function animate(durationMs: number, step: (p: number) => void) {
     animating = true
+    bending = true
     setInteractive(false)
     syncBasemap()
     return tween(durationMs, (p) => {
       step(p)
+      if (bending && p >= 0.97) {
+        bending = false
+        syncBasemap()
+      }
       // Draw in this frame, not MapLibre's next one.
       map?.redraw()
     }).finally(() => {
       animating = false
+      bending = false
       setInteractive(true)
       syncBasemap()
     })
   }
 
   const inverse = new Float64Array(16)
+  type RenderArgs = Parameters<NonNullable<CustomLayerInterface['render']>>[1]
+  function applyProjection(pd: RenderArgs['defaultProjectionData']) {
+    if (!content) return
+    const u = content.uniforms
+    // mainMatrix projects the unit sphere while MapLibre renders a globe.
+    u.sphereMatrix.set(pd.mainMatrix)
+    if (!ownBend || pd.projectionTransition > 0) {
+      // Eye = the point sent to w = 0: column z of the inverse.
+      const inv = invertMat4(pd.mainMatrix, inverse)
+      if (inv && inv[11] !== 0) {
+        u.camModel = [inv[8] / inv[11], inv[9] / inv[11], inv[10] / inv[11]]
+      }
+    }
+    if (ownBend && flat) {
+      const [w, h] = size()
+      applyFlatUniforms(u, flat, w, h)
+    } else {
+      // Follow MapLibre's blend: fallbackMatrix takes Mercator 0..1.
+      u.flatKind = 1
+      u.flatMatrix.set(pd.fallbackMatrix)
+      u.morph = pd.projectionTransition
+    }
+  }
   const layer: CustomLayerInterface = {
     id: 'fiab-globe',
     type: 'custom',
     renderingMode: '3d',
     render: (gl, args) => {
       if (!content || !map) return
-      const u = content.uniforms
-      const pd = args.defaultProjectionData
-      // mainMatrix projects the unit sphere while MapLibre renders a globe.
-      u.sphereMatrix.set(pd.mainMatrix)
-      if (!ownBend || pd.projectionTransition > 0) {
-        // Eye = the point sent to w = 0: column z of the inverse.
-        const inv = invertMat4(pd.mainMatrix, inverse)
-        if (inv && inv[11] !== 0) {
-          u.camModel = [inv[8] / inv[11], inv[9] / inv[11], inv[10] / inv[11]]
-        }
-      }
-      if (ownBend && flat) {
-        const [w, h] = size()
-        applyFlatUniforms(u, flat, w, h)
-      } else {
-        // Follow MapLibre's blend: fallbackMatrix takes Mercator 0..1.
-        u.flatKind = 1
-        u.flatMatrix.set(pd.fallbackMatrix)
-        u.morph = pd.projectionTransition
-      }
+      applyProjection(args.defaultProjectionData)
       content.draw(gl)
     },
+  }
+  /** The flat map's pixels, above everything, until the live globe has loaded. */
+  const seedLayer: CustomLayerInterface = {
+    id: 'fiab-globe-seed',
+    type: 'custom',
+    renderingMode: '3d',
+    render: (gl, args) => {
+      if (!content || !map) return
+      applyProjection(args.defaultProjectionData)
+      content.drawSeed(gl)
+    },
+  }
+  function addLayers(m: MapLibreMap) {
+    // Data under the trailing label band; roads and borders sit above early labels.
+    const layers = m.getStyle().layers
+    let band = layers.length
+    while (band > 0 && layers[band - 1].type === 'symbol') band--
+    if (!m.getLayer(layer.id)) m.addLayer(layer, layers[band]?.id)
+    if (!m.getLayer(seedLayer.id)) m.addLayer(seedLayer)
+  }
+
+  /** Hold the seed until the live layers and tiles are in, then fade it. */
+  function releaseSeed() {
+    const c = content
+    if (!c) return
+    const loaded = Promise.all([
+      c.whenLoaded(),
+      new Promise<void>((resolve) => {
+        if (!map || map.loaded()) resolve()
+        else map.once('idle', () => resolve())
+      }),
+    ])
+    void Promise.race([
+      loaded,
+      new Promise<void>((r) => window.setTimeout(r, SEED_HOLD_CAP_MS)),
+    ])
+      .then(() =>
+        tween(SEED_FADE_MS, (p) => {
+          content?.setSeedOpacity(1 - p)
+          map?.triggerRepaint()
+        }),
+      )
+      .then(() => {
+        if (content && flat === null) content.setSeed(null, EMPTY_FLAT, 1, 1)
+      })
   }
 
   return {
@@ -412,7 +482,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       )
       await new Promise<void>((resolve) => m.once('load', () => resolve()))
       styleReady = true
-      m.addLayer(layer)
+      addLayers(m)
       const [w, h] = size()
       // Bound the neutral zoom via MapLibre's zoom at the current latitude.
       const offset = measuredZoom(m) - m.getZoom()
@@ -446,15 +516,20 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         }),
       ]).then(() => undefined),
 
-    morphIn: (from, to, durationMs) => {
+    morphIn: (from, to, durationMs, seed) => {
       const m = map
       if (!m || !content) return Promise.resolve()
       const u = content.uniforms
+      const [sw, sh] = size()
+      content.setSeed(seed, from, sw, sh)
       const settle = () => {
         wheelLockUntil = performance.now() + WHEEL_SETTLE_MS
         map?.scrollZoom.disable()
         settleWheel()
         content?.scheduleUpgrade()
+        labelsHidden = false
+        syncBasemap()
+        releaseSeed()
       }
       if (from.projection !== 'merc') {
         // MapLibre has no equirectangular: our bend over its globe.
@@ -464,25 +539,34 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         jumpTo(m, to)
         u.morph = 0
         return animate(durationMs, (p) => {
-          u.morph = easeInOutCubic(p)
+          u.morph = easeOutCubic(p)
         }).then(() => {
           ownBend = false
+          flat = null
           syncBasemap()
           settle()
         })
       }
-      // MapLibre bends itself: starts as the OL Mercator frame.
+      // Fly from the OL Mercator frame to the wrap scale, then wrap at fixed camera.
       flat = null
       const minZoom = m.getMinZoom()
       m.setMinZoom(-2)
       const start = { ...from, zoom: mercatorZoom(from.resolution) }
       const end = { ...to, lon: nearLon(to.lon, from.lon), zoom: globeZoom(to) }
+      const mid = { ...start, zoom: end.zoom }
+      const total = durationMs > 0 ? FLY_MS + durationMs : 0
       setGlobeness(m, 0)
       place(m, start)
-      return animate(durationMs, (p) => {
-        const e = easeInOutCubic(p)
+      return animate(total, (p) => {
+        const t = p * total
+        if (total > 0 && t < FLY_MS) {
+          place(m, lerpCam(start, mid, easeInOutCubic(t / FLY_MS)))
+          return
+        }
+        const e =
+          total > 0 ? easeOutCubic(Math.min(1, (t - FLY_MS) / durationMs)) : 1
         setGlobeness(m, e)
-        place(m, lerpCam(start, end, e))
+        place(m, lerpCam(mid, end, e))
       }).then(() => {
         jumpTo(m, to)
         m.setMinZoom(minZoom)
@@ -494,6 +578,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       const m = map
       if (!m || !content) return Promise.resolve()
       const u = content.uniforms
+      content.setSeed(null, to, 1, 1)
       if (to.projection !== 'merc') {
         ownBend = true
         flat = to
@@ -503,6 +588,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       }
       // Ends as the OL Mercator frame the handoff reveals.
       flat = null
+      labelsHidden = true
       m.setMinZoom(-2)
       const c = m.getCenter()
       const start = { lon: c.lng, lat: c.lat, zoom: m.getZoom() }

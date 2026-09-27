@@ -61,7 +61,7 @@ describe('STORAGE_KEYS', () => {
 
 describe('STORE_VERSIONS', () => {
   it('has UI store version', () => {
-    expect(STORE_VERSIONS.ui).toBe(11)
+    expect(STORE_VERSIONS.ui).toBe(12)
   })
 
   it('has config store version', () => {

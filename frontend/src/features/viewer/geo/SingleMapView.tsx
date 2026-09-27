@@ -787,6 +787,7 @@ export function SingleMapView({
       {pointer && (
         <PointerReadoutBadge
           pointer={pointer}
+          label={t(`projections.short.${viewerProjectionOf(view).id}`)}
           crs={view.getProjection().getCode()}
           metres={viewerProjectionOf(view).gridReadout}
         />

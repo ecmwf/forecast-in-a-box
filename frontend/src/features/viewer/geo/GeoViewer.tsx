@@ -61,7 +61,7 @@ import {
 import { GLOBE_ENGINE } from '../globe/engine-entry'
 import { flatKindOf, panGlobeCamera } from '../globe/globe-camera'
 import { useGlobeMode } from '../globe/useGlobeMode'
-import { useZoomOutPastWorld } from '../globe/useZoomOutPastWorld'
+import { compositeMapToCanvas } from '../map-export'
 import { disableGlobe, supportsGlobe } from '../globe/webgl-support'
 import {
   activeLayersBbox,
@@ -109,6 +109,7 @@ import type { BboxAxisOrder } from '../projections'
 import type { ProjectionOption } from './GeoToolbar'
 import type { SourceSlot } from './layer-pairing'
 import type {
+  CaptureResult,
   CompareMapSource,
   CompareMode,
   CompareModeOptions,
@@ -142,6 +143,18 @@ import { createLogger } from '@/lib/logger'
 import { useUiStore } from '@/stores/uiStore'
 
 const log = createLogger('GeoViewer')
+
+/** The flat panels' pixels now (DOM order a, b): the bend starts from them. */
+function snapshotFlatMaps(area: HTMLElement | null): Array<CaptureResult> {
+  if (!area) return []
+  const viewports = [...area.querySelectorAll<HTMLElement>('.ol-viewport')]
+  return viewports.flatMap((viewport, i) => {
+    const canvas = compositeMapToCanvas(viewport.parentElement ?? viewport)
+    return canvas
+      ? [{ slot: i === 0 ? 'a' : 'b', label: '', timeLabel: null, canvas }]
+      : []
+  })
+}
 
 // Lazy: the globe chunk loads only when the globe is first shown.
 const GlobeView = lazy(() =>
@@ -278,8 +291,6 @@ export function GeoViewer({
   const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
 
   // -------- 3D globe (flat ↔ globe handoff) --------
-  const globeAutoTransition = useUiStore((s) => s.globeAutoTransition)
-  const setGlobeAutoTransition = useUiStore((s) => s.setGlobeAutoTransition)
   const reducedMotion = useMedia('(prefers-reduced-motion: reduce)')
   const globePanels = hasB && focusSlot === null && mode === 'side' ? 2 : 1
   // Back from the globe: the flat map it bent from, else Mercator.
@@ -290,7 +301,6 @@ export function GeoViewer({
     onFlatView: adoptFlatView,
     panelCount: globePanels,
     reducedMotion,
-    autoExit: globeAutoTransition,
     exitTarget: globeExitTarget,
     initialCamera: startOnGlobe
       ? (initialViewRef.current?.camera ?? { lon: 10, lat: 30, zoom: 1.5 })
@@ -299,7 +309,12 @@ export function GeoViewer({
       log.error('Globe failed to start', { error: err })
       showToast.error(t('globe.failed'))
     },
+    captureFlat: () => Promise.resolve(snapshotFlatMaps(mapAreaRef.current)),
   })
+  const mapAreaRef = useRef<HTMLDivElement>(null)
+  // Opening the projection menu mounts the hidden globe: chunk, style, tiles.
+  const [globeWarm, setGlobeWarm] = useState(false)
+  const warmGlobe = useCallback(() => setGlobeWarm(true), [])
   const globePhaseRef = useRef(globe.phase)
   globePhaseRef.current = globe.phase
   const onGlobeFailure = useCallback(
@@ -1150,23 +1165,8 @@ export function GeoViewer({
         }
       : { kind: 'outline', theme: resolvedTheme, opacity: basemapOpacity }
   }, [availableBasemaps, effectiveBasemapId, resolvedTheme, basemapOpacity])
-  // Zooming out past the whole world bends the flat map into the globe.
-  const mapAreaRef = useRef<HTMLDivElement>(null)
-  const globeOption = projectionOptions.find((p) => p.id === 'globe')
-  const enterGlobe = globe.enter
-  const globeAutoReady = globe.autoReady
-  useZoomOutPastWorld(mapAreaRef, viewRef, {
-    enabled:
-      globeAutoTransition &&
-      globe.phase === 'flat' &&
-      globeOption !== undefined &&
-      globeOption.blockedBy === null &&
-      flatKindOf(flatId) !== null,
-    panelCount: globePanels,
-    onTrigger: () => {
-      if (globeAutoReady()) enterGlobe()
-    },
-  })
+  const globeOffered =
+    projectionOptions.find((p) => p.id === 'globe')?.blockedBy === null
 
   // -------- Capabilities load/error surface --------
   // Only A gates the whole viewer; a failing/loading B must not blank a
@@ -1283,11 +1283,7 @@ export function GeoViewer({
         projections={projectionOptions}
         onProjectionChange={changeProjection}
         globeActive={globe.phase !== 'flat'}
-        globeAuto={
-          globeAvailable
-            ? { enabled: globeAutoTransition, onChange: setGlobeAutoTransition }
-            : null
-        }
+        onGlobeIntent={globeOffered ? warmGlobe : undefined}
         basemapOpacity={basemapOpacity}
         onBasemapOpacityChange={setBasemapOpacity}
       />
@@ -1436,7 +1432,7 @@ export function GeoViewer({
           {...tourAttr(TOUR.visualise.map)}
         >
           {startup && <StartupStatusPill {...startup} />}
-          {globe.phase !== 'flat' && (
+          {(globe.phase !== 'flat' || (globeWarm && globeOffered)) && (
             <Suspense fallback={null}>
               <GlobeView
                 layout={globePanels === 2 ? 'side' : 'single'}

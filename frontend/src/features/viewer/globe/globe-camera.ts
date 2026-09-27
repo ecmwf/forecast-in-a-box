@@ -21,6 +21,7 @@ import {
   lonLatToMercatorUnit,
 } from './sphere-math'
 import type View from 'ol/View'
+import type { Coordinate } from 'ol/coordinate'
 import type { FlatProjectionId } from '../projection-ids'
 import type { ViewerProjection } from '../projections'
 import type { CameraOrigin, FlatCamera, FlatKind, GlobeCamera } from './engine'
@@ -155,6 +156,23 @@ export function globeCameraOf(view: View): GlobeCamera | null {
   return { lon, lat, zoom: zoomFromGroundMpp(mpp) }
 }
 
+/** Flat resolution matching the globe camera's centre ground scale. */
+export function matchingFlatResolution(
+  view: View,
+  center: Coordinate,
+  camera: GlobeCamera,
+): number {
+  const perUnit = getPointResolution(view.getProjection(), 1, center, 'm')
+  const wanted =
+    Number.isFinite(perUnit) && perUnit > 0
+      ? groundMppFromZoom(camera.zoom) / perUnit
+      : view.getMaxResolution()
+  return Math.min(
+    Math.max(wanted, view.getMinResolution()),
+    view.getMaxResolution(),
+  )
+}
+
 /** Point a flat view at a globe camera, constrained (out-of-extent → home centre). */
 export function applyGlobeCamera(
   view: View,
@@ -174,18 +192,8 @@ export function applyGlobeCamera(
   ) {
     center = getCenter(target.homeExtent)
   }
-  const perUnit = getPointResolution(projection, 1, center, 'm')
-  const wanted =
-    Number.isFinite(perUnit) && perUnit > 0
-      ? groundMppFromZoom(camera.zoom) / perUnit
-      : view.getMaxResolution()
   // Resolution first — the centre constraint depends on it.
-  view.setResolution(
-    Math.min(
-      Math.max(wanted, view.getMinResolution()),
-      view.getMaxResolution(),
-    ),
-  )
+  view.setResolution(matchingFlatResolution(view, center, camera))
   view.setCenter(center)
 }
 

@@ -1617,8 +1617,8 @@ describe('GeoViewer layer extents', () => {
       expect(bbox[2]).toBeLessThanOrEqual(3.6e6)
       expect(bbox[1]).toBeGreaterThanOrEqual(3.9e6)
       expect(bbox[3]).toBeLessThanOrEqual(11.3e6)
-      // Fit to globe frames the active layers, not the service bbox.
-      await screen.getByRole('button', { name: 'Fit to globe' }).click()
+      // Fit view frames the active layers, not the service bbox.
+      await screen.getByRole('button', { name: 'Fit view' }).click()
       await expect
         .poll(() => lastCamera(onViewStateChange)?.lon, { timeout: 8000 })
         .toBeCloseTo(10, 0)
@@ -1674,7 +1674,7 @@ describe('GeoViewer projections', () => {
       await screen.getByRole('button', { name: 'Projection & basemap' }).click()
       await screen
         .getByRole('radio', {
-          name: 'Arctic — polar stereographic',
+          name: /^Arctic — polar stereographic/,
           exact: true,
         })
         .click()
