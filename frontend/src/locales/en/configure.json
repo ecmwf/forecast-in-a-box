@@ -136,7 +136,17 @@
     "addBlock": "Add {{title}}",
     "loadingBlocks": "Loading available blocks...",
     "clickSourceToStart": "Click or drag a source to get started",
-    "clickToAdd": "Click or drag blocks onto the canvas"
+    "clickToAdd": "Click or drag blocks onto the canvas",
+    "usableOnly": "Only usable now",
+    "view": "View",
+    "searchShortcut": "Press / to search",
+    "compact": "Compact rows",
+    "noMatches": "No blocks match",
+    "filter": "Filter blocks",
+    "show": "Show",
+    "plugins": "Plugins",
+    "resetFilters": "Reset filters",
+    "removeFilter": "Remove filter: {{filter}}"
   },
   "addBlockNode": {
     "addKind": "Add {{label}}"

@@ -51,6 +51,12 @@ interface UiState {
   outputFilmstrip: boolean
   setOutputFilmstrip: (value: boolean) => void
 
+  // Block palette: hide unusable blocks, one-line rows.
+  paletteUsableOnly: boolean
+  setPaletteUsableOnly: (value: boolean) => void
+  paletteCompact: boolean
+  setPaletteCompact: (value: boolean) => void
+
   // Application timezone (IANA id) — governs all date/time entry and display.
   timeZone: string
   setTimeZone: (timeZone: string) => void
@@ -73,6 +79,8 @@ const initialState = {
   pluginsSort: { key: 'name', dir: 'asc' } as CatalogueSortSetting,
   artifactsSort: { key: 'name', dir: 'asc' } as CatalogueSortSetting,
   outputFilmstrip: true,
+  paletteUsableOnly: false,
+  paletteCompact: false,
   timeZone: 'UTC',
   journalShowFlow: false,
 }
@@ -116,6 +124,8 @@ export const useUiStore = create<UiState>()(
         setPluginsSort: (pluginsSort) => set({ pluginsSort }),
         setArtifactsSort: (artifactsSort) => set({ artifactsSort }),
         setOutputFilmstrip: (outputFilmstrip) => set({ outputFilmstrip }),
+        setPaletteUsableOnly: (paletteUsableOnly) => set({ paletteUsableOnly }),
+        setPaletteCompact: (paletteCompact) => set({ paletteCompact }),
 
         // Application timezone management
         setTimeZone: (timeZone) => set({ timeZone }),
@@ -198,6 +208,8 @@ export const useUiStore = create<UiState>()(
           pluginsSort: state.pluginsSort,
           artifactsSort: state.artifactsSort,
           outputFilmstrip: state.outputFilmstrip,
+          paletteUsableOnly: state.paletteUsableOnly,
+          paletteCompact: state.paletteCompact,
           timeZone: state.timeZone,
         }),
       },
