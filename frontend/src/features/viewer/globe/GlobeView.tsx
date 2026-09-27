@@ -21,7 +21,7 @@ import { LoupeOverlay } from '../geo/LoupeOverlay'
 import { isWorldBbox } from '../wms-capabilities'
 import { GLOBE_ENGINE } from './engine-entry'
 import { globeCameraForBbox, globeFitZoom } from './globe-camera'
-import { globeLayerSpecs } from './globe-layer-specs'
+import { globeDecorationSpecs, globeLayerSpecs } from './globe-layer-specs'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { PointerReadout } from '../hooks/usePointerReadout'
 import type {
@@ -232,9 +232,28 @@ function GlobePanel({
   const [pointer, setPointer] = useState<PointerReadout | null>(null)
   const slot = source.slot
 
+  // The native basemap is this panel's own server: expand it per source.
+  const panelBasemap = useMemo<GlobeBasemapSpec>(
+    () =>
+      basemap.kind === 'wms'
+        ? { ...basemap, layers: globeDecorationSpecs(source, basemap.opacity) }
+        : basemap,
+    [
+      basemap,
+      source.decorationLayers,
+      source.baseUrl,
+      source.slot,
+      source.bboxAxisOrder,
+    ],
+  )
   // Engine events read the latest props without remounting the engine.
-  const latest = useRef({ source, basemap, onFailure, onContextLost })
-  latest.current = { source, basemap, onFailure, onContextLost }
+  const latest = useRef({
+    source,
+    basemap: panelBasemap,
+    onFailure,
+    onContextLost,
+  })
+  latest.current = { source, basemap: panelBasemap, onFailure, onContextLost }
   const zBase = slot === 'a' ? 100 : 200
 
   useEffect(() => {
@@ -296,8 +315,8 @@ function GlobePanel({
   }, [engine, specsKey])
 
   useEffect(() => {
-    engine?.setBasemap(basemap)
-  }, [engine, basemap])
+    engine?.setBasemap(panelBasemap)
+  }, [engine, panelBasemap])
 
   const drawLoupe = useMemo(
     () =>

@@ -57,11 +57,13 @@ export interface GlobeOutlineSpec {
   opacity: number
 }
 
-/** Outline strokes, or a Mapbox-style vector basemap. */
-export interface GlobeBasemapSpec extends GlobeOutlineSpec {
-  kind: 'outline' | 'vector'
-  styleUrl?: string
-}
+/** Outline strokes, a Mapbox-style vector basemap, or the server's own decoration layers. */
+export type GlobeBasemapSpec = GlobeOutlineSpec &
+  (
+    | { kind: 'outline' }
+    | { kind: 'vector'; styleUrl: string }
+    | { kind: 'wms'; layers: ReadonlyArray<GlobeLayerSpec> }
+  )
 
 export type CameraOrigin = 'user' | 'program'
 

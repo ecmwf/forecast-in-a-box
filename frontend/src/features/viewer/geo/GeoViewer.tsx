@@ -582,9 +582,8 @@ export function GeoViewer({
   const onGlobe = projectionId === 'globe'
   const effectiveBasemapId = useMemo(() => {
     const opt = availableBasemaps.find((o) => o.id === basemapId)
-    const fits = onGlobe
-      ? opt?.type === 'outline' || opt?.type === 'vector'
-      : !opt || basemapFitsProjection(opt, projection)
+    // Every offered basemap draws on the globe.
+    const fits = !opt || onGlobe || basemapFitsProjection(opt, projection)
     return fits ? basemapId : OUTLINE_BASEMAP.id
   }, [availableBasemaps, basemapId, projection, onGlobe])
   // Under a handoff the flat map matches the globe's first frame: Carto only from Mercator.
@@ -1156,14 +1155,16 @@ export function GeoViewer({
   const resolvedTheme = useUiStore((s) => s.resolvedTheme)
   const globeBasemap = useMemo<GlobeBasemapSpec>(() => {
     const opt = availableBasemaps.find((o) => o.id === effectiveBasemapId)
-    return opt?.type === 'vector'
-      ? {
-          kind: 'vector',
-          styleUrl: vectorStyleUrl(opt, resolvedTheme),
-          theme: resolvedTheme,
-          opacity: basemapOpacity,
-        }
-      : { kind: 'outline', theme: resolvedTheme, opacity: basemapOpacity }
+    const base = { theme: resolvedTheme, opacity: basemapOpacity }
+    if (opt?.type === 'vector')
+      return {
+        ...base,
+        kind: 'vector',
+        styleUrl: vectorStyleUrl(opt, resolvedTheme),
+      }
+    // Each globe panel expands the native basemap from its own server.
+    if (opt?.type === 'skinnywms') return { ...base, kind: 'wms', layers: [] }
+    return { ...base, kind: 'outline' }
   }, [availableBasemaps, effectiveBasemapId, resolvedTheme, basemapOpacity])
   const globeOffered =
     projectionOptions.find((p) => p.id === 'globe')?.blockedBy === null

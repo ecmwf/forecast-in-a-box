@@ -308,13 +308,16 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       basemap.kind === 'vector' && basemap.styleUrl ? basemap.styleUrl : null
     if (wanted !== styleUrl) return loadStyle(wanted)
     if (wanted && styleLayers.length === 0) return
+    content.setDecoration(basemap.kind === 'wms' ? basemap.layers : [])
     // MapLibre's basemap follows its own bend, not ours: outline then.
     const vector = wanted !== null && !ownBend
-    const key = `${vector}|${basemap.theme}|${basemap.opacity}|${labelsHidden}|${bending}`
+    const key = `${vector}|${basemap.kind}|${basemap.theme}|${basemap.opacity}|${labelsHidden}|${bending}`
     if (key === shownKey) return
     shownKey = key
     content.setOutline(
-      vector ? null : { theme: basemap.theme, opacity: basemap.opacity },
+      vector || basemap.kind === 'wms'
+        ? null
+        : { theme: basemap.theme, opacity: basemap.opacity },
     )
     const f = basemap.opacity
     for (const l of styleLayers) {

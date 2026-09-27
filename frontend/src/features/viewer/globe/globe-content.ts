@@ -225,6 +225,8 @@ export interface GlobeContent {
   uniforms: MorphUniforms
   setLayers: (specs: ReadonlyArray<GlobeLayerSpec>) => void
   setOutline: (spec: GlobeOutlineSpec | null) => void
+  /** The server's own basemap images: z below the data (background) or above (reference). */
+  setDecoration: (specs: ReadonlyArray<GlobeLayerSpec>) => void
   /** Bend the flat map's own pixels; null drops them. */
   setSeed: (
     seed: GlobeSeed | null,
@@ -261,6 +263,8 @@ export function createGlobeContent({
     camModel: [0, 0, 5],
   }
   const layers = new Map<string, LayerEntry>()
+  const deco = new Map<string, LayerEntry>()
+  const allEntries = () => [...layers.values(), ...deco.values()]
   const loadWaiters: Array<() => void> = []
   let res: GlResources | null = null
   let baseColor = BASE_COLOR.light
@@ -284,7 +288,7 @@ export function createGlobeContent({
   }
 
   function checkLoaded() {
-    if ([...layers.values()].every((e) => e.settled)) {
+    if (allEntries().every((e) => e.settled)) {
       for (const resolve of loadWaiters.splice(0)) resolve()
     }
   }
@@ -359,7 +363,7 @@ export function createGlobeContent({
   function scheduleUpgrade() {
     window.clearTimeout(upgradeTimer)
     upgradeTimer = window.setTimeout(() => {
-      for (const entry of layers.values()) {
+      for (const entry of allEntries()) {
         const target = targetScale(entry.spec)
         if (
           !entry.controller &&
@@ -425,7 +429,7 @@ export function createGlobeContent({
     if (res?.gl === gl) return res
     if (res) {
       // A new context: the old resources died with the old one.
-      for (const entry of layers.values()) entry.texture = null
+      for (const entry of allEntries()) entry.texture = null
       for (const group of lineGroups) group.mesh = null
       if (seed) seed.texture = null
     }
@@ -508,9 +512,7 @@ export function createGlobeContent({
     gl.activeTexture(gl.TEXTURE0)
     gl.uniform1i(layer.uniforms.uTex, 0)
     gl.uniform1f(layer.uniforms.uFlatUv, 0)
-    const ordered = [...layers.values()].sort(
-      (a, b) => a.spec.zIndex - b.spec.zIndex,
-    )
+    const ordered = allEntries().sort((a, b) => a.spec.zIndex - b.spec.zIndex)
     for (const entry of ordered) {
       if (entry.pending) {
         entry.texture = createTexture(gl, entry.pending)
@@ -537,52 +539,57 @@ export function createGlobeContent({
     gl.useProgram(null)
   }
 
+  /** Match `target` to `specs`: new keys load, changed params reload, the rest update. */
+  function reconcile(
+    target: Map<string, LayerEntry>,
+    specs: ReadonlyArray<GlobeLayerSpec>,
+  ) {
+    const wanted = new Set<string>()
+    for (const spec of specs) {
+      wanted.add(spec.key)
+      const paramsKey = `${spec.endpoint}|${JSON.stringify(spec.params)}`
+      let entry = target.get(spec.key)
+      if (!entry) {
+        entry = {
+          spec,
+          paramsKey,
+          pending: null,
+          texture: null,
+          box: [0, 0, 1, 1],
+          scale: 0,
+          controller: null,
+          errored: false,
+          settled: false,
+        }
+        target.set(spec.key, entry)
+        load(entry, firstScale(spec))
+      } else if (entry.paramsKey !== paramsKey) {
+        entry.spec = spec
+        entry.paramsKey = paramsKey
+        // Keep the shown detail when the time/style changes.
+        load(
+          entry,
+          Math.max(firstScale(spec), Math.min(entry.scale, targetScale(spec))),
+        )
+      } else {
+        entry.spec = spec
+      }
+    }
+    for (const [key, entry] of target) {
+      if (wanted.has(key)) continue
+      removeLayer(entry)
+      target.delete(key)
+    }
+    checkLoaded()
+    invalidate()
+  }
+
   return {
     uniforms,
 
-    setLayers: (specs) => {
-      const wanted = new Set<string>()
-      for (const spec of specs) {
-        wanted.add(spec.key)
-        const paramsKey = `${spec.endpoint}|${JSON.stringify(spec.params)}`
-        let entry = layers.get(spec.key)
-        if (!entry) {
-          entry = {
-            spec,
-            paramsKey,
-            pending: null,
-            texture: null,
-            box: [0, 0, 1, 1],
-            scale: 0,
-            controller: null,
-            errored: false,
-            settled: false,
-          }
-          layers.set(spec.key, entry)
-          load(entry, firstScale(spec))
-        } else if (entry.paramsKey !== paramsKey) {
-          entry.spec = spec
-          entry.paramsKey = paramsKey
-          // Keep the shown detail when the time/style changes.
-          load(
-            entry,
-            Math.max(
-              firstScale(spec),
-              Math.min(entry.scale, targetScale(spec)),
-            ),
-          )
-        } else {
-          entry.spec = spec
-        }
-      }
-      for (const [key, entry] of layers) {
-        if (wanted.has(key)) continue
-        removeLayer(entry)
-        layers.delete(key)
-      }
-      checkLoaded()
-      invalidate()
-    },
+    setLayers: (specs) => reconcile(layers, specs),
+
+    setDecoration: (specs) => reconcile(deco, specs),
 
     setOutline: (spec) => {
       outline = spec
@@ -617,8 +624,9 @@ export function createGlobeContent({
     dispose: () => {
       disposed = true
       window.clearTimeout(upgradeTimer)
-      for (const entry of layers.values()) removeLayer(entry)
+      for (const entry of allEntries()) removeLayer(entry)
       layers.clear()
+      deco.clear()
       outline = null
       clearLines()
       clearSeed()

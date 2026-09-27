@@ -286,6 +286,22 @@ describe('globe registration', () => {
     expect(near(frame(engine).at(WIDTH / 2, HEIGHT / 2), SOLID, 2)).toBe(true)
   })
 
+  it('draws the native basemap under the data and its reference lines above', async () => {
+    engine.setBasemap({
+      kind: 'wms',
+      theme: 'light',
+      opacity: 1,
+      layers: [spec('solid', 0), spec('region', 1000, REGION)],
+    })
+    engine.setLayers([spec('world', 1)])
+    await engine.whenLoaded()
+    const f = frame(engine)
+    // Background where nothing else is drawn; data markers and the reference marker on top.
+    expect(near(f.at(WIDTH / 2, HEIGHT / 2 + 60), SOLID, 2)).toBe(true)
+    expect(readoutError(engine, WORLD_MARKERS[0])).toBeLessThan(0.3)
+    expect(readoutError(engine, REGION_MARKER)).toBeLessThan(0.3)
+  })
+
   it('shows only server colours when magnified', async () => {
     engine.setLayers([spec('world', 1)])
     await engine.whenLoaded()

@@ -402,12 +402,9 @@ export function GeoToolbar({
               <div className="flex flex-col">
                 {availableBasemaps.map((b) => {
                   // Web basemaps are Mercator-only; the Outline stands in.
-                  const fits = globeActive
-                    ? b.type === 'outline' || b.type === 'vector'
-                    : basemapFitsProjection(b, projection)
-                  const unfitHint = globeActive
-                    ? t('globe.toolUnavailable')
-                    : t('basemaps.mercatorOnly')
+                  const fits =
+                    globeActive || basemapFitsProjection(b, projection)
+                  const unfitHint = t('basemaps.mercatorOnly')
                   return (
                     <button
                       key={b.id}
