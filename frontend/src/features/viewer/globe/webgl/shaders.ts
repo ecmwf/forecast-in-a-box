@@ -64,7 +64,9 @@ uniform vec4 uBox;
 ${VISIBILITY}
 void main() {
   vec2 uv = (vUv - uBox.xy) / uBox.zw;
-  if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) discard;
+  // MSAA runs pixel centres just outside the seam triangle: allow one pixel.
+  vec2 slack = fwidth(uv);
+  if (any(lessThan(uv, -slack)) || any(greaterThan(uv, vec2(1.0) + slack))) discard;
   // Premultiplied texels, passed through untouched (legend colours).
   fragColor = texture(uTex, uv) * (uOpacity * visibility());
 }

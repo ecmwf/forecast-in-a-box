@@ -404,7 +404,7 @@ export function GeoToolbar({
                   />
                 </label>
               )}
-              {globeAuto && (
+              {globeActive && (
                 <P className="px-2 pb-1.5 text-xs text-muted-foreground">
                   {t('projections.globeSymbolsNote')}
                 </P>

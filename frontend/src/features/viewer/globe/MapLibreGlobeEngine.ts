@@ -262,9 +262,11 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       if (map !== m || styleUrl !== url) return
       styleReady = true
       setGlobeness(m, globeness)
-      // Data under the labels, as on the flat map.
-      const labels = m.getStyle().layers.find((l) => l.type === 'symbol')
-      if (!m.getLayer(layer.id)) m.addLayer(layer, labels?.id)
+      // Data under the trailing label band; roads and borders sit above early labels.
+      const layers = m.getStyle().layers
+      let band = layers.length
+      while (band > 0 && layers[band - 1].type === 'symbol') band--
+      if (!m.getLayer(layer.id)) m.addLayer(layer, layers[band]?.id)
       styleLayers = m
         .getStyle()
         .layers.filter((l) => l.id !== layer.id)

@@ -425,16 +425,6 @@ export function createGlobeContent({
       drawMesh(gl, r.surface)
     }
 
-    if (lineGroups.length > 0) {
-      setShared(gl, color)
-      gl.uniform1f(color.uniforms.uOpacity, 1)
-      for (const group of lineGroups) {
-        group.mesh ??= createMesh(gl, group.geometry)
-        gl.uniform4fv(color.uniforms.uColor, group.color)
-        drawMesh(gl, group.mesh)
-      }
-    }
-
     const layer = r.layerProgram
     setShared(gl, layer)
     gl.activeTexture(gl.TEXTURE0)
@@ -455,6 +445,16 @@ export function createGlobeContent({
       drawMesh(gl, r.surface)
     }
     gl.bindTexture(gl.TEXTURE_2D, null)
+
+    if (lineGroups.length > 0) {
+      setShared(gl, color)
+      gl.uniform1f(color.uniforms.uOpacity, 1)
+      for (const group of lineGroups) {
+        group.mesh ??= createMesh(gl, group.geometry)
+        gl.uniform4fv(color.uniforms.uColor, group.color)
+        drawMesh(gl, group.mesh)
+      }
+    }
     gl.useProgram(null)
   }
 

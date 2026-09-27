@@ -46,6 +46,7 @@ const WORLD_MARKERS: ReadonlyArray<Marker> = [
 const REGION: [number, number, number, number] = [-60, 20, -20, 55]
 const REGION_MARKER: Marker = { lon: -50, lat: 40, rgb: [255, 160, 0] }
 const CAMERA = { lon: -35, lat: 10, zoom: globeFitZoom(WIDTH, HEIGHT) }
+const SOLID: Rgb = [40, 120, 200]
 
 /** PNG of `bbox` at `ppd` px/degree; markers are whole-pixel squares (no AA). */
 async function markerPng(
@@ -63,6 +64,21 @@ async function markerPng(
     const y = (n - m.lat) * ppd
     ctx.fillRect(x - side / 2, y - side / 2, side, side)
   }
+  const blob = await canvas.convertToBlob({ type: 'image/png' })
+  return blob.arrayBuffer()
+}
+
+/** Solid PNG of `bbox` at `ppd` px/degree. */
+async function solidPng(
+  bbox: readonly [number, number, number, number],
+  ppd: number,
+  rgb: Rgb,
+): Promise<ArrayBuffer> {
+  const [w, s, e, n] = bbox
+  const canvas = new OffscreenCanvas((e - w) * ppd, (n - s) * ppd)
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = `rgb(${rgb.join(',')})`
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   const blob = await canvas.convertToBlob({ type: 'image/png' })
   return blob.arrayBuffer()
 }
@@ -136,6 +152,21 @@ function readoutError(engine: GlobeEngine, m: Marker, tol = 12) {
   return Math.hypot(dLon, hit!.lat - m.lat)
 }
 
+/** Pixels around the marker that are neither its colour nor the background. */
+function blendedAround(engine: GlobeEngine, m: Marker): number {
+  const f = frame(engine)
+  const c = f.centroid(m.rgb, 12)!
+  const background = f.at(c.x + 14, c.y)
+  let blended = 0
+  for (let dy = -6; dy <= 6; dy++) {
+    for (let dx = -6; dx <= 6; dx++) {
+      const px = f.at(c.x + dx, c.y + dy)
+      if (!near(px, m.rgb, 2) && !near(px, background, 2)) blended++
+    }
+  }
+  return blended
+}
+
 describe('globe registration', () => {
   let container: HTMLDivElement
   let engine: GlobeEngine
@@ -145,12 +176,14 @@ describe('globe registration', () => {
     requests.length = 0
     const world = await markerPng([-180, -90, 180, 90], 4, WORLD_MARKERS, 8)
     const region = await markerPng(REGION, 10, [REGION_MARKER], 10)
+    const solid = await solidPng([-180, -90, 180, 90], 4, SOLID)
     worker.use(
       http.get(ENDPOINT, ({ request }) => {
         const url = new URL(request.url)
         requests.push(url)
+        const name = url.searchParams.get('LAYERS')
         const body =
-          url.searchParams.get('LAYERS') === 'region' ? region : world
+          name === 'region' ? region : name === 'solid' ? solid : world
         return HttpResponse.arrayBuffer(body, {
           headers: { 'Content-Type': 'image/png' },
         })
@@ -192,5 +225,49 @@ describe('globe registration', () => {
     await engine.whenLoaded()
     expect(requests[0].searchParams.get('BBOX')).toBe('20,-60,55,-20')
     expect(readoutError(engine, REGION_MARKER)).toBeLessThan(0.3)
+  })
+
+  it('has no crack along the antimeridian', async () => {
+    engine.setCamera({ ...CAMERA, lon: 180, lat: 0 })
+    // The 180° meridian is also a graticule line: hide the outline strokes.
+    engine.setBasemap({ kind: 'outline', theme: 'light', opacity: 0 })
+    engine.setLayers([spec('solid', 1)])
+    await engine.whenLoaded()
+    const f = frame(engine)
+    // The seam runs down the middle of the view: every pixel near it is the fill.
+    const bad: Array<string> = []
+    for (let y = HEIGHT / 2 - 150; y <= HEIGHT / 2 + 150; y += 3) {
+      for (let dx = -3; dx <= 3; dx++) {
+        const px = f.at(WIDTH / 2 + dx, y)
+        if (!near(px, SOLID, 2))
+          bad.push(`(${WIDTH / 2 + dx},${y})=${px.join(',')}`)
+      }
+    }
+    expect(bad).toEqual([])
+  })
+
+  it('has no crack along the antimeridian when zoomed in', async () => {
+    engine.setCamera({ lon: -178.4, lat: 79.4, zoom: 5.2 })
+    engine.setBasemap({ kind: 'outline', theme: 'light', opacity: 0 })
+    engine.setLayers([spec('solid', 1)])
+    await engine.whenLoaded()
+    const f = frame(engine)
+    const bad: Array<string> = []
+    for (let y = 20; y < HEIGHT - 20; y += 2) {
+      for (let x = 20; x < WIDTH - 20; x += 2) {
+        const px = f.at(x, y)
+        if (!near(px, SOLID, 2)) bad.push(`(${x},${y})=${px.join(',')}`)
+      }
+    }
+    expect(bad).toEqual([])
+  })
+
+  it('shows only server colours when magnified', async () => {
+    engine.setLayers([spec('world', 1)])
+    await engine.whenLoaded()
+    const marker = WORLD_MARKERS[0]
+    // Nearest sampling: no blended fringe around a marker.
+    expect(blendedAround(engine, marker)).toBe(0)
+    expect(readoutError(engine, marker, 2)).toBeLessThan(0.3)
   })
 })
