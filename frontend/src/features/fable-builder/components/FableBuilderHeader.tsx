@@ -16,6 +16,7 @@ import {
   Check,
   ChevronDown,
   Download,
+  FileText,
   HelpCircle,
   MoreVertical,
   Play,
@@ -334,10 +335,11 @@ export function FableBuilderHeader({
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-8 gap-1"
+                          className="h-8 gap-1.5"
                         />
                       }
                     >
+                      <FileText className="h-4 w-4" />
                       {t('header.file')}
                       <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                     </DropdownMenuTrigger>
