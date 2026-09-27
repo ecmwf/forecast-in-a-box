@@ -224,7 +224,7 @@ describe('configure first-run tutorial', () => {
       .element(screen.getByRole('dialog', { name: 'Chain the next block' }))
       .not.toBeInTheDocument()
     await screen
-      .getByRole('button', { name: /^Select/ })
+      .getByRole('button', { name: /^Select · ecmwf-base/ })
       .last()
       .click()
     await expect

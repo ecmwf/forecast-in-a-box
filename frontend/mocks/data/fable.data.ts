@@ -183,6 +183,44 @@ export const mockCatalogue: BlockFactoryCatalogue = {
       },
     },
   },
+  // Second plugin whose titles clash with ecmwf-base.
+  ['demo/demo-plots']: {
+    factories: {
+      mapPlot: {
+        kind: 'sink',
+        title: 'Map Plot',
+        description: 'Quick-look map from the demo plugin',
+        configuration_options: {
+          param: {
+            title: 'Parameters',
+            description: "Parameters to plot (e.g. '2t')",
+            value_type: 'list[str]',
+          },
+        },
+        inputs: ['dataset'],
+      },
+      select: {
+        kind: 'transform',
+        title: 'Select',
+        description: 'Demo variant of the select transform',
+        configuration_options: {
+          dimension: {
+            title: 'Dimension',
+            description: 'Dimension to select from the dataset',
+            value_type: 'str',
+          },
+        },
+        inputs: ['dataset'],
+      },
+      histogram: {
+        kind: 'product',
+        title: 'Histogram',
+        description: 'Value distribution of a field',
+        configuration_options: {},
+        inputs: ['dataset'],
+      },
+    },
+  },
 }
 
 /**
@@ -359,7 +397,6 @@ export function calculateExpansion(fable: FableBuilderV1): {
   const localGlyphs = fable.local_glyphs ?? {}
 
   // Available blocks by kind (using new PluginCompositeId format)
-  // Only ecmwf-base plugin is loaded
   const sourceBlocks: Array<PluginBlockFactoryId> = [
     {
       plugin: pluginId('ecmwf', 'ecmwf-base'),
@@ -382,6 +419,16 @@ export function calculateExpansion(fable: FableBuilderV1): {
       factory: 'temporalStatistics',
       restrictions: {},
     },
+    {
+      plugin: pluginId('demo', 'demo-plots'),
+      factory: 'select',
+      restrictions: {},
+    },
+    {
+      plugin: pluginId('demo', 'demo-plots'),
+      factory: 'histogram',
+      restrictions: {},
+    },
   ]
   const sinkBlocks: Array<BlockExpansion> = [
     {
@@ -392,6 +439,11 @@ export function calculateExpansion(fable: FableBuilderV1): {
     {
       plugin: pluginId('ecmwf', 'ecmwf-base'),
       factory: 'mapPlotSink',
+      restrictions: {},
+    },
+    {
+      plugin: pluginId('demo', 'demo-plots'),
+      factory: 'mapPlot',
       restrictions: {},
     },
   ]
@@ -450,9 +502,9 @@ export function calculateExpansion(fable: FableBuilderV1): {
       resolved_configuration_options[blockId] = resolvedForBlock
     }
 
-    // Calculate possible expansions based on block kind
+    // Like the backend: sinks may follow any block with an output.
     if (factory.kind === 'source' || factory.kind === 'transform') {
-      possible_expansions[blockId] = qubedBlocks
+      possible_expansions[blockId] = [...qubedBlocks, ...sinkBlocks]
     } else if (factory.kind === 'product') {
       possible_expansions[blockId] = sinkBlocks
     }
