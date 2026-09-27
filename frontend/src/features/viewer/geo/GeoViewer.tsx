@@ -58,7 +58,7 @@ import {
   viewResolutionFor,
   viewerProjectionOf,
 } from '../projections'
-import { GLOBE_ENGINES } from '../globe/engines/registry'
+import { GLOBE_ENGINE } from '../globe/engine-entry'
 import { flatKindOf, panGlobeCamera } from '../globe/globe-camera'
 import { useGlobeMode } from '../globe/useGlobeMode'
 import { useZoomOutPastWorld } from '../globe/useZoomOutPastWorld'
@@ -280,9 +280,6 @@ export function GeoViewer({
   // -------- 3D globe (flat ↔ globe handoff) --------
   const globeAutoTransition = useUiStore((s) => s.globeAutoTransition)
   const setGlobeAutoTransition = useUiStore((s) => s.setGlobeAutoTransition)
-  const globeEngineId = useUiStore((s) => s.globeEngine)
-  const setGlobeEngineId = useUiStore((s) => s.setGlobeEngine)
-  const globeEngine = GLOBE_ENGINES[globeEngineId]
   const reducedMotion = useMedia('(prefers-reduced-motion: reduce)')
   const globePanels = hasB && focusSlot === null && mode === 'side' ? 2 : 1
   // Back from the globe: the flat map it bent from, else Mercator.
@@ -568,18 +565,18 @@ export function GeoViewer({
   }, [availableBasemaps, basemapId, sourceA.loadingLayers])
   // Where the choice cannot be drawn the Outline stands in; the choice is kept.
   const onGlobe = projectionId === 'globe'
-  const globeVectorBasemap = globeEngine.capabilities.vectorBasemap
   const effectiveBasemapId = useMemo(() => {
     const opt = availableBasemaps.find((o) => o.id === basemapId)
     const fits = onGlobe
-      ? opt?.type === 'outline' ||
-        (opt?.type === 'vector' && globeVectorBasemap)
+      ? opt?.type === 'outline' || opt?.type === 'vector'
       : !opt || basemapFitsProjection(opt, projection)
     return fits ? basemapId : OUTLINE_BASEMAP.id
-  }, [availableBasemaps, basemapId, projection, onGlobe, globeVectorBasemap])
-  // Flat maps under a globe handoff match the globe's mid-morph outline.
+  }, [availableBasemaps, basemapId, projection, onGlobe])
+  // Under a handoff the flat map matches the globe's first frame: Carto only from Mercator.
   const flatBasemapId =
-    globe.phase === 'flat' ? effectiveBasemapId : OUTLINE_BASEMAP.id
+    globe.phase === 'flat' || flatId === 'merc'
+      ? effectiveBasemapId
+      : OUTLINE_BASEMAP.id
 
   // Offered only when every loaded source advertises the CRS.
   const projectionOptions = useMemo<ReadonlyArray<ProjectionOption>>(() => {
@@ -602,7 +599,7 @@ export function GeoViewer({
     }))
     if (!globeAvailable) return flat
     // The globe shows one source, or two side by side.
-    const crsBlock = lacking(globeEngine.requiredCrs)
+    const crsBlock = lacking(GLOBE_ENGINE.requiredCrs)
     const modeBlock = hasB && focusSlot === null && mode !== 'side'
     return [
       ...flat,
@@ -625,7 +622,6 @@ export function GeoViewer({
     a.label,
     b,
     globeAvailable,
-    globeEngine,
     hasB,
     focusSlot,
     mode,
@@ -1287,15 +1283,9 @@ export function GeoViewer({
         projections={projectionOptions}
         onProjectionChange={changeProjection}
         globeActive={globe.phase !== 'flat'}
-        globeVectorBasemap={globeVectorBasemap}
         globeAuto={
           globeAvailable
-            ? {
-                enabled: globeAutoTransition,
-                onChange: setGlobeAutoTransition,
-                engine: globeEngineId,
-                onEngineChange: setGlobeEngineId,
-              }
+            ? { enabled: globeAutoTransition, onChange: setGlobeAutoTransition }
             : null
         }
         basemapOpacity={basemapOpacity}
@@ -1449,7 +1439,6 @@ export function GeoViewer({
           {globe.phase !== 'flat' && (
             <Suspense fallback={null}>
               <GlobeView
-                engine={globeEngine}
                 layout={globePanels === 2 ? 'side' : 'single'}
                 sources={
                   globePanels === 2 && mapSourceB

@@ -224,11 +224,7 @@
     "blockedMode": "Only one source or side-by-side",
     "snappedBackMode": "The 3D globe shows one source or side-by-side, back to the flat map",
     "autoGlobe": "Bend into a globe when zooming out",
-    "globeEngine": "Globe renderer",
-    "globeEngines": {
-      "three": "three.js",
-      "maplibre": "MapLibre"
-    },
+    "globeSymbolsNote": "On the globe, wind barbs, arrows and labels drawn by the map server are squeezed east–west towards the poles, so their directions are approximate at high latitudes.",
     "short": {
       "merc": "Mercator",
       "geo": "Equirectangular",

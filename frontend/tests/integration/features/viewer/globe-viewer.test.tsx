@@ -10,7 +10,7 @@
 
 /**
  * GeoViewer ↔ 3D globe wiring through the engine seam: a fake engine
- * stands in for three.js (headless WebGL is not guaranteed), so these
+ * stands in for MapLibre (headless WebGL is not guaranteed), so these
  * assert gating, handoff, and what reaches the engine — not pixels.
  */
 
@@ -50,7 +50,7 @@ vi.mock('@/features/viewer/globe/webgl-support', () => ({
   disableGlobe: () => {},
 }))
 
-vi.mock('@/features/viewer/globe/engines/registry', () => {
+vi.mock('@/features/viewer/globe/engine-entry', () => {
   const fakeEngine = (): GlobeEngine => {
     let camera: GlobeCamera = { lon: 0, lat: 0, zoom: 1 }
     let el: HTMLElement | null = null
@@ -84,24 +84,19 @@ vi.mock('@/features/viewer/globe/engines/registry', () => {
       },
     }
   }
-  const entry = {
-    requiredCrs: 'EPSG:4326',
-    capabilities: {
-      morphFrom: ['merc', 'geo'],
-      poles: true,
-      minZoom: -2,
+  return {
+    GLOBE_ENGINE: {
+      requiredCrs: 'EPSG:4326',
       maxZoom: 6,
-      vectorBasemap: false,
+      load: () => Promise.resolve(fakeEngine),
     },
-    load: () => Promise.resolve(fakeEngine),
   }
-  return { GLOBE_ENGINES: { three: { ...entry }, maplibre: { ...entry } } }
 })
 
 let nextPort = 19950
 
 beforeEach(() => {
-  useUiStore.setState({ globeEngine: 'three', globeAutoTransition: true })
+  useUiStore.setState({ globeAutoTransition: true })
 })
 
 function Harness({
@@ -191,6 +186,10 @@ describe('GeoViewer 3D globe', () => {
     await screen.getByRole('radio', { name: '3D globe' }).click()
 
     await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+    // Server-drawn symbols are squeezed on the globe; the menu says so there.
+    await expect
+      .element(screen.getByText(/directions are approximate at high latitudes/))
+      .toBeVisible()
     await expect
       .poll(() => engineCalls.layers.at(-1)?.map((s) => s.params.LAYERS))
       .toEqual(['2t'])
@@ -206,23 +205,6 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByTestId('globe-view'))
       .not.toBeInTheDocument()
-  })
-
-  it('remounts the globe when the renderer changes', async () => {
-    const screen = await render(<Harness portA={registerServer()} />)
-    await expect
-      .element(screen.getByText('2 m temperature').first())
-      .toBeVisible()
-    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
-    await screen.getByRole('radio', { name: '3D globe' }).click()
-    await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
-
-    const { mounted, destroyed } = engineCalls
-    await screen.getByRole('radio', { name: 'MapLibre' }).click()
-    await expect.poll(() => engineCalls.destroyed).toBe(destroyed + 1)
-    await expect.poll(() => engineCalls.mounted).toBe(mounted + 1)
-    await screen.getByRole('radio', { name: 'three.js' }).click()
-    await expect.poll(() => engineCalls.mounted).toBe(mounted + 2)
   })
 
   it('is blocked in single-map comparison modes', async () => {

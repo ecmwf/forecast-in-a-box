@@ -18,6 +18,7 @@ import { PointerReadoutBadge } from '../components/PointerReadoutBadge'
 import { CompareSlotTag } from '../geo/CompareSlotTag'
 import { LoadErrorBadge, erroredTitles } from '../geo/SingleMapView'
 import { LoupeOverlay } from '../geo/LoupeOverlay'
+import { GLOBE_ENGINE } from './engine-entry'
 import { globeCameraForBbox, globeFitZoom } from './globe-camera'
 import { globeLayerSpecs } from './globe-layer-specs'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
@@ -28,7 +29,6 @@ import type {
   FitBboxAction,
 } from '../geo/types'
 import type { GlobeBasemapSpec, GlobeEngine, ViewportDraw } from './engine'
-import type { GlobeEngineEntry } from './engines/registry'
 import type { SharedGlobeCamera } from './globe-camera'
 
 type CrossPosition = { x: number; y: number } | null
@@ -42,8 +42,6 @@ export interface GlobeLoupe {
 }
 
 export interface GlobeViewProps {
-  /** Renderer; a change remounts the panels. */
-  engine: GlobeEngineEntry
   layout: 'single' | 'side'
   /** One source per panel. */
   sources: ReadonlyArray<CompareMapSource>
@@ -68,7 +66,6 @@ export interface GlobeViewProps {
 }
 
 export function GlobeView({
-  engine: entry,
   layout,
   sources,
   camera,
@@ -103,12 +100,12 @@ export function GlobeView({
       if (!engine) return
       const [w, h] = engine.size()
       camera.set(
-        globeCameraForBbox(bbox, w, h, entry.capabilities.maxZoom),
+        globeCameraForBbox(bbox, w, h, GLOBE_ENGINE.maxZoom),
         'program',
         'fit',
       )
     },
-    [camera, entry],
+    [camera],
   )
   const bbox = sources[0]?.bbox ?? null
   useEffect(() => {
@@ -155,7 +152,6 @@ export function GlobeView({
   const panels = sources.map((source) => (
     <GlobePanel
       key={source.slot}
-      engine={entry}
       source={source}
       camera={camera}
       active={active}
@@ -194,7 +190,6 @@ export function GlobeView({
 }
 
 function GlobePanel({
-  engine: entry,
   source,
   camera,
   active,
@@ -209,7 +204,6 @@ function GlobePanel({
   loupeMirror,
   onCross,
 }: {
-  engine: GlobeEngineEntry
   source: CompareMapSource
   camera: SharedGlobeCamera
   active: boolean
@@ -233,8 +227,9 @@ function GlobePanel({
   const slot = source.slot
 
   // Engine events read the latest props without remounting the engine.
-  const latest = useRef({ source, onFailure, onContextLost })
-  latest.current = { source, onFailure, onContextLost }
+  const latest = useRef({ source, basemap, onFailure, onContextLost })
+  latest.current = { source, basemap, onFailure, onContextLost }
+  const zBase = slot === 'a' ? 100 : 200
 
   useEffect(() => {
     const el = containerRef.current
@@ -243,8 +238,7 @@ function GlobePanel({
     // Read via a function: TS keeps narrowing across the await.
     const isCancelled = () => cancelled
     let mounted: GlobeEngine | null = null
-    entry
-      .load()
+    GLOBE_ENGINE.load()
       .then(async (create) => {
         if (cancelled) return
         mounted = create()
@@ -266,6 +260,9 @@ function GlobePanel({
         })
         if (isCancelled()) return
         mounted.setCamera(camera.get())
+        // Content before registering: the handoff's whenLoaded must see it.
+        mounted.setLayers(globeLayerSpecs(latest.current.source, zBase))
+        mounted.setBasemap(latest.current.basemap)
         setEngine(mounted)
         register(slot, mounted)
       })
@@ -277,7 +274,7 @@ function GlobePanel({
       register(slot, null)
       mounted?.destroy()
     }
-  }, [entry, camera, register, slot])
+  }, [camera, register, slot, zBase])
 
   useEffect(() => {
     if (!engine) return
@@ -286,7 +283,6 @@ function GlobePanel({
     })
   }, [engine, camera, slot])
 
-  const zBase = slot === 'a' ? 100 : 200
   const specs = globeLayerSpecs(source, zBase)
   const specsKey = JSON.stringify(specs)
   useEffect(() => {

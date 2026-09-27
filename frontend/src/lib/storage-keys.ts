@@ -140,7 +140,7 @@ export const STORAGE_KEYS = {
  * ```
  */
 export const STORE_VERSIONS = {
-  ui: 9, // v9: Added globeEngine
+  ui: 11, // v11: Removed globeEngine, globeExactColours
   config: 1,
   fableBuilder: 3, // v3: Removed mode, edgeStyle, autoLayout
   activity: 2, // v2: navigateTo rewritten for /executions→/execute, /dashboard→/overview

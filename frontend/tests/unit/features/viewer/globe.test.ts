@@ -19,6 +19,7 @@ import {
 } from '@/features/viewer/globe/sphere-math'
 import {
   applyGlobeCamera,
+  flatClipTransform,
   globeCameraForBbox,
   globeCameraOf,
   globeExitZoom,
@@ -27,10 +28,7 @@ import {
   panGlobeCamera,
   zoomFromGroundMpp,
 } from '@/features/viewer/globe/globe-camera'
-import {
-  flatClipTransform,
-  pickLonLat,
-} from '@/features/viewer/globe/engines/three/view-math'
+import { invertMat4 } from '@/features/viewer/globe/webgl/gl'
 import {
   WORLD_REGION,
   layerRegion,
@@ -110,7 +108,7 @@ describe('globe camera', () => {
   })
 })
 
-describe('three engine view math', () => {
+describe('flat clip transform', () => {
   it('puts the flat view centre at clip origin and the world at OL width', () => {
     const resolution = 50000 // m/px
     const t = flatClipTransform(
@@ -129,13 +127,24 @@ describe('three engine view math', () => {
       ),
     ).toBeNull()
   })
+})
 
-  it('picks the camera centre at the viewport centre, null off-globe', () => {
-    const camera = { lon: 30, lat: -20, zoom: 2 }
-    const hit = pickLonLat([400, 300], [800, 600], camera)
-    expect(hit?.lon).toBeCloseTo(30, 6)
-    expect(hit?.lat).toBeCloseTo(-20, 6)
-    expect(pickLonLat([2, 2], [800, 600], { ...camera, zoom: 0.5 })).toBeNull()
+describe('mat4 inverse', () => {
+  it('inverts a translated perspective matrix and rejects a singular one', () => {
+    // prettier-ignore
+    const m = [
+      2, 0, 0, 0,
+      0, 3, 0, 0,
+      0, 0, -1.2, -1,
+      1, 2, -2.2, 0,
+    ]
+    const inv = invertMat4(m)!
+    // Column 3 of the inverse is the eye: (0,0,1,0) pulled back through m.
+    const eye = [inv[8] / inv[11], inv[9] / inv[11], inv[10] / inv[11]]
+    expect(eye[0]).toBeCloseTo(-0.5, 9)
+    expect(eye[1]).toBeCloseTo(-2 / 3, 9)
+    expect(eye[2]).toBeCloseTo(0, 9)
+    expect(invertMat4(new Array<number>(16).fill(0))).toBeNull()
   })
 })
 

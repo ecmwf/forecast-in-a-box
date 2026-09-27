@@ -57,21 +57,10 @@ export interface GlobeOutlineSpec {
   opacity: number
 }
 
-/** Outline strokes, or a Mapbox-style vector basemap (`vectorBasemap` engines). */
+/** Outline strokes, or a Mapbox-style vector basemap. */
 export interface GlobeBasemapSpec extends GlobeOutlineSpec {
   kind: 'outline' | 'vector'
   styleUrl?: string
-}
-
-export interface GlobeEngineCapabilities {
-  /** Flat kinds the engine can morph from; others crossfade. */
-  morphFrom: ReadonlyArray<FlatKind>
-  /** Data reaches the poles (Mercator tiles stop at ±85.05°). */
-  poles: boolean
-  minZoom: number
-  maxZoom: number
-  /** Can draw a vector (Mapbox-style) basemap on the globe. */
-  vectorBasemap: boolean
 }
 
 export type CameraOrigin = 'user' | 'program'

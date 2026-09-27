@@ -32,7 +32,6 @@ import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber } from '../format'
 import { basemapFitsProjection } from '../ol-layers'
-import { GLOBE_ENGINE_IDS } from '../globe/engine-ids'
 import {
   downloadAnnotationsGeojson,
   parseAnnotationsGeojson,
@@ -46,7 +45,6 @@ import type { MeasureMode } from '../hooks/useMeasure'
 import type { MapAnnotation } from './annotations'
 import type { BasemapOption } from '../ol-layers'
 import type { ProjectionId } from '../projection-ids'
-import type { GlobeEngineId } from '../globe/engine-ids'
 import type { ViewerProjection } from '../projections'
 import { Button } from '@/components/ui/button'
 import {
@@ -143,7 +141,6 @@ export function GeoToolbar({
   projections,
   onProjectionChange,
   globeActive = false,
-  globeVectorBasemap = false,
   globeAuto = null,
 }: {
   /** Single-source: comparison modes + link toggle hidden. */
@@ -187,14 +184,10 @@ export function GeoToolbar({
   onProjectionChange: (id: ProjectionId) => void
   /** On the 3D globe: map-click tools are unavailable. */
   globeActive?: boolean
-  /** The globe engine draws vector basemaps. */
-  globeVectorBasemap?: boolean
-  /** Globe settings; null when the globe is not offered. */
+  /** Auto-bend setting; null when the globe is not offered. */
   globeAuto?: {
     enabled: boolean
     onChange: (enabled: boolean) => void
-    engine: GlobeEngineId
-    onEngineChange: (engine: GlobeEngineId) => void
   } | null
 }) {
   const { t } = useTranslation('visualise')
@@ -412,32 +405,9 @@ export function GeoToolbar({
                 </label>
               )}
               {globeAuto && (
-                <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-sm">
-                  {t('projections.globeEngine')}
-                  <span
-                    role="radiogroup"
-                    aria-label={t('projections.globeEngine')}
-                    className="flex rounded-md bg-muted p-0.5"
-                  >
-                    {GLOBE_ENGINE_IDS.map((id) => (
-                      <button
-                        key={id}
-                        type="button"
-                        role="radio"
-                        aria-checked={globeAuto.engine === id}
-                        onClick={() => globeAuto.onEngineChange(id)}
-                        className={cn(
-                          'rounded px-2 py-0.5 text-xs',
-                          globeAuto.engine === id
-                            ? 'bg-background font-medium shadow-sm'
-                            : 'text-muted-foreground',
-                        )}
-                      >
-                        {t(`projections.globeEngines.${id}`)}
-                      </button>
-                    ))}
-                  </span>
-                </div>
+                <P className="px-2 pb-1.5 text-xs text-muted-foreground">
+                  {t('projections.globeSymbolsNote')}
+                </P>
               )}
               <P className="mt-1 border-t border-border px-2 pt-2 pb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {tExec('lens.basemap')}
@@ -446,8 +416,7 @@ export function GeoToolbar({
                 {availableBasemaps.map((b) => {
                   // Web basemaps are Mercator-only; the Outline stands in.
                   const fits = globeActive
-                    ? b.type === 'outline' ||
-                      (b.type === 'vector' && globeVectorBasemap)
+                    ? b.type === 'outline' || b.type === 'vector'
                     : basemapFitsProjection(b, projection)
                   const unfitHint = globeActive
                     ? t('globe.toolUnavailable')

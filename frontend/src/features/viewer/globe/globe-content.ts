@@ -8,42 +8,45 @@
  * does it submit to any jurisdiction.
  */
 
-/** Globe scene content (layers, textures, outline) for any renderer owner. */
+/** Globe scene content (layer textures, outline lines) drawn into a host WebGL2 context. */
 
-import {
-  LinearFilter,
-  LinearMipmapLinearFilter,
-  NoColorSpace,
-  Scene,
-  Texture,
-  Vector4,
-} from 'three'
-import { globeRadiusPx } from '../../globe-camera'
+import { flatClipTransform, globeRadiusPx } from './globe-camera'
 import {
   layerRegion,
   regionGetMapUrl,
   regionScale,
   regionSize,
-} from '../../globe-getmap'
+} from './globe-getmap'
 import {
-  createBaseMesh,
-  createLayerMesh,
-  createLinesMesh,
-  createMorphUniforms,
-  createSurfaceGeometry,
   geojsonLines,
   graticuleLines,
-} from './globe-scene'
-import { flatClipTransform } from './view-math'
-import type { LineSegments, Mesh, RawShaderMaterial } from 'three'
-import type { MorphUniforms } from './globe-scene'
+  linesGeometry,
+  surfaceGeometry,
+} from './webgl/geometry'
+import {
+  createMesh,
+  createProgram,
+  createTexture,
+  deleteMesh,
+  drawMesh,
+} from './webgl/gl'
+import {
+  COLOR_FRAGMENT,
+  COLOR_UNIFORMS,
+  LAYER_FRAGMENT,
+  LAYER_UNIFORMS,
+  SHARED_UNIFORMS,
+  VERTEX,
+} from './webgl/shaders'
+import type { Mesh, Program } from './webgl/gl'
+import type { Geometry } from './webgl/geometry'
 import type {
   FlatCamera,
   GlobeEngineEvents,
   GlobeLayerSpec,
   GlobeOutlineSpec,
   ViewportDraw,
-} from '../../engine'
+} from './engine'
 import { createLogger } from '@/lib/logger'
 import { loadOutlineData, outlinePalette } from '@/lib/map/ol-outline'
 
@@ -56,16 +59,34 @@ const MAX_SIDE = 4096
 const UPGRADE_FACTOR = 1.25
 const UPGRADE_IDLE_MS = 300
 
-const BASE_COLOR = {
-  light: new Vector4(0.87, 0.9, 0.94, 1),
-  dark: new Vector4(0.12, 0.16, 0.23, 1),
+type Vec4 = [number, number, number, number]
+
+const BASE_COLOR: Record<'light' | 'dark', Vec4> = {
+  light: [0.87, 0.9, 0.94, 1],
+  dark: [0.12, 0.16, 0.23, 1],
+}
+
+/** Uniforms every draw shares; matrices column-major. */
+export interface MorphUniforms {
+  /** Flat unit world → clip. */
+  flatMatrix: Float32Array
+  /** Unit sphere → clip. */
+  sphereMatrix: Float32Array
+  /** 0 = flat, 1 = globe. */
+  morph: number
+  /** 0 = equirectangular, 1 = Mercator. */
+  flatKind: number
+  /** Camera position in sphere space (far-side fade). */
+  camModel: [number, number, number]
 }
 
 interface LayerEntry {
   spec: GlobeLayerSpec
   paramsKey: string
-  mesh: Mesh
-  texture: Texture | null
+  /** Decoded, waiting for a context to upload into. */
+  pending: ImageBitmap | null
+  texture: WebGLTexture | null
+  box: Vec4
   /** px/degree of the shown texture (0 = none yet). */
   scale: number
   controller: AbortController | null
@@ -74,11 +95,29 @@ interface LayerEntry {
   settled: boolean
 }
 
+interface LineGroup {
+  geometry: Geometry
+  color: Vec4
+  mesh: Mesh | null
+}
+
+type SharedUniform = (typeof SHARED_UNIFORMS)[number]
+type LayerProgram = Program<SharedUniform | (typeof LAYER_UNIFORMS)[number]>
+type ColorProgram = Program<SharedUniform | (typeof COLOR_UNIFORMS)[number]>
+
+interface GlResources {
+  gl: WebGL2RenderingContext
+  layerProgram: LayerProgram
+  colorProgram: ColorProgram
+  surface: Mesh
+  maxTextureSize: number
+}
+
 /** rgba()/rgb() → vec4. */
-function cssColor(css: string): Vector4 {
+function cssColor(css: string): Vec4 {
   const parts = /rgba?\(([^)]+)\)/.exec(css)?.[1].split(',').map(Number) ?? []
   const [r = 0, g = 0, b = 0, a = 1] = parts
-  return new Vector4(r / 255, g / 255, b / 255, a)
+  return [r / 255, g / 255, b / 255, a]
 }
 
 export const easeInOutCubic = (p: number) =>
@@ -127,7 +166,7 @@ export function drawCanvasViewport(
   ctx.setTransform(1, 0, 0, 1, 0, 0)
 }
 
-/** Flat camera → `uFlatMatrix` / `uFlatKind` for a viewport. */
+/** Flat camera → `flatMatrix` / `flatKind` for a viewport. */
 export function applyFlatUniforms(
   uniforms: MorphUniforms,
   flat: FlatCamera,
@@ -136,25 +175,26 @@ export function applyFlatUniforms(
 ): void {
   const t = flatClipTransform(flat, width, height)
   if (!t) return
-  uniforms.uFlatKind.value = flat.projection === 'merc' ? 1 : 0
-  // Row-major: clipX = kx(x − cx), clipY = ky(cy − y).
+  uniforms.flatKind = flat.projection === 'merc' ? 1 : 0
+  // clipX = kx(x − cx), clipY = ky(cy − y); column-major.
   // prettier-ignore
-  uniforms.uFlatMatrix.value.set(
-    t.kx, 0, 0, -t.kx * t.cx,
-    0, -t.ky, 0, t.ky * t.cy,
+  uniforms.flatMatrix.set([
+    t.kx, 0, 0, 0,
+    0, -t.ky, 0, 0,
     0, 0, 0, 0,
-    0, 0, 0, 1,
-  )
+    -t.kx * t.cx, t.ky * t.cy, 0, 1,
+  ])
 }
 
 export interface GlobeContent {
-  scene: Scene
   uniforms: MorphUniforms
   setLayers: (specs: ReadonlyArray<GlobeLayerSpec>) => void
   setOutline: (spec: GlobeOutlineSpec | null) => void
   whenLoaded: () => Promise<void>
   /** Refetch sharper textures once the camera rests. */
   scheduleUpgrade: () => void
+  /** Draw everything with the current uniforms into `gl` (host-owned state). */
+  draw: (gl: WebGL2RenderingContext) => void
   dispose: () => void
 }
 
@@ -162,25 +202,24 @@ export function createGlobeContent({
   events,
   invalidate,
   zoom,
-  maxTextureSize,
-  anisotropy,
 }: {
   events: GlobeEngineEvents
   invalidate: () => void
   /** Current neutral zoom (texture detail). */
   zoom: () => number
-  maxTextureSize: () => number
-  anisotropy: () => number
 }): GlobeContent {
-  const scene = new Scene()
-  const uniforms = createMorphUniforms()
-  const surface = createSurfaceGeometry()
+  const uniforms: MorphUniforms = {
+    flatMatrix: new Float32Array(16),
+    sphereMatrix: new Float32Array(16),
+    morph: 1,
+    flatKind: 1,
+    camModel: [0, 0, 5],
+  }
   const layers = new Map<string, LayerEntry>()
   const loadWaiters: Array<() => void> = []
-  const base = createBaseMesh(surface, uniforms, BASE_COLOR.light)
-  base.visible = false
-  scene.add(base)
-  let lines: Array<LineSegments> = []
+  let res: GlResources | null = null
+  let baseColor = BASE_COLOR.light
+  let lineGroups: Array<LineGroup> = []
   let outline: GlobeOutlineSpec | null = null
   let inFlight = 0
   let upgradeTimer = 0
@@ -191,7 +230,7 @@ export function createGlobeContent({
     regionScale(
       layerRegion(spec),
       (2 * Math.PI * globeRadiusPx(zoom())) / 360,
-      Math.min(MAX_SIDE, maxTextureSize()),
+      Math.min(MAX_SIDE, res?.maxTextureSize ?? MAX_SIDE),
     )
   const firstScale = (spec: GlobeLayerSpec) => {
     const [w, , e] = layerRegion(spec)
@@ -209,36 +248,11 @@ export function createGlobeContent({
     events.onLoadingChange(inFlight)
   }
 
-  function showTexture(
-    entry: LayerEntry,
-    bitmap: ImageBitmap,
-    region: ReturnType<typeof layerRegion>,
-    scale: number,
-  ) {
-    const texture = new Texture(bitmap)
-    texture.flipY = false
-    texture.colorSpace = NoColorSpace
-    texture.generateMipmaps = true
-    texture.minFilter = LinearMipmapLinearFilter
-    texture.magFilter = LinearFilter
-    texture.anisotropy = anisotropy()
-    texture.needsUpdate = true
-    const old = entry.texture
-    const { uniforms: u } = entry.mesh.material as RawShaderMaterial
-    u.uTex.value = texture
-    const [w, s, e, n] = region
-    ;(u.uBox.value as Vector4).set(
-      (w + 180) / 360,
-      (90 - n) / 180,
-      (e - w) / 360,
-      (n - s) / 180,
-    )
-    entry.texture = texture
-    entry.scale = scale
-    if (old) {
-      old.dispose()
-      ;(old.image as ImageBitmap | null)?.close()
-    }
+  function dropTexture(entry: LayerEntry) {
+    if (entry.texture && res) res.gl.deleteTexture(entry.texture)
+    entry.texture = null
+    entry.pending?.close()
+    entry.pending = null
   }
 
   function load(entry: LayerEntry, scale: number) {
@@ -250,9 +264,9 @@ export function createGlobeContent({
     const url = regionGetMapUrl(entry.spec, region, regionSize(region, scale))
     setInFlight(1)
     fetch(url, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`GetMap ${res.status}`)
-        return res.blob()
+      .then((r) => {
+        if (!r.ok) throw new Error(`GetMap ${r.status}`)
+        return r.blob()
       })
       .then((blob) =>
         createImageBitmap(blob, {
@@ -265,9 +279,17 @@ export function createGlobeContent({
           bitmap.close()
           return
         }
-        showTexture(entry, bitmap, region, scale)
+        dropTexture(entry)
+        entry.pending = bitmap
+        const [w, s, e, n] = region
+        entry.box = [
+          (w + 180) / 360,
+          (90 - n) / 180,
+          (e - w) / 360,
+          (n - s) / 180,
+        ]
+        entry.scale = scale
         entry.errored = false
-        entry.mesh.visible = true
         events.onLayerLoad(key, time, true)
         scheduleUpgrade()
       })
@@ -276,7 +298,7 @@ export function createGlobeContent({
         log.warn(`Globe GetMap failed for ${entry.spec.layerName}`, err)
         // A stale image must never pose as the requested instant.
         entry.errored = true
-        entry.mesh.visible = false
+        dropTexture(entry)
         events.onLayerLoad(key, time, false)
       })
       .finally(() => {
@@ -305,28 +327,25 @@ export function createGlobeContent({
 
   function removeLayer(entry: LayerEntry) {
     entry.controller?.abort()
-    scene.remove(entry.mesh)
-    ;(entry.mesh.material as RawShaderMaterial).dispose()
-    entry.texture?.dispose()
-    ;(entry.texture?.image as ImageBitmap | null)?.close()
+    dropTexture(entry)
+  }
+
+  function clearLines() {
+    for (const group of lineGroups) {
+      if (group.mesh && res) deleteMesh(res.gl, group.mesh)
+    }
+    lineGroups = []
   }
 
   function buildOutline() {
-    for (const mesh of lines) {
-      scene.remove(mesh)
-      mesh.geometry.dispose()
-      ;(mesh.material as RawShaderMaterial).dispose()
-    }
-    lines = []
-    base.visible = outline !== null
+    clearLines()
     if (!outline) {
       if (!disposed) invalidate()
       return
     }
     const spec = outline
     const palette = outlinePalette(spec.theme)
-    ;(base.material as RawShaderMaterial).uniforms.uColor.value =
-      BASE_COLOR[spec.theme]
+    baseColor = BASE_COLOR[spec.theme]
     void loadOutlineData().then(
       (data) => {
         if (disposed || outline !== spec) return
@@ -335,12 +354,14 @@ export function createGlobeContent({
           [geojsonLines(data.countries), palette.border],
           [geojsonLines(data.coastlines), palette.coast],
         ]
-        lines = groups.map(([polylines, color], i) => {
+        lineGroups = groups.map(([polylines, color]) => {
           const color4 = cssColor(color)
-          color4.w *= spec.opacity
-          const mesh = createLinesMesh(polylines, uniforms, color4, 1 + i)
-          scene.add(mesh)
-          return mesh
+          color4[3] *= spec.opacity
+          return {
+            geometry: linesGeometry(polylines),
+            color: color4,
+            mesh: null,
+          }
         })
         invalidate()
       },
@@ -348,8 +369,96 @@ export function createGlobeContent({
     )
   }
 
+  /** Programs and the surface mesh live as long as the context. */
+  function attach(gl: WebGL2RenderingContext): GlResources {
+    if (res?.gl === gl) return res
+    if (res) {
+      // A new context: the old resources died with the old one.
+      for (const entry of layers.values()) entry.texture = null
+      for (const group of lineGroups) group.mesh = null
+    }
+    res = {
+      gl,
+      layerProgram: createProgram(gl, VERTEX, LAYER_FRAGMENT, [
+        ...SHARED_UNIFORMS,
+        ...LAYER_UNIFORMS,
+      ]),
+      colorProgram: createProgram(gl, VERTEX, COLOR_FRAGMENT, [
+        ...SHARED_UNIFORMS,
+        ...COLOR_UNIFORMS,
+      ]),
+      surface: createMesh(gl, surfaceGeometry()),
+      maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
+    }
+    return res
+  }
+
+  function setShared(gl: WebGL2RenderingContext, p: Program<SharedUniform>) {
+    gl.useProgram(p.program)
+    gl.uniformMatrix4fv(p.uniforms.uFlatMatrix, false, uniforms.flatMatrix)
+    gl.uniformMatrix4fv(p.uniforms.uSphereMatrix, false, uniforms.sphereMatrix)
+    gl.uniform1f(p.uniforms.uMorph, uniforms.morph)
+    gl.uniform1f(p.uniforms.uFlatKind, uniforms.flatKind)
+    gl.uniform3fv(p.uniforms.uCamModel, uniforms.camModel)
+  }
+
+  function draw(gl: WebGL2RenderingContext) {
+    if (disposed) return
+    const r = attach(gl)
+    gl.disable(gl.DEPTH_TEST)
+    gl.disable(gl.CULL_FACE)
+    gl.disable(gl.STENCIL_TEST)
+    gl.enable(gl.BLEND)
+    gl.blendFuncSeparate(
+      gl.ONE,
+      gl.ONE_MINUS_SRC_ALPHA,
+      gl.ONE,
+      gl.ONE_MINUS_SRC_ALPHA,
+    )
+
+    // Base fill only shows once round; while flat, OL shows no fill there.
+    const color = r.colorProgram
+    if (outline) {
+      setShared(gl, color)
+      gl.uniform4fv(color.uniforms.uColor, baseColor)
+      gl.uniform1f(color.uniforms.uOpacity, uniforms.morph)
+      drawMesh(gl, r.surface)
+    }
+
+    if (lineGroups.length > 0) {
+      setShared(gl, color)
+      gl.uniform1f(color.uniforms.uOpacity, 1)
+      for (const group of lineGroups) {
+        group.mesh ??= createMesh(gl, group.geometry)
+        gl.uniform4fv(color.uniforms.uColor, group.color)
+        drawMesh(gl, group.mesh)
+      }
+    }
+
+    const layer = r.layerProgram
+    setShared(gl, layer)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.uniform1i(layer.uniforms.uTex, 0)
+    const ordered = [...layers.values()].sort(
+      (a, b) => a.spec.zIndex - b.spec.zIndex,
+    )
+    for (const entry of ordered) {
+      if (entry.pending) {
+        entry.texture = createTexture(gl, entry.pending)
+        entry.pending.close()
+        entry.pending = null
+      }
+      if (!entry.texture || entry.spec.opacity <= 0) continue
+      gl.bindTexture(gl.TEXTURE_2D, entry.texture)
+      gl.uniform1f(layer.uniforms.uOpacity, entry.spec.opacity)
+      gl.uniform4fv(layer.uniforms.uBox, entry.box)
+      drawMesh(gl, r.surface)
+    }
+    gl.bindTexture(gl.TEXTURE_2D, null)
+    gl.useProgram(null)
+  }
+
   return {
-    scene,
     uniforms,
 
     setLayers: (specs) => {
@@ -359,14 +468,12 @@ export function createGlobeContent({
         const paramsKey = `${spec.endpoint}|${JSON.stringify(spec.params)}`
         let entry = layers.get(spec.key)
         if (!entry) {
-          const mesh = createLayerMesh(surface, uniforms, null, spec.zIndex)
-          mesh.visible = false
-          scene.add(mesh)
           entry = {
             spec,
             paramsKey,
-            mesh,
+            pending: null,
             texture: null,
+            box: [0, 0, 1, 1],
             scale: 0,
             controller: null,
             errored: false,
@@ -388,9 +495,6 @@ export function createGlobeContent({
         } else {
           entry.spec = spec
         }
-        const material = entry.mesh.material as RawShaderMaterial
-        material.uniforms.uOpacity.value = spec.opacity
-        entry.mesh.renderOrder = spec.zIndex
       }
       for (const [key, entry] of layers) {
         if (wanted.has(key)) continue
@@ -414,15 +518,21 @@ export function createGlobeContent({
 
     scheduleUpgrade,
 
+    draw,
+
     dispose: () => {
       disposed = true
       window.clearTimeout(upgradeTimer)
       for (const entry of layers.values()) removeLayer(entry)
       layers.clear()
       outline = null
-      buildOutline()
-      surface.dispose()
-      ;(base.material as RawShaderMaterial).dispose()
+      clearLines()
+      if (res) {
+        deleteMesh(res.gl, res.surface)
+        res.gl.deleteProgram(res.layerProgram.program)
+        res.gl.deleteProgram(res.colorProgram.program)
+        res = null
+      }
       for (const resolve of loadWaiters.splice(0)) resolve()
     },
   }

@@ -17,6 +17,8 @@ import {
   EARTH_RADIUS_M,
   MAX_MERCATOR_LAT,
   MERCATOR_WORLD_M,
+  lonLatToEquirectUnit,
+  lonLatToMercatorUnit,
 } from './sphere-math'
 import type View from 'ol/View'
 import type { FlatProjectionId } from '../projection-ids'
@@ -106,6 +108,31 @@ export function worldWidthPx(view: View): number | null {
   if (code === 'EPSG:3857') return MERCATOR_WORLD_M / res
   if (code === 'EPSG:4326') return 360 / res
   return null
+}
+
+/** Unit flat world → clip matching the OL view: clipX = kx(x − cx), clipY = ky(cy − y). */
+export function flatClipTransform(
+  flat: FlatCamera,
+  widthPx: number,
+  heightPx: number,
+): { kx: number; ky: number; cx: number; cy: number } | null {
+  let world: [number, number]
+  let center: [number, number]
+  if (flat.projection === 'merc') {
+    world = [MERCATOR_WORLD_M, MERCATOR_WORLD_M]
+    center = lonLatToMercatorUnit(flat.lon, flat.lat)
+  } else if (flat.projection === 'geo') {
+    world = [360, 180]
+    center = lonLatToEquirectUnit(flat.lon, flat.lat)
+  } else {
+    return null
+  }
+  return {
+    kx: (2 * world[0]) / (flat.resolution * widthPx),
+    ky: (2 * world[1]) / (flat.resolution * heightPx),
+    cx: center[0],
+    cy: center[1],
+  }
 }
 
 export function flatCameraOf(
