@@ -12,15 +12,22 @@
  * Continuous-pan keyboard handling: plain WASD/arrow holds pan via rAF;
  * modifier chords are the browser's; held-state comes from TanStack's
  * tracker so macOS-swallowed keyups and window blur cannot leave the
- * camera panning forever.
+ * camera panning forever. +/- zoom one step per press.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { HotkeysProvider, KeyStateTracker } from '@tanstack/react-hotkeys'
+import { NAV_ZOOM_STEP } from '@/features/viewer/geo/map-nav'
 import { useGeoShortcuts } from '@/features/viewer/geo/useGeoShortcuts'
 
-function Harness({ onPan }: { onPan: (dx: number, dy: number) => void }) {
+function Harness({
+  onPan,
+  onZoom,
+}: {
+  onPan: (dx: number, dy: number) => void
+  onZoom: (delta: number) => void
+}) {
   useGeoShortcuts({
     onToggleSidebars: () => {},
     onMode: () => {},
@@ -32,14 +39,18 @@ function Harness({ onPan }: { onPan: (dx: number, dy: number) => void }) {
     onAnnotate: () => {},
     onAnnotateDisarm: { enabled: false, disarm: () => {} },
     onPan,
+    onZoom,
   })
   return null
 }
 
-function renderHarness(onPan: (dx: number, dy: number) => void) {
+function renderHarness(
+  onPan: (dx: number, dy: number) => void,
+  onZoom: (delta: number) => void = () => {},
+) {
   return render(
     <HotkeysProvider>
-      <Harness onPan={onPan} />
+      <Harness onPan={onPan} onZoom={onZoom} />
     </HotkeysProvider>,
   )
 }
@@ -121,5 +132,42 @@ describe('useGeoShortcuts continuous pan', () => {
     const count = onPan.mock.calls.length
     await settle(200)
     expect(onPan.mock.calls.length).toBe(count)
+  })
+})
+
+describe('useGeoShortcuts zoom keys', () => {
+  it('zooms one step per press, whatever the layout needs Shift for', async () => {
+    const onZoom = vi.fn()
+    await renderHarness(() => {}, onZoom)
+
+    // US '+' is Shift+'='; the bare '=' and '-' keys count too.
+    const plus = pressKey('keydown', { key: '+', shiftKey: true })
+    pressKey('keydown', { key: '=' })
+    pressKey('keydown', { key: '-' })
+    // Key repeat is ignored: one step per press.
+    pressKey('keydown', { key: '-', repeat: true })
+
+    const step = NAV_ZOOM_STEP
+    expect(onZoom.mock.calls).toEqual([[step], [step], [-step]])
+    expect(plus.defaultPrevented).toBe(true)
+  })
+
+  it('leaves browser zoom chords and text fields alone', async () => {
+    const onZoom = vi.fn()
+    await renderHarness(() => {}, onZoom)
+
+    const cmdPlus = pressKey('keydown', { key: '=', metaKey: true })
+    const input = document.createElement('input')
+    document.body.append(input)
+    try {
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '-', bubbles: true }),
+      )
+    } finally {
+      input.remove()
+    }
+
+    expect(onZoom).not.toHaveBeenCalled()
+    expect(cmdPlus.defaultPrevented).toBe(false)
   })
 })

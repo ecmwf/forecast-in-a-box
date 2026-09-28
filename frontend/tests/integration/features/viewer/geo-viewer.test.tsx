@@ -39,6 +39,7 @@ import {
 import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
+import { NAV_ZOOM_STEP } from '@/features/viewer/geo/map-nav'
 import { CompareHelpDialog } from '@/features/viewer/geo/CompareHelpDialog'
 import i18n from '@/lib/i18n'
 import { useStylePinsStore } from '@/stores/stylePinsStore'
@@ -186,6 +187,8 @@ function injectMapSizing(): () => void {
   style.textContent = `
       [class*='h-full'][class*='overflow-hidden'][class*='rounded-md'] { position: relative; height: 400px; }
       [class*='absolute'][class*='inset-0'] { position: absolute; inset: 0; }
+      [class*='absolute'][class*='top-2'][class*='right-2'] { position: absolute; top: 8px; right: 8px; z-index: 10; }
+      [class~='pointer-events-none'] { pointer-events: none; }
     `
   document.head.append(style)
   return () => style.remove()
@@ -280,6 +283,49 @@ describe('GeoViewer', () => {
       new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
     )
     await expect.element(divider).toHaveAttribute('aria-valuenow', '52')
+  })
+
+  it('moves the flat map from its pan and zoom controls and the +/- keys', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    const camera = () =>
+      [...onViewStateChange.mock.calls]
+        .reverse()
+        .map((c) => (c[0] as Partial<ViewerUrlState>).camera)
+        .find((cam) => cam !== undefined)
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('2 m temperature').first().click()
+      await expect.poll(camera).toBeDefined()
+      const start = camera()!
+      // OL's own zoom buttons are gone: one control, shared with the globe.
+      expect(document.querySelector('.ol-zoom')).toBeNull()
+
+      await screen.getByRole('button', { name: 'Zoom in' }).click()
+      await expect
+        .poll(() => camera()?.zoom)
+        .toBeCloseTo(start.zoom + NAV_ZOOM_STEP, 2)
+      const lon = camera()!.lon
+      await screen
+        .getByRole('group', { name: 'Pan' })
+        .getByRole('button', { name: 'Pan right' })
+        .click()
+      await expect.poll(() => camera()?.lon).toBeGreaterThan(lon)
+
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '-', bubbles: true }),
+      )
+      await expect.poll(() => camera()?.zoom).toBeCloseTo(start.zoom, 2)
+    } finally {
+      removeSizing()
+    }
   })
 
   it('switches modes; flicker toggles the visible source', async () => {

@@ -19,6 +19,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import OlMap from 'ol/Map'
 import View from 'ol/View'
 import LayerGroup from 'ol/layer/Group'
+import { defaults as defaultControls } from 'ol/control/defaults'
 import { fromLonLat } from 'ol/proj'
 import { getCenter, getWidth } from 'ol/extent'
 import { BASEMAPS, makeBasemapLayer } from '../ol-layers'
@@ -176,6 +177,8 @@ export function useOlMapBase(
       target: container,
       layers: [basemap],
       view: olView,
+      // Zoom buttons come from MapNavControls, shared with the globe.
+      controls: defaultControls({ zoom: false }),
       // Default is 1px: a real mouse almost always drifts more than that
       // between press and release, silently swallowing `singleclick`
       // (annotations, feature hits). 6px still pans responsively.

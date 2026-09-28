@@ -84,6 +84,7 @@ import { useViewerExport } from './useViewerExport'
 import { useViewerTimeline } from './useViewerTimeline'
 import { downloadAnnotationsGeojson } from './annotations'
 import { useGeoShortcuts } from './useGeoShortcuts'
+import { panView, zoomView } from './map-nav'
 import { GeoTimeSlider } from './GeoTimeSlider'
 import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
@@ -486,6 +487,14 @@ export function GeoViewer({
     (fit: FitBboxAction | null) => setFitBboxAction(() => fit),
     [],
   )
+  // The globe registers its clamped zoom; the flat maps share `view`.
+  const [globeZoom, setGlobeZoom] = useState<((delta: number) => void) | null>(
+    null,
+  )
+  const onRegisterZoom = useCallback(
+    (zoom: ((delta: number) => void) | null) => setGlobeZoom(() => zoom),
+    [],
+  )
 
   const bBaseUrl = b?.baseUrl ?? null
 
@@ -871,20 +880,16 @@ export function GeoViewer({
   const { pan: panGlobe, zoomToResolution: zoomGlobeToResolution } = globe
   const onPan = useCallback(
     (dx: number, dy: number) => {
-      if (panGlobe(dx, dy)) return
-      const current = viewRef.current
-      const center = current.getCenter()
-      const resolution = current.getResolution()
-      if (!center || resolution === undefined) return
-      const target: [number, number] = [
-        center[0] + dx * resolution,
-        center[1] - dy * resolution,
-      ]
-      current.setCenter(
-        current.getConstrainedCenter(target, resolution) ?? target,
-      )
+      if (!panGlobe(dx, dy)) panView(viewRef.current, dx, dy)
     },
     [panGlobe],
+  )
+  const onZoom = useCallback(
+    (delta: number) => {
+      if (globeZoom) globeZoom(delta)
+      else zoomView(viewRef.current, delta)
+    },
+    [globeZoom],
   )
 
   // Live ground resolution (m/px) drives the panel's scale-band hints.
@@ -965,6 +970,7 @@ export function GeoViewer({
       },
     },
     onPan,
+    onZoom,
   })
 
   // -------- User-uploaded GeoJSON context overlays --------
@@ -1391,6 +1397,7 @@ export function GeoViewer({
               onContextLost={globe.onContextLost}
               onRegisterFit={onRegisterFit}
               onRegisterFitBbox={onRegisterFitBbox}
+              onRegisterZoom={onRegisterZoom}
               onRegisterCapture={onRegisterCapture}
             />
           )}

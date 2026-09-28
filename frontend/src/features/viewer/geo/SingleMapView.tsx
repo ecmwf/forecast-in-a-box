@@ -49,6 +49,8 @@ import { isAnnotationFeature, useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
 import { PanelCorner, SlotStatusBadges } from './SlotStatusBadges'
+import { MapNavControls } from './MapNavControls'
+import { NAV_CLEARANCE, NAV_EASE_MS, panView, zoomView } from './map-nav'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
@@ -666,9 +668,13 @@ export function SingleMapView({
             : undefined
         }
       />
-      {/* left-12 clears the OL zoom control (the tag hid its + button). */}
       {(showA || showB) && (
-        <div className="pointer-events-none absolute top-2 right-2 left-12 z-10 flex items-start gap-2">
+        <div
+          className={cn(
+            'pointer-events-none absolute top-2 left-2 z-10 flex items-start gap-2',
+            NAV_CLEARANCE,
+          )}
+        >
           {showA && (
             <CompareSlotTag
               slot="a"
@@ -699,6 +705,10 @@ export function SingleMapView({
           <SlotStatusBadges source={a} erroredNames={stackA.erroredNames} />
         )}
       </PanelCorner>
+      <MapNavControls
+        onPan={(dx, dy) => panView(view, dx, dy, NAV_EASE_MS)}
+        onZoom={(delta) => zoomView(view, delta)}
+      />
       <PanelCorner side="right">
         {showB && (
           <SlotStatusBadges source={b} erroredNames={stackB.erroredNames} />

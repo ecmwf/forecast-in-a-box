@@ -34,6 +34,8 @@ import { useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
 import { PanelCorner, SlotStatusBadges } from './SlotStatusBadges'
+import { MapNavControls } from './MapNavControls'
+import { NAV_CLEARANCE, NAV_EASE_MS, panView, zoomView } from './map-nav'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
@@ -460,8 +462,12 @@ function DualMapPanel({
           )}
         </div>
       )}
-      {/* left-12 clears the OL zoom control (the tag hid its + button). */}
-      <div className="pointer-events-none absolute top-2 right-2 left-12 z-10 flex">
+      <div
+        className={cn(
+          'pointer-events-none absolute top-2 left-2 z-10 flex',
+          NAV_CLEARANCE,
+        )}
+      >
         <CompareSlotTag
           slot={source.slot}
           label={source.label}
@@ -474,6 +480,10 @@ function DualMapPanel({
       <PanelCorner side="left">
         <SlotStatusBadges source={source} erroredNames={stack.erroredNames} />
       </PanelCorner>
+      <MapNavControls
+        onPan={(dx, dy) => panView(view, dx, dy, NAV_EASE_MS)}
+        onZoom={(delta) => zoomView(view, delta)}
+      />
       {cross && (
         <>
           <div

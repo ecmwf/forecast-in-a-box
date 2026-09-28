@@ -36,6 +36,7 @@ import type {
 import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
+import { NAV_ZOOM_STEP } from '@/features/viewer/geo/map-nav'
 import i18n from '@/lib/i18n'
 
 const engineCalls = vi.hoisted(() => ({
@@ -184,7 +185,7 @@ function injectMapSizing(): () => void {
       [class*='h-full'][class*='overflow-hidden'][class*='rounded-md'] { position: relative; height: 400px; }
       [class*='absolute'][class*='inset-0'] { position: absolute; inset: 0; }
       [data-globe-panel] { position: relative; height: 400px; }
-      [class*='absolute'][class*='top-10'][class*='right-2'] { position: absolute; top: 40px; right: 8px; z-index: 10; }
+      [class*='absolute'][class*='top-2'][class*='right-2'] { position: absolute; top: 8px; right: 8px; z-index: 10; }
       [class~='pointer-events-none'] { pointer-events: none; }
     `
   document.head.append(style)
@@ -232,7 +233,7 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByRole('button', { name: 'Measure distance' }))
       .toBeDisabled()
-    // The panel is a named, focusable region with non-drag controls.
+    // The panel is a named region with the flat maps' non-drag controls.
     const panel = screen.getByRole('region', { name: '3D globe, source A' })
     await expect.element(panel).toBeInTheDocument()
     const zoomBefore = engineCalls.camera().zoom
@@ -241,13 +242,20 @@ describe('GeoViewer 3D globe', () => {
     await zoom.getByRole('button', { name: 'Zoom in' }).click({ force: true })
     await expect
       .poll(() => engineCalls.camera().zoom)
-      .toBeGreaterThan(zoomBefore)
+      .toBeCloseTo(zoomBefore + NAV_ZOOM_STEP, 6)
     const lonBefore = engineCalls.camera().lon
     await panel
-      .getByRole('group', { name: 'Nudge' })
-      .getByRole('button', { name: 'Nudge east' })
+      .getByRole('group', { name: 'Pan' })
+      .getByRole('button', { name: 'Pan right' })
       .click({ force: true })
-    await expect.poll(() => engineCalls.camera().lon).not.toBe(lonBefore)
+    await expect.poll(() => engineCalls.camera().lon).toBeGreaterThan(lonBefore)
+    // The - key zooms the globe too, by the same step.
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { key: '-', bubbles: true }),
+    )
+    await expect
+      .poll(() => engineCalls.camera().zoom)
+      .toBeCloseTo(zoomBefore, 6)
 
     // P cycles projections: from the globe, back to Web Mercator.
     document.body.dispatchEvent(

@@ -11,6 +11,7 @@
 /** A source's status pills under its slot tag: data gap, failed layers, time offset. */
 
 import { useTranslation } from 'react-i18next'
+import { NAV_CLEARANCE } from './map-nav'
 import type { ReactNode } from 'react'
 import type { ParsedLayer } from '../wms-capabilities'
 import type { CompareMapSource } from './types'
@@ -36,7 +37,7 @@ export function PanelCorner({
     <div
       className={cn(
         'absolute top-10 z-10 flex flex-col gap-1.5',
-        side === 'left' ? 'left-2 items-start' : 'right-2 items-end',
+        side === 'left' ? 'left-2 items-start' : [NAV_CLEARANCE, 'items-end'],
       )}
     >
       {children}

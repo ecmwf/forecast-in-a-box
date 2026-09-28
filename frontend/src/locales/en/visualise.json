@@ -410,6 +410,7 @@
       "swipe": "Nudge the swipe divider (when focused)",
       "help": "Open this help",
       "pan": "Pan the map (arrow keys too)",
+      "zoom": "Zoom in / out",
       "annotate": "Toggle the annotate tool (Esc disarms)"
     }
   },
@@ -480,17 +481,19 @@
   },
   "globe": {
     "panel": "3D globe, source {{slot}}",
-    "zoom": "Zoom",
-    "nudge": "Nudge",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out",
-    "panNorth": "Nudge north",
-    "panSouth": "Nudge south",
-    "panWest": "Nudge west",
-    "panEast": "Nudge east",
     "toolUnavailable": "Not available on the 3D globe",
     "contextLost": "The 3D globe stopped (graphics context lost), back to the flat map",
     "failed": "The 3D globe could not start, staying on the flat map",
     "unsupported": "This browser cannot show the 3D globe, showing the flat map"
+  },
+  "nav": {
+    "pan": "Pan",
+    "panUp": "Pan up",
+    "panDown": "Pan down",
+    "panLeft": "Pan left",
+    "panRight": "Pan right",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out"
   }
 }
