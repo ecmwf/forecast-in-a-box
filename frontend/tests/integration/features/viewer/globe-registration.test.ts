@@ -456,6 +456,85 @@ describe('globe registration', () => {
     expect(readoutError(engine, WORLD_MARKERS[0])).toBeLessThan(0.3)
   })
 
+  it('never shows two instants at once after a time step', async () => {
+    const T1 = '2026-07-06T00:00:00Z'
+    const T2 = '2026-07-06T06:00:00Z'
+    const colours: Record<string, Rgb> = {
+      [T1]: [220, 40, 40],
+      [T2]: [40, 40, 220],
+    }
+    const isWorld = (u: URL) => u.searchParams.get('BBOX') === '-90,-180,90,180'
+    let releaseWorld = () => {}
+    const worldHeld = new Promise<void>((resolve) => {
+      releaseWorld = resolve
+    })
+    worker.use(
+      http.get(ENDPOINT, async ({ request }) => {
+        const url = new URL(request.url)
+        if (url.searchParams.get('LAYERS') !== 'timed') return
+        requests.push(url)
+        const time = url.searchParams.get('TIME') ?? ''
+        // The new world image is slow; the view image of the new instant lands first.
+        if (isWorld(url) && time === T2) await worldHeld
+        const [s, w, n, e] = (url.searchParams.get('BBOX') ?? '')
+          .split(',')
+          .map(Number)
+        const ppd = Number(url.searchParams.get('WIDTH')) / (e - w)
+        return HttpResponse.arrayBuffer(
+          await solidPng([w, s, e, n], ppd, colours[time]),
+          { headers: { 'Content-Type': 'image/png' } },
+        )
+      }),
+    )
+    const timed = (time: string): GlobeLayerSpec => {
+      const base = spec('timed', 1)
+      return { ...base, params: { ...base.params, TIME: time }, time }
+    }
+    /** On-screen pixels of each instant. */
+    const instants = () => {
+      const f = frame(engine)
+      const count = { t1: 0, t2: 0 }
+      for (let y = 4; y < HEIGHT; y += 8)
+        for (let x = 4; x < WIDTH; x += 8) {
+          const px = f.at(x, y)
+          if (near(px, colours[T1], 30)) count.t1++
+          else if (near(px, colours[T2], 30)) count.t2++
+        }
+      return count
+    }
+
+    // High up the view image misses the top corners, so the world image shows there.
+    engine.setCamera({ lon: -45, lat: 70, zoom: 5 })
+    engine.setLayers([timed(T1)])
+    await engine.whenLoaded()
+    expect(requests.some((u) => !isWorld(u))).toBe(true)
+
+    engine.setLayers([timed(T2)])
+    await expect
+      .poll(() =>
+        requests.some((u) => !isWorld(u) && u.searchParams.get('TIME') === T2),
+      )
+      .toBe(true)
+    await new Promise((r) => setTimeout(r, 500))
+    // Until the new world image is in, the frame stays wholly on T1.
+    const held = instants()
+    expect(held.t1, JSON.stringify(held)).toBeGreaterThan(100)
+    expect(held.t2, JSON.stringify(held)).toBe(0)
+    // With a view image covering the screen, the world image is re-fetched small.
+    const worldT2 = requests.find(
+      (u) => isWorld(u) && u.searchParams.get('TIME') === T2,
+    )!
+    expect(Number(worldT2.searchParams.get('WIDTH'))).toBeLessThanOrEqual(1024)
+
+    releaseWorld()
+    await expect
+      .poll(() => {
+        const c = instants()
+        return c.t2 > 100 && c.t1 === 0
+      })
+      .toBe(true)
+  })
+
   it('recovers its layers after a WebGL context loss', async () => {
     engine.setLayers([spec('world', 1)])
     await engine.whenLoaded()

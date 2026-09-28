@@ -108,6 +108,8 @@ interface Tile extends Slot {
   region: Region
   /** px/degree of the shown texture (0 = none yet). */
   scale: number
+  /** Params the shown texture was fetched with ('' = none). */
+  shownKey: string
   controller: AbortController | null
 }
 
@@ -120,6 +122,8 @@ interface LayerEntry extends Slot {
   box: Vec4
   /** px/degree of the shown texture (0 = none yet). */
   scale: number
+  /** Params the shown texture was fetched with ('' = none). */
+  shownKey: string
   controller: AbortController | null
   /** Screen-resolution image of the visible area, once the world image is too coarse. */
   detail: Tile | null
@@ -425,6 +429,7 @@ export function createGlobeContent({
     tile.texture = null
     tile.pending?.close()
     tile.pending = null
+    tile.shownKey = ''
     textureLedger.bytes -= tile.bytes
     tile.bytes = 0
   }
@@ -436,11 +441,21 @@ export function createGlobeContent({
     entry.detail = null
   }
 
+  /** Call off an in-flight view image, keeping the shown one. */
+  function abortDetail(entry: LayerEntry) {
+    const d = entry.detail
+    if (!d?.controller) return
+    d.controller.abort()
+    d.controller = null
+    holdBytes(d, 0)
+  }
+
   function dropTexture(entry: LayerEntry) {
     if (entry.texture && res) res.gl.deleteTexture(entry.texture)
     entry.texture = null
     entry.pending?.close()
     entry.pending = null
+    entry.shownKey = ''
     textureLedger.bytes -= entry.bytes
     entry.bytes = 0
   }
@@ -469,12 +484,14 @@ export function createGlobeContent({
   function loadDetail(entry: LayerEntry, region: Region, scale: number) {
     entry.detail?.controller?.abort()
     const controller = new AbortController()
+    const key = entry.paramsKey
     const tile: Tile = entry.detail ?? {
       pending: null,
       texture: null,
       box: NO_HOLE,
       region,
       scale: 0,
+      shownKey: '',
       controller: null,
       bytes: 0,
       reserved: 0,
@@ -495,6 +512,7 @@ export function createGlobeContent({
         tile.box = boxOf(region)
         tile.region = region
         tile.scale = scale
+        tile.shownKey = key
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted || disposed) return
@@ -516,6 +534,7 @@ export function createGlobeContent({
     const controller = new AbortController()
     entry.controller = controller
     const { key, time } = entry.spec
+    const paramsKey = entry.paramsKey
     const region = layerRegion(entry.spec)
     // The first image always loads; the budget only bounds sharper ones.
     const scale = Math.max(
@@ -533,6 +552,7 @@ export function createGlobeContent({
         dropTexture(entry)
         commitBytes(entry)
         entry.pending = bitmap
+        entry.shownKey = paramsKey
         entry.box = boxOf(region)
         entry.scale = scale
         entry.errored = false
@@ -583,7 +603,11 @@ export function createGlobeContent({
       d ?? { bytes: 0, reserved: 0 },
     )
     if (scale <= worldCap * UPGRADE_FACTOR) return
-    if (d && d.scale * UPGRADE_FACTOR >= scale && covers(d.region, region))
+    if (
+      d?.shownKey === entry.paramsKey &&
+      d.scale * UPGRADE_FACTOR >= scale &&
+      covers(d.region, region)
+    )
       return
     // Alongside the world image, not after it: entering zoomed in needs it first.
     if (!entry.errored) loadDetail(entry, region, scale)
@@ -771,7 +795,13 @@ export function createGlobeContent({
         d.pending.close()
         d.pending = null
       }
-      if ((!entry.texture && !d?.texture) || entry.spec.opacity <= 0) continue
+      // One instant per frame: a view image only over a world image of its params.
+      const detail =
+        d?.texture &&
+        d.shownKey === (entry.texture ? entry.shownKey : entry.paramsKey)
+          ? d
+          : null
+      if ((!entry.texture && !detail) || entry.spec.opacity <= 0) continue
       // Outside the server's scale band the layer is hidden, as on the flat map.
       if (
         entry.spec.scale &&
@@ -782,12 +812,12 @@ export function createGlobeContent({
       if (entry.texture) {
         gl.bindTexture(gl.TEXTURE_2D, entry.texture)
         gl.uniform4fv(layer.uniforms.uBox, entry.box)
-        gl.uniform4fv(layer.uniforms.uHole, d?.texture ? d.box : NO_HOLE)
+        gl.uniform4fv(layer.uniforms.uHole, detail ? detail.box : NO_HOLE)
         drawMesh(gl, r.surface)
       }
-      if (d?.texture) {
-        gl.bindTexture(gl.TEXTURE_2D, d.texture)
-        gl.uniform4fv(layer.uniforms.uBox, d.box)
+      if (detail) {
+        gl.bindTexture(gl.TEXTURE_2D, detail.texture)
+        gl.uniform4fv(layer.uniforms.uBox, detail.box)
         gl.uniform4fv(layer.uniforms.uHole, NO_HOLE)
         drawMesh(gl, r.surface)
       }
@@ -836,6 +866,7 @@ export function createGlobeContent({
           texture: null,
           box: [0, 0, 1, 1],
           scale: 0,
+          shownKey: '',
           controller: null,
           detail: null,
           errored: false,
@@ -854,17 +885,22 @@ export function createGlobeContent({
       } else if (entry.paramsKey !== paramsKey) {
         entry.spec = spec
         entry.paramsKey = paramsKey
+        entry.errored = false
         changed = true
-        dropDetail(entry)
-        if (hold) defer(entry)
-        else {
-          // Keep the shown detail when the time/style changes.
+        if (hold) {
+          dropDetail(entry)
+          defer(entry)
+        } else {
+          // Keep the shown pair until the new world image lands; fetched small when a view image covers it.
+          abortDetail(entry)
           load(
             entry,
-            Math.max(
-              firstScale(spec),
-              Math.min(entry.scale, targetScale(spec)),
-            ),
+            entry.detail?.texture
+              ? firstScale(spec)
+              : Math.max(
+                  firstScale(spec),
+                  Math.min(entry.scale, targetScale(spec)),
+                ),
           )
           loading.push(entry)
         }
