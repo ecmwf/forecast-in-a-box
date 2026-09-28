@@ -46,6 +46,8 @@ const FLY_MS = 400
 /** Longest hold of the seed image after the bend while live layers load. */
 const SEED_HOLD_CAP_MS = 4000
 const SEED_FADE_MS = 250
+/** A context lost this long without a restore hands the panel back to the flat map. */
+const RESTORE_WAIT_MS = 5000
 const EMPTY_FLAT: FlatCamera = {
   projection: 'merc',
   lon: 0,
@@ -176,6 +178,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   let programmatic = false
   let wheelLockUntil = 0
   let wheelTimer = 0
+  let restoreTimer = 0
   let basemap: GlobeBasemapSpec | null = null
   /** Vector style currently loaded (null = the empty globe style). */
   let styleUrl: string | null = null
@@ -488,7 +491,20 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         events.onCameraChange(cameraOf(m), 'user')
         content?.scheduleUpgrade()
       })
-      m.on('webglcontextlost', () => events.onContextLost())
+      m.on('webglcontextlost', () => {
+        styleReady = false
+        window.clearTimeout(restoreTimer)
+        restoreTimer = window.setTimeout(
+          () => events.onContextLost(),
+          RESTORE_WAIT_MS,
+        )
+      })
+      // MapLibre restores its own layers; custom layers, state and textures are ours.
+      m.on('webglcontextrestored', () => {
+        window.clearTimeout(restoreTimer)
+        content?.reset()
+        loadStyle(styleUrl)
+      })
       const onWheel = () => {
         if (performance.now() < wheelLockUntil) {
           wheelLockUntil = performance.now() + 150
@@ -653,6 +669,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
 
     destroy: () => {
       window.clearTimeout(wheelTimer)
+      window.clearTimeout(restoreTimer)
       content?.dispose()
       content = null
       map?.remove()

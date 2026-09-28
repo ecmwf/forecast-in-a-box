@@ -23,6 +23,7 @@ import type {
 } from '@/features/viewer/globe/engine'
 import { GLOBE_ENGINE } from '@/features/viewer/globe/engine-entry'
 import { globeFitZoom } from '@/features/viewer/globe/globe-camera'
+import { textureLedger } from '@/features/viewer/globe/globe-content'
 
 const ENDPOINT = 'http://localhost:9911/wms'
 const WIDTH = 640
@@ -346,6 +347,55 @@ describe('globe registration', () => {
       .toBe(true)
     await new Promise((r) => setTimeout(r, 300))
     expect(readoutError(engine, WORLD_MARKERS[0])).toBeLessThan(0.3)
+  })
+
+  it('recovers its layers after a WebGL context loss', async () => {
+    engine.setLayers([spec('world', 1)])
+    await engine.whenLoaded()
+    const canvas = container.querySelector<HTMLCanvasElement>(
+      '[data-testid="globe-canvas"]',
+    )!
+    const lose = canvas
+      .getContext('webgl2')!
+      .getExtension('WEBGL_lose_context')!
+    const fetched = requests.length
+    lose.loseContext()
+    await new Promise((r) => setTimeout(r, 50))
+    lose.restoreContext()
+    // Textures died with the context: the image is fetched again, then drawn right.
+    await expect
+      .poll(() => requests.length, { timeout: 5000 })
+      .toBeGreaterThan(fetched)
+    await engine.whenLoaded()
+    await new Promise((r) => setTimeout(r, 300))
+    for (const m of WORLD_MARKERS) {
+      expect(readoutError(engine, m)).toBeLessThan(0.3)
+    }
+  })
+
+  it('keeps layer textures within the GPU budget', async () => {
+    const budget = textureLedger.budget
+    // Room for three first images (1024 px wide), none of the sharper ones.
+    textureLedger.budget = 8 * 2 ** 20
+    try {
+      engine.setCamera({ lon: -45, lat: 15, zoom: 6 })
+      engine.setLayers([
+        spec('solid', 0),
+        spec('world', 1),
+        spec('region', 3, REGION),
+      ])
+      await engine.whenLoaded()
+      await new Promise((r) => setTimeout(r, 800))
+      expect(textureLedger.bytes).toBeLessThanOrEqual(textureLedger.budget)
+      expect(
+        requests.every((u) => Number(u.searchParams.get('WIDTH')) <= 1024),
+      ).toBe(true)
+      expect(readoutError(engine, WORLD_MARKERS[0])).toBeLessThan(0.3)
+      engine.destroy()
+      expect(textureLedger.bytes).toBe(0)
+    } finally {
+      textureLedger.budget = budget
+    }
   })
 
   it('shows only server colours when magnified', async () => {

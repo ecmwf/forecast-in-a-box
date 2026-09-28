@@ -93,7 +93,13 @@ export interface MorphUniforms {
 }
 
 /** One texture: decoded bitmap waiting for upload, or uploaded. */
-interface Tile {
+/** Ledger share of one image: resident (pending or uploaded) and in flight. */
+interface Slot {
+  bytes: number
+  reserved: number
+}
+
+interface Tile extends Slot {
   pending: ImageBitmap | null
   texture: WebGLTexture | null
   box: Vec4
@@ -103,7 +109,7 @@ interface Tile {
   controller: AbortController | null
 }
 
-interface LayerEntry {
+interface LayerEntry extends Slot {
   spec: GlobeLayerSpec
   paramsKey: string
   /** Decoded, waiting for a context to upload into. */
@@ -129,6 +135,13 @@ export interface GlobeViewState {
 }
 
 const NO_HOLE: Vec4 = [0, 0, 0, 0]
+
+/** GPU bytes every globe panel on the page may hold in layer textures; touch devices get less. */
+export const textureLedger = {
+  budget: (navigator.maxTouchPoints > 1 ? 96 : 256) * 2 ** 20,
+  bytes: 0,
+}
+const bytesOf = (size: readonly [number, number]) => size[0] * size[1] * 4
 
 function boxOf([w, s, e, n]: Region): Vec4 {
   return [(w + 180) / 360, (90 - n) / 180, (e - w) / 360, (n - s) / 180]
@@ -304,6 +317,8 @@ export interface GlobeContent {
   draw: (gl: WebGL2RenderingContext) => void
   /** Draw the seed image (above the host's own layers). */
   drawSeed: (gl: WebGL2RenderingContext) => void
+  /** After a context loss: GL handles are dead, so every image is fetched again. */
+  reset: () => void
   dispose: () => void
 }
 
@@ -361,11 +376,32 @@ export function createGlobeContent({
     events.onLoadingChange(inFlight)
   }
 
+  function holdBytes(slot: Slot, n: number) {
+    textureLedger.bytes += n - slot.reserved
+    slot.reserved = n
+  }
+
+  /** The reserved image is now the resident one. */
+  function commitBytes(slot: Slot) {
+    slot.bytes = slot.reserved
+    slot.reserved = 0
+  }
+
+  /** Largest scale up to `scale` whose image fits the budget once this slot's own image goes. */
+  function fitScale(region: Region, scale: number, slot: Slot): number {
+    const free =
+      textureLedger.budget - textureLedger.bytes + slot.bytes + slot.reserved
+    const need = bytesOf(regionSize(region, scale))
+    return need <= free ? scale : scale * Math.sqrt(Math.max(free, 0) / need)
+  }
+
   function dropTile(tile: Tile) {
     if (tile.texture && res) res.gl.deleteTexture(tile.texture)
     tile.texture = null
     tile.pending?.close()
     tile.pending = null
+    textureLedger.bytes -= tile.bytes
+    tile.bytes = 0
   }
 
   function dropDetail(entry: LayerEntry) {
@@ -380,6 +416,8 @@ export function createGlobeContent({
     entry.texture = null
     entry.pending?.close()
     entry.pending = null
+    textureLedger.bytes -= entry.bytes
+    entry.bytes = 0
   }
 
   function fetchBitmap(
@@ -413,9 +451,12 @@ export function createGlobeContent({
       region,
       scale: 0,
       controller: null,
+      bytes: 0,
+      reserved: 0,
     }
     tile.controller = controller
     entry.detail = tile
+    holdBytes(tile, bytesOf(regionSize(region, scale)))
     setInFlight(1)
     fetchBitmap(entry.spec, region, scale, controller.signal)
       .then((bitmap) => {
@@ -424,6 +465,7 @@ export function createGlobeContent({
           return
         }
         dropTile(tile)
+        commitBytes(tile)
         tile.pending = bitmap
         tile.box = boxOf(region)
         tile.region = region
@@ -434,18 +476,27 @@ export function createGlobeContent({
         log.warn(`Globe detail GetMap failed for ${entry.spec.layerName}`, err)
       })
       .finally(() => {
-        if (tile.controller === controller) tile.controller = null
+        if (tile.controller === controller) {
+          tile.controller = null
+          holdBytes(tile, 0)
+        }
         setInFlight(-1)
         if (!disposed) invalidate()
       })
   }
 
-  function load(entry: LayerEntry, scale: number) {
+  function load(entry: LayerEntry, wanted: number) {
     entry.controller?.abort()
     const controller = new AbortController()
     entry.controller = controller
     const { key, time } = entry.spec
     const region = layerRegion(entry.spec)
+    // The first image always loads; the budget only bounds sharper ones.
+    const scale = Math.max(
+      fitScale(region, wanted, entry),
+      Math.min(wanted, firstScale(entry.spec)),
+    )
+    holdBytes(entry, bytesOf(regionSize(region, scale)))
     setInFlight(1)
     fetchBitmap(entry.spec, region, scale, controller.signal)
       .then((bitmap) => {
@@ -454,6 +505,7 @@ export function createGlobeContent({
           return
         }
         dropTexture(entry)
+        commitBytes(entry)
         entry.pending = bitmap
         entry.box = boxOf(region)
         entry.scale = scale
@@ -470,7 +522,10 @@ export function createGlobeContent({
         events.onLayerLoad(key, time, false)
       })
       .finally(() => {
-        if (entry.controller === controller) entry.controller = null
+        if (entry.controller === controller) {
+          entry.controller = null
+          holdBytes(entry, 0)
+        }
         setInFlight(-1)
         if (!controller.signal.aborted) entry.settled = true
         checkLoaded()
@@ -493,9 +548,15 @@ export function createGlobeContent({
     const visible = visibleRegion(v)
     const region = intersect(visible, layerRegion(entry.spec))
     if (!region) return
-    const scale = regionScale(region, wanted, maxPx)
     const d = entry.detail
     if (d?.controller) return
+    // Within budget the detail must still beat the world image.
+    const scale = fitScale(
+      region,
+      regionScale(region, wanted, maxPx),
+      d ?? { bytes: 0, reserved: 0 },
+    )
+    if (scale <= worldCap * UPGRADE_FACTOR) return
     if (d && d.scale * UPGRADE_FACTOR >= scale && covers(d.region, region))
       return
     if (!entry.controller && !entry.errored) loadDetail(entry, region, scale)
@@ -506,7 +567,11 @@ export function createGlobeContent({
     upgradeTimer = window.setTimeout(() => {
       const v = view()
       for (const entry of allEntries()) {
-        const target = targetScale(entry.spec)
+        const target = fitScale(
+          layerRegion(entry.spec),
+          targetScale(entry.spec),
+          entry,
+        )
         if (
           !entry.controller &&
           !entry.errored &&
@@ -729,6 +794,8 @@ export function createGlobeContent({
           detail: null,
           errored: false,
           settled: false,
+          bytes: 0,
+          reserved: 0,
         }
         target.set(spec.key, entry)
         load(entry, firstScale(spec))
@@ -790,6 +857,20 @@ export function createGlobeContent({
     draw,
 
     drawSeed,
+
+    reset: () => {
+      res = null
+      for (const group of lineGroups) group.mesh = null
+      clearSeed()
+      for (const entry of allEntries()) {
+        dropTexture(entry)
+        dropDetail(entry)
+        entry.scale = 0
+        entry.settled = false
+        load(entry, firstScale(entry.spec))
+      }
+      scheduleUpgrade()
+    },
 
     dispose: () => {
       disposed = true
