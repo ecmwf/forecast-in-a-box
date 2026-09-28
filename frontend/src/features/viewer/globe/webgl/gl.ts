@@ -110,7 +110,10 @@ export function deleteMesh(gl: WebGL2RenderingContext, mesh: Mesh): void {
   for (const buffer of mesh.buffers) gl.deleteBuffer(buffer)
 }
 
-/** Premultiplied RGBA, nearest at every scale: only colours the server drew. */
+/** Anisotropy cap: sharp at the limb and at high latitudes. */
+const MAX_ANISOTROPY = 8
+
+/** Premultiplied RGBA; nearest when magnified (server colours), trilinear when minified (no broken lines). */
 export function createTexture(
   gl: WebGL2RenderingContext,
   source: TexImageSource,
@@ -124,10 +127,24 @@ export function createTexture(
   gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE)
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source)
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+  gl.generateMipmap(gl.TEXTURE_2D)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+  gl.texParameteri(
+    gl.TEXTURE_2D,
+    gl.TEXTURE_MIN_FILTER,
+    gl.LINEAR_MIPMAP_LINEAR,
+  )
+  const aniso = gl.getExtension('EXT_texture_filter_anisotropic')
+  if (aniso) {
+    const max = gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT) as number
+    gl.texParameterf(
+      gl.TEXTURE_2D,
+      aniso.TEXTURE_MAX_ANISOTROPY_EXT,
+      Math.min(MAX_ANISOTROPY, max),
+    )
+  }
   gl.bindTexture(gl.TEXTURE_2D, null)
   return texture
 }

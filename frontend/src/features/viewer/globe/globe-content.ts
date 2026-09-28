@@ -143,7 +143,9 @@ export const textureLedger = {
   budget: (navigator.maxTouchPoints > 1 ? 96 : 256) * 2 ** 20,
   bytes: 0,
 }
-const bytesOf = (size: readonly [number, number]) => size[0] * size[1] * 4
+// RGBA plus a third for the mipmaps.
+const bytesOf = (size: readonly [number, number]) =>
+  Math.ceil((size[0] * size[1] * 4 * 4) / 3)
 
 function boxOf([w, s, e, n]: Region): Vec4 {
   return [(w + 180) / 360, (90 - n) / 180, (e - w) / 360, (n - s) / 180]

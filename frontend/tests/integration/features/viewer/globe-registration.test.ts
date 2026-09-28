@@ -48,6 +48,8 @@ const REGION: [number, number, number, number] = [-60, 20, -20, 55]
 const REGION_MARKER: Marker = { lon: -50, lat: 40, rgb: [255, 160, 0] }
 const CAMERA = { lon: -35, lat: 10, zoom: globeFitZoom(WIDTH, HEIGHT) }
 const SOLID: Rgb = [40, 120, 200]
+// One-texel meridians 21 texels apart, so sampling phase drifts line to line; ~2.5× minified east–west near 65°N.
+const LINE_LONS = Array.from({ length: 11 }, (_, i) => -60 + i * 5.25)
 
 /** PNG of `bbox` at `ppd` px/degree; markers are whole-pixel squares (no AA). */
 async function markerPng(
@@ -64,6 +66,22 @@ async function markerPng(
     const x = (m.lon - w) * ppd
     const y = (n - m.lat) * ppd
     ctx.fillRect(x - side / 2, y - side / 2, side, side)
+  }
+  const blob = await canvas.convertToBlob({ type: 'image/png' })
+  return blob.arrayBuffer()
+}
+
+/** World PNG at `ppd` px/degree with one-texel meridian lines at `lons`, `lat0`..`lat1`. */
+async function linesPng(
+  ppd: number,
+  lons: ReadonlyArray<number>,
+  [lat0, lat1]: readonly [number, number],
+): Promise<ArrayBuffer> {
+  const canvas = new OffscreenCanvas(360 * ppd, 180 * ppd)
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = 'rgb(0,0,0)'
+  for (const lon of lons) {
+    ctx.fillRect((lon + 180) * ppd, (90 - lat1) * ppd, 1, (lat1 - lat0) * ppd)
   }
   const blob = await canvas.convertToBlob({ type: 'image/png' })
   return blob.arrayBuffer()
@@ -180,6 +198,7 @@ describe('globe registration', () => {
     const world = await markerPng([-180, -90, 180, 90], 4, WORLD_MARKERS, 8)
     const region = await markerPng(REGION, 10, [REGION_MARKER], 10)
     const solid = await solidPng([-180, -90, 180, 90], 4, SOLID)
+    const lines = await linesPng(4, LINE_LONS, [45, 80])
     worker.use(
       http.get(ENDPOINT, async ({ request }) => {
         const url = new URL(request.url)
@@ -201,7 +220,9 @@ describe('globe registration', () => {
             ? region
             : name === 'solid'
               ? solid
-              : world
+              : name === 'lines'
+                ? lines
+                : world
         return HttpResponse.arrayBuffer(body, {
           headers: { 'Content-Type': 'image/png' },
         })
@@ -375,8 +396,8 @@ describe('globe registration', () => {
 
   it('keeps layer textures within the GPU budget', async () => {
     const budget = textureLedger.budget
-    // Room for three first images (1024 px wide), none of the sharper ones.
-    textureLedger.budget = 8 * 2 ** 20
+    // Room for three first images (1024 px wide, with mipmaps), none of the sharper ones.
+    textureLedger.budget = 11 * 2 ** 20
     try {
       engine.setCamera({ lon: -45, lat: 15, zoom: 6 })
       engine.setLayers([
@@ -402,9 +423,34 @@ describe('globe registration', () => {
     engine.setLayers([spec('world', 1)])
     await engine.whenLoaded()
     const marker = WORLD_MARKERS[0]
+    // About 4 screen px per texel; read before the idle upgrade refetches.
+    engine.setCamera({
+      lon: marker.lon,
+      lat: marker.lat,
+      zoom: CAMERA.zoom + 2,
+    })
     // Nearest sampling: no blended fringe around a marker.
     expect(blendedAround(engine, marker)).toBe(0)
     expect(readoutError(engine, marker, 2)).toBeLessThan(0.3)
+  })
+
+  it('keeps thin lines when the image is minified', async () => {
+    engine.setBasemap({ kind: 'outline', theme: 'light', opacity: 0 })
+    engine.setCamera({ lon: -35, lat: 65, zoom: CAMERA.zoom })
+    engine.setLayers([spec('lines', 1)])
+    await engine.whenLoaded()
+    // Along the centre row every meridian shows; nearest sampling drops most.
+    const f = frame(engine)
+    const ground = f.at(WIDTH / 2 + 4, HEIGHT / 2)
+    let runs = 0
+    let inLine = false
+    // The lines lie within ±45 px of the centre; the limb is far outside.
+    for (let x = WIDTH / 2 - 120; x < WIDTH / 2 + 120; x++) {
+      const line = f.at(x, HEIGHT / 2)[0] < ground[0] - 12
+      if (line && !inLine) runs++
+      inLine = line
+    }
+    expect(runs).toBe(LINE_LONS.length)
   })
 
   it('bends a transparent flat map over the globe ground, premultiplied', async () => {
