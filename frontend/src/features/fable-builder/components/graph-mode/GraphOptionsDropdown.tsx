@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { ChevronDown, Lock, LockOpen, Map, Sparkles } from 'lucide-react'
+import { ChevronDown, Eye, Lock, LockOpen, Map, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { LayoutDirection } from '@/features/fable-builder/stores/fableBuilderStore'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
@@ -43,8 +43,9 @@ export function GraphOptionsDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<Button variant="outline" size="sm" className="h-8 gap-1" />}
+        render={<Button variant="outline" size="sm" className="h-8 gap-1.5" />}
       >
+        <Eye className="h-4 w-4" />
         {t('graphOptions.view')}
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </DropdownMenuTrigger>

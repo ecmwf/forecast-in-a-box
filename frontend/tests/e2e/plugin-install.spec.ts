@@ -15,7 +15,7 @@
  * After installing a plugin the backend temporarily returns 503 on the
  * catalogue endpoint while plugins reload. The UI must wait for the
  * catalogue to recover, then refresh plugin details so the installed
- * plugin moves from "Available" to "Installed".
+ * plugin's card gains its enable switch in place.
  *
  * Works with both MSW mocks (npm run test:e2e) and a real backend
  * (npm run test:e2e:stack).
@@ -43,7 +43,7 @@ test.describe('Plugin Install Flow', () => {
     await navigateTo(page, '/admin/plugins')
   })
 
-  test('installing a plugin moves it from available to installed', async ({
+  test('installing a plugin turns its card into an installed one', async ({
     page,
   }) => {
     // Track catalogue 503 responses to verify retry behaviour
@@ -57,7 +57,7 @@ test.describe('Plugin Install Flow', () => {
     })
 
     // Wait for the page to fully load
-    const heading = page.getByRole('heading', { name: /plugin store/i })
+    const heading = page.getByRole('heading', { name: /^plugins$/i })
     await expect(heading).toBeVisible({ timeout: 10000 })
 
     // Switch to card view so each plugin has its own Card element
@@ -69,7 +69,6 @@ test.describe('Plugin Install Flow', () => {
     }
 
     // Find the first available plugin card that has an Install button.
-    // The available section always uses card view (individual Card per plugin).
     const availableCards = page
       .locator('[data-slot="card"]')
       .filter({ has: page.getByRole('button', { name: /^Install$/ }) })
@@ -105,8 +104,7 @@ test.describe('Plugin Install Flow', () => {
     //  3. GET  /blueprint/catalogue → 200  (retry succeeds)
     //  4. GET  /plugin/list         → 200  (updated listing)
 
-    // After install completes the plugin should appear in the installed
-    // section with a toggle switch. Wait for the full retry + refetch cycle.
+    // The same card gains a switch once the retry + refetch cycle is done.
     const installedCard = page
       .locator('[data-slot="card"]')
       .filter({ hasText: pluginName })

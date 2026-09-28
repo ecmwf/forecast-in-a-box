@@ -146,7 +146,7 @@ describe('QubeTree (Dimensional Matrix)', () => {
   it('renders the matrix title and section headings', async () => {
     const screen = await renderWithProviders(<QubeTree node={sampleQube} />)
 
-    await expect.element(screen.getByText('Data Qube Matrix')).toBeVisible()
+    await expect.element(screen.getByText('Data Qube matrix')).toBeVisible()
     await expect.element(screen.getByText('Pressure levels (PL)')).toBeVisible()
     await expect.element(screen.getByText('Surface levels (SFC)')).toBeVisible()
   })
@@ -211,9 +211,9 @@ describe('QubeTree (generic compressed-tree fallback)', () => {
   it('switches to the generic tree title when no `param` dim is present', async () => {
     const screen = await renderWithProviders(<QubeTree node={genericQube} />)
 
-    await expect.element(screen.getByText('Data Qube Tree')).toBeVisible()
+    await expect.element(screen.getByText('Data Qube tree')).toBeVisible()
     // Matrix-only chrome should NOT be in the document.
-    expect(screen.getByText('Data Qube Matrix').elements()).toHaveLength(0)
+    expect(screen.getByText('Data Qube matrix').elements()).toHaveLength(0)
   })
 
   it('compresses single-child chains onto one line', async () => {

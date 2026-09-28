@@ -21,6 +21,7 @@ import { STORAGE_KEYS, STORE_VERSIONS } from '@/lib/storage-keys'
 
 export type Theme = 'light' | 'dark' | 'system'
 export type AdminViewMode = 'table' | 'card'
+export type CatalogueSortSetting = { key: string; dir: 'asc' | 'desc' }
 
 interface UiState {
   // Application state
@@ -41,6 +42,20 @@ interface UiState {
   setModelsViewMode: (mode: AdminViewMode) => void
   artifactsViewMode: AdminViewMode
   setArtifactsViewMode: (mode: AdminViewMode) => void
+  pluginsSort: CatalogueSortSetting
+  setPluginsSort: (sort: CatalogueSortSetting) => void
+  artifactsSort: CatalogueSortSetting
+  setArtifactsSort: (sort: CatalogueSortSetting) => void
+
+  // Filmstrip under the full-screen output viewers.
+  outputFilmstrip: boolean
+  setOutputFilmstrip: (value: boolean) => void
+
+  // Block palette: hide unusable blocks, one-line rows.
+  paletteUsableOnly: boolean
+  setPaletteUsableOnly: (value: boolean) => void
+  paletteCompact: boolean
+  setPaletteCompact: (value: boolean) => void
 
   // Application timezone (IANA id) — governs all date/time entry and display.
   timeZone: string
@@ -61,6 +76,11 @@ const initialState = {
   pluginsViewMode: 'table' as AdminViewMode,
   modelsViewMode: 'table' as AdminViewMode,
   artifactsViewMode: 'table' as AdminViewMode,
+  pluginsSort: { key: 'name', dir: 'asc' } as CatalogueSortSetting,
+  artifactsSort: { key: 'name', dir: 'asc' } as CatalogueSortSetting,
+  outputFilmstrip: true,
+  paletteUsableOnly: false,
+  paletteCompact: false,
   timeZone: 'UTC',
   journalShowFlow: false,
 }
@@ -101,6 +121,11 @@ export const useUiStore = create<UiState>()(
         setPluginsViewMode: (pluginsViewMode) => set({ pluginsViewMode }),
         setModelsViewMode: (modelsViewMode) => set({ modelsViewMode }),
         setArtifactsViewMode: (artifactsViewMode) => set({ artifactsViewMode }),
+        setPluginsSort: (pluginsSort) => set({ pluginsSort }),
+        setArtifactsSort: (artifactsSort) => set({ artifactsSort }),
+        setOutputFilmstrip: (outputFilmstrip) => set({ outputFilmstrip }),
+        setPaletteUsableOnly: (paletteUsableOnly) => set({ paletteUsableOnly }),
+        setPaletteCompact: (paletteCompact) => set({ paletteCompact }),
 
         // Application timezone management
         setTimeZone: (timeZone) => set({ timeZone }),
@@ -180,6 +205,11 @@ export const useUiStore = create<UiState>()(
           pluginsViewMode: state.pluginsViewMode,
           modelsViewMode: state.modelsViewMode,
           artifactsViewMode: state.artifactsViewMode,
+          pluginsSort: state.pluginsSort,
+          artifactsSort: state.artifactsSort,
+          outputFilmstrip: state.outputFilmstrip,
+          paletteUsableOnly: state.paletteUsableOnly,
+          paletteCompact: state.paletteCompact,
           timeZone: state.timeZone,
         }),
       },

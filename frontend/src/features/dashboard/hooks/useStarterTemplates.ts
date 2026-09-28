@@ -18,6 +18,10 @@ import {
   parsePluginKey,
 } from '@/api/types/plugins.types'
 import { usePluginList } from '@/api/hooks/usePlugins'
+import {
+  templateBookmarkKey,
+  useTemplateBookmarksStore,
+} from '@/stores/templateBookmarksStore'
 
 /** How many templates the dashboard offers alongside the blank canvas. */
 export const STARTER_TEMPLATE_LIMIT = 3
@@ -39,14 +43,15 @@ function templateOrderFrom(listing: PluginListing): TemplateOrderByPlugin {
 }
 
 /**
- * Pick the templates offered as starting points: the official plugin's when
- * it is installed, otherwise any plugin's, each in its declared order.
- * Exported for tests.
+ * Pick the templates offered as starting points: bookmarked ones first (any
+ * plugin, bookmark order), then the official plugin's, else any plugin's, each
+ * in its declared order. Exported for tests.
  */
 export function selectStarterTemplates(
   templates: ReadonlyArray<TemplateEntry>,
   orderByPlugin: TemplateOrderByPlugin,
   limit: number = STARTER_TEMPLATE_LIMIT,
+  bookmarkedKeys: ReadonlyArray<string> = [],
 ): Array<TemplateEntry> {
   // display_name is the join key, so a row without one cannot be ordered.
   const byPlugin = new Map<string, Map<string, TemplateEntry>>()
@@ -75,8 +80,16 @@ export function selectStarterTemplates(
         : [...byName.values()]),
     )
   }
+  // Bookmarks whose template is gone (plugin removed) are skipped.
+  const byKey = new Map<string, TemplateEntry>()
+  for (const template of templates) {
+    const key = templateBookmarkKey(template)
+    if (key && !byKey.has(key)) byKey.set(key, template)
+  }
+  const bookmarked = bookmarkedKeys.flatMap((key) => byKey.get(key) ?? [])
+  const defaults = ordered.filter((template) => !bookmarked.includes(template))
   // Filter happened before slicing, so a failed ingest doesn't cost a card.
-  return ordered.slice(0, limit)
+  return [...bookmarked, ...defaults].slice(0, limit)
 }
 
 export function useStarterTemplates() {
@@ -88,9 +101,16 @@ export function useStarterTemplates() {
     [listing],
   )
 
+  const bookmarkedKeys = useTemplateBookmarksStore((state) => state.keys)
   const starters = useMemo(
-    () => selectStarterTemplates(templates, orderByPlugin),
-    [templates, orderByPlugin],
+    () =>
+      selectStarterTemplates(
+        templates,
+        orderByPlugin,
+        STARTER_TEMPLATE_LIMIT,
+        bookmarkedKeys,
+      ),
+    [templates, orderByPlugin, bookmarkedKeys],
   )
 
   return {

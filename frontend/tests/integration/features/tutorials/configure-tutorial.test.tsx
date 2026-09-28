@@ -224,7 +224,7 @@ describe('configure first-run tutorial', () => {
       .element(screen.getByRole('dialog', { name: 'Chain the next block' }))
       .not.toBeInTheDocument()
     await screen
-      .getByRole('button', { name: /^Select/ })
+      .getByRole('button', { name: /^Select · ecmwf-base/ })
       .last()
       .click()
     await expect
@@ -274,9 +274,9 @@ describe('configure first-run tutorial', () => {
       .toBeVisible()
     await screen.getByRole('button', { name: 'Show me', exact: true }).click()
     await expect
-      .element(screen.getByRole('heading', { name: 'Run Forecast' }))
+      .element(screen.getByRole('heading', { name: 'Run forecast' }))
       .toBeVisible()
-    await screen.getByRole('button', { name: 'Start Run' }).click()
+    await screen.getByRole('button', { name: 'Start run' }).click()
 
     // The expected navigation completes the tour instead of ending it.
     await expect
@@ -379,7 +379,7 @@ describe('configure first-run tutorial', () => {
     await openTourFromHelp(screen, 'Take the tour from the top')
     await screen.getByRole('button', { name: 'Start', exact: true }).click()
 
-    // Not pre-satisfied: Show me presses New configuration → 0 blocks.
+    // Not pre-satisfied: Show me presses New workflow → 0 blocks.
     await expect
       .element(
         screen.getByRole('heading', { name: 'Start from a clean canvas' }),

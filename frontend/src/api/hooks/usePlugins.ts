@@ -15,7 +15,12 @@
  */
 
 import { useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import type { BlockFactoryCatalogue, BlockKind } from '@/api/types/fable.types'
 import type {
   PluginCapability,
@@ -51,7 +56,13 @@ export const pluginKeys = {
   list: () => [...pluginKeys.all, 'list'] as const,
   /** Mutation key — lets notification dispatch skip what this tab started. */
   mutation: () => [...pluginKeys.all, 'mutation'] as const,
+  /** Per-kind key under `mutation()`, to tell operations apart. */
+  operation: (kind: PluginOperation) =>
+    [...pluginKeys.mutation(), kind] as const,
 }
+
+export type PluginOperation =
+  'install' | 'uninstall' | 'enable' | 'disable' | 'update' | 'settings'
 
 /**
  * Hook to get all plugin details (raw backend response)
@@ -156,12 +167,13 @@ async function waitForCatalogue(): Promise<void> {
  * the catalogue is available again and details are refreshed.
  */
 function usePluginMutation<TVariables>(
+  kind: PluginOperation,
   action: (variables: TVariables) => Promise<void>,
 ) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationKey: pluginKeys.mutation(),
+    mutationKey: pluginKeys.operation(kind),
     mutationFn: async (variables: TVariables) => {
       await action(variables)
       // Poll until the catalogue is available again (plugins finished reloading)
@@ -177,27 +189,28 @@ function usePluginMutation<TVariables>(
 }
 
 export function useInstallPlugin() {
-  return usePluginMutation(installPlugin)
+  return usePluginMutation('install', installPlugin)
 }
 
 export function useUninstallPlugin() {
-  return usePluginMutation(uninstallPlugin)
+  return usePluginMutation('uninstall', uninstallPlugin)
 }
 
 export function useEnablePlugin() {
-  return usePluginMutation(enablePlugin)
+  return usePluginMutation('enable', enablePlugin)
 }
 
 export function useDisablePlugin() {
-  return usePluginMutation(disablePlugin)
+  return usePluginMutation('disable', disablePlugin)
 }
 
 export function useUpdatePlugin() {
-  return usePluginMutation(updatePlugin)
+  return usePluginMutation('update', updatePlugin)
 }
 
 export function useUpdatePluginSettings() {
   return usePluginMutation(
+    'settings',
     ({
       compositeId,
       settings,
@@ -205,6 +218,26 @@ export function useUpdatePluginSettings() {
       compositeId: PluginCompositeId
       settings: PluginSettingsUpdate
     }) => updatePluginSettings(compositeId, settings),
+  )
+}
+
+/** In-flight operation per plugin, keyed `store/local`. */
+export function usePluginOperations(): Map<string, PluginOperation> {
+  const pending = useMutationState({
+    filters: { mutationKey: pluginKeys.mutation(), status: 'pending' },
+    select: (mutation) => ({
+      kind: mutation.options.mutationKey?.[2] as PluginOperation,
+      id: mutation.state.variables as PluginCompositeId,
+    }),
+  })
+  return useMemo(
+    () =>
+      new Map(
+        pending
+          .filter((p) => p.kind !== 'settings')
+          .map((p) => [`${p.id.store}/${p.id.local}`, p.kind]),
+      ),
+    [pending],
   )
 }
 

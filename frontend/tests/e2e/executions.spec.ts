@@ -150,7 +150,7 @@ test.describe('Execution Detail Page', () => {
     // Verify we're on the executions page
     await expect(page).toHaveURL(/execute/)
 
-    // Find a job detail link — use exact match to avoid "View Results" etc.
+    // Find a job detail link — use exact match to avoid "View results" etc.
     const viewLink = page.getByRole('link', { name: 'View', exact: true })
     const inspectLink = page.getByRole('link', {
       name: 'Inspect',

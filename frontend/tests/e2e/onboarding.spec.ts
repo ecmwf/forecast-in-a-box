@@ -70,7 +70,7 @@ test.describe('First-run onboarding', () => {
     // The guided part runs as coachmarks on the real pages.
     const card = page.locator('[data-tour-card]')
     await expect(
-      card.getByRole('heading', { name: 'Your dashboard, at a glance' }),
+      card.getByRole('heading', { name: 'Your overview, at a glance' }),
     ).toBeVisible()
     await expect(card.getByText('1 of 5', { exact: true })).toBeVisible()
     const pages = [
@@ -87,7 +87,7 @@ test.describe('First-run onboarding', () => {
       await expect(card.getByRole('heading', { name: title })).toBeVisible()
     }
 
-    await page.getByRole('button', { name: 'Start from Scratch' }).click()
+    await page.getByRole('button', { name: 'Start from scratch' }).click()
     await page.waitForURL(/configure\?.*fresh=true/, { timeout: 15000 })
     await expect(card).not.toBeVisible()
     expect(await readOnboardingStatus(page)).toBe('active')

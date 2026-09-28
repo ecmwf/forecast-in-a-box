@@ -36,12 +36,12 @@ vi.mock('@tanstack/react-router', async () => {
   }
 })
 
-const PLACEHOLDER = 'Search pages, presets, runs and blocks...'
+const PLACEHOLDER = 'Search pages, workflows, runs and blocks...'
 
 /** Every command label, grouped, for exhaustive presence checks. */
 const ALL_COMMANDS = [
-  'New Forecast Configuration',
-  'Dashboard',
+  'New workflow',
+  'Overview',
   'Configure',
   'Execute',
   'Visualise',
@@ -89,7 +89,7 @@ describe('CommandPalette', () => {
     await expect.element(screen.getByPlaceholder(PLACEHOLDER)).toBeVisible()
 
     // Both category headings render.
-    await expect.element(screen.getByText('Getting Started')).toBeVisible()
+    await expect.element(screen.getByText('Getting started')).toBeVisible()
     await expect.element(screen.getByText('Navigation')).toBeVisible()
 
     // Every command is present as a selectable option.
@@ -104,14 +104,10 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    // Dashboard is bound to `g d` — shown as two keycaps within its option.
-    const dashboard = screen.getByRole('option', { name: /Dashboard/ })
-    await expect
-      .element(dashboard.getByText('G', { exact: true }))
-      .toBeVisible()
-    await expect
-      .element(dashboard.getByText('D', { exact: true }))
-      .toBeVisible()
+    // Overview is bound to `g o` — shown as two keycaps within its option.
+    const overview = screen.getByRole('option', { name: /Overview/ })
+    await expect.element(overview.getByText('G', { exact: true })).toBeVisible()
+    await expect.element(overview.getByText('O', { exact: true })).toBeVisible()
   })
 
   it('shows a footer with the palette controls', async () => {
@@ -133,15 +129,13 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    await screen.getByPlaceholder(PLACEHOLDER).fill('dashboard')
+    await screen.getByPlaceholder(PLACEHOLDER).fill('overview')
 
     await expect
-      .element(screen.getByRole('option', { name: /Dashboard/ }))
+      .element(screen.getByRole('option', { name: /Overview/ }))
       .toBeVisible()
     await expect
-      .element(
-        screen.getByRole('option', { name: /New Forecast Configuration/ }),
-      )
+      .element(screen.getByRole('option', { name: /New workflow/ }))
       .not.toBeInTheDocument()
   })
 
@@ -157,7 +151,7 @@ describe('CommandPalette', () => {
       .element(screen.getByRole('option', { name: /Execute/ }))
       .toBeVisible()
     await expect
-      .element(screen.getByRole('option', { name: /Dashboard/ }))
+      .element(screen.getByRole('option', { name: /Overview/ }))
       .not.toBeInTheDocument()
   })
 
@@ -175,7 +169,7 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    await screen.getByRole('option', { name: /Dashboard/ }).click()
+    await screen.getByRole('option', { name: /Overview/ }).click()
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/overview' })
     expect(useCommandStore.getState().isOpen).toBe(false)
@@ -185,9 +179,7 @@ describe('CommandPalette', () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
-    await screen
-      .getByRole('option', { name: /New Forecast Configuration/ })
-      .click()
+    await screen.getByRole('option', { name: /New workflow/ }).click()
 
     // Explicit fresh intent — a bench holding unsaved work asks first.
     expect(mockNavigate).toHaveBeenCalledWith({
@@ -221,13 +213,13 @@ describe('CommandPalette', () => {
     expect(useCommandStore.getState().isOpen).toBe(false)
   })
 
-  it('lists plugin templates under Presets once loaded', async () => {
+  it('lists plugin templates under Workflows once loaded', async () => {
     useCommandStore.getState().setOpen(true)
     const screen = await renderPalette()
 
     // The mock list marks only its templates with a source; saved presets
     // need `user_defined`, which the seeded fables do not carry.
-    await expect.element(screen.getByText('Presets')).toBeVisible()
+    await expect.element(screen.getByText('Workflows')).toBeVisible()
     await expect
       .element(screen.getByRole('option', { name: /testBasic/ }))
       .toBeVisible()

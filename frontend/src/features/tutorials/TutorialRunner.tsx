@@ -300,13 +300,21 @@ function ActiveTutorial({
       showToast.info(t('common.showMeUnavailable'))
       return
     }
-    const followUp = action.then
-    if (followUp === undefined || !('within' in followUp)) return
-    // Poll briefly for the follow-up target (e.g. a dialog just opened).
+    if (action.then !== undefined) scheduleFollowUp(action.then)
+  }
+
+  /** Poll briefly for a follow-up target (a fresh dialog or tab), then chain. */
+  function scheduleFollowUp(next: ShowMeAction) {
+    if (!('within' in next)) return
     cancelFollowUp()
     let tries = 0
     followUpTimerRef.current = window.setInterval(() => {
-      if (pressShowMe(followUp) || ++tries >= 20) cancelFollowUp()
+      if (pressShowMe(next)) {
+        cancelFollowUp()
+        if (next.then !== undefined) scheduleFollowUp(next.then)
+      } else if (++tries >= 20) {
+        cancelFollowUp()
+      }
     }, 100)
   }
 

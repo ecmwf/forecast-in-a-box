@@ -76,10 +76,10 @@ describe('ValidationStatusBadge — issues popover', () => {
     await expect.element(badge).toBeVisible()
 
     await badge.click()
-    await expect.element(screen.getByText('Configuration Issues')).toBeVisible()
+    await expect.element(screen.getByText('Workflow issues')).toBeVisible()
     await expect.element(screen.getByText('Some backend error')).toBeVisible()
     await expect
-      .element(screen.getByText('Unknown glyph: ${dataRoot}'))
+      .element(screen.getByText('Unknown variable: ${dataRoot}'))
       .toBeVisible()
   })
 

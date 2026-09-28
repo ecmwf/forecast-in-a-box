@@ -167,7 +167,11 @@ export function ArtifactDetailPage({
               </Button>
             </>
           ) : (
-            <Button size="sm" onClick={() => onDownload(detail.composite_id)}>
+            <Button
+              size="sm"
+              onClick={() => onDownload(detail.composite_id)}
+              disabled={!detail.is_locally_compatible}
+            >
               <Download className="mr-1 h-4 w-4" />
               {t('actions.download')}
             </Button>

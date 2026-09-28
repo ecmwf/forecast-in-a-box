@@ -39,7 +39,7 @@ function DashboardPage() {
       {/* Row 2: Getting Started */}
       <GettingStartedSection />
 
-      {/* Row 3: My Configuration Presets */}
+      {/* Row 3: My Workflows */}
       <ConfigPresetsSection />
 
       {/* Row 4: Forecast Journal */}

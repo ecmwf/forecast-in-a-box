@@ -42,7 +42,7 @@ export function navigationCommands(navigate: NavigateFn): Array<Command> {
       icon: <Home className="h-4 w-4" />,
       category: 'Navigation',
       keywords: ['home', 'dashboard', 'main'],
-      hotkey: ['G', 'D'],
+      hotkey: ['G', 'O'],
       action: () => navigate({ to: '/overview' }),
     },
     {

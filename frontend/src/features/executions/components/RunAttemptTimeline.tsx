@@ -8,14 +8,33 @@
  * does it submit to any jurisdiction.
  */
 
-/** One row per attempt, oldest first — the retry story at a glance. */
+/** A run's attempts as one stacked line; the full history in a popover. */
 
-import { ChevronRight } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { RunStatusIcon } from './RunStatusIcon'
+import type { TFunction } from 'i18next'
+import type { JobExecutionDetail, JobStatus } from '@/api/types/job.types'
 import { useServerTime } from '@/api/hooks/useSchedules'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { useRunAttempts } from '@/features/journal/data/useRunAttempts'
 import { formatInZone } from '@/lib/datetime'
+import { cn } from '@/lib/utils'
+
+/** Dots in the collapsed stack; older attempts collapse into "+N". */
+const STACK_SIZE = 5
+
+const DOT_CLASS: Record<JobStatus, string> = {
+  submitted: 'bg-blue-500',
+  preparing: 'bg-blue-500',
+  running: 'bg-amber-500',
+  completed: 'bg-emerald-500',
+  failed: 'bg-red-500',
+  unknown: 'bg-gray-400',
+}
 
 interface RunAttemptTimelineProps {
   jobId: string
@@ -26,38 +45,128 @@ export function RunAttemptTimeline({
   jobId,
   attemptCount,
 }: RunAttemptTimelineProps) {
-  const { t } = useTranslation('executions')
+  const { t } = useTranslation(['executions', 'common'])
   const { serverTimeToLocal, timeZone } = useServerTime()
-  const attempts = useRunAttempts(jobId, attemptCount, attemptCount > 1)
-  if (attemptCount < 2 || attempts.length === 0) return null
+  const [open, setOpen] = useState(false)
+  const multiple = attemptCount > 1
+  const recent = useRunAttempts(jobId, attemptCount, multiple, STACK_SIZE)
+  const all = useRunAttempts(jobId, attemptCount, multiple && open)
+  if (!multiple || recent.length === 0) return null
 
-  const ordered = [...attempts].sort(
-    (a, b) => a.attempt_count - b.attempt_count,
+  const byNumber = (a: JobExecutionDetail, b: JobExecutionDetail) =>
+    a.attempt_count - b.attempt_count
+  const stack = [...recent].sort(byNumber)
+  const hidden = attemptCount - stack.length
+  // Exact only once every attempt is known.
+  const known = all.length === attemptCount ? all : stack
+  const failed =
+    known.length === attemptCount
+      ? known.filter((a) => a.status === 'failed').length
+      : null
+  const history = [...(all.length > 0 ? all : stack)].sort((a, b) =>
+    byNumber(b, a),
   )
+  const time = (iso: string) =>
+    formatInZone(serverTimeToLocal(iso), timeZone, 'yyyy-MM-dd HH:mm')
+
   return (
-    <ol
-      aria-label={t('attempts.title')}
-      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
-    >
-      {ordered.map((attempt, index) => (
-        <li key={attempt.attempt_count} className="flex items-center gap-2">
-          {index > 0 && (
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="group -mx-1.5 inline-flex w-fit items-center gap-2.5 rounded-md px-1.5 py-0.5 text-sm transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+          />
+        }
+      >
+        <span className="flex items-center" aria-hidden>
+          {hidden > 0 && (
+            <span className="mr-1.5 font-mono text-xs text-muted-foreground tabular-nums">
+              +{hidden}
+            </span>
           )}
-          <RunStatusIcon status={attempt.status} />
-          <span className="font-medium">
-            {t('attempts.attempt', { number: attempt.attempt_count })}
-          </span>
+          {stack.map((attempt, index) => (
+            <span
+              key={attempt.attempt_count}
+              className={cn(
+                'size-3.5 rounded-full ring-2 ring-background transition-[margin] duration-150 motion-reduce:transition-none',
+                index > 0 && '-ml-1.5 group-hover:-ml-0.5',
+                DOT_CLASS[attempt.status],
+              )}
+            />
+          ))}
+        </span>
+        <span className="font-medium">
+          {t('attempts.count', { count: attemptCount })}
+        </span>
+        {failed !== null && failed > 0 && (
           <span className="text-muted-foreground">
-            {t(`status.${attempt.status}`)} ·{' '}
-            {formatInZone(
-              serverTimeToLocal(attempt.updated_at),
-              timeZone,
-              'yyyy-MM-dd HH:mm',
-            )}
+            {t('attempts.failedCount', { count: failed })}
           </span>
-        </li>
-      ))}
-    </ol>
+        )}
+      </PopoverTrigger>
+
+      <PopoverContent align="start" className="w-80 gap-1 p-2">
+        <div className="px-2 pt-1 text-sm font-medium">
+          {t('attempts.title')}
+        </div>
+        <ol className="max-h-72 overflow-y-auto">
+          {history.map((attempt) => (
+            <li
+              key={attempt.attempt_count}
+              className="flex gap-2.5 rounded-md px-2 py-1.5"
+            >
+              <span
+                className={cn(
+                  'mt-1.5 size-2.5 shrink-0 rounded-full',
+                  DOT_CLASS[attempt.status],
+                )}
+              />
+              <span className="min-w-0">
+                <span className="block">
+                  <span className="font-medium">
+                    {t('attempts.attempt', { number: attempt.attempt_count })}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {' · '}
+                    {t(`status.${attempt.status}`)}
+                  </span>
+                </span>
+                <span className="block text-muted-foreground tabular-nums">
+                  {time(attempt.created_at)} · {duration(attempt, t)}
+                </span>
+              </span>
+            </li>
+          ))}
+          {all.length < attemptCount && (
+            <li className="px-2 py-1.5 text-muted-foreground">
+              {t('common:loading')}
+            </li>
+          )}
+        </ol>
+      </PopoverContent>
+    </Popover>
   )
+}
+
+/** Run time in its two largest units, e.g. "2 m 24 s". */
+function duration(attempt: JobExecutionDetail, t: TFunction<'executions'>) {
+  const end =
+    attempt.status === 'completed' || attempt.status === 'failed'
+      ? new Date(attempt.updated_at)
+      : new Date()
+  const secs = Math.max(
+    0,
+    Math.round((end.getTime() - new Date(attempt.created_at).getTime()) / 1000),
+  )
+  const [d, h, m, s] = [
+    Math.floor(secs / 86400),
+    Math.floor(secs / 3600) % 24,
+    Math.floor(secs / 60) % 60,
+    secs % 60,
+  ]
+  if (d) return t('attempts.duration.days', { a: d, b: h })
+  if (h) return t('attempts.duration.hours', { a: h, b: m })
+  if (m) return t('attempts.duration.minutes', { a: m, b: s })
+  return t('attempts.duration.seconds', { a: s })
 }

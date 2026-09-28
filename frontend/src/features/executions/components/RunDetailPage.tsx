@@ -36,6 +36,7 @@ import { OutputsPanel } from './OutputsPanel'
 import { SpecificationPanel } from './SpecificationPanel'
 import { StoredOutputsCard } from './StoredOutputsCard'
 import type { CSSProperties, ReactNode } from 'react'
+import { useBlockDisplayNames } from '@/features/fable-builder/hooks/useBlockDisplayNames'
 import { RunMetadataDialog } from '@/features/journal/components/RunMetadataDialog'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { useViewportFill } from '@/hooks/useViewportFill'
@@ -118,6 +119,7 @@ export function RunDetailPage() {
 
   const jobData = statusQuery.data
   const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
+  const blockNames = useBlockDisplayNames(fableData?.builder)
 
   // Cross-panel selection is per-run; clear it on mount and on jobId change.
   const resetExecutionSelection = useExecutionHoverStore(
@@ -273,9 +275,13 @@ export function RunDetailPage() {
         isDeletePending={deleteMutation.isPending}
         completedBlockCount={jobData.completed_block_ids?.length ?? null}
         plannedBlockCount={jobData.planned_block_ids?.length ?? null}
+        idLineExtra={
+          <RunAttemptTimeline
+            jobId={jobId}
+            attemptCount={jobData.attempt_count}
+          />
+        }
       />
-
-      <RunAttemptTimeline jobId={jobId} attemptCount={jobData.attempt_count} />
 
       {fableData?.coreVersionMismatch && (
         <CoreVersionMismatchBadge detail={fableData.coreVersionMismatch} />
@@ -394,6 +400,7 @@ export function RunDetailPage() {
                     lostTaskIds={jobData.lost_task_ids}
                     completedBlockIds={jobData.completed_block_ids}
                     plannedBlockIds={jobData.planned_block_ids}
+                    blockNames={blockNames}
                     toolbarSlot={toolbarSlot}
                     onViewLogs={() => setActiveTab('logs')}
                   />

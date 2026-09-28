@@ -75,7 +75,7 @@ describe('Responsive Layout', () => {
 
       // The hamburger button is always in the DOM but hidden via lg:hidden CSS class
       const menuButton = screen.container.querySelector(
-        '[aria-label="Open Menu"]',
+        '[aria-label="Open menu"]',
       )
       expect(menuButton).toBeTruthy()
       expect(menuButton?.classList.contains('lg:hidden')).toBe(true)
@@ -92,7 +92,7 @@ describe('Responsive Layout', () => {
       )
 
       await expect
-        .element(screen.getByLabelText('Open Menu'))
+        .element(screen.getByLabelText('Open menu'))
         .toBeInTheDocument()
     })
 
@@ -129,7 +129,7 @@ describe('Responsive Layout', () => {
         </AuthContext.Provider>,
       )
 
-      const menuButton = screen.getByLabelText('Open Menu')
+      const menuButton = screen.getByLabelText('Open menu')
       await menuButton.click()
 
       // After opening, the mobile navigation should appear
@@ -145,7 +145,7 @@ describe('Responsive Layout', () => {
         </AuthContext.Provider>,
       )
 
-      const menuButton = screen.getByLabelText('Open Menu')
+      const menuButton = screen.getByLabelText('Open menu')
       await menuButton.click()
 
       await expect.element(screen.getByText('About')).toBeVisible()
@@ -159,11 +159,11 @@ describe('Responsive Layout', () => {
         </AuthContext.Provider>,
       )
 
-      const menuButton = screen.getByLabelText('Open Menu')
+      const menuButton = screen.getByLabelText('Open menu')
       await menuButton.click()
 
       await expect
-        .element(screen.getByLabelText('Close Menu'))
+        .element(screen.getByLabelText('Close menu'))
         .toBeInTheDocument()
     })
 
@@ -175,7 +175,7 @@ describe('Responsive Layout', () => {
         </AuthContext.Provider>,
       )
 
-      const menuButton = screen.getByLabelText('Open Menu')
+      const menuButton = screen.getByLabelText('Open menu')
       await menuButton.click()
 
       const header = screen.getByRole('banner')
@@ -209,7 +209,7 @@ describe('Responsive Layout', () => {
       )
 
       await expect
-        .element(screen.getByLabelText('Open Menu'))
+        .element(screen.getByLabelText('Open menu'))
         .toBeInTheDocument()
       await expect.element(screen.getByTestId('content')).toBeVisible()
     })

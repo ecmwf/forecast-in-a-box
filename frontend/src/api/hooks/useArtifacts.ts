@@ -26,8 +26,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import i18n from 'i18next'
 import type {
   ArtifactInfo,
@@ -76,6 +82,7 @@ export const artifactKeys = {
   list: () => [...artifactKeys.all, 'list'] as const,
   detail: (compositeId: CompositeArtifactId) =>
     [...artifactKeys.all, 'detail', compositeId] as const,
+  delete: () => [...artifactKeys.all, 'delete'] as const,
 }
 
 /**
@@ -202,7 +209,7 @@ export function wakeDownloadPolling(compositeId: CompositeArtifactId): void {
  */
 async function startDownloadPolling(
   compositeId: CompositeArtifactId,
-  onComplete?: () => void,
+  onComplete?: () => Promise<unknown>,
 ) {
   const key = encodeArtifactId(compositeId)
 
@@ -234,7 +241,8 @@ async function startDownloadPolling(
       },
       onWake: (wake) => downloadWakers.set(key, wake),
     })
-    onComplete?.()
+    // Keep the progress entry until the list shows the model as downloaded.
+    await onComplete?.()
     return response
   } finally {
     abortControllers.delete(key)
@@ -267,23 +275,27 @@ export function useDownloadActions() {
       if (!compositeId.artifact_store_id || !compositeId.artifact_local_id)
         continue
 
-      startDownloadPolling(compositeId, () => {
-        queryClient.invalidateQueries({ queryKey: artifactKeys.list() })
-        queryClient.invalidateQueries({
-          queryKey: artifactKeys.detail(compositeId),
-        })
-      }).catch(handleDownloadError)
+      startDownloadPolling(compositeId, () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
+          queryClient.invalidateQueries({
+            queryKey: artifactKeys.detail(compositeId),
+          }),
+        ]),
+      ).catch(handleDownloadError)
     }
   }, [queryClient])
 
   const mutate = useCallback(
     (compositeId: CompositeArtifactId) => {
-      startDownloadPolling(compositeId, () => {
-        queryClient.invalidateQueries({ queryKey: artifactKeys.list() })
-        queryClient.invalidateQueries({
-          queryKey: artifactKeys.detail(compositeId),
-        })
-      }).catch(handleDownloadError)
+      startDownloadPolling(compositeId, () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
+          queryClient.invalidateQueries({
+            queryKey: artifactKeys.detail(compositeId),
+          }),
+        ]),
+      ).catch(handleDownloadError)
     },
     [queryClient],
   )
@@ -311,6 +323,11 @@ export function useDownloadProgress(compositeId: CompositeArtifactId) {
     isDownloading: entry !== undefined,
     progress: entry?.progress,
   }
+}
+
+/** Encoded ids of downloading models; stable across progress ticks. */
+export function useDownloadingKeys(): Array<string> {
+  return useDownloadStore(useShallow((state) => Object.keys(state.downloads)))
 }
 
 /**
@@ -360,12 +377,24 @@ export function useDeleteModel() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    mutationKey: artifactKeys.delete(),
     mutationFn: deleteModel,
-    onSuccess: (_data, compositeId) => {
-      queryClient.invalidateQueries({ queryKey: artifactKeys.list() })
-      queryClient.invalidateQueries({
-        queryKey: artifactKeys.detail(compositeId),
-      })
-    },
+    // Awaited: stays pending until the list reflects the delete.
+    onSuccess: (_data, compositeId) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
+        queryClient.invalidateQueries({
+          queryKey: artifactKeys.detail(compositeId),
+        }),
+      ]),
+  })
+}
+
+/** Encoded ids of models being deleted. */
+export function useDeletingKeys(): Array<string> {
+  return useMutationState({
+    filters: { mutationKey: artifactKeys.delete(), status: 'pending' },
+    select: (mutation) =>
+      encodeArtifactId(mutation.state.variables as CompositeArtifactId),
   })
 }

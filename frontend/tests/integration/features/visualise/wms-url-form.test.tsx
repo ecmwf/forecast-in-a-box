@@ -75,13 +75,16 @@ async function renderPicker() {
     ]),
     history: createMemoryHistory({ initialEntries: ['/visualise'] }),
   })
-  return await render(
+  const screen = await render(
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
         <RouterProvider router={router} />
       </I18nextProvider>
     </QueryClientProvider>,
   )
+  // The form lives on the picker's WMS tab.
+  await screen.getByRole('tab', { name: 'WMS servers' }).click()
+  return screen
 }
 
 beforeEach(() => {

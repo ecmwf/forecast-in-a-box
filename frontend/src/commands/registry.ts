@@ -36,7 +36,7 @@ export interface Command {
   description?: string
   /** Optional icon */
   icon?: ReactNode
-  /** Optional global keyboard shortcut, as a key sequence (e.g. ['G', 'D']) */
+  /** Optional global keyboard shortcut, as a key sequence (e.g. ['G', 'O']) */
   hotkey?: HotkeySequence
   /** Category for grouping */
   category: CommandCategory

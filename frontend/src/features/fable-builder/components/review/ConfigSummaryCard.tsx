@@ -8,6 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
+import { useMemo } from 'react'
 import { AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
@@ -15,6 +16,7 @@ import type {
   BlockFactoryCatalogue,
   BlockInstanceId,
 } from '@/api/types/fable.types'
+import { blockDisplayNames } from '@/features/fable-builder/utils/block-names'
 import {
   useBlockValidation,
   useFableBuilderStore,
@@ -22,6 +24,7 @@ import {
 import { P } from '@/components/base/typography'
 import { getFactory } from '@/api/types/fable.types'
 import { cn } from '@/lib/utils'
+import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
 
 interface ConfigSummaryCardProps {
   instanceId: BlockInstanceId
@@ -35,6 +38,10 @@ export function ConfigSummaryCard({
   const { t } = useTranslation('configure')
   const fable = useFableBuilderStore((state) => state.fable)
   const blockValidation = useBlockValidation(instanceId)
+  const names = useMemo(
+    () => blockDisplayNames(fable, catalogue),
+    [fable, catalogue],
+  )
 
   const instance = fable.blocks[instanceId]
   const factory = getFactory(catalogue, instance.factory_id)
@@ -53,11 +60,9 @@ export function ConfigSummaryCard({
   const connectedInputs = Object.entries(instance.input_ids)
     .filter(([_, sourceId]) => sourceId && sourceId in fable.blocks)
     .map(([inputName, sourceId]) => {
-      const sourceBlock = fable.blocks[sourceId]
-      const sourceFactory = getFactory(catalogue, sourceBlock.factory_id)
       return {
         inputName,
-        sourceTitle: sourceFactory?.title ?? t('configSummary.unknownSource'),
+        sourceTitle: names[sourceId] ?? t('configSummary.unknownSource'),
       }
     })
 
@@ -69,7 +74,9 @@ export function ConfigSummaryCard({
       )}
     >
       <div className="mb-2 flex items-center justify-between">
-        <span className="font-medium">{factory.title}</span>
+        <span className="font-medium">
+          <BlockName name={names[instanceId]} />
+        </span>
         {hasErrors && (
           <span className="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-sm font-medium text-danger">
             <AlertCircle className="h-3 w-3" />

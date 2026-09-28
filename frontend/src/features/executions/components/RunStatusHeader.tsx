@@ -19,6 +19,7 @@ import {
   Settings2,
   Trash2,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { JobStatus } from '@/api/types/job.types'
 import { isTerminalStatus } from '@/api/types/job.types'
 import { useServerTime } from '@/api/hooks/useSchedules'
@@ -70,6 +71,8 @@ interface RunStatusHeaderProps {
   /** Subtext hidden when planned is null/undefined/empty. */
   completedBlockCount?: number | null
   plannedBlockCount?: number | null
+  /** Shown after the run id, e.g. the attempt history. */
+  idLineExtra?: ReactNode
 }
 
 function formatElapsed(ms: number): string {
@@ -165,6 +168,7 @@ export function RunStatusHeader({
   isDeletePending,
   completedBlockCount,
   plannedBlockCount,
+  idLineExtra,
 }: RunStatusHeaderProps) {
   const { t } = useTranslation(['executions', 'journal'])
   const terminal = isTerminalStatus(status)
@@ -203,7 +207,10 @@ export function RunStatusHeader({
           {description && (
             <P className="line-clamp-2 text-muted-foreground">{description}</P>
           )}
-          <P className="truncate text-muted-foreground">{jobId}</P>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3">
+            <P className="truncate text-muted-foreground">{jobId}</P>
+            {idLineExtra}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

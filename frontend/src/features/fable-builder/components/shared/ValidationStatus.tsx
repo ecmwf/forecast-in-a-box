@@ -17,7 +17,7 @@ import { useMemo, useState } from 'react'
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
-import { getFactory } from '@/api/types/fable.types'
+import { blockDisplayNames } from '@/features/fable-builder/utils/block-names'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -71,6 +71,7 @@ export function ValidationStatusBadge({
       return key ? t(`validationStatus.hints.${key}`) : null
     }
     const list: Array<Issue> = []
+    const blockNames = blockDisplayNames(fable, catalogue)
     for (const message of validationState.globalErrors) {
       list.push({
         blockId: null,
@@ -84,14 +85,7 @@ export function ValidationStatusBadge({
     )) {
       if (!state.hasErrors) continue
       // `in` guard, not `?.`: index access is typed non-nullable here.
-      const block = blockId in fable.blocks ? fable.blocks[blockId] : undefined
-      let label = blockId
-      if (block) {
-        const factoryTitle = catalogue
-          ? getFactory(catalogue, block.factory_id)?.title
-          : undefined
-        label = factoryTitle ?? block.factory_id.factory
-      }
+      const label = blockId in blockNames ? blockNames[blockId] : blockId
       for (const message of state.errors) {
         list.push({ blockId, label, message, hint: hintFrom(message) })
       }
@@ -107,7 +101,7 @@ export function ValidationStatusBadge({
       }
     }
     return list
-  }, [validationState, fable.blocks, catalogue, t])
+  }, [validationState, fable, catalogue, t])
 
   if (isValidating) {
     return (
