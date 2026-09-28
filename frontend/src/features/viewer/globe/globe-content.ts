@@ -321,6 +321,8 @@ export interface GlobeContent {
   whenLoaded: () => Promise<void>
   /** Refetch sharper textures once the camera rests. */
   scheduleUpgrade: () => void
+  /** Upgrade at once: entering, where the camera is already final. */
+  upgradeNow: () => void
   /** Draw everything with the current uniforms into `gl` (host-owned state). */
   draw: (gl: WebGL2RenderingContext) => void
   /** Draw the seed image (above the host's own layers). */
@@ -376,7 +378,8 @@ export function createGlobeContent({
   }
 
   function checkLoaded() {
-    if (allEntries().every((e) => e.settled)) {
+    // Loaded = every first image settled and no sharp view image still coming.
+    if (allEntries().every((e) => e.settled && !e.detail?.controller)) {
       for (const resolve of loadWaiters.splice(0)) resolve()
     }
   }
@@ -491,6 +494,7 @@ export function createGlobeContent({
           holdBytes(tile, 0)
         }
         setInFlight(-1)
+        checkLoaded()
         if (!disposed) invalidate()
       })
   }
@@ -569,29 +573,34 @@ export function createGlobeContent({
     if (scale <= worldCap * UPGRADE_FACTOR) return
     if (d && d.scale * UPGRADE_FACTOR >= scale && covers(d.region, region))
       return
-    if (!entry.controller && !entry.errored) loadDetail(entry, region, scale)
+    // Alongside the world image, not after it: entering zoomed in needs it first.
+    if (!entry.errored) loadDetail(entry, region, scale)
+  }
+
+  /** Sharper world images and view images for the current camera. */
+  function upgradeNow() {
+    window.clearTimeout(upgradeTimer)
+    if (!live) return
+    const v = view()
+    for (const entry of allEntries()) {
+      const target = fitScale(
+        layerRegion(entry.spec),
+        targetScale(entry.spec),
+        entry,
+      )
+      if (
+        !entry.controller &&
+        !entry.errored &&
+        target > entry.scale * UPGRADE_FACTOR
+      )
+        load(entry, target)
+      upgradeDetail(entry, v)
+    }
   }
 
   function scheduleUpgrade() {
     window.clearTimeout(upgradeTimer)
-    upgradeTimer = window.setTimeout(() => {
-      if (!live) return
-      const v = view()
-      for (const entry of allEntries()) {
-        const target = fitScale(
-          layerRegion(entry.spec),
-          targetScale(entry.spec),
-          entry,
-        )
-        if (
-          !entry.controller &&
-          !entry.errored &&
-          target > entry.scale * UPGRADE_FACTOR
-        )
-          load(entry, target)
-        upgradeDetail(entry, v)
-      }
-    }, UPGRADE_IDLE_MS)
+    upgradeTimer = window.setTimeout(upgradeNow, UPGRADE_IDLE_MS)
   }
 
   function removeLayer(entry: LayerEntry) {
@@ -751,7 +760,7 @@ export function createGlobeContent({
         d.pending.close()
         d.pending = null
       }
-      if (!entry.texture || entry.spec.opacity <= 0) continue
+      if ((!entry.texture && !d?.texture) || entry.spec.opacity <= 0) continue
       // Outside the server's scale band the layer is hidden, as on the flat map.
       if (
         entry.spec.scale &&
@@ -759,10 +768,12 @@ export function createGlobeContent({
       )
         continue
       gl.uniform1f(layer.uniforms.uOpacity, entry.spec.opacity)
-      gl.bindTexture(gl.TEXTURE_2D, entry.texture)
-      gl.uniform4fv(layer.uniforms.uBox, entry.box)
-      gl.uniform4fv(layer.uniforms.uHole, d?.texture ? d.box : NO_HOLE)
-      drawMesh(gl, r.surface)
+      if (entry.texture) {
+        gl.bindTexture(gl.TEXTURE_2D, entry.texture)
+        gl.uniform4fv(layer.uniforms.uBox, entry.box)
+        gl.uniform4fv(layer.uniforms.uHole, d?.texture ? d.box : NO_HOLE)
+        drawMesh(gl, r.surface)
+      }
       if (d?.texture) {
         gl.bindTexture(gl.TEXTURE_2D, d.texture)
         gl.uniform4fv(layer.uniforms.uBox, d.box)
@@ -800,6 +811,7 @@ export function createGlobeContent({
   ) {
     const hold = deferrable && !live
     const wanted = new Set<string>()
+    const loading: Array<LayerEntry> = []
     for (const spec of specs) {
       wanted.add(spec.key)
       const paramsKey = `${spec.endpoint}|${JSON.stringify(spec.params)}`
@@ -822,14 +834,17 @@ export function createGlobeContent({
         }
         target.set(spec.key, entry)
         if (hold) entry.stale = true
-        else load(entry, firstScale(spec))
+        else {
+          load(entry, firstScale(spec))
+          loading.push(entry)
+        }
       } else if (entry.paramsKey !== paramsKey) {
         entry.spec = spec
         entry.paramsKey = paramsKey
         dropDetail(entry)
         if (hold) defer(entry)
-        // Keep the shown detail when the time/style changes.
-        else
+        else {
+          // Keep the shown detail when the time/style changes.
           load(
             entry,
             Math.max(
@@ -837,6 +852,8 @@ export function createGlobeContent({
               Math.min(entry.scale, targetScale(spec)),
             ),
           )
+          loading.push(entry)
+        }
       } else {
         entry.spec = spec
       }
@@ -846,6 +863,9 @@ export function createGlobeContent({
       removeLayer(entry)
       target.delete(key)
     }
+    // Sharp view images once every first image holds its budget share.
+    const v = view()
+    for (const entry of loading) upgradeDetail(entry, v)
     checkLoaded()
     invalidate()
   }
@@ -870,8 +890,8 @@ export function createGlobeContent({
         }
         return
       }
-      for (const entry of layers.values()) {
-        if (!entry.stale) continue
+      const woken = [...layers.values()].filter((entry) => entry.stale)
+      for (const entry of woken) {
         entry.stale = false
         load(
           entry,
@@ -881,6 +901,8 @@ export function createGlobeContent({
           ),
         )
       }
+      const v = view()
+      for (const entry of woken) upgradeDetail(entry, v)
       scheduleUpgrade()
     },
 
@@ -909,6 +931,8 @@ export function createGlobeContent({
       }),
 
     scheduleUpgrade,
+
+    upgradeNow,
 
     draw,
 

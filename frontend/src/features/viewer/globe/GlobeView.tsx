@@ -344,6 +344,8 @@ function GlobePanel({
 
   useEffect(() => {
     if (!engine) return
+    // Moves made before this subscription (the warm camera) still count.
+    engine.setCamera(camera.get())
     return camera.subscribe((cam, _origin, from, move) => {
       if (from !== slot) engine.setCamera(cam, move)
     })

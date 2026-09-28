@@ -268,6 +268,18 @@ describe('globe registration', () => {
     expect(readoutError(engine, m)).toBeLessThan(0.01)
   })
 
+  it('fetches the sharp view image with the world image when zoomed in', async () => {
+    const m = WORLD_MARKERS[0]
+    engine.setCamera({ lon: m.lon, lat: m.lat, zoom: 5 })
+    engine.setLayers([spec('world', 1)])
+    // Loaded only once the view image is in, not just the coarse world one.
+    await engine.whenLoaded()
+    const boxes = requests.map((u) => u.searchParams.get('BBOX'))
+    expect(boxes).toContain('-90,-180,90,180')
+    expect(boxes.some((b) => b !== '-90,-180,90,180')).toBe(true)
+    expect(readoutError(engine, m)).toBeLessThan(0.05)
+  })
+
   it('places a regional layer on its bbox', async () => {
     engine.setLayers([spec('region', 2, REGION)])
     await engine.whenLoaded()

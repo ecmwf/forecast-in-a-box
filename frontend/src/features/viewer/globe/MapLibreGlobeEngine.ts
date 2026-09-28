@@ -591,8 +591,9 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       if (!m || !content) return Promise.resolve()
       const u = content.uniforms
       u.polarCap = 1
-      // Entering wakes a warm globe, whatever React's effect timing.
+      // Wake a warm globe (whatever React's timing); the camera is final, so fetch sharp now.
       content.setLive(true)
+      content.upgradeNow()
       const [sw, sh] = size()
       content.setSeed(seed, from, sw, sh)
       const settle = () => {
