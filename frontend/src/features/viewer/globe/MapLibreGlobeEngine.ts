@@ -417,7 +417,9 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       // Eye = the point sent to w = 0: column z of the inverse.
       const inv = invertMat4(pd.mainMatrix, inverse)
       if (inv && inv[11] !== 0) {
-        u.camModel = [inv[8] / inv[11], inv[9] / inv[11], inv[10] / inv[11]]
+        u.camModel[0] = inv[8] / inv[11]
+        u.camModel[1] = inv[9] / inv[11]
+        u.camModel[2] = inv[10] / inv[11]
       }
     }
     if (ownBend && flat) {

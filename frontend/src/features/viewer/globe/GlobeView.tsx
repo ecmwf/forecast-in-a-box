@@ -17,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MapLoadingBar } from '../components/MapLoadingBar'
@@ -35,6 +36,7 @@ import {
   panGlobeCamera,
 } from './globe-camera'
 import { globeDecorationSpecs, globeLayerSpecs } from './globe-layer-specs'
+import type { ComponentProps } from 'react'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { PointerReadout } from '../hooks/usePointerReadout'
 import type {
@@ -57,6 +59,37 @@ const EASE: CameraMove = { easeMs: 300 }
 const KEY_ZOOM_STEP = 0.5
 
 type CrossPosition = { x: number; y: number } | null
+
+/** A value read through useSyncExternalStore: writes re-render only its readers. */
+interface ValueStore<T> {
+  get: () => T
+  set: (value: T) => void
+  subscribe: (listener: () => void) => () => void
+}
+
+function createValueStore<T>(initial: T): ValueStore<T> {
+  let value = initial
+  const listeners = new Set<() => void>()
+  return {
+    get: () => value,
+    set: (next) => {
+      if (next === value) return
+      value = next
+      for (const listener of listeners) listener()
+    },
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+  }
+}
+
+const NO_CROSS = createValueStore<CrossPosition>(null)
+
+const useValue = <T,>(store: ValueStore<T>): T =>
+  useSyncExternalStore(store.subscribe, store.get)
 
 export interface GlobeLoupe {
   sizePx: number
@@ -111,7 +144,8 @@ export function GlobeView({
   onRegisterCapture,
 }: GlobeViewProps) {
   const enginesRef = useRef(new Map<string, GlobeEngine>())
-  const [cross, setCross] = useState<CrossPosition>(null)
+  // Pointer moves write here, not React state: only the crosshairs re-render.
+  const [cross] = useState(() => createValueStore<CrossPosition>(null))
   const register = useCallback(
     (panel: string, engine: GlobeEngine | null) => {
       if (engine) enginesRef.current.set(panel, engine)
@@ -163,20 +197,22 @@ export function GlobeView({
     label: side ? `${s.slot.toUpperCase()} · ${s.label}` : s.label,
     timeLabel: s.timeLabel,
   }))
-  const captureKey = JSON.stringify(captureMeta)
+  const captureMetaRef = useRef(captureMeta)
+  useLayoutEffect(() => {
+    captureMetaRef.current = captureMeta
+  })
   useEffect(() => {
     if (!active) return
-    const meta: typeof captureMeta = JSON.parse(captureKey)
     onRegisterCapture(() =>
       Promise.resolve(
-        meta.flatMap((m) => {
+        captureMetaRef.current.flatMap((m) => {
           const engine = enginesRef.current.get(m.slot)
           return engine ? [{ ...m, canvas: engine.capture() }] : []
         }),
       ),
     )
     return () => onRegisterCapture(null)
-  }, [active, captureKey, onRegisterCapture])
+  }, [active, onRegisterCapture])
 
   const panels = sources.map((source) => (
     <GlobePanel
@@ -195,8 +231,7 @@ export function GlobeView({
       onFailure={onFailure}
       onContextLost={onContextLost}
       cross={side ? cross : null}
-      loupeMirror={side && loupe.mirror ? cross : null}
-      onCross={side ? setCross : undefined}
+      mirrorLoupe={side && loupe.mirror}
     />
   ))
 
@@ -236,8 +271,7 @@ function GlobePanel({
   onFailure,
   onContextLost,
   cross,
-  loupeMirror,
-  onCross,
+  mirrorLoupe,
 }: {
   source: CompareMapSource
   camera: SharedGlobeCamera
@@ -250,16 +284,18 @@ function GlobePanel({
   register: (panel: string, engine: GlobeEngine | null) => void
   onFailure: (err: unknown) => void
   onContextLost: () => void
-  cross: CrossPosition
-  loupeMirror: CrossPosition
-  onCross?: (position: CrossPosition) => void
+  /** Side-by-side: the shared crosshair; null in a single panel. */
+  cross: ValueStore<CrossPosition> | null
+  mirrorLoupe: boolean
 }) {
   const { t } = useTranslation('visualise')
   const containerRef = useRef<HTMLDivElement>(null)
   const [engine, setEngine] = useState<GlobeEngine | null>(null)
   const [inFlight, setInFlight] = useState(0)
   const [errored, setErrored] = useState<ReadonlySet<string>>(new Set())
-  const [pointer, setPointer] = useState<PointerReadout | null>(null)
+  const [pointer] = useState(() =>
+    createValueStore<PointerReadout | null>(null),
+  )
   const slot = source.slot
 
   // The native basemap is this panel's own server: expand it per source.
@@ -352,10 +388,10 @@ function GlobePanel({
   }, [engine, camera, slot])
 
   const specs = globeLayerSpecs(source, zBase)
-  const specsKey = JSON.stringify(specs)
+  // Every commit: the engine diffs, so an unchanged stack costs nothing.
   useEffect(() => {
-    engine?.setLayers(JSON.parse(specsKey))
-  }, [engine, specsKey])
+    engine?.setLayers(specs)
+  })
 
   useEffect(() => {
     engine?.setBasemap(panelBasemap)
@@ -384,12 +420,12 @@ function GlobePanel({
     const rect = e.currentTarget.getBoundingClientRect()
     const px: [number, number] = [e.clientX - rect.left, e.clientY - rect.top]
     const hit = engine?.pick(px) ?? null
-    setPointer(hit && { ...hit, x: hit.lon, y: hit.lat })
-    onCross?.({ x: px[0] / rect.width, y: px[1] / rect.height })
+    pointer.set(hit && { ...hit, x: hit.lon, y: hit.lat })
+    cross?.set({ x: px[0] / rect.width, y: px[1] / rect.height })
   }
   const onPointerLeave = () => {
-    setPointer(null)
-    onCross?.(null)
+    pointer.set(null)
+    cross?.set(null)
   }
   const zoomBy = (delta: number) => {
     if (!engine) return
@@ -466,37 +502,72 @@ function GlobePanel({
               })}
             </div>
           )}
-          <LoupeOverlay
+          <MirroredLoupe
             containerRef={containerRef}
-            mirror={loupeMirror}
+            store={mirrorLoupe ? cross : null}
             sizePx={loupe.sizePx}
             zoom={loupe.zoom}
             latched={loupe.latched}
             drawSource={drawLoupe}
           />
           <PinnedLegendsBar items={pinnedLegends} onUnpin={onUnpinLegend} />
-          {pointer && (
-            <PointerReadoutBadge
-              pointer={pointer}
-              label={t('projections.short.globe')}
-              crs={t('projections.globeCode')}
-              metres={false}
-            />
-          )}
-          {cross && (
-            <>
-              <div
-                className="pointer-events-none absolute inset-y-0 z-10 w-px bg-foreground/40"
-                style={{ left: `${cross.x * 100}%` }}
-              />
-              <div
-                className="pointer-events-none absolute inset-x-0 z-10 h-px bg-foreground/40"
-                style={{ top: `${cross.y * 100}%` }}
-              />
-            </>
-          )}
+          <GlobeReadout
+            store={pointer}
+            label={t('projections.short.globe')}
+            crs={t('projections.globeCode')}
+          />
+          {cross && <Crosshair store={cross} />}
         </>
       )}
     </div>
   )
+}
+
+function GlobeReadout({
+  store,
+  label,
+  crs,
+}: {
+  store: ValueStore<PointerReadout | null>
+  label: string
+  crs: string
+}) {
+  const pointer = useValue(store)
+  return pointer ? (
+    <PointerReadoutBadge
+      pointer={pointer}
+      label={label}
+      crs={crs}
+      metres={false}
+    />
+  ) : null
+}
+
+function Crosshair({ store }: { store: ValueStore<CrossPosition> }) {
+  const cross = useValue(store)
+  if (!cross) return null
+  return (
+    <>
+      <div
+        className="pointer-events-none absolute inset-y-0 z-10 w-px bg-foreground/40"
+        style={{ left: `${cross.x * 100}%` }}
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 z-10 h-px bg-foreground/40"
+        style={{ top: `${cross.y * 100}%` }}
+      />
+    </>
+  )
+}
+
+/** The loupe, mirrored from the other panel's pointer when `store` is set. */
+function MirroredLoupe({
+  store,
+  ...props
+}: { store: ValueStore<CrossPosition> | null } & Omit<
+  ComponentProps<typeof LoupeOverlay>,
+  'mirror'
+>) {
+  const mirror = useValue(store ?? NO_CROSS)
+  return <LoupeOverlay mirror={mirror} {...props} />
 }

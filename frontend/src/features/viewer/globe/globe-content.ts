@@ -149,6 +149,10 @@ export const textureLedger = {
 const bytesOf = (size: readonly [number, number]) =>
   Math.ceil((size[0] * size[1] * 4 * 4) / 3)
 
+/** What drawing reads from a spec besides its image. */
+const drawKey = (spec: GlobeLayerSpec) =>
+  `${spec.opacity}|${spec.zIndex}|${spec.scale?.minRes}|${spec.scale?.maxRes}`
+
 function boxOf([w, s, e, n]: Region): Vec4 {
   return [(w + 180) / 360, (90 - n) / 180, (e - w) / 360, (n - s) / 180]
 }
@@ -354,6 +358,11 @@ export function createGlobeContent({
   const layers = new Map<string, LayerEntry>()
   const deco = new Map<string, LayerEntry>()
   const allEntries = () => [...layers.values(), ...deco.values()]
+  // Draw order by z, rebuilt only when the stacks change.
+  let drawOrder: Array<LayerEntry> = []
+  const reorder = () => {
+    drawOrder = allEntries().sort((a, b) => a.spec.zIndex - b.spec.zIndex)
+  }
   const loadWaiters: Array<() => void> = []
   let res: GlResources | null = null
   let baseColor = BASE_COLOR.light
@@ -747,8 +756,7 @@ export function createGlobeContent({
     gl.uniform1i(layer.uniforms.uTex, 0)
     gl.uniform1f(layer.uniforms.uFlatUv, 0)
     const mpp = groundMppFromZoom(zoom())
-    const ordered = allEntries().sort((a, b) => a.spec.zIndex - b.spec.zIndex)
-    for (const entry of ordered) {
+    for (const entry of drawOrder) {
       if (entry.pending) {
         entry.texture = createTexture(gl, entry.pending)
         entry.pending.close()
@@ -812,6 +820,7 @@ export function createGlobeContent({
     const hold = deferrable && !live
     const wanted = new Set<string>()
     const loading: Array<LayerEntry> = []
+    let changed = false
     for (const spec of specs) {
       wanted.add(spec.key)
       const paramsKey = `${spec.endpoint}|${JSON.stringify(spec.params)}`
@@ -833,6 +842,7 @@ export function createGlobeContent({
           reserved: 0,
         }
         target.set(spec.key, entry)
+        changed = true
         if (hold) entry.stale = true
         else {
           load(entry, firstScale(spec))
@@ -841,6 +851,7 @@ export function createGlobeContent({
       } else if (entry.paramsKey !== paramsKey) {
         entry.spec = spec
         entry.paramsKey = paramsKey
+        changed = true
         dropDetail(entry)
         if (hold) defer(entry)
         else {
@@ -855,6 +866,7 @@ export function createGlobeContent({
           loading.push(entry)
         }
       } else {
+        if (drawKey(entry.spec) !== drawKey(spec)) changed = true
         entry.spec = spec
       }
     }
@@ -862,11 +874,17 @@ export function createGlobeContent({
       if (wanted.has(key)) continue
       removeLayer(entry)
       target.delete(key)
+      changed = true
     }
     // Sharp view images once every first image holds its budget share.
-    const v = view()
-    for (const entry of loading) upgradeDetail(entry, v)
+    if (loading.length > 0) {
+      const v = view()
+      for (const entry of loading) upgradeDetail(entry, v)
+    }
     checkLoaded()
+    // An unchanged stack (React pushes one every commit) repaints nothing.
+    if (!changed) return
+    reorder()
     invalidate()
   }
 
@@ -959,6 +977,7 @@ export function createGlobeContent({
       for (const entry of allEntries()) removeLayer(entry)
       layers.clear()
       deco.clear()
+      drawOrder = []
       outline = null
       clearLines()
       clearSeed()
