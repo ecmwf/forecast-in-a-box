@@ -48,10 +48,10 @@ import { OverlayHoverCard } from './OverlayHoverCard'
 import { isAnnotationFeature, useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
+import { PanelCorner, SlotStatusBadges } from './SlotStatusBadges'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
-import type { ParsedLayer } from '../wms-capabilities'
 import type { MeasureMode } from '../hooks/useMeasure'
 import type { SourceSlot } from './layer-pairing'
 import type RenderEvent from 'ol/render/Event'
@@ -694,28 +694,16 @@ export function SingleMapView({
         </div>
       )}
 
-      {showA && a.hiddenAtTime && <GapBadge slot="A" side="left" />}
-      {showB && b.hiddenAtTime && <GapBadge slot="B" side="right" />}
-      {showA && stackA.errorCount > 0 && !a.hiddenAtTime && (
-        <LoadErrorBadge
-          slot="A"
-          side="left"
-          layers={erroredTitles(stackA.erroredNames, a.layers)}
-        />
-      )}
-      {showB && stackB.errorCount > 0 && !b.hiddenAtTime && (
-        <LoadErrorBadge
-          slot="B"
-          side="right"
-          layers={erroredTitles(stackB.erroredNames, b.layers)}
-        />
-      )}
-      {showA && a.timeTag && (
-        <TimeTagBadge slot="A" tag={a.timeTag} side="left" />
-      )}
-      {showB && b.timeTag && (
-        <TimeTagBadge slot="B" tag={b.timeTag} side="right" />
-      )}
+      <PanelCorner side="left">
+        {showA && (
+          <SlotStatusBadges source={a} erroredNames={stackA.erroredNames} />
+        )}
+      </PanelCorner>
+      <PanelCorner side="right">
+        {showB && (
+          <SlotStatusBadges source={b} erroredNames={stackB.erroredNames} />
+        )}
+      </PanelCorner>
 
       {mode === 'swipe' && !solo && (
         <div
@@ -837,90 +825,6 @@ export function SingleMapView({
           </p>
         </div>
       )}
-    </div>
-  )
-}
-
-/** Nearest/offset resolution indicator, e.g. "B +6 h". */
-function TimeTagBadge({
-  slot,
-  tag,
-  side,
-}: {
-  slot: string
-  tag: string
-  side: 'left' | 'right'
-}) {
-  const { t } = useTranslation('visualise')
-  return (
-    <div
-      className={
-        side === 'left'
-          ? 'absolute top-10 left-2 z-10'
-          : 'absolute top-10 right-2 z-10'
-      }
-    >
-      <div className="rounded-md border border-border bg-background/90 px-2 py-1 font-mono text-xs font-medium shadow-sm backdrop-blur-sm">
-        {t('timeline.offsetBadge', { slot, tag })}
-      </div>
-    </div>
-  )
-}
-
-function GapBadge({ slot, side }: { slot: string; side: 'left' | 'right' }) {
-  const { t } = useTranslation('visualise')
-  return (
-    <div
-      className={
-        side === 'left'
-          ? 'absolute top-10 left-2 z-10'
-          : 'absolute top-10 right-2 z-10'
-      }
-    >
-      <div className="rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
-        {t('timeline.gap', { slot })}
-      </div>
-    </div>
-  )
-}
-
-/** Failing layer names → display titles for the badge. */
-export function erroredTitles(
-  names: ReadonlyArray<string>,
-  layers: ReadonlyArray<ParsedLayer>,
-): Array<string> {
-  return names.map((n) => layers.find((l) => l.name === n)?.title ?? n)
-}
-
-/** The server returned no image for the requested instant (the layer is
- *  hidden — an older image must never pose as this time). */
-export function LoadErrorBadge({
-  slot,
-  side,
-  layers,
-}: {
-  slot: string
-  side: 'left' | 'right'
-  /** Titles of the affected layers — named so intact layers aren't accused. */
-  layers: ReadonlyArray<string>
-}) {
-  const { t } = useTranslation('visualise')
-  const shown = layers.slice(0, 2).join(', ')
-  const more = layers.length - 2
-  return (
-    <div
-      className={
-        side === 'left'
-          ? 'absolute top-10 left-2 z-10'
-          : 'absolute top-10 right-2 z-10'
-      }
-    >
-      <div className="max-w-64 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs font-medium text-danger">
-        {t('timeline.loadErrorLayers', {
-          slot,
-          layers: more > 0 ? `${shown} +${more}` : shown,
-        })}
-      </div>
     </div>
   )
 }

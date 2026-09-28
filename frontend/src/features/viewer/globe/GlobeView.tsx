@@ -24,8 +24,8 @@ import { MapLoadingBar } from '../components/MapLoadingBar'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
 import { PointerReadoutBadge } from '../components/PointerReadoutBadge'
 import { CompareSlotTag } from '../geo/CompareSlotTag'
-import { LoadErrorBadge, erroredTitles } from '../geo/SingleMapView'
 import { LoupeOverlay } from '../geo/LoupeOverlay'
+import { PanelCorner, SlotStatusBadges } from '../geo/SlotStatusBadges'
 import { isWorldBbox } from '../wms-capabilities'
 import { GLOBE_ENGINE } from './engine-entry'
 import { GlobeControls } from './GlobeControls'
@@ -482,26 +482,9 @@ function GlobePanel({
               submittedAt={source.submittedAt}
             />
           </div>
-          {source.hiddenAtTime && (
-            <div className="absolute top-10 left-2 z-10 rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
-              {t('timeline.gap', { slot: slot.toUpperCase() })}
-            </div>
-          )}
-          {erroredNames.length > 0 && !source.hiddenAtTime && (
-            <LoadErrorBadge
-              slot={slot.toUpperCase()}
-              side="left"
-              layers={erroredTitles(erroredNames, source.layers)}
-            />
-          )}
-          {source.timeTag && (
-            <div className="absolute top-10 left-2 z-10 rounded-md border border-border bg-background/90 px-2 py-1 font-mono text-xs font-medium shadow-sm backdrop-blur-sm">
-              {t('timeline.offsetBadge', {
-                slot: slot.toUpperCase(),
-                tag: source.timeTag,
-              })}
-            </div>
-          )}
+          <PanelCorner side="left">
+            <SlotStatusBadges source={source} erroredNames={erroredNames} />
+          </PanelCorner>
           <MirroredLoupe
             containerRef={containerRef}
             store={mirrorLoupe ? cross : null}

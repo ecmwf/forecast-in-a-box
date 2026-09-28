@@ -32,8 +32,8 @@ import { useContextOverlays, useOverlayHover } from './overlays'
 import { OverlayHoverCard } from './OverlayHoverCard'
 import { useAnnotationLayer } from './annotations'
 import { CompareSlotTag } from './CompareSlotTag'
-import { LoadErrorBadge, erroredTitles } from './SingleMapView'
 import { LoupeOverlay } from './LoupeOverlay'
+import { PanelCorner, SlotStatusBadges } from './SlotStatusBadges'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
@@ -471,26 +471,9 @@ function DualMapPanel({
           submittedAt={source.submittedAt}
         />
       </div>
-      {source.hiddenAtTime && (
-        <div className="absolute top-10 left-2 z-10 rounded-md border border-amber-500/40 bg-amber-50/95 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
-          {t('timeline.gap', { slot: source.slot.toUpperCase() })}
-        </div>
-      )}
-      {stack.errorCount > 0 && !source.hiddenAtTime && (
-        <LoadErrorBadge
-          slot={source.slot.toUpperCase()}
-          side="left"
-          layers={erroredTitles(stack.erroredNames, source.layers)}
-        />
-      )}
-      {source.timeTag && (
-        <div className="absolute top-10 left-2 z-10 rounded-md border border-border bg-background/90 px-2 py-1 font-mono text-xs font-medium shadow-sm backdrop-blur-sm">
-          {t('timeline.offsetBadge', {
-            slot: source.slot.toUpperCase(),
-            tag: source.timeTag,
-          })}
-        </div>
-      )}
+      <PanelCorner side="left">
+        <SlotStatusBadges source={source} erroredNames={stack.erroredNames} />
+      </PanelCorner>
       {cross && (
         <>
           <div
