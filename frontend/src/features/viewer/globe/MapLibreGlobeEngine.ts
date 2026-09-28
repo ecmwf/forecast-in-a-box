@@ -18,7 +18,11 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { GLOBE_ENGINE } from './engine-entry'
-import { globeMinZoom, zoomFromGroundMpp } from './globe-camera'
+import {
+  globeMinZoom,
+  globenessForProgress,
+  zoomFromGroundMpp,
+} from './globe-camera'
 import {
   applyFlatUniforms,
   createGlobeContent,
@@ -27,7 +31,12 @@ import {
   easeOutCubic,
   tween,
 } from './globe-content'
-import { EARTH_RADIUS_M, MERCATOR_WORLD_M } from './sphere-math'
+import {
+  EARTH_RADIUS_M,
+  MERCATOR_WORLD_M,
+  lonLatToMercatorUnit,
+  lonLatToUnitSphere,
+} from './sphere-math'
 import { invertMat4 } from './webgl/gl'
 import type { CustomLayerInterface } from 'maplibre-gl'
 import type { GlobeContent } from './globe-content'
@@ -187,8 +196,6 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   let attribution: AttributionControl | null = null
   /** Our clip-space bend runs (non-Mercator flat); else MapLibre bends. */
   let ownBend = false
-  /** Labels off from the unbend until the next bend settles. */
-  let labelsHidden = false
   /** Carto layers spike at the poles mid-bend: off while bending. */
   let bending = false
   let globeness = 1
@@ -326,7 +333,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     content.setDecoration(basemap.kind === 'wms' ? basemap.layers : [])
     // MapLibre's basemap follows its own bend, not ours: outline then.
     const vector = wanted !== null && !ownBend
-    const key = `${vector}|${basemap.kind}|${basemap.theme}|${basemap.opacity}|${labelsHidden}|${bending}`
+    const key = `${vector}|${basemap.kind}|${basemap.theme}|${basemap.opacity}|${bending}`
     if (key === shownKey) return
     shownKey = key
     content.setOutline(
@@ -337,7 +344,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     const f = basemap.opacity
     for (const l of styleLayers) {
       m.setLayoutProperty(l.id, 'visibility', vector ? l.visibility : 'none')
-      const lf = bending || (labelsHidden && l.type === 'symbol') ? 0 : f
+      const lf = bending ? 0 : f
       for (const [prop, value] of l.paint) {
         const next = lf === 1 ? value : scaleOpacity(value, lf)
         m.setPaintProperty(l.id, prop, next as PaintValue)
@@ -352,9 +359,14 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     }
   }
 
-  function animate(durationMs: number, step: (p: number) => void) {
+  /** `holdBasemap`: Carto off while bending (the seed stands in for it on entry). */
+  function animate(
+    durationMs: number,
+    step: (p: number) => void,
+    holdBasemap = true,
+  ) {
     animating = true
-    bending = true
+    bending = holdBasemap
     setInteractive(false)
     syncBasemap()
     return tween(durationMs, (p) => {
@@ -374,12 +386,33 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   }
 
   const inverse = new Float64Array(16)
+  // The last globe and Mercator clip matrices MapLibre drew with.
+  const lastSphere = new Float64Array(16)
+  const lastFlat = new Float64Array(16)
+  let haveMatrices = false
+
+  /** Globeness showing `cam`'s centre `s` of the way from globe to flat on screen. */
+  function globenessAt(s: number, cam: MapLibreCam): number {
+    if (!haveMatrices) return 1 - s
+    const [x, y, z] = lonLatToUnitSphere(cam.lon, cam.lat)
+    const [mx, my] = lonLatToMercatorUnit(cam.lon, cam.lat)
+    const S = lastSphere
+    const F = lastFlat
+    const ws = S[3] * x + S[7] * y + S[11] * z + S[15]
+    const wf = F[3] * mx + F[7] * my + F[15]
+    return ws > 0 && wf > 0 ? globenessForProgress(s, wf / ws) : 1 - s
+  }
   type RenderArgs = Parameters<NonNullable<CustomLayerInterface['render']>>[1]
   function applyProjection(pd: RenderArgs['defaultProjectionData']) {
     if (!content) return
     const u = content.uniforms
     // mainMatrix projects the unit sphere while MapLibre renders a globe.
     u.sphereMatrix.set(pd.mainMatrix)
+    if (pd.projectionTransition > 0) {
+      lastSphere.set(pd.mainMatrix)
+      lastFlat.set(pd.fallbackMatrix)
+      haveMatrices = true
+    }
     if (!ownBend || pd.projectionTransition > 0) {
       // Eye = the point sent to w = 0: column z of the inverse.
       const inv = invertMat4(pd.mainMatrix, inverse)
@@ -557,6 +590,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       const m = map
       if (!m || !content) return Promise.resolve()
       const u = content.uniforms
+      u.polarCap = 1
       // Entering wakes a warm globe, whatever React's effect timing.
       content.setLive(true)
       const [sw, sh] = size()
@@ -566,7 +600,6 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         map?.scrollZoom.disable()
         settleWheel()
         content?.scheduleUpgrade()
-        labelsHidden = false
         syncBasemap()
         releaseSeed()
       }
@@ -625,9 +658,9 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
           u.morph = 1 - easeInOutCubic(p)
         })
       }
-      // Ends as the OL Mercator frame the handoff reveals.
+      // Ends as the OL Mercator frame the handoff reveals; Carto and its labels unroll too.
       flat = null
-      labelsHidden = true
+      u.polarCap = 0
       m.setMinZoom(-2)
       const c = m.getCenter()
       const start = { lon: c.lng, lat: c.lat, zoom: m.getZoom() }
@@ -636,11 +669,17 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         lat: to.lat,
         zoom: mercatorZoom(to.resolution),
       }
-      return animate(durationMs, (p) => {
-        const e = easeInOutCubic(p)
-        setGlobeness(m, 1 - e)
-        place(m, lerpCam(start, end, e))
-      })
+      return animate(
+        durationMs,
+        (p) => {
+          // Eased on screen, not in clip space, so the unroll spans the whole move.
+          const s = easeInOutCubic(p)
+          const cam = lerpCam(start, end, s)
+          setGlobeness(m, globenessAt(s, cam))
+          place(m, cam)
+        },
+        false,
+      )
     },
 
     pick: (px) => {

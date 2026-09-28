@@ -31,6 +31,8 @@ export type GlobePhase = 'flat' | 'entering' | 'globe' | 'leaving'
 
 /** The wrap; the engine flies to the wrap scale first. */
 const MORPH_MS = 500
+/** The unbend back to the flat map. */
+const UNBEND_MS = 700
 /** Globe overlay fade (CSS) — keep in step with GlobeView. */
 export const GLOBE_FADE_MS = 200
 const ENGINE_READY_CAP_MS = 10000
@@ -215,7 +217,7 @@ export function useGlobeMode({
         !reducedRef.current
       void (async () => {
         if (morph)
-          await Promise.all(list.map((e) => e.morphOut(flat, MORPH_MS)))
+          await Promise.all(list.map((e) => e.morphOut(flat, UNBEND_MS)))
         if (run !== runRef.current) return
         setOverlayVisible(false)
         await sleep(instant ? 0 : GLOBE_FADE_MS)

@@ -90,6 +90,8 @@ export interface MorphUniforms {
   flatKind: number
   /** Camera position in sphere space (far-side fade). */
   camModel: [number, number, number]
+  /** 1: polar rows hidden mid-bend; 0: kept (screen-even unbend). */
+  polarCap: number
 }
 
 /** One texture: decoded bitmap waiting for upload, or uploaded. */
@@ -345,6 +347,7 @@ export function createGlobeContent({
     morph: 1,
     flatKind: 1,
     camModel: [0, 0, 5],
+    polarCap: 1,
   }
   const layers = new Map<string, LayerEntry>()
   const deco = new Map<string, LayerEntry>()
@@ -675,6 +678,7 @@ export function createGlobeContent({
     gl.uniformMatrix4fv(p.uniforms.uSphereMatrix, false, uniforms.sphereMatrix)
     gl.uniform1f(p.uniforms.uMorph, uniforms.morph)
     gl.uniform1f(p.uniforms.uFlatKind, uniforms.flatKind)
+    gl.uniform1f(p.uniforms.uPolarCap, uniforms.polarCap)
     gl.uniform3fv(p.uniforms.uCamModel, uniforms.camModel)
   }
 

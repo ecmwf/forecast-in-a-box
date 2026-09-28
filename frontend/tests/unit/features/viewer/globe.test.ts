@@ -24,6 +24,7 @@ import {
   globeCameraOf,
   globeExitZoom,
   globeFitZoom,
+  globenessForProgress,
   groundMppFromZoom,
   panGlobeCamera,
   zoomFromGroundMpp,
@@ -105,6 +106,21 @@ describe('globe camera', () => {
     expect(globeCameraForBbox([-180, -90, 180, 90], 800, 600, 6).zoom).toBe(
       globeFitZoom(800, 600),
     )
+  })
+})
+
+describe('unbend progress', () => {
+  it('maps on-screen progress to a clip-space globeness', () => {
+    expect(globenessForProgress(0, 40)).toBe(1)
+    expect(globenessForProgress(1, 40)).toBe(0)
+    // The projected point sits s of the way to its flat position, whatever the w ratio.
+    for (const r of [0.05, 1, 40]) {
+      for (const s of [0.1, 0.5, 0.9]) {
+        const g = globenessForProgress(s, r)
+        const flatWeight = ((1 - g) * r) / (g + (1 - g) * r)
+        expect(flatWeight).toBeCloseTo(s, 12)
+      }
+    }
   })
 })
 

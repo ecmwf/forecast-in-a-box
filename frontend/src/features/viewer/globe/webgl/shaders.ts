@@ -17,6 +17,7 @@ export const SHARED_UNIFORMS = [
   'uMorph',
   'uFlatKind',
   'uCamModel',
+  'uPolarCap',
 ] as const
 
 // Clip-space mix: exact OL frame at 0, exact globe at 1.
@@ -48,6 +49,8 @@ void main() {
 const VISIBILITY = `
 uniform float uMorph;
 uniform float uFlatKind;
+// 1: hide polar rows mid-bend (raw clip blends spike them); 0: keep them (screen-even unbend).
+uniform float uPolarCap;
 in vec2 vUv;
 in float vFacing;
 out vec4 fragColor;
@@ -55,7 +58,7 @@ out vec4 fragColor;
 const float MERC_EDGE = (90.0 - 85.0511) / 180.0;
 // Polar rows spike mid-bend: Mercator pins them to the map edge.
 bool polarCap() {
-  return uFlatKind > 0.5 && uMorph < 0.98 && (vUv.y < MERC_EDGE || vUv.y > 1.0 - MERC_EDGE);
+  return uPolarCap > 0.5 && uFlatKind > 0.5 && uMorph < 0.98 && (vUv.y < MERC_EDGE || vUv.y > 1.0 - MERC_EDGE);
 }
 float visibility() {
   float edge = max(fwidth(vFacing), 1e-6);
