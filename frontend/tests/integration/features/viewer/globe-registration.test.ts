@@ -48,6 +48,12 @@ const REGION: [number, number, number, number] = [-60, 20, -20, 55]
 const REGION_MARKER: Marker = { lon: -50, lat: 40, rgb: [255, 160, 0] }
 const CAMERA = { lon: -35, lat: 10, zoom: globeFitZoom(WIDTH, HEIGHT) }
 const SOLID: Rgb = [40, 120, 200]
+// One-degree bands at the pole: a smudge would mix them.
+const POLAR_BANDS = [
+  [89, 90, [255, 0, 0]],
+  [88, 89, [0, 200, 0]],
+  [87, 88, [0, 0, 255]],
+] as const
 // One-texel meridians 21 texels apart, so sampling phase drifts line to line; ~2.5× minified east–west near 65°N.
 const LINE_LONS = Array.from({ length: 11 }, (_, i) => -60 + i * 5.25)
 
@@ -82,6 +88,21 @@ async function linesPng(
   ctx.fillStyle = 'rgb(0,0,0)'
   for (const lon of lons) {
     ctx.fillRect((lon + 180) * ppd, (90 - lat1) * ppd, 1, (lat1 - lat0) * ppd)
+  }
+  const blob = await canvas.convertToBlob({ type: 'image/png' })
+  return blob.arrayBuffer()
+}
+
+/** World PNG at `ppd` px/degree with full-width latitude bands. */
+async function bandsPng(
+  ppd: number,
+  bands: ReadonlyArray<readonly [number, number, Rgb]>,
+): Promise<ArrayBuffer> {
+  const canvas = new OffscreenCanvas(360 * ppd, 180 * ppd)
+  const ctx = canvas.getContext('2d')!
+  for (const [south, north, rgb] of bands) {
+    ctx.fillStyle = `rgb(${rgb.join(',')})`
+    ctx.fillRect(0, (90 - north) * ppd, canvas.width, (north - south) * ppd)
   }
   const blob = await canvas.convertToBlob({ type: 'image/png' })
   return blob.arrayBuffer()
@@ -199,6 +220,7 @@ describe('globe registration', () => {
     const region = await markerPng(REGION, 10, [REGION_MARKER], 10)
     const solid = await solidPng([-180, -90, 180, 90], 4, SOLID)
     const lines = await linesPng(4, LINE_LONS, [45, 80])
+    const bands = await bandsPng(4, POLAR_BANDS)
     worker.use(
       http.get(ENDPOINT, async ({ request }) => {
         const url = new URL(request.url)
@@ -222,7 +244,9 @@ describe('globe registration', () => {
               ? solid
               : name === 'lines'
                 ? lines
-                : world
+                : name === 'bands'
+                  ? bands
+                  : world
         return HttpResponse.arrayBuffer(body, {
           headers: { 'Content-Type': 'image/png' },
         })
@@ -278,6 +302,25 @@ describe('globe registration', () => {
     expect(boxes).toContain('-90,-180,90,180')
     expect(boxes.some((b) => b !== '-90,-180,90,180')).toBe(true)
     expect(readoutError(engine, m)).toBeLessThan(0.05)
+  })
+
+  it('keeps latitudes sharp at the pole', async () => {
+    engine.setCamera({ lon: 0, lat: 88, zoom: 3.6 })
+    engine.setLayers([spec('bands', 1)])
+    await engine.whenLoaded()
+    // Mid-band pixels keep the band's colour; the mip smudge blends them.
+    const f = frame(engine)
+    let checked = 0
+    const off: Array<string> = []
+    for (let y = 0; y < HEIGHT; y += 2)
+      for (let x = 0; x < WIDTH; x += 2) {
+        const hit = engine.pick([x, y])
+        if (!hit || hit.lat < 88.3 || hit.lat > 88.7) continue
+        checked++
+        if (!near(f.at(x, y), POLAR_BANDS[1][2], 12)) off.push(`${x},${y}`)
+      }
+    expect(checked).toBeGreaterThan(20)
+    expect(off).toEqual([])
   })
 
   it('places a regional layer on its bbox', async () => {

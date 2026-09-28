@@ -11,6 +11,8 @@
 /** GLSL ES 3.00 for the morphing sphere, driven by MapLibre-style clip matrices. */
 
 export const ATTRIBUTES = ['aSphere', 'aGeo', 'aMerc'] as const
+/** Texture anisotropy cap; the layer shader bounds its footprints to it too. */
+export const MAX_ANISOTROPY = 8
 export const SHARED_UNIFORMS = [
   'uFlatMatrix',
   'uSphereMatrix',
@@ -86,15 +88,24 @@ uniform vec4 uHole;
 in vec2 vFlat;
 ${VISIBILITY}
 void main() {
+  vec2 uv = (mix(vUv, vFlat, uFlatUv) - uBox.xy) / uBox.zw;
+  // Gradients before any discard.
+  vec2 gx = dFdx(uv);
+  vec2 gy = dFdy(uv);
+  // MSAA runs pixel centres just outside the seam triangle: allow one pixel.
+  vec2 slack = abs(gx) + abs(gy);
+  // Longitudes converge at the poles: cap the east-west footprint at the anisotropy limit, so latitudes stay sharp.
+  float across = max(max(abs(gx.y), abs(gy.y)), 1e-9);
+  float along = max(max(abs(gx.x), abs(gy.x)), 1e-9);
+  float k = min(1.0, ${MAX_ANISOTROPY.toFixed(1)} * across / along);
+  gx.x *= k;
+  gy.x *= k;
   if (uHole.z > 0.0 && all(greaterThanEqual(vUv, uHole.xy)) && all(lessThanEqual(vUv, uHole.xy + uHole.zw))) discard;
   // The seed has no pixels beyond Mercator's edge at any morph.
   if (polarCap() || (uFlatUv > 0.5 && uFlatKind > 0.5 && (vUv.y < MERC_EDGE || vUv.y > 1.0 - MERC_EDGE))) discard;
-  vec2 uv = (mix(vUv, vFlat, uFlatUv) - uBox.xy) / uBox.zw;
-  // MSAA runs pixel centres just outside the seam triangle: allow one pixel.
-  vec2 slack = fwidth(uv);
   if (any(lessThan(uv, -slack)) || any(greaterThan(uv, vec2(1.0) + slack))) discard;
   // Premultiplied texels, passed through untouched (legend colours).
-  fragColor = texture(uTex, uv) * (uOpacity * visibility());
+  fragColor = textureGrad(uTex, uv, gx, gy) * (uOpacity * visibility());
 }
 `
 

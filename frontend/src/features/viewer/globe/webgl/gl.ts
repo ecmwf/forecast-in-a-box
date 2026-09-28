@@ -10,7 +10,7 @@
 
 /** Small WebGL2 helpers: programs, meshes, textures, a 4x4 inverse. */
 
-import { ATTRIBUTES } from './shaders'
+import { ATTRIBUTES, MAX_ANISOTROPY } from './shaders'
 import type { Geometry } from './geometry'
 
 export interface Program<TUniform extends string> {
@@ -109,9 +109,6 @@ export function deleteMesh(gl: WebGL2RenderingContext, mesh: Mesh): void {
   gl.deleteVertexArray(mesh.vao)
   for (const buffer of mesh.buffers) gl.deleteBuffer(buffer)
 }
-
-/** Anisotropy cap: sharp at the limb and at high latitudes. */
-const MAX_ANISOTROPY = 8
 
 /** Premultiplied RGBA; nearest when magnified (server colours), trilinear when minified (no broken lines). */
 export function createTexture(
