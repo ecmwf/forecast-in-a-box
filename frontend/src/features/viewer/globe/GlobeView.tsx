@@ -205,7 +205,8 @@ export function GlobeView({
       data-testid="globe-view"
       className={cn(
         'absolute inset-0 z-30 bg-background transition-opacity duration-200 motion-reduce:transition-none',
-        !visible && 'pointer-events-none',
+        // Handoffs send input to the real map underneath.
+        (!visible || !active) && 'pointer-events-none',
       )}
       style={{ opacity: visible ? 1 : 0 }}
     >

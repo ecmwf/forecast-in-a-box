@@ -258,6 +258,12 @@ export function GeoViewer({
   const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
 
   // -------- 3D globe (flat ↔ globe handoff) --------
+  // The flat maps' export capture resolves after OL's rendercomplete.
+  const flatCaptureRef = useRef<(() => Promise<unknown>) | null>(null)
+  const whenFlatRendered = useCallback(
+    () => flatCaptureRef.current?.().then(() => undefined) ?? Promise.resolve(),
+    [],
+  )
   const globe = useGlobeViewer({
     viewRef,
     adoptFlatView,
@@ -268,6 +274,7 @@ export function GeoViewer({
     hasB,
     focusSlot,
     mode,
+    whenFlatRendered,
   })
   const { projectionId, changeProjection } = globe
 
@@ -924,6 +931,9 @@ export function GeoViewer({
     annotations,
     slotIds: { a: a.id, b: bId },
   })
+  useLayoutEffect(() => {
+    flatCaptureRef.current = captureAction
+  }, [captureAction])
 
   useGeoShortcuts({
     onProjectionCycle: cycleProjection,

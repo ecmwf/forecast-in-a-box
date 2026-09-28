@@ -102,6 +102,7 @@ export function useGlobeViewer({
   hasB,
   focusSlot,
   mode,
+  whenFlatRendered,
 }: {
   viewRef: RefObject<View>
   adoptFlatView: (view: View, id: FlatProjectionId) => void
@@ -114,6 +115,8 @@ export function useGlobeViewer({
   hasB: boolean
   focusSlot: SourceSlot | null
   mode: CompareMode
+  /** Resolves once the flat map has rendered its layers (the unbend's hand-back). */
+  whenFlatRendered: () => Promise<void>
 }): GlobeViewer {
   const { t } = useTranslation('visualise')
   const [available, setAvailable] = useState(supportsGlobe)
@@ -141,6 +144,7 @@ export function useGlobeViewer({
       showToast.error(t('globe.failed'))
     },
     captureFlat: () => Promise.resolve(snapshotFlatMaps(mapAreaRef.current)),
+    whenFlatRendered,
   })
   const phaseRef = useRef(globe.phase)
   useLayoutEffect(() => {

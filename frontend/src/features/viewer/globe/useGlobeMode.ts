@@ -33,6 +33,8 @@ export type GlobePhase = 'flat' | 'entering' | 'globe' | 'leaving'
 const MORPH_MS = 500
 /** The unbend back to the flat map. */
 const UNBEND_MS = 700
+/** Longest hold of the flat end frame while the OL map under it renders. */
+const FLAT_READY_CAP_MS = 2500
 /** Globe overlay fade (CSS) — keep in step with GlobeView. */
 export const GLOBE_FADE_MS = 200
 const ENGINE_READY_CAP_MS = 10000
@@ -65,6 +67,7 @@ export function useGlobeMode({
   initialCamera,
   onFailure,
   captureFlat,
+  whenFlatRendered,
 }: {
   viewRef: RefObject<View>
   /** Adopt a new flat View (GeoViewer's view + projection state). */
@@ -80,6 +83,8 @@ export function useGlobeMode({
   onFailure: (err: unknown) => void
   /** The flat map's pixels per slot: the bend starts from them. */
   captureFlat: () => Promise<ReadonlyArray<CaptureResult>>
+  /** Resolves once the OL map under the overlay has rendered its layers. */
+  whenFlatRendered: () => Promise<void>
 }): GlobeMode {
   const [phase, setPhase] = useState<GlobePhase>(
     initialCamera ? 'globe' : 'flat',
@@ -139,6 +144,7 @@ export function useGlobeMode({
   const onFailureRef = useRef(onFailure)
   const reducedRef = useRef(reducedMotion)
   const captureFlatRef = useRef(captureFlat)
+  const whenFlatRenderedRef = useRef(whenFlatRendered)
 
   const enter = useCallback(() => {
     if (phaseRef.current !== 'flat') return
@@ -219,6 +225,13 @@ export function useGlobeMode({
         if (morph)
           await Promise.all(list.map((e) => e.morphOut(flat, UNBEND_MS)))
         if (run !== runRef.current) return
+        // Hold the globe's flat end frame until the OL map under it has drawn.
+        if (!instant)
+          await Promise.race([
+            whenFlatRenderedRef.current().catch(() => {}),
+            sleep(FLAT_READY_CAP_MS),
+          ])
+        if (run !== runRef.current) return
         setOverlayVisible(false)
         await sleep(instant ? 0 : GLOBE_FADE_MS)
         if (run !== runRef.current) return
@@ -238,6 +251,7 @@ export function useGlobeMode({
     onFailureRef.current = onFailure
     reducedRef.current = reducedMotion
     captureFlatRef.current = captureFlat
+    whenFlatRenderedRef.current = whenFlatRendered
     leaveRef.current = leave
     exitTargetRef.current = exitTarget
   })
