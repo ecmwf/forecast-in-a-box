@@ -10,7 +10,14 @@
 
 /** Globe panels (one per shown source, one shared camera) overlaying the OL maps. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { MapLoadingBar } from '../components/MapLoadingBar'
 import { PinnedLegendsBar } from '../components/PinnedLegendsBar'
@@ -249,18 +256,19 @@ function GlobePanel({
   const slot = source.slot
 
   // The native basemap is this panel's own server: expand it per source.
+  const { decorationLayers, baseUrl, bboxAxisOrder } = source
   const panelBasemap = useMemo<GlobeBasemapSpec>(
     () =>
       basemap.kind === 'wms'
-        ? { ...basemap, layers: globeDecorationSpecs(source, basemap.opacity) }
+        ? {
+            ...basemap,
+            layers: globeDecorationSpecs(
+              { decorationLayers, baseUrl, slot, bboxAxisOrder },
+              basemap.opacity,
+            ),
+          }
         : basemap,
-    [
-      basemap,
-      source.decorationLayers,
-      source.baseUrl,
-      source.slot,
-      source.bboxAxisOrder,
-    ],
+    [basemap, decorationLayers, baseUrl, slot, bboxAxisOrder],
   )
   // Engine events read the latest props without remounting the engine.
   const latest = useRef({
@@ -269,7 +277,9 @@ function GlobePanel({
     onFailure,
     onContextLost,
   })
-  latest.current = { source, basemap: panelBasemap, onFailure, onContextLost }
+  useLayoutEffect(() => {
+    latest.current = { source, basemap: panelBasemap, onFailure, onContextLost }
+  })
   const zBase = slot === 'a' ? 100 : 200
 
   useEffect(() => {

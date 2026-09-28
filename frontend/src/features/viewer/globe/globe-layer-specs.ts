@@ -10,14 +10,15 @@
 
 /** A source's active stack as engine specs (useWmsLayerStack's params, order, opacity). */
 
-import { DEFAULT_LAYER_OPACITY } from '../ol-layers'
+import { DEFAULT_LAYER_OPACITY, vectorStyleUrl } from '../ol-layers'
 import {
   layerRequestParams,
   skinnyWmsBasemap,
   toWmsEndpoint,
 } from '../wms-capabilities'
 import type { CompareMapSource } from '../geo/types'
-import type { GlobeLayerSpec } from './engine'
+import type { GlobeBasemapSpec, GlobeLayerSpec } from './engine'
+import type { BasemapOption } from '../ol-layers'
 
 export function globeLayerSpecs(
   source: CompareMapSource,
@@ -61,7 +62,10 @@ const REFERENCE_Z = 1000
 
 /** The server's own basemap as engine specs: opaque background, reference lines. */
 export function globeDecorationSpecs(
-  source: CompareMapSource,
+  source: Pick<
+    CompareMapSource,
+    'decorationLayers' | 'baseUrl' | 'slot' | 'bboxAxisOrder'
+  >,
   opacity: number,
 ): Array<GlobeLayerSpec> {
   const { background, reference } = skinnyWmsBasemap(source.decorationLayers)
@@ -101,4 +105,17 @@ export function globeDecorationSpecs(
     })
   }
   return specs
+}
+
+/** The globe's basemap for a flat option; each panel expands a native one itself. */
+export function globeBasemapSpec(
+  opt: BasemapOption | undefined,
+  theme: 'light' | 'dark',
+  opacity: number,
+): GlobeBasemapSpec {
+  const base = { theme, opacity }
+  if (opt?.type === 'vector')
+    return { ...base, kind: 'vector', styleUrl: vectorStyleUrl(opt, theme) }
+  if (opt?.type === 'skinnywms') return { ...base, kind: 'wms', layers: [] }
+  return { ...base, kind: 'outline' }
 }

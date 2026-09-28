@@ -10,7 +10,7 @@
 
 /** Flat ↔ globe handoff: flat → entering → globe → leaving → flat. */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { getViewerProjection, viewerProjectionOf } from '../projections'
 import {
@@ -84,14 +84,12 @@ export function useGlobeMode({
   )
   const [overlayVisible, setOverlayVisible] = useState(initialCamera !== null)
   const phaseRef = useRef(phase)
-  phaseRef.current = phase
   const [camera] = useState(() =>
     createSharedGlobeCamera(initialCamera ?? { lon: 10, lat: 30, zoom: 1 }),
   )
   const enginesRef = useRef(new Map<string, GlobeEngine>())
   const readyWaitersRef = useRef<Array<() => void>>([])
   const panelCountRef = useRef(panelCount)
-  panelCountRef.current = panelCount
   const runRef = useRef(0)
 
   const registerEngine = useCallback(
@@ -136,13 +134,9 @@ export function useGlobeMode({
   const settle = useCallback((next: GlobePhase) => setPhase(next), [])
 
   const onFlatViewRef = useRef(onFlatView)
-  onFlatViewRef.current = onFlatView
   const onFailureRef = useRef(onFailure)
-  onFailureRef.current = onFailure
   const reducedRef = useRef(reducedMotion)
-  reducedRef.current = reducedMotion
   const captureFlatRef = useRef(captureFlat)
-  captureFlatRef.current = captureFlat
 
   const enter = useCallback(() => {
     if (phaseRef.current !== 'flat') return
@@ -233,9 +227,18 @@ export function useGlobeMode({
   )
 
   const leaveRef = useRef(leave)
-  leaveRef.current = leave
   const exitTargetRef = useRef(exitTarget)
-  exitTargetRef.current = exitTarget
+  // The transitions read the latest values; refs sync after every commit.
+  useLayoutEffect(() => {
+    phaseRef.current = phase
+    panelCountRef.current = panelCount
+    onFlatViewRef.current = onFlatView
+    onFailureRef.current = onFailure
+    reducedRef.current = reducedMotion
+    captureFlatRef.current = captureFlat
+    leaveRef.current = leave
+    exitTargetRef.current = exitTarget
+  })
 
   const fail = useCallback(() => {
     if (phaseRef.current === 'globe') {
