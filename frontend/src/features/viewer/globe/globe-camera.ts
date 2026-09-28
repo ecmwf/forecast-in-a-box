@@ -35,10 +35,9 @@ import type {
 /** Ground m/px at zoom 0 (OL's 256 px Web Mercator tile). */
 export const EQUATOR_MPP_Z0 = MERCATOR_WORLD_M / 256
 
-// Globe radius / viewport: resting fit, zoom-out floor, auto-exit point.
+// Globe radius / viewport: resting fit, zoom-out floor.
 const FIT_RADIUS = 0.45
 const MIN_RADIUS = 0.25
-const EXIT_RADIUS = 1.5
 
 export function groundMppFromZoom(zoom: number): number {
   return EQUATOR_MPP_Z0 / 2 ** zoom
@@ -69,10 +68,6 @@ export function globeFitZoom(width: number, height: number): number {
 
 export function globeMinZoom(width: number, height: number): number {
   return zoomForRadius(MIN_RADIUS * Math.min(width, height))
-}
-
-export function globeExitZoom(width: number, height: number): number {
-  return zoomForRadius(EXIT_RADIUS * Math.max(width, height))
 }
 
 /** Rotate by a screen drag (px) at the centre's ground scale; north stays up. */
@@ -111,16 +106,6 @@ export function globeCameraForBbox(
 /** Flat layouts the globe can bend from; null for polar/LAEA. */
 export function flatKindOf(id: FlatProjectionId): FlatKind | null {
   return id === 'merc' || id === 'geo' ? id : null
-}
-
-/** Width of the whole flat world in px, for the morphable projections. */
-export function worldWidthPx(view: View): number | null {
-  const res = view.getResolution()
-  if (res === undefined) return null
-  const code = view.getProjection().getCode()
-  if (code === 'EPSG:3857') return MERCATOR_WORLD_M / res
-  if (code === 'EPSG:4326') return 360 / res
-  return null
 }
 
 /** Unit flat world → clip matching the OL view: clipX = kx(x − cx), clipY = ky(cy − y). */

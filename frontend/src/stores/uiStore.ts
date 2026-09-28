@@ -192,17 +192,6 @@ export const useUiStore = create<UiState>()(
             delete state.panelShadow
           }
 
-          // v11: one globe renderer, one sampling mode — the switches are gone.
-          if (version < 11) {
-            delete state.globeEngine
-            delete state.globeExactColours
-          }
-
-          // v12: the globe is entered on purpose — the auto-bend switch is gone.
-          if (version < 12) {
-            delete state.globeAutoTransition
-          }
-
           return state as {
             theme: Theme
             pluginsViewMode: AdminViewMode

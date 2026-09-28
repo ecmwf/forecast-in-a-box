@@ -31,12 +31,6 @@ export function lonLatToUnitSphere(lon: number, lat: number): Vec3 {
   ]
 }
 
-/** Unit-sphere point → degrees. */
-export function unitSphereToLonLat([x, y, z]: Vec3): [number, number] {
-  const lat = Math.asin(Math.max(-1, Math.min(1, y))) / D2R
-  return [Math.atan2(x, z) / D2R, lat]
-}
-
 /** Mercator unit world (MapLibre's MercatorCoordinate); poles clamp. */
 export function lonLatToMercatorUnit(
   lon: number,

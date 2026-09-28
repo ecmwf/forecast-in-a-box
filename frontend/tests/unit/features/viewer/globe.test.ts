@@ -15,7 +15,6 @@ import type { ParsedLayer } from '@/features/viewer/wms-capabilities'
 import {
   lonLatToMercatorUnit,
   lonLatToUnitSphere,
-  unitSphereToLonLat,
 } from '@/features/viewer/globe/sphere-math'
 import {
   applyGlobeCamera,
@@ -23,7 +22,6 @@ import {
   globeCameraForBbox,
   globeCameraOf,
   globeEntryCamera,
-  globeExitZoom,
   globeFitZoom,
   globenessForProgress,
   groundMppFromZoom,
@@ -43,18 +41,12 @@ import { createViewerView } from '@/features/viewer/hooks/useOlMapBase'
 import { getViewerProjection } from '@/features/viewer/projections'
 
 describe('sphere math (MapLibre conventions)', () => {
-  it('faces lon/lat 0 towards +Z and round-trips', () => {
-    const [x, y, z] = lonLatToUnitSphere(0, 0)
-    expect([x, y, z].map((v) => +v.toFixed(9))).toEqual([0, 0, 1])
-    for (const [lon, lat] of [
-      [12, 50],
-      [-170, -33],
-      [90, 89],
-    ]) {
-      const [rlon, rlat] = unitSphereToLonLat(lonLatToUnitSphere(lon, lat))
-      expect(rlon).toBeCloseTo(lon, 9)
-      expect(rlat).toBeCloseTo(lat, 9)
-    }
+  it('faces lon/lat 0 towards +Z, east towards +X, north towards +Y', () => {
+    const round = (v: ReadonlyArray<number>) => v.map((c) => +c.toFixed(9) || 0)
+    expect(round(lonLatToUnitSphere(0, 0))).toEqual([0, 0, 1])
+    expect(round(lonLatToUnitSphere(90, 0))).toEqual([1, 0, 0])
+    expect(round(lonLatToUnitSphere(0, 90))).toEqual([0, 1, 0])
+    expect(Math.hypot(...lonLatToUnitSphere(-170, -33))).toBeCloseTo(1, 12)
   })
 
   it('maps Mercator into the unit square and clamps the poles', () => {
@@ -67,11 +59,6 @@ describe('sphere math (MapLibre conventions)', () => {
 describe('globe camera', () => {
   it('converts zoom and ground scale both ways', () => {
     expect(zoomFromGroundMpp(groundMppFromZoom(3.7))).toBeCloseTo(3.7, 12)
-  })
-
-  it('keeps the auto-exit zoom well above the resting fit', () => {
-    // Hysteresis: bending in lands at the fit, flattening needs >1 level more.
-    expect(globeExitZoom(900, 600) - globeFitZoom(900, 600)).toBeGreaterThan(1)
   })
 
   it.each([
