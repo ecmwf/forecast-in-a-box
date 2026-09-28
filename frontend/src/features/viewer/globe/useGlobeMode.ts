@@ -129,13 +129,18 @@ export function useGlobeMode({
   const engines = useCallback(
     (): Promise<Array<GlobeEngine>> =>
       new Promise((resolve, reject) => {
-        const done = () => resolve([...enginesRef.current.values()])
-        if (enginesRef.current.size >= panelCountRef.current) return done()
+        if (enginesRef.current.size >= panelCountRef.current)
+          return resolve([...enginesRef.current.values()])
+        const timer = window.setTimeout(() => {
+          const waiters = readyWaitersRef.current
+          waiters.splice(waiters.indexOf(done), 1)
+          reject(new Error('Globe engine did not start'))
+        }, ENGINE_READY_CAP_MS)
+        function done() {
+          window.clearTimeout(timer)
+          resolve([...enginesRef.current.values()])
+        }
         readyWaitersRef.current.push(done)
-        window.setTimeout(
-          () => reject(new Error('Globe engine did not start')),
-          ENGINE_READY_CAP_MS,
-        )
       }),
     [],
   )

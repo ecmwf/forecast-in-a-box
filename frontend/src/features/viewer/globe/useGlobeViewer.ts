@@ -13,6 +13,7 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -120,12 +121,16 @@ export function useGlobeViewer({
 }): GlobeViewer {
   const { t } = useTranslation('visualise')
   const [available, setAvailable] = useState(supportsGlobe)
-  const unsupported = initialProjection === 'globe' && initialCamera === null
+  // The restore is judged once, on mount.
+  const [unsupported] = useState(
+    () => initialProjection === 'globe' && initialCamera === null,
+  )
+  const notifyUnsupported = useEffectEvent(() =>
+    showToast.info(t('globe.unsupported')),
+  )
   useEffect(() => {
-    if (unsupported) showToast.info(t('globe.unsupported'))
-    // Mount only: the restore is judged once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (unsupported) notifyUnsupported()
+  }, [unsupported])
 
   const reducedMotion = useMedia('(prefers-reduced-motion: reduce)')
   const panels = hasB && focusSlot === null && mode === 'side' ? 2 : 1
