@@ -55,6 +55,8 @@ const FLY_MS = 400
 /** Longest hold of the seed image after the bend while live layers load. */
 const SEED_HOLD_CAP_MS = 4000
 const SEED_FADE_MS = 250
+/** Shortest take-over of a bend in flight (the camera still has to arrive). */
+const MIN_TAKEOVER_MS = 200
 /** A context lost this long without a restore hands the panel back to the flat map. */
 const RESTORE_WAIT_MS = 5000
 const EMPTY_FLAT: FlatCamera = {
@@ -199,6 +201,10 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   /** Carto layers spike at the poles mid-bend: off while bending. */
   let bending = false
   let globeness = 1
+  /** The bend in flight; a new one takes over from where it is. */
+  let animation: AbortController | null = null
+  /** MapLibre's zoom floor on the settled globe. */
+  let globeFloor = -2
   let styleReady = false
   const detach: Array<() => void> = []
 
@@ -364,24 +370,35 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     durationMs: number,
     step: (p: number) => void,
     holdBasemap = true,
-  ) {
+  ): Promise<boolean> {
+    animation?.abort()
+    const controller = new AbortController()
+    animation = controller
     animating = true
     bending = holdBasemap
     setInteractive(false)
     syncBasemap()
-    return tween(durationMs, (p) => {
-      step(p)
-      if (bending && p >= 0.97) {
-        bending = false
-        syncBasemap()
-      }
-      // Draw in this frame, not MapLibre's next one.
-      map?.redraw()
-    }).finally(() => {
+    return tween(
+      durationMs,
+      (p) => {
+        step(p)
+        if (bending && p >= 0.97) {
+          bending = false
+          syncBasemap()
+        }
+        // Draw in this frame, not MapLibre's next one.
+        map?.redraw()
+      },
+      controller.signal,
+    ).then((done) => {
+      // Taken over: the newer animation owns the state now.
+      if (animation !== controller) return false
+      animation = null
       animating = false
       bending = false
       setInteractive(true)
       syncBasemap()
+      return done
     })
   }
 
@@ -391,7 +408,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   const lastFlat = new Float64Array(16)
   let haveMatrices = false
 
-  /** Globeness showing `cam`'s centre `s` of the way from globe to flat on screen. */
+  /** Globeness showing `cam`'s centre `s` of the way from globe to flat; the map is its own inverse. */
   function globenessAt(s: number, cam: MapLibreCam): number {
     if (!haveMatrices) return 1 - s
     const [x, y, z] = lonLatToUnitSphere(cam.lon, cam.lat)
@@ -401,6 +418,56 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     const ws = S[3] * x + S[7] * y + S[11] * z + S[15]
     const wf = F[3] * mx + F[7] * my + F[15]
     return ws > 0 && wf > 0 ? globenessForProgress(s, wf / ws) : 1 - s
+  }
+
+  /** Settled on the globe: exact camera, zoom floor, sharp textures, the seed let go. */
+  function arrive(m: MapLibreMap, to: GlobeCamera) {
+    jumpTo(m, to)
+    m.setMinZoom(globeFloor)
+    if (content) content.uniforms.polarCap = 1
+    wheelLockUntil = performance.now() + WHEEL_SETTLE_MS
+    m.scrollZoom.disable()
+    settleWheel()
+    content?.scheduleUpgrade()
+    syncBasemap()
+    releaseSeed()
+  }
+
+  /** Back to the globe from wherever a bend is, eased on screen, the live layers showing. */
+  function rebend(
+    m: MapLibreMap,
+    to: GlobeCamera,
+    durationMs: number,
+  ): Promise<void> {
+    const u = content!.uniforms
+    if (ownBend) {
+      const m0 = u.morph
+      return animate(Math.max(durationMs * (1 - m0), MIN_TAKEOVER_MS), (p) => {
+        u.morph = m0 + (1 - m0) * easeInOutCubic(p)
+      }).then((done) => {
+        if (!done) return
+        ownBend = false
+        flat = null
+        arrive(m, to)
+      })
+    }
+    const c = m.getCenter()
+    const start = { lon: c.lng, lat: c.lat, zoom: m.getZoom() }
+    const end = { ...to, lon: nearLon(to.lon, c.lng), zoom: globeZoom(to) }
+    const s0 = globenessAt(globeness, start)
+    u.polarCap = 0
+    return animate(
+      Math.max(durationMs * s0, MIN_TAKEOVER_MS),
+      (p) => {
+        const e = easeInOutCubic(p)
+        const cam = lerpCam(start, end, e)
+        setGlobeness(m, globenessAt(s0 * (1 - e), cam))
+        place(m, cam)
+      },
+      false,
+    ).then((done) => {
+      if (done) arrive(m, to)
+    })
   }
   type RenderArgs = Parameters<NonNullable<CustomLayerInterface['render']>>[1]
   function applyProjection(pd: RenderArgs['defaultProjectionData']) {
@@ -557,7 +624,8 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       const offset = measuredZoom(m) - m.getZoom()
       m.setMaxZoom(MAX_ZOOM - offset)
       // MapLibre's zoom floor is -2.
-      m.setMinZoom(Math.max(-2, globeMinZoom(w, h) - offset))
+      globeFloor = Math.max(-2, globeMinZoom(w, h) - offset)
+      m.setMinZoom(globeFloor)
     },
 
     setLayers: (specs) => content?.setLayers(specs),
@@ -567,7 +635,18 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       syncBasemap()
     },
 
-    setLive: (on) => content?.setLive(on),
+    setLive: (on) => {
+      content?.setLive(on)
+      if (on || !map || !content) return
+      // Hidden again: the next entry starts afresh from the flat map.
+      animation?.abort()
+      ownBend = false
+      flat = null
+      content.uniforms.morph = 1
+      content.setSeed(null, EMPTY_FLAT, 1, 1)
+      setGlobeness(map, 1)
+      map.setMinZoom(globeFloor)
+    },
 
     getCamera: () => (map ? cameraOf(map) : { lon: 0, lat: 0, zoom: 1 }),
 
@@ -592,20 +671,15 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       const m = map
       if (!m || !content) return Promise.resolve()
       const u = content.uniforms
-      u.polarCap = 1
       // Wake a warm globe (whatever React's timing); the camera is final, so fetch sharp now.
       content.setLive(true)
       content.upgradeNow()
+      // Mid-bend, or flat after an unbend: take over from there.
+      if (animation || globeness < 1 || u.morph < 1)
+        return rebend(m, to, durationMs)
+      u.polarCap = 1
       const [sw, sh] = size()
       content.setSeed(seed, from, sw, sh)
-      const settle = () => {
-        wheelLockUntil = performance.now() + WHEEL_SETTLE_MS
-        map?.scrollZoom.disable()
-        settleWheel()
-        content?.scheduleUpgrade()
-        syncBasemap()
-        releaseSeed()
-      }
       if (from.projection !== 'merc') {
         // MapLibre has no equirectangular: our bend over its globe.
         ownBend = true
@@ -615,16 +689,15 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         u.morph = 0
         return animate(durationMs, (p) => {
           u.morph = easeOutCubic(p)
-        }).then(() => {
+        }).then((done) => {
+          if (!done) return
           ownBend = false
           flat = null
-          syncBasemap()
-          settle()
+          arrive(m, to)
         })
       }
       // Zoom from the OL Mercator frame to the target scale if it differs, then wrap at fixed camera.
       flat = null
-      const minZoom = m.getMinZoom()
       m.setMinZoom(-2)
       const start = { ...from, zoom: mercatorZoom(from.resolution) }
       const end = { ...to, lon: nearLon(to.lon, from.lon), zoom: globeZoom(to) }
@@ -646,10 +719,8 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
           total > 0 ? easeOutCubic(Math.min(1, (t - fly) / durationMs)) : 1
         setGlobeness(m, e)
         place(m, lerpCam(mid, end, e))
-      }).then(() => {
-        jumpTo(m, to)
-        m.setMinZoom(minZoom)
-        settle()
+      }).then((done) => {
+        if (done) arrive(m, to)
       })
     },
 
@@ -657,13 +728,15 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       const m = map
       if (!m || !content) return Promise.resolve()
       const u = content.uniforms
-      content.setSeed(null, to, 1, 1)
-      if (to.projection !== 'merc') {
+      // Mid-entry the flat map's own pixels are still up: they unbend back as they came.
+      if (!animation) content.setSeed(null, to, 1, 1)
+      if (to.projection !== 'merc' && globeness === 1) {
         ownBend = true
         flat = to
-        return animate(durationMs, (p) => {
-          u.morph = 1 - easeInOutCubic(p)
-        })
+        const m0 = u.morph
+        return animate(Math.max(durationMs * m0, MIN_TAKEOVER_MS), (p) => {
+          u.morph = m0 * (1 - easeInOutCubic(p))
+        }).then(() => undefined)
       }
       // Ends as the OL Mercator frame the handoff reveals; Carto and its labels unroll too.
       flat = null
@@ -676,17 +749,19 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         lat: to.lat,
         zoom: mercatorZoom(to.resolution),
       }
+      // From wherever the bend is: 0 on the settled globe.
+      const s0 = globenessAt(globeness, start)
       return animate(
-        durationMs,
+        Math.max(durationMs * (1 - s0), MIN_TAKEOVER_MS),
         (p) => {
           // Eased on screen, not in clip space, so the unroll spans the whole move.
-          const s = easeInOutCubic(p)
-          const cam = lerpCam(start, end, s)
-          setGlobeness(m, globenessAt(s, cam))
+          const e = easeInOutCubic(p)
+          const cam = lerpCam(start, end, e)
+          setGlobeness(m, globenessAt(s0 + (1 - s0) * e, cam))
           place(m, cam)
         },
         false,
-      )
+      ).then(() => undefined)
     },
 
     pick: (px) => {
@@ -718,6 +793,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     size,
 
     destroy: () => {
+      animation?.abort()
       window.clearTimeout(wheelTimer)
       window.clearTimeout(restoreTimer)
       content?.dispose()

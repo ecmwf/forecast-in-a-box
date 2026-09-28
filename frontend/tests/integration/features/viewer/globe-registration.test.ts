@@ -323,6 +323,28 @@ describe('globe registration', () => {
     expect(off).toEqual([])
   })
 
+  it('takes a bend over mid-flight, either way', async () => {
+    engine.setLayers([spec('solid', 1)])
+    await engine.whenLoaded()
+    const flat = {
+      projection: 'merc' as const,
+      lon: -35,
+      lat: 10,
+      resolution: 20000,
+    }
+    const centre: [number, number] = [WIDTH / 2, HEIGHT / 2]
+    const entering = engine.morphIn(flat, CAMERA, 600, null)
+    await new Promise((r) => setTimeout(r, 250))
+    await Promise.all([entering, engine.morphOut(flat, 600)])
+    // The superseded entry did not finish onto the globe: flat, no readout.
+    expect(engine.pick(centre)).toBeNull()
+    const leaving = engine.morphOut(flat, 600)
+    await engine.morphIn(flat, CAMERA, 600, null)
+    await leaving
+    expect(engine.pick(centre)).not.toBeNull()
+    expect(near(frame(engine).at(...centre), SOLID, 3)).toBe(true)
+  })
+
   it('places a regional layer on its bbox', async () => {
     engine.setLayers([spec('region', 2, REGION)])
     await engine.whenLoaded()

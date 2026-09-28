@@ -223,35 +223,38 @@ export const easeInOutCubic = (p: number) =>
 
 export const easeOutCubic = (p: number) => 1 - (1 - p) ** 3
 
-/** rAF tween of `step(0→1)`; resolves even where rAF is throttled. */
+/** rAF tween of `step(0→1)`, even where rAF is throttled; false when aborted before the end. */
 export function tween(
   durationMs: number,
   step: (p: number) => void,
-): Promise<void> {
+  signal?: AbortSignal,
+): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(false)
   if (durationMs <= 0) {
     step(1)
-    return Promise.resolve()
+    return Promise.resolve(true)
   }
   return new Promise((resolve) => {
     // The clock starts on the first drawn frame, not on the call.
     let start = -1
     let done = false
-    const finish = () => {
+    const finish = (completed: boolean) => {
       if (done) return
       done = true
-      step(1)
-      resolve()
+      if (completed) step(1)
+      resolve(completed)
     }
     const frame = (now: number) => {
       if (done) return
       if (start < 0) start = now
       const p = Math.min(1, (now - start) / durationMs)
-      if (p >= 1) return finish()
+      if (p >= 1) return finish(true)
       step(p)
       requestAnimationFrame(frame)
     }
+    signal?.addEventListener('abort', () => finish(false), { once: true })
     requestAnimationFrame(frame)
-    window.setTimeout(finish, durationMs + 1500)
+    window.setTimeout(() => finish(true), durationMs + 1500)
   })
 }
 

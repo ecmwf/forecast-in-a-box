@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** Flat ↔ globe handoff: flat → entering → globe → leaving → flat. */
+/** Flat ↔ globe handoff: flat → entering → globe → leaving → flat; either bend reverses mid-flight. */
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
@@ -92,6 +92,11 @@ export function useGlobeMode({
     initialCamera ? 'globe' : 'flat',
   )
   const [overlayVisible, setOverlayVisible] = useState(initialCamera !== null)
+  const overlayShownRef = useRef(initialCamera !== null)
+  const show = useCallback((visible: boolean) => {
+    overlayShownRef.current = visible
+    setOverlayVisible(visible)
+  }, [])
   const phaseRef = useRef(phase)
   const [camera] = useState(() =>
     createSharedGlobeCamera(initialCamera ?? { lon: 10, lat: 30, zoom: 1 }),
@@ -153,7 +158,28 @@ export function useGlobeMode({
   const captureFlatRef = useRef(captureFlat)
   const whenFlatRenderedRef = useRef(whenFlatRendered)
 
+  /** Back onto the globe from an unbend in flight, or its hold. */
+  const reenter = useCallback(() => {
+    const run = ++runRef.current
+    phaseRef.current = 'entering'
+    setPhase('entering')
+    show(true)
+    const view = viewRef.current
+    const from = flatCameraOf(view, viewerProjectionOf(view).id)
+    const list = [...enginesRef.current.values()]
+    const ms = reducedRef.current ? 0 : MORPH_MS
+    void (async () => {
+      if (from)
+        await Promise.all(
+          list.map((e) => e.morphIn(from, camera.get(), ms, null)),
+        )
+      if (run !== runRef.current) return
+      settle('globe')
+    })()
+  }, [viewRef, camera, settle, show])
+
   const enter = useCallback(() => {
+    if (phaseRef.current === 'leaving') return reenter()
     if (phaseRef.current !== 'flat') return
     const view = viewRef.current
     const flatId = viewerProjectionOf(view).id
@@ -186,7 +212,7 @@ export function useGlobeMode({
         ])
         if (run !== runRef.current) return
         camera.set(target, 'program', 'mode')
-        setOverlayVisible(true)
+        show(true)
         const panels = [...enginesRef.current]
         await Promise.all(
           panels.map(([panel, e]) => {
@@ -207,27 +233,38 @@ export function useGlobeMode({
         settle('globe')
       } catch (err) {
         if (run !== runRef.current) return
-        setOverlayVisible(false)
+        show(false)
         settle('flat')
         onFailureRef.current(err)
       }
     })()
-  }, [viewRef, engines, camera, settle])
+  }, [viewRef, engines, camera, settle, show, reenter])
 
   const leave = useCallback(
     (target: FlatProjectionId, instant = false) => {
-      if (phaseRef.current !== 'globe') return
+      const current = phaseRef.current
+      if (current !== 'globe' && current !== 'entering') return
       const run = ++runRef.current
+      // Nothing shown yet: just call the entry off.
+      if (current === 'entering' && !overlayShownRef.current) {
+        phaseRef.current = 'flat'
+        settle('flat')
+        return
+      }
       phaseRef.current = 'leaving'
       setPhase('leaving')
       const list = [...enginesRef.current.values()]
       const size = list[0]?.size() ?? [1024, 768]
-      const projection = getViewerProjection(target)
-      const next = createViewerView(projection)
-      applyGlobeCamera(next, projection, camera.get(), size)
-      next.set(AUTOFIT_KEY, true, true)
-      // OL remounts underneath and loads during the unbend.
-      onFlatViewRef.current(next, target)
+      // Mid-entry the flat map still under the globe is the one to return to.
+      let next = viewRef.current
+      if (current !== 'entering' || viewerProjectionOf(next).id !== target) {
+        const projection = getViewerProjection(target)
+        next = createViewerView(projection)
+        applyGlobeCamera(next, projection, camera.get(), size)
+        next.set(AUTOFIT_KEY, true, true)
+        // OL remounts underneath and loads during the unbend.
+        onFlatViewRef.current(next, target)
+      }
       const flat = flatCameraOf(next, target)
       const morph =
         !instant &&
@@ -245,13 +282,13 @@ export function useGlobeMode({
             sleep(FLAT_READY_CAP_MS),
           ])
         if (run !== runRef.current) return
-        setOverlayVisible(false)
+        show(false)
         await sleep(instant ? 0 : GLOBE_FADE_MS)
         if (run !== runRef.current) return
         settle('flat')
       })()
     },
-    [camera, settle],
+    [viewRef, camera, settle, show],
   )
 
   const leaveRef = useRef(leave)
@@ -277,9 +314,9 @@ export function useGlobeMode({
     if (phaseRef.current !== 'entering') return
     runRef.current++
     phaseRef.current = 'flat'
-    setOverlayVisible(false)
+    show(false)
     settle('flat')
-  }, [settle])
+  }, [settle, show])
 
   return {
     phase,
