@@ -18,8 +18,10 @@ import {
   createSharedGlobeCamera,
   flatCameraOf,
   flatKindOf,
+  globeEntryCamera,
   globeFitZoom,
 } from './globe-camera'
+import { GLOBE_ENGINE } from './engine-entry'
 import type { RefObject } from 'react'
 import type View from 'ol/View'
 import type { FlatProjectionId } from '../projection-ids'
@@ -105,14 +107,14 @@ export function useGlobeMode({
         enginesRef.current.set(panel, engine)
         // Warm: rest the hidden globe where the bend will end, so its tiles load.
         if (phaseRef.current === 'flat') {
-          const flat = flatCameraOf(viewRef.current, 'merc')
           const [w, h] = engine.size()
-          if (flat)
-            camera.set(
-              { lon: flat.lon, lat: flat.lat, zoom: globeFitZoom(w, h) },
-              'program',
-              'warm',
-            )
+          const target = globeEntryCamera(
+            viewRef.current,
+            w,
+            h,
+            GLOBE_ENGINE.maxZoom,
+          )
+          if (target) camera.set(target, 'program', 'warm')
         }
       } else {
         enginesRef.current.delete(panel)
@@ -161,7 +163,13 @@ export function useGlobeMode({
         const list = await engines()
         if (run !== runRef.current) return
         const [w, h] = list[0].size()
-        const target: GlobeCamera = {
+        // The flat map's own scale; only a whole-world view grows to the fit.
+        const target: GlobeCamera = globeEntryCamera(
+          view,
+          w,
+          h,
+          GLOBE_ENGINE.maxZoom,
+        ) ?? {
           lon: from.lon,
           lat: Math.max(-85, Math.min(85, from.lat)),
           zoom: globeFitZoom(w, h),

@@ -168,6 +168,22 @@ export function globeCameraOf(view: View): GlobeCamera | null {
   return { lon, lat, zoom: zoomFromGroundMpp(mpp) }
 }
 
+/** Where a bend from `view` ends: its centre and ground scale, no smaller than the resting fit. */
+export function globeEntryCamera(
+  view: View,
+  width: number,
+  height: number,
+  maxZoom: number,
+): GlobeCamera | null {
+  const cam = globeCameraOf(view)
+  if (!cam) return null
+  return {
+    lon: cam.lon,
+    lat: Math.max(-85, Math.min(85, cam.lat)),
+    zoom: Math.min(maxZoom, Math.max(globeFitZoom(width, height), cam.zoom)),
+  }
+}
+
 /** Flat resolution matching the globe camera's centre ground scale. */
 export function matchingFlatResolution(
   view: View,

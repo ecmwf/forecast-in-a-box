@@ -11,19 +11,51 @@
 import { act } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
+import { fromLonLat } from 'ol/proj'
 import type { GlobeEngine } from '@/features/viewer/globe/engine'
+import { globeCameraOf } from '@/features/viewer/globe/globe-camera'
 import { createViewerView } from '@/features/viewer/hooks/useOlMapBase'
 import { getViewerProjection } from '@/features/viewer/projections'
 import { useGlobeMode } from '@/features/viewer/globe/useGlobeMode'
 
-/** Just enough engine for the handoff: unbends at once. */
+/** Just enough engine for the handoff: bends and unbends at once. */
 const unbendingEngine = () =>
   ({
     size: () => [800, 600],
+    morphIn: vi.fn(() => Promise.resolve()),
     morphOut: vi.fn(() => Promise.resolve()),
   }) as unknown as GlobeEngine
 
 describe('useGlobeMode', () => {
+  it("enters at the flat map's own scale", async () => {
+    const view = createViewerView(getViewerProjection('merc'))
+    view.setCenter(fromLonLat([10, 50]))
+    // About a country across: well inside the resting fit.
+    view.setResolution(1500)
+    const { result } = await renderHook(() =>
+      useGlobeMode({
+        viewRef: { current: view },
+        onFlatView: () => {},
+        panelCount: 1,
+        reducedMotion: false,
+        exitTarget: 'merc',
+        initialCamera: null,
+        onFailure: () => {},
+        captureFlat: () => Promise.resolve([]),
+        whenFlatRendered: () => Promise.resolve(),
+      }),
+    )
+    const engine = unbendingEngine()
+    act(() => result.current.registerEngine('a', engine))
+    act(() => result.current.enter())
+    await expect.poll(() => vi.mocked(engine.morphIn).mock.calls.length).toBe(1)
+    const [, to] = vi.mocked(engine.morphIn).mock.calls[0]
+    const flat = globeCameraOf(view)!
+    expect(to.zoom).toBeCloseTo(flat.zoom, 6)
+    expect(to.lon).toBeCloseTo(10, 6)
+    expect(to.lat).toBeCloseTo(50, 6)
+  })
+
   it('holds the globe over the flat map until that map has rendered', async () => {
     let rendered = () => {}
     const whenFlatRendered = () =>

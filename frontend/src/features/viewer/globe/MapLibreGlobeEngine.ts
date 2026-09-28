@@ -50,7 +50,7 @@ import type {
 const MAX_ZOOM = GLOBE_ENGINE.maxZoom
 /** The wheel gesture that bent the map in is not globe input. */
 const WHEEL_SETTLE_MS = 400
-/** Fly to the wrap scale (world width = globe circumference) before wrapping. */
+/** Zoom to the target scale before wrapping, per zoom level (none at the same scale). */
 const FLY_MS = 400
 /** Longest hold of the seed image after the bend while live layers load. */
 const SEED_HOLD_CAP_MS = 4000
@@ -619,24 +619,28 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
           settle()
         })
       }
-      // Fly from the OL Mercator frame to the wrap scale, then wrap at fixed camera.
+      // Zoom from the OL Mercator frame to the target scale if it differs, then wrap at fixed camera.
       flat = null
       const minZoom = m.getMinZoom()
       m.setMinZoom(-2)
       const start = { ...from, zoom: mercatorZoom(from.resolution) }
       const end = { ...to, lon: nearLon(to.lon, from.lon), zoom: globeZoom(to) }
       const mid = { ...start, zoom: end.zoom }
-      const total = durationMs > 0 ? FLY_MS + durationMs : 0
+      const fly =
+        durationMs > 0
+          ? FLY_MS * Math.min(1, Math.abs(end.zoom - start.zoom))
+          : 0
+      const total = durationMs > 0 ? fly + durationMs : 0
       setGlobeness(m, 0)
       place(m, start)
       return animate(total, (p) => {
         const t = p * total
-        if (total > 0 && t < FLY_MS) {
-          place(m, lerpCam(start, mid, easeInOutCubic(t / FLY_MS)))
+        if (t < fly) {
+          place(m, lerpCam(start, mid, easeInOutCubic(t / fly)))
           return
         }
         const e =
-          total > 0 ? easeOutCubic(Math.min(1, (t - FLY_MS) / durationMs)) : 1
+          total > 0 ? easeOutCubic(Math.min(1, (t - fly) / durationMs)) : 1
         setGlobeness(m, e)
         place(m, lerpCam(mid, end, e))
       }).then(() => {

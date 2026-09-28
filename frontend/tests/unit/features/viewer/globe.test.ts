@@ -22,6 +22,7 @@ import {
   flatClipTransform,
   globeCameraForBbox,
   globeCameraOf,
+  globeEntryCamera,
   globeExitZoom,
   globeFitZoom,
   globenessForProgress,
@@ -88,6 +89,23 @@ describe('globe camera', () => {
     expect(back?.lon).toBeCloseTo(20, 6)
     expect(back?.lat).toBeCloseTo(lat, 6)
     expect(back?.zoom).toBeCloseTo(4, 2)
+  })
+
+  it('enters at the flat scale; a whole-world view grows to the fit; capped', () => {
+    const projection = getViewerProjection('merc')
+    const view = createViewerView(projection)
+    const [w, h] = [800, 600]
+    const fit = globeFitZoom(w, h)
+    const at = (zoom: number) => {
+      applyGlobeCamera(view, projection, { lon: 10, lat: 50, zoom }, [w, h])
+      return globeEntryCamera(view, w, h, 8)
+    }
+    const regional = at(fit + 2)
+    expect(regional?.zoom).toBeCloseTo(fit + 2, 2)
+    expect(regional?.lon).toBeCloseTo(10, 6)
+    expect(regional?.lat).toBeCloseTo(50, 6)
+    expect(at(fit - 1)?.zoom).toBeCloseTo(fit, 6)
+    expect(at(9.5)?.zoom).toBe(8)
   })
 
   it('pans like a drag: right moves west, wrapping at the dateline', () => {

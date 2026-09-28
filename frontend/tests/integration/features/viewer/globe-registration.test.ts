@@ -259,6 +259,15 @@ describe('globe registration', () => {
     }
   })
 
+  it('reads a marker back at the zoom ceiling, off centre', async () => {
+    engine.setLayers([spec('world', 1)])
+    await engine.whenLoaded()
+    const m = WORLD_MARKERS[0]
+    engine.setCamera({ lon: m.lon + 0.25, lat: m.lat + 0.15, zoom: 8 })
+    // ~1 km: under two pixels at 611 m/px.
+    expect(readoutError(engine, m)).toBeLessThan(0.01)
+  })
+
   it('places a regional layer on its bbox', async () => {
     engine.setLayers([spec('region', 2, REGION)])
     await engine.whenLoaded()
