@@ -15,7 +15,7 @@
  */
 
 import { useState } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -43,6 +43,7 @@ const engineCalls = vi.hoisted(() => ({
   seeds: [] as Array<boolean>,
   mounted: 0,
   destroyed: 0,
+  camera: (): GlobeCamera => ({ lon: 0, lat: 0, zoom: 1 }),
 }))
 
 vi.mock('@/features/viewer/globe/webgl-support', () => ({
@@ -67,6 +68,7 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
       getCamera: () => camera,
       setCamera: (next) => {
         camera = next
+        engineCalls.camera = () => camera
       },
       whenLoaded: () => Promise.resolve(),
       morphIn: (_from, to, _ms, seed) => {
@@ -173,7 +175,27 @@ function registerServer(crs?: Array<string>): number {
   return port
 }
 
+/** Tests run without Tailwind: give panels a height and pin overlays. */
+function injectMapSizing(): () => void {
+  const style = document.createElement('style')
+  style.textContent = `
+      [class*='h-full'][class*='overflow-hidden'][class*='rounded-md'] { position: relative; height: 400px; }
+      [class*='absolute'][class*='inset-0'] { position: absolute; inset: 0; }
+      [data-globe-panel] { position: relative; height: 400px; }
+      [class*='absolute'][class*='top-10'][class*='right-2'] { position: absolute; top: 40px; right: 8px; z-index: 10; }
+      [class~='pointer-events-none'] { pointer-events: none; }
+    `
+  document.head.append(style)
+  return () => style.remove()
+}
+
 describe('GeoViewer 3D globe', () => {
+  let removeSizing = () => {}
+  beforeEach(() => {
+    removeSizing = injectMapSizing()
+  })
+  afterEach(() => removeSizing())
+
   it('bends into the globe with the active stack and flattens back', async () => {
     const portA = registerServer()
     const screen = await render(<Harness portA={portA} />)
@@ -189,10 +211,14 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .poll(() => engineCalls.seeds.length, { timeout: 5000 })
       .toBe(seeds + 1)
-    // Server-drawn symbols are squeezed on the globe; the menu says so there.
+    // Server-drawn symbols are squeezed on the globe; an info icon says so.
     await expect
-      .element(screen.getByText(/directions are approximate at high latitudes/))
-      .toBeVisible()
+      .element(
+        screen.getByRole('button', {
+          name: /directions are approximate at high latitudes/,
+        }),
+      )
+      .toBeInTheDocument()
     await expect
       .poll(() => engineCalls.layers.at(-1)?.map((s) => s.params.LAYERS))
       .toEqual(['2t'])
@@ -201,8 +227,27 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByRole('button', { name: 'Measure distance' }))
       .toBeDisabled()
+    // The panel is a named, focusable region with non-drag controls.
+    const panel = screen.getByRole('region', { name: '3D globe, source A' })
+    await expect.element(panel).toBeInTheDocument()
+    const zoomBefore = engineCalls.camera().zoom
+    const zoom = panel.getByRole('group', { name: 'Zoom' })
+    // Unstyled test layout never settles for Playwright's stability check.
+    await zoom.getByRole('button', { name: 'Zoom in' }).click({ force: true })
+    await expect
+      .poll(() => engineCalls.camera().zoom)
+      .toBeGreaterThan(zoomBefore)
+    const lonBefore = engineCalls.camera().lon
+    await panel
+      .getByRole('group', { name: 'Nudge' })
+      .getByRole('button', { name: 'Nudge east' })
+      .click({ force: true })
+    await expect.poll(() => engineCalls.camera().lon).not.toBe(lonBefore)
 
-    await screen.getByRole('radio', { name: /^Web Mercator/ }).click()
+    // P cycles projections: from the globe, back to Web Mercator.
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'p', code: 'KeyP', bubbles: true }),
+    )
     // Back on the flat map the globe stays warm: hidden, not torn down.
     await expect
       .element(screen.getByTestId('globe-view'))

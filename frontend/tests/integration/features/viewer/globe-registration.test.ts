@@ -87,6 +87,7 @@ function spec(
   layerName: string,
   zIndex: number,
   bbox?: GlobeLayerSpec['bbox'],
+  scale?: GlobeLayerSpec['scale'],
 ): GlobeLayerSpec {
   return {
     key: `a:${layerName}`,
@@ -102,6 +103,7 @@ function spec(
     time: null,
     bboxAxisOrder: 'epsg',
     bbox,
+    scale,
     opacity: 1,
     zIndex,
   }
@@ -178,12 +180,27 @@ describe('globe registration', () => {
     const region = await markerPng(REGION, 10, [REGION_MARKER], 10)
     const solid = await solidPng([-180, -90, 180, 90], 4, SOLID)
     worker.use(
-      http.get(ENDPOINT, ({ request }) => {
+      http.get(ENDPOINT, async ({ request }) => {
         const url = new URL(request.url)
         requests.push(url)
         const name = url.searchParams.get('LAYERS')
-        const body =
-          name === 'region' ? region : name === 'solid' ? solid : world
+        // The world layer renders whatever BBOX is asked, like a real server.
+        const [s, w, n, e] = (url.searchParams.get('BBOX') ?? '')
+          .split(',')
+          .map(Number)
+        const subWorld = name === 'world' && !(w === -180 && e === 180)
+        const body = subWorld
+          ? await markerPng(
+              [w, s, e, n],
+              Number(url.searchParams.get('WIDTH')) / (e - w),
+              WORLD_MARKERS,
+              8,
+            )
+          : name === 'region'
+            ? region
+            : name === 'solid'
+              ? solid
+              : world
         return HttpResponse.arrayBuffer(body, {
           headers: { 'Content-Type': 'image/png' },
         })
@@ -300,6 +317,35 @@ describe('globe registration', () => {
     expect(near(f.at(WIDTH / 2, HEIGHT / 2 + 60), SOLID, 2)).toBe(true)
     expect(readoutError(engine, WORLD_MARKERS[0])).toBeLessThan(0.3)
     expect(readoutError(engine, REGION_MARKER)).toBeLessThan(0.3)
+  })
+
+  it('hides a layer outside its scale band', async () => {
+    // Band far below the current ground scale: the server would not draw it.
+    engine.setLayers([spec('solid', 1, undefined, { minRes: 1, maxRes: 10 })])
+    await engine.whenLoaded()
+    expect(near(frame(engine).at(WIDTH / 2, HEIGHT / 2), SOLID, 2)).toBe(false)
+    engine.setLayers([spec('solid', 1)])
+    await engine.whenLoaded()
+    expect(near(frame(engine).at(WIDTH / 2, HEIGHT / 2), SOLID, 2)).toBe(true)
+  })
+
+  it('fetches the visible area sharp once the world image is too coarse', async () => {
+    engine.setCamera({ lon: -45, lat: 15, zoom: 6 })
+    engine.setLayers([spec('world', 1)])
+    await engine.whenLoaded()
+    // The idle upgrade asks for a sub-world BBOX at screen resolution.
+    await expect
+      .poll(
+        () =>
+          requests.some((u) => {
+            const bbox = u.searchParams.get('BBOX') ?? ''
+            return bbox !== '' && bbox !== '-90,-180,90,180'
+          }),
+        { timeout: 5000 },
+      )
+      .toBe(true)
+    await new Promise((r) => setTimeout(r, 300))
+    expect(readoutError(engine, WORLD_MARKERS[0])).toBeLessThan(0.3)
   })
 
   it('shows only server colours when magnified', async () => {

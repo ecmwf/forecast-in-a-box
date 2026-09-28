@@ -479,6 +479,15 @@
     "replace": "Replace"
   },
   "globe": {
+    "panel": "3D globe, source {{slot}}",
+    "zoom": "Zoom",
+    "nudge": "Nudge",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "panNorth": "Nudge north",
+    "panSouth": "Nudge south",
+    "panWest": "Nudge west",
+    "panEast": "Nudge east",
     "toolUnavailable": "Not available on the 3D globe",
     "contextLost": "The 3D globe stopped (graphics context lost), back to the flat map",
     "failed": "The 3D globe could not start, staying on the flat map",

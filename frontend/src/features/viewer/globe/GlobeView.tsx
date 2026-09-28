@@ -20,7 +20,13 @@ import { LoadErrorBadge, erroredTitles } from '../geo/SingleMapView'
 import { LoupeOverlay } from '../geo/LoupeOverlay'
 import { isWorldBbox } from '../wms-capabilities'
 import { GLOBE_ENGINE } from './engine-entry'
-import { globeCameraForBbox, globeFitZoom } from './globe-camera'
+import { GlobeControls } from './GlobeControls'
+import {
+  globeCameraForBbox,
+  globeFitZoom,
+  globeMinZoom,
+  panGlobeCamera,
+} from './globe-camera'
 import { globeDecorationSpecs, globeLayerSpecs } from './globe-layer-specs'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { PointerReadout } from '../hooks/usePointerReadout'
@@ -29,9 +35,19 @@ import type {
   CompareMapSource,
   FitBboxAction,
 } from '../geo/types'
-import type { GlobeBasemapSpec, GlobeEngine, ViewportDraw } from './engine'
+import type {
+  CameraMove,
+  GlobeBasemapSpec,
+  GlobeEngine,
+  ViewportDraw,
+} from './engine'
 import type { SharedGlobeCamera } from './globe-camera'
 import { cn } from '@/lib/utils'
+
+/** Controls and keys ease the camera; drags and the WASD loop cut. */
+const EASE: CameraMove = { easeMs: 300 }
+/** Zoom levels per +/- key press. */
+const KEY_ZOOM_STEP = 0.5
 
 type CrossPosition = { x: number; y: number } | null
 
@@ -303,8 +319,8 @@ function GlobePanel({
 
   useEffect(() => {
     if (!engine) return
-    return camera.subscribe((cam, _origin, from) => {
-      if (from !== slot) engine.setCamera(cam)
+    return camera.subscribe((cam, _origin, from, move) => {
+      if (from !== slot) engine.setCamera(cam, move)
     })
   }, [engine, camera, slot])
 
@@ -344,14 +360,42 @@ function GlobePanel({
     setPointer(null)
     onCross?.(null)
   }
+  const zoomBy = (delta: number) => {
+    if (!engine) return
+    const [w, h] = engine.size()
+    const cam = camera.get()
+    const zoom = Math.min(
+      GLOBE_ENGINE.maxZoom,
+      Math.max(globeMinZoom(w, h), cam.zoom + delta),
+    )
+    camera.set({ ...cam, zoom }, 'program', 'controls', EASE)
+  }
+  const panBy = (dx: number, dy: number) =>
+    camera.set(
+      panGlobeCamera(camera.get(), -dx, -dy),
+      'program',
+      'controls',
+      EASE,
+    )
+  // Arrows pan through the viewer's shortcuts; +/- zoom the focused panel.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === '+' || e.key === '=') zoomBy(KEY_ZOOM_STEP)
+    else if (e.key === '-' || e.key === '_') zoomBy(-KEY_ZOOM_STEP)
+    else return
+    e.preventDefault()
+  }
 
   return (
     // Pointer tracking on the root: the loupe shield sits above the canvas.
     <div
-      className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/20"
+      role="region"
+      aria-label={t('globe.panel', { slot: slot.toUpperCase() })}
+      tabIndex={0}
+      className="relative h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/20 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
       data-globe-panel={slot}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
+      onKeyDown={onKeyDown}
     >
       <div
         ref={containerRef}
@@ -359,6 +403,7 @@ function GlobePanel({
       />
       {active && (
         <>
+          <GlobeControls onZoom={zoomBy} onPan={panBy} />
           <MapLoadingBar loading={loading} slot={slot} />
           <div className="pointer-events-none absolute top-2 right-2 left-2 z-10 flex">
             <CompareSlotTag

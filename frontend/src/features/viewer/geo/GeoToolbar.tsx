@@ -20,6 +20,7 @@ import {
   Copy,
   Download,
   Eraser,
+  Info,
   Layers,
   MessageSquarePlus,
   Ruler,
@@ -58,6 +59,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { P } from '@/components/base/typography'
 import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { showToast } from '@/lib/toast'
@@ -362,7 +369,10 @@ export function GeoToolbar({
                       : p.blockedReason === 'mode'
                         ? p.blockedBy
                         : t('projections.blockedBy', { source: p.blockedBy })
-                  return (
+                  // Server-drawn symbols distort on the globe: an info icon says so.
+                  const note =
+                    p.id === 'globe' ? t('projections.globeSymbolsNote') : null
+                  const radio = (
                     <button
                       key={p.id}
                       type="button"
@@ -372,7 +382,7 @@ export function GeoToolbar({
                       title={hint ?? undefined}
                       onClick={() => onProjectionChange(p.id)}
                       className={cn(
-                        'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
+                        'flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
                         selected && 'bg-accent font-medium',
                       )}
                     >
@@ -389,13 +399,30 @@ export function GeoToolbar({
                       )}
                     </button>
                   )
+                  if (!note) return radio
+                  return (
+                    <div key={p.id} className="flex items-center gap-1">
+                      {radio}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                type="button"
+                                aria-label={note}
+                                className="rounded-md p-1 text-muted-foreground hover:text-foreground"
+                              />
+                            }
+                          >
+                            <Info className="size-3.5" />
+                          </TooltipTrigger>
+                          <TooltipContent align="end">{note}</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )
                 })}
               </div>
-              {globeActive && (
-                <P className="px-2 pb-1.5 text-xs text-muted-foreground">
-                  {t('projections.globeSymbolsNote')}
-                </P>
-              )}
               <P className="mt-1 border-t border-border px-2 pt-2 pb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {tExec('lens.basemap')}
               </P>

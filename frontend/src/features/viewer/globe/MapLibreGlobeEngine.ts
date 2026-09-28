@@ -222,6 +222,18 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     programmatic = false
   }
 
+  /** Ease to `cam`, measuring MapLibre's target through a silent jump. */
+  function easeTo(m: MapLibreMap, cam: GlobeCamera, durationMs: number) {
+    const start = { center: m.getCenter(), zoom: m.getZoom() }
+    jumpTo(m, cam)
+    const end = { center: m.getCenter(), zoom: m.getZoom() }
+    programmatic = true
+    m.jumpTo(start)
+    programmatic = false
+    m.once('moveend', () => content?.scheduleUpgrade())
+    m.easeTo({ ...end, duration: durationMs })
+  }
+
   /** MapLibre's own Mercator (0) → globe (1) blend. */
   function setGlobeness(m: MapLibreMap, value: number) {
     globeness = value
@@ -465,7 +477,10 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       content = createGlobeContent({
         events,
         invalidate: () => m.triggerRepaint(),
-        zoom: () => measuredZoom(m),
+        view: () => {
+          const [width, height] = size()
+          return { ...cameraOf(m), width, height }
+        },
       })
       // Gestures carry the DOM event; resizes and jumps do not.
       m.on('move', (e) => {
@@ -503,8 +518,9 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
 
     getCamera: () => (map ? cameraOf(map) : { lon: 0, lat: 0, zoom: 1 }),
 
-    setCamera: (cam) => {
+    setCamera: (cam, move) => {
       if (!map) return
+      if (move?.easeMs) return easeTo(map, cam, move.easeMs)
       jumpTo(map, cam)
       content?.scheduleUpgrade()
     },

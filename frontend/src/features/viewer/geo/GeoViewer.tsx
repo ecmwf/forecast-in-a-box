@@ -59,7 +59,12 @@ import {
   viewerProjectionOf,
 } from '../projections'
 import { GLOBE_ENGINE } from '../globe/engine-entry'
-import { flatKindOf, panGlobeCamera } from '../globe/globe-camera'
+import {
+  flatKindOf,
+  groundMppFromZoom,
+  panGlobeCamera,
+  zoomFromGroundMpp,
+} from '../globe/globe-camera'
 import { useGlobeMode } from '../globe/useGlobeMode'
 import { compositeMapToCanvas } from '../map-export'
 import { disableGlobe, supportsGlobe } from '../globe/webgl-support'
@@ -104,7 +109,7 @@ import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
 import type { FlatProjectionId, ProjectionId } from '../projection-ids'
-import type { GlobeBasemapSpec } from '../globe/engine'
+import type { GlobeBasemapSpec, GlobeCamera } from '../globe/engine'
 import type { BboxAxisOrder } from '../projections'
 import type { ProjectionOption } from './GeoToolbar'
 import type { SourceSlot } from './layer-pairing'
@@ -963,19 +968,40 @@ export function GeoViewer({
 
   // Live ground resolution (m/px) drives the panel's scale-band hints.
   const [viewResolution, setViewResolution] = useState<number | null>(null)
+  const globeSettled = globe.phase === 'globe'
   useEffect(() => {
+    if (globeSettled) return
     const update = () => setViewResolution(groundResolution(view))
     update()
     view.on('change:resolution', update)
     return () => view.un('change:resolution', update)
-  }, [view])
-  const onZoomToResolution = useCallback((res: number) => {
-    const current = viewRef.current
-    current.animate({
-      resolution: viewResolutionFor(current, res),
-      duration: 350,
-    })
-  }, [])
+  }, [view, globeSettled])
+  useEffect(() => {
+    if (!globeSettled) return
+    const update = (cam: GlobeCamera) =>
+      setViewResolution(groundMppFromZoom(cam.zoom))
+    update(globeCamera.get())
+    return globeCamera.subscribe(update)
+  }, [globeSettled, globeCamera])
+  const onZoomToResolution = useCallback(
+    (res: number) => {
+      if (globePhaseRef.current === 'globe') {
+        const cam = globeCamera.get()
+        globeCamera.set(
+          { ...cam, zoom: zoomFromGroundMpp(res) },
+          'program',
+          'scale',
+        )
+        return
+      }
+      const current = viewRef.current
+      current.animate({
+        resolution: viewResolutionFor(current, res),
+        duration: 350,
+      })
+    },
+    [globeCamera],
+  )
 
   // -------- Export (map components register their capture action) ------
   const {

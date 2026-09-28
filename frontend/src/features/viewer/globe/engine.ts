@@ -12,7 +12,7 @@
 
 import type { FlatProjectionId } from '../projection-ids'
 import type { BboxAxisOrder } from '../projections'
-import type { Bbox } from '../wms-capabilities'
+import type { Bbox, ScaleBand } from '../wms-capabilities'
 import type { SourceSlot } from '../geo/layer-pairing'
 
 /** Neutral camera; centre ground m/px = EQUATOR_MPP_Z0 / 2^zoom (MapLibre zoom = zoom − 1). */
@@ -47,6 +47,8 @@ export interface GlobeLayerSpec {
   time: string | null
   bboxAxisOrder: BboxAxisOrder
   bbox?: Bbox
+  /** Ground m/px band the server draws this in; absent = every zoom. */
+  scale?: ScaleBand
   /** Per-layer × master; 0 keeps the texture but draws nothing. */
   opacity: number
   zIndex: number
@@ -67,6 +69,11 @@ export type GlobeBasemapSpec = GlobeOutlineSpec &
 
 export type CameraOrigin = 'user' | 'program'
 
+/** How to reach a camera: cut, or ease over `easeMs`. */
+export interface CameraMove {
+  easeMs?: number
+}
+
 /** The flat map's pixels at the handoff; the bend starts from them. */
 export interface GlobeSeed {
   image: HTMLCanvasElement
@@ -84,7 +91,7 @@ export interface GlobeEngine {
   setLayers: (specs: ReadonlyArray<GlobeLayerSpec>) => void
   setBasemap: (spec: GlobeBasemapSpec) => void
   getCamera: () => GlobeCamera
-  setCamera: (camera: GlobeCamera) => void
+  setCamera: (camera: GlobeCamera, move?: CameraMove) => void
   /** Resolves when layers already set have a first image (or failed). */
   whenLoaded: () => Promise<void>
   /** Animate from the OL view onto the globe camera; `seed` bends the flat pixels. */

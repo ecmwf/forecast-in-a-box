@@ -44,6 +44,7 @@ export function globeLayerSpecs(
         time,
         bboxAxisOrder: source.bboxAxisOrder,
         bbox: layer.bbox,
+        scale: layer.scale,
         opacity:
           (source.layerOpacities.get(layerName) ?? DEFAULT_LAYER_OPACITY) *
           master,

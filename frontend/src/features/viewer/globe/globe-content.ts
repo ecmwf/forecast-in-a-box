@@ -10,7 +10,12 @@
 
 /** Globe scene content (layer textures, outline lines) drawn into a host WebGL2 context. */
 
-import { flatClipTransform, globeRadiusPx } from './globe-camera'
+import { scaleBandState } from '../wms-capabilities'
+import {
+  flatClipTransform,
+  globeRadiusPx,
+  groundMppFromZoom,
+} from './globe-camera'
 import {
   MERCATOR_WORLD_M,
   lonLatToEquirectUnit,
@@ -43,6 +48,7 @@ import {
   SHARED_UNIFORMS,
   VERTEX,
 } from './webgl/shaders'
+import type { Region } from './globe-getmap'
 import type { Mesh, Program } from './webgl/gl'
 import type { Geometry } from './webgl/geometry'
 import type {
@@ -86,6 +92,17 @@ export interface MorphUniforms {
   camModel: [number, number, number]
 }
 
+/** One texture: decoded bitmap waiting for upload, or uploaded. */
+interface Tile {
+  pending: ImageBitmap | null
+  texture: WebGLTexture | null
+  box: Vec4
+  region: Region
+  /** px/degree of the shown texture (0 = none yet). */
+  scale: number
+  controller: AbortController | null
+}
+
 interface LayerEntry {
   spec: GlobeLayerSpec
   paramsKey: string
@@ -96,10 +113,55 @@ interface LayerEntry {
   /** px/degree of the shown texture (0 = none yet). */
   scale: number
   controller: AbortController | null
+  /** Screen-resolution image of the visible area, once the world image is too coarse. */
+  detail: Tile | null
   errored: boolean
   /** Settled at least once (whenLoaded). */
   settled: boolean
 }
+
+export interface GlobeViewState {
+  lon: number
+  lat: number
+  zoom: number
+  width: number
+  height: number
+}
+
+const NO_HOLE: Vec4 = [0, 0, 0, 0]
+
+function boxOf([w, s, e, n]: Region): Vec4 {
+  return [(w + 180) / 360, (90 - n) / 180, (e - w) / 360, (n - s) / 180]
+}
+
+/** The area on screen, with margin; the whole width once it wraps. */
+function visibleRegion(v: GlobeViewState): Region {
+  const ppd = (Math.PI * globeRadiusPx(v.zoom)) / 180
+  const dLat = (v.height / 2 / ppd) * 1.5
+  const dLon =
+    (v.width / 2 / (ppd * Math.max(0.1, Math.cos((v.lat * Math.PI) / 180)))) *
+    1.5
+  const wraps = dLon >= 180 || v.lon - dLon < -180 || v.lon + dLon > 180
+  return [
+    wraps ? -180 : v.lon - dLon,
+    Math.max(-90, v.lat - dLat),
+    wraps ? 180 : v.lon + dLon,
+    Math.min(90, v.lat + dLat),
+  ]
+}
+
+function intersect(a: Region, b: Region): Region | null {
+  const r: Region = [
+    Math.max(a[0], b[0]),
+    Math.max(a[1], b[1]),
+    Math.min(a[2], b[2]),
+    Math.min(a[3], b[3]),
+  ]
+  return r[0] < r[2] && r[1] < r[3] ? r : null
+}
+
+const covers = (a: Region, b: Region) =>
+  a[0] <= b[0] && a[1] <= b[1] && a[2] >= b[2] && a[3] >= b[3]
 
 interface SeedEntry {
   pending: HTMLCanvasElement | null
@@ -248,13 +310,14 @@ export interface GlobeContent {
 export function createGlobeContent({
   events,
   invalidate,
-  zoom,
+  view,
 }: {
   events: GlobeEngineEvents
   invalidate: () => void
-  /** Current neutral zoom (texture detail). */
-  zoom: () => number
+  /** Current camera and viewport (texture detail, scale bands). */
+  view: () => GlobeViewState
 }): GlobeContent {
+  const zoom = () => view().zoom
   const uniforms: MorphUniforms = {
     flatMatrix: new Float32Array(16),
     sphereMatrix: new Float32Array(16),
@@ -298,6 +361,20 @@ export function createGlobeContent({
     events.onLoadingChange(inFlight)
   }
 
+  function dropTile(tile: Tile) {
+    if (tile.texture && res) res.gl.deleteTexture(tile.texture)
+    tile.texture = null
+    tile.pending?.close()
+    tile.pending = null
+  }
+
+  function dropDetail(entry: LayerEntry) {
+    if (!entry.detail) return
+    entry.detail.controller?.abort()
+    dropTile(entry.detail)
+    entry.detail = null
+  }
+
   function dropTexture(entry: LayerEntry) {
     if (entry.texture && res) res.gl.deleteTexture(entry.texture)
     entry.texture = null
@@ -305,15 +382,14 @@ export function createGlobeContent({
     entry.pending = null
   }
 
-  function load(entry: LayerEntry, scale: number) {
-    entry.controller?.abort()
-    const controller = new AbortController()
-    entry.controller = controller
-    const { key, time } = entry.spec
-    const region = layerRegion(entry.spec)
-    const url = regionGetMapUrl(entry.spec, region, regionSize(region, scale))
-    setInFlight(1)
-    fetch(url, { signal: controller.signal })
+  function fetchBitmap(
+    spec: GlobeLayerSpec,
+    region: Region,
+    scale: number,
+    signal: AbortSignal,
+  ): Promise<ImageBitmap> {
+    const url = regionGetMapUrl(spec, region, regionSize(region, scale))
+    return fetch(url, { signal })
       .then((r) => {
         if (!r.ok) throw new Error(`GetMap ${r.status}`)
         return r.blob()
@@ -324,6 +400,54 @@ export function createGlobeContent({
           colorSpaceConversion: 'none',
         }),
       )
+  }
+
+  /** A screen-resolution image of `region` over the coarser world image. */
+  function loadDetail(entry: LayerEntry, region: Region, scale: number) {
+    entry.detail?.controller?.abort()
+    const controller = new AbortController()
+    const tile: Tile = entry.detail ?? {
+      pending: null,
+      texture: null,
+      box: NO_HOLE,
+      region,
+      scale: 0,
+      controller: null,
+    }
+    tile.controller = controller
+    entry.detail = tile
+    setInFlight(1)
+    fetchBitmap(entry.spec, region, scale, controller.signal)
+      .then((bitmap) => {
+        if (controller.signal.aborted || disposed) {
+          bitmap.close()
+          return
+        }
+        dropTile(tile)
+        tile.pending = bitmap
+        tile.box = boxOf(region)
+        tile.region = region
+        tile.scale = scale
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted || disposed) return
+        log.warn(`Globe detail GetMap failed for ${entry.spec.layerName}`, err)
+      })
+      .finally(() => {
+        if (tile.controller === controller) tile.controller = null
+        setInFlight(-1)
+        if (!disposed) invalidate()
+      })
+  }
+
+  function load(entry: LayerEntry, scale: number) {
+    entry.controller?.abort()
+    const controller = new AbortController()
+    entry.controller = controller
+    const { key, time } = entry.spec
+    const region = layerRegion(entry.spec)
+    setInFlight(1)
+    fetchBitmap(entry.spec, region, scale, controller.signal)
       .then((bitmap) => {
         if (controller.signal.aborted || disposed) {
           bitmap.close()
@@ -331,13 +455,7 @@ export function createGlobeContent({
         }
         dropTexture(entry)
         entry.pending = bitmap
-        const [w, s, e, n] = region
-        entry.box = [
-          (w + 180) / 360,
-          (90 - n) / 180,
-          (e - w) / 360,
-          (n - s) / 180,
-        ]
+        entry.box = boxOf(region)
         entry.scale = scale
         entry.errored = false
         events.onLayerLoad(key, time, true)
@@ -360,9 +478,33 @@ export function createGlobeContent({
       })
   }
 
+  /** Once the world image is too coarse for the screen, fetch the visible area sharp. */
+  function upgradeDetail(entry: LayerEntry, v: GlobeViewState) {
+    const maxPx = Math.min(MAX_SIDE, res?.maxTextureSize ?? MAX_SIDE)
+    const wanted = (2 * Math.PI * globeRadiusPx(v.zoom)) / 360
+    const worldCap = regionScale(layerRegion(entry.spec), wanted, maxPx)
+    if (wanted <= worldCap * UPGRADE_FACTOR) {
+      if (entry.detail) {
+        dropDetail(entry)
+        invalidate()
+      }
+      return
+    }
+    const visible = visibleRegion(v)
+    const region = intersect(visible, layerRegion(entry.spec))
+    if (!region) return
+    const scale = regionScale(region, wanted, maxPx)
+    const d = entry.detail
+    if (d?.controller) return
+    if (d && d.scale * UPGRADE_FACTOR >= scale && covers(d.region, region))
+      return
+    if (!entry.controller && !entry.errored) loadDetail(entry, region, scale)
+  }
+
   function scheduleUpgrade() {
     window.clearTimeout(upgradeTimer)
     upgradeTimer = window.setTimeout(() => {
+      const v = view()
       for (const entry of allEntries()) {
         const target = targetScale(entry.spec)
         if (
@@ -371,6 +513,7 @@ export function createGlobeContent({
           target > entry.scale * UPGRADE_FACTOR
         )
           load(entry, target)
+        upgradeDetail(entry, v)
       }
     }, UPGRADE_IDLE_MS)
   }
@@ -378,6 +521,7 @@ export function createGlobeContent({
   function removeLayer(entry: LayerEntry) {
     entry.controller?.abort()
     dropTexture(entry)
+    dropDetail(entry)
   }
 
   function clearSeed() {
@@ -429,7 +573,10 @@ export function createGlobeContent({
     if (res?.gl === gl) return res
     if (res) {
       // A new context: the old resources died with the old one.
-      for (const entry of allEntries()) entry.texture = null
+      for (const entry of allEntries()) {
+        entry.texture = null
+        if (entry.detail) entry.detail.texture = null
+      }
       for (const group of lineGroups) group.mesh = null
       if (seed) seed.texture = null
     }
@@ -488,6 +635,7 @@ export function createGlobeContent({
     gl.uniform1f(layer.uniforms.uFlatUv, 1)
     gl.uniform1f(layer.uniforms.uOpacity, seed.opacity)
     gl.uniform4fv(layer.uniforms.uBox, seed.box)
+    gl.uniform4fv(layer.uniforms.uHole, NO_HOLE)
     drawMesh(gl, r.surface)
     gl.bindTexture(gl.TEXTURE_2D, null)
     gl.useProgram(null)
@@ -512,6 +660,7 @@ export function createGlobeContent({
     gl.activeTexture(gl.TEXTURE0)
     gl.uniform1i(layer.uniforms.uTex, 0)
     gl.uniform1f(layer.uniforms.uFlatUv, 0)
+    const mpp = groundMppFromZoom(zoom())
     const ordered = allEntries().sort((a, b) => a.spec.zIndex - b.spec.zIndex)
     for (const entry of ordered) {
       if (entry.pending) {
@@ -519,11 +668,30 @@ export function createGlobeContent({
         entry.pending.close()
         entry.pending = null
       }
+      const d = entry.detail
+      if (d?.pending) {
+        d.texture = createTexture(gl, d.pending)
+        d.pending.close()
+        d.pending = null
+      }
       if (!entry.texture || entry.spec.opacity <= 0) continue
-      gl.bindTexture(gl.TEXTURE_2D, entry.texture)
+      // Outside the server's scale band the layer is hidden, as on the flat map.
+      if (
+        entry.spec.scale &&
+        scaleBandState(entry.spec.scale, mpp) !== 'in-range'
+      )
+        continue
       gl.uniform1f(layer.uniforms.uOpacity, entry.spec.opacity)
+      gl.bindTexture(gl.TEXTURE_2D, entry.texture)
       gl.uniform4fv(layer.uniforms.uBox, entry.box)
+      gl.uniform4fv(layer.uniforms.uHole, d?.texture ? d.box : NO_HOLE)
       drawMesh(gl, r.surface)
+      if (d?.texture) {
+        gl.bindTexture(gl.TEXTURE_2D, d.texture)
+        gl.uniform4fv(layer.uniforms.uBox, d.box)
+        gl.uniform4fv(layer.uniforms.uHole, NO_HOLE)
+        drawMesh(gl, r.surface)
+      }
     }
     gl.bindTexture(gl.TEXTURE_2D, null)
 
@@ -558,6 +726,7 @@ export function createGlobeContent({
           box: [0, 0, 1, 1],
           scale: 0,
           controller: null,
+          detail: null,
           errored: false,
           settled: false,
         }
@@ -566,6 +735,7 @@ export function createGlobeContent({
       } else if (entry.paramsKey !== paramsKey) {
         entry.spec = spec
         entry.paramsKey = paramsKey
+        dropDetail(entry)
         // Keep the shown detail when the time/style changes.
         load(
           entry,

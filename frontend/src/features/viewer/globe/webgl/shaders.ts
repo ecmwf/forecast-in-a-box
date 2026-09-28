@@ -63,7 +63,13 @@ float visibility() {
 }
 `
 
-export const LAYER_UNIFORMS = ['uTex', 'uOpacity', 'uBox', 'uFlatUv'] as const
+export const LAYER_UNIFORMS = [
+  'uTex',
+  'uOpacity',
+  'uBox',
+  'uFlatUv',
+  'uHole',
+] as const
 export const LAYER_FRAGMENT = `#version 300 es
 precision highp float;
 uniform sampler2D uTex;
@@ -72,9 +78,12 @@ uniform float uOpacity;
 uniform vec4 uBox;
 // 1: uBox is in flat-world units (the seed image).
 uniform float uFlatUv;
+// Equirect area a sharper detail texture covers instead (zero = none).
+uniform vec4 uHole;
 in vec2 vFlat;
 ${VISIBILITY}
 void main() {
+  if (uHole.z > 0.0 && all(greaterThanEqual(vUv, uHole.xy)) && all(lessThanEqual(vUv, uHole.xy + uHole.zw))) discard;
   // The seed has no pixels beyond Mercator's edge at any morph.
   if (polarCap() || (uFlatUv > 0.5 && uFlatKind > 0.5 && (vUv.y < MERC_EDGE || vUv.y > 1.0 - MERC_EDGE))) discard;
   vec2 uv = (mix(vUv, vFlat, uFlatUv) - uBox.xy) / uBox.zw;
