@@ -236,7 +236,7 @@ Use `showToast` from `@/lib/toast` for user notifications. Let TanStack Query ha
 | Integ | `tests/integration/` | Vitest + MSW     | 19    |
 | E2E   | `tests/e2e/`         | Playwright + MSW | 8     |
 
-Two Playwright configs: `playwright.config.ts` (MSW-mocked) and `playwright.config.stack.ts` (real backend). All E2E tests must work against both.
+Two Playwright configs: `playwright.config.ts` (MSW-mocked) and `playwright.config.stack.ts` (real backend). All E2E tests must work against both, except `globe.spec.ts`: it runs in the mocked config's `globe` project on the full Chromium build (hardware WebGL in headless mode where a GPU exists) and skips itself on software renderers.
 
 See [development_guidelines/TESTING.md](./development_guidelines/TESTING.md) for patterns and strategy.
 

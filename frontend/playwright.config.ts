@@ -47,6 +47,13 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /globe\.spec\.ts/,
+    },
+    {
+      // Full Chromium: hardware WebGL headless where a GPU exists; the shell's SwiftShader is refused.
+      name: 'globe',
+      use: { ...devices['Desktop Chrome'], channel: 'chromium' },
+      testMatch: /globe\.spec\.ts/,
     },
   ],
 })
