@@ -532,6 +532,8 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       syncBasemap()
     },
 
+    setLive: (on) => content?.setLive(on),
+
     getCamera: () => (map ? cameraOf(map) : { lon: 0, lat: 0, zoom: 1 }),
 
     setCamera: (cam, move) => {
@@ -555,6 +557,8 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       const m = map
       if (!m || !content) return Promise.resolve()
       const u = content.uniforms
+      // Entering wakes a warm globe, whatever React's effect timing.
+      content.setLive(true)
       const [sw, sh] = size()
       content.setSeed(seed, from, sw, sh)
       const settle = () => {

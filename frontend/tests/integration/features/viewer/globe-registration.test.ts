@@ -432,4 +432,27 @@ describe('globe registration', () => {
     ]
     expect(near(f.at(WIDTH / 2 + 20, HEIGHT / 2), blend, 4)).toBe(true)
   })
+
+  it('fetches nothing while hidden and loads once live', async () => {
+    engine.setLive(false)
+    engine.setLayers([spec('world', 1)])
+    engine.setLayers([
+      {
+        ...spec('world', 1),
+        params: { ...spec('world', 1).params, TIME: 't1' },
+      },
+    ])
+    await new Promise((r) => setTimeout(r, 400))
+    expect(requests).toEqual([])
+    // Entering wakes it, whatever called setLive last.
+    await engine.morphIn(
+      { projection: 'merc', lon: -35, lat: 10, resolution: 20000 },
+      CAMERA,
+      0,
+      null,
+    )
+    await engine.whenLoaded()
+    expect(requests.map((u) => u.searchParams.get('TIME'))).toEqual(['t1'])
+    expect(readoutError(engine, WORLD_MARKERS[0])).toBeLessThan(0.3)
+  })
 })

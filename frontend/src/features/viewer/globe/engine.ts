@@ -90,6 +90,8 @@ export interface GlobeEngine {
   mount: (container: HTMLElement, events: GlobeEngineEvents) => Promise<void>
   setLayers: (specs: ReadonlyArray<GlobeLayerSpec>) => void
   setBasemap: (spec: GlobeBasemapSpec) => void
+  /** Hidden (warm) globes keep their layers but fetch nothing until live. */
+  setLive: (live: boolean) => void
   getCamera: () => GlobeCamera
   setCamera: (camera: GlobeCamera, move?: CameraMove) => void
   /** Resolves when layers already set have a first image (or failed). */

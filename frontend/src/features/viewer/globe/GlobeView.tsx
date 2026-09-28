@@ -75,6 +75,8 @@ export interface GlobeViewProps {
   visible: boolean
   /** Settled on the globe: show chrome, own fit/capture. */
   active: boolean
+  /** Entering, on or leaving the globe; a warm, hidden one fetches no data. */
+  live: boolean
   basemap: GlobeBasemapSpec
   /** Hold-Z magnifier settings (toolbar). */
   loupe: GlobeLoupe
@@ -96,6 +98,7 @@ export function GlobeView({
   camera,
   visible,
   active,
+  live,
   basemap,
   loupe,
   pinnedLegends,
@@ -181,6 +184,7 @@ export function GlobeView({
       source={source}
       camera={camera}
       active={active}
+      live={live}
       basemap={basemap}
       loupe={loupe}
       pinnedLegends={pinnedLegends.filter(
@@ -222,6 +226,7 @@ function GlobePanel({
   source,
   camera,
   active,
+  live,
   basemap,
   loupe,
   pinnedLegends,
@@ -236,6 +241,7 @@ function GlobePanel({
   source: CompareMapSource
   camera: SharedGlobeCamera
   active: boolean
+  live: boolean
   basemap: GlobeBasemapSpec
   loupe: GlobeLoupe
   pinnedLegends: ReadonlyArray<PinnedLegendItem>
@@ -273,12 +279,19 @@ function GlobePanel({
   // Engine events read the latest props without remounting the engine.
   const latest = useRef({
     source,
+    live,
     basemap: panelBasemap,
     onFailure,
     onContextLost,
   })
   useLayoutEffect(() => {
-    latest.current = { source, basemap: panelBasemap, onFailure, onContextLost }
+    latest.current = {
+      source,
+      live,
+      basemap: panelBasemap,
+      onFailure,
+      onContextLost,
+    }
   })
   const zBase = slot === 'a' ? 100 : 200
 
@@ -311,6 +324,7 @@ function GlobePanel({
         })
         if (isCancelled()) return
         mounted.setCamera(camera.get())
+        mounted.setLive(latest.current.live)
         // Content before registering: the handoff's whenLoaded must see it.
         mounted.setLayers(globeLayerSpecs(latest.current.source, zBase))
         mounted.setBasemap(latest.current.basemap)
@@ -343,6 +357,10 @@ function GlobePanel({
   useEffect(() => {
     engine?.setBasemap(panelBasemap)
   }, [engine, panelBasemap])
+
+  useEffect(() => {
+    engine?.setLive(live)
+  }, [engine, live])
 
   const drawLoupe = useMemo(
     () =>

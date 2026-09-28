@@ -41,6 +41,7 @@ import i18n from '@/lib/i18n'
 const engineCalls = vi.hoisted(() => ({
   layers: [] as Array<ReadonlyArray<GlobeLayerSpec>>,
   seeds: [] as Array<boolean>,
+  live: [] as Array<boolean>,
   mounted: 0,
   destroyed: 0,
   camera: (): GlobeCamera => ({ lon: 0, lat: 0, zoom: 1 }),
@@ -65,6 +66,7 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
       },
       setLayers: (specs) => engineCalls.layers.push(specs),
       setBasemap: () => {},
+      setLive: (live) => engineCalls.live.push(live),
       getCamera: () => camera,
       setCamera: (next) => {
         camera = next
@@ -204,6 +206,8 @@ describe('GeoViewer 3D globe', () => {
     await screen.getByRole('button', { name: 'Projection & basemap' }).click()
     // Opening the menu warms the globe: mounted, hidden, before any choice.
     await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+    // Warm is not live: no data fetches until the globe is entered.
+    await expect.poll(() => engineCalls.live.at(-1)).toBe(false)
     const seeds = engineCalls.seeds.length
     await screen.getByRole('radio', { name: /^3D globe/ }).click()
 
@@ -219,6 +223,7 @@ describe('GeoViewer 3D globe', () => {
         }),
       )
       .toBeInTheDocument()
+    expect(engineCalls.live.at(-1)).toBe(true)
     await expect
       .poll(() => engineCalls.layers.at(-1)?.map((s) => s.params.LAYERS))
       .toEqual(['2t'])
@@ -253,6 +258,7 @@ describe('GeoViewer 3D globe', () => {
       .element(screen.getByTestId('globe-view'))
       .toHaveStyle({ opacity: '0' })
     expect(engineCalls.destroyed).toBe(0)
+    await expect.poll(() => engineCalls.live.at(-1)).toBe(false)
   })
 
   it('is blocked in single-map comparison modes', async () => {

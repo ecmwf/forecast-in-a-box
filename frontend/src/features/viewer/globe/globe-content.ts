@@ -124,6 +124,8 @@ interface LayerEntry extends Slot {
   errored: boolean
   /** Settled at least once (whenLoaded). */
   settled: boolean
+  /** Changed while not live: fetch on the next wake. */
+  stale: boolean
 }
 
 export interface GlobeViewState {
@@ -300,6 +302,8 @@ export interface GlobeContent {
   uniforms: MorphUniforms
   setLayers: (specs: ReadonlyArray<GlobeLayerSpec>) => void
   setOutline: (spec: GlobeOutlineSpec | null) => void
+  /** Not live: data layers keep their specs but fetch nothing (a hidden, warm globe). */
+  setLive: (live: boolean) => void
   /** The server's own basemap images: z below the data (background) or above (reference). */
   setDecoration: (specs: ReadonlyArray<GlobeLayerSpec>) => void
   /** Bend the flat map's own pixels; null drops them. */
@@ -352,6 +356,7 @@ export function createGlobeContent({
   let inFlight = 0
   let upgradeTimer = 0
   let disposed = false
+  let live = true
 
   /** One texel per screen px at the centre, within the size limits. */
   const targetScale = (spec: GlobeLayerSpec) =>
@@ -565,6 +570,7 @@ export function createGlobeContent({
   function scheduleUpgrade() {
     window.clearTimeout(upgradeTimer)
     upgradeTimer = window.setTimeout(() => {
+      if (!live) return
       const v = view()
       for (const entry of allEntries()) {
         const target = fitScale(
@@ -772,11 +778,21 @@ export function createGlobeContent({
     gl.useProgram(null)
   }
 
+  /** Hold an entry until the next wake; its old image must not pose as the new one. */
+  function defer(entry: LayerEntry) {
+    entry.controller?.abort()
+    dropTexture(entry)
+    entry.settled = false
+    entry.stale = true
+  }
+
   /** Match `target` to `specs`: new keys load, changed params reload, the rest update. */
   function reconcile(
     target: Map<string, LayerEntry>,
     specs: ReadonlyArray<GlobeLayerSpec>,
+    deferrable: boolean,
   ) {
+    const hold = deferrable && !live
     const wanted = new Set<string>()
     for (const spec of specs) {
       wanted.add(spec.key)
@@ -794,20 +810,27 @@ export function createGlobeContent({
           detail: null,
           errored: false,
           settled: false,
+          stale: false,
           bytes: 0,
           reserved: 0,
         }
         target.set(spec.key, entry)
-        load(entry, firstScale(spec))
+        if (hold) entry.stale = true
+        else load(entry, firstScale(spec))
       } else if (entry.paramsKey !== paramsKey) {
         entry.spec = spec
         entry.paramsKey = paramsKey
         dropDetail(entry)
+        if (hold) defer(entry)
         // Keep the shown detail when the time/style changes.
-        load(
-          entry,
-          Math.max(firstScale(spec), Math.min(entry.scale, targetScale(spec))),
-        )
+        else
+          load(
+            entry,
+            Math.max(
+              firstScale(spec),
+              Math.min(entry.scale, targetScale(spec)),
+            ),
+          )
       } else {
         entry.spec = spec
       }
@@ -824,9 +847,36 @@ export function createGlobeContent({
   return {
     uniforms,
 
-    setLayers: (specs) => reconcile(layers, specs),
+    setLayers: (specs) => reconcile(layers, specs, true),
 
-    setDecoration: (specs) => reconcile(deco, specs),
+    // The native basemap has no time: a warm globe preloads it.
+    setDecoration: (specs) => reconcile(deco, specs, false),
+
+    setLive: (on) => {
+      if (on === live) return
+      live = on
+      if (!on) {
+        window.clearTimeout(upgradeTimer)
+        // In-flight loads for a hidden globe would only feed the flat map's failure log.
+        for (const entry of layers.values()) {
+          if (entry.controller) defer(entry)
+          entry.detail?.controller?.abort()
+        }
+        return
+      }
+      for (const entry of layers.values()) {
+        if (!entry.stale) continue
+        entry.stale = false
+        load(
+          entry,
+          Math.max(
+            firstScale(entry.spec),
+            Math.min(entry.scale, targetScale(entry.spec)),
+          ),
+        )
+      }
+      scheduleUpgrade()
+    },
 
     setOutline: (spec) => {
       outline = spec
@@ -867,7 +917,8 @@ export function createGlobeContent({
         dropDetail(entry)
         entry.scale = 0
         entry.settled = false
-        load(entry, firstScale(entry.spec))
+        if (!live && layers.has(entry.spec.key)) entry.stale = true
+        else load(entry, firstScale(entry.spec))
       }
       scheduleUpgrade()
     },

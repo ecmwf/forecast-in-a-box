@@ -1366,6 +1366,7 @@ export function GeoViewer({
               camera={globe.camera}
               visible={globe.overlayVisible}
               active={globe.phase === 'globe'}
+              live={globe.phase !== 'flat'}
               basemap={globeBasemap}
               loupe={{
                 sizePx: modeOptions.loupeSizePx,
