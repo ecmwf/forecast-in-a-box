@@ -406,4 +406,30 @@ describe('globe registration', () => {
     expect(blendedAround(engine, marker)).toBe(0)
     expect(readoutError(engine, marker, 2)).toBeLessThan(0.3)
   })
+
+  it('bends a transparent flat map over the globe ground, premultiplied', async () => {
+    engine.setLayers([spec('solid', 1)])
+    await engine.whenLoaded()
+    // Left: empty (no ground painted); right: half-transparent magenta.
+    const image = document.createElement('canvas')
+    image.width = WIDTH
+    image.height = HEIGHT
+    const ctx = image.getContext('2d')!
+    ctx.fillStyle = 'rgba(255,0,255,0.5)'
+    ctx.fillRect(WIDTH / 2, 0, WIDTH / 2, HEIGHT)
+    await engine.morphIn(
+      { projection: 'merc', lon: -35, lat: 10, resolution: 20000 },
+      CAMERA,
+      0,
+      { image },
+    )
+    const f = frame(engine)
+    expect(near(f.at(WIDTH / 2 - 20, HEIGHT / 2), SOLID, 3)).toBe(true)
+    const blend: Rgb = [
+      Math.round((255 + SOLID[0]) / 2),
+      Math.round(SOLID[1] / 2),
+      Math.round((255 + SOLID[2]) / 2),
+    ]
+    expect(near(f.at(WIDTH / 2 + 20, HEIGHT / 2), blend, 4)).toBe(true)
+  })
 })

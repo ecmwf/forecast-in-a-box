@@ -56,7 +56,11 @@ function snapshotFlatMaps(area: HTMLElement | null): Array<CaptureResult> {
   if (!area) return []
   const viewports = [...area.querySelectorAll<HTMLElement>('.ol-viewport')]
   return viewports.flatMap((viewport, i) => {
-    const canvas = compositeMapToCanvas(viewport.parentElement ?? viewport)
+    // Transparent: the globe's own ground shows where the flat map has none.
+    const canvas = compositeMapToCanvas(
+      viewport.parentElement ?? viewport,
+      null,
+    )
     return canvas
       ? [{ slot: i === 0 ? 'a' : 'b', label: '', timeLabel: null, canvas }]
       : []

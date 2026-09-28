@@ -690,7 +690,7 @@ export function createGlobeContent({
     const layer = r.layerProgram
     setShared(gl, layer)
     if (seed.pending) {
-      seed.texture = createTexture(gl, seed.pending)
+      seed.texture = createTexture(gl, seed.pending, { premultiply: true })
       seed.pending = null
     }
     if (!seed.texture) return
