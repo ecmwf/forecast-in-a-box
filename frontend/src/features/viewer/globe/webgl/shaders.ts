@@ -87,11 +87,17 @@ uniform float uFlatUv;
 uniform vec4 uHole;
 in vec2 vFlat;
 ${VISIBILITY}
+// Equirect x in a box's frame: a box past x = 1 continues across the antimeridian.
+float boxX(float x, vec4 box) {
+  return x < box.x && box.x + box.z > 1.0 ? x + 1.0 : x;
+}
 void main() {
-  vec2 uv = (mix(vUv, vFlat, uFlatUv) - uBox.xy) / uBox.zw;
-  // Gradients before any discard.
+  vec2 src = mix(vUv, vFlat, uFlatUv);
+  vec2 uv = (src - uBox.xy) / uBox.zw;
+  // Gradients before any discard, and before the wrap jump.
   vec2 gx = dFdx(uv);
   vec2 gy = dFdy(uv);
+  if (uFlatUv < 0.5) uv.x = (boxX(src.x, uBox) - uBox.x) / uBox.z;
   // MSAA runs pixel centres just outside the seam triangle: allow one pixel.
   vec2 slack = abs(gx) + abs(gy);
   // Longitudes converge at the poles: cap the east-west footprint at the anisotropy limit, so latitudes stay sharp.
@@ -100,7 +106,8 @@ void main() {
   float k = min(1.0, ${MAX_ANISOTROPY.toFixed(1)} * across / along);
   gx.x *= k;
   gy.x *= k;
-  if (uHole.z > 0.0 && all(greaterThanEqual(vUv, uHole.xy)) && all(lessThanEqual(vUv, uHole.xy + uHole.zw))) discard;
+  vec2 hole = vec2(boxX(vUv.x, uHole), vUv.y);
+  if (uHole.z > 0.0 && all(greaterThanEqual(hole, uHole.xy)) && all(lessThanEqual(hole, uHole.xy + uHole.zw))) discard;
   // The seed has no pixels beyond Mercator's edge at any morph.
   if (polarCap() || (uFlatUv > 0.5 && uFlatKind > 0.5 && (vUv.y < MERC_EDGE || vUv.y > 1.0 - MERC_EDGE))) discard;
   if (any(lessThan(uv, -slack)) || any(greaterThan(uv, vec2(1.0) + slack))) discard;

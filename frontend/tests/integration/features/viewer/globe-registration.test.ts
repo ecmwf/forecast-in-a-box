@@ -44,6 +44,12 @@ const WORLD_MARKERS: ReadonlyArray<Marker> = [
   { lon: -15, lat: 45, rgb: [255, 0, 255] },
   { lon: -35, lat: -35, rgb: [0, 200, 200] },
 ]
+// Either side of the antimeridian, and near the pole; open ocean, off the 30° graticule.
+const EDGE_MARKERS: ReadonlyArray<Marker> = [
+  { lon: 179.2, lat: -40.3, rgb: [255, 0, 0] },
+  { lon: -179.3, lat: -39.7, rgb: [0, 0, 255] },
+  { lon: 100, lat: 83, rgb: [0, 200, 0] },
+]
 const REGION: [number, number, number, number] = [-60, 20, -20, 55]
 const REGION_MARKER: Marker = { lon: -50, lat: 40, rgb: [255, 160, 0] }
 const CAMERA = { lon: -35, lat: 10, zoom: globeFitZoom(WIDTH, HEIGHT) }
@@ -57,21 +63,23 @@ const POLAR_BANDS = [
 // One-texel meridians 21 texels apart, so sampling phase drifts line to line; ~2.5× minified east–west near 65°N.
 const LINE_LONS = Array.from({ length: 11 }, (_, i) => -60 + i * 5.25)
 
-/** PNG of `bbox` at `ppd` px/degree; markers are whole-pixel squares (no AA). */
+/** PNG of `bbox` at `ppd` px/degree or an exact [width, height]; markers are whole-pixel squares (no AA). */
 async function markerPng(
   bbox: readonly [number, number, number, number],
-  ppd: number,
+  scale: number | readonly [number, number],
   markers: ReadonlyArray<Marker>,
   side: number,
 ): Promise<ArrayBuffer> {
   const [w, s, e, n] = bbox
-  const canvas = new OffscreenCanvas((e - w) * ppd, (n - s) * ppd)
+  const [width, height] =
+    typeof scale === 'number' ? [(e - w) * scale, (n - s) * scale] : scale
+  const canvas = new OffscreenCanvas(width, height)
   const ctx = canvas.getContext('2d')!
   for (const m of markers) {
     ctx.fillStyle = `rgb(${m.rgb.join(',')})`
-    const x = (m.lon - w) * ppd
-    const y = (n - m.lat) * ppd
-    ctx.fillRect(x - side / 2, y - side / 2, side, side)
+    const x = ((m.lon - w) / (e - w)) * width
+    const y = ((n - m.lat) / (n - s)) * height
+    ctx.fillRect(Math.round(x - side / 2), Math.round(y - side / 2), side, side)
   }
   const blob = await canvas.convertToBlob({ type: 'image/png' })
   return blob.arrayBuffer()
@@ -233,23 +241,25 @@ describe('globe registration', () => {
         const [s, w, n, e] = (url.searchParams.get('BBOX') ?? '')
           .split(',')
           .map(Number)
-        const subWorld = name === 'world' && !(w === -180 && e === 180)
-        const body = subWorld
-          ? await markerPng(
-              [w, s, e, n],
-              Number(url.searchParams.get('WIDTH')) / (e - w),
-              WORLD_MARKERS,
-              8,
-            )
-          : name === 'region'
-            ? region
-            : name === 'solid'
-              ? solid
-              : name === 'lines'
-                ? lines
-                : name === 'bands'
-                  ? bands
-                  : world
+        const size = [
+          Number(url.searchParams.get('WIDTH')),
+          Number(url.searchParams.get('HEIGHT')),
+        ] as const
+        const whole = w === -180 && e === 180 && s === -90 && n === 90
+        const body =
+          name === 'world' && !whole
+            ? await markerPng([w, s, e, n], size, WORLD_MARKERS, 8)
+            : name === 'edge'
+              ? await markerPng([w, s, e, n], size, EDGE_MARKERS, 8)
+              : name === 'region'
+                ? region
+                : name === 'solid'
+                  ? solid
+                  : name === 'lines'
+                    ? lines
+                    : name === 'bands'
+                      ? bands
+                      : world
         return HttpResponse.arrayBuffer(body, {
           headers: { 'Content-Type': 'image/png' },
         })
@@ -507,7 +517,7 @@ describe('globe registration', () => {
           )
         }),
       )
-      // High up the view image misses the top corners, so the world image shows there.
+      // Zoomed in: a view image over the world image.
       engine.setCamera({ lon: -45, lat: 70, zoom: 5 })
       engine.setLayers([timed(T1)])
       await engine.whenLoaded()
@@ -604,6 +614,40 @@ describe('globe registration', () => {
       expect(Number(u.searchParams.get('WIDTH'))).toBeLessThanOrEqual(2000)
       expect(Number(u.searchParams.get('HEIGHT'))).toBeLessThanOrEqual(2000)
     }
+  })
+
+  it('fetches the view sharp across the antimeridian, in two halves', async () => {
+    engine.setCamera({ lon: 180, lat: -40, zoom: 6 })
+    engine.setLayers([spec('edge', 1)])
+    await engine.whenLoaded()
+    const boxes = requests.map((u) =>
+      (u.searchParams.get('BBOX') ?? '').split(',').map(Number),
+    )
+    // Lat-first: south, west, north, east.
+    expect(boxes.some(([s, , , e]) => e === 180 && s > -90)).toBe(true)
+    expect(boxes.some(([s, w]) => w === -180 && s > -90)).toBe(true)
+    for (const m of EDGE_MARKERS.slice(0, 2)) {
+      expect(readoutError(engine, m)).toBeLessThan(0.05)
+    }
+  })
+
+  it('asks for square pixels at a pole, which servers like SkinnyWMS need', async () => {
+    engine.setCamera({ lon: 100, lat: 83, zoom: 6 })
+    engine.setLayers([spec('edge', 1)])
+    await engine.whenLoaded()
+    await new Promise((r) => setTimeout(r, 500))
+    // A non-square request comes back letterboxed from Magics, the data squeezed into a strip.
+    for (const u of requests) {
+      const [s, w, n, e] = (u.searchParams.get('BBOX') ?? '')
+        .split(',')
+        .map(Number)
+      const width = Number(u.searchParams.get('WIDTH'))
+      const height = Number(u.searchParams.get('HEIGHT'))
+      expect(
+        Math.abs((width / (e - w)) * (n - s) - height),
+      ).toBeLessThanOrEqual(1)
+    }
+    expect(readoutError(engine, EDGE_MARKERS[2])).toBeLessThan(0.3)
   })
 
   it('recovers its layers after a WebGL context loss', async () => {

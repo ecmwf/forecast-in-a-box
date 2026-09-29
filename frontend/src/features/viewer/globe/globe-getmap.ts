@@ -47,7 +47,7 @@ export function regionScale(
   return Math.min(ppd, maxWidth / (e - w), maxHeight / (n - s))
 }
 
-/** Image size of a region at `scale` px/degree. */
+/** Image size of a region at `scale` px/degree; square pixels, as servers like SkinnyWMS letterbox others. */
 export function regionSize(region: Region, scale: number): [number, number] {
   const [w, s, e, n] = region
   return [

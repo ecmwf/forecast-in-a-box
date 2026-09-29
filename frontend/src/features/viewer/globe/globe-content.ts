@@ -186,20 +186,31 @@ function boxOf([w, s, e, n]: Region): Vec4 {
   return [(w + 180) / 360, (90 - n) / 180, (e - w) / 360, (n - s) / 180]
 }
 
-/** The area on screen, with margin; the whole width once it wraps. */
+/** The area on screen, with margin; its east edge may run past 180° across the antimeridian. */
 function visibleRegion(v: GlobeViewState): Region {
   const ppd = (Math.PI * globeRadiusPx(v.zoom)) / 180
   const dLat = (v.height / 2 / ppd) * 1.5
+  const s = Math.max(-90, v.lat - dLat)
+  const n = Math.min(90, v.lat + dLat)
+  // A pole in view shows every longitude.
+  if (s <= -90 || n >= 90) return [-180, s, 180, n]
   const dLon =
     (v.width / 2 / (ppd * Math.max(0.1, Math.cos((v.lat * Math.PI) / 180)))) *
     1.5
-  const wraps = dLon >= 180 || v.lon - dLon < -180 || v.lon + dLon > 180
-  return [
-    wraps ? -180 : v.lon - dLon,
-    Math.max(-90, v.lat - dLat),
-    wraps ? 180 : v.lon + dLon,
-    Math.min(90, v.lat + dLat),
-  ]
+  if (dLon >= 180) return [-180, s, 180, n]
+  const w = v.lon - dLon
+  return w < -180
+    ? [w + 360, s, v.lon + dLon + 360, n]
+    : [w, s, v.lon + dLon, n]
+}
+
+/** A view region clipped to a layer's; it continues across the antimeridian only where both do. */
+function overlap(view: Region, layer: Region): Region | null {
+  if (view[2] <= 180) return intersect(view, layer)
+  const east = intersect([view[0], view[1], 180, view[3]], layer)
+  const west = intersect([-180, view[1], view[2] - 360, view[3]], layer)
+  if (east && west) return [east[0], east[1], west[2] + 360, east[3]]
+  return east ?? west
 }
 
 function intersect(a: Region, b: Region): Region | null {
@@ -212,8 +223,28 @@ function intersect(a: Region, b: Region): Region | null {
   return r[0] < r[2] && r[1] < r[3] ? r : null
 }
 
-const covers = (a: Region, b: Region) =>
+const within = (a: Region, b: Region) =>
   a[0] <= b[0] && a[1] <= b[1] && a[2] >= b[2] && a[3] >= b[3]
+
+/** `a` holds `b`, either written with or without the 360° shift. */
+const covers = (a: Region, b: Region) =>
+  within(a, b) ||
+  within(a, [b[0] + 360, b[1], b[2] + 360, b[3]]) ||
+  within(a, [b[0] - 360, b[1], b[2] - 360, b[3]])
+
+/** West and east halves side by side: one texture for a region across the antimeridian. */
+function join([west, east]: ReadonlyArray<ImageBitmap>): Promise<ImageBitmap> {
+  const canvas = new OffscreenCanvas(west.width + east.width, west.height)
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(west, 0, 0)
+  ctx.drawImage(east, west.width, 0)
+  west.close()
+  east.close()
+  return createImageBitmap(canvas, {
+    premultiplyAlpha: 'premultiply',
+    colorSpaceConversion: 'none',
+  })
+}
 
 interface SeedEntry {
   pending: HTMLCanvasElement | null
@@ -452,8 +483,12 @@ export function createGlobeContent({
   function fitScale(region: Region, scale: number, slot: Slot): number {
     const free =
       textureLedger.budget - textureLedger.bytes + slot.bytes + slot.reserved
-    const need = bytesOf(regionSize(region, scale))
-    return need <= free ? scale : scale * Math.sqrt(Math.max(free, 0) / need)
+    const need = (at: number) => bytesOf(regionSize(region, at))
+    if (need(scale) <= free) return scale
+    let fit = scale * Math.sqrt(Math.max(free, 0) / need(scale))
+    // Sizes round to whole pixels, which can tip the estimate over.
+    for (let i = 0; i < 32 && need(fit) > free; i++) fit *= 0.98
+    return fit
   }
 
   function dropTile(tile: Tile) {
@@ -495,10 +530,10 @@ export function createGlobeContent({
   function fetchBitmap(
     spec: GlobeLayerSpec,
     region: Region,
-    scale: number,
+    size: readonly [number, number],
     signal: AbortSignal,
   ): Promise<ImageBitmap> {
-    const url = regionGetMapUrl(spec, region, regionSize(region, scale))
+    const url = regionGetMapUrl(spec, region, size)
     return fetch(url, { signal })
       .then((r) => {
         if (!r.ok) throw new Error(`GetMap ${r.status}`)
@@ -510,6 +545,49 @@ export function createGlobeContent({
           colorSpaceConversion: 'none',
         }),
       )
+  }
+
+  /** `region` as one bitmap; past 180° two GetMaps on a pixel grid anchored there, joined. */
+  async function fetchRegion(
+    spec: GlobeLayerSpec,
+    region: Region,
+    scale: number,
+    signal: AbortSignal,
+  ): Promise<{ bitmap: ImageBitmap; region: Region }> {
+    const [w, s, e, n] = region
+    if (e <= 180) {
+      const size = regionSize(region, scale)
+      return { bitmap: await fetchBitmap(spec, region, size, signal), region }
+    }
+    const height = Math.max(1, Math.round((n - s) * scale))
+    const west = Math.max(1, Math.round((180 - w) * scale))
+    const east = Math.max(1, Math.round((e - 180) * scale))
+    const halves = await Promise.allSettled([
+      fetchBitmap(
+        spec,
+        [180 - west / scale, s, 180, n],
+        [west, height],
+        signal,
+      ),
+      fetchBitmap(
+        spec,
+        [-180, s, east / scale - 180, n],
+        [east, height],
+        signal,
+      ),
+    ])
+    const bitmaps = halves.flatMap((h) =>
+      h.status === 'fulfilled' ? [h.value] : [],
+    )
+    const failed = halves.find((h) => h.status === 'rejected')
+    if (failed) {
+      for (const b of bitmaps) b.close()
+      throw failed.reason
+    }
+    return {
+      bitmap: await join(bitmaps),
+      region: [180 - west / scale, s, 180 + east / scale, n],
+    }
   }
 
   /** A screen-resolution image of `region` over the coarser world image. */
@@ -532,8 +610,8 @@ export function createGlobeContent({
     entry.detail = tile
     holdBytes(tile, bytesOf(regionSize(region, scale)))
     setInFlight(1)
-    fetchBitmap(entry.spec, region, scale, controller.signal)
-      .then((bitmap) => {
+    fetchRegion(entry.spec, region, scale, controller.signal)
+      .then(({ bitmap, region: shown }) => {
         if (controller.signal.aborted || disposed) {
           bitmap.close()
           return
@@ -541,8 +619,8 @@ export function createGlobeContent({
         dropTile(tile)
         commitBytes(tile)
         tile.pending = bitmap
-        tile.box = boxOf(region)
-        tile.region = region
+        tile.box = boxOf(shown)
+        tile.region = shown
         tile.scale = scale
         tile.shownKey = key
         recover(entry.detailBackoff)
@@ -579,7 +657,12 @@ export function createGlobeContent({
     )
     holdBytes(entry, bytesOf(regionSize(region, scale)))
     setInFlight(1)
-    fetchBitmap(entry.spec, region, scale, controller.signal)
+    fetchBitmap(
+      entry.spec,
+      region,
+      regionSize(region, scale),
+      controller.signal,
+    )
       .then((bitmap) => {
         if (controller.signal.aborted || disposed) {
           bitmap.close()
@@ -636,8 +719,7 @@ export function createGlobeContent({
       }
       return
     }
-    const visible = visibleRegion(v)
-    const region = intersect(visible, layerRegion(entry.spec))
+    const region = overlap(visibleRegion(v), layerRegion(entry.spec))
     if (!region) return
     const d = entry.detail
     if (d?.controller) return
