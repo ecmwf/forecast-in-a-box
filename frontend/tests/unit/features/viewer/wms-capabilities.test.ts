@@ -976,6 +976,10 @@ describe('activeLayersBbox', () => {
     expect(activeLayersBbox(layers, [])).toBeNull()
     expect(isWorldBbox([-180, -90, 180, 90])).toBe(true)
     expect(isWorldBbox([-10, 40, 10, 60])).toBe(false)
+    // Half a grid cell over or short of the edges is still the world (DWD ICON).
+    expect(isWorldBbox([-180.125, -90.125, 179.875, 90.125])).toBe(true)
+    expect(isWorldBbox([0, -89.5, 360, 89.5])).toBe(true)
+    expect(isWorldBbox([-180, -80, 180, 80])).toBe(false)
   })
 })
 

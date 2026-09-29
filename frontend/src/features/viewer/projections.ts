@@ -294,7 +294,12 @@ export function carryCamera(
 /** WGS84 bbox as a view extent; null when the projection cannot frame it. */
 export function bboxExtentFor(p: ViewerProjection, bbox: Bbox): Extent | null {
   if (p.mercator || p.id === 'geo') {
-    return transformExtent(bbox, 'EPSG:4326', p.code)
+    // Latitudes past the projection's edge map to infinity: clip first.
+    return transformExtent(
+      getIntersection(bbox, p.worldExtent),
+      'EPSG:4326',
+      p.code,
+    )
   }
   if (isWorldBbox(bbox) || !containsExtent(p.worldExtent, bbox)) return null
   const extent = transformExtent(bbox, 'EPSG:4326', p.code, 8)

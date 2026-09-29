@@ -184,6 +184,18 @@ describe('layerExtentFor', () => {
     expect(layerExtentFor(merc, [-180, -90, 180, 90])).toBe(merc.extent)
     expect(layerExtentFor(merc, [170, 40, -170, 60])).toBe(merc.extent)
     expect(layerExtentFor(npole, [-180, -55, 180, 85])).toBe(npole.extent)
+    // Half-cell overhangs are global too, not an empty Mercator extent.
+    expect(layerExtentFor(merc, [-180.125, -90.125, 179.875, 90.125])).toBe(
+      merc.extent,
+    )
+  })
+
+  it('clips a box past the Mercator edge instead of losing it to infinity', () => {
+    const merc = getViewerProjection('merc')
+    const extent = layerExtentFor(merc, [0, 60, 40, 90.125])
+    expect(extent.every(Number.isFinite)).toBe(true)
+    expect(extent[3]).toBeCloseTo(merc.extent[3], -3)
+    expect(extent[1]).toBeGreaterThan(0)
   })
 
   it('clips a regional bbox to the projection world', () => {

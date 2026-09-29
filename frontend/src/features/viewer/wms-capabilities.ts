@@ -1019,8 +1019,9 @@ export function layerRequestParams(
 export type Bbox = [number, number, number, number]
 
 /** Whole-globe bbox: nothing to clip. */
+/** Global, allowing half-cell overhangs or insets (DWD ICON: −180.125…179.875, ±90.125). */
 export const isWorldBbox = (bbox: Bbox): boolean =>
-  bbox[0] <= -180 && bbox[1] <= -90 && bbox[2] >= 180 && bbox[3] >= 90
+  bbox[2] - bbox[0] >= 359 && bbox[1] <= -89 && bbox[3] >= 89
 
 /** Union of two bboxes; either may be absent. */
 export function unionBbox(a: Bbox | null, b: Bbox | null): Bbox | null {
