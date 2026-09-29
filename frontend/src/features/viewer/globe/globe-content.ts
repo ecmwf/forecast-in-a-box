@@ -70,8 +70,30 @@ const MAX_SIDE = 4096
 /** Refetch when the wanted detail beats the shown one by this factor. */
 const UPGRADE_FACTOR = 1.25
 const UPGRADE_IDLE_MS = 300
+/** After a failed sharper image, wait this long before the next, doubling up to the cap. */
+const RETRY_MS = 5000
+const RETRY_MAX_MS = 5 * 60_000
 
 type Vec4 = [number, number, number, number]
+
+interface Backoff {
+  /** performance.now() before which no sharper image is asked for. */
+  until: number
+  failures: number
+}
+
+function backOff(b: Backoff) {
+  b.failures++
+  b.until =
+    performance.now() + Math.min(RETRY_MAX_MS, RETRY_MS * 2 ** (b.failures - 1))
+}
+
+function recover(b: Backoff) {
+  b.failures = 0
+  b.until = 0
+}
+
+const retryDue = (b: Backoff) => performance.now() >= b.until
 
 const BASE_COLOR: Record<'light' | 'dark', Vec4> = {
   light: [0.87, 0.9, 0.94, 1],
@@ -127,6 +149,9 @@ interface LayerEntry extends Slot {
   controller: AbortController | null
   /** Screen-resolution image of the visible area, once the world image is too coarse. */
   detail: Tile | null
+  /** Sharper world images and view images each back off after a failure. */
+  upgradeBackoff: Backoff
+  detailBackoff: Backoff
   errored: boolean
   /** Settled at least once (whenLoaded). */
   settled: boolean
@@ -513,10 +538,12 @@ export function createGlobeContent({
         tile.region = region
         tile.scale = scale
         tile.shownKey = key
+        recover(entry.detailBackoff)
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted || disposed) return
         log.warn(`Globe detail GetMap failed for ${entry.spec.layerName}`, err)
+        backOff(entry.detailBackoff)
       })
       .finally(() => {
         if (tile.controller === controller) {
@@ -535,6 +562,8 @@ export function createGlobeContent({
     entry.controller = controller
     const { key, time } = entry.spec
     const paramsKey = entry.paramsKey
+    // A sharper copy of the shown instant: failing it keeps what is shown.
+    const sharper = entry.shownKey === paramsKey
     const region = layerRegion(entry.spec)
     // The first image always loads; the budget only bounds sharper ones.
     const scale = Math.max(
@@ -556,11 +585,20 @@ export function createGlobeContent({
         entry.box = boxOf(region)
         entry.scale = scale
         entry.errored = false
+        if (sharper) recover(entry.upgradeBackoff)
         events.onLayerLoad(key, time, true)
         scheduleUpgrade()
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted || disposed) return
+        if (sharper) {
+          log.warn(
+            `Globe sharper GetMap failed for ${entry.spec.layerName}, keeping the shown image`,
+            err,
+          )
+          backOff(entry.upgradeBackoff)
+          return
+        }
         log.warn(`Globe GetMap failed for ${entry.spec.layerName}`, err)
         // A stale image must never pose as the requested instant.
         entry.errored = true
@@ -610,7 +648,8 @@ export function createGlobeContent({
     )
       return
     // Alongside the world image, not after it: entering zoomed in needs it first.
-    if (!entry.errored) loadDetail(entry, region, scale)
+    if (!entry.errored && retryDue(entry.detailBackoff))
+      loadDetail(entry, region, scale)
   }
 
   /** Sharper world images and view images for the current camera. */
@@ -627,6 +666,7 @@ export function createGlobeContent({
       if (
         !entry.controller &&
         !entry.errored &&
+        retryDue(entry.upgradeBackoff) &&
         target > entry.scale * UPGRADE_FACTOR
       )
         load(entry, target)
@@ -869,6 +909,8 @@ export function createGlobeContent({
           shownKey: '',
           controller: null,
           detail: null,
+          upgradeBackoff: { until: 0, failures: 0 },
+          detailBackoff: { until: 0, failures: 0 },
           errored: false,
           settled: false,
           stale: false,

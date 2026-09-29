@@ -213,9 +213,12 @@ describe('globe registration', () => {
   let container: HTMLDivElement
   let engine: GlobeEngine
   const requests: Array<URL> = []
+  /** onLayerLoad outcomes, in order. */
+  const loads: Array<boolean> = []
 
   beforeEach(async () => {
     requests.length = 0
+    loads.length = 0
     const world = await markerPng([-180, -90, 180, 90], 4, WORLD_MARKERS, 8)
     const region = await markerPng(REGION, 10, [REGION_MARKER], 10)
     const solid = await solidPng([-180, -90, 180, 90], 4, SOLID)
@@ -259,7 +262,7 @@ describe('globe registration', () => {
     engine = create()
     await engine.mount(container, {
       onCameraChange: () => {},
-      onLayerLoad: () => {},
+      onLayerLoad: (_key, _time, ok) => loads.push(ok),
       onLoadingChange: () => {},
       onContextLost: () => {},
     })
@@ -557,6 +560,33 @@ describe('globe registration', () => {
       expect(c.t1).toBe(0)
       expect(c.t2).toBeGreaterThan(100)
     })
+  })
+
+  it('keeps the shown image when a sharper copy fails, and backs off', async () => {
+    // A server that refuses images wider than 1024 px, like a MaxWidth limit.
+    const sharper = (u: URL) =>
+      u.searchParams.get('LAYERS') === 'world' &&
+      Number(u.searchParams.get('WIDTH')) > 1024
+    worker.use(
+      http.get(ENDPOINT, ({ request }) => {
+        const url = new URL(request.url)
+        if (!sharper(url)) return
+        requests.push(url)
+        return new HttpResponse(null, { status: 500 })
+      }),
+    )
+    engine.setLayers([spec('world', 1)])
+    await engine.whenLoaded()
+    // The idle upgrade asks for a sharper world image and fails.
+    await expect.poll(() => requests.filter(sharper).length).toBe(1)
+    await new Promise((r) => setTimeout(r, 300))
+    // The instant is served: the coarser image stays and nothing is reported failed.
+    expect(loads).not.toContain(false)
+    expect(readoutError(engine, WORLD_MARKERS[0])).toBeLessThan(0.3)
+    // A camera move does not retry straight away.
+    engine.setCamera({ ...CAMERA, lon: CAMERA.lon + 2 })
+    await new Promise((r) => setTimeout(r, 800))
+    expect(requests.filter(sharper)).toHaveLength(1)
   })
 
   it('recovers its layers after a WebGL context loss', async () => {
