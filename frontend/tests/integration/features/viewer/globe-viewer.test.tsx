@@ -46,6 +46,8 @@ const engineCalls = vi.hoisted(() => ({
   mounted: 0,
   destroyed: 0,
   camera: (): GlobeCamera => ({ lon: 0, lat: 0, zoom: 1 }),
+  loaded: Promise.resolve(),
+  captures: 0,
 }))
 
 vi.mock('@/features/viewer/globe/webgl-support', () => ({
@@ -73,7 +75,7 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
         camera = next
         engineCalls.camera = () => camera
       },
-      whenLoaded: () => Promise.resolve(),
+      whenLoaded: () => engineCalls.loaded,
       morphIn: (_from, to, _ms, seed) => {
         camera = to
         engineCalls.seeds.push(seed !== null)
@@ -81,7 +83,10 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
       },
       morphOut: () => Promise.resolve(),
       pick: () => null,
-      capture: () => document.createElement('canvas'),
+      capture: () => {
+        engineCalls.captures++
+        return document.createElement('canvas')
+      },
       drawViewport: () => {},
       size: () => [800, 600],
       destroy: () => {
@@ -329,5 +334,33 @@ describe('GeoViewer 3D globe', () => {
     expect(onViewStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ projection: 'globe' }),
     )
+  })
+
+  it('captures the globe only once its images are in', async () => {
+    const screen = await render(
+      <Harness
+        portA={registerServer()}
+        initialViewState={{
+          projection: 'globe',
+          camera: { lon: 12, lat: 48, zoom: 2 },
+        }}
+      />,
+    )
+    await expect
+      .element(screen.getByRole('region', { name: '3D globe, source A' }))
+      .toBeInTheDocument()
+    let loaded = () => {}
+    engineCalls.loaded = new Promise<void>((resolve) => {
+      loaded = resolve
+    })
+    const before = engineCalls.captures
+    // C copies the view: the export capture path.
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', bubbles: true }),
+    )
+    await new Promise((r) => setTimeout(r, 300))
+    expect(engineCalls.captures).toBe(before)
+    loaded()
+    await expect.poll(() => engineCalls.captures).toBe(before + 1)
   })
 })

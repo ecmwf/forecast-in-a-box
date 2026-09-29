@@ -236,14 +236,16 @@ export function GlobeView({
   })
   useEffect(() => {
     if (!active) return
-    onRegisterCapture(() =>
-      Promise.resolve(
-        captureMetaRef.current.flatMap((m) => {
-          const engine = enginesRef.current.get(m.slot)
-          return engine ? [{ ...m, canvas: engine.capture() }] : []
-        }),
-      ),
-    )
+    onRegisterCapture(async () => {
+      // The shown instant's images, as the flat maps wait for rendercomplete.
+      await Promise.all(
+        [...enginesRef.current.values()].map((e) => e.whenLoaded()),
+      )
+      return captureMetaRef.current.flatMap((m) => {
+        const engine = enginesRef.current.get(m.slot)
+        return engine ? [{ ...m, canvas: engine.capture() }] : []
+      })
+    })
     return () => onRegisterCapture(null)
   }, [active, onRegisterCapture])
 

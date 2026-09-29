@@ -893,6 +893,8 @@ export function createGlobeContent({
         } else {
           // Keep the shown pair until the new world image lands; fetched small when a view image covers it.
           abortDetail(entry)
+          // Unloaded until the new instant is in: export waits on it.
+          entry.settled = false
           load(
             entry,
             entry.detail?.texture
