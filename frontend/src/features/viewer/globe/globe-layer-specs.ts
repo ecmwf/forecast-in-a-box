@@ -44,6 +44,7 @@ export function globeLayerSpecs(
         ),
         time,
         bboxAxisOrder: source.bboxAxisOrder,
+        maxImageSize: source.maxImageSize,
         bbox: layer.bbox,
         scale: layer.scale,
         opacity:
@@ -64,7 +65,7 @@ const REFERENCE_Z = 1000
 export function globeDecorationSpecs(
   source: Pick<
     CompareMapSource,
-    'decorationLayers' | 'baseUrl' | 'slot' | 'bboxAxisOrder'
+    'decorationLayers' | 'baseUrl' | 'slot' | 'bboxAxisOrder' | 'maxImageSize'
   >,
   opacity: number,
 ): Array<GlobeLayerSpec> {
@@ -76,6 +77,7 @@ export function globeDecorationSpecs(
     endpoint,
     time: null,
     bboxAxisOrder: source.bboxAxisOrder,
+    maxImageSize: source.maxImageSize,
     opacity,
   }
   const specs: Array<GlobeLayerSpec> = [

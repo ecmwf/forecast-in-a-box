@@ -33,6 +33,8 @@ export interface CompareMapSource {
   layerSettings: ReadonlyMap<string, LayerRequestSettings>
   /** How this server reads a 1.3.0 BBOX in projected CRSs. */
   bboxAxisOrder: BboxAxisOrder
+  /** Largest GetMap the server accepts, null when unadvertised. */
+  maxImageSize: readonly [number, number] | null
   /** Raw TIME string THIS server advertised for the current instant. */
   resolveTime: (layer: ParsedLayer) => string | null
   /** Per-request load outcomes (feeds the GetMap failure cache). */

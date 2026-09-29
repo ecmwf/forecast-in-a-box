@@ -589,6 +589,23 @@ describe('globe registration', () => {
     expect(requests.filter(sharper)).toHaveLength(1)
   })
 
+  it("asks for no image larger than the server's MaxWidth/MaxHeight", async () => {
+    engine.setCamera({ lon: -45, lat: 15, zoom: 5 })
+    engine.setLayers([{ ...spec('world', 1), maxImageSize: [2000, 2000] }])
+    await engine.whenLoaded()
+    // Sharper images still come, capped at the limit.
+    await expect
+      .poll(() =>
+        requests.some((u) => Number(u.searchParams.get('WIDTH')) > 1024),
+      )
+      .toBe(true)
+    await new Promise((r) => setTimeout(r, 500))
+    for (const u of requests) {
+      expect(Number(u.searchParams.get('WIDTH'))).toBeLessThanOrEqual(2000)
+      expect(Number(u.searchParams.get('HEIGHT'))).toBeLessThanOrEqual(2000)
+    }
+  })
+
   it('recovers its layers after a WebGL context loss', async () => {
     engine.setLayers([spec('world', 1)])
     await engine.whenLoaded()

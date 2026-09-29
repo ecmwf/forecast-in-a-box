@@ -220,14 +220,16 @@ describe('globe GetMap', () => {
   it('sizes a region to the wanted detail, capped per side', () => {
     const region = [0, 50, 40, 72] as const
     // 10 px/deg fits; 400 px/deg would exceed 4096 px across 40 degrees.
-    expect(regionSize(region, regionScale(region, 10, 4096))).toEqual([
+    expect(regionSize(region, regionScale(region, 10, [4096, 4096]))).toEqual([
       400, 220,
     ])
-    expect(regionScale(region, 400, 4096)).toBeCloseTo(4096 / 40)
+    expect(regionScale(region, 400, [4096, 4096])).toBeCloseTo(4096 / 40)
     // The world at the old maximum: 4096 x 2048.
     expect(
-      regionSize(WORLD_REGION, regionScale(WORLD_REGION, 100, 4096)),
+      regionSize(WORLD_REGION, regionScale(WORLD_REGION, 100, [4096, 4096])),
     ).toEqual([4096, 2048])
+    // A server's MaxWidth/MaxHeight caps each side on its own.
+    expect(regionScale(region, 400, [4096, 1100])).toBeCloseTo(1100 / 22)
   })
 })
 

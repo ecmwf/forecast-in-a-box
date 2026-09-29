@@ -340,19 +340,19 @@ function GlobePanel({
   const slot = source.slot
 
   // The native basemap is this panel's own server: expand it per source.
-  const { decorationLayers, baseUrl, bboxAxisOrder } = source
+  const { decorationLayers, baseUrl, bboxAxisOrder, maxImageSize } = source
   const panelBasemap = useMemo<GlobeBasemapSpec>(
     () =>
       basemap.kind === 'wms'
         ? {
             ...basemap,
             layers: globeDecorationSpecs(
-              { decorationLayers, baseUrl, slot, bboxAxisOrder },
+              { decorationLayers, baseUrl, slot, bboxAxisOrder, maxImageSize },
               basemap.opacity,
             ),
           }
         : basemap,
-    [basemap, decorationLayers, baseUrl, slot, bboxAxisOrder],
+    [basemap, decorationLayers, baseUrl, slot, bboxAxisOrder, maxImageSize],
   )
   // Engine events read the latest props without remounting the engine.
   const latest = useRef({

@@ -1048,6 +1048,7 @@ export function GeoViewer({
     bboxAxisOrder: isLensProxyUrl(a.baseUrl)
       ? 'xy'
       : (a.bboxAxisOrder ?? 'epsg'),
+    maxImageSize: sourceA.maxImageSize,
     resolveTime: resolveTimeA,
     onLoadResult: onLoadResultA,
     timeSteps: rawStepsA,
@@ -1077,6 +1078,7 @@ export function GeoViewer({
         bboxAxisOrder: isLensProxyUrl(b.baseUrl)
           ? 'xy'
           : (b.bboxAxisOrder ?? 'epsg'),
+        maxImageSize: sourceB.maxImageSize,
         resolveTime: resolveTimeB,
         onLoadResult: onLoadResultB,
         timeSteps: rawStepsB,

@@ -74,6 +74,8 @@ export interface ParsedCapabilities {
   bbox: [number, number, number, number]
   /** Every CRS/SRS code advertised anywhere in the layer tree. */
   crs: ReadonlyArray<string>
+  /** Largest GetMap image accepted (1.3.0 MaxWidth/MaxHeight; Infinity = unlimited side), null when unadvertised. */
+  maxImageSize: readonly [number, number] | null
 }
 
 /** Codes a server may advertise instead of the one we request. */
@@ -324,7 +326,22 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
     ;(isDecorationLayer(layer) ? decorationLayers : layers).push(layer)
   }
 
-  return { layers, decorationLayers, bbox, crs: [...crs] }
+  return {
+    layers,
+    decorationLayers,
+    bbox,
+    crs: [...crs],
+    maxImageSize: parseMaxImageSize(doc),
+  }
+}
+
+function parseMaxImageSize(doc: Document): readonly [number, number] | null {
+  const side = (tag: string) => {
+    const n = Number(doc.querySelector(`Service > ${tag}`)?.textContent)
+    return Number.isFinite(n) && n > 0 ? n : Infinity
+  }
+  const size = [side('MaxWidth'), side('MaxHeight')] as const
+  return size.every((n) => n === Infinity) ? null : size
 }
 
 /** Properties child layers inherit from ancestors (WMS 1.3.0 §7.2.4.8). */

@@ -46,6 +46,8 @@ export interface GlobeLayerSpec {
   /** TIME on the request (load-result attribution). */
   time: string | null
   bboxAxisOrder: BboxAxisOrder
+  /** Largest image the server accepts (MaxWidth/MaxHeight); absent = unlimited. */
+  maxImageSize?: readonly [number, number] | null
   bbox?: Bbox
   /** Ground m/px band the server draws this in; absent = every zoom. */
   scale?: ScaleBand

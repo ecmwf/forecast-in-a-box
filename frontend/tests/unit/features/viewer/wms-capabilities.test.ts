@@ -794,6 +794,28 @@ describe('parseCapabilities — CRS', () => {
   })
 })
 
+describe('parseCapabilities — image size limits', () => {
+  const caps = (service: string) => `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0" xmlns="http://www.opengis.net/wms">
+  <Service><Name>WMS</Name>${service}</Service>
+  <Capability>
+    <Layer><Title>root</Title><Layer><Name>2t</Name><Title>2t</Title></Layer></Layer>
+  </Capability>
+</WMS_Capabilities>`
+
+  it('reads MaxWidth/MaxHeight; a missing side is unlimited', () => {
+    expect(
+      parseCapabilities(
+        caps('<MaxWidth>2048</MaxWidth><MaxHeight>1024</MaxHeight>'),
+      ).maxImageSize,
+    ).toEqual([2048, 1024])
+    expect(
+      parseCapabilities(caps('<MaxWidth>2048</MaxWidth>')).maxImageSize,
+    ).toEqual([2048, Infinity])
+    expect(parseCapabilities(caps('')).maxImageSize).toBeNull()
+  })
+})
+
 describe('parseCapabilities — per-layer bbox', () => {
   const xml = `<?xml version="1.0"?>
 <WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">

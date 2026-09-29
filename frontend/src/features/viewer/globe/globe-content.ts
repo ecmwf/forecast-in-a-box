@@ -406,12 +406,19 @@ export function createGlobeContent({
   let disposed = false
   let live = true
 
+  /** Image side limits: ours, the GPU's, and the server's MaxWidth/MaxHeight. */
+  const maxImage = (spec: GlobeLayerSpec): [number, number] => {
+    const cap = Math.min(MAX_SIDE, res?.maxTextureSize ?? MAX_SIDE)
+    const [w, h] = spec.maxImageSize ?? [cap, cap]
+    return [Math.min(cap, w), Math.min(cap, h)]
+  }
+
   /** One texel per screen px at the centre, within the size limits. */
   const targetScale = (spec: GlobeLayerSpec) =>
     regionScale(
       layerRegion(spec),
       (2 * Math.PI * globeRadiusPx(zoom())) / 360,
-      Math.min(MAX_SIDE, res?.maxTextureSize ?? MAX_SIDE),
+      maxImage(spec),
     )
   const firstScale = (spec: GlobeLayerSpec) => {
     const [w, , e] = layerRegion(spec)
@@ -619,7 +626,7 @@ export function createGlobeContent({
 
   /** Once the world image is too coarse for the screen, fetch the visible area sharp. */
   function upgradeDetail(entry: LayerEntry, v: GlobeViewState) {
-    const maxPx = Math.min(MAX_SIDE, res?.maxTextureSize ?? MAX_SIDE)
+    const maxPx = maxImage(entry.spec)
     const wanted = (2 * Math.PI * globeRadiusPx(v.zoom)) / 360
     const worldCap = regionScale(layerRegion(entry.spec), wanted, maxPx)
     if (wanted <= worldCap * UPGRADE_FACTOR) {

@@ -37,14 +37,14 @@ export function layerRegion(spec: GlobeLayerSpec): Region {
   return [b[0], Math.max(-90, b[1]), b[2], Math.min(90, b[3])]
 }
 
-/** Achievable px/degree: `ppd`, capped so neither side exceeds `maxPx`. */
+/** Achievable px/degree: `ppd`, capped so neither side exceeds its pixel limit. */
 export function regionScale(
   region: Region,
   ppd: number,
-  maxPx: number,
+  [maxWidth, maxHeight]: readonly [number, number],
 ): number {
   const [w, s, e, n] = region
-  return Math.min(ppd, maxPx / (e - w), maxPx / (n - s))
+  return Math.min(ppd, maxWidth / (e - w), maxHeight / (n - s))
 }
 
 /** Image size of a region at `scale` px/degree. */
