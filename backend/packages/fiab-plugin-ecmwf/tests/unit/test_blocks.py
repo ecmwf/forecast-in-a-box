@@ -157,7 +157,7 @@ class TestOperationalForecastSource:
             _block_instance(
                 "operationalForecastSource",
                 {
-                    "source": "ecmwf-open-data",
+                    "source": "opendata",
                     "base_time": datetime(2024, 1, 1, time),
                     "forecast": forecast,
                 },
@@ -187,7 +187,7 @@ class TestOperationalForecastSource:
                 configuration_values=_config(
                     dict(
                         {
-                            "source": "ecmwf-open-data",
+                            "source": "opendata",
                             "base_time": datetime(2024, 1, 1),
                             "forecast": "ifs-ens",
                         },
@@ -203,7 +203,7 @@ class TestOperationalForecastSource:
     def test_catalogue_value_types_are_canonical(self) -> None:
         assert (
             OperationalForecastSource.configuration_options[ConfigurationOptionId("source")].value_type.serialize()
-            == "enumClosed[str]('mars','ecmwf-open-data')"
+            == "enumClosed[str]('mars','opendata','opendata:google','opendata:aws')"
         )
         assert OperationalForecastSource.configuration_options[ConfigurationOptionId("base_time")].value_type.serialize() == "datetime"
         assert PARAM not in OperationalForecastSource.configuration_options

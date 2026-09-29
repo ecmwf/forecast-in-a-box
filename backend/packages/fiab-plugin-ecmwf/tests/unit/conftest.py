@@ -96,7 +96,7 @@ def dummy_blockinstance() -> BlockInstance:
         BlockInstanceBase(
             input_ids={},
             configuration_values={
-                SOURCE: "ecmwf-open-data",
+                SOURCE: "opendata",
                 BASE_TIME: datetime(2024, 1, 1),
                 FORECAST: "aifs-ens",
             },
@@ -162,7 +162,7 @@ def operational_forecast_blockinstance(dataset: str) -> BlockInstance:
         BlockInstanceBase(
             input_ids={},
             configuration_values={
-                SOURCE: "ecmwf-open-data",
+                SOURCE: "opendata",
                 BASE_TIME: datetime(2024, 1, 1),
                 FORECAST: dataset,
             },

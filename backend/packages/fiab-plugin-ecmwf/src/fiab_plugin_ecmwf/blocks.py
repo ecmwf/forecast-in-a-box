@@ -85,7 +85,7 @@ class OperationalForecastSource(Source):
         SOURCE: BlockConfigurationOption(
             title="Source",
             description="Top level source for earthkit data",
-            value_type=ClosedEnumType(["mars", "ecmwf-open-data"]),
+            value_type=ClosedEnumType(["mars", "opendata", "opendata:google", "opendata:aws"]),
         ),
         FORECAST: BlockConfigurationOption(
             title="Forecast model",
@@ -132,7 +132,7 @@ class OperationalForecastSource(Source):
         time = self._convert_time(basetime.time().hour)
 
         source = block.config_as_str(SOURCE)
-        if source == "ecmwf-open-data":
+        if source.startswith("opendata"):
             requirements = Requirements(environment=opendata_dependencies)
         elif source == "mars":
             requirements = Requirements(environment=mars_dependencies)
