@@ -10,9 +10,9 @@
 
 /** Engine-agnostic globe camera math, OL handoff, and the shared camera store. */
 
-import { fromLonLat, getPointResolution, toLonLat } from 'ol/proj'
+import { fromLonLat, toLonLat } from 'ol/proj'
 import { containsCoordinate, getCenter } from 'ol/extent'
-import { groundResolution } from '../projections'
+import { groundResolution, metresPerUnitAt } from '../projections'
 import {
   EARTH_RADIUS_M,
   MAX_MERCATOR_LAT,
@@ -169,7 +169,7 @@ export function matchingFlatResolution(
   center: Coordinate,
   camera: GlobeCamera,
 ): number {
-  const perUnit = getPointResolution(view.getProjection(), 1, center, 'm')
+  const perUnit = metresPerUnitAt(view.getProjection(), center)
   const wanted =
     Number.isFinite(perUnit) && perUnit > 0
       ? groundMppFromZoom(camera.zoom) / perUnit

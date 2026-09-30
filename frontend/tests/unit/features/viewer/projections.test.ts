@@ -10,10 +10,12 @@
 
 import { describe, expect, it } from 'vitest'
 import View from 'ol/View'
-import { get as getProjection, transform } from 'ol/proj'
+import { fromLonLat, get as getProjection, transform } from 'ol/proj'
 import { containsExtent, getCenter } from 'ol/extent'
 import {
   PROJECTIONS,
+  bandMetres,
+  bandResolution,
   carryCamera,
   getViewerProjection,
   groundResolution,
@@ -21,7 +23,6 @@ import {
   layerExtentFor,
   registerViewerProjections,
   requestProjection,
-  viewResolutionFor,
   viewerProjectionOf,
 } from '@/features/viewer/projections'
 import { createViewerView, fitView } from '@/features/viewer/hooks/useOlMapBase'
@@ -159,8 +160,25 @@ describe('carryCamera', () => {
     const view = createViewerView(getViewerProjection('geo'))
     view.setCenter([10, 50])
     view.setResolution(0.5)
-    const metres = groundResolution(view)!
-    expect(viewResolutionFor(view, metres)).toBeCloseTo(0.5, 4)
+    expect(bandResolution(view, bandMetres(view)!)).toBeCloseTo(0.5, 6)
+  })
+
+  it('reads lat/lon scale north-south, as servers do', () => {
+    const view = createViewerView(getViewerProjection('geo'))
+    view.setCenter([10, 70])
+    view.setResolution(0.01)
+    // A degree of latitude: not averaged with the shorter degree of longitude.
+    expect(groundResolution(view)! / 0.01).toBeCloseTo(111_319, -1)
+    expect(bandMetres(view)).toBeCloseTo(groundResolution(view)!, 6)
+  })
+
+  it('hints Mercator bands in server metres, not ground metres', () => {
+    const view = createViewerView(getViewerProjection('merc'))
+    view.setCenter(fromLonLat([0, 60]))
+    view.setResolution(1000)
+    // The layer stack gates on view units: hints must agree with it.
+    expect(bandMetres(view)).toBeCloseTo(1000, 6)
+    expect(groundResolution(view)).toBeCloseTo(500, 0)
   })
 })
 

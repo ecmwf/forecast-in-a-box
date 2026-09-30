@@ -49,10 +49,10 @@ import {
 import { DEFAULT_PROJECTION_ID } from '../projection-ids'
 import {
   PROJECTIONS,
+  bandMetres,
+  bandResolution,
   carryCamera,
   getViewerProjection,
-  groundResolution,
-  viewResolutionFor,
   viewerProjectionOf,
 } from '../projections'
 import { GLOBE_ENGINE } from '../globe/engine-entry'
@@ -890,7 +890,7 @@ export function GeoViewer({
   const globeSettled = globe.phase === 'globe'
   useEffect(() => {
     if (globeSettled) return
-    const update = () => setFlatResolution(groundResolution(view))
+    const update = () => setFlatResolution(bandMetres(view))
     update()
     view.on('change:resolution', update)
     return () => view.un('change:resolution', update)
@@ -901,7 +901,7 @@ export function GeoViewer({
       if (zoomGlobeToResolution(res)) return
       const current = viewRef.current
       current.animate({
-        resolution: viewResolutionFor(current, res),
+        resolution: bandResolution(current, res),
         duration: 350,
       })
     },

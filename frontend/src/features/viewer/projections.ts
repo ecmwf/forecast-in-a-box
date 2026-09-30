@@ -34,6 +34,7 @@ import {
 } from 'ol/extent'
 import { isWorldBbox } from './wms-capabilities'
 import { DEFAULT_PROJECTION_ID, FLAT_PROJECTION_IDS } from './projection-ids'
+import type { Coordinate } from 'ol/coordinate'
 import type { Extent } from 'ol/extent'
 import type View from 'ol/View'
 import type { FlatProjectionId, ProjectionId } from './projection-ids'
@@ -236,25 +237,33 @@ export function requestProjection(
   return twin
 }
 
-/** Metres per pixel at the view centre (scale hints, band checks). */
+/** Ground metres per projection unit at `at`; lat/lon takes its north-south scale. */
+export function metresPerUnitAt(
+  projection: Projection,
+  at: Coordinate,
+): number {
+  return projection.getUnits() === 'degrees'
+    ? (projection.getMetersPerUnit() ?? NaN)
+    : getPointResolution(projection, 1, at, 'm')
+}
+
+/** Ground m/px at the view centre: the flat map's look, matched by the globe. */
 export function groundResolution(view: View): number | null {
   const center = view.getCenter()
   const res = view.getResolution()
   if (!center || res === undefined) return null
-  const metres = getPointResolution(view.getProjection(), res, center, 'm')
+  const metres = res * metresPerUnitAt(view.getProjection(), center)
   return Number.isFinite(metres) && metres > 0 ? metres : null
 }
 
-/** View resolution that renders `metresPerPx` at the view centre. */
-export function viewResolutionFor(view: View, metresPerPx: number): number {
-  const center = view.getCenter() ?? getCenter(view.getProjection().getExtent())
-  const perUnit = getPointResolution(view.getProjection(), 1, center, 'm')
-  return Number.isFinite(perUnit) && perUnit > 0
-    ? metresPerPx / perUnit
-    : metresPerPx
+/** The view's m/px as WMS servers reckon scale (units x metres per unit): band hints. */
+export function bandMetres(view: View): number | null {
+  const res = view.getResolution()
+  if (res === undefined) return null
+  return res * (view.getProjection().getMetersPerUnit() ?? 1)
 }
 
-/** Metre band → this projection's resolution units (degrees for 4326). */
+/** Metre band -> this projection's resolution units (degrees for 4326). */
 export function bandResolution(view: View, metres: number): number {
   if (!Number.isFinite(metres)) return metres
   return metres / (view.getProjection().getMetersPerUnit() ?? 1)
@@ -278,8 +287,8 @@ export function carryCamera(
   ) {
     next = getCenter(target.homeExtent)
   }
-  const groundMpp = getPointResolution(pFrom, res, center, 'm')
-  const perUnit = getPointResolution(pTo, 1, next, 'm')
+  const groundMpp = res * metresPerUnitAt(pFrom, center)
+  const perUnit = metresPerUnitAt(pTo, next)
   const wanted =
     Number.isFinite(groundMpp) && Number.isFinite(perUnit) && perUnit > 0
       ? groundMpp / perUnit
