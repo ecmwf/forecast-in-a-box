@@ -273,3 +273,4 @@ See [Internationalization (i18n)](#internationalization-i18n) for the full mecha
 
 - [development_guidelines/TESTING.md](./development_guidelines/TESTING.md) — Test patterns and strategy
 - [development_guidelines/UI_DESIGN.md](./development_guidelines/UI_DESIGN.md) — Design guidelines
+- [development_guidelines/GLOBE.md](./development_guidelines/GLOBE.md) - 3D globe: modules, the bend, the image pipeline
