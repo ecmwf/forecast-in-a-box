@@ -253,6 +253,12 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByRole('button', { name: 'Measure distance' }))
       .toBeDisabled()
+    // Disabled buttons get no hover: their group carries the reason.
+    await expect
+      .element(screen.getByTitle('Not available on the 3D globe'))
+      .toContainElement(
+        screen.getByRole('button', { name: 'Measure distance' }).element(),
+      )
     // The panel is a named region with the flat maps' non-drag controls.
     const panel = screen.getByRole('region', { name: '3D globe, source A' })
     await expect.element(panel).toBeInTheDocument()

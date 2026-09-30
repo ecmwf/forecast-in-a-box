@@ -480,138 +480,141 @@ export function GeoToolbar({
             </PopoverContent>
           </Popover>
           <span className="mx-1 h-5 w-px bg-border" />
-          <Button
-            variant={measureMode === 'line' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-            aria-pressed={measureMode === 'line'}
-            disabled={globeActive}
-            onClick={() =>
-              onMeasureMode(measureMode === 'line' ? 'none' : 'line')
-            }
-            title={globeActive ? t('globe.toolUnavailable') : t('measure.line')}
-            aria-label={t('measure.line')}
+          {/* Disabled buttons take no pointer events: the reason sits on their group. */}
+          <span
+            className="flex shrink-0 items-center gap-3"
+            title={globeActive ? t('globe.toolUnavailable') : undefined}
           >
-            <Ruler className="h-4 w-4" />
-          </Button>
-          {/* Area split-button: click = freeform, chevron picks the shape. */}
-          <span className="flex items-center">
             <Button
-              variant={
-                measureMode === 'area' || measureMode === 'box'
-                  ? 'secondary'
-                  : 'ghost'
-              }
+              variant={measureMode === 'line' ? 'secondary' : 'ghost'}
               size="icon"
               className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-              aria-pressed={measureMode === 'area' || measureMode === 'box'}
+              aria-pressed={measureMode === 'line'}
               disabled={globeActive}
               onClick={() =>
-                onMeasureMode(
+                onMeasureMode(measureMode === 'line' ? 'none' : 'line')
+              }
+              title={t('measure.line')}
+              aria-label={t('measure.line')}
+            >
+              <Ruler className="h-4 w-4" />
+            </Button>
+            {/* Area split-button: click = freeform, chevron picks the shape. */}
+            <span className="flex items-center">
+              <Button
+                variant={
                   measureMode === 'area' || measureMode === 'box'
-                    ? 'none'
-                    : 'area',
-                )
-              }
-              title={
-                globeActive ? t('globe.toolUnavailable') : t('measure.area')
-              }
-              aria-label={t('measure.area')}
-            >
-              <SquareDashed className="h-4 w-4" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="-ml-1 h-7 w-6"
-                    disabled={globeActive}
-                    title={t('measure.shapeMenu')}
-                    aria-label={t('measure.shapeMenu')}
-                  />
+                    ? 'secondary'
+                    : 'ghost'
                 }
+                size="icon"
+                className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+                aria-pressed={measureMode === 'area' || measureMode === 'box'}
+                disabled={globeActive}
+                onClick={() =>
+                  onMeasureMode(
+                    measureMode === 'area' || measureMode === 'box'
+                      ? 'none'
+                      : 'area',
+                  )
+                }
+                title={t('measure.area')}
+                aria-label={t('measure.area')}
               >
-                <ChevronDown className="h-3 w-3" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-44">
-                <DropdownMenuItem onClick={() => onMeasureMode('area')}>
-                  {t('measure.freeform')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onMeasureMode('box')}>
-                  {t('measure.rectangle')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-            disabled={globeActive}
-            onClick={onMeasureClear}
-            title={t('measure.clear')}
-            aria-label={t('measure.clear')}
-          >
-            <Eraser className="h-4 w-4" />
-          </Button>
-          <span className="flex items-center">
+                <SquareDashed className="h-4 w-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="-ml-1 h-7 w-6"
+                      disabled={globeActive}
+                      title={t('measure.shapeMenu')}
+                      aria-label={t('measure.shapeMenu')}
+                    />
+                  }
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuItem onClick={() => onMeasureMode('area')}>
+                    {t('measure.freeform')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onMeasureMode('box')}>
+                    {t('measure.rectangle')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </span>
             <Button
-              variant={annotateArmed ? 'secondary' : 'ghost'}
+              variant="ghost"
               size="icon"
-              className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-              aria-pressed={annotateArmed}
+              className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
               disabled={globeActive}
-              onClick={onAnnotateToggle}
-              title={
-                globeActive
-                  ? t('globe.toolUnavailable')
-                  : `${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`
-              }
-              aria-label={t('annotations.tool')}
+              onClick={onMeasureClear}
+              title={t('measure.clear')}
+              aria-label={t('measure.clear')}
             >
-              <KeyBadge label={keyLabel(COMPARE_KEYS.annotate)} show={reveal} />
-              <MessageSquarePlus className="h-4 w-4" />
+              <Eraser className="h-4 w-4" />
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="-ml-1 h-7 w-6"
-                    title={t('annotations.options')}
-                    aria-label={t('annotations.options')}
-                  />
-                }
+            <span className="flex items-center">
+              <Button
+                variant={annotateArmed ? 'secondary' : 'ghost'}
+                size="icon"
+                className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+                aria-pressed={annotateArmed}
+                disabled={globeActive}
+                onClick={onAnnotateToggle}
+                title={`${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`}
+                aria-label={t('annotations.tool')}
               >
-                <ChevronDown className="h-3 w-3" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-60">
-                <DropdownMenuItem
-                  onClick={() => annotationFileRef.current?.click()}
+                <KeyBadge
+                  label={keyLabel(COMPARE_KEYS.annotate)}
+                  show={reveal}
+                />
+                <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="-ml-1 h-7 w-6"
+                      title={t('annotations.options')}
+                      aria-label={t('annotations.options')}
+                    />
+                  }
                 >
-                  <Upload className="h-3.5 w-3.5" />
-                  {t('annotations.import')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={annotations.length === 0}
-                  onClick={() => downloadAnnotationsGeojson(annotations)}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {t('annotations.export')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <input
-              ref={annotationFileRef}
-              type="file"
-              accept=".json,.geojson,application/geo+json,application/json"
-              className="hidden"
-              aria-label={t('annotations.import')}
-              onChange={(e) => void onAnnotationFiles(e.target.files)}
-            />
+                  <ChevronDown className="h-3 w-3" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-60">
+                  <DropdownMenuItem
+                    onClick={() => annotationFileRef.current?.click()}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    {t('annotations.import')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={annotations.length === 0}
+                    onClick={() => downloadAnnotationsGeojson(annotations)}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {t('annotations.export')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <input
+                ref={annotationFileRef}
+                type="file"
+                accept=".json,.geojson,application/geo+json,application/json"
+                className="hidden"
+                aria-label={t('annotations.import')}
+                onChange={(e) => void onAnnotationFiles(e.target.files)}
+              />
+            </span>
           </span>
           <span className="mx-1 h-5 w-px bg-border" />
           <span className="flex items-center">
