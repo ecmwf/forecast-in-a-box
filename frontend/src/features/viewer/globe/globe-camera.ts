@@ -37,7 +37,7 @@ export const EQUATOR_MPP_Z0 = MERCATOR_WORLD_M / 256
 
 // Globe radius / viewport: resting fit, zoom-out floor.
 const FIT_RADIUS = 0.45
-const MIN_RADIUS = 0.25
+const MIN_RADIUS = 0.15
 
 export function groundMppFromZoom(zoom: number): number {
   return EQUATOR_MPP_Z0 / 2 ** zoom

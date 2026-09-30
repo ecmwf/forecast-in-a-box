@@ -23,7 +23,12 @@ import type {
   GlobeLayerSpec,
 } from '@/features/viewer/globe/engine'
 import { GLOBE_ENGINE } from '@/features/viewer/globe/engine-entry'
-import { globeFitZoom } from '@/features/viewer/globe/globe-camera'
+import {
+  globeFitZoom,
+  globeMinZoom,
+  zoomFromGroundMpp,
+} from '@/features/viewer/globe/globe-camera'
+import { EARTH_RADIUS_M } from '@/features/viewer/globe/sphere-math'
 import { textureLedger } from '@/features/viewer/globe/globe-textures'
 
 const ENDPOINT = 'http://localhost:9911/wms'
@@ -293,6 +298,35 @@ describe('globe registration', () => {
     expect(canvas.tabIndex).toBe(-1)
     expect(canvas.hasAttribute('role')).toBe(false)
     expect(canvas.hasAttribute('aria-label')).toBe(false)
+  })
+
+  it('holds the zoom range at every latitude', () => {
+    const centre = [WIDTH / 2, HEIGHT / 2] as const
+    // Ground m/px at the centre, read back through pick.
+    const shownZoom = () => {
+      const a = engine.pick(centre)!
+      const b = engine.pick([centre[0], centre[1] + 20])!
+      return zoomFromGroundMpp(
+        ((a.lat - b.lat) * Math.PI * EARTH_RADIUS_M) / 180 / 20,
+      )
+    }
+    // The globe's radius on screen: the floor is a globe size.
+    const radius = () => {
+      let r = 0
+      while (engine.pick([centre[0] + r + 1, centre[1]])) r++
+      return r
+    }
+    const floors: Array<number> = []
+    for (const lat of [0, 80]) {
+      engine.setCamera({ lon: 0, lat, zoom: 12 })
+      expect(shownZoom()).toBeCloseTo(GLOBE_ENGINE.maxZoom, 1)
+      engine.setCamera({ lon: 0, lat, zoom: -10 })
+      floors.push(radius())
+    }
+    expect(floors[0]).toBeGreaterThan(0)
+    expect(Math.abs(floors[1] - floors[0])).toBeLessThanOrEqual(2)
+    engine.setCamera({ lon: 0, lat: 0, zoom: -10 })
+    expect(shownZoom()).toBeCloseTo(globeMinZoom(WIDTH, HEIGHT), 1)
   })
 
   it('reads every world marker back at its own lon/lat', async () => {

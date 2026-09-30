@@ -26,6 +26,7 @@ import { EARTH_RADIUS_M } from './sphere-math'
 import { invertMat4 } from './webgl/gl'
 import type { CustomLayerInterface } from 'maplibre-gl'
 import type { GlobeContent } from './globe-content'
+import type { ViewState } from './globe-plan'
 import type {
   FlatCamera,
   GlobeBasemapSpec,
@@ -166,8 +167,8 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   /** Carto's share of its opacity: 0 while bending, 1 settled. */
   let cartoShown = 1
   let cartoFade: AbortController | null = null
-  /** MapLibre's zoom floor on the globe. */
-  let globeFloor = MAPLIBRE_MIN_ZOOM
+  /** Camera and size, measured once per move or resize (two project() calls and a layout read). */
+  let viewCache: ViewState | null = null
   let restoreTimer = 0
   const detach: Array<() => void> = []
   const inverse = new Float64Array(16)
@@ -190,6 +191,31 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   function cameraOf(m: MapLibreMap): GlobeCamera {
     const c = m.getCenter()
     return { lon: c.lng, lat: c.lat, zoom: measuredZoom(m) }
+  }
+
+  function viewOf(m: MapLibreMap): ViewState {
+    if (!viewCache) {
+      const [width, height] = size()
+      viewCache = { ...cameraOf(m), width, height }
+    }
+    return viewCache
+  }
+
+  /** The neutral zoom range in MapLibre's zoom: its ceiling shifts with latitude, its floor with size. */
+  function boundZoom(m: MapLibreMap, floor: boolean) {
+    const v = viewOf(m)
+    const offset = v.zoom - m.getZoom()
+    if (floor) {
+      // MapLibre applies minZoom as a globe size at any latitude: convert at the equator.
+      const equator = offset + Math.log2(Math.cos((v.lat * Math.PI) / 180))
+      const min = Math.max(
+        MAPLIBRE_MIN_ZOOM,
+        globeMinZoom(v.width, v.height) - equator,
+      )
+      if (Math.abs(m.getMinZoom() - min) > 1e-6) m.setMinZoom(min)
+    }
+    const max = Math.max(m.getMinZoom(), MAX_ZOOM - offset)
+    if (Math.abs(m.getMaxZoom() - max) > 1e-6) m.setMaxZoom(max)
   }
 
   function jumpTo(m: MapLibreMap, cam: GlobeCamera) {
@@ -449,15 +475,21 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       content = createGlobeContent({
         events,
         invalidate: () => m.triggerRepaint(),
-        view: () => {
-          const [width, height] = size()
-          return { ...cameraOf(m), width, height }
-        },
+        view: () => viewOf(m),
+      })
+      m.on('move', () => {
+        viewCache = null
+        if (styleReady) boundZoom(m, false)
+      })
+      m.on('resize', () => {
+        viewCache = null
+        if (styleReady) boundZoom(m, true)
       })
       // Gestures carry the DOM event; programmatic moves and resizes do not.
       m.on('move', (e) => {
         if (!e.originalEvent) return
-        events.onCameraChange(cameraOf(m), 'user')
+        const { lon, lat, zoom } = viewOf(m)
+        events.onCameraChange({ lon, lat, zoom }, 'user')
         content?.scheduleUpgrade()
       })
       m.on('webglcontextlost', () => {
@@ -477,12 +509,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       await new Promise<void>((resolve) => m.once('load', () => resolve()))
       styleReady = true
       addLayers(m)
-      const [w, h] = size()
-      // Bound the neutral zoom via MapLibre's zoom at the current latitude.
-      const offset = measuredZoom(m) - m.getZoom()
-      m.setMaxZoom(MAX_ZOOM - offset)
-      globeFloor = Math.max(MAPLIBRE_MIN_ZOOM, globeMinZoom(w, h) - offset)
-      m.setMinZoom(globeFloor)
+      boundZoom(m, true)
     },
 
     setLayers: (specs) => content?.setLayers(specs),
