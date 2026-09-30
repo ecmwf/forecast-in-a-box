@@ -18,6 +18,7 @@ import { Profiler, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
+import axe from 'axe-core'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -369,6 +370,33 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByRole('button', { name: /^Annotate/ }))
       .toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('axe: no serious violations on the globe', async () => {
+    const screen = await render(
+      <Harness
+        portA={registerServer()}
+        initialViewState={{
+          projection: 'globe',
+          camera: { lon: 12, lat: 48, zoom: 2 },
+        }}
+      />,
+    )
+    await expect
+      .element(screen.getByRole('region', { name: '3D globe, source A' }))
+      .toBeInTheDocument()
+    const results = await axe.run(document.body, {
+      // Unstyled test env: colour contrast is meaningless here.
+      rules: { 'color-contrast': { enabled: false } },
+    })
+    const serious = results.violations.filter(
+      (v) => v.impact === 'serious' || v.impact === 'critical',
+    )
+    expect(
+      serious.map(
+        (v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
+      ),
+    ).toEqual([])
   })
 
   it('is blocked in single-map comparison modes', async () => {
