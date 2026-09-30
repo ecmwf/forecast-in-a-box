@@ -29,7 +29,9 @@ import type View from 'ol/View'
 import {
   createViewerView,
   useOlMapBase,
+  whenViewRendered,
 } from '@/features/viewer/hooks/useOlMapBase'
+import { getViewerProjection } from '@/features/viewer/projections'
 import { usePointerReadout } from '@/features/viewer/hooks/usePointerReadout'
 import { useAnnotationLayer } from '@/features/viewer/geo/annotations'
 import { useContextOverlays } from '@/features/viewer/geo/overlays'
@@ -136,5 +138,21 @@ describe('restored-camera floor', () => {
     await render(<Harness resetKey="floor" overlays={[]} view={view} />)
     await expect.poll(() => view.isDef()).toBe(true)
     expect(view.getZoom()).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('whenViewRendered', () => {
+  it('waits for a map on the View, then for its complete render', async () => {
+    const view = createViewerView(getViewerProjection('geo'))
+    let rendered = false
+    void whenViewRendered(view).then(() => {
+      rendered = true
+    })
+    // No map on the View yet: nothing has drawn it.
+    await new Promise((r) => setTimeout(r, 100))
+    expect(rendered).toBe(false)
+
+    await render(<Harness resetKey="rendered" overlays={[]} view={view} />)
+    await expect.poll(() => rendered, { timeout: 5000 }).toBe(true)
   })
 })

@@ -22,6 +22,7 @@ import LayerGroup from 'ol/layer/Group'
 import { defaults as defaultControls } from 'ol/control/defaults'
 import { fromLonLat } from 'ol/proj'
 import { getCenter, getWidth } from 'ol/extent'
+import { unByKey } from 'ol/Observable'
 import { BASEMAPS, makeBasemapLayer } from '../ol-layers'
 import {
   getViewerProjection,
@@ -40,6 +41,24 @@ import { makeOutlineBasemapLayer } from '@/lib/map/ol-outline'
 // "Auto-fit done" flag on the shared View, so it survives a map remount (mode switch).
 // Exported: a URL-restored camera pre-marks the View as framed.
 export const AUTOFIT_KEY = 'fiab:autoFitted'
+
+// Maps mounted on a View but not yet completely rendered, and whether one has rendered.
+const LOADING_MAPS_KEY = 'fiab:loadingMaps'
+const RENDERED_KEY = 'fiab:rendered'
+
+/** Resolves once a map on `view` has completely rendered and none is still loading. */
+export function whenViewRendered(view: View): Promise<void> {
+  const done = () =>
+    view.get(RENDERED_KEY) === true && view.get(LOADING_MAPS_KEY) === 0
+  if (done()) return Promise.resolve()
+  return new Promise((resolve) => {
+    const key = view.on('propertychange', () => {
+      if (!done()) return
+      unByKey(key)
+      resolve()
+    })
+  })
+}
 
 const FIT_PADDING = [40, 40, 40, 40]
 
@@ -198,6 +217,15 @@ export function useOlMapBase(
       moveTolerance: 6,
     })
     mapRef.current = map
+    const countLoading = (delta: number) =>
+      olView.set(LOADING_MAPS_KEY, (olView.get(LOADING_MAPS_KEY) ?? 0) + delta)
+    let loading = true
+    countLoading(1)
+    const firstRender = map.once('rendercomplete', () => {
+      loading = false
+      olView.set(RENDERED_KEY, true)
+      countLoading(-1)
+    })
     // Recreation signal for hooks that mount layers on the map — deps on
     // the stable mapRef alone strand them on a replaced instance.
     setMapVersion((v) => v + 1)
@@ -212,6 +240,9 @@ export function useOlMapBase(
     ro.observe(container)
     return () => {
       ro.disconnect()
+      // Unmounted before its first complete render: stop counting it.
+      unByKey(firstRender)
+      if (loading) countLoading(-1)
       map.setTarget(undefined)
       // Detach from the shared View (setView unlistens the old view's
       // listeners) — else every discarded map leaks through it.

@@ -12,6 +12,7 @@ import { act } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import { fromLonLat } from 'ol/proj'
+import type View from 'ol/View'
 import type { GlobeCamera, GlobeEngine } from '@/features/viewer/globe/engine'
 import { globeCameraOf } from '@/features/viewer/globe/globe-camera'
 import { createViewerView } from '@/features/viewer/hooks/useOlMapBase'
@@ -90,6 +91,41 @@ describe('useGlobeMode', () => {
 
     act(() => rendered())
     await expect.poll(() => result.current.overlayVisible).toBe(false)
+    await expect.poll(() => result.current.phase).toBe('flat')
+  })
+
+  it('waits for the new flat View even without a bend', async () => {
+    let rendered = () => {}
+    const waitedOn: Array<View> = []
+    const adopted: Array<View> = []
+    const { result } = await renderHook(() =>
+      useGlobeMode({
+        viewRef: { current: createViewerView(getViewerProjection('merc')) },
+        onFlatView: (v) => adopted.push(v),
+        panelCount: 1,
+        // Reduced motion: no unbend to hide the flat map's loading behind.
+        reducedMotion: true,
+        exitTarget: 'merc',
+        initialCamera: { lon: 0, lat: 20, zoom: 1.5 },
+        onFailure: () => {},
+        captureFlat: () => Promise.resolve([]),
+        whenFlatRendered: (v) => {
+          waitedOn.push(v)
+          return new Promise<void>((resolve) => {
+            rendered = resolve
+          })
+        },
+      }),
+    )
+    act(() => result.current.registerEngine('a', unbendingEngine()))
+
+    act(() => result.current.leave('geo'))
+    await expect.poll(() => waitedOn.length).toBe(1)
+    expect(waitedOn[0]).toBe(adopted[0])
+    await new Promise((r) => setTimeout(r, 300))
+    expect(result.current.overlayVisible).toBe(true)
+
+    act(() => rendered())
     await expect.poll(() => result.current.phase).toBe('flat')
   })
 

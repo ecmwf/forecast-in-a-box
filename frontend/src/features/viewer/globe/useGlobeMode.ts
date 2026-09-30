@@ -88,8 +88,8 @@ export function useGlobeMode({
   onFailure: (err: unknown) => void
   /** The flat map's pixels per slot: the bend starts from them. */
   captureFlat: () => Promise<ReadonlyArray<CaptureResult>>
-  /** Resolves once the OL map under the overlay has rendered its layers. */
-  whenFlatRendered: () => Promise<void>
+  /** Resolves once the OL maps on `view` have rendered their layers. */
+  whenFlatRendered: (view: View) => Promise<void>
 }): GlobeMode {
   const [phase, setPhase] = useState<GlobePhase>(
     initialCamera ? 'globe' : 'flat',
@@ -285,7 +285,7 @@ export function useGlobeMode({
         if (!instant)
           await Promise.race([
             whenFlatRenderedRef
-              .current()
+              .current(next)
               .catch((err: unknown) =>
                 log.warn('Waiting for the flat map failed', err),
               ),
