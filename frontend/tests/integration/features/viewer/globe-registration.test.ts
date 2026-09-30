@@ -286,6 +286,15 @@ describe('globe registration', () => {
     container.remove()
   })
 
+  it('leaves focus and naming to the host panel', () => {
+    const canvas = container.querySelector<HTMLCanvasElement>(
+      '[data-testid="globe-canvas"]',
+    )!
+    expect(canvas.tabIndex).toBe(-1)
+    expect(canvas.hasAttribute('role')).toBe(false)
+    expect(canvas.hasAttribute('aria-label')).toBe(false)
+  })
+
   it('reads every world marker back at its own lon/lat', async () => {
     engine.setLayers([spec('world', 1)])
     await engine.whenLoaded()

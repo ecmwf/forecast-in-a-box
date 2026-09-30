@@ -281,6 +281,8 @@ export function GlobeView({
         (!visible || !active) && 'pointer-events-none',
       )}
       style={{ opacity: visible ? 1 : 0 }}
+      // Hidden (warm, or faded out): out of the tab order and the a11y tree.
+      inert={!visible}
     >
       {side ? (
         <div className="@container h-full min-h-0">

@@ -216,6 +216,10 @@ describe('GeoViewer 3D globe', () => {
     await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
     // Warm is not live: no data fetches until the globe is entered.
     await expect.poll(() => engineCalls.live.at(-1)).toBe(false)
+    // Hidden, it is out of the tab order and the a11y tree.
+    await expect
+      .element(screen.getByTestId('globe-view'))
+      .toHaveAttribute('inert')
     const seeds = engineCalls.seeds.length
     await screen.getByRole('radio', { name: /^3D globe/ }).click()
 
@@ -232,6 +236,9 @@ describe('GeoViewer 3D globe', () => {
       )
       .toBeInTheDocument()
     expect(engineCalls.live.at(-1)).toBe(true)
+    await expect
+      .element(screen.getByTestId('globe-view'))
+      .not.toHaveAttribute('inert')
     await expect
       .poll(() => engineCalls.layers.at(-1)?.map((s) => s.params.LAYERS))
       .toEqual(['2t'])
@@ -272,6 +279,9 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByTestId('globe-view'))
       .toHaveStyle({ opacity: '0' })
+    await expect
+      .element(screen.getByTestId('globe-view'))
+      .toHaveAttribute('inert')
     expect(engineCalls.destroyed).toBe(0)
     await expect.poll(() => engineCalls.live.at(-1)).toBe(false)
   })

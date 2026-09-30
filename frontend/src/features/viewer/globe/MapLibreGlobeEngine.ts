@@ -440,7 +440,12 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       })
       map = m
       m.touchZoomRotate.disableRotation()
-      m.getCanvas().dataset.testid = 'globe-canvas'
+      const canvas = m.getCanvas()
+      canvas.dataset.testid = 'globe-canvas'
+      // No keyboard handler: the host's labelled panel is the region, not a "Map" tab stop.
+      canvas.tabIndex = -1
+      canvas.removeAttribute('role')
+      canvas.removeAttribute('aria-label')
       content = createGlobeContent({
         events,
         invalidate: () => m.triggerRepaint(),
