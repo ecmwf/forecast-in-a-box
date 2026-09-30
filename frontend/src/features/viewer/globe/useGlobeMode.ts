@@ -67,6 +67,8 @@ export interface GlobeMode {
   leave: (target: FlatProjectionId, instant?: boolean) => void
   /** Drop back to the flat map now (engine failure, lost context). */
   fail: () => void
+  /** The panels' size in CSS px (they share one); null before one mounts. */
+  panelSize: () => readonly [number, number] | null
 }
 
 export function useGlobeMode({
@@ -341,6 +343,11 @@ export function useGlobeMode({
     settle('flat')
   }, [settle, show])
 
+  const panelSize = useCallback(
+    () => enginesRef.current.values().next().value?.size() ?? null,
+    [],
+  )
+
   return {
     phase,
     overlayVisible,
@@ -349,5 +356,6 @@ export function useGlobeMode({
     enter,
     leave,
     fail,
+    panelSize,
   }
 }

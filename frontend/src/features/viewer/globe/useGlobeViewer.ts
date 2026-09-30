@@ -23,8 +23,11 @@ import { useTranslation } from 'react-i18next'
 import { compositeMapToCanvas } from '../map-export'
 import { whenViewRendered } from '../hooks/useOlMapBase'
 import { DEFAULT_PROJECTION_ID } from '../projection-ids'
+import { navEaseMs } from '../geo/map-nav'
+import { GLOBE_ENGINE } from './engine-entry'
 import {
   flatKindOf,
+  globeMinZoom,
   groundMppFromZoom,
   panGlobeCamera,
   zoomFromGroundMpp,
@@ -88,6 +91,8 @@ export interface GlobeViewer extends GlobeMode {
   onContextLost: () => void
   /** Nudge the globe by screen px; false when the flat map should pan. */
   pan: (dx: number, dy: number) => boolean
+  /** Step the globe's zoom (eased, within range); false when the flat map should. */
+  zoomBy: (delta: number) => boolean
   /** Zoom the globe to a ground resolution; false when the flat map should. */
   zoomToResolution: (mpp: number) => boolean
   /** Ground m/px of the settled globe; null off it. */
@@ -189,7 +194,7 @@ export function useGlobeViewer({
     [enter, leave, changeFlatProjection],
   )
 
-  const { camera } = globe
+  const { camera, panelSize } = globe
   // Keys pan the view; the globe pans like the opposite drag.
   const pan = useCallback(
     (dx: number, dy: number) => {
@@ -198,6 +203,23 @@ export function useGlobeViewer({
       return true
     },
     [camera],
+  )
+  // Buttons and +/- ease (not under reduced motion); drags and the WASD loop cut.
+  const zoomBy = useCallback(
+    (delta: number) => {
+      const size = panelSize()
+      if (phaseRef.current !== 'globe' || !size) return false
+      const cam = camera.get()
+      const zoom = Math.min(
+        GLOBE_ENGINE.maxZoom,
+        Math.max(globeMinZoom(size[0], size[1]), cam.zoom + delta),
+      )
+      camera.set({ ...cam, zoom }, 'program', 'controls', {
+        easeMs: navEaseMs(),
+      })
+      return true
+    },
+    [camera, panelSize],
   )
   const zoomToResolution = useCallback(
     (mpp: number) => {
@@ -231,6 +253,7 @@ export function useGlobeViewer({
     onFailure,
     onContextLost,
     pan,
+    zoomBy,
     zoomToResolution,
     resolution,
   }

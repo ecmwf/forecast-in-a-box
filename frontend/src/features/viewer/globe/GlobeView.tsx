@@ -33,7 +33,6 @@ import { GLOBE_ENGINE } from './engine-entry'
 import {
   globeCameraForBbox,
   globeFitZoom,
-  globeMinZoom,
   panGlobeCamera,
 } from './globe-camera'
 import { globeDecorationSpecs, globeLayerSpecs } from './globe-layer-specs'
@@ -111,8 +110,8 @@ export interface GlobeViewProps {
   onContextLost: () => void
   onRegisterFit: (fit: (() => void) | null) => void
   onRegisterFitBbox: (fit: FitBboxAction | null) => void
-  /** The +/- keys' zoom, clamped like the buttons'. */
-  onRegisterZoom: (zoom: ((delta: number) => void) | null) => void
+  /** The nav buttons' zoom step. */
+  onZoom: (delta: number) => void
   onRegisterCapture: (
     capture: (() => Promise<Array<CaptureResult>>) | null,
   ) => void
@@ -134,7 +133,7 @@ export function GlobeView({
   onContextLost,
   onRegisterFit,
   onRegisterFitBbox,
-  onRegisterZoom,
+  onZoom,
   onRegisterCapture,
 }: GlobeViewProps) {
   const enginesRef = useRef(new Map<string, GlobeEngine>())
@@ -185,24 +184,6 @@ export function GlobeView({
     }
   }, [active, bbox, camera, fitBbox, onRegisterFit, onRegisterFitBbox])
 
-  // Panels share one size, so the first engine's floor holds for all.
-  // Buttons and +/- ease the camera (not under reduced motion); drags and the WASD loop cut.
-  const zoomBy = useCallback(
-    (delta: number) => {
-      const engine = firstEngine()
-      if (!engine) return
-      const [w, h] = engine.size()
-      const cam = camera.get()
-      const zoom = Math.min(
-        GLOBE_ENGINE.maxZoom,
-        Math.max(globeMinZoom(w, h), cam.zoom + delta),
-      )
-      camera.set({ ...cam, zoom }, 'program', 'controls', {
-        easeMs: navEaseMs(),
-      })
-    },
-    [camera],
-  )
   const panBy = useCallback(
     (dx: number, dy: number) =>
       camera.set(
@@ -213,12 +194,6 @@ export function GlobeView({
       ),
     [camera],
   )
-  useEffect(() => {
-    if (!active) return
-    onRegisterZoom(zoomBy)
-    return () => onRegisterZoom(null)
-  }, [active, zoomBy, onRegisterZoom])
-
   const side = layout === 'side'
   const captureMeta = sources.map((s) => ({
     slot: s.slot,
@@ -262,7 +237,7 @@ export function GlobeView({
       onContextLost={onContextLost}
       cross={side ? cross : null}
       mirrorLoupe={side && loupe.mirror}
-      onZoom={zoomBy}
+      onZoom={onZoom}
       onPan={panBy}
     />
   ))

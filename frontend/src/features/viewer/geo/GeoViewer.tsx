@@ -480,14 +480,6 @@ export function GeoViewer({
     (fit: FitBboxAction | null) => setFitBboxAction(() => fit),
     [],
   )
-  // The globe registers its clamped zoom; the flat maps share `view`.
-  const [globeZoom, setGlobeZoom] = useState<((delta: number) => void) | null>(
-    null,
-  )
-  const onRegisterZoom = useCallback(
-    (zoom: ((delta: number) => void) | null) => setGlobeZoom(() => zoom),
-    [],
-  )
 
   const bBaseUrl = b?.baseUrl ?? null
 
@@ -870,7 +862,11 @@ export function GeoViewer({
 
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
-  const { pan: panGlobe, zoomToResolution: zoomGlobeToResolution } = globe
+  const {
+    pan: panGlobe,
+    zoomBy: zoomGlobe,
+    zoomToResolution: zoomGlobeToResolution,
+  } = globe
   const onPan = useCallback(
     (dx: number, dy: number) => {
       if (!panGlobe(dx, dy)) panView(viewRef.current, dx, dy)
@@ -879,10 +875,9 @@ export function GeoViewer({
   )
   const onZoom = useCallback(
     (delta: number) => {
-      if (globeZoom) globeZoom(delta)
-      else zoomView(viewRef.current, delta)
+      if (!zoomGlobe(delta)) zoomView(viewRef.current, delta)
     },
-    [globeZoom],
+    [zoomGlobe],
   )
 
   // Live ground resolution (m/px) drives the panel's scale-band hints.
@@ -1393,7 +1388,7 @@ export function GeoViewer({
               onContextLost={globe.onContextLost}
               onRegisterFit={onRegisterFit}
               onRegisterFitBbox={onRegisterFitBbox}
-              onRegisterZoom={onRegisterZoom}
+              onZoom={zoomGlobe}
               onRegisterCapture={onRegisterCapture}
             />
           )}
