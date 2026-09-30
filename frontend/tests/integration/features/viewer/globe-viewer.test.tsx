@@ -14,7 +14,7 @@
  * assert gating, handoff, and what reaches the engine — not pixels.
  */
 
-import { useState } from 'react'
+import { Profiler, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { I18nextProvider } from 'react-i18next'
@@ -32,6 +32,7 @@ import type {
   GlobeBasemapSpec,
   GlobeCamera,
   GlobeEngine,
+  GlobeEngineEvents,
   GlobeLayerSpec,
 } from '@/features/viewer/globe/engine'
 import type { CompareMode } from '@/features/viewer/geo/types'
@@ -50,6 +51,8 @@ const engineCalls = vi.hoisted(() => ({
   camera: (): GlobeCamera => ({ lon: 0, lat: 0, zoom: 1 }),
   loaded: Promise.resolve(),
   captures: 0,
+  events: null as GlobeEngineEvents | null,
+  commits: 0,
 }))
 
 vi.mock('@/features/viewer/globe/webgl-support', () => ({
@@ -62,8 +65,9 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
     let camera: GlobeCamera = { lon: 0, lat: 0, zoom: 1 }
     let el: HTMLElement | null = null
     return {
-      mount: (container) => {
+      mount: (container, events) => {
         engineCalls.mounted++
+        engineCalls.events = events
         el = document.createElement('div')
         el.dataset.testid = 'globe-canvas'
         container.append(el)
@@ -131,27 +135,29 @@ function Harness({
         const [mode, setMode] = useState<CompareMode>(initialMode)
         return (
           <div style={{ width: 1100, height: 700 }}>
-            <GeoViewer
-              a={{
-                id: `run:${portA}`,
-                baseUrl: `http://localhost:${portA}`,
-                label: 'Run A',
-              }}
-              b={
-                portB === null
-                  ? null
-                  : {
-                      id: `run:${portB}`,
-                      baseUrl: `http://localhost:${portB}`,
-                      label: 'Run B',
-                    }
-              }
-              mode={mode}
-              onModeChange={setMode}
-              onHelp={() => {}}
-              initialViewState={initialViewState}
-              onViewStateChange={onViewStateChange}
-            />
+            <Profiler id="viewer" onRender={() => engineCalls.commits++}>
+              <GeoViewer
+                a={{
+                  id: `run:${portA}`,
+                  baseUrl: `http://localhost:${portA}`,
+                  label: 'Run A',
+                }}
+                b={
+                  portB === null
+                    ? null
+                    : {
+                        id: `run:${portB}`,
+                        baseUrl: `http://localhost:${portB}`,
+                        label: 'Run B',
+                      }
+                }
+                mode={mode}
+                onModeChange={setMode}
+                onHelp={() => {}}
+                initialViewState={initialViewState}
+                onViewStateChange={onViewStateChange}
+              />
+            </Profiler>
           </div>
         )
       },
@@ -300,6 +306,32 @@ describe('GeoViewer 3D globe', () => {
     await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
     // The flat map falls back to the outline; the globe must not switch style mid-bend.
     await expect.poll(() => engineCalls.basemaps.at(-1)?.kind).toBe('vector')
+  })
+
+  it('re-renders the viewer on zoom steps, not on every drag frame', async () => {
+    const screen = await render(
+      <Harness
+        portA={registerServer()}
+        initialViewState={{
+          projection: 'globe',
+          camera: { lon: 12, lat: 48, zoom: 2 },
+        }}
+      />,
+    )
+    await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+    await expect.poll(() => engineCalls.events).not.toBeNull()
+    await new Promise((r) => setTimeout(r, 500))
+    const before = engineCalls.commits
+    // A drag north: the measured zoom drifts a little every frame.
+    for (let i = 1; i <= 30; i++) {
+      engineCalls.events!.onCameraChange(
+        { lon: 12, lat: 48 + i * 0.05, zoom: 2 + i * 0.001 },
+        'user',
+      )
+      await new Promise((r) => requestAnimationFrame(r))
+    }
+    await new Promise((r) => setTimeout(r, 300))
+    expect(engineCalls.commits - before).toBeLessThan(5)
   })
 
   it('is blocked in single-map comparison modes', async () => {

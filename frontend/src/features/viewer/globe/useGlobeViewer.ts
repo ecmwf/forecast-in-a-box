@@ -210,7 +210,11 @@ export function useGlobeViewer({
     },
     [camera],
   )
-  const zoom = useSyncExternalStore(camera.subscribe, () => camera.get().zoom)
+  // Scale hints need no finer than 1/20 zoom; the measured zoom drifts on every drag frame.
+  const zoom = useSyncExternalStore(
+    camera.subscribe,
+    () => Math.round(camera.get().zoom * 20) / 20,
+  )
   const resolution = globe.phase === 'globe' ? groundMppFromZoom(zoom) : null
 
   return {
