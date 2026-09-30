@@ -26,10 +26,10 @@ OUTPUT_ROOT = BlueprintTemplateExampleInput(
 )
 
 FORECAST_SOURCE = BlueprintTemplateExampleInput(
-    example_value="ecmwf-open-data",
+    example_value="opendata",
     display_name="Forecast Source",
     display_description="Where to download the forecast from",
-    type_hint=ClosedEnumType(["mars", "ecmwf-open-data"]),
+    type_hint=ClosedEnumType(["mars", "opendata", "opendata:google", "opendata:aws"]),
 )
 
 
