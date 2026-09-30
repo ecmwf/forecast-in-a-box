@@ -390,7 +390,7 @@
       },
       "tools": {
         "title": "Tools",
-        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The annotate tool (N) records numbered findings pinned to the map — per panel in side-by-side — and they are baked into exports. The layers icon (P) switches the map projection — Web Mercator, an equirectangular globe, Arctic and Antarctic polar views, an equal-area Europe, or a 3D globe — and the basemap and its opacity. Data is rendered natively by each server, so a projection is offered only when every active source supports it; web basemaps need Web Mercator, elsewhere the built-in outline map takes over. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel."
+        "body": "Measure distance or area with the ruler tools (results stay until cleared). Hold Z for a magnifier loupe. The annotate tool (N) records numbered findings pinned to the map — per panel in side-by-side — and they are baked into exports. The layers icon (P) switches the map projection — Web Mercator, a lat/lon grid (equirectangular), Arctic and Antarctic polar views, an equal-area Europe, or a 3D globe — and the basemap and its opacity. Data is rendered natively by each server, so a projection is offered only when every active source supports it. On the flat map web basemaps need Web Mercator, elsewhere the built-in outline map takes over; the 3D globe draws every basemap. Upload GeoJSON in the left sidebar to draw boundaries or tracks over every panel. Measuring, annotating and GeoJSON overlays work on the flat maps only."
       },
       "export": {
         "title": "Export",
