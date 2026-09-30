@@ -15,6 +15,7 @@
  */
 
 import { HttpResponse, http } from 'msw'
+import { fromLonLat } from 'ol/proj'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { worker } from '@tests/test-extend'
 import type {
@@ -23,7 +24,7 @@ import type {
 } from '@/features/viewer/globe/engine'
 import { GLOBE_ENGINE } from '@/features/viewer/globe/engine-entry'
 import { globeFitZoom } from '@/features/viewer/globe/globe-camera'
-import { textureLedger } from '@/features/viewer/globe/globe-content'
+import { textureLedger } from '@/features/viewer/globe/globe-textures'
 
 const ENDPOINT = 'http://localhost:9911/wms'
 const WIDTH = 640
@@ -356,6 +357,159 @@ describe('globe registration', () => {
     await leaving
     expect(engine.pick(centre)).not.toBeNull()
     expect(near(frame(engine).at(...centre), SOLID, 3)).toBe(true)
+  })
+
+  describe('while bending', () => {
+    const MERC = {
+      projection: 'merc' as const,
+      lon: CAMERA.lon,
+      lat: CAMERA.lat,
+      resolution: 60000,
+    }
+    const GEO = {
+      projection: 'geo' as const,
+      lon: CAMERA.lon,
+      lat: CAMERA.lat,
+      resolution: 0.5,
+    }
+
+    /** Serve a whole-world PNG painted by `paint` (1440 x 720, 4 px/deg) as layer `name`. */
+    async function serveWorld(
+      name: string,
+      paint: (ctx: OffscreenCanvasRenderingContext2D) => void,
+    ) {
+      const canvas = new OffscreenCanvas(1440, 720)
+      paint(canvas.getContext('2d')!)
+      const png = await (
+        await canvas.convertToBlob({ type: 'image/png' })
+      ).arrayBuffer()
+      worker.use(
+        http.get(ENDPOINT, ({ request }) => {
+          const url = new URL(request.url)
+          if (url.searchParams.get('LAYERS') !== name) return
+          return HttpResponse.arrayBuffer(png, {
+            headers: { 'Content-Type': 'image/png' },
+          })
+        }),
+      )
+      engine.setLayers([spec(name, 1)])
+      await engine.whenLoaded()
+    }
+
+    /** Pixels passing `test` in a CSS-px box, sampled every 5 px. */
+    function count(
+      test: (px: Rgb) => boolean,
+      [x0, y0, x1, y1]: readonly [number, number, number, number],
+    ) {
+      const f = frame(engine)
+      let n = 0
+      for (let y = y0; y < y1; y += 5)
+        for (let x = x0; x < x1; x += 5) if (test(f.at(x, y))) n++
+      return n
+    }
+
+    /** Sample every 200 ms through an entry and the unbend after it. */
+    async function sampleBends(
+      flat: typeof MERC | typeof GEO,
+      camera: typeof CAMERA,
+      sample: () => number,
+    ) {
+      const seen: Array<number> = []
+      await engine.morphOut(flat, 0)
+      for (const bend of [
+        () => engine.morphIn(flat, camera, 3000, null),
+        () => engine.morphOut(flat, 3000),
+      ]) {
+        const done = bend()
+        for (let i = 0; i < 14; i++) {
+          await new Promise((r) => setTimeout(r, 200))
+          seen.push(sample())
+        }
+        await done
+      }
+      return seen
+    }
+
+    it.each([
+      ['Mercator', { ...MERC, resolution: 5000 }],
+      ['lat/lon grid', { ...GEO, resolution: 0.05 }],
+    ] as const)('moves points evenly on screen (%s)', async (_, flat) => {
+      engine.setLayers([spec('world', 1)])
+      await engine.whenLoaded()
+      const m = WORLD_MARKERS[0]
+      const [mx, my] = fromLonLat([m.lon, m.lat])
+      const [cx, cy] = fromLonLat([flat.lon, flat.lat])
+      const flatAt =
+        flat.projection === 'merc'
+          ? {
+              x: WIDTH / 2 + (mx - cx) / flat.resolution,
+              y: HEIGHT / 2 - (my - cy) / flat.resolution,
+            }
+          : {
+              x: WIDTH / 2 + (m.lon - flat.lon) / flat.resolution,
+              y: HEIGHT / 2 - (m.lat - flat.lat) / flat.resolution,
+            }
+      await engine.morphOut(flat, 0)
+      // Slow, so a third of the way in is early in the bend on any machine.
+      const bending = engine.morphIn(flat, CAMERA, 6000, null)
+      await new Promise((r) => setTimeout(r, 2000))
+      const mid = frame(engine).centroid(m.rgb, 12)
+      await bending
+      const end = frame(engine).centroid(m.rgb, 12)
+      expect(mid).not.toBeNull()
+      expect(end).not.toBeNull()
+      // Share of the way from its flat position to its globe one; a clip-space blend is there at once.
+      const progress =
+        Math.hypot(mid!.x - flatAt.x, mid!.y - flatAt.y) /
+        Math.hypot(end!.x - flatAt.x, end!.y - flatAt.y)
+      expect(progress).toBeGreaterThan(0.03)
+      expect(progress).toBeLessThan(0.6)
+    })
+
+    it.each([
+      ['Mercator', MERC],
+      ['lat/lon grid', GEO],
+    ] as const)('keeps the far side behind the front (%s)', async (_, flat) => {
+      // The hemisphere facing the camera red, the far one blue.
+      await serveWorld('halves', (ctx) => {
+        ctx.fillStyle = 'rgb(0,0,255)'
+        ctx.fillRect(0, 0, 1440, 720)
+        ctx.fillStyle = 'rgb(255,0,0)'
+        ctx.fillRect(((CAMERA.lon + 90) / 360) * 1440, 0, 720, 720)
+      })
+      const middle = [
+        WIDTH / 2 - 100,
+        HEIGHT / 2 - 100,
+        WIDTH / 2 + 100,
+        HEIGHT / 2 + 100,
+      ] as const
+      const seen = await sampleBends(flat, CAMERA, () =>
+        count(([r, , b]) => b > 150 && r < 100, middle),
+      )
+      expect(seen).toEqual(seen.map(() => 0))
+    })
+
+    it.each([
+      ['Mercator', MERC],
+      ['lat/lon grid', GEO],
+    ] as const)(
+      'sweeps nothing across the view with the dateline in it (%s)',
+      async (_, flat) => {
+        // Over the Americas the dateline is on the left: 150E to 180 must stay there.
+        const americas = { ...CAMERA, lon: -115 }
+        await serveWorld('dateline', (ctx) => {
+          ctx.fillStyle = 'rgb(0,200,0)'
+          ctx.fillRect(((150 + 180) / 360) * 1440, 0, 120, 720)
+        })
+        const right = [WIDTH * 0.6, 0, WIDTH, HEIGHT] as const
+        const seen = await sampleBends(
+          { ...flat, lon: americas.lon },
+          americas,
+          () => count(([r, g, b]) => g > 150 && r < 100 && b < 100, right),
+        )
+        expect(seen).toEqual(seen.map(() => 0))
+      },
+    )
   })
 
   it('places a regional layer on its bbox', async () => {

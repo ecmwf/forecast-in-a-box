@@ -56,12 +56,6 @@ function zoomForRadius(px: number): number {
   return zoomFromGroundMpp(EARTH_RADIUS_M / px)
 }
 
-/** Clip-space globeness placing a point `s` of the way from globe to flat on screen; `wRatio` = flat w / globe w. */
-export function globenessForProgress(s: number, wRatio: number): number {
-  const flat = wRatio * (1 - s)
-  return flat / (s + flat)
-}
-
 export function globeFitZoom(width: number, height: number): number {
   return zoomForRadius(FIT_RADIUS * Math.min(width, height))
 }

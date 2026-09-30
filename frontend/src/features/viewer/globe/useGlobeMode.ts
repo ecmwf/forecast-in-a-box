@@ -31,7 +31,7 @@ import type { SharedGlobeCamera } from './globe-camera'
 
 export type GlobePhase = 'flat' | 'entering' | 'globe' | 'leaving'
 
-/** The wrap; the engine flies to the wrap scale first. */
+/** The bend onto the globe. */
 const MORPH_MS = 500
 /** The unbend back to the flat map. */
 const UNBEND_MS = 700

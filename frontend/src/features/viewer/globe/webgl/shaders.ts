@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** GLSL ES 3.00 for the morphing sphere, driven by MapLibre-style clip matrices. */
+/** GLSL ES 3.00 for the bending sphere: flat (t = 0) to globe (t = 1) in screen space. */
 
 export const ATTRIBUTES = ['aSphere', 'aGeo', 'aMerc'] as const
 /** Texture anisotropy cap; the layer shader bounds its footprints to it too. */
@@ -16,13 +16,13 @@ export const MAX_ANISOTROPY = 8
 export const SHARED_UNIFORMS = [
   'uFlatMatrix',
   'uSphereMatrix',
-  'uMorph',
+  'uT',
   'uFlatKind',
+  'uFlatCenterX',
   'uCamModel',
-  'uPolarCap',
 ] as const
 
-// Clip-space mix: exact OL frame at 0, exact globe at 1.
+// Each point moves in a straight line on screen from its flat to its globe position.
 export const VERTEX = `#version 300 es
 precision highp float;
 in vec3 aSphere;
@@ -30,41 +30,63 @@ in vec2 aGeo;
 in vec2 aMerc;
 uniform mat4 uFlatMatrix;
 uniform mat4 uSphereMatrix;
-uniform float uMorph;
+uniform float uT;
 uniform float uFlatKind;
+// The flat camera's centre in unit flat x.
+uniform float uFlatCenterX;
 uniform vec3 uCamModel;
 out vec2 vUv;
 out vec2 vFlat;
 out float vFacing;
+out float vShift;
 void main() {
   vec2 flatPos = mix(aGeo, aMerc, uFlatKind);
+  // The world copy nearest the flat camera, so nothing crosses the view.
+  vShift = floor(uFlatCenterX - flatPos.x + 0.5);
+  flatPos.x += vShift;
   vec4 flatClip = uFlatMatrix * vec4(flatPos, 0.0, 1.0);
   vec4 sphereClip = uSphereMatrix * vec4(aSphere, 1.0);
-  gl_Position = mix(flatClip, sphereClip, uMorph);
+  // The flat matrix is orthographic: its clip xy is already on screen.
+  vec2 ndc = mix(flatClip.xy, sphereClip.xy / sphereClip.w, uT);
+  // At the sphere's w: exact flat frame at 0, perspective-correct globe at 1.
+  gl_Position = vec4(ndc * sphereClip.w, sphereClip.z, sphereClip.w);
   vUv = aGeo;
   vFlat = flatPos;
   vFacing = dot(aSphere, normalize(uCamModel - aSphere));
 }
 `
 
-// Far side fades in the bend; once round, a 1 px antialiased horizon.
+// Latitudes the flat map lacks fade in with t; triangles across the copy cut are skipped mid-bend.
 const VISIBILITY = `
-uniform float uMorph;
+uniform float uT;
 uniform float uFlatKind;
-// 1: hide polar rows mid-bend (raw clip blends spike them); 0: keep them (screen-even unbend).
-uniform float uPolarCap;
 in vec2 vUv;
 in float vFacing;
+in float vShift;
 out vec4 fragColor;
 // Mercator's latitude limit in unit equirect y.
 const float MERC_EDGE = (90.0 - 85.0511) / 180.0;
-// Polar rows spike mid-bend: Mercator pins them to the map edge.
-bool polarCap() {
-  return uPolarCap > 0.5 && uFlatKind > 0.5 && uMorph < 0.98 && (vUv.y < MERC_EDGE || vUv.y > 1.0 - MERC_EDGE);
+bool offFlat() {
+  return uFlatKind > 0.5 && (vUv.y < MERC_EDGE || vUv.y > 1.0 - MERC_EDGE);
 }
-float visibility() {
+bool acrossCut() {
+  return uT < 1.0 && abs(vShift - floor(vShift + 0.5)) > 1e-3;
+}
+float offFlatFade() {
+  return offFlat() ? smoothstep(0.5, 1.0, uT) : 1.0;
+}
+// Once round, a 1 px antialiased horizon.
+float horizon() {
   float edge = max(fwidth(vFacing), 1e-6);
-  return mix(1.0, smoothstep(-edge, edge, vFacing), smoothstep(0.0, 0.6, uMorph));
+  return smoothstep(-edge, edge, vFacing);
+}
+// Surfaces: the far side is culled as its triangles turn away; only the horizon is softened.
+float surfaceVisibility() {
+  return mix(1.0, horizon(), smoothstep(0.9, 1.0, uT)) * offFlatFade();
+}
+// Lines cannot be culled: their far side fades out late in the bend.
+float lineVisibility() {
+  return mix(1.0, horizon(), smoothstep(0.3, 0.6, uT)) * offFlatFade();
 }
 `
 
@@ -108,11 +130,11 @@ void main() {
   gy.x *= k;
   vec2 hole = vec2(boxX(vUv.x, uHole), vUv.y);
   if (uHole.z > 0.0 && all(greaterThanEqual(hole, uHole.xy)) && all(lessThanEqual(hole, uHole.xy + uHole.zw))) discard;
-  // The seed has no pixels beyond Mercator's edge at any morph.
-  if (polarCap() || (uFlatUv > 0.5 && uFlatKind > 0.5 && (vUv.y < MERC_EDGE || vUv.y > 1.0 - MERC_EDGE))) discard;
+  // The flat map's own pixels exist only where it shows the world.
+  if (acrossCut() || (uFlatUv > 0.5 && offFlat())) discard;
   if (any(lessThan(uv, -slack)) || any(greaterThan(uv, vec2(1.0) + slack))) discard;
   // Premultiplied texels, passed through untouched (legend colours).
-  fragColor = textureGrad(uTex, uv, gx, gy) * (uOpacity * visibility());
+  fragColor = textureGrad(uTex, uv, gx, gy) * (uOpacity * surfaceVisibility());
 }
 `
 
@@ -123,7 +145,7 @@ uniform vec4 uColor;
 uniform float uOpacity;
 ${VISIBILITY}
 void main() {
-  if (polarCap()) discard;
-  fragColor = vec4(uColor.rgb * uColor.a, uColor.a) * (uOpacity * visibility());
+  if (acrossCut()) discard;
+  fragColor = vec4(uColor.rgb * uColor.a, uColor.a) * (uOpacity * lineVisibility());
 }
 `
