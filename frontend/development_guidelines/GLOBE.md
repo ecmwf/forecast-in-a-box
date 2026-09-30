@@ -23,6 +23,7 @@ MapLibre draws the globe; we add one custom layer (its extension point) for the 
 | `useGlobeMode.ts`                    | Phases `flat -> entering -> globe -> leaving -> flat`; either bend reverses |
 | `webgl-support.ts`                   | Hardware WebGL2 check; software renderers are refused                       |
 | `GlobeView.tsx`, `LazyGlobeView.tsx` | Overlay with one panel per source; lazy engine boundary                     |
+| `GlobePanel.tsx`, `value-store.ts`   | One panel: engine, chrome, readout, loupe; pointer values off React state   |
 | `engine.ts`, `engine-entry.ts`       | Engine seam (types) and the lazily loaded MapLibre engine                   |
 | `MapLibreGlobeEngine.ts`             | MapLibre lifecycle, camera, Carto, and the bend (`bendTo`)                  |
 | `globe-layer-specs.ts`               | Flat layer stack and basemap choice -> globe layer and basemap specs        |
