@@ -48,14 +48,12 @@ import {
 } from '../ol-layers'
 import { DEFAULT_PROJECTION_ID } from '../projection-ids'
 import {
-  PROJECTIONS,
   bandMetres,
   bandResolution,
   carryCamera,
   getViewerProjection,
   viewerProjectionOf,
 } from '../projections'
-import { GLOBE_ENGINE } from '../globe/engine-entry'
 import { globeBasemapSpec } from '../globe/globe-layer-specs'
 import { LazyGlobeView } from '../globe/LazyGlobeView'
 import { globeStartCamera, useGlobeViewer } from '../globe/useGlobeViewer'
@@ -65,7 +63,6 @@ import {
   rebaseLensUrl,
   resolveStyle,
   skinnyWmsBasemap,
-  supportsCrs,
   unionBbox,
 } from '../wms-capabilities'
 import { StartupStatusPill } from '../components/StartupStatusPill'
@@ -81,6 +78,7 @@ import { AnnotationEditorDialog } from './AnnotationEditorDialog'
 import { useViewerAnnotations } from './useViewerAnnotations'
 import { useViewerUrlState } from './useViewerUrlState'
 import { useViewerExport } from './useViewerExport'
+import { useProjectionOptions } from './useProjectionOptions'
 import { useViewerTimeline } from './useViewerTimeline'
 import { downloadAnnotationsGeojson } from './annotations'
 import { useGeoShortcuts } from './useGeoShortcuts'
@@ -102,7 +100,6 @@ import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
 import type { FlatProjectionId } from '../projection-ids'
 import type { BboxAxisOrder } from '../projections'
-import type { ProjectionOption } from './GeoToolbar'
 import type { SourceSlot } from './layer-pairing'
 import type {
   CompareMapSource,
@@ -127,7 +124,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
-import { showToast } from '@/lib/toast'
 import {
   stylePinKey,
   styleScope,
@@ -520,99 +516,17 @@ export function GeoViewer({
       ? effectiveBasemapId
       : OUTLINE_BASEMAP.id
 
-  // Offered only when every loaded source advertises the CRS.
-  const projectionOptions = useMemo<ReadonlyArray<ProjectionOption>>(() => {
-    const sources = [
-      { src: sourceA, label: `A · ${a.label}` },
-      ...(b ? [{ src: sourceB, label: `B · ${b.label}` }] : []),
-    ]
-    const lacking = (code: string) =>
-      sources.find(
-        ({ src }) =>
-          !src.loadingLayers &&
-          src.error === null &&
-          !supportsCrs(src.crs, code),
-      )?.label ?? null
-    const flat: Array<ProjectionOption> = PROJECTIONS.map((p) => ({
-      id: p.id,
-      labelKey: p.labelKey,
-      // Mercator is never blocked: every server answers it in practice.
-      blockedBy: p.id === DEFAULT_PROJECTION_ID ? null : lacking(p.code),
-    }))
-    if (!globe.available) return flat
-    // The globe shows one source, or two side by side.
-    const crsBlock = lacking(GLOBE_ENGINE.requiredCrs)
-    const modeBlock = hasB && focusSlot === null && mode !== 'side'
-    return [
-      ...flat,
-      {
-        id: 'globe',
-        labelKey: 'projections.globe',
-        blockedBy:
-          crsBlock ?? (modeBlock ? t('projections.blockedMode') : null),
-        blockedReason: crsBlock ? 'crs' : modeBlock ? 'mode' : undefined,
-      },
-    ]
-    // Keyed on the meaningful bits — the source objects churn every render.
-  }, [
-    sourceA.crs,
-    sourceA.loadingLayers,
-    sourceA.error,
-    sourceB.crs,
-    sourceB.loadingLayers,
-    sourceB.error,
-    a.label,
-    b,
-    globe.available,
-    hasB,
+  const { projectionOptions, cycleProjection } = useProjectionOptions({
+    sourceA,
+    sourceB,
+    aLabel: a.label,
+    bLabel: b?.label ?? null,
+    globe,
     focusSlot,
     mode,
-    t,
-  ])
-  // Snap back when a source lacks the CRS or the layout cannot show the globe.
-  const { leave: leaveGlobe, exitTarget: globeExitTarget } = globe
-  useEffect(() => {
-    if (projectionId === 'globe') {
-      if (globe.phase !== 'globe') return
-      const current = projectionOptions.find((p) => p.id === 'globe')
-      if (!current) return leaveGlobe(DEFAULT_PROJECTION_ID, true)
-      if (!current.blockedBy) return
-      if (current.blockedReason === 'mode') {
-        showToast.info(t('projections.snappedBackMode'))
-        return leaveGlobe(globeExitTarget)
-      }
-      showToast.info(
-        t('projections.snappedBack', {
-          source: current.blockedBy,
-          projection: t(current.labelKey),
-        }),
-      )
-      return leaveGlobe(DEFAULT_PROJECTION_ID)
-    }
-    const current = projectionOptions.find((p) => p.id === projectionId)
-    if (!current?.blockedBy) return
-    showToast.info(
-      t('projections.snappedBack', {
-        source: current.blockedBy,
-        projection: t(current.labelKey),
-      }),
-    )
-    changeProjection(DEFAULT_PROJECTION_ID)
-  }, [
-    projectionOptions,
     projectionId,
     changeProjection,
-    t,
-    globe.phase,
-    leaveGlobe,
-    globeExitTarget,
-  ])
-  const cycleProjection = useCallback(() => {
-    const open = projectionOptions.filter((p) => p.blockedBy === null)
-    const idx = open.findIndex((p) => p.id === projectionId)
-    const next = open.at((idx + 1) % open.length)
-    if (next) changeProjection(next.id)
-  }, [projectionOptions, projectionId, changeProjection])
+  })
 
   // -------- URL view-state restore + report --------
   useViewerUrlState({
