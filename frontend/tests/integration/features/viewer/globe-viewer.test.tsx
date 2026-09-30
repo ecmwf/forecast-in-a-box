@@ -17,6 +17,7 @@
 import { Profiler, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { I18nextProvider } from 'react-i18next'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -200,6 +201,7 @@ function injectMapSizing(): () => void {
       [data-globe-panel] { position: relative; height: 400px; }
       [class*='absolute'][class*='top-2'][class*='right-2'] { position: absolute; top: 8px; right: 8px; z-index: 10; }
       [class~='pointer-events-none'] { pointer-events: none; }
+      [class~='sr-only'] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     `
   document.head.append(style)
   return () => style.remove()
@@ -236,11 +238,16 @@ describe('GeoViewer 3D globe', () => {
     // Server-drawn symbols are squeezed on the globe; an info icon says so.
     await expect
       .element(
-        screen.getByRole('button', {
-          name: /directions are approximate at high latitudes/,
-        }),
+        screen.getByRole('button', { name: 'About symbols on the globe' }),
       )
-      .toBeInTheDocument()
+      .toHaveAccessibleDescription(
+        /directions are approximate at high latitudes/,
+      )
+    // Done with the menu: close it, so it covers none of the panel's controls.
+    await userEvent.keyboard('{Escape}')
+    await expect
+      .element(screen.getByRole('radio', { name: /^3D globe/ }))
+      .not.toBeInTheDocument()
     expect(engineCalls.live.at(-1)).toBe(true)
     await expect
       .element(screen.getByTestId('globe-view'))

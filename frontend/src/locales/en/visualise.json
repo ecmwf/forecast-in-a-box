@@ -224,6 +224,7 @@
     "snappedBack": "{{source}} does not serve the {{projection}} projection — back to Web Mercator",
     "blockedMode": "Only one source or side-by-side",
     "snappedBackMode": "The 3D globe shows one source or side-by-side, back to the flat map",
+    "globeSymbolsInfo": "About symbols on the globe",
     "globeSymbolsNote": "On the globe, wind barbs, arrows and labels drawn by the map server are squeezed east–west towards the poles, so their directions are approximate at high latitudes.",
     "short": {
       "merc": "Mercator",

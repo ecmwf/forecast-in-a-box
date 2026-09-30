@@ -29,7 +29,7 @@ import {
   Upload,
   ZoomIn,
 } from 'lucide-react'
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber } from '../format'
 import { basemapFitsProjection } from '../ol-layers'
@@ -195,6 +195,8 @@ export function GeoToolbar({
   onGlobeIntent?: () => void
 }) {
   const { t } = useTranslation('visualise')
+  // Describes each projection's note button (a short name, the note as description).
+  const noteId = useId()
   const annotationFileRef = useRef<HTMLInputElement>(null)
 
   const onAnnotationFiles = async (files: FileList | null) => {
@@ -409,7 +411,8 @@ export function GeoToolbar({
                             render={
                               <button
                                 type="button"
-                                aria-label={note}
+                                aria-label={t('projections.globeSymbolsInfo')}
+                                aria-describedby={`${noteId}-${p.id}`}
                                 className="rounded-md p-1 text-muted-foreground hover:text-foreground"
                               />
                             }
@@ -419,6 +422,9 @@ export function GeoToolbar({
                           <TooltipContent align="end">{note}</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
+                      <span id={`${noteId}-${p.id}`} className="sr-only">
+                        {note}
+                      </span>
                     </div>
                   )
                 })}
