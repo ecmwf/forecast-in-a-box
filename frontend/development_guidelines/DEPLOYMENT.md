@@ -33,7 +33,7 @@ Content-Security-Policy:
 | `img-src` | `'self' data: blob:` | App icons are same-origin; three.js globe textures use `data:` and `blob:` URIs |
 | `font-src` | `'self'` | IBM Plex Sans is bundled via `@fontsource-variable` |
 | `connect-src` | `'self'` | Fetch API calls, `EventSource` (SSE), and the notification WebSocket, all same-origin. CSP3 lets `'self'` match the page origin's `ws:`/`wss:` scheme upgrade, which every browser this app supports implements |
-| `worker-src` | `'self'` | MSW service worker (`mockServiceWorker.js`) in dev/test; omit in production if unused |
+| `worker-src` | `'self'` | The 3D globe's MapLibre worker, a same-origin module (no `blob:` workers); the MSW service worker (`mockServiceWorker.js`) in dev/test |
 | `frame-src` | `'none'` | App does not embed iframes |
 | `object-src` | `'none'` | No plugins (Flash, Java, etc.) |
 | `base-uri` | `'self'` | Prevent `<base>` tag injection |
@@ -45,7 +45,7 @@ Content-Security-Policy:
 - If you serve the backend on a different origin (e.g. `https://api.example.com`), add it to `connect-src` — including `wss://api.example.com` for the notification WebSocket, since `'self'`'s scheme-upgrade leniency applies only to the page's own origin. Note the geo viewer's lens sources do **not** support this: they are addressed by a relative path under `/api/v1/lens/proxy/`, so lens viewing requires the app and backend to share an origin.
 - Reverse proxies in front of the backend must forward WebSocket upgrades on `/api/v1/notification/ws` (nginx: `proxy_http_version 1.1` plus the `Upgrade`/`Connection` headers).
 - `'unsafe-inline'` in `style-src` is required because three.js and some UI libraries inject styles at runtime. If this is unacceptable, consider using a CSP nonce strategy.
-- `worker-src 'self'` can be removed in production if MSW is not used.
+- Keep `worker-src 'self'` in production: without it the 3D globe cannot start its MapLibre worker.
 
 ### Geo viewer (map) origins
 
