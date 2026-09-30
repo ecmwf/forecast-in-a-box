@@ -31,6 +31,8 @@ import {
   viewerProjectionOf,
 } from '../projections'
 import type { RefObject } from 'react'
+import type { Extent } from 'ol/extent'
+import type { Size } from 'ol/size'
 import type { BasemapLayer } from '../ol-layers'
 import type { ViewerProjection } from '../projections'
 import { makeOutlineBasemapLayer } from '@/lib/map/ol-outline'
@@ -38,6 +40,17 @@ import { makeOutlineBasemapLayer } from '@/lib/map/ol-outline'
 // "Auto-fit done" flag on the shared View, so it survives a map remount (mode switch).
 // Exported: a URL-restored camera pre-marks the View as framed.
 export const AUTOFIT_KEY = 'fiab:autoFitted'
+
+const FIT_PADDING = [40, 40, 40, 40]
+
+/** Fit `extent`; Mercator fits stop at the world's width so the window stays filled. */
+export function fitView(view: View, extent: Extent, size: Size) {
+  view.fit(extent, { size, padding: FIT_PADDING })
+  const p = viewerProjectionOf(view)
+  if (!p.mercator) return
+  const widthFill = getWidth(p.extent) / size[0]
+  if ((view.getResolution() ?? 0) > widthFill) view.setResolution(widthFill)
+}
 
 /** A viewer View: extent-constrained, pre-framed on the projection's home. */
 export function createViewerView(
@@ -61,8 +74,8 @@ export function createViewerView(
     extent: projection.extent,
     smoothExtentConstraint: false,
     constrainResolution: false,
-    // Only Mercator fills the window; the rest letterbox so the poles show.
-    showFullExtent: !projection.mercator,
+    // Zooming out may letterbox; fits keep Mercator filling the window (fitView).
+    showFullExtent: true,
   })
 }
 
@@ -130,17 +143,17 @@ export function useOlMapBase(
       viewerProjectionOf(olView),
       force ? bboxRef.current : null,
     )
-    olView.fit(extent, { padding: [40, 40, 40, 40] })
+    fitView(olView, extent, size)
   }, [])
 
   const fitBbox = useCallback((bbox: [number, number, number, number]) => {
     const map = mapRef.current
     if (!map) return
+    const size = map.getSize()
+    if (!size) return
     const olView = map.getView()
     olView.set(AUTOFIT_KEY, true, true)
-    olView.fit(homeExtentFor(viewerProjectionOf(olView), bbox), {
-      padding: [40, 40, 40, 40],
-    })
+    fitView(olView, homeExtentFor(viewerProjectionOf(olView), bbox), size)
   }, [])
 
   const setFitBbox = useCallback(

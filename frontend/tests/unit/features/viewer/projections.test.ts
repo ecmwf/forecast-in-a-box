@@ -24,7 +24,7 @@ import {
   viewResolutionFor,
   viewerProjectionOf,
 } from '@/features/viewer/projections'
-import { createViewerView } from '@/features/viewer/hooks/useOlMapBase'
+import { createViewerView, fitView } from '@/features/viewer/hooks/useOlMapBase'
 import {
   FLAT_PROJECTION_IDS,
   PROJECTION_IDS,
@@ -106,14 +106,26 @@ describe('createViewerView', () => {
     expect(shown[3]).toBeGreaterThanOrEqual(90)
   })
 
-  it('keeps Mercator filling the window (no void)', () => {
+  it('lets Mercator zoom out until the whole world shows', () => {
     const view = createViewerView(getViewerProjection('merc'))
     const size: [number, number] = [2000, 980]
-    view.fit(getViewerProjection('merc').extent, { size })
+    view.setViewportSize(size)
+    view.setResolution(1e9)
     const shown = view.calculateExtent(size)
     const world = getViewerProjection('merc').extent
-    expect(shown[1]).toBeGreaterThanOrEqual(world[1] - 1)
-    expect(shown[3]).toBeLessThanOrEqual(world[3] + 1)
+    expect(shown[1]).toBeLessThanOrEqual(world[1] + 1)
+    expect(shown[3]).toBeGreaterThanOrEqual(world[3] - 1)
+  })
+
+  it('fits Mercator to the world width, so the window stays filled', () => {
+    const merc = getViewerProjection('merc')
+    const view = createViewerView(merc)
+    const size: [number, number] = [2000, 980]
+    view.setViewportSize(size)
+    fitView(view, merc.extent, size)
+    const shown = view.calculateExtent(size)
+    expect(shown[0]).toBeCloseTo(merc.extent[0], -1)
+    expect(shown[2]).toBeCloseTo(merc.extent[2], -1)
   })
 })
 
