@@ -270,6 +270,10 @@ describe('GeoViewer 3D globe', () => {
     await expect.element(panel).toBeInTheDocument()
     const zoomBefore = engineCalls.camera().zoom
     const zoom = panel.getByRole('group', { name: 'Zoom' })
+    // Assistive tech learns the keys that do the same.
+    await expect
+      .element(zoom.getByRole('button', { name: 'Zoom in' }))
+      .toHaveAttribute('aria-keyshortcuts', 'plus =')
     // Unstyled test layout never settles for Playwright's stability check.
     await zoom.getByRole('button', { name: 'Zoom in' }).click({ force: true })
     await expect

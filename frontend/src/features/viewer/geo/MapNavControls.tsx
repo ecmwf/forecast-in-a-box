@@ -34,9 +34,11 @@ export function MapNavControls({
   onZoom: (delta: number) => void
 }) {
   const { t } = useTranslation('visualise')
+  // `keys`: aria-keyshortcuts, the keys pressed (the plus key is written "plus").
   const button = (
     label: string,
     key: string,
+    keys: string,
     Icon: LucideIcon,
     onClick: () => void,
     className: string,
@@ -46,6 +48,7 @@ export function MapNavControls({
       variant="ghost"
       title={`${label} (${key})`}
       aria-label={label}
+      aria-keyshortcuts={keys}
       onClick={onClick}
       // Each wedge or half is its own target: the 44 px hit halo would overlap a neighbour.
       className={cn(
@@ -61,10 +64,12 @@ export function MapNavControls({
   const wedge = (
     label: string,
     key: string,
+    keys: string,
     Icon: LucideIcon,
     onClick: () => void,
     cell: string,
-  ) => button(label, key, Icon, onClick, cn('size-full', cell), '-rotate-45')
+  ) =>
+    button(label, key, keys, Icon, onClick, cn('size-full', cell), '-rotate-45')
   return (
     // Faded at rest so the data reads first; full strength while in use.
     <div className="absolute top-2 right-2 z-10 flex touch-manipulation items-center gap-1.5 opacity-70 transition-opacity hover:opacity-100 has-focus-visible:opacity-100 motion-reduce:transition-none">
@@ -78,6 +83,7 @@ export function MapNavControls({
           {wedge(
             t('nav.panUp'),
             keyLabel('ArrowUp'),
+            'ArrowUp W',
             ChevronUp,
             () => onPan(0, -NAV_PAN_PX),
             'col-start-1 row-start-1',
@@ -85,6 +91,7 @@ export function MapNavControls({
           {wedge(
             t('nav.panRight'),
             keyLabel('ArrowRight'),
+            'ArrowRight D',
             ChevronRight,
             () => onPan(NAV_PAN_PX, 0),
             'col-start-2 row-start-1',
@@ -92,6 +99,7 @@ export function MapNavControls({
           {wedge(
             t('nav.panDown'),
             keyLabel('ArrowDown'),
+            'ArrowDown S',
             ChevronDown,
             () => onPan(0, NAV_PAN_PX),
             'col-start-2 row-start-2',
@@ -99,6 +107,7 @@ export function MapNavControls({
           {wedge(
             t('nav.panLeft'),
             keyLabel('ArrowLeft'),
+            'ArrowLeft A',
             ChevronLeft,
             () => onPan(-NAV_PAN_PX, 0),
             'col-start-1 row-start-2',
@@ -116,6 +125,7 @@ export function MapNavControls({
         {button(
           t('nav.zoomIn'),
           '+',
+          'plus =',
           Plus,
           () => onZoom(NAV_ZOOM_STEP),
           'h-auto flex-1',
@@ -124,6 +134,7 @@ export function MapNavControls({
         {button(
           t('nav.zoomOut'),
           '−',
+          '-',
           Minus,
           () => onZoom(-NAV_ZOOM_STEP),
           'h-auto flex-1',
