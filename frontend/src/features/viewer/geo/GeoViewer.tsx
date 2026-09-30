@@ -946,7 +946,10 @@ export function GeoViewer({
     onCopy: () => copyView(null),
     onExport: () => setExportOpen(true),
     onHelp,
-    onAnnotate: toggleAnnotate,
+    // Map-click tools have no globe counterpart.
+    onAnnotate: () => {
+      if (globe.phase === 'flat') toggleAnnotate()
+    },
     onAnnotateDisarm: {
       enabled:
         sheetOpen ||

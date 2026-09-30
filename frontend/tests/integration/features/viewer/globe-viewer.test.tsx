@@ -340,6 +340,26 @@ describe('GeoViewer 3D globe', () => {
     expect(engineCalls.commits - before).toBeLessThan(5)
   })
 
+  it('keeps the annotate key inert on the globe', async () => {
+    const screen = await render(
+      <Harness
+        portA={registerServer()}
+        initialViewState={{
+          projection: 'globe',
+          camera: { lon: 12, lat: 48, zoom: 2 },
+        }}
+      />,
+    )
+    await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', bubbles: true }),
+    )
+    await new Promise((r) => setTimeout(r, 100))
+    await expect
+      .element(screen.getByRole('button', { name: /^Annotate/ }))
+      .toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('is blocked in single-map comparison modes', async () => {
     const screen = await render(
       <Harness
