@@ -75,7 +75,7 @@ export default [
     rules: { 'react-hooks/rules-of-hooks': 'error' },
   },
   {
-    // New code holds to the full hook rules, exhaustive deps included.
+    // The globe folder follows the full hook rules, exhaustive deps included.
     files: ['src/features/viewer/globe/**'],
     plugins: { 'react-hooks': reactHooks },
     rules: {
