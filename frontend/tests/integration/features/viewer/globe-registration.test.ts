@@ -668,6 +668,36 @@ describe('globe registration', () => {
     expect(readoutError(engine, WORLD_MARKERS[0])).toBeLessThan(0.3)
   })
 
+  it('draws no ring where the sharp image meets the edge of its layer', async () => {
+    // A see-through regional layer with its west edge at the screen centre, zoomed in until sharp.
+    const region: [number, number, number, number] = [-100, -40, 20, 40]
+    engine.setBasemap({ kind: 'outline', theme: 'light', opacity: 0 })
+    engine.setCamera({ lon: -100, lat: 10, zoom: 7 })
+    engine.setLayers([{ ...spec('solid', 1, region), opacity: 0.5 }])
+    await engine.whenLoaded()
+    await expect
+      .poll(() => requests.length, { timeout: 5000 })
+      .toBeGreaterThan(1)
+    await new Promise((r) => setTimeout(r, 300))
+    const f = frame(engine)
+    const y = HEIGHT / 2
+    const ground = f.at(WIDTH / 2 - 40, y)
+    const tint = (x: number) => {
+      const px = f.at(x, y)
+      return (
+        Math.abs(px[0] - ground[0]) +
+        Math.abs(px[1] - ground[1]) +
+        Math.abs(px[2] - ground[2])
+      )
+    }
+    const inside = tint(WIDTH / 2 + 40)
+    expect(inside).toBeGreaterThan(30)
+    // Drawn twice, the edge would be tinted beyond the inside.
+    for (let x = WIDTH / 2 - 4; x <= WIDTH / 2 + 4; x++) {
+      expect(tint(x), `x = ${x}`).toBeLessThanOrEqual(inside + 6)
+    }
+  })
+
   describe('after a time step', () => {
     // Real decodes and uploads: room under a loaded test machine.
     const settled = { timeout: 5000 }

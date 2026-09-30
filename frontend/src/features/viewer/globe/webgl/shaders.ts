@@ -119,6 +119,8 @@ void main() {
   // Gradients before any discard, and before the wrap jump.
   vec2 gx = dFdx(uv);
   vec2 gy = dFdy(uv);
+  // The detail's edge slack in equirect units: its hole in the world image must match it.
+  vec2 holeSlack = abs(dFdx(vUv)) + abs(dFdy(vUv));
   if (uFlatUv < 0.5) uv.x = (boxX(src.x, uBox) - uBox.x) / uBox.z;
   // MSAA runs pixel centres just outside the seam triangle: allow one pixel.
   vec2 slack = abs(gx) + abs(gy);
@@ -129,7 +131,7 @@ void main() {
   gx.x *= k;
   gy.x *= k;
   vec2 hole = vec2(boxX(vUv.x, uHole), vUv.y);
-  if (uHole.z > 0.0 && all(greaterThanEqual(hole, uHole.xy)) && all(lessThanEqual(hole, uHole.xy + uHole.zw))) discard;
+  if (uHole.z > 0.0 && all(greaterThanEqual(hole, uHole.xy - holeSlack)) && all(lessThanEqual(hole, uHole.xy + uHole.zw + holeSlack))) discard;
   // The flat map's own pixels exist only where it shows the world.
   if (acrossCut() || (uFlatUv > 0.5 && offFlat())) discard;
   if (any(lessThan(uv, -slack)) || any(greaterThan(uv, vec2(1.0) + slack))) discard;
