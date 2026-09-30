@@ -36,6 +36,7 @@ import {
   panGlobeCamera,
 } from './globe-camera'
 import { globeDecorationSpecs, globeLayerSpecs } from './globe-layer-specs'
+import { GLOBE_FADE_MS } from './useGlobeMode'
 import type { ComponentProps } from 'react'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { PointerReadout } from '../hooks/usePointerReadout'
@@ -235,11 +236,14 @@ export function GlobeView({
     <div
       data-testid="globe-view"
       className={cn(
-        'absolute inset-0 z-30 bg-background transition-opacity duration-200 motion-reduce:transition-none',
+        'absolute inset-0 z-30 bg-background transition-opacity motion-reduce:transition-none',
         // Handoffs send input to the real map underneath.
         (!visible || !active) && 'pointer-events-none',
       )}
-      style={{ opacity: visible ? 1 : 0 }}
+      style={{
+        opacity: visible ? 1 : 0,
+        transitionDuration: `${GLOBE_FADE_MS}ms`,
+      }}
       // Hidden (warm, or faded out): out of the tab order and the a11y tree.
       inert={!visible}
     >
@@ -294,7 +298,7 @@ function GlobePanel({
   const containerRef = useRef<HTMLDivElement>(null)
   const [engine, setEngine] = useState<GlobeEngine | null>(null)
   const [inFlight, setInFlight] = useState(0)
-  const [errored, setErrored] = useState<ReadonlySet<string>>(new Set())
+  const [errored, setErrored] = useState<ReadonlySet<string>>(() => new Set())
   const [pointer] = useState(() =>
     createValueStore<PointerReadout | null>(null),
   )

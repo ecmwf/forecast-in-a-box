@@ -638,7 +638,9 @@ export function GeoViewer({
   const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)
 
   // Pinned legends, keyed `${slot}:${layerName}`.
-  const [pinnedLegends, setPinnedLegends] = useState<Set<string>>(new Set())
+  const [pinnedLegends, setPinnedLegends] = useState<Set<string>>(
+    () => new Set(),
+  )
   const togglePinLegend = useCallback((slot: SourceSlot, name: string) => {
     const key = `${slot}:${name}`
     setPinnedLegends((prev) => {

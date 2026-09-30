@@ -13,11 +13,6 @@
 import { scaleBandState } from '../wms-capabilities'
 import { flatClipTransform, groundMppFromZoom } from './globe-camera'
 import {
-  MERCATOR_WORLD_M,
-  lonLatToEquirectUnit,
-  lonLatToMercatorUnit,
-} from './sphere-math'
-import {
   geojsonLines,
   graticuleLines,
   linesGeometry,
@@ -104,20 +99,9 @@ function cssColor(css: string): Vec4 {
 
 /** The viewport of a flat camera in unit flat-world coordinates. */
 function flatViewportBox(flat: FlatCamera, w: number, h: number): Vec4 | null {
-  let world: [number, number]
-  let c: [number, number]
-  if (flat.projection === 'merc') {
-    world = [MERCATOR_WORLD_M, MERCATOR_WORLD_M]
-    c = lonLatToMercatorUnit(flat.lon, flat.lat)
-  } else if (flat.projection === 'geo') {
-    world = [360, 180]
-    c = lonLatToEquirectUnit(flat.lon, flat.lat)
-  } else {
-    return null
-  }
-  const bw = (w * flat.resolution) / world[0]
-  const bh = (h * flat.resolution) / world[1]
-  return [c[0] - bw / 2, c[1] - bh / 2, bw, bh]
+  // Clip spans -1..1: the viewport is 2/k flat units about the centre.
+  const t = flatClipTransform(flat, w, h)
+  return t ? [t.cx - 1 / t.kx, t.cy - 1 / t.ky, 2 / t.kx, 2 / t.ky] : null
 }
 
 /** Flat camera -> the flat end of the bend for a viewport. */

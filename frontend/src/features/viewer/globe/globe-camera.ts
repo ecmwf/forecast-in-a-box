@@ -58,6 +58,9 @@ export function globeMinZoom(width: number, height: number): number {
   return zoomForRadius(MIN_RADIUS * Math.min(width, height))
 }
 
+/** The camera centre's latitude, kept off the poles. */
+export const clampCameraLat = (lat: number) => Math.max(-85, Math.min(85, lat))
+
 /** Rotate by a screen drag (px) at the centre's ground scale; north stays up. */
 export function panGlobeCamera(
   camera: GlobeCamera,
@@ -65,7 +68,7 @@ export function panGlobeCamera(
   dyPx: number,
 ): GlobeCamera {
   const degPerPx = 180 / (Math.PI * globeRadiusPx(camera.zoom))
-  const lat = Math.max(-85, Math.min(85, camera.lat + dyPx * degPerPx))
+  const lat = clampCameraLat(camera.lat + dyPx * degPerPx)
   const lon =
     camera.lon -
     (dxPx * degPerPx) / Math.max(Math.cos((camera.lat * Math.PI) / 180), 0.2)
@@ -152,7 +155,7 @@ export function globeEntryCamera(
   if (!cam) return null
   return {
     lon: cam.lon,
-    lat: Math.max(-85, Math.min(85, cam.lat)),
+    lat: clampCameraLat(cam.lat),
     zoom: Math.min(maxZoom, Math.max(globeFitZoom(width, height), cam.zoom)),
   }
 }

@@ -21,6 +21,7 @@ import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { getViewerProjection, viewerProjectionOf } from '../projections'
 import {
   applyGlobeCamera,
+  clampCameraLat,
   createSharedGlobeCamera,
   flatCameraOf,
   flatKindOf,
@@ -46,7 +47,7 @@ const MORPH_MS = 500
 const UNBEND_MS = 700
 /** Longest hold of the flat end frame while the OL map under it renders. */
 const FLAT_READY_CAP_MS = 2500
-/** Globe overlay fade (CSS) — keep in step with GlobeView. */
+/** The overlay's opacity fade; GlobeView's CSS transition takes it too. */
 export const GLOBE_FADE_MS = 200
 const ENGINE_READY_CAP_MS = 10000
 /** Longest wait for the flat map's pixels; without them the bend starts bare. */
@@ -220,7 +221,7 @@ export function useGlobeMode({
           GLOBE_ENGINE.maxZoom,
         ) ?? {
           lon: from.lon,
-          lat: Math.max(-85, Math.min(85, from.lat)),
+          lat: clampCameraLat(from.lat),
           zoom: globeFitZoom(w, h),
         }
         const morph = flatKindOf(flatId) !== null && !reducedRef.current
