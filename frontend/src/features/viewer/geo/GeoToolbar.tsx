@@ -324,8 +324,8 @@ export function GeoToolbar({
             className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
             disabled={!onFit}
             onClick={() => onFit?.()}
-            title={`${tExec('lens.fitGlobe')} (${keyLabel(COMPARE_KEYS.fit)})`}
-            aria-label={tExec('lens.fitGlobe')}
+            title={`${tExec('lens.fitView')} (${keyLabel(COMPARE_KEYS.fit)})`}
+            aria-label={tExec('lens.fitView')}
           >
             <KeyBadge label={keyLabel(COMPARE_KEYS.fit)} show={reveal} />
             <Scan className="h-4 w-4" />

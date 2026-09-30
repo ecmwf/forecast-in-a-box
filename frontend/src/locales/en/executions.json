@@ -259,7 +259,7 @@
     "nextStep": "Next time step",
     "play": "Play time animation",
     "pause": "Pause time animation",
-    "fitGlobe": "Fit view",
+    "fitView": "Fit view",
     "pinLegend": "Pin legend open",
     "unpinLegend": "Unpin legend",
     "dragHandle": "Drag to reorder",
