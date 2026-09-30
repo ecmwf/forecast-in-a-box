@@ -425,6 +425,8 @@ describe('globe registration', () => {
     ) {
       const seen: Array<number> = []
       await engine.morphOut(flat, 0)
+      // Left and hidden, as in the app: the next entry starts afresh at the target camera.
+      engine.setLive(false)
       for (const bend of [
         () => engine.morphIn(flat, camera, 3000, null),
         () => engine.morphOut(flat, 3000),
@@ -495,7 +497,7 @@ describe('globe registration', () => {
       const seen = await sampleBends(flat, CAMERA, () =>
         count(([r, , b]) => b > 150 && r < 100, middle),
       )
-      expect(seen).toEqual(seen.map(() => 0))
+      expect(seen, JSON.stringify(seen)).toEqual(seen.map(() => 0))
     })
 
     it.each([
@@ -516,7 +518,7 @@ describe('globe registration', () => {
           americas,
           () => count(([r, g, b]) => g > 150 && r < 100 && b < 100, right),
         )
-        expect(seen).toEqual(seen.map(() => 0))
+        expect(seen, JSON.stringify(seen)).toEqual(seen.map(() => 0))
       },
     )
   })
