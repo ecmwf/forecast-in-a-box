@@ -10,7 +10,13 @@
 
 /** Flat <-> globe handoff: flat -> entering -> globe -> leaving -> flat; either bend reverses mid-flight. */
 
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { getViewerProjection, viewerProjectionOf } from '../projections'
 import {
@@ -154,6 +160,13 @@ export function useGlobeMode({
   )
 
   const settle = useCallback((next: GlobePhase) => setPhase(next), [])
+  // Runs still in flight when the viewer goes away must not report into it.
+  useEffect(
+    () => () => {
+      runRef.current++
+    },
+    [],
+  )
 
   const onFlatViewRef = useRef(onFlatView)
   const onFailureRef = useRef(onFailure)

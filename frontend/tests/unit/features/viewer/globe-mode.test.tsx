@@ -129,6 +129,41 @@ describe('useGlobeMode', () => {
     await expect.poll(() => result.current.phase).toBe('flat')
   })
 
+  it('reports nothing into a viewer that has gone', async () => {
+    const onFailure = vi.fn()
+    const view = createViewerView(getViewerProjection('merc'))
+    view.setCenter(fromLonLat([10, 50]))
+    view.setResolution(1500)
+    const { result, unmount } = await renderHook(() =>
+      useGlobeMode({
+        viewRef: { current: view },
+        onFlatView: () => {},
+        panelCount: 1,
+        reducedMotion: false,
+        exitTarget: 'merc',
+        initialCamera: null,
+        onFailure,
+        captureFlat: () => Promise.resolve([]),
+        whenFlatRendered: () => Promise.resolve(),
+      }),
+    )
+    const engine = unbendingEngine()
+    let fail = (_err: Error) => {}
+    vi.mocked(engine.morphIn).mockReturnValue(
+      new Promise((_, reject) => {
+        fail = reject
+      }),
+    )
+    act(() => result.current.registerEngine('a', engine))
+    act(() => result.current.enter())
+    await expect.poll(() => vi.mocked(engine.morphIn).mock.calls.length).toBe(1)
+
+    await unmount()
+    fail(new Error('engine lost'))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(onFailure).not.toHaveBeenCalled()
+  })
+
   describe('reversing mid-bend', () => {
     const deferred = () => {
       let resolve = () => {}

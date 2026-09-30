@@ -124,7 +124,7 @@ export function useGlobeViewer({
     () => initialProjection === 'globe' && initialCamera === null,
   )
   const notifyUnsupported = useEffectEvent(() =>
-    showToast.info(t('globe.unsupported')),
+    showToast.info(t('globe.unsupported'), undefined, 'globe-unsupported'),
   )
   useEffect(() => {
     if (unsupported) notifyUnsupported()
@@ -144,7 +144,7 @@ export function useGlobeViewer({
     initialCamera,
     onFailure: (err) => {
       log.error('Globe failed to start', { error: err })
-      showToast.error(t('globe.failed'))
+      showToast.error(t('globe.failed'), undefined, 'globe-failed')
     },
     captureFlat: () => Promise.resolve(snapshotFlatMaps(mapAreaRef.current)),
     whenFlatRendered: whenViewRendered,
@@ -161,7 +161,8 @@ export function useGlobeViewer({
   const onFailure = useCallback(
     (err: unknown) => {
       log.error('Globe engine failed', { error: err })
-      showToast.error(t('globe.failed'))
+      // Each panel's engine reports: one toast.
+      showToast.error(t('globe.failed'), undefined, 'globe-failed')
       fail()
       setWarm(false)
     },
@@ -171,7 +172,7 @@ export function useGlobeViewer({
     log.warn('Globe WebGL context lost')
     disableGlobe()
     setAvailable(false)
-    showToast.error(t('globe.contextLost'))
+    showToast.error(t('globe.contextLost'), undefined, 'globe-context-lost')
     fail()
     setWarm(false)
   }, [fail, t])

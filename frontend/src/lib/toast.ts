@@ -12,7 +12,8 @@ import { toast } from 'sonner'
 import i18n from 'i18next'
 
 /**
- * Toast notification utilities for user-facing messages.
+ * Toast notification utilities for user-facing messages; an `id` replaces
+ * rather than stacks a toast with the same id.
  *
  * Usage:
  * ```ts
@@ -27,26 +28,26 @@ export const showToast = {
   /**
    * Show a success toast notification.
    */
-  success: (message: string, description?: string) =>
-    toast.success(message, { description }),
+  success: (message: string, description?: string, id?: string) =>
+    toast.success(message, { description, id }),
 
   /**
    * Show an error toast notification.
    */
-  error: (message: string, description?: string) =>
-    toast.error(message, { description }),
+  error: (message: string, description?: string, id?: string) =>
+    toast.error(message, { description, id }),
 
   /**
    * Show a warning toast notification.
    */
-  warning: (message: string, description?: string) =>
-    toast.warning(message, { description }),
+  warning: (message: string, description?: string, id?: string) =>
+    toast.warning(message, { description, id }),
 
   /**
    * Show an info toast notification.
    */
-  info: (message: string, description?: string) =>
-    toast.info(message, { description }),
+  info: (message: string, description?: string, id?: string) =>
+    toast.info(message, { description, id }),
 
   /**
    * Show an API error toast with optional retry action.
