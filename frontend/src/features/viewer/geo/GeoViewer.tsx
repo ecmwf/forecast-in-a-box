@@ -1097,14 +1097,15 @@ export function GeoViewer({
 
   // -------- Globe wiring --------
   const resolvedTheme = useUiStore((s) => s.resolvedTheme)
+  // The choice itself, not the flat fallback: a warm globe must not switch style mid-bend.
   const globeBasemap = useMemo(
     () =>
       globeBasemapSpec(
-        availableBasemaps.find((o) => o.id === effectiveBasemapId),
+        availableBasemaps.find((o) => o.id === basemapId),
         resolvedTheme,
         basemapOpacity,
       ),
-    [availableBasemaps, effectiveBasemapId, resolvedTheme, basemapOpacity],
+    [availableBasemaps, basemapId, resolvedTheme, basemapOpacity],
   )
   const globeOffered =
     projectionOptions.find((p) => p.id === 'globe')?.blockedBy === null

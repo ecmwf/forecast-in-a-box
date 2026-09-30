@@ -29,6 +29,7 @@ import {
 } from '@tanstack/react-router'
 import { registerMockWmsServer } from '@tests/../mocks/data/wms.data'
 import type {
+  GlobeBasemapSpec,
   GlobeCamera,
   GlobeEngine,
   GlobeLayerSpec,
@@ -41,6 +42,7 @@ import i18n from '@/lib/i18n'
 
 const engineCalls = vi.hoisted(() => ({
   layers: [] as Array<ReadonlyArray<GlobeLayerSpec>>,
+  basemaps: [] as Array<GlobeBasemapSpec>,
   seeds: [] as Array<boolean>,
   live: [] as Array<boolean>,
   mounted: 0,
@@ -68,7 +70,7 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
         return Promise.resolve()
       },
       setLayers: (specs) => engineCalls.layers.push(specs),
-      setBasemap: () => {},
+      setBasemap: (spec) => engineCalls.basemaps.push(spec),
       setLive: (live) => engineCalls.live.push(live),
       getCamera: () => camera,
       setCamera: (next) => {
@@ -272,6 +274,22 @@ describe('GeoViewer 3D globe', () => {
       .toHaveStyle({ opacity: '0' })
     expect(engineCalls.destroyed).toBe(0)
     await expect.poll(() => engineCalls.live.at(-1)).toBe(false)
+  })
+
+  it('warms the globe with the chosen basemap under a lat/lon map', async () => {
+    const screen = await render(
+      <Harness
+        portA={registerServer()}
+        initialViewState={{ projection: 'geo' }}
+      />,
+    )
+    await expect
+      .element(screen.getByText('2 m temperature').first())
+      .toBeVisible()
+    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
+    // The flat map falls back to the outline; the globe must not switch style mid-bend.
+    await expect.poll(() => engineCalls.basemaps.at(-1)?.kind).toBe('vector')
   })
 
   it('is blocked in single-map comparison modes', async () => {
