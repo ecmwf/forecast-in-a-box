@@ -199,7 +199,7 @@ export function useGlobeViewer({
   const pan = useCallback(
     (dx: number, dy: number) => {
       if (phaseRef.current !== 'globe') return false
-      camera.set(panGlobeCamera(camera.get(), -dx, -dy), 'program', 'keys')
+      camera.set(panGlobeCamera(camera.get(), -dx, -dy), 'keys')
       return true
     },
     [camera],
@@ -214,7 +214,7 @@ export function useGlobeViewer({
         GLOBE_ENGINE.maxZoom,
         Math.max(globeMinZoom(size[0], size[1]), cam.zoom + delta),
       )
-      camera.set({ ...cam, zoom }, 'program', 'controls', {
+      camera.set({ ...cam, zoom }, 'controls', {
         easeMs: navEaseMs(),
       })
       return true
@@ -224,11 +224,7 @@ export function useGlobeViewer({
   const zoomToResolution = useCallback(
     (mpp: number) => {
       if (phaseRef.current !== 'globe') return false
-      camera.set(
-        { ...camera.get(), zoom: zoomFromGroundMpp(mpp) },
-        'program',
-        'scale',
-      )
+      camera.set({ ...camera.get(), zoom: zoomFromGroundMpp(mpp) }, 'scale')
       return true
     },
     [camera],

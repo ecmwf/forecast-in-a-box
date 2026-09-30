@@ -154,11 +154,7 @@ export function GlobeView({
       const engine = firstEngine()
       if (!engine) return
       const [w, h] = engine.size()
-      camera.set(
-        globeCameraForBbox(bbox, w, h, GLOBE_ENGINE.maxZoom),
-        'program',
-        'fit',
-      )
+      camera.set(globeCameraForBbox(bbox, w, h, GLOBE_ENGINE.maxZoom), 'fit')
     },
     [camera],
   )
@@ -171,11 +167,7 @@ export function GlobeView({
       // Regional layers turn the globe to them; a world extent only resets the zoom.
       if (bbox && !isWorldBbox(bbox)) return fitBbox(bbox)
       const [w, h] = engine.size()
-      camera.set(
-        { ...camera.get(), zoom: globeFitZoom(w, h) },
-        'program',
-        'fit',
-      )
+      camera.set({ ...camera.get(), zoom: globeFitZoom(w, h) }, 'fit')
     })
     onRegisterFitBbox(fitBbox)
     return () => {
@@ -186,12 +178,9 @@ export function GlobeView({
 
   const panBy = useCallback(
     (dx: number, dy: number) =>
-      camera.set(
-        panGlobeCamera(camera.get(), -dx, -dy),
-        'program',
-        'controls',
-        { easeMs: navEaseMs() },
-      ),
+      camera.set(panGlobeCamera(camera.get(), -dx, -dy), 'controls', {
+        easeMs: navEaseMs(),
+      }),
     [camera],
   )
   const side = layout === 'side'
@@ -357,7 +346,7 @@ function GlobePanel({
         if (cancelled) return
         mounted = create()
         await mounted.mount(el, {
-          onCameraChange: (cam, origin) => camera.set(cam, origin, slot),
+          onCameraChange: (cam) => camera.set(cam, slot),
           onLayerLoad: (key, time, ok) => {
             const name = key.slice(key.indexOf(':') + 1)
             latest.current.source.onLoadResult?.(name, time, ok)
@@ -395,7 +384,7 @@ function GlobePanel({
     if (!engine) return
     // Moves made before this subscription (the warm camera) still count.
     engine.setCamera(camera.get())
-    return camera.subscribe((cam, _origin, from, move) => {
+    return camera.subscribe((cam, from, move) => {
       if (from !== slot) engine.setCamera(cam, move)
     })
   }, [engine, camera, slot])

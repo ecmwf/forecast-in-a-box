@@ -24,13 +24,7 @@ import type View from 'ol/View'
 import type { Coordinate } from 'ol/coordinate'
 import type { FlatProjectionId } from '../projection-ids'
 import type { ViewerProjection } from '../projections'
-import type {
-  CameraMove,
-  CameraOrigin,
-  FlatCamera,
-  FlatKind,
-  GlobeCamera,
-} from './engine'
+import type { CameraMove, FlatCamera, FlatKind, GlobeCamera } from './engine'
 
 /** Ground m/px at zoom 0 (OL's 256 px Web Mercator tile). */
 export const EQUATOR_MPP_Z0 = MERCATOR_WORLD_M / 256
@@ -164,7 +158,7 @@ export function globeEntryCamera(
 }
 
 /** Flat resolution matching the globe camera's centre ground scale. */
-export function matchingFlatResolution(
+function matchingFlatResolution(
   view: View,
   center: Coordinate,
   camera: GlobeCamera,
@@ -206,7 +200,6 @@ export function applyGlobeCamera(
 
 type CameraListener = (
   camera: GlobeCamera,
-  origin: CameraOrigin,
   from: string,
   move?: CameraMove,
 ) => void
@@ -214,12 +207,7 @@ type CameraListener = (
 /** One camera for all globe panels; `from` lets a panel skip its own echo. */
 export interface SharedGlobeCamera {
   get: () => GlobeCamera
-  set: (
-    camera: GlobeCamera,
-    origin: CameraOrigin,
-    from: string,
-    move?: CameraMove,
-  ) => void
+  set: (camera: GlobeCamera, from: string, move?: CameraMove) => void
   subscribe: (listener: CameraListener) => () => void
 }
 
@@ -230,9 +218,9 @@ export function createSharedGlobeCamera(
   const listeners = new Set<CameraListener>()
   return {
     get: () => current,
-    set: (camera, origin, from, move) => {
+    set: (camera, from, move) => {
       current = camera
-      for (const listener of listeners) listener(camera, origin, from, move)
+      for (const listener of listeners) listener(camera, from, move)
     },
     subscribe: (listener) => {
       listeners.add(listener)

@@ -22,14 +22,8 @@ export const FLAT_PROJECTION_IDS = [
   'laea',
 ] as const
 
-/** Not an OL projection: the 3D globe display mode. */
-export const GLOBE_PROJECTION_ID = 'globe'
-
-/** Toolbar order. */
-export const PROJECTION_IDS = [
-  ...FLAT_PROJECTION_IDS,
-  GLOBE_PROJECTION_ID,
-] as const
+/** Toolbar order; 'globe' is not an OL projection but the 3D globe mode. */
+export const PROJECTION_IDS = [...FLAT_PROJECTION_IDS, 'globe'] as const
 
 export type ProjectionId = (typeof PROJECTION_IDS)[number]
 export type FlatProjectionId = (typeof FLAT_PROJECTION_IDS)[number]
@@ -40,12 +34,5 @@ export function isProjectionId(value: unknown): value is ProjectionId {
   return (
     typeof value === 'string' &&
     (PROJECTION_IDS as ReadonlyArray<string>).includes(value)
-  )
-}
-
-export function isFlatProjectionId(value: unknown): value is FlatProjectionId {
-  return (
-    typeof value === 'string' &&
-    (FLAT_PROJECTION_IDS as ReadonlyArray<string>).includes(value)
   )
 }

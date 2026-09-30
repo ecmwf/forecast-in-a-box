@@ -130,7 +130,7 @@ export function useGlobeMode({
             h,
             GLOBE_ENGINE.maxZoom,
           )
-          if (target) camera.set(target, 'program', 'warm')
+          if (target) camera.set(target, 'warm')
         }
       } else {
         enginesRef.current.delete(panel)
@@ -232,7 +232,7 @@ export function useGlobeMode({
           sleep(SEED_CAP_MS).then((): Array<CaptureResult> => []),
         ])
         if (run !== runRef.current) return
-        camera.set(target, 'program', 'mode')
+        camera.set(target, 'mode')
         show(true)
         const panels = [...enginesRef.current]
         await Promise.all(

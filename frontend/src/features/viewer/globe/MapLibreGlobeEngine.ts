@@ -332,7 +332,8 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
 
   /** Move the bend from where it is to `target` (0 = flat, 1 = globe); Carto sits it out. */
   function bendTo(target: 0 | 1, durationMs: number): Promise<boolean> {
-    const u = content!.uniforms
+    if (!content) return Promise.resolve(false)
+    const u = content.uniforms
     const from = u.t
     animation?.abort()
     const controller = new AbortController()
@@ -489,7 +490,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       m.on('move', (e) => {
         if (!e.originalEvent) return
         const { lon, lat, zoom } = viewOf(m)
-        events.onCameraChange({ lon, lat, zoom }, 'user')
+        events.onCameraChange({ lon, lat, zoom })
         content?.scheduleUpgrade()
       })
       m.on('webglcontextlost', () => {
@@ -533,8 +534,6 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       setInteractive(true)
       applyBasemapOpacity()
     },
-
-    getCamera: () => (map ? cameraOf(map) : { lon: 0, lat: 0, zoom: 1 }),
 
     setCamera: (cam, move) => {
       if (!map) return
@@ -592,9 +591,10 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     },
 
     capture: () => {
-      map?.redraw()
-      const src = map!.getCanvas()
       const out = document.createElement('canvas')
+      if (!map) return out
+      map.redraw()
+      const src = map.getCanvas()
       out.width = src.width
       out.height = src.height
       out.getContext('2d')?.drawImage(src, 0, 0)

@@ -19,7 +19,7 @@ export const MAX_MERCATOR_LAT = 85.0511287798066
 
 const D2R = Math.PI / 180
 
-export type Vec3 = [number, number, number]
+type Vec3 = [number, number, number]
 
 /** Degrees -> point on the unit sphere. */
 export function lonLatToUnitSphere(lon: number, lat: number): Vec3 {

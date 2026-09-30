@@ -69,8 +69,6 @@ export type GlobeBasemapSpec = GlobeOutlineSpec &
     | { kind: 'wms'; layers: ReadonlyArray<GlobeLayerSpec> }
   )
 
-export type CameraOrigin = 'user' | 'program'
-
 /** How to reach a camera: cut, or ease over `easeMs`. */
 export interface CameraMove {
   easeMs?: number
@@ -82,7 +80,8 @@ export interface GlobeSeed {
 }
 
 export interface GlobeEngineEvents {
-  onCameraChange: (camera: GlobeCamera, origin: CameraOrigin) => void
+  /** A gesture moved the camera (programmatic moves report nothing). */
+  onCameraChange: (camera: GlobeCamera) => void
   onLayerLoad: (key: string, time: string | null, ok: boolean) => void
   onLoadingChange: (inFlight: number) => void
   onContextLost: () => void
@@ -94,7 +93,6 @@ export interface GlobeEngine {
   setBasemap: (spec: GlobeBasemapSpec) => void
   /** Hidden (warm) globes keep their layers but fetch nothing until live. */
   setLive: (live: boolean) => void
-  getCamera: () => GlobeCamera
   setCamera: (camera: GlobeCamera, move?: CameraMove) => void
   /** Resolves when layers already set have a first image (or failed). */
   whenLoaded: () => Promise<void>

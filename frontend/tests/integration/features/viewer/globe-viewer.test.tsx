@@ -77,7 +77,6 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
       setLayers: (specs) => engineCalls.layers.push(specs),
       setBasemap: (spec) => engineCalls.basemaps.push(spec),
       setLive: (live) => engineCalls.live.push(live),
-      getCamera: () => camera,
       setCamera: (next) => {
         camera = next
         engineCalls.camera = () => camera
@@ -337,10 +336,11 @@ describe('GeoViewer 3D globe', () => {
     const before = engineCalls.commits
     // A drag north: the measured zoom drifts a little every frame.
     for (let i = 1; i <= 30; i++) {
-      engineCalls.events!.onCameraChange(
-        { lon: 12, lat: 48 + i * 0.05, zoom: 2 + i * 0.001 },
-        'user',
-      )
+      engineCalls.events!.onCameraChange({
+        lon: 12,
+        lat: 48 + i * 0.05,
+        zoom: 2 + i * 0.001,
+      })
       await new Promise((r) => requestAnimationFrame(r))
     }
     await new Promise((r) => setTimeout(r, 300))
