@@ -28,6 +28,9 @@ import type { FlatProjectionId } from '../projection-ids'
 import type { CaptureResult } from '../geo/types'
 import type { GlobeCamera, GlobeEngine } from './engine'
 import type { SharedGlobeCamera } from './globe-camera'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('globe')
 
 export type GlobePhase = 'flat' | 'entering' | 'globe' | 'leaving'
 
@@ -207,7 +210,10 @@ export function useGlobeMode({
         }
         const morph = flatKindOf(flatId) !== null && !reducedRef.current
         const captures = await Promise.race([
-          captureFlatRef.current().catch(() => []),
+          captureFlatRef.current().catch((err: unknown) => {
+            log.warn('Flat map capture failed; bending without its pixels', err)
+            return []
+          }),
           sleep(SEED_CAP_MS).then((): Array<CaptureResult> => []),
         ])
         if (run !== runRef.current) return
@@ -278,7 +284,11 @@ export function useGlobeMode({
         // Hold the globe's flat end frame until the OL map under it has drawn.
         if (!instant)
           await Promise.race([
-            whenFlatRenderedRef.current().catch(() => {}),
+            whenFlatRenderedRef
+              .current()
+              .catch((err: unknown) =>
+                log.warn('Waiting for the flat map failed', err),
+              ),
             sleep(FLAT_READY_CAP_MS),
           ])
         if (run !== runRef.current) return
