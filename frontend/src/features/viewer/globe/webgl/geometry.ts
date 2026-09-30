@@ -40,7 +40,7 @@ function geometryOf(lonLats: ReadonlyArray<number>): Geometry {
   return { sphere, geo, merc }
 }
 
-/** Lon/lat grid (1.4° × 1°), shared by the base and every layer. */
+/** Lon/lat grid (1.4 deg x 1 deg), shared by the base and every layer. */
 export function surfaceGeometry(nLon = 256, nLat = 180): Geometry {
   const lonLats: Array<number> = []
   for (let j = 0; j <= nLat; j++) {
@@ -131,7 +131,7 @@ export function geojsonLines(json: unknown): Array<Array<[number, number]>> {
   return out
 }
 
-/** 30° graticule; meridians stop short of the poles. */
+/** 30 deg graticule; meridians stop short of the poles. */
 export function graticuleLines(): Array<Array<[number, number]>> {
   const lines: Array<Array<[number, number]>> = []
   for (let lon = -180; lon < 180; lon += 30) {

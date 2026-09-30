@@ -36,7 +36,7 @@ interface Marker {
   rgb: Rgb
 }
 
-// Open ocean, clear of the 30° graticule, within 35° of the camera.
+// Open ocean, clear of the 30 deg graticule, within 35 deg of the camera.
 const WORLD_MARKERS: ReadonlyArray<Marker> = [
   { lon: -45, lat: 15, rgb: [255, 0, 0] },
   { lon: -40, lat: 45, rgb: [0, 200, 0] },
@@ -44,7 +44,7 @@ const WORLD_MARKERS: ReadonlyArray<Marker> = [
   { lon: -15, lat: 45, rgb: [255, 0, 255] },
   { lon: -35, lat: -35, rgb: [0, 200, 200] },
 ]
-// Either side of the antimeridian, and near the pole; open ocean, off the 30° graticule.
+// Either side of the antimeridian, and near the pole; open ocean, off the 30 deg graticule.
 const EDGE_MARKERS: ReadonlyArray<Marker> = [
   { lon: 179.2, lat: -40.3, rgb: [255, 0, 0] },
   { lon: -179.3, lat: -39.7, rgb: [0, 0, 255] },
@@ -60,7 +60,7 @@ const POLAR_BANDS = [
   [88, 89, [0, 200, 0]],
   [87, 88, [0, 0, 255]],
 ] as const
-// One-texel meridians 21 texels apart, so sampling phase drifts line to line; ~2.5× minified east–west near 65°N.
+// One-texel meridians 21 texels apart, so sampling phase drifts line to line; ~2.5x minified east-west near 65N.
 const LINE_LONS = Array.from({ length: 11 }, (_, i) => -60 + i * 5.25)
 
 /** PNG of `bbox` at `ppd` px/degree or an exact [width, height]; markers are whole-pixel squares (no AA). */
@@ -367,7 +367,7 @@ describe('globe registration', () => {
 
   it('has no crack along the antimeridian', async () => {
     engine.setCamera({ ...CAMERA, lon: 180, lat: 0 })
-    // The 180° meridian is also a graticule line: hide the outline strokes.
+    // The 180 deg meridian is also a graticule line: hide the outline strokes.
     engine.setBasemap({ kind: 'outline', theme: 'light', opacity: 0 })
     engine.setLayers([spec('solid', 1)])
     await engine.whenLoaded()
@@ -724,7 +724,7 @@ describe('globe registration', () => {
     const ground = f.at(WIDTH / 2 + 4, HEIGHT / 2)
     let runs = 0
     let inLine = false
-    // The lines lie within ±45 px of the centre; the limb is far outside.
+    // The lines lie within +/-45 px of the centre; the limb is far outside.
     for (let x = WIDTH / 2 - 120; x < WIDTH / 2 + 120; x++) {
       const line = f.at(x, HEIGHT / 2)[0] < ground[0] - 12
       if (line && !inLine) runs++

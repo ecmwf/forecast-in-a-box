@@ -16,7 +16,7 @@ import type View from 'ol/View'
 
 /** Screen px per pan press. */
 export const NAV_PAN_PX = 80
-/** Zoom levels per press: half a level, a √2 scale step. */
+/** Zoom levels per press: half a level, a sqrt(2) scale step. */
 export const NAV_ZOOM_STEP = 0.5
 export const NAV_EASE_MS = 300
 /** Right inset keeping slot tags and their badges clear of MapNavControls. */

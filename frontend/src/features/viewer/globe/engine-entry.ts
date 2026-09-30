@@ -15,7 +15,7 @@ import type { GlobeEngineFactory } from './engine'
 export const GLOBE_ENGINE = {
   /** CRS every source must advertise for the globe to be offered. */
   requiredCrs: 'EPSG:4326',
-  /** Neutral zoom ceiling; the ~1° sphere mesh stays within a pixel of true up to here. */
+  /** Neutral zoom ceiling; the ~1 deg sphere mesh stays within a pixel of true up to here. */
   maxZoom: 8,
   load: (): Promise<GlobeEngineFactory> =>
     import('./MapLibreGlobeEngine').then((m) => m.createMapLibreGlobeEngine),

@@ -73,7 +73,7 @@ export function MapNavControls({
         aria-label={t('nav.pan')}
         className={cn('size-16 rounded-full', surface)}
       >
-        {/* A square grid turned 45°: its quadrants are the up/right/down/left wedges. */}
+        {/* A square grid turned 45 deg: its quadrants are the up/right/down/left wedges. */}
         <div className="grid size-full rotate-45 grid-cols-2 grid-rows-2 overflow-hidden rounded-full">
           {wedge(
             t('nav.panUp'),

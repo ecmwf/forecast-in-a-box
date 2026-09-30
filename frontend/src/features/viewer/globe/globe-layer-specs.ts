@@ -50,7 +50,7 @@ export function globeLayerSpecs(
         opacity:
           (source.layerOpacities.get(layerName) ?? DEFAULT_LAYER_OPACITY) *
           master,
-        // Index 0 → highest z.
+        // Index 0 -> highest z.
         zIndex: zBase + (activeOrder.length - idx),
       },
     ]

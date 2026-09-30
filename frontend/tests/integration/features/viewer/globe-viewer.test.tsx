@@ -9,7 +9,7 @@
  */
 
 /**
- * GeoViewer ↔ 3D globe wiring through the engine seam: a fake engine
+ * GeoViewer <-> 3D globe wiring through the engine seam: a fake engine
  * stands in for MapLibre (headless WebGL is not guaranteed), so these
  * assert gating, handoff, and what reaches the engine — not pixels.
  */

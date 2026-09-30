@@ -21,7 +21,7 @@ const D2R = Math.PI / 180
 
 export type Vec3 = [number, number, number]
 
-/** Degrees → point on the unit sphere. */
+/** Degrees -> point on the unit sphere. */
 export function lonLatToUnitSphere(lon: number, lat: number): Vec3 {
   const cosLat = Math.cos(lat * D2R)
   return [

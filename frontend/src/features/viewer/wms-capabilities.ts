@@ -546,7 +546,7 @@ function parseBbox(
     Number(geo.getAttribute(a)),
   )
   if (!box.every(Number.isFinite)) return null
-  // 1.3.0 EPSG:4326 is latitude-first; |x| > 91 betrays lon-first (1° for half-cell overhangs).
+  // 1.3.0 EPSG:4326 is latitude-first; |x| > 91 betrays lon-first (1 deg for half-cell overhangs).
   const latFirst =
     geo.getAttribute('CRS') === 'EPSG:4326' &&
     Math.abs(box[0]) <= 91 &&
@@ -1019,7 +1019,7 @@ export function layerRequestParams(
 export type Bbox = [number, number, number, number]
 
 /** Whole-globe bbox: nothing to clip. */
-/** Global, allowing half-cell overhangs or insets (DWD ICON: −180.125…179.875, ±90.125). */
+/** Global, allowing half-cell overhangs or insets (DWD ICON: -180.125..179.875, +/-90.125). */
 export const isWorldBbox = (bbox: Bbox): boolean =>
   bbox[2] - bbox[0] >= 359 && bbox[1] <= -89 && bbox[3] >= 89
 

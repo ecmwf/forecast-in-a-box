@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-/** Flat ↔ globe handoff: flat → entering → globe → leaving → flat; either bend reverses mid-flight. */
+/** Flat <-> globe handoff: flat -> entering -> globe -> leaving -> flat; either bend reverses mid-flight. */
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'

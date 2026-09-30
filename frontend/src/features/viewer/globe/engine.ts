@@ -15,7 +15,7 @@ import type { BboxAxisOrder } from '../projections'
 import type { Bbox, ScaleBand } from '../wms-capabilities'
 import type { SourceSlot } from '../geo/layer-pairing'
 
-/** Neutral camera; centre ground m/px = EQUATOR_MPP_Z0 / 2^zoom (MapLibre zoom = zoom − 1). */
+/** Neutral camera; centre ground m/px = EQUATOR_MPP_Z0 / 2^zoom. */
 export interface GlobeCamera {
   lon: number
   lat: number
@@ -51,7 +51,7 @@ export interface GlobeLayerSpec {
   bbox?: Bbox
   /** Ground m/px band the server draws this in; absent = every zoom. */
   scale?: ScaleBand
-  /** Per-layer × master; 0 keeps the texture but draws nothing. */
+  /** Per-layer x master; 0 keeps the texture but draws nothing. */
   opacity: number
   zIndex: number
 }
@@ -107,7 +107,7 @@ export interface GlobeEngine {
   ) => Promise<void>
   /** Animate from the current globe onto the OL view. */
   morphOut: (to: FlatCamera, durationMs: number) => Promise<void>
-  /** Screen px (container-relative) → lon/lat, null off the globe. */
+  /** Screen px (container-relative) -> lon/lat, null off the globe. */
   pick: (px: readonly [number, number]) => { lon: number; lat: number } | null
   /** Render now and copy the frame into a 2D canvas. */
   capture: () => HTMLCanvasElement

@@ -108,7 +108,7 @@ export function flatKindOf(id: FlatProjectionId): FlatKind | null {
   return id === 'merc' || id === 'geo' ? id : null
 }
 
-/** Unit flat world → clip matching the OL view: clipX = kx(x − cx), clipY = ky(cy − y). */
+/** Unit flat world -> clip matching the OL view: clipX = kx(x - cx), clipY = ky(cy - y). */
 export function flatClipTransform(
   flat: FlatCamera,
   widthPx: number,
@@ -186,7 +186,7 @@ export function matchingFlatResolution(
   )
 }
 
-/** Point a flat view at a globe camera, constrained (out-of-extent → home centre). */
+/** Point a flat view at a globe camera, constrained (out-of-extent -> home centre). */
 export function applyGlobeCamera(
   view: View,
   target: ViewerProjection,

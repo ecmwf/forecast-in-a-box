@@ -17,7 +17,7 @@ import type { ParsedLayer } from '../wms-capabilities'
 import type { CompareMapSource } from './types'
 import { cn } from '@/lib/utils'
 
-/** Failing layer names → display titles for the badge. */
+/** Failing layer names -> display titles for the badge. */
 function erroredTitles(
   names: ReadonlyArray<string>,
   layers: ReadonlyArray<ParsedLayer>,

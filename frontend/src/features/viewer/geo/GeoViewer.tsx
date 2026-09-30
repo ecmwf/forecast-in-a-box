@@ -258,7 +258,7 @@ export function GeoViewer({
   // Source focus: a slot views only that source (UI collapses to it); null compares both.
   const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
 
-  // -------- 3D globe (flat ↔ globe handoff) --------
+  // -------- 3D globe (flat <-> globe handoff) --------
   // The flat maps' export capture resolves after OL's rendercomplete.
   const flatCaptureRef = useRef<(() => Promise<unknown>) | null>(null)
   const whenFlatRendered = useCallback(

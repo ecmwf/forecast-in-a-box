@@ -19,7 +19,7 @@
  *   H          help dialog
  *   N          toggle the annotate tool (Esc disarms)
  *   W/A/S/D    pan the map (arrow keys too)
- *   + / −      zoom in / out one step
+ *   + / -      zoom in / out one step
  * Space (flicker) and hold-Z (loupe) live with their features; the swipe
  * divider consumes its own arrow keys while focused (the pan guard
  * yields to it).
