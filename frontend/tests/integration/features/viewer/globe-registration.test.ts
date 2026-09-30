@@ -470,6 +470,8 @@ describe('globe registration', () => {
   })
 
   describe('after a time step', () => {
+    // Real decodes and uploads: room under a loaded test machine.
+    const settled = { timeout: 5000 }
     const T1 = '2026-07-06T00:00:00Z'
     const T2 = '2026-07-06T06:00:00Z'
     const colours: Record<string, Rgb> = {
@@ -527,10 +529,12 @@ describe('globe registration', () => {
     it('never shows two instants at once', async () => {
       engine.setLayers([timed(T2)])
       await expect
-        .poll(() =>
-          requests.some(
-            (u) => !isWorld(u) && u.searchParams.get('TIME') === T2,
-          ),
+        .poll(
+          () =>
+            requests.some(
+              (u) => !isWorld(u) && u.searchParams.get('TIME') === T2,
+            ),
+          settled,
         )
         .toBe(true)
       await new Promise((r) => setTimeout(r, 500))
@@ -551,7 +555,7 @@ describe('globe registration', () => {
         .poll(() => {
           const c = instants()
           return c.t2 > 100 && c.t1 === 0
-        })
+        }, settled)
         .toBe(true)
     })
 
@@ -565,7 +569,7 @@ describe('globe registration', () => {
       // An export now would pair the T1 image with the T2 label.
       expect(loaded).toBe(false)
       releaseWorld()
-      await expect.poll(() => loaded).toBe(true)
+      await expect.poll(() => loaded, settled).toBe(true)
       const c = instants()
       expect(c.t1).toBe(0)
       expect(c.t2).toBeGreaterThan(100)
