@@ -18,7 +18,14 @@ import type View from 'ol/View'
 export const NAV_PAN_PX = 80
 /** Zoom levels per press: half a level, a sqrt(2) scale step. */
 export const NAV_ZOOM_STEP = 0.5
-export const NAV_EASE_MS = 300
+const NAV_EASE_MS = 300
+
+/** Ease per press; none under reduced motion. */
+export function navEaseMs(): number {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 0
+    : NAV_EASE_MS
+}
 /** Right inset keeping slot tags and their badges clear of MapNavControls. */
 export const NAV_CLEARANCE = 'right-30'
 
@@ -36,7 +43,7 @@ export function panView(view: View, dx: number, dy: number, durationMs = 0) {
 }
 
 /** Zoom by `delta` levels about the centre, within the view's zoom limits. */
-export function zoomView(view: View, delta: number, durationMs = NAV_EASE_MS) {
+export function zoomView(view: View, delta: number, durationMs = navEaseMs()) {
   const zoom = view.getZoom()
   if (zoom === undefined) return
   view.cancelAnimations()

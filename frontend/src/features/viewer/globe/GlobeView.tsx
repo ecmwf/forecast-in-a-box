@@ -26,7 +26,7 @@ import { PointerReadoutBadge } from '../components/PointerReadoutBadge'
 import { CompareSlotTag } from '../geo/CompareSlotTag'
 import { LoupeOverlay } from '../geo/LoupeOverlay'
 import { MapNavControls } from '../geo/MapNavControls'
-import { NAV_CLEARANCE, NAV_EASE_MS } from '../geo/map-nav'
+import { NAV_CLEARANCE, navEaseMs } from '../geo/map-nav'
 import { PanelCorner, SlotStatusBadges } from '../geo/SlotStatusBadges'
 import { isWorldBbox } from '../wms-capabilities'
 import { GLOBE_ENGINE } from './engine-entry'
@@ -45,17 +45,9 @@ import type {
   CompareMapSource,
   FitBboxAction,
 } from '../geo/types'
-import type {
-  CameraMove,
-  GlobeBasemapSpec,
-  GlobeEngine,
-  ViewportDraw,
-} from './engine'
+import type { GlobeBasemapSpec, GlobeEngine, ViewportDraw } from './engine'
 import type { SharedGlobeCamera } from './globe-camera'
 import { cn } from '@/lib/utils'
-
-/** Buttons and +/- ease the camera; drags and the WASD loop cut. */
-const EASE: CameraMove = { easeMs: NAV_EASE_MS }
 
 type CrossPosition = { x: number; y: number } | null
 
@@ -194,6 +186,7 @@ export function GlobeView({
   }, [active, bbox, camera, fitBbox, onRegisterFit, onRegisterFitBbox])
 
   // Panels share one size, so the first engine's floor holds for all.
+  // Buttons and +/- ease the camera (not under reduced motion); drags and the WASD loop cut.
   const zoomBy = useCallback(
     (delta: number) => {
       const engine = firstEngine()
@@ -204,7 +197,9 @@ export function GlobeView({
         GLOBE_ENGINE.maxZoom,
         Math.max(globeMinZoom(w, h), cam.zoom + delta),
       )
-      camera.set({ ...cam, zoom }, 'program', 'controls', EASE)
+      camera.set({ ...cam, zoom }, 'program', 'controls', {
+        easeMs: navEaseMs(),
+      })
     },
     [camera],
   )
@@ -214,7 +209,7 @@ export function GlobeView({
         panGlobeCamera(camera.get(), -dx, -dy),
         'program',
         'controls',
-        EASE,
+        { easeMs: navEaseMs() },
       ),
     [camera],
   )

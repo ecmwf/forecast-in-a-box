@@ -35,7 +35,7 @@ import { CompareSlotTag } from './CompareSlotTag'
 import { LoupeOverlay } from './LoupeOverlay'
 import { PanelCorner, SlotStatusBadges } from './SlotStatusBadges'
 import { MapNavControls } from './MapNavControls'
-import { NAV_CLEARANCE, NAV_EASE_MS, panView, zoomView } from './map-nav'
+import { NAV_CLEARANCE, navEaseMs, panView, zoomView } from './map-nav'
 import type { PinnedLegendItem } from '../components/PinnedLegendsBar'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
@@ -481,7 +481,7 @@ function DualMapPanel({
         <SlotStatusBadges source={source} erroredNames={stack.erroredNames} />
       </PanelCorner>
       <MapNavControls
-        onPan={(dx, dy) => panView(view, dx, dy, NAV_EASE_MS)}
+        onPan={(dx, dy) => panView(view, dx, dy, navEaseMs())}
         onZoom={(delta) => zoomView(view, delta)}
       />
       {cross && (
