@@ -538,8 +538,7 @@ class TestMapPlotSink:
             .validator(BlockFactoryId("mapPlotSink"), map_plot_sink_configuration.block, {"dataset": sample_forecast_source_output})
             .restrictions
         )
-        param_list = "'U component of wind [m s**-1] (u)','Mean sea level pressure [Pa] (msl)','2 metre temperature [K] (2t)'"
-        assert restrictions[PARAM].serialize() == f"list[enumClosed[param]({param_list})]"
+        assert restrictions[PARAM].serialize() == f"list[enumClosed[param]('131','151','167')]"
 
     def test_expander_has_no_parameters_restrictions(self, sample_forecast_source_output: QubedOutput) -> None:
         expansions = plugin().expander(sample_forecast_source_output)

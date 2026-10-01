@@ -271,7 +271,7 @@ class TestPredefinedThresholdProb:
             )
             .restrictions
         )
-        assert restrictions[PARAM].serialize() == "enumClosed[param]('2 metre temperature less than 273.15 K [%] (2tl273)')"
+        assert restrictions[PARAM].serialize() == "enumClosed[param]('131073')"
 
     @pytest.mark.parametrize(
         "forecast_output, source_action, expected, identical_qubes",
@@ -616,7 +616,7 @@ class TestThermalIndices:
             )
             .restrictions
         )
-        for param in ["2r", "nefft", "wcf", "wbt", "heatx", "hmdx", "aptmp"]:
+        for param in ["260004", "260242", "261016", "260005", "260255", "261018", "261023"]:
             assert param in restrictions[PARAM].serialize()
         assert "utci" not in restrictions[PARAM].serialize()
 
