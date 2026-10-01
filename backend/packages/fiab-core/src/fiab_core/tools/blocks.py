@@ -10,7 +10,7 @@
 import abc
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
-from typing import Any, Callable, Literal, TypeVar, cast
+from typing import TypeVar, cast
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action
@@ -31,7 +31,17 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.tools.convert import GeoDomainWrapper
-from fiab_core.types import ArtifactType, ClosedEnumType, DatetimeType, DateType, FloatType, IntType, ListType, OpenEnumType, StringType
+from fiab_core.types import (
+    ArtifactType,
+    ClosedEnumType,
+    DatetimeType,
+    DateType,
+    FloatType,
+    IntType,
+    ListType,
+    OpenEnumType,
+    StringType,
+)
 
 
 class BlockInstanceConfigurationError(ValueError):
@@ -85,29 +95,25 @@ class BlockInstanceRich:
             return self.block.configuration_values[option_id]
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} is missing for block factory {self.factory_id!r}")
 
-    def config_as_str(self, key: str | ConfigurationOptionId, *, validator: Callable[[str, str], None] | None = None) -> str:
+    def config_as_str(self, key: str | ConfigurationOptionId) -> str:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.value_type, (StringType, ClosedEnumType, OpenEnumType)):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not str")
         raw_value = self._get_raw_value(option_id)
         if isinstance(raw_value, str):
-            if validator is not None:
-                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected str, got {type(raw_value).__name__}")
 
-    def config_as_int(self, key: str | ConfigurationOptionId, *, validator: Callable[[int, str], None] | None = None) -> int:
+    def config_as_int(self, key: str | ConfigurationOptionId) -> int:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.value_type, IntType):
             raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not int")
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is int:
-            if validator is not None:
-                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected int, got {type(raw_value).__name__}")
 
-    def config_as_float(self, key: str | ConfigurationOptionId, *, validator: Callable[[float, str], None] | None = None) -> float:
+    def config_as_float(self, key: str | ConfigurationOptionId) -> float:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.value_type, FloatType):
             raise BlockInstanceConfigurationError(
@@ -115,12 +121,10 @@ class BlockInstanceRich:
             )
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is float:
-            if validator is not None:
-                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected float, got {type(raw_value).__name__}")
 
-    def config_as_date(self, key: str | ConfigurationOptionId, *, validator: Callable[[date, str], None] | None = None) -> date:
+    def config_as_date(self, key: str | ConfigurationOptionId) -> date:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.value_type, DateType):
             raise BlockInstanceConfigurationError(
@@ -128,12 +132,10 @@ class BlockInstanceRich:
             )
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is date:
-            if validator is not None:
-                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected date, got {type(raw_value).__name__}")
 
-    def config_as_datetime(self, key: str | ConfigurationOptionId, *, validator: Callable[[datetime, str], None] | None = None) -> datetime:
+    def config_as_datetime(self, key: str | ConfigurationOptionId) -> datetime:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.value_type, DatetimeType):
             raise BlockInstanceConfigurationError(
@@ -141,14 +143,10 @@ class BlockInstanceRich:
             )
         raw_value = self._get_raw_value(option_id)
         if type(raw_value) is datetime:
-            if validator is not None:
-                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected datetime, got {type(raw_value).__name__}")
 
-    def config_as_artifactid(
-        self, key: str | ConfigurationOptionId, *, validator: Callable[[CompositeArtifactId, str], None] | None = None
-    ) -> CompositeArtifactId:
+    def config_as_artifactid(self, key: str | ConfigurationOptionId) -> CompositeArtifactId:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.value_type, (ArtifactType, ClosedEnumType, OpenEnumType)):
             raise BlockInstanceConfigurationError(
@@ -156,8 +154,6 @@ class BlockInstanceRich:
             )
         raw_value = self._get_raw_value(option_id)
         if isinstance(raw_value, CompositeArtifactId):
-            if validator is not None:
-                validator(raw_value, option_id)
             return raw_value
         raise BlockInstanceConfigurationError(f"Configuration option {option_id!r} expected artifact, got {type(raw_value).__name__}")
 
@@ -167,7 +163,6 @@ class BlockInstanceRich:
         item_type: type[T],
         *,
         allow_empty: bool = True,
-        validator: Callable[[T, str], None] | None = None,
     ) -> list[T]:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.value_type, ListType):
@@ -198,14 +193,9 @@ class BlockInstanceRich:
             raise BlockInstanceConfigurationError(
                 f"Configuration option {option_id!r} expected list[{item_type.__name__}], got {[type(item).__name__ for item in raw_value]!r}"
             )
-        typed_raw_value = cast(list[T], raw_value)
-        if validator is not None:
-            for item in typed_raw_value:
-                validator(item, option_id)
-        return typed_raw_value
+        return cast(list[T], raw_value)
 
     def config_as_geodomain(self, key: str | ConfigurationOptionId) -> GeoDomainWrapper:
-        # NOTE validators are hard to support here due to being such a large union...
         option_id, option = self._get_configuration_option(key)
         raw_value = self._get_raw_value(option_id)
         # NOTE we ignore types as we trust parser -- but its fragile!
