@@ -23,8 +23,8 @@ import { useGlobeMode } from '@/features/viewer/globe/useGlobeMode'
 const unbendingEngine = () =>
   ({
     size: () => [800, 600],
-    morphIn: vi.fn(() => Promise.resolve()),
-    morphOut: vi.fn(() => Promise.resolve()),
+    bendIn: vi.fn(() => Promise.resolve()),
+    bendOut: vi.fn(() => Promise.resolve()),
   }) as unknown as GlobeEngine
 
 describe('useGlobeMode', () => {
@@ -49,8 +49,8 @@ describe('useGlobeMode', () => {
     const engine = unbendingEngine()
     act(() => result.current.registerEngine('a', engine))
     act(() => result.current.enter())
-    await expect.poll(() => vi.mocked(engine.morphIn).mock.calls.length).toBe(1)
-    const [, to] = vi.mocked(engine.morphIn).mock.calls[0]
+    await expect.poll(() => vi.mocked(engine.bendIn).mock.calls.length).toBe(1)
+    const [, to] = vi.mocked(engine.bendIn).mock.calls[0]
     const flat = globeCameraOf(view)!
     expect(to.zoom).toBeCloseTo(flat.zoom, 6)
     expect(to.lon).toBeCloseTo(10, 6)
@@ -81,9 +81,7 @@ describe('useGlobeMode', () => {
     act(() => result.current.registerEngine('a', engine))
 
     act(() => result.current.leave('merc'))
-    await expect
-      .poll(() => vi.mocked(engine.morphOut).mock.calls.length)
-      .toBe(1)
+    await expect.poll(() => vi.mocked(engine.bendOut).mock.calls.length).toBe(1)
     // Unbent, but the flat map is still loading: the globe's frame stays up.
     await new Promise((r) => setTimeout(r, 300))
     expect(result.current.phase).toBe('leaving')
@@ -149,14 +147,14 @@ describe('useGlobeMode', () => {
     )
     const engine = unbendingEngine()
     let fail = (_err: Error) => {}
-    vi.mocked(engine.morphIn).mockReturnValue(
+    vi.mocked(engine.bendIn).mockReturnValue(
       new Promise((_, reject) => {
         fail = reject
       }),
     )
     act(() => result.current.registerEngine('a', engine))
     act(() => result.current.enter())
-    await expect.poll(() => vi.mocked(engine.morphIn).mock.calls.length).toBe(1)
+    await expect.poll(() => vi.mocked(engine.bendIn).mock.calls.length).toBe(1)
 
     await unmount()
     fail(new Error('engine lost'))
@@ -196,15 +194,15 @@ describe('useGlobeMode', () => {
       const result = await mode(null)
       const bend = deferred()
       const engine = unbendingEngine()
-      vi.mocked(engine.morphIn).mockReturnValue(bend.promise)
+      vi.mocked(engine.bendIn).mockReturnValue(bend.promise)
       act(() => result.current.registerEngine('a', engine))
       act(() => result.current.enter())
       await expect
-        .poll(() => vi.mocked(engine.morphIn).mock.calls.length)
+        .poll(() => vi.mocked(engine.bendIn).mock.calls.length)
         .toBe(1)
       act(() => result.current.leave('merc'))
       await expect
-        .poll(() => vi.mocked(engine.morphOut).mock.calls.length)
+        .poll(() => vi.mocked(engine.bendOut).mock.calls.length)
         .toBe(1)
       // The superseded entry finishing late must not land on the globe.
       act(() => bend.resolve())
@@ -217,15 +215,15 @@ describe('useGlobeMode', () => {
       const result = await mode({ lon: 10, lat: 50, zoom: 7 })
       const unbend = deferred()
       const engine = unbendingEngine()
-      vi.mocked(engine.morphOut).mockReturnValue(unbend.promise)
+      vi.mocked(engine.bendOut).mockReturnValue(unbend.promise)
       act(() => result.current.registerEngine('a', engine))
       act(() => result.current.leave('merc'))
       await expect
-        .poll(() => vi.mocked(engine.morphOut).mock.calls.length)
+        .poll(() => vi.mocked(engine.bendOut).mock.calls.length)
         .toBe(1)
       act(() => result.current.enter())
       await expect.poll(() => result.current.phase).toBe('globe')
-      expect(vi.mocked(engine.morphIn).mock.calls[0][1]).toEqual({
+      expect(vi.mocked(engine.bendIn).mock.calls[0][1]).toEqual({
         lon: 10,
         lat: 50,
         zoom: 7,
@@ -246,7 +244,7 @@ describe('useGlobeMode', () => {
       const engine = unbendingEngine()
       act(() => result.current.registerEngine('a', engine))
       await new Promise((r) => setTimeout(r, 100))
-      expect(engine.morphIn).not.toHaveBeenCalled()
+      expect(engine.bendIn).not.toHaveBeenCalled()
     })
   })
 })

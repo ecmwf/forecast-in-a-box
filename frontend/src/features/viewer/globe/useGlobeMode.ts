@@ -42,7 +42,7 @@ const log = createLogger('globe')
 export type GlobePhase = 'flat' | 'entering' | 'globe' | 'leaving'
 
 /** The bend onto the globe. */
-const MORPH_MS = 500
+const BEND_MS = 500
 /** The unbend back to the flat map. */
 const UNBEND_MS = 700
 /** Longest hold of the flat end frame while the OL map under it renders. */
@@ -58,13 +58,13 @@ const sleep = (ms: number) =>
 
 export interface GlobeMode {
   phase: GlobePhase
-  /** Overlay opacity target (fades in once the morph starts). */
+  /** Overlay opacity target (fades in once the bend starts). */
   overlayVisible: boolean
   camera: SharedGlobeCamera
   /** Globe panels register their engine (null on unmount). */
   registerEngine: (panel: string, engine: GlobeEngine | null) => void
   enter: () => void
-  /** `instant` skips the morph (snap-back, context loss). */
+  /** `instant` skips the bend (snap-back, context loss). */
   leave: (target: FlatProjectionId, instant?: boolean) => void
   /** Drop back to the flat map now (engine failure, lost context). */
   fail: () => void
@@ -186,11 +186,11 @@ export function useGlobeMode({
     const view = viewRef.current
     const from = flatCameraOf(view, viewerProjectionOf(view).id)
     const list = [...enginesRef.current.values()]
-    const ms = reducedRef.current ? 0 : MORPH_MS
+    const ms = reducedRef.current ? 0 : BEND_MS
     void (async () => {
       if (from)
         await Promise.all(
-          list.map((e) => e.morphIn(from, camera.get(), ms, null)),
+          list.map((e) => e.bendIn(from, camera.get(), ms, null)),
         )
       if (run !== runRef.current) return
       settle('globe')
@@ -224,7 +224,7 @@ export function useGlobeMode({
           lat: clampCameraLat(from.lat),
           zoom: globeFitZoom(w, h),
         }
-        const morph = flatKindOf(flatId) !== null && !reducedRef.current
+        const bend = flatKindOf(flatId) !== null && !reducedRef.current
         const captures = await Promise.race([
           captureFlatRef.current().catch((err: unknown) => {
             log.warn('Flat map capture failed; bending without its pixels', err)
@@ -243,10 +243,10 @@ export function useGlobeMode({
               captures.length === 1 && panels.length === 1
                 ? captures[0]
                 : captures.find((c) => c.slot === panel)
-            return e.morphIn(
+            return e.bendIn(
               from,
               target,
-              morph ? MORPH_MS : 0,
+              bend ? BEND_MS : 0,
               capture ? { image: capture.canvas } : null,
             )
           }),
@@ -288,14 +288,13 @@ export function useGlobeMode({
         onFlatViewRef.current(next, target)
       }
       const flat = flatCameraOf(next, target)
-      const morph =
+      const bend =
         !instant &&
         flat !== null &&
         flatKindOf(target) !== null &&
         !reducedRef.current
       void (async () => {
-        if (morph)
-          await Promise.all(list.map((e) => e.morphOut(flat, UNBEND_MS)))
+        if (bend) await Promise.all(list.map((e) => e.bendOut(flat, UNBEND_MS)))
         if (run !== runRef.current) return
         // Hold the globe's flat end frame until the OL map under it has drawn.
         if (!instant)

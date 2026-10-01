@@ -602,7 +602,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         }),
       ]).then(() => undefined),
 
-    morphIn: (from, to, durationMs, seed) => {
+    bendIn: (from, to, durationMs, seed) => {
       const m = map
       if (!m || !content) return Promise.resolve()
       // Wake a warm globe (whatever React's timing); the camera is final, so fetch sharp now.
@@ -621,7 +621,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       })
     },
 
-    morphOut: (to, durationMs) => {
+    bendOut: (to, durationMs) => {
       const m = map
       if (!m || !content) return Promise.resolve()
       // Mid-entry the flat map's own pixels are still up: they unbend back as they came.

@@ -105,9 +105,9 @@ describe('globe bend cut', () => {
       resolution: 60000,
     }
     engine.setCamera(camera)
-    await engine.morphOut(flat, 0)
+    await engine.bendOut(flat, 0)
     engine.setLive(false)
-    const bending = engine.morphIn(flat, camera, 3000, null)
+    const bending = engine.bendIn(flat, camera, 3000, null)
     // Early in the bend: lines on the far side are still drawn at full strength.
     const seen: Array<number> = []
     for (let i = 0; i < 6; i++) {

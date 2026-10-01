@@ -22,7 +22,7 @@ export interface GlobeCamera {
   zoom: number
 }
 
-/** Morphable flat layouts: Web Mercator or equirectangular. */
+/** Flat layouts the globe bends from: Web Mercator or equirectangular. */
 export type FlatKind = 'merc' | 'geo'
 
 /** OL view snapshot at a handoff; `resolution` in view units per px. */
@@ -99,14 +99,14 @@ export interface GlobeEngine {
   /** Resolves when layers already set have a first image (or failed). */
   whenLoaded: () => Promise<void>
   /** Animate from the OL view onto the globe camera; `seed` bends the flat pixels. */
-  morphIn: (
+  bendIn: (
     from: FlatCamera,
     to: GlobeCamera,
     durationMs: number,
     seed: GlobeSeed | null,
   ) => Promise<void>
   /** Animate from the current globe onto the OL view. */
-  morphOut: (to: FlatCamera, durationMs: number) => Promise<void>
+  bendOut: (to: FlatCamera, durationMs: number) => Promise<void>
   /** Screen px (container-relative) -> lon/lat, null off the globe. */
   pick: (px: readonly [number, number]) => { lon: number; lat: number } | null
   /** Render now and copy the frame into a 2D canvas. */

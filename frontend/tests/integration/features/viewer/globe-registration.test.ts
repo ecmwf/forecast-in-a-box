@@ -432,13 +432,13 @@ describe('globe registration', () => {
       resolution: 20000,
     }
     const centre: [number, number] = [WIDTH / 2, HEIGHT / 2]
-    const entering = engine.morphIn(flat, CAMERA, 600, null)
+    const entering = engine.bendIn(flat, CAMERA, 600, null)
     await new Promise((r) => setTimeout(r, 250))
-    await Promise.all([entering, engine.morphOut(flat, 600)])
+    await Promise.all([entering, engine.bendOut(flat, 600)])
     // The superseded entry did not finish onto the globe: flat, no readout.
     expect(engine.pick(centre)).toBeNull()
-    const leaving = engine.morphOut(flat, 600)
-    await engine.morphIn(flat, CAMERA, 600, null)
+    const leaving = engine.bendOut(flat, 600)
+    await engine.bendIn(flat, CAMERA, 600, null)
     await leaving
     expect(engine.pick(centre)).not.toBeNull()
     expect(near(frame(engine).at(...centre), SOLID, 3)).toBe(true)
@@ -500,12 +500,12 @@ describe('globe registration', () => {
       sample: () => number,
     ) {
       const seen: Array<number> = []
-      await engine.morphOut(flat, 0)
+      await engine.bendOut(flat, 0)
       // Left and hidden, as in the app: the next entry starts afresh at the target camera.
       engine.setLive(false)
       for (const bend of [
-        () => engine.morphIn(flat, camera, 3000, null),
-        () => engine.morphOut(flat, 3000),
+        () => engine.bendIn(flat, camera, 3000, null),
+        () => engine.bendOut(flat, 3000),
       ]) {
         const done = bend()
         for (let i = 0; i < 14; i++) {
@@ -536,9 +536,9 @@ describe('globe registration', () => {
               x: WIDTH / 2 + (m.lon - flat.lon) / flat.resolution,
               y: HEIGHT / 2 - (m.lat - flat.lat) / flat.resolution,
             }
-      await engine.morphOut(flat, 0)
+      await engine.bendOut(flat, 0)
       // Slow, so a third of the way in is early in the bend on any machine.
-      const bending = engine.morphIn(flat, CAMERA, 6000, null)
+      const bending = engine.bendIn(flat, CAMERA, 6000, null)
       await new Promise((r) => setTimeout(r, 2000))
       const mid = frame(engine).centroid(m.rgb, 12)
       await bending
@@ -656,7 +656,7 @@ describe('globe registration', () => {
       lat: 10,
       resolution: 20000,
     }
-    await engine.morphIn(from, CAMERA, 0, { image })
+    await engine.bendIn(from, CAMERA, 0, { image })
     // The seed covers the live layer until it fades.
     expect(
       near(frame(engine).at(WIDTH / 2, HEIGHT / 2), [255, 0, 255], 2),
@@ -1038,7 +1038,7 @@ describe('globe registration', () => {
     const ctx = image.getContext('2d')!
     ctx.fillStyle = 'rgba(255,0,255,0.5)'
     ctx.fillRect(WIDTH / 2, 0, WIDTH / 2, HEIGHT)
-    await engine.morphIn(
+    await engine.bendIn(
       { projection: 'merc', lon: -35, lat: 10, resolution: 20000 },
       CAMERA,
       0,
@@ -1066,7 +1066,7 @@ describe('globe registration', () => {
     await new Promise((r) => setTimeout(r, 400))
     expect(requests).toEqual([])
     // Entering wakes it, whatever called setLive last.
-    await engine.morphIn(
+    await engine.bendIn(
       { projection: 'merc', lon: -35, lat: 10, resolution: 20000 },
       CAMERA,
       0,

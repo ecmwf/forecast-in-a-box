@@ -83,12 +83,12 @@ vi.mock('@/features/viewer/globe/engine-entry', () => {
         engineCalls.camera = () => camera
       },
       whenLoaded: () => engineCalls.loaded,
-      morphIn: (_from, to, _ms, seed) => {
+      bendIn: (_from, to, _ms, seed) => {
         camera = to
         engineCalls.seeds.push(seed !== null)
         return Promise.resolve()
       },
-      morphOut: () => Promise.resolve(),
+      bendOut: () => Promise.resolve(),
       pick: () => null,
       capture: () => {
         engineCalls.captures++
