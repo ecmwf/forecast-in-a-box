@@ -10,13 +10,14 @@
 """Definitions of all the types"""
 
 import logging
-import re
 from abc import ABC, abstractmethod
 from datetime import date, datetime, timedelta
 from typing import Any, Iterable, Literal, get_args
 
 import fiab_core  # to satisfy the type checker for artifacts annotation
+from fiab_core.types.dt_util import parse_timedelta
 from fiab_core.types.exceptions import NotNoneInput, NotStringInput, WrongType
+from fiab_core.types.traits import FableTrait
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +25,18 @@ logger = logging.getLogger(__name__)
 
 
 class FableType(ABC):
-    """Base class for all Fable type expressions. Provides validation and conversion of string values."""
+    """Base class for all Fable type expressions. Provides validation and conversion of string values.
+
+    Supports mixing in traits (see fiab_core.types.traits), which add extra validation on top of
+    the main type conversion and are serialized as a ``{}`` suffix, eg ``int{positive}``.
+    """
+
+    def __init__(self, traits: list[FableTrait] | None = None) -> None:
+        self.traits = traits or []
 
     @abstractmethod
-    def validate_convert(self, value: Any) -> Any:
-        """Convert and validate a value according to this type.
+    def validate_convert_main(self, value: Any) -> Any:
+        """Convert and validate a value according to this type, ignoring traits.
 
         Accepts a string value and returns the converted value, or raises:
         - TypeError if value is not a string
@@ -36,9 +44,33 @@ class FableType(ABC):
         """
         # NOTE probably change to value: str and get rid of the NoStringInput exception? Or utilize that centrally and have children override internal method only
 
+    def validate_convert(self, value: Any) -> Any:
+        """Convert and validate a value according to this type, then validate it against each trait.
+
+        Traits are only invoked if the main conversion succeeds. Issues are collected across all
+        traits (not just the first failing one) and raised together as a single WrongType.
+        """
+        converted = self.validate_convert_main(value)
+        issues: list[str] = []
+        for trait in self.traits:
+            result = trait.validate(converted)
+            if result.e is not None:
+                issues.append(result.e)
+        if issues:
+            raise WrongType(f"Trait validation failed for {value!r}: {'; '.join(issues)}")
+        return converted
+
     @abstractmethod
+    def serialize_main(self) -> str:
+        """Serialize this type's own expression, ignoring traits, to a string that can be parsed back via parse()."""
+
     def serialize(self) -> str:
-        """Serialize this type to a string expression that can be parsed back via parse()."""
+        """Serialize this type (including its traits) to a string expression that can be parsed back via parse()."""
+        main = self.serialize_main()
+        if not self.traits:
+            return main
+        traits_str = ",".join(trait.serialize() for trait in self.traits)
+        return f"{main}{{{traits_str}}}"
 
 
 # PRIMITIVE TYPES
@@ -47,12 +79,12 @@ class FableType(ABC):
 class StringType(FableType):
     """The string type. Conversion is a no-op; validates that the type expression is valid."""
 
-    def validate_convert(self, value: Any) -> str:
+    def validate_convert_main(self, value: Any) -> str:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         return value
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "str"
 
 
@@ -63,19 +95,19 @@ class NoneType(FableType):
     an option accepts an explicit null. Note that an explicit null is a different thing
     than a missing value -- the latter is never passed to validate_convert at all."""
 
-    def validate_convert(self, value: Any) -> None:
+    def validate_convert_main(self, value: Any) -> None:
         if value is not None:
             raise NotNoneInput(f"Expected None, got {type(value).__name__}")
         return None
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "none"
 
 
 class IntType(FableType):
     """The integer type. Converts string to int."""
 
-    def validate_convert(self, value: Any) -> int:
+    def validate_convert_main(self, value: Any) -> int:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         try:
@@ -83,14 +115,14 @@ class IntType(FableType):
         except ValueError:
             raise WrongType(f"Cannot convert {value!r} to int")
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "int"
 
 
 class FloatType(FableType):
     """The float type. Converts string to float."""
 
-    def validate_convert(self, value: Any) -> float:
+    def validate_convert_main(self, value: Any) -> float:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         try:
@@ -98,14 +130,14 @@ class FloatType(FableType):
         except ValueError:
             raise WrongType(f"Cannot convert {value!r} to float")
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "float"
 
 
 class DateType(FableType):
     """The date type. Converts ISO 8601 date string (YYYY-MM-DD) to datetime.date."""
 
-    def validate_convert(self, value: Any) -> date:
+    def validate_convert_main(self, value: Any) -> date:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         try:
@@ -113,7 +145,7 @@ class DateType(FableType):
         except ValueError:
             raise WrongType(f"Cannot parse {value!r} as date (expected ISO 8601 format: YYYY-MM-DD)")
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "date"
 
 
@@ -123,7 +155,7 @@ class DatetimeType(FableType):
     Accepts format: YYYY-MM-DDTHH:MM:SS or YYYY-MM-DDTHH:MM:SS.ffffff or with +HH:MM/-HH:MM timezone.
     """
 
-    def validate_convert(self, value: Any) -> datetime:
+    def validate_convert_main(self, value: Any) -> datetime:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
 
@@ -140,27 +172,14 @@ class DatetimeType(FableType):
 
         raise WrongType(f"Cannot parse {value!r} as datetime (expected ISO 8601 format)")
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "datetime"
 
 
 # NOTE deliberately no support for calendar-dependent components (years, months) since
 # they do not correspond to a fixed duration and would make the conversion ambiguous.
-# The leading 'P' designator is checked for and stripped separately, so it is not part
-# of this pattern. All groups are optional; at least one must actually be present for a
-# match to be considered meaningful (checked by the caller, since an all-absent match
-# still satisfies this regex, e.g. for a bare 'T').
-_TIMEDELTA_PATTERN = re.compile(
-    r"^"
-    r"(?:(?P<weeks>\d+)W)?"
-    r"(?:(?P<days>\d+)D)?"
-    r"(?:T"
-    r"(?:(?P<hours>\d+)H)?"
-    r"(?:(?P<minutes>\d+)M)?"
-    r"(?:(?P<seconds>\d+(?:\.\d+)?)S)?"
-    r")?"
-    r"$"
-)
+# See fiab_core.types.dt_util.parse_timedelta for the actual parsing logic, shared with
+# traits that need to opportunistically interpret an argument as a duration.
 
 
 class TimeDeltaType(FableType):
@@ -175,29 +194,12 @@ class TimeDeltaType(FableType):
     '3DT1M' are accepted too.
     """
 
-    def validate_convert(self, value: Any) -> timedelta:
+    def validate_convert_main(self, value: Any) -> timedelta:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
+        return parse_timedelta(value)
 
-        raw = value.strip()
-        body = raw[1:] if raw.startswith("P") else raw
-        if not body:
-            raise WrongType(f"Cannot parse {value!r} as timedelta (expected ISO 8601 duration format)")
-
-        match = _TIMEDELTA_PATTERN.match(body)
-        if match is None or not any(match.groupdict().values()):
-            raise WrongType(f"Cannot parse {value!r} as timedelta (expected ISO 8601 duration format)")
-
-        groups = match.groupdict()
-        return timedelta(
-            weeks=int(groups["weeks"] or 0),
-            days=int(groups["days"] or 0),
-            hours=int(groups["hours"] or 0),
-            minutes=int(groups["minutes"] or 0),
-            seconds=float(groups["seconds"] or 0),
-        )
-
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "timedelta"
 
 
@@ -234,12 +236,13 @@ class ClosedEnumType(FableType):
     to StringType for backwards compatibility.
     """
 
-    def __init__(self, items: Iterable[Any], subtype: FableType = StringType()) -> None:
+    def __init__(self, items: Iterable[Any], subtype: FableType = StringType(), traits: list[FableTrait] | None = None) -> None:
+        super().__init__(traits)
         self.subtype = subtype
         self.items = [self.subtype.validate_convert(item) for item in items]
         self._item_set = set(self.items)
 
-    def validate_convert(self, value: Any) -> Any:
+    def validate_convert_main(self, value: Any) -> Any:
         # NOTE no isinstance check here -- the subtype is responsible for rejecting
         # inputs of a wrong shape, and it may well accept a non-string one (eg NoneType)
         converted = self.subtype.validate_convert(value)
@@ -248,7 +251,7 @@ class ClosedEnumType(FableType):
             raise WrongType(f"{value!r} is not a valid option. Valid options are: {options}")
         return converted
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         items_str = ",".join(_serialize_enum_item(item, self.subtype) for item in self.items)
         return f"enumClosed[{self.subtype.serialize()}]({items_str})"
 
@@ -259,15 +262,16 @@ class OpenEnumType(FableType):
     See ClosedEnumType for the meaning of ``items`` and ``subtype``.
     """
 
-    def __init__(self, items: Iterable[Any], subtype: FableType = StringType()) -> None:
+    def __init__(self, items: Iterable[Any], subtype: FableType = StringType(), traits: list[FableTrait] | None = None) -> None:
+        super().__init__(traits)
         self.subtype = subtype
         self.items = [self.subtype.validate_convert(item) for item in items]
 
-    def validate_convert(self, value: Any) -> Any:
+    def validate_convert_main(self, value: Any) -> Any:
         # NOTE see the comment in ClosedEnumType.validate_convert
         return self.subtype.validate_convert(value)
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         items_str = ",".join(_serialize_enum_item(item, self.subtype) for item in self.items)
         return f"enumOpen[{self.subtype.serialize()}]({items_str})"
 
@@ -275,10 +279,11 @@ class OpenEnumType(FableType):
 class ListType(FableType):
     """List type. Converts comma-separated string to a list by validating and converting each item."""
 
-    def __init__(self, item_type: FableType) -> None:
+    def __init__(self, item_type: FableType, traits: list[FableTrait] | None = None) -> None:
+        super().__init__(traits)
         self.item_type = item_type
 
-    def validate_convert(self, value: Any) -> list[Any]:
+    def validate_convert_main(self, value: Any) -> list[Any]:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
 
@@ -299,17 +304,18 @@ class ListType(FableType):
 
         return result
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return f"list[{self.item_type.serialize()}]"
 
 
 class UnionType(FableType):
     """Union type. Tries each member type in order and returns the first successful conversion."""
 
-    def __init__(self, types: list[FableType]) -> None:
+    def __init__(self, types: list[FableType], traits: list[FableTrait] | None = None) -> None:
+        super().__init__(traits)
         self.types = types
 
-    def validate_convert(self, value: Any) -> Any:
+    def validate_convert_main(self, value: Any) -> Any:
         # NOTE we deliberately try the member types *before* checking that the input is a
         # string, because some members (notably NoneType) legitimately accept a non-string
         # input. Only if no member accepted the value do we report the non-string input.
@@ -324,7 +330,7 @@ class UnionType(FableType):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         raise WrongType(f"Cannot convert {value!r} to any of: {', '.join(t.serialize() for t in self.types)}")
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return f"union[{','.join(t.serialize() for t in self.types)}]"
 
 
@@ -337,11 +343,11 @@ class BoundingBoxWSENType(ListType):
     - south <= north;
     - west > east is allowed and means the box crosses the antimeridian."""
 
-    def __init__(self) -> None:
-        super().__init__(IntType())
+    def __init__(self, traits: list[FableTrait] | None = None) -> None:
+        super().__init__(IntType(), traits=traits)
 
-    def validate_convert(self, value: Any) -> list[int]:
-        result = super().validate_convert(value)
+    def validate_convert_main(self, value: Any) -> list[int]:
+        result = super().validate_convert_main(value)
         if len(result) != 4:
             raise WrongType(f"BoundingBoxWSEN must have exactly 4 elements, got {len(result)}")
         west, south, east, north = result
@@ -351,7 +357,7 @@ class BoundingBoxWSENType(ListType):
             raise WrongType(f"Invalid bounding box: south ({south}) must be <= north ({north})")
         return result
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "bboxWSEN"
 
 
@@ -363,8 +369,8 @@ UnrestrictedGeoDomainAlias = ClosedEnumType(get_args(UnrestrictedGeoDomainLitera
 class GeoDomainSingleType(StringType):
     """Country/domain type. A string representing a country or preset area like Europe or Arctic (detailed validation to be added later)."""
 
-    def validate_convert(self, value: Any) -> str:
-        v = super().validate_convert(value)
+    def validate_convert_main(self, value: Any) -> str:
+        v = super().validate_convert_main(value)
         if v in UnrestrictedGeoDomainAlias.items:
             raise WrongType("cannot use {v} within country/domain, as that is a special value")
         try:
@@ -374,17 +380,17 @@ class GeoDomainSingleType(StringType):
             pass
         return v
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "geodomainSingle"
 
 
 class GeoDomainType(UnionType):
     """An alias for a union over bounding box, list of single geo domains, and a single geo domain type."""
 
-    def __init__(self) -> None:
-        super().__init__([BoundingBoxWSENType(), UnrestrictedGeoDomainAlias, ListType(GeoDomainSingleType())])
+    def __init__(self, traits: list[FableTrait] | None = None) -> None:
+        super().__init__([BoundingBoxWSENType(), UnrestrictedGeoDomainAlias, ListType(GeoDomainSingleType())], traits=traits)
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "geodomain"
 
 
@@ -395,7 +401,7 @@ class ArtifactType(FableType):
     # NOTE we are being careful here as we dont want to introduce a strict dependency
     # of types on artifacts. Hence the (exceptional) string annotation, in-body import,
     # defensive lookup, etc
-    def validate_convert(self, value: Any) -> "fiab_core.artifacts.CompositeArtifactId":
+    def validate_convert_main(self, value: Any) -> "fiab_core.artifacts.CompositeArtifactId":
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
@@ -413,7 +419,7 @@ class ArtifactType(FableType):
             raise WrongType(f"{artifact_id=} is not known to the ArtifactsProvider")
         return artifact_id
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "artifact"
 
 
@@ -422,7 +428,8 @@ class ParameterType(StringType):
     to perform param lookup to build a better UI form, displaying additional info,
     name conversion, etc"""
 
-    def validate_convert(self, value: Any) -> str:
+    def validate_convert_main(self, value: Any) -> str:
+        value: str = super().validate_convert_main(value)
         try:
             import pymetkit.paramdb  # type: ignore[import]
 
@@ -437,5 +444,5 @@ class ParameterType(StringType):
 
         return value
 
-    def serialize(self) -> str:
+    def serialize_main(self) -> str:
         return "param"
