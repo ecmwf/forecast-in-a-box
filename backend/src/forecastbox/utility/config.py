@@ -37,13 +37,6 @@ def _validate_url(url: str) -> bool:
     return (parse.scheme is not None) and (parse.netloc is not None)
 
 
-class StatusMessage:
-    """Namespace class for status message sharing"""
-
-    # NOTE this class is here as this is a low place in hierarchy, and we dont want circular imports
-    gateway_running = "running"
-
-
 class ConcurrentPools(StrEnum):
     General = "general"
     Io = "io"

@@ -17,6 +17,7 @@ import urllib.parse
 import uuid
 from dataclasses import dataclass
 from multiprocessing.process import BaseProcess
+from typing import cast
 
 from cascade.deployment.logging import LoggingConfig
 from cascade.executor import platform
@@ -32,9 +33,15 @@ from forecastbox.domain.gateway.exceptions import (
 )
 from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility import tunnel
-from forecastbox.utility.config import LocalGateway, RemoteGateway, StatusMessage, UnmanagedGateway, config
+from forecastbox.utility.config import LocalGateway, RemoteGateway, UnmanagedGateway, config
 
 logger = logging.getLogger(__name__)
+
+GATEWAY_RUNNING = "running"
+
+
+def _gateway_running(message: str) -> bool:
+    return message == GATEWAY_RUNNING
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -199,18 +206,27 @@ def status_gateway() -> str:
     if isinstance(gateway_connection, LocalProcess):
         if gateway_connection.process.exitcode is not None:
             raise GatewayExited(gateway_connection.process.exitcode)
-        # TODO -- call gw status api once available
-        return StatusMessage.gateway_running
     elif isinstance(gateway_connection, RemoteTunnel):
-        # TODO -- call gw status api once available, on fallback run sh command through tunnel to check the proc status?
-        if tunnel.status(gateway_connection.handle):
-            return StatusMessage.gateway_running
-        raise GatewayExited(255)
+        if not tunnel.status(gateway_connection.handle):
+            raise GatewayExited(255)
     elif isinstance(gateway_connection, RemoteUrl):
-        # TODO -- actually attempt resolving the url, then call gw status api once its available.
-        return StatusMessage.gateway_running
+        pass
     else:
         assert_never(gateway_connection)
+
+    try:
+        response = client.request_response(
+            api.JobProgressRequest(job_ids=[], detailed_report=False),
+            get_gateway_url(),
+            timeout_ms=1000,
+        )
+        response = cast(api.JobProgressResponse, response)
+    except Exception as error:
+        return f"error: {repr(error)}"
+
+    if response.error:
+        return f"error: {response.error}"
+    return GATEWAY_RUNNING
 
 
 def ensure_gateway(attempts: int = 30, interval_seconds: float = 0.5) -> None:
@@ -231,7 +247,7 @@ def ensure_gateway(attempts: int = 30, interval_seconds: float = 0.5) -> None:
         except GatewayNotStarted as error:
             last_error = error
         else:
-            if status == StatusMessage.gateway_running:
+            if _gateway_running(status):
                 return
         time.sleep(interval_seconds)
     raise GatewayNotRunning(f"gateway did not report running status within {attempts * interval_seconds:.1f}s") from last_error
