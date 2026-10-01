@@ -87,7 +87,7 @@ CI). Prefix `VITE_PORT=3100` while a dev server holds :3000.
 | `src/components/` | ~39%    | >50%   |
 | `src/features/`   | ~20%    | >50%   |
 
-**Test count:** 40 unit + 16 integration + 7 E2E = 63 test files
+**Test count:** 149 unit + 57 integration + 13 E2E = 219 test files
 
 ### What NOT to Test
 
@@ -104,9 +104,9 @@ tests/
 ├── utils/
 │   ├── render.tsx    # Custom render with providers
 │   └── factories.ts  # Test data factories
-├── unit/             # Unit tests (40 files - pure logic, hooks, stores, utils, components)
-├── integration/      # Integration tests (16 files - feature flows with MSW)
-└── e2e/              # Playwright E2E (7 test files, all run against both mock and real backend)
+├── unit/             # Unit tests (149 files - pure logic, hooks, stores, utils, components)
+├── integration/      # Integration tests (57 files - feature flows with MSW)
+└── e2e/              # Playwright E2E (13 test files; all but globe.spec.ts also run against the real backend)
     └── *.spec.ts           # Works with both playwright.config.ts (MSW) and playwright.config.stack.ts (real)
 ```
 
