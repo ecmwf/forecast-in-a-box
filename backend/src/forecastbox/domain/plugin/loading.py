@@ -28,12 +28,11 @@ from packaging.version import Version
 from pydantic import ValidationError
 
 from forecastbox.domain.plugin.compatibility import check_environment_baseline, install_plugin_compatibly
-from forecastbox.domain.plugin.db import delete_plugin_state, get_plugin_state, upsert_plugin_state
+from forecastbox.domain.plugin.db import delete_plugin_state, get_all_plugin_states_by_id, get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.errors import PluginError, PluginErrors
+from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.state import publish_bulk_snapshot, publish_single_snapshot, publish_unloaded
 from forecastbox.domain.plugin.template_ingest import ingest_plugin_templates, unload_plugin_templates
-from forecastbox.utility.concurrency.synchronization import timed_acquire
-from forecastbox.utility.config import PluginSettings, PluginsSettings, config, config_edit_lock
 from forecastbox.utility.packages import try_import, try_version
 
 logger = logging.getLogger(__name__)
@@ -86,21 +85,21 @@ def _version_from_install(installed: dict[str, str], module_name: str) -> str | 
     return None
 
 
-def load_plugins(plugins: PluginsSettings) -> None:
-    """Initial bulk load: install/import every configured, enabled plugin, publish the
-    complete catalogue in one atomic snapshot, then run template ingestion for each
-    successfully loaded plugin.
+def load_plugins() -> None:
+    """Initial bulk load: install/import every persisted, enabled plugin (from the plugin_state
+    database table), publish the complete catalogue in one atomic snapshot, then run template
+    ingestion for each successfully loaded plugin.
     """
     logger.info("starting initial plugin load")
     check_environment_baseline()
     lookup: dict[PluginCompositeId, Plugin] = {}
     errors: dict[PluginCompositeId, PluginErrors] = {}
-    for pluginKey, pluginSettings in plugins.items():
-        plugin_id_str = PluginCompositeId.to_str(pluginKey)
-        db_state = get_plugin_state(plugin_id_str)
-        if db_state is not None and not db_state.enabled:
+    for pluginKey, db_state in get_all_plugin_states_by_id().items():
+        plugin_id_str = db_state.plugin_id
+        if not db_state.enabled:
             logger.info(f"skipping disabled plugin {pluginKey}")
             continue
+        pluginSettings = db_state.to_settings()
         installed_versions: dict[str, str] = {}
         install_error: str | None = None
         # NOTE consider running all pip invocations at once -- worse error reporting but better perf
@@ -165,7 +164,15 @@ def load_plugins(plugins: PluginsSettings) -> None:
                 err_msg = f"plugin {pluginKey} state not found -- install originally failed?"
                 logger.error(err_msg)
                 errors[pluginKey] = PluginErrors([PluginError(source="load", severity="error", detail=err_msg)])
-                upsert_plugin_state(plugin_id=plugin_id_str, version=version_imported, enabled=True, plugin_errors=PluginErrors([]))
+                upsert_plugin_state(
+                    plugin_id=plugin_id_str,
+                    version=version_imported,
+                    pip_source=pluginSettings.pip_source,
+                    module_name=pluginSettings.module_name,
+                    update_strategy=pluginSettings.update_strategy,
+                    enabled=True,
+                    plugin_errors=PluginErrors([]),
+                )
             else:
                 db_ver = fresh_state.plugin_version
                 if db_ver != version_imported:
@@ -202,6 +209,9 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
             upsert_plugin_state(
                 plugin_id=plugin_id_str,
                 version="install failed",
+                pip_source=pluginSettings.pip_source,
+                module_name=pluginSettings.module_name,
+                update_strategy=pluginSettings.update_strategy,
                 plugin_errors=PluginErrors([PluginError(source="install", severity="error", detail=install_result.e)]),
             )
             raise RuntimeError(f"install failed for {pluginId}: {install_result.e}")
@@ -229,9 +239,22 @@ def update_single(pluginId: PluginCompositeId, pluginSettings: PluginSettings, i
     if not publish_single_snapshot(pluginId, result.t, new_errs):
         raise ValueError("failed to acquire the shared lock")
     if version_install is not None:
-        upsert_plugin_state(plugin_id=plugin_id_str, version=version_install, plugin_errors=PluginErrors([]))
+        upsert_plugin_state(
+            plugin_id=plugin_id_str,
+            version=version_install,
+            pip_source=pluginSettings.pip_source,
+            module_name=pluginSettings.module_name,
+            update_strategy=pluginSettings.update_strategy,
+            plugin_errors=PluginErrors([]),
+        )
     else:
-        upsert_plugin_state(plugin_id=plugin_id_str, plugin_errors=PluginErrors([]))
+        upsert_plugin_state(
+            plugin_id=plugin_id_str,
+            pip_source=pluginSettings.pip_source,
+            module_name=pluginSettings.module_name,
+            update_strategy=pluginSettings.update_strategy,
+            plugin_errors=PluginErrors([]),
+        )
     if result.t is not None:
         ingest_plugin_templates(pluginId, result.t)
     logger.debug(f"single plugin loading finished: {pluginId}")
@@ -251,16 +274,10 @@ def unload_single(plugin_id: PluginCompositeId) -> None:
 
 
 def uninstall_plugin_sync(plugin_id: PluginCompositeId) -> None:
-    """Delete a plugin's DB state, remove its config entry, and unload its in-memory
-    catalogue/templates. Runs synchronously on a ``PluginManagement`` worker, so direct
-    (not pool-bridged) DB and config access is correct here.
+    """Delete a plugin's DB state and unload its in-memory catalogue/templates. Runs
+    synchronously on a ``PluginManagement`` worker, so direct (not pool-bridged) DB access
+    is correct here. The caller is responsible for verifying the plugin is actually
+    installed beforehand.
     """
-    if plugin_id not in config.external.plugins:
-        raise ValueError(f"plugin {plugin_id} not installed")
     delete_plugin_state(plugin_id=PluginCompositeId.to_str(plugin_id))
-    with timed_acquire(config_edit_lock, 5) as result:
-        if not result:
-            raise ValueError("failed to acquire the shared lock")
-        config.external.plugins.pop(plugin_id)
-        config.save_to_file()
     unload_single(plugin_id)

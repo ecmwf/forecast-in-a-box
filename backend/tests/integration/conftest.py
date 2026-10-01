@@ -23,12 +23,11 @@ from forecastbox.utility.config import (
     GatewayStartupParams,
     LocalGateway,
     PluginCompositeIdReadable,
-    PluginSettings,
     PluginStoreConfig,
     validate_runtime,
 )
 
-from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token
+from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token, retry_until
 
 fake_artifact_registry_port = 12001
 fake_artifact_store_id = "test_store"
@@ -183,7 +182,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
         config.backend.data_path = f"file://{td_data.name}"
         config.backend.allow_scheduler = True
-        plugin_test_loc = pathlib.Path(__file__).parent.parent / "packages" / "fiab-plugin-test"
+        plugin_test_loc = pathlib.Path(__file__).parent.parent.parent / "packages" / "fiab-plugin-test"
         config.external.artifact_stores = {
             ArtifactStoreId(fake_artifact_store_id): ArtifactStoreConfig(
                 url=f"http://localhost:{fake_artifact_registry_port}/artifacts.json",
@@ -192,16 +191,11 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         }
         config.external.plugin_stores = {
             PluginStoreId("localTest"): PluginStoreConfig(
-                url=f"file://{plugin_test_loc}",
+                url=f"-e file://{plugin_test_loc}",
                 method="localSingle",
             ),
         }
-        config.external.plugins = {
-            testPluginId: PluginSettings(
-                pip_source=f"-e file://{plugin_test_loc}",
-                module_name="fiab_plugin_test",
-            ),
-        }
+        config.external.default_plugins = [testPluginId]
 
         config.backend.launch_browser = False
         config.auth.domain_allowlist_registry = ["somewhere.org"]
@@ -218,6 +212,38 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         client = httpx.Client(base_url=config.backend.local_url() + "/api/v1", follow_redirects=True)
         # we need to call admin register before yielding this to anybody, because the first registered user is admin
         _register_user(client, "admin@somewhere.org", "adminPassword")
+
+        # Install the configured default plugins exactly the way an admin would through the API (the
+        # backend itself never installs plugins implicitly at startup -- see `default_plugins` in
+        # `ExternalServicesSettings`): log in as the just-registered admin, wait for the plugin subsystem
+        # to finish its asynchronous store initialization, submit an install for each default plugin id,
+        # then poll `/status` again for it to settle back to "ok" so every test can assume the default
+        # (test) plugin is already installed and loaded.
+        def _poll_status() -> dict:
+            response = client.get("/status", timeout=10)
+            response.raise_for_status()
+            return response.json()
+
+        def _plugins_settled(data: dict) -> dict | None:
+            return data if data.get("plugins") == "ok" else None
+
+        retry_until(_poll_status, _plugins_settled, attempts=60, sleep=1.0, error_msg="plugin stores did not become ready")
+
+        with httpx.Client(base_url=str(client.base_url), follow_redirects=True) as admin_setup_client:
+            login_response = admin_setup_client.post(
+                "/auth/jwt/login", data={"username": "admin@somewhere.org", "password": "adminPassword"}
+            )
+            assert login_response.is_success, f"admin login failed: {login_response.text}"
+            token = extract_auth_token_from_response(login_response)
+            assert token is not None, "admin token should not be None"
+            admin_setup_client.cookies.set(**prepare_cookie_with_auth_token(token))
+
+            for plugin_id in config.external.default_plugins:
+                install_response = admin_setup_client.post("/plugin/install", json=plugin_id.model_dump())
+                assert install_response.is_success, f"failed to submit install of {plugin_id}: {install_response.text}"
+
+        retry_until(_poll_status, _plugins_settled, attempts=60, sleep=1.0, error_msg="default plugin install did not settle")
+
         yield client
     finally:
         if client is not None:
