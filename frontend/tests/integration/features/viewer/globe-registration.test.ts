@@ -354,6 +354,23 @@ describe('globe registration', () => {
     }
   })
 
+  it('draws a layer whose server ignores the requested size', async () => {
+    // Wider than any GPU's texture limit: uploaded as is, it would fail.
+    const oversized = await solidPng([0, 0, 17000, 40], 1, SOLID)
+    worker.use(
+      http.get(ENDPOINT, ({ request }) => {
+        if (new URL(request.url).searchParams.get('LAYERS') !== 'oversized')
+          return
+        return HttpResponse.arrayBuffer(oversized, {
+          headers: { 'Content-Type': 'image/png' },
+        })
+      }),
+    )
+    engine.setLayers([spec('oversized', 1)])
+    await engine.whenLoaded()
+    expect(near(frame(engine).at(WIDTH / 2, HEIGHT / 2), SOLID, 12)).toBe(true)
+  })
+
   it('reads every world marker back at its own lon/lat', async () => {
     engine.setLayers([spec('world', 1)])
     await engine.whenLoaded()
@@ -936,6 +953,26 @@ describe('globe registration', () => {
     const budget = textureLedger.budget
     // Room for three first images (1024 px wide, with mipmaps), none of the sharper ones.
     textureLedger.budget = 11 * 2 ** 20
+    // A server honouring WIDTH/HEIGHT: the ledger counts what arrives.
+    worker.use(
+      http.get(ENDPOINT, async ({ request }) => {
+        const url = new URL(request.url)
+        const name = url.searchParams.get('LAYERS')
+        if (name !== 'solid' && name !== 'world') return
+        const [s, w, n, e] = (url.searchParams.get('BBOX') ?? '')
+          .split(',')
+          .map(Number)
+        const size = [
+          Number(url.searchParams.get('WIDTH')),
+          Number(url.searchParams.get('HEIGHT')),
+        ] as const
+        const markers = name === 'world' ? WORLD_MARKERS : []
+        const body = await markerPng([w, s, e, n], size, markers, 8)
+        return HttpResponse.arrayBuffer(body, {
+          headers: { 'Content-Type': 'image/png' },
+        })
+      }),
+    )
     try {
       engine.setCamera({ lon: -45, lat: 15, zoom: 6 })
       engine.setLayers([

@@ -131,6 +131,7 @@ function fetchBitmap(
   spec: GlobeLayerSpec,
   region: Region,
   size: readonly [number, number],
+  cap: readonly [number, number],
   signal: AbortSignal,
 ): Promise<ImageBitmap> {
   const url = regionGetMapUrl(spec, region, size)
@@ -145,6 +146,21 @@ function fetchBitmap(
         colorSpaceConversion: 'none',
       }),
     )
+    .then((bitmap) => {
+      const k = Math.min(1, cap[0] / bitmap.width, cap[1] / bitmap.height)
+      if (k === 1) return bitmap
+      // Past the GPU's or our limit (a server ignoring WIDTH/HEIGHT): shrink to fit, averaged as minified textures are.
+      log.warn(
+        `GetMap for ${spec.layerName} returned ${bitmap.width}x${bitmap.height}, past ${cap[0]}x${cap[1]}`,
+      )
+      return createImageBitmap(bitmap, {
+        resizeWidth: Math.max(1, Math.floor(bitmap.width * k)),
+        resizeHeight: Math.max(1, Math.floor(bitmap.height * k)),
+        resizeQuality: 'high',
+        premultiplyAlpha: 'premultiply',
+        colorSpaceConversion: 'none',
+      }).finally(() => bitmap.close())
+    })
 }
 
 /** `region` as one bitmap; past 180 deg two halves, joined. */
@@ -152,11 +168,14 @@ async function fetchRegion(
   spec: GlobeLayerSpec,
   region: Region,
   scale: number,
+  cap: readonly [number, number],
   signal: AbortSignal,
 ): Promise<{ bitmap: ImageBitmap; region: Region }> {
   const plan = requestParts(region, scale)
   const results = await Promise.allSettled(
-    plan.parts.map((part) => fetchBitmap(spec, part.region, part.size, signal)),
+    plan.parts.map((part) =>
+      fetchBitmap(spec, part.region, part.size, cap, signal),
+    ),
   )
   const bitmaps = results.flatMap((r) =>
     r.status === 'fulfilled' ? [r.value] : [],
@@ -313,13 +332,21 @@ export function createTextureStore({
     entry.detail = tile
     holdBytes(tile, bytesOf(regionSize(region, scale)))
     setInFlight(1)
-    fetchRegion(entry.spec, region, scale, controller.signal)
+    fetchRegion(
+      entry.spec,
+      region,
+      scale,
+      limits(entry.spec),
+      controller.signal,
+    )
       .then(({ bitmap, region: shown }) => {
         if (controller.signal.aborted || disposed) {
           bitmap.close()
           return
         }
         dropTile(tile)
+        // What arrived, not what was asked: a server may send another size.
+        holdBytes(tile, bytesOf([bitmap.width, bitmap.height]))
         commitBytes(tile)
         tile.pending = bitmap
         tile.box = boxOf(shown)
@@ -366,6 +393,7 @@ export function createTextureStore({
       entry.spec,
       region,
       regionSize(region, scale),
+      limits(entry.spec),
       controller.signal,
     )
       .then((bitmap) => {
@@ -374,6 +402,7 @@ export function createTextureStore({
           return
         }
         dropTexture(entry)
+        holdBytes(entry, bytesOf([bitmap.width, bitmap.height]))
         commitBytes(entry)
         entry.pending = bitmap
         entry.shownKey = paramsKey
