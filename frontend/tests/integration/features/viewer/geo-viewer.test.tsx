@@ -1981,6 +1981,39 @@ describe('GeoViewer layer browser grouping', () => {
       .toBeInTheDocument()
   })
 
+  it('opens a large, clustering catalog flat too', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    // Fourteen titles, twelve of them in two prefix clusters.
+    const cluster = (prefix: string, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        name: `${prefix.replace(/ /g, '')}${i}`,
+        title: `${prefix} level ${i + 1}`,
+      }))
+    registerMockWmsServer(portA, {
+      layers: [
+        ...cluster('Carbon dioxide at', 6),
+        ...cluster('Ozone mixing ratio at', 6),
+        { name: 'ws', title: 'Wind speed 10m' },
+        { name: 'msl', title: 'Mean sea level pressure' },
+      ],
+    })
+    registerMockWmsServer(portB, { layers: [] })
+    const screen = await render(
+      <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
+    )
+
+    await expect
+      .element(screen.getByText('Carbon dioxide at level 1'))
+      .toBeVisible()
+    expect(screen.getByText('6 layers').elements()).toHaveLength(0)
+    await expect
+      .element(screen.getByRole('button', { name: 'Group similar layers' }))
+      .toHaveAttribute('aria-pressed', 'false')
+    await screen.getByRole('button', { name: 'Group similar layers' }).click()
+    await expect.element(screen.getByText('6 layers').first()).toBeVisible()
+  })
+
   it('the group toggle clusters flat full-title rows on demand', async () => {
     const portA = nextPort++
     const portB = nextPort++
