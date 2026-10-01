@@ -24,7 +24,7 @@ from qubed import Qube
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.anemoi.utils import CheckpointArtifact, get_checkpoint_enum_type
-from fiab_plugin_ecmwf.block_utils import ENSEMBLE
+from fiab_plugin_ecmwf.constants import ENSEMBLE
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, datacubes, expand
 
 # ---------------------------------------------------------------------------

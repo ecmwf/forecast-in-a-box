@@ -1,37 +1,9 @@
-import functools
 from typing import Any
 
-from fiab_core.fable import ConfigurationOptionId, QubedOutput
+from fiab_core.fable import QubedOutput
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
 from pymetkit.paramdb import ParamDB
 from qubed import Qube
-
-BASE_TIME = ConfigurationOptionId("base_time")
-CHECKPOINT = ConfigurationOptionId("checkpoint")
-COMPARISON = ConfigurationOptionId("comparison")
-DIMENSION = ConfigurationOptionId("dimension")
-DATE = ConfigurationOptionId("date")
-DOMAIN = ConfigurationOptionId("domain")
-ENSEMBLE = ConfigurationOptionId("number")
-FORECAST = ConfigurationOptionId("forecast")
-FORMAT = ConfigurationOptionId("format")
-GROUPBY = ConfigurationOptionId("groupby")
-INPUT_SOURCE = ConfigurationOptionId("input_source")
-LEAD_TIME = ConfigurationOptionId("lead_time")
-LEVEL = ConfigurationOptionId("levelist")
-LEVTYPE = ConfigurationOptionId("levtype")
-PARAM = ConfigurationOptionId("param")
-PATH = ConfigurationOptionId("path")
-SOURCE = ConfigurationOptionId("source")
-SPLITBY = ConfigurationOptionId("splitby")
-STATISTIC = ConfigurationOptionId("statistic")
-STEP = ConfigurationOptionId("step")
-THRESHOLD = ConfigurationOptionId("threshold")
-TIME = ConfigurationOptionId("time")
-TYPE = ConfigurationOptionId("type")
-VALUES = ConfigurationOptionId("values")
-QUANTILE = ConfigurationOptionId("quantile")
-
 
 ParamDBInstance = ParamDB()
 

@@ -33,7 +33,7 @@ from fiab_core.types.traits import DivisibleBy, Positive
 from qubed import Qube
 from qubed.value_types import QEnum
 
-from fiab_plugin_ecmwf.block_utils import (
+from fiab_plugin_ecmwf.constants import (
     BASE_TIME,
     CHECKPOINT,
     DATE,

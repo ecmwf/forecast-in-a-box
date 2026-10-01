@@ -31,7 +31,8 @@ from qubed import Qube
 
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource
-from fiab_plugin_ecmwf.block_utils import (
+from fiab_plugin_ecmwf.blocks import OperationalForecastSource
+from fiab_plugin_ecmwf.constants import (
     BASE_TIME,
     CHECKPOINT,
     COMPARISON,
@@ -45,7 +46,6 @@ from fiab_plugin_ecmwf.block_utils import (
     THRESHOLD,
     TYPE,
 )
-from fiab_plugin_ecmwf.blocks import OperationalForecastSource
 from fiab_plugin_ecmwf.products.blocks import (
     CustomThresholdProbability,
     EnsembleStatistics,

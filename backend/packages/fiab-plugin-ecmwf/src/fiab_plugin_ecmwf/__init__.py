@@ -16,12 +16,11 @@ from fiab_core.tools.plugins import QubedPluginBuilder
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.blocks import (
-    GribSink,
-    MapPlotSink,
     OperationalForecastSource,
     Select,
-    ZarrSink,
 )
+from fiab_plugin_ecmwf.output.blocks import GribSink, ZarrSink
+from fiab_plugin_ecmwf.plotting.blocks import MapPlotSink
 from fiab_plugin_ecmwf.products.blocks import (
     CustomThresholdProbability,
     EnsembleStatistics,
