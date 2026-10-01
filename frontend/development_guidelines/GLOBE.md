@@ -75,6 +75,18 @@ reloads MapLibre's style mid-bend.
   per frame.
 - `globe-render.ts` uploads and draws what the store hands it; it owns no loading state.
 
+## Camera and basemap
+
+- Zoom is neutral (centre ground m/px), measured from what MapLibre renders. Its range is mapped
+  to MapLibre's zoom on every move: the ceiling at the current latitude, the floor (a globe
+  radius) at the equator, because MapLibre applies `minZoom` as a globe size at any latitude but
+  `maxZoom` as is.
+- If Carto's style cannot load (offline, intranet), the engine falls back to the outline, toasts
+  once, and tries Carto again only when the basemap choice changes. Our outline style is passed
+  built, not through `transformStyle`: MapLibre defers that until the current style loads, and
+  a failed style never does.
+- A map that has not loaded after 10 s fails its mount; the panel hands back to the flat map.
+
 ## Invariants and their tests
 
 | Invariant                                         | Test                                                             |
