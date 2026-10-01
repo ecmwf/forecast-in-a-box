@@ -32,8 +32,12 @@ import type {
   GlobeBasemapSpec,
   GlobeCamera,
   GlobeEngine,
+  GlobeEngineEvents,
   ViewportDraw,
 } from './engine'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('globe')
 
 const MAX_ZOOM = GLOBE_ENGINE.maxZoom
 const MAPLIBRE_MIN_ZOOM = -2
@@ -157,6 +161,9 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   let basemap: GlobeBasemapSpec | null = null
   /** Vector style currently loaded (null = the empty globe style). */
   let styleUrl: string | null = null
+  /** A vector style that failed to load: the outline stands in until the choice changes. */
+  let failedStyleUrl: string | null = null
+  let events: GlobeEngineEvents | null = null
   let styleReady = false
   let outlineKey = ''
   let attribution: AttributionControl | null = null
@@ -256,19 +263,37 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     if (!m) return
     styleUrl = url
     styleReady = false
-    m.setStyle(url ?? GLOBE_STYLE, {
-      diff: false,
-      transformStyle: (_prev, next) => ({
-        ...next,
-        projection: PROJECTION,
-        state: {
-          ...next.state,
-          [BASEMAP_OPACITY]: { default: (basemap?.opacity ?? 1) * cartoShown },
-        },
-        layers: next.layers.map(withBasemapOpacity),
-      }),
+    const ours = (next: StyleSpecification): StyleSpecification => ({
+      ...next,
+      projection: PROJECTION,
+      state: {
+        ...next.state,
+        [BASEMAP_OPACITY]: { default: (basemap?.opacity ?? 1) * cartoShown },
+      },
+      layers: next.layers.map(withBasemapOpacity),
     })
+    // Ours is built here: MapLibre defers a transformStyle until the current style loads, and a failed one never does.
+    if (url === null) m.setStyle(ours(GLOBE_STYLE), { diff: false })
+    else
+      m.setStyle(url, {
+        diff: false,
+        transformStyle: (_prev, next) => ours(next),
+      })
+    // Before style.load only the style itself can fail (its fetch or validation).
+    const failed = (e: { error?: unknown }) => {
+      m.off('error', failed)
+      if (map !== m || url === null) return
+      log.warn(`Basemap style failed to load: ${url}`, e.error)
+      if (styleUrl === url) {
+        failedStyleUrl = url
+        events?.onBasemapFailed()
+      }
+      // A newer choice waits behind this style in MapLibre: ours clears the way, syncBasemap loads the choice.
+      loadStyle(null)
+    }
+    m.on('error', failed)
     m.once('style.load', () => {
+      m.off('error', failed)
       if (map !== m || styleUrl !== url) return
       styleReady = true
       addLayers(m)
@@ -306,7 +331,11 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
     const m = map
     if (!m || !content || !basemap) return
     const wanted =
-      basemap.kind === 'vector' && basemap.styleUrl ? basemap.styleUrl : null
+      basemap.kind === 'vector' &&
+      basemap.styleUrl &&
+      basemap.styleUrl !== failedStyleUrl
+        ? basemap.styleUrl
+        : null
     if (wanted !== styleUrl) return loadStyle(wanted)
     content.setDecoration(basemap.kind === 'wms' ? basemap.layers : [])
     // The outline is the basemap, or Carto's stand-in while bending.
@@ -445,7 +474,8 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
   }
 
   return {
-    mount: async (el, events) => {
+    mount: async (el, handlers) => {
+      events = handlers
       container = el
       // MapLibre makes its container position: relative — give it a filled child.
       const host = document.createElement('div')
@@ -474,7 +504,7 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       canvas.removeAttribute('role')
       canvas.removeAttribute('aria-label')
       content = createGlobeContent({
-        events,
+        events: handlers,
         invalidate: () => m.triggerRepaint(),
         view: () => viewOf(m),
       })
@@ -490,14 +520,14 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
       m.on('move', (e) => {
         if (!e.originalEvent) return
         const { lon, lat, zoom } = viewOf(m)
-        events.onCameraChange({ lon, lat, zoom })
+        handlers.onCameraChange({ lon, lat, zoom })
         content?.scheduleUpgrade()
       })
       m.on('webglcontextlost', () => {
         styleReady = false
         window.clearTimeout(restoreTimer)
         restoreTimer = window.setTimeout(
-          () => events.onContextLost(),
+          () => handlers.onContextLost(),
           RESTORE_WAIT_MS,
         )
       })

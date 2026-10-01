@@ -58,6 +58,7 @@ export interface GlobeViewProps {
   registerEngine: (panel: string, engine: GlobeEngine | null) => void
   onFailure: (err: unknown) => void
   onContextLost: () => void
+  onBasemapFailed: () => void
   onRegisterFit: (fit: (() => void) | null) => void
   onRegisterFitBbox: (fit: FitBboxAction | null) => void
   /** The nav buttons' zoom step. */
@@ -81,6 +82,7 @@ export function GlobeView({
   registerEngine,
   onFailure,
   onContextLost,
+  onBasemapFailed,
   onRegisterFit,
   onRegisterFitBbox,
   onZoom,
@@ -174,6 +176,7 @@ export function GlobeView({
       register={register}
       onFailure={onFailure}
       onContextLost={onContextLost}
+      onBasemapFailed={onBasemapFailed}
       cross={side ? cross : null}
       mirrorLoupe={side && loupe.mirror}
       onZoom={onZoom}

@@ -229,10 +229,12 @@ describe('globe registration', () => {
   const requests: Array<URL> = []
   /** onLayerLoad outcomes, in order. */
   const loads: Array<boolean> = []
+  let basemapFailures = 0
 
   beforeEach(async () => {
     requests.length = 0
     loads.length = 0
+    basemapFailures = 0
     const world = await markerPng([-180, -90, 180, 90], 4, WORLD_MARKERS, 8)
     const region = await markerPng(REGION, 10, [REGION_MARKER], 10)
     const solid = await solidPng([-180, -90, 180, 90], 4, SOLID)
@@ -281,6 +283,7 @@ describe('globe registration', () => {
       onLayerLoad: (_key, _time, ok) => loads.push(ok),
       onLoadingChange: () => {},
       onContextLost: () => {},
+      onBasemapFailed: () => basemapFailures++,
     })
     engine.setCamera(CAMERA)
     engine.setBasemap({ kind: 'outline', theme: 'light', opacity: 1 })
@@ -327,6 +330,28 @@ describe('globe registration', () => {
     expect(Math.abs(floors[1] - floors[0])).toBeLessThanOrEqual(2)
     engine.setCamera({ lon: 0, lat: 0, zoom: -10 })
     expect(shownZoom()).toBeCloseTo(globeMinZoom(WIDTH, HEIGHT), 1)
+  })
+
+  it('keeps the data on the outline when the basemap style cannot load', async () => {
+    const styleUrl = 'http://localhost:9911/unreachable-style.json'
+    let styleRequests = 0
+    worker.use(
+      http.get(styleUrl, () => {
+        styleRequests++
+        return new HttpResponse(null, { status: 503 })
+      }),
+    )
+    engine.setLayers([spec('world', 1)])
+    await engine.whenLoaded()
+    engine.setBasemap({ kind: 'vector', styleUrl, theme: 'light', opacity: 1 })
+    await expect.poll(() => basemapFailures).toBe(1)
+    // Reported once, not retried in a loop.
+    await new Promise((r) => setTimeout(r, 500))
+    expect(styleRequests).toBe(1)
+    expect(basemapFailures).toBe(1)
+    for (const m of WORLD_MARKERS) {
+      expect(readoutError(engine, m)).toBeLessThan(0.3)
+    }
   })
 
   it('reads every world marker back at its own lon/lat', async () => {

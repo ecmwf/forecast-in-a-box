@@ -484,6 +484,7 @@
     "panel": "3D globe, source {{slot}}",
     "toolUnavailable": "Not available on the 3D globe",
     "contextLost": "The 3D globe stopped (graphics context lost), back to the flat map",
+    "basemapFailed": "The basemap did not load, so the globe shows the outline map",
     "failed": "The 3D globe could not start, staying on the flat map",
     "unsupported": "This browser cannot show the 3D globe, showing the flat map"
   },

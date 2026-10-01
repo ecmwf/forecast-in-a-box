@@ -89,6 +89,7 @@ export interface GlobeViewer extends GlobeMode {
   warmUp: () => void
   onFailure: (err: unknown) => void
   onContextLost: () => void
+  onBasemapFailed: () => void
   /** Nudge the globe by screen px; false when the flat map should pan. */
   pan: (dx: number, dy: number) => boolean
   /** Step the globe's zoom (eased, within range); false when the flat map should. */
@@ -181,6 +182,16 @@ export function useGlobeViewer({
     fail()
     setWarm(false)
   }, [fail, t])
+  // Each panel's engine reports: one toast.
+  const onBasemapFailed = useCallback(
+    () =>
+      showToast.info(
+        t('globe.basemapFailed'),
+        undefined,
+        'globe-basemap-failed',
+      ),
+    [t],
+  )
 
   const projectionId: ProjectionId =
     globe.phase === 'entering' || globe.phase === 'globe' ? 'globe' : flatId
@@ -248,6 +259,7 @@ export function useGlobeViewer({
     warmUp,
     onFailure,
     onContextLost,
+    onBasemapFailed,
     pan,
     zoomBy,
     zoomToResolution,

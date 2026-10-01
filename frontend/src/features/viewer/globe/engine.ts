@@ -85,6 +85,8 @@ export interface GlobeEngineEvents {
   onLayerLoad: (key: string, time: string | null, ok: boolean) => void
   onLoadingChange: (inFlight: number) => void
   onContextLost: () => void
+  /** The vector basemap's style did not load; the outline stands in. */
+  onBasemapFailed: () => void
 }
 
 export interface GlobeEngine {

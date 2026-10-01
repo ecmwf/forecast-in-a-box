@@ -67,6 +67,7 @@ describe('globe bend cut', () => {
       onLayerLoad: () => {},
       onLoadingChange: () => {},
       onContextLost: () => {},
+      onBasemapFailed: () => {},
     })
     engine.setBasemap({ kind: 'outline', theme: 'light', opacity: 1 })
     // The outline data resolves asynchronously.

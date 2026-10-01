@@ -56,6 +56,7 @@ export function GlobePanel({
   register,
   onFailure,
   onContextLost,
+  onBasemapFailed,
   cross,
   mirrorLoupe,
   onZoom,
@@ -72,6 +73,7 @@ export function GlobePanel({
   register: (panel: string, engine: GlobeEngine | null) => void
   onFailure: (err: unknown) => void
   onContextLost: () => void
+  onBasemapFailed: () => void
   /** Side-by-side: the shared crosshair; null in a single panel. */
   cross: ValueStore<CrossPosition> | null
   mirrorLoupe: boolean
@@ -110,6 +112,7 @@ export function GlobePanel({
     basemap: panelBasemap,
     onFailure,
     onContextLost,
+    onBasemapFailed,
   })
   useLayoutEffect(() => {
     latest.current = {
@@ -118,6 +121,7 @@ export function GlobePanel({
       basemap: panelBasemap,
       onFailure,
       onContextLost,
+      onBasemapFailed,
     }
   })
   const zBase = slot === 'a' ? 100 : 200
@@ -148,6 +152,7 @@ export function GlobePanel({
           },
           onLoadingChange: setInFlight,
           onContextLost: () => latest.current.onContextLost(),
+          onBasemapFailed: () => latest.current.onBasemapFailed(),
         })
         if (isCancelled()) return
         mounted.setCamera(camera.get())

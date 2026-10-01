@@ -1302,6 +1302,7 @@ export function GeoViewer({
               registerEngine={globe.registerEngine}
               onFailure={globe.onFailure}
               onContextLost={globe.onContextLost}
+              onBasemapFailed={globe.onBasemapFailed}
               onRegisterFit={onRegisterFit}
               onRegisterFitBbox={onRegisterFitBbox}
               onZoom={zoomGlobe}
