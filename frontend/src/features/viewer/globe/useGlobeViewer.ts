@@ -26,6 +26,7 @@ import { DEFAULT_PROJECTION_ID } from '../projection-ids'
 import { navEaseMs } from '../geo/map-nav'
 import { GLOBE_ENGINE } from './engine-entry'
 import {
+  GLOBE_HOME_CAMERA,
   flatKindOf,
   globeMinZoom,
   groundMppFromZoom,
@@ -53,7 +54,7 @@ export function globeStartCamera(
   initial: ViewerUrlState | null,
 ): GlobeCamera | null {
   if (initial?.projection !== 'globe' || !supportsGlobe()) return null
-  return initial.camera ?? { lon: 10, lat: 30, zoom: 1.5 }
+  return initial.camera ?? GLOBE_HOME_CAMERA
 }
 
 /** The flat panels' pixels now (DOM order a, b): the bend starts from them. */

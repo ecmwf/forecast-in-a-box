@@ -20,6 +20,7 @@ import {
 import { AUTOFIT_KEY, createViewerView } from '../hooks/useOlMapBase'
 import { getViewerProjection, viewerProjectionOf } from '../projections'
 import {
+  GLOBE_HOME_CAMERA,
   applyGlobeCamera,
   clampCameraLat,
   createSharedGlobeCamera,
@@ -111,7 +112,7 @@ export function useGlobeMode({
   }, [])
   const phaseRef = useRef(phase)
   const [camera] = useState(() =>
-    createSharedGlobeCamera(initialCamera ?? { lon: 10, lat: 30, zoom: 1 }),
+    createSharedGlobeCamera(initialCamera ?? GLOBE_HOME_CAMERA),
   )
   const enginesRef = useRef(new Map<string, GlobeEngine>())
   const readyWaitersRef = useRef<Array<() => void>>([])

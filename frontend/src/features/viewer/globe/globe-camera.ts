@@ -58,6 +58,9 @@ export function globeMinZoom(width: number, height: number): number {
   return zoomForRadius(MIN_RADIUS * Math.min(width, height))
 }
 
+/** Where a globe with no camera of its own starts. */
+export const GLOBE_HOME_CAMERA: GlobeCamera = { lon: 10, lat: 30, zoom: 1.5 }
+
 /** The camera centre's latitude, kept off the poles. */
 export const clampCameraLat = (lat: number) => Math.max(-85, Math.min(85, lat))
 
