@@ -18,7 +18,8 @@ And similarly to the `fiab.sh`, you can configure it arbitrarily, including edit
 
 ## Configuration
 
-The `fiab.sh` allows for numerous environment variables, like which released version to pull, what `uv` or `venv` to use, where to actually install, et cetera.
+The `fiab.sh` allows for a few environment variables, like what `uv` to use, where to actually install, et cetera.
+The released version is never changed by a regular run -- use `fiab.sh upgrade [version]` or `fiab.sh reinstall [version]` for that, see `fiab.sh help`.
 Those make no sense for `just dev`, because that's hardwired to use the state of the repository.
 
 Behavioral and runtime configuration, like where to read plugins from or what port to bind comes from `config.toml` (whose individual entires can also be superseded by an envvar).
@@ -34,6 +35,6 @@ Forecast-in-a-Box is persistent -- meaning plugin installation, job submission h
 This persistence is via sqlite databases, `jobs.db` and `user.db`, located in either `~/.fiab` or `<repo>/backend/.fiab` directories, depending on launch method.
 The database is created from scratch if not found -- meaning if you need to clean history completely, just delete the `.db` files.
 You can also manually manipulate entries in the database if you need a fine surgery.
-Alternative to get a tabula rasa is giving `--full-reinstall` to either `just dev` or `fiab.sh`, which is a more thorough wipe than just the db.
+Alternative to get a tabula rasa is `just dev reinstall` or `fiab.sh reinstall`, which is a more thorough wipe than just the db.
 
 There is some persistence in the browser cache, so in case the frontend seems glitchy, do a force reload.

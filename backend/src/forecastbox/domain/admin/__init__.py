@@ -120,7 +120,8 @@ def mark_release(release: Release) -> None:
     if not Globals.ReleaseMarker:
         raise ValueError("couldnt determine Release Marker path -- fiab.sh launcher incorrectly executed?")
     releaseMarker = Path(Globals.ReleaseMarker)
-    releaseMarker.write_text(f"{release}")
+    # NOTE fiab.sh expects the marker in the release tag format, ie, vX.Y.Z
+    releaseMarker.write_text(f"v{release}")
 
 
 def should_install_default_plugin() -> bool:
