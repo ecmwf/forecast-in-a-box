@@ -65,7 +65,7 @@ This is only consulted on first run (see `entrypoint.warmup` and `entrypoint.boo
 it is a list of ids, not a full plugin specification, and it is never rewritten by the backend at runtime.
 
 ## Troubleshooting
-If things go very wrong, you can wipe the `venv` and the database (in `.fiab/job.db`) (or use the `--full-reinstall`, consult [launching.md](./launching.md)).
+If things go very wrong, you can wipe the `venv` and the database (in `.fiab/job.db`) (or use the `reinstall`, consult [launching.md](./launching.md)).
 The config file itself does not need any editing -- it only ever contains plugin *stores* and, optionally, the
 ids of default plugins to auto-install on first run, never the install record of a concrete plugin.
 Next run of `just dev`/`fiab.sh` would re-create the db and venv in a pristine state.

@@ -18,7 +18,7 @@ buildRelease release_tag="":
     else
         tag="${release_tag#v}"
     fi
-    docker build --build-arg FIAB_RELEASE="$release_tag" -t "fiab-slim:${tag}" -f Dockerfile-release .
+    docker build --build-arg RELEASE_TAG="$release_tag" -t "fiab-slim:${tag}" -f Dockerfile-release .
     docker tag "fiab-slim:${tag}" fiab-slim:release
 
 buildDev:

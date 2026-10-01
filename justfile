@@ -63,8 +63,8 @@ dev *args:
     # NOTE on MacOS, empty array fails to expand in a for-safe way, hence we need
     # conditional expansion into itself (${var+"$var"} basically)
     for arg in ${args[@]+"${args[@]}"} ; do
-        if [ "$arg" == "full-reinstall" ] ; then
-            echo "full reinstall! Will drop the db and sync the venv"
+        if [ "$arg" == "reinstall" ] ; then
+            echo "reinstall! Will drop the db and sync the venv"
             pushd backend
             uv sync --extra runtime --all-packages
             rm -rf .fiab/*db

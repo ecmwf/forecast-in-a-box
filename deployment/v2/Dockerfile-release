@@ -5,12 +5,12 @@
 
 FROM fiab-base:latest 
 
-ARG FIAB_RELEASE="v0.0.0"
-ENV FIAB_RELEASE=$FIAB_RELEASE
+# NOTE the launcher is taken from main and replaces itself with the one of the release during the warmup
+ARG RELEASE_TAG="v0.0.0"
 RUN : \
-    && curl https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/$FIAB_RELEASE/scripts/fiab.sh > /home/fiab/fiab.sh \
+    && curl -fLsS https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/main/scripts/fiab.sh > /home/fiab/fiab.sh \
     && chmod u+x /home/fiab/fiab.sh \
-    && /home/fiab/fiab.sh warmup \
+    && /home/fiab/fiab.sh warmup "$RELEASE_TAG" \
     && : ;
 
 ENTRYPOINT ["/home/fiab/fiab.sh"]
