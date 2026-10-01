@@ -81,22 +81,26 @@ class NonNegative(FableTrait):
 class DivisibleBy(FableTrait):
     """Requires the value to be evenly divisible by ``n``.
 
-    ``n`` is given as a raw string, since the trait is declared independently of the type it
-    is applied to -- it may be a plain number (for Int/Float) or an ISO 8601 duration (for
-    TimeDelta). Both interpretations are attempted eagerly at construction time, and the
-    matching one is picked at validation time based on the actual value's type.
+    ``n`` is given either as a plain number (int/float, for Int/Float typed values) or as a
+    raw string, since the trait is declared independently of the type it is applied to -- a
+    string argument may be a plain number or an ISO 8601 duration (for TimeDelta). Both
+    interpretations are attempted eagerly at construction time, and the matching one is
+    picked at validation time based on the actual value's type.
     """
 
-    def __init__(self, n: str) -> None:
-        self.raw = n.strip()
+    def __init__(self, n: int | float | str) -> None:
+        self.raw = n.strip() if isinstance(n, str) else str(n)
         self.numeric: int | float | None = None
-        try:
-            self.numeric = int(self.raw)
-        except ValueError:
+        if isinstance(n, (int, float)):
+            self.numeric = n
+        else:
             try:
-                self.numeric = float(self.raw)
+                self.numeric = int(self.raw)
             except ValueError:
-                self.numeric = None
+                try:
+                    self.numeric = float(self.raw)
+                except ValueError:
+                    self.numeric = None
         self.duration: timedelta | None = try_parse_timedelta(self.raw)
         if self.numeric is None and self.duration is None:
             raise WrongType(f"divisibleBy argument {n!r} is neither a number nor a timedelta")

@@ -7,7 +7,15 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
-"""Validation utilities for block configuration values."""
+"""Validation utilities for block configuration values.
+
+Deprecated: these are a legacy, block-local alternative to declaring traits (see
+fiab_core.types.traits) directly on the configuration option's FableType, eg
+``IntType(traits=Positive())``. Traits are validated automatically wherever a value
+goes through FableType.validate_convert or BlockInstanceRich.config_as_*, so they are
+the standard approach going forward; this module is kept only for compatibility with
+existing plugins that still pass validator= callables explicitly.
+"""
 
 from .blocks import BlockInstanceConfigurationError
 

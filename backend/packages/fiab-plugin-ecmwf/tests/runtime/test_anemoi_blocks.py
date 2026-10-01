@@ -218,7 +218,7 @@ class TestAnemoiSourceValidate:
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": -1, "base_time": datetime(2024, 1, 1), "number": 1},
         )
-        with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
+        with pytest.raises(BlockInstanceConfigurationError, match="is not positive"):
             AnemoiSource().validate(
                 block=block,
                 inputs={},
@@ -246,7 +246,7 @@ class TestAnemoiSourceValidate:
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 0},
         )
-        with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
+        with pytest.raises(BlockInstanceConfigurationError, match="is not positive"):
             AnemoiSource().validate(
                 block=block,
                 inputs={},
@@ -409,7 +409,7 @@ class TestAnemoiTransformValidate:
             {"checkpoint": dummy_checkpoint, "lead_time": -1},
             input_ids={"initial conditions": "src"},
         )
-        with pytest.raises(BlockInstanceConfigurationError, match="must be positive"):
+        with pytest.raises(BlockInstanceConfigurationError, match="is not positive"):
             AnemoiTransform().validate(
                 block=block,
                 inputs={"initial conditions": anemoi_input_source_output},

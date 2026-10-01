@@ -28,8 +28,8 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
-from fiab_core.tools.validators import positive
 from fiab_core.types import ClosedEnumType, DatetimeType, IntType, OpenEnumType
+from fiab_core.types.traits import DivisibleBy, Positive
 from qubed import Qube
 from qubed.value_types import QEnum
 
@@ -186,6 +186,7 @@ class AnemoiBaseBlock:
         """Add restrictions to the block configuration options based on the checkpoint properties"""
         if not checkpoint.is_ensemble_model and checkpoint.is_ensemble_model is not None:
             restrictions[ENSEMBLE] = ClosedEnumType([1])  # Only allow single member for non-ensemble models
+        restrictions[LEAD_TIME] = IntType(traits=DivisibleBy(checkpoint.model_step))
 
     def get_input_qube(
         self, checkpoint: CheckpointArtifact, ensemble_members: int | set = 0, base_time: datetime | None = None
@@ -261,7 +262,7 @@ class AnemoiSource(Source, AnemoiBaseBlock):
         LEAD_TIME: BlockConfigurationOption(
             title="Lead time",
             description="Lead time of the forecast",
-            value_type=IntType(),
+            value_type=IntType(traits=Positive()),
         ),
         BASE_TIME: BlockConfigurationOption(
             title="Base time",
@@ -271,7 +272,7 @@ class AnemoiSource(Source, AnemoiBaseBlock):
         ENSEMBLE: BlockConfigurationOption(
             title="Ensemble Member",
             description="ID of ensemble member.",
-            value_type=IntType(),
+            value_type=IntType(traits=Positive()),
             default_value="1",
         ),
     }
@@ -279,9 +280,9 @@ class AnemoiSource(Source, AnemoiBaseBlock):
     def validate(
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
-        ensemble_members = block.config_as_int(ENSEMBLE, validator=positive)
+        ensemble_members = block.config_as_int(ENSEMBLE)
         checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
-        lead_time = block.config_as_int(LEAD_TIME, validator=positive)
+        lead_time = block.config_as_int(LEAD_TIME)
         base_time = block.config_as_datetime(BASE_TIME)
 
         self.validate_lead_time(checkpoint, lead_time)
@@ -302,9 +303,9 @@ class AnemoiSource(Source, AnemoiBaseBlock):
         datetime = strip_timezone(block.config_as_datetime(BASE_TIME))
         action = builder.from_input(
             input_source=input_source,
-            lead_time=block.config_as_int(LEAD_TIME, validator=positive),
+            lead_time=block.config_as_int(LEAD_TIME),
             date=datetime,
-            ensemble=block.config_as_int(ENSEMBLE, validator=positive),
+            ensemble=block.config_as_int(ENSEMBLE),
         )
         action.set_scalar_coords(
             {
@@ -341,7 +342,7 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
         ENSEMBLE: BlockConfigurationOption(
             title="Ensemble Member",
             description="ID of ensemble member.",
-            value_type=IntType(),
+            value_type=IntType(traits=Positive()),
             default_value="1",
         ),
     }
@@ -350,7 +351,7 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
-        ensemble_members = block.config_as_int(ENSEMBLE, validator=positive)
+        ensemble_members = block.config_as_int(ENSEMBLE)
         base_time = block.config_as_datetime(BASE_TIME)
 
         self.validate_ensemble(checkpoint, ensemble_members)
@@ -368,7 +369,7 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
         action = builder.get_initial_conditions(
             input_source=block.config_as_str(INPUT_SOURCE),
             date=base_time,
-            ensemble=block.config_as_int(ENSEMBLE, validator=positive),
+            ensemble=block.config_as_int(ENSEMBLE),
         )
         action.set_scalar_coords(
             {
@@ -394,7 +395,7 @@ class AnemoiTransform(Transform, AnemoiBaseBlock):
         LEAD_TIME: BlockConfigurationOption(
             title="Lead time",
             description="Lead time of the forecast",
-            value_type=IntType(),
+            value_type=IntType(traits=Positive()),
         ),
     }
 
@@ -402,7 +403,7 @@ class AnemoiTransform(Transform, AnemoiBaseBlock):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         checkpoint = CheckpointArtifact(block.config_as_artifactid(CHECKPOINT))
-        lead_time = block.config_as_int(LEAD_TIME, validator=positive)
+        lead_time = block.config_as_int(LEAD_TIME)
         qubed_input = checkpoint.combine_if_nested_qube(checkpoint.get_model_input())
 
         if not "initial conditions" in inputs:
@@ -434,7 +435,7 @@ class AnemoiTransform(Transform, AnemoiBaseBlock):
         builder = AnemoiBuilder(block.config_as_artifactid(CHECKPOINT))
         action = builder.from_initial_conditions(
             inputs[input_task],
-            lead_time=block.config_as_int(LEAD_TIME, validator=positive),
+            lead_time=block.config_as_int(LEAD_TIME),
         )
         return Either.ok(action)
 
