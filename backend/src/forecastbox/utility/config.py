@@ -182,6 +182,27 @@ class PluginStoreConfig(FiabBaseModel):
 PluginStoresConfig = dict[PluginStoreId, PluginStoreConfig]
 
 
+PluginRefreshStrategy = Literal["automatic", "manual"]
+"""Whether a plugin should be pip-updated automatically on every launch (``automatic``)
+or left to manual/API updates (``manual``)."""
+
+
+class DefaultPluginSettings(FiabBaseModel):
+    """Optional settings overrides applied to a default plugin right after its install.
+
+    Every field defaults to ``None``, meaning "leave the value the install produced" --
+    only the fields a user wants to override need to be specified.
+    """
+
+    is_enabled: bool | None = None
+    excluded_templates: list[str] | None = None
+    glyph_remapping: dict[str, str] | None = None
+    update_strategy: PluginRefreshStrategy | None = None
+
+
+DefaultPluginsSettingsConfig = dict[PluginCompositeIdReadable, DefaultPluginSettings]
+
+
 def _default_plugins() -> DefaultPluginIds:
     return [PluginCompositeIdReadable.from_str("ecmwf:ecmwf-base")]
 
@@ -247,10 +268,21 @@ class ExternalServicesSettings(FiabBaseModel):
     default_plugins: DefaultPluginIds = Field(default_factory=_default_plugins)
     """Ids of plugins installed automatically on first run. Does not reflect currently
     installed plugins -- see the plugin_state database table for that."""
+    default_plugins_settings: DefaultPluginsSettingsConfig = Field(default_factory=dict)
+    """Optional settings overrides applied to a subset of default_plugins right after
+    their install. Keys not present in default_plugins are rejected."""
     plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
     artifact_stores: ArtifactStoresConfig = Field(default_factory=_default_artifact_stores)
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""
+
+    @model_validator(mode="after")
+    def validate_default_plugins_settings_subset(self) -> Self:
+        unknown = set(self.default_plugins_settings) - set(self.default_plugins)
+        if unknown:
+            unknown_str = sorted(PluginCompositeId.to_str(k) for k in unknown)
+            raise ValueError(f"default_plugins_settings contains ids not present in default_plugins: {unknown_str}")
+        return self
 
     def validate_runtime(self) -> list[str]:
         errors = []

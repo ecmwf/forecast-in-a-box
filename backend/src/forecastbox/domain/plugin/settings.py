@@ -16,11 +16,10 @@ It is only ever sourced fresh from a plugin store at install time, see
 ``domain.plugin.store.resolve_plugin_from_store``.
 """
 
-from typing import Literal
-
+from forecastbox.utility.config import PluginRefreshStrategy
 from forecastbox.utility.pydantic import FiabBaseModel
 
-PluginRefreshStrategy = Literal["automatic", "manual"]
+__all__ = ["PluginRefreshStrategy", "PluginSettings"]
 
 
 class PluginSettings(FiabBaseModel):
