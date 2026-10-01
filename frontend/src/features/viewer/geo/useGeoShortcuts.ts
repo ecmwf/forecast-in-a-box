@@ -17,6 +17,7 @@
  *   C          copy the view to the clipboard
  *   E          export dialog
  *   H          help dialog
+ *   ?          show the toolbar's keys until the next key or click
  *   N          toggle the annotate tool (Esc disarms)
  *   W/A/S/D    pan the map (arrow keys too)
  *   + / -      zoom in / out one step
@@ -25,12 +26,8 @@
  * yields to it).
  */
 
-import { useEffect, useEffectEvent } from 'react'
-import {
-  formatForDisplay,
-  useHotkey,
-  useKeyHold,
-} from '@tanstack/react-hotkeys'
+import { useCallback, useEffect, useEffectEvent, useState } from 'react'
+import { formatForDisplay, useHotkey } from '@tanstack/react-hotkeys'
 import { NAV_ZOOM_STEP } from './map-nav'
 import { COMPARE_MODES } from './types'
 import type { CompareMode } from './types'
@@ -44,6 +41,7 @@ export const COMPARE_KEYS = {
   copy: 'C',
   export: 'E',
   help: 'H',
+  badges: '?',
   annotate: 'N',
   /** Hold-to-magnify (handled in LoupeOverlay, not via useHotkey). */
   loupe: 'Z',
@@ -96,6 +94,7 @@ export function useGeoShortcuts(handlers: {
   onCopy: () => void
   onExport: () => void
   onHelp: () => void
+  onToggleBadges: () => void
   onAnnotate: () => void
   /** Disarm the annotate tool; active only while it's armed (and the
    *  editor dialog is closed — the dialog owns Escape when open). */
@@ -113,6 +112,7 @@ export function useGeoShortcuts(handlers: {
     onCopy,
     onExport,
     onHelp,
+    onToggleBadges,
     onAnnotate,
     onAnnotateDisarm,
     onPan,
@@ -158,6 +158,7 @@ export function useGeoShortcuts(handlers: {
   useHotkey(COMPARE_KEYS.copy, gated(onCopy), opts)
   useHotkey(COMPARE_KEYS.export, gated(onExport), opts)
   useHotkey(COMPARE_KEYS.help, gated(onHelp), opts)
+  useHotkey(COMPARE_KEYS.badges, gated(onToggleBadges), opts)
   useHotkey(COMPARE_KEYS.annotate, gated(onAnnotate), opts)
   useHotkey('Escape', () => onAnnotateDisarm.disarm(), {
     ...opts,
@@ -182,12 +183,34 @@ export function useGeoShortcuts(handlers: {
   }, [])
 }
 
-/**
- * True while ⌘ (macOS) / Ctrl is held — the toolbar uses it to reveal
- * shortcut badges on its buttons (TanStack's global key-state tracker).
- */
-export function useShortcutReveal(): boolean {
-  const meta = useKeyHold('Meta')
-  const control = useKeyHold('Control')
-  return meta || control
+/** The toggle itself and bare modifiers (Shift types `?`) keep the badges up. */
+const KEEPS_BADGES = new Set([
+  '?',
+  'Shift',
+  'Meta',
+  'Control',
+  'Alt',
+  'AltGraph',
+])
+
+/** `?` toggles the toolbar's key badges; the next key, click or blur hides them and still acts. */
+export function useKeyBadges(): { shown: boolean; toggle: () => void } {
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    if (!shown) return
+    const hide = () => setShown(false)
+    const key = (e: KeyboardEvent) => {
+      if (!KEEPS_BADGES.has(e.key)) hide()
+    }
+    window.addEventListener('keydown', key, true)
+    window.addEventListener('pointerdown', hide, true)
+    window.addEventListener('blur', hide)
+    return () => {
+      window.removeEventListener('keydown', key, true)
+      window.removeEventListener('pointerdown', hide, true)
+      window.removeEventListener('blur', hide)
+    }
+  }, [shown])
+  const toggle = useCallback(() => setShown((v) => !v), [])
+  return { shown, toggle }
 }

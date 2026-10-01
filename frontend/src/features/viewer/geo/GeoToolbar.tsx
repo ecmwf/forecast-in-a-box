@@ -37,7 +37,7 @@ import {
   downloadAnnotationsGeojson,
   parseAnnotationsGeojson,
 } from './annotations'
-import { COMPARE_KEYS, keyLabel, useShortcutReveal } from './useGeoShortcuts'
+import { COMPARE_KEYS, keyLabel } from './useGeoShortcuts'
 import { COMPARE_MODES } from './types'
 import type { LinkMode } from './useCompareSelection'
 import type { SourceSlot } from './layer-pairing'
@@ -149,6 +149,7 @@ export function GeoToolbar({
   onProjectionChange,
   globeActive = false,
   onGlobeIntent,
+  showKeys = false,
 }: {
   /** Single-source: comparison modes + link toggle hidden. */
   solo?: boolean
@@ -193,6 +194,8 @@ export function GeoToolbar({
   globeActive?: boolean
   /** The projection menu opened and the globe is offered: warm it up. */
   onGlobeIntent?: () => void
+  /** Shortcut badges on the buttons (toggled by `?`). */
+  showKeys?: boolean
 }) {
   const { t } = useTranslation('visualise')
   // Describes each projection's note button (a short name, the note as description).
@@ -213,7 +216,6 @@ export function GeoToolbar({
   }
 
   const { t: tExec } = useTranslation('executions')
-  const reveal = useShortcutReveal()
 
   return (
     <div className="space-y-2 rounded-md border border-border bg-muted/40 px-2.5 py-2">
@@ -280,7 +282,7 @@ export function GeoToolbar({
                 >
                   <KeyBadge
                     label={keyLabel(COMPARE_KEYS.modes[index])}
-                    show={reveal}
+                    show={showKeys}
                   />
                   {t(`modes.${id}`)}
                 </button>
@@ -327,7 +329,7 @@ export function GeoToolbar({
             title={`${tExec('lens.fitView')} (${keyLabel(COMPARE_KEYS.fit)})`}
             aria-label={tExec('lens.fitView')}
           >
-            <KeyBadge label={keyLabel(COMPARE_KEYS.fit)} show={reveal} />
+            <KeyBadge label={keyLabel(COMPARE_KEYS.fit)} show={showKeys} />
             <Scan className="h-4 w-4" />
           </Button>
           <Popover onOpenChange={(open) => open && onGlobeIntent?.()}>
@@ -346,7 +348,7 @@ export function GeoToolbar({
             >
               <KeyBadge
                 label={keyLabel(COMPARE_KEYS.projection)}
-                show={reveal}
+                show={showKeys}
               />
               <Layers className="h-4 w-4" />
               <span className="text-xs">
@@ -580,7 +582,7 @@ export function GeoToolbar({
               >
                 <KeyBadge
                   label={keyLabel(COMPARE_KEYS.annotate)}
-                  show={reveal}
+                  show={showKeys}
                 />
                 <MessageSquarePlus className="h-4 w-4" />
               </Button>
@@ -634,7 +636,7 @@ export function GeoToolbar({
               title={`${tExec('lens.copyMap')} (${keyLabel(COMPARE_KEYS.copy)})`}
               aria-label={tExec('lens.copyMap')}
             >
-              <KeyBadge label={keyLabel(COMPARE_KEYS.copy)} show={reveal} />
+              <KeyBadge label={keyLabel(COMPARE_KEYS.copy)} show={showKeys} />
               <Copy className="h-4 w-4" />
             </Button>
             {copySlots && (
@@ -671,7 +673,7 @@ export function GeoToolbar({
             title={`${t('export.open')} (${keyLabel(COMPARE_KEYS.export)})`}
             aria-label={t('export.open')}
           >
-            <KeyBadge label={keyLabel(COMPARE_KEYS.export)} show={reveal} />
+            <KeyBadge label={keyLabel(COMPARE_KEYS.export)} show={showKeys} />
             <Download className="h-4 w-4" />
             {t('export.label')}
           </Button>
@@ -688,7 +690,7 @@ export function GeoToolbar({
               title={`${t('modes.loupeLatch')} (${keyLabel(COMPARE_KEYS.loupe)})`}
               aria-label={t('modes.loupeLatch')}
             >
-              <KeyBadge label={keyLabel(COMPARE_KEYS.loupe)} show={reveal} />
+              <KeyBadge label={keyLabel(COMPARE_KEYS.loupe)} show={showKeys} />
               <ZoomIn className="h-4 w-4" />
             </Button>
             <Popover>

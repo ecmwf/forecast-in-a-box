@@ -399,7 +399,6 @@
     },
     "shortcuts": {
       "title": "Keyboard shortcuts",
-      "revealHint": "Hold {{key}} to see shortcut badges on the toolbar.",
       "sidebars": "Toggle both sidebars",
       "modes": "Switch comparison mode",
       "fit": "Fit view",
@@ -410,6 +409,7 @@
       "loupe": "Magnifier loupe (hold)",
       "swipe": "Nudge the swipe divider (when focused)",
       "help": "Open this help",
+      "badges": "Show each key on the toolbar (the next key or click hides them)",
       "pan": "Pan the map (arrow keys too)",
       "zoom": "Zoom in / out",
       "annotate": "Toggle the annotate tool (Esc disarms)"

@@ -491,6 +491,27 @@ describe('GeoViewer', () => {
     press('h')
   })
 
+  it('shows the toolbar keys on ? until the next key', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    const fit = screen.getByRole('button', { name: 'Fit view' })
+    await expect.element(fit).toBeInTheDocument()
+    const badge = () => fit.element().querySelector('kbd')?.textContent ?? null
+    const press = (key: string, init: KeyboardEventInit = {}) => {
+      for (const type of ['keydown', 'keyup'])
+        document.dispatchEvent(
+          new KeyboardEvent(type, { key, bubbles: true, ...init }),
+        )
+    }
+
+    press('?', { code: 'Slash', shiftKey: true })
+    await expect.poll(badge).toBe('F')
+    // The next key hides them and still acts: B hides the sidebars.
+    press('b')
+    await expect.poll(badge).toBeNull()
+    await expect.element(screen.getByText('Active layers')).not.toBeVisible()
+  })
+
   it('offers a basemap picker with an opacity slider', async () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)

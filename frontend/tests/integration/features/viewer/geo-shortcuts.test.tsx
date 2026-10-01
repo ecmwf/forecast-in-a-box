@@ -12,14 +12,33 @@
  * Continuous-pan keyboard handling: plain WASD/arrow holds pan via rAF;
  * modifier chords are the browser's; held-state comes from TanStack's
  * tracker so macOS-swallowed keyups and window blur cannot leave the
- * camera panning forever. +/- zoom one step per press.
+ * camera panning forever. +/- zoom one step per press. `?` shows the
+ * toolbar's key badges until the next key, click or blur.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { HotkeysProvider, KeyStateTracker } from '@tanstack/react-hotkeys'
 import { NAV_ZOOM_STEP } from '@/features/viewer/geo/map-nav'
-import { useGeoShortcuts } from '@/features/viewer/geo/useGeoShortcuts'
+import {
+  useGeoShortcuts,
+  useKeyBadges,
+} from '@/features/viewer/geo/useGeoShortcuts'
+
+const IDLE = {
+  onToggleSidebars: () => {},
+  onMode: () => {},
+  onFit: null,
+  onProjectionCycle: () => {},
+  onCopy: () => {},
+  onExport: () => {},
+  onHelp: () => {},
+  onToggleBadges: () => {},
+  onAnnotate: () => {},
+  onAnnotateDisarm: { enabled: false, disarm: () => {} },
+  onPan: () => {},
+  onZoom: () => {},
+}
 
 function Harness({
   onPan,
@@ -28,20 +47,14 @@ function Harness({
   onPan: (dx: number, dy: number) => void
   onZoom: (delta: number) => void
 }) {
-  useGeoShortcuts({
-    onToggleSidebars: () => {},
-    onMode: () => {},
-    onFit: null,
-    onProjectionCycle: () => {},
-    onCopy: () => {},
-    onExport: () => {},
-    onHelp: () => {},
-    onAnnotate: () => {},
-    onAnnotateDisarm: { enabled: false, disarm: () => {} },
-    onPan,
-    onZoom,
-  })
+  useGeoShortcuts({ ...IDLE, onPan, onZoom })
   return null
+}
+
+function BadgeHarness({ onCopy }: { onCopy: () => void }) {
+  const badges = useKeyBadges()
+  useGeoShortcuts({ ...IDLE, onCopy, onToggleBadges: badges.toggle })
+  return badges.shown ? <kbd>badges</kbd> : null
 }
 
 function renderHarness(
@@ -169,5 +182,58 @@ describe('useGeoShortcuts zoom keys', () => {
 
     expect(onZoom).not.toHaveBeenCalled()
     expect(cmdPlus.defaultPrevented).toBe(false)
+  })
+})
+
+describe('useKeyBadges', () => {
+  const press = (init: KeyboardEventInit) => {
+    pressKey('keydown', init)
+    pressKey('keyup', init)
+  }
+  const QUESTION = { key: '?', code: 'Slash', shiftKey: true }
+
+  async function renderBadges(onCopy = () => {}) {
+    return render(
+      <HotkeysProvider>
+        <BadgeHarness onCopy={onCopy} />
+      </HotkeysProvider>,
+    )
+  }
+
+  it('toggles on ? (typed with Shift) and off again', async () => {
+    const screen = await renderBadges()
+    press({ key: 'Shift', shiftKey: true })
+    press(QUESTION)
+    await expect.element(screen.getByText('badges')).toBeInTheDocument()
+    // Shift on its way to the second ? leaves them up for the toggle.
+    press({ key: 'Shift', shiftKey: true })
+    await settle(50)
+    await expect.element(screen.getByText('badges')).toBeInTheDocument()
+    press(QUESTION)
+    await expect.element(screen.getByText('badges')).not.toBeInTheDocument()
+  })
+
+  it('hides them on the next key, whose shortcut still runs', async () => {
+    const onCopy = vi.fn()
+    const screen = await renderBadges(onCopy)
+    press(QUESTION)
+    await expect.element(screen.getByText('badges')).toBeInTheDocument()
+    press({ key: 'c' })
+    await expect.element(screen.getByText('badges')).not.toBeInTheDocument()
+    expect(onCopy).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides them on a click or when the window loses focus', async () => {
+    const screen = await renderBadges()
+    press(QUESTION)
+    await expect.element(screen.getByText('badges')).toBeInTheDocument()
+    document.body.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true }),
+    )
+    await expect.element(screen.getByText('badges')).not.toBeInTheDocument()
+    press(QUESTION)
+    await expect.element(screen.getByText('badges')).toBeInTheDocument()
+    window.dispatchEvent(new Event('blur'))
+    await expect.element(screen.getByText('badges')).not.toBeInTheDocument()
   })
 })

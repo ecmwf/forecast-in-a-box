@@ -81,7 +81,7 @@ import { useViewerExport } from './useViewerExport'
 import { useProjectionOptions } from './useProjectionOptions'
 import { useViewerTimeline } from './useViewerTimeline'
 import { downloadAnnotationsGeojson } from './annotations'
-import { useGeoShortcuts } from './useGeoShortcuts'
+import { useGeoShortcuts, useKeyBadges } from './useGeoShortcuts'
 import { panView, zoomView } from './map-nav'
 import { GeoTimeSlider } from './GeoTimeSlider'
 import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
@@ -841,6 +841,7 @@ export function GeoViewer({
     slotIds: { a: a.id, b: bId },
   })
 
+  const keyBadges = useKeyBadges()
   useGeoShortcuts({
     onProjectionCycle: cycleProjection,
     // Any open → collapse both; else restore (one sheet only on phones).
@@ -857,6 +858,7 @@ export function GeoViewer({
     onCopy: () => copyView(null),
     onExport: () => setExportOpen(true),
     onHelp,
+    onToggleBadges: keyBadges.toggle,
     // Map-click tools have no globe counterpart.
     onAnnotate: () => {
       if (globe.phase === 'flat') toggleAnnotate()
@@ -1106,6 +1108,7 @@ export function GeoViewer({
         onLinkModeChange={(next) => selection.setLinkMode(next)}
         linkDisabled={zeroOverlap}
         onFit={fitAction}
+        showKeys={keyBadges.shown}
         options={modeOptions}
         onOptionsChange={(patch) =>
           setModeOptions((prev) => ({ ...prev, ...patch }))
