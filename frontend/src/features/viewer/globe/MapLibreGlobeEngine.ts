@@ -50,6 +50,8 @@ const CARTO_FADE_MS = 250
 const MIN_TAKEOVER_MS = 200
 /** A context lost this long without a restore hands the panel back to the flat map. */
 const RESTORE_WAIT_MS = 5000
+/** A map not loaded by then fails its mount (the panel hands back to the flat map). */
+const LOAD_CAP_MS = 10000
 const EMPTY_FLAT: FlatCamera = {
   projection: 'merc',
   lon: 0,
@@ -537,7 +539,25 @@ export function createMapLibreGlobeEngine(): GlobeEngine {
         content?.reset()
         loadStyle(styleUrl)
       })
-      await new Promise<void>((resolve) => m.once('load', () => resolve()))
+      // A map that never loads (no worker, no context) fails the mount instead of hanging it.
+      await new Promise<void>((resolve, reject) => {
+        const timer = window.setTimeout(
+          () => reject(new Error('Globe map did not load')),
+          LOAD_CAP_MS,
+        )
+        const fail = (e: { error?: unknown }) => {
+          window.clearTimeout(timer)
+          reject(
+            e.error instanceof Error ? e.error : new Error('Globe map failed'),
+          )
+        }
+        m.once('error', fail)
+        m.once('load', () => {
+          window.clearTimeout(timer)
+          m.off('error', fail)
+          resolve()
+        })
+      })
       styleReady = true
       addLayers(m)
       boundZoom(m, true)
