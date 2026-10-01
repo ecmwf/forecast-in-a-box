@@ -216,7 +216,19 @@ export const mockCatalogue: BlockFactoryCatalogue = {
         kind: 'product',
         title: 'Histogram',
         description: 'Value distribution of a field',
-        configuration_options: {},
+        configuration_options: {
+          // Mirrors fiab-plugin-ecmwf's AnemoiSource.ENSEMBLE: a trait-bearing
+          // int (`int{positive}`), to exercise the traits suffix in the fable
+          // type grammar. The trait itself is not yet surfaced in the UI.
+          // No test builds a 'histogram' block, so adding this required
+          // option here cannot break existing fixtures.
+          bins: {
+            title: 'Bins',
+            description: 'Number of histogram bins',
+            value_type: 'int{positive}',
+            default_value: '10',
+          },
+        },
         inputs: ['dataset'],
       },
     },
