@@ -99,10 +99,11 @@ reloads MapLibre's style mid-bend.
 | Registration, seam, poles, budget, context loss   | `globe-registration`                                             |
 | The warm globe already has the chosen basemap     | `globe-viewer` "warms the globe with the chosen basemap"         |
 
-`tests/integration/features/viewer/globe-registration.test.ts` runs the real engine on WebGL in
+`tests/integration/features/viewer/globe-registration.gpu.test.ts` runs the real engine on WebGL in
 Vitest browser mode against a mock WMS that renders whatever BBOX and size is asked.
-`tests/e2e/globe.spec.ts` runs on the `globe` Playwright project (full Chromium, hardware GL);
-run it with `VITE_PORT=3100` while a dev server holds :3000.
+`tests/e2e/globe.spec.ts` runs on the `globe` Playwright project (full Chromium, hardware GL).
+CI skips both (software GL makes them slow): run `npm run test:globe` before pushing globe changes,
+with `VITE_PORT=3100` while a dev server holds :3000.
 
 ## Known limits
 

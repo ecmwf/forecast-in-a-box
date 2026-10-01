@@ -12,6 +12,9 @@ import { defineConfig, mergeConfig } from 'vitest/config'
 import { playwright } from '@vitest/browser-playwright'
 import viteConfig from './vite.config.ts'
 
+/** Real-WebGL tests: minutes on CI's software renderer, so they run locally (`npm run test:gpu`). */
+export const GPU_TESTS = 'tests/**/*.gpu.test.ts'
+
 export default mergeConfig(
   viteConfig({ mode: 'test', command: 'serve' }),
   defineConfig({
@@ -45,7 +48,7 @@ export default mergeConfig(
         'src/**/*.{test,spec}.{ts,tsx}',
         'tests/**/*.{test,spec}.{ts,tsx}',
       ],
-      exclude: ['tests/e2e/**', 'node_modules/**'],
+      exclude: ['tests/e2e/**', 'node_modules/**', GPU_TESTS],
       setupFiles: ['./tests/setup.ts'],
       browser: {
         enabled: true,
