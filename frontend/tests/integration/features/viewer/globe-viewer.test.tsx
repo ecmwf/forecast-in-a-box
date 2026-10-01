@@ -462,6 +462,7 @@ describe('GeoViewer 3D globe', () => {
   })
 
   it('captures the globe only once its images are in', async () => {
+    const basemapsBefore = engineCalls.basemaps.length
     const screen = await render(
       <Harness
         portA={registerServer()}
@@ -474,6 +475,10 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByRole('region', { name: '3D globe, source A' }))
       .toBeInTheDocument()
+    // The first basemap marks the engine registered after its async mount: C before that captures nothing.
+    await expect
+      .poll(() => engineCalls.basemaps.length)
+      .toBeGreaterThan(basemapsBefore)
     let loaded = () => {}
     engineCalls.loaded = new Promise<void>((resolve) => {
       loaded = resolve
