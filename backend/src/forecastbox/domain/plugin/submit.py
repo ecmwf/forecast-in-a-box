@@ -36,6 +36,7 @@ from functools import partial
 from fiab_core.fable import PluginCompositeId
 from packaging.version import Version
 
+from forecastbox.domain.plugin.db import get_plugin_state
 from forecastbox.domain.plugin.events import (
     PluginGlobalErrorEvent,
     PluginInstalledEvent,
@@ -48,9 +49,9 @@ from forecastbox.domain.plugin.events import (
 from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
 from forecastbox.domain.plugin.loading import load_plugins as _load_plugins
 from forecastbox.domain.plugin.loading import uninstall_plugin_sync, unload_single, update_single
+from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.state import PluginManager, finish_ok, finish_with_error, release_reservation, reserve_operation
 from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected, TaskName, execution_manager
-from forecastbox.utility.config import PluginsSettings, config
 from forecastbox.utility.dispatcher import Event, EventName, submit_event
 
 logger = logging.getLogger(__name__)
@@ -105,8 +106,8 @@ def _run_managed(trigger: str, worker: Callable[[], None], on_success: PluginSuc
             _notify_success(on_success)
 
 
-def _run_load_all(plugins: PluginsSettings) -> None:
-    _run_managed("Initial plugin load", partial(_load_plugins, plugins))
+def _run_load_all() -> None:
+    _run_managed("Initial plugin load", _load_plugins)
 
 
 def submit_load_all(start_after: Future[None]) -> Future[None]:
@@ -137,26 +138,35 @@ def submit_load_all(start_after: Future[None]) -> Future[None]:
         start_after,
         ConcurrentPools.PluginManagement,
         TaskName("plugin.initial-load"),
-        partial(_run_load_all, config.external.plugins),
+        _run_load_all,
     )
 
 
-async def submit_update_single(pluginId: PluginCompositeId, install: bool, version: Version | None) -> str:
+async def submit_update_single(
+    pluginId: PluginCompositeId, install: bool, version: Version | None, settings: PluginSettings | None = None
+) -> str:
     """Reserve and submit an install/update/reload operation for one plugin.
+
+    ``settings`` is the pip-install/import spec to use. Pass it explicitly for a fresh
+    install (there is no persisted state yet to read it from); omit it for an update or
+    settings-only change on an already-installed plugin, in which case it is read from
+    the plugin_state database table.
 
     The success notification emitted depends on the situation: a settings-only change
     (``install=False``, from ``POST /plugin/settings``) is reported as settings-applied;
     otherwise, if the plugin is already present in ``PluginManager.plugins`` it is reported
     as an update, and if not, as a fresh install.
     """
-    pluginSettings = config.external.plugins.get(pluginId, None)
-    if pluginSettings is None:
-        return f"plugin {pluginId} not configured"
+    plugin_id_str = PluginCompositeId.to_str(pluginId)
+    if settings is None:
+        db_state = await execution_manager.await_jobs_db("plugin.state.get", partial(get_plugin_state, plugin_id_str))
+        if db_state is None:
+            return f"plugin {pluginId} not configured"
+        settings = db_state.to_settings()
     result = reserve_operation()
     if not result.accepted:
         return result.reason
     trigger = f"Update of plugin {pluginId}"
-    plugin_id_str = PluginCompositeId.to_str(pluginId)
     on_success: PluginSuccessNotification
     if not install:
         on_success = PluginSettingsAppliedEvent(plugin_id=plugin_id_str)
@@ -165,10 +175,10 @@ async def submit_update_single(pluginId: PluginCompositeId, install: bool, versi
     else:
         on_success = PluginInstalledEvent(plugin_id=plugin_id_str)
     try:
-        await execution_manager.awaitable_submit(
+        execution_manager.submit_monitored(
             ConcurrentPools.PluginManagement,
             TaskName("plugin.update"),
-            partial(_run_managed, trigger, partial(update_single, pluginId, pluginSettings, install, version), on_success),
+            partial(_run_managed, trigger, partial(update_single, pluginId, settings, install, version), on_success),
         )
     except SubmissionRejected:
         release_reservation()
@@ -177,7 +187,7 @@ async def submit_update_single(pluginId: PluginCompositeId, install: bool, versi
 
 
 async def submit_unload_single(pluginId: PluginCompositeId) -> None:
-    """Reserve and await an unload operation. The caller (route) owns success/failure
+    """Reserve and submit an unload operation. The caller (route) owns success/failure
     reporting; a recorded global ``updater_error`` does not block this cleanup path.
     """
     result = reserve_operation(refuse_on_error=False)
@@ -186,7 +196,7 @@ async def submit_unload_single(pluginId: PluginCompositeId) -> None:
     trigger = f"Unload of plugin {pluginId}"
     on_success = PluginUnloadedEvent(plugin_id=PluginCompositeId.to_str(pluginId))
     try:
-        await execution_manager.awaitable_submit(
+        execution_manager.submit_monitored(
             ConcurrentPools.PluginManagement,
             TaskName("plugin.unload"),
             partial(_run_managed, trigger, partial(unload_single, pluginId), on_success),
@@ -198,7 +208,8 @@ async def submit_unload_single(pluginId: PluginCompositeId) -> None:
 
 async def submit_uninstall_single(pluginId: PluginCompositeId) -> None:
     logger.debug(f"about to uninstall {pluginId=}")
-    if pluginId not in config.external.plugins:
+    db_state = await execution_manager.await_jobs_db("plugin.state.get", partial(get_plugin_state, PluginCompositeId.to_str(pluginId)))
+    if db_state is None:
         raise ValueError(f"plugin {pluginId} not installed")
     result = reserve_operation(refuse_on_error=False)
     if not result.accepted:
@@ -206,7 +217,7 @@ async def submit_uninstall_single(pluginId: PluginCompositeId) -> None:
     trigger = f"Uninstall of plugin {pluginId}"
     on_success = PluginUninstalledEvent(plugin_id=PluginCompositeId.to_str(pluginId))
     try:
-        await execution_manager.awaitable_submit(
+        execution_manager.submit_monitored(
             ConcurrentPools.PluginManagement,
             TaskName("plugin.uninstall"),
             partial(_run_managed, trigger, partial(uninstall_plugin_sync, pluginId), on_success),

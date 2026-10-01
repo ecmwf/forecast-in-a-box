@@ -507,7 +507,7 @@ test.describe('Fable Builder - Review & Validation', () => {
         await reviewButton.click()
         await page.waitForTimeout(3000)
 
-        // Should show either "Ready to Submit" or "Configuration Has Errors"
+        // Should show either "Ready to submit" or "Workflow has errors"
         const readyText = page.getByText(/ready to submit/i)
         const errorsText = page.getByText(/has errors/i)
         const validatingText = page.getByText(/validating/i)

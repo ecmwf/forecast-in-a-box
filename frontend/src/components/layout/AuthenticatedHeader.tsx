@@ -20,6 +20,7 @@ import {
   FileText,
   Globe,
   HelpCircle,
+  KeyRound,
   LogOut,
   Monitor,
   Moon,
@@ -57,6 +58,8 @@ import {
 import { Logo } from '@/components/common/Logo'
 import { ActivityMonitor } from '@/components/common/ActivityMonitor'
 import { TimeZoneSelect } from '@/components/common/TimeZoneSelect'
+import { EcmwfKeyDialog } from '@/features/visualise/components/sources/EcmwfKeyDialog'
+import { useEcmwfKeyStore } from '@/stores/ecmwfKeyStore'
 import { NavToggle } from '@/components/layout/NavToggle'
 import { StatusDetailsPopover } from '@/components/common/StatusDetailsPopover'
 import { StatusIndicator } from '@/components/common/StatusIndicator'
@@ -79,6 +82,8 @@ export function AuthenticatedHeader() {
   const setTimeZone = useUiStore((state) => state.setTimeZone)
   const timeZone = useAppTimeZone()
   const [tzDialogOpen, setTzDialogOpen] = useState(false)
+  const hasEcmwfKey = useEcmwfKeyStore((s) => s.key !== null)
+  const openEcmwfKeyDialog = useEcmwfKeyStore((s) => s.openDialog)
   const { t } = useTranslation('common')
   const setCommandOpen = useCommandStore((state) => state.setOpen)
   const navigate = useNavigate()
@@ -238,6 +243,15 @@ export function AuthenticatedHeader() {
                     {timeZoneOffsetLabel(timeZone)}
                   </span>
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={openEcmwfKeyDialog}>
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  {t('userMenu.ecmwfKey')}
+                  {hasEcmwfKey && (
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {t('userMenu.ecmwfKeySet')}
+                    </span>
+                  )}
+                </DropdownMenuItem>
               </DropdownMenuGroup>
 
               <DropdownMenuSeparator />
@@ -337,6 +351,7 @@ export function AuthenticatedHeader() {
               />
             </DialogContent>
           </Dialog>
+          <EcmwfKeyDialog />
         </div>
       </div>
 

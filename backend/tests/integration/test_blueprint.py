@@ -2037,3 +2037,13 @@ def test_blueprint_artifact_execute(tmpdir: Any, backend_client_user: httpx.Clie
     assert detail_resp.is_success, detail_resp.text
     detail = CompilationDetailResponse.model_validate(detail_resp.json())
     assert len(detail.tasks) == 2, f"Expected 2 tasks, got {len(detail.tasks)}: {detail.tasks}"
+
+    # Verify the artifact id resolves to its catalog display name
+    resolve_resp = backend_client_user.post(
+        "/blueprint/options/resolveDisplay",
+        json={"elements": [{"typeName": "artifact", "value": checkpoint_composite_id}]},
+    )
+    assert resolve_resp.is_success, resolve_resp.text
+    resolved = resolve_resp.json()["elements"]
+    assert len(resolved) == 1
+    assert resolved[0]["display"] == "Small Test Checkpoint"

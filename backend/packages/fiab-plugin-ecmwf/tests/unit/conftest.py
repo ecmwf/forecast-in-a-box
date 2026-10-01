@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import cast
 
 import pytest
-from earthkit.workflows.fluent import Action
+from earthkit.workflows.fluent import Action, merge
 from fiab_core.artifacts import CompositeArtifactId
 from fiab_core.fable import (
     BlockFactoryId,
@@ -37,6 +37,7 @@ from fiab_plugin_ecmwf.constants import (
     FORECAST,
     INPUT_SOURCE,
     LEAD_TIME,
+    LEVEL,
     PARAM,
     SOURCE,
     STATISTIC,
@@ -95,7 +96,7 @@ def dummy_blockinstance() -> BlockInstance:
         BlockInstanceBase(
             input_ids={},
             configuration_values={
-                SOURCE: "ecmwf-open-data",
+                SOURCE: "opendata",
                 BASE_TIME: datetime(2024, 1, 1),
                 FORECAST: "aifs-ens",
             },
@@ -161,7 +162,7 @@ def operational_forecast_blockinstance(dataset: str) -> BlockInstance:
         BlockInstanceBase(
             input_ids={},
             configuration_values={
-                SOURCE: "ecmwf-open-data",
+                SOURCE: "opendata",
                 BASE_TIME: datetime(2024, 1, 1),
                 FORECAST: dataset,
             },
@@ -175,7 +176,7 @@ def operational_forecast_source_output(operational_forecast_blockinstance: Block
     oper_output = cast(
         QubedOutput, OperationalForecastSource().validate(block=operational_forecast_blockinstance, inputs={}, restrictions={})
     )
-    return select(oper_output, {PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]})
+    return select(oper_output, {PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4], LEVEL: [100, 200]})
 
 
 @pytest.fixture
@@ -183,7 +184,9 @@ def operational_forecast_source_action(
     mock_forecast_preset: pytest.FixtureRequest, operational_forecast_blockinstance: BlockInstance
 ) -> Action:
     oper_action = OperationalForecastSource().compile(inputs={}, block=operational_forecast_blockinstance).get_or_raise()
-    return oper_action.select({PARAM: ["167", "151", "131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]}, expand=True)
+    sfc_action = oper_action.select({PARAM: ["167", "151"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4]})
+    pl_action = oper_action.select({PARAM: ["131"], STEP: [0, 6, 12], ENSEMBLE: [0, 1, 2, 3, 4], LEVEL: [100, 200]})
+    return merge(sfc_action, pl_action)
 
 
 @pytest.fixture

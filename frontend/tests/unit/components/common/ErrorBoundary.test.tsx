@@ -98,7 +98,7 @@ describe('ErrorBoundary', () => {
         </ErrorBoundary>,
       )
       await expect
-        .element(screen.getByRole('button', { name: 'Try Again' }))
+        .element(screen.getByRole('button', { name: 'Try again' }))
         .toBeVisible()
     })
 
@@ -109,7 +109,7 @@ describe('ErrorBoundary', () => {
         </ErrorBoundary>,
       )
       await expect
-        .element(screen.getByRole('button', { name: 'Refresh Page' }))
+        .element(screen.getByRole('button', { name: 'Refresh page' }))
         .toBeVisible()
     })
   })
@@ -156,7 +156,7 @@ describe('ErrorBoundary', () => {
           <ThrowingComponent shouldThrow={true} />
         </ErrorBoundary>,
       )
-      const button = screen.getByRole('button', { name: 'Try Again' })
+      const button = screen.getByRole('button', { name: 'Try again' })
       await button.click()
       expect(onReset).toHaveBeenCalledTimes(1)
     })

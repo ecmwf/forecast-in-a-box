@@ -13,7 +13,7 @@
 
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { History, X } from 'lucide-react'
+import { History, RotateCcw, X } from 'lucide-react'
 import { FableMiniFlow } from '@/features/journal/components/FableMiniFlow'
 import {
   benchSnapshot,
@@ -103,10 +103,12 @@ function ShelfRow() {
         className="mx-auto hidden max-h-12 min-w-0 lg:block"
       />
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        <Button size="sm" onClick={restore}>
+        {/* Outline, not primary: the page's one primary action is Run. */}
+        <Button size="sm" variant="outline" onClick={restore}>
+          <RotateCcw />
           {t('shelf.restore')}
         </Button>
-        <Button size="sm" variant="outline" onClick={exportJson}>
+        <Button size="sm" variant="ghost" onClick={exportJson}>
           {t('shelf.export')}
         </Button>
         <Button

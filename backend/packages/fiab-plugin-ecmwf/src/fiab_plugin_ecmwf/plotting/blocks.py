@@ -10,7 +10,8 @@
 import logging
 
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, Payload
+from earthkit.workflows.fluent import Action, create_task_instance
+from earthkit.workflows.metadata import NodeMetadata, Requirements
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -26,8 +27,6 @@ from fiab_core.types import ClosedEnumType, GeoDomainType, ListType, ParameterTy
 
 from ..block_utils import (
     _extract_dataset,
-    _param_id_to_param_key,
-    _param_key_to_param_id,
 )
 from ..constants import (
     DOMAIN,
@@ -105,9 +104,8 @@ class MapPlotSink(Sink):
 
         input_axes = axes(input_dataset)
         input_param_values = input_axes.get(PARAM, set())
-        param_values = [_param_id_to_param_key(x) for x in input_param_values]
-        if param_values:
-            restrictions[PARAM] = ListType(ClosedEnumType(sorted(param_values), subtype=ParameterType()))
+        if input_param_values:
+            restrictions[PARAM] = ListType(ClosedEnumType(sorted(input_param_values), subtype=ParameterType()))
 
         common = common_dimensions(input_dataset).intersection({PARAM, STEP, ENSEMBLE, LEVEL})
         splitby = [x for x in common if len(input_axes[x]) > 1]
@@ -117,9 +115,9 @@ class MapPlotSink(Sink):
         splitby_value = block.config_as_list(SPLITBY, str, allow_empty=True)
         fmt = block.config_as_str(FORMAT)
 
-        missing_params = [param for param in params if param not in param_values]
+        missing_params = [param for param in params if param not in input_param_values]
         if missing_params:
-            raise ValueError(f"params {missing_params} are not in the input parameters: {param_values}")
+            raise ValueError(f"params {missing_params} are not in the input parameters: {input_param_values}")
 
         if "none" in splitby_value and len(splitby_value) != 1:
             raise ValueError("Invalid splitby value: if none is selected, no other dimensions can be present")
@@ -135,7 +133,7 @@ class MapPlotSink(Sink):
         block: BlockInstanceRich,
     ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
         input_task = block.input_ids["dataset"]
-        params = [_param_key_to_param_id(x) for x in block.config_as_list(PARAM, str, allow_empty=False)]
+        params = block.config_as_list(PARAM, str, allow_empty=False)
         groupby = block.config_as_str(GROUPBY)
         splitby = block.config_as_list(SPLITBY, str, allow_empty=True)
         if "none" in splitby:
@@ -150,16 +148,18 @@ class MapPlotSink(Sink):
         )
 
         action = selected.map(
-            Payload(
-                "fiab_plugin_ecmwf.plotting.runtime.map_plot",
-                kwargs={
+            create_task_instance(
+                "fiab_plugin_ecmwf.runtime.plots.map_plot",
+                static_input_kw={
                     "domain": block.config_as_geodomain(DOMAIN).with_bbox_earthkitplots().value or None,
                     "format": block.config_as_str(FORMAT),
                     "groupby": None if groupby == "none" else groupby,
                     # "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
                 },
-                metadata={"environment": ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11"]},
-            )
+            ),
+            node_metadata=NodeMetadata(
+                requirements=Requirements(environment=["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11"])
+            ),
         )
         return Either.ok(action)
 

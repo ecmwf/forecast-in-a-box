@@ -192,12 +192,12 @@ describe('RunListPage Integration', () => {
   describe('status links', () => {
     it('links completed runs to their results', async () => {
       const screen = await renderJobList()
-      await expect.element(screen.getByText('View Results')).toBeVisible()
+      await expect.element(screen.getByText('View results')).toBeVisible()
     })
 
     it('links failed runs to their error', async () => {
       const screen = await renderJobList()
-      await expect.element(screen.getByText('View Error')).toBeVisible()
+      await expect.element(screen.getByText('View error')).toBeVisible()
     })
 
     it('links submitted runs to inspect', async () => {

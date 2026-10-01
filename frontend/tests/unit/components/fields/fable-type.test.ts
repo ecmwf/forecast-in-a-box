@@ -157,6 +157,19 @@ describe('parseFableType', () => {
     expect(parseFableType("enum[str]('a')")).toEqual(openEnum(['a']))
   })
 
+  it('ignores a trailing traits suffix, anywhere it can appear', () => {
+    // *TODO* once traits are represented in FableType, these should carry
+    // the parsed trait descriptors instead of being silently dropped.
+    expect(parseFableType('int{positive}')).toEqual(intType)
+    expect(parseFableType('float{nonNegative,divisibleBy(3)}')).toEqual(
+      floatType,
+    )
+    expect(parseFableType('list[int{positive}]')).toEqual(listOf(intType))
+    expect(parseFableType('union[int{positive},str]')).toEqual(
+      unionOf([intType, stringType]),
+    )
+  })
+
   it('rejects strings outside the grammar', () => {
     expect(parseFableType('foobar')).toBeNull()
     expect(parseFableType('enumClosed[str]()')).toBeNull()

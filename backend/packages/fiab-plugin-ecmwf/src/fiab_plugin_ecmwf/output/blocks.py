@@ -12,7 +12,8 @@ import os
 import re
 
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, Payload
+from earthkit.workflows.fluent import Action, create_task_instance
+from earthkit.workflows.metadata import NodeMetadata, Requirements
 from earthkit.workflows.nodetree import nodetree_dimensions, nodetree_new_dimension
 from fiab_core.fable import (
     ActionLookup,
@@ -86,11 +87,11 @@ class ZarrSink(Sink):
             .combine_branches(dim=temp_dim)
             .concatenate(dim=temp_dim)
             .map(
-                Payload(
-                    "fiab_plugin_ecmwf.output.runtime.write_zarr",
-                    kwargs={"path": block.config_as_str(PATH)},
-                    metadata={"environment": ["zarr"]},
-                )
+                create_task_instance(
+                    "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
+                    static_input_kw={"path": block.config_as_str(PATH)},
+                ),
+                node_metadata=NodeMetadata(requirements=Requirements(environment=["zarr"])),
             )
         )
         return Either.ok(action)
@@ -148,9 +149,9 @@ class GribSink(Sink):
             pass
 
         action = action.map(
-            Payload(
-                "fiab_plugin_ecmwf.output.runtime.write_grib",
-                kwargs={"path": block.config_as_str(PATH)},
+            create_task_instance(
+                "fiab_plugin_ecmwf.runtime.sinks.write_grib",
+                static_input_kw={"path": block.config_as_str(PATH)},
             )
         )
         return Either.ok(action)

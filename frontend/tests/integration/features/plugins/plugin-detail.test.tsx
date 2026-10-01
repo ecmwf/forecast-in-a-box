@@ -159,7 +159,7 @@ describe('Plugin Detail Page', () => {
 
       // The source block button should be enabled
       const sourceButton = screen.getByRole('button', {
-        name: /Use Source in Configuration/i,
+        name: /Use Source in a Workflow/i,
       })
       await expect.element(sourceButton).toBeInTheDocument()
       await expect.element(sourceButton).not.toBeDisabled()
@@ -177,7 +177,7 @@ describe('Plugin Detail Page', () => {
 
       // Product block buttons should be disabled (2 product factories)
       const productButtons = screen.getByRole('button', {
-        name: /Use Product in Configuration/i,
+        name: /Use Product in a Workflow/i,
       })
       await expect.element(productButtons.first()).toBeDisabled()
       await expect.element(productButtons.nth(1)).toBeDisabled()
@@ -195,27 +195,25 @@ describe('Plugin Detail Page', () => {
 
       // Hover over a disabled product button's tooltip trigger
       const productButtons = screen.getByRole('button', {
-        name: /Use Product in Configuration/i,
+        name: /Use Product in a Workflow/i,
       })
       await productButtons.first().hover()
 
       // Tooltip text should appear
       await expect
-        .element(
-          screen.getByText('Configurations must start with a source block'),
-        )
+        .element(screen.getByText('Workflows must start with a source block'))
         .toBeVisible()
     })
   })
 
-  describe('Back to Plugins Button', () => {
+  describe('Back to plugins Button', () => {
     it('renders Back to Plugins button', async () => {
       const screen = await renderWithRouter(
         <PluginDetailPage plugin={mockPlugin} catalogue={mockCatalogue} />,
       )
 
       await expect
-        .element(screen.getByRole('button', { name: /Back to Plugins/i }))
+        .element(screen.getByRole('button', { name: /Back to plugins/i }))
         .toBeVisible()
     })
   })

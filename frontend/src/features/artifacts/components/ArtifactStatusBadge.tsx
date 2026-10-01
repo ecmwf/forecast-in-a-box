@@ -24,26 +24,27 @@ interface ArtifactStatusBadgeProps {
   isAvailable: boolean
   /** If set, shows a "Downloading X%" badge instead of the static status */
   downloadProgress?: number
+  /** In-flight work, e.g. "Deleting"; progress shows elsewhere. */
+  busyLabel?: string
   className?: string
 }
 
 export function ArtifactStatusBadge({
   isAvailable,
   downloadProgress,
+  busyLabel,
   className,
 }: ArtifactStatusBadgeProps) {
   const { t } = useTranslation('artifacts')
 
-  // Downloading state takes priority.
-  if (downloadProgress !== undefined) {
+  const activeLabel =
+    downloadProgress !== undefined
+      ? t('status.downloading', { progress: Math.round(downloadProgress) })
+      : busyLabel
+  if (activeLabel !== undefined) {
     return (
       <StatusBadge
-        variant={{
-          label: t('status.downloading', {
-            progress: Math.round(downloadProgress),
-          }),
-          ...STATUS_BADGE_VARIANTS.available,
-        }}
+        variant={{ label: activeLabel, ...STATUS_BADGE_VARIANTS.busy }}
         pulse
         className={className}
       />
@@ -52,7 +53,7 @@ export function ArtifactStatusBadge({
 
   const variant: StatusBadgeVariant = isAvailable
     ? { label: t('status.downloaded'), ...STATUS_BADGE_VARIANTS.active }
-    : { label: t('status.notDownloaded'), ...STATUS_BADGE_VARIANTS.warning }
+    : { label: t('status.available'), ...STATUS_BADGE_VARIANTS.available }
 
   return <StatusBadge variant={variant} className={className} />
 }

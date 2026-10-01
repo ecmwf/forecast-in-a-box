@@ -31,6 +31,10 @@ import { H2, P } from '@/components/base/typography'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
+import {
+  templateBookmarkKey,
+  useTemplateBookmarksStore,
+} from '@/stores/templateBookmarksStore'
 
 /** Informational filler for the tracks the template cards would have taken. */
 function StarterPanel({
@@ -56,6 +60,11 @@ export function GettingStartedSection() {
   const navigate = useNavigate()
   const { starters, hasStarters, templateCount, isLoading, isError, refetch } =
     useStarterTemplates()
+  const bookmarkedKeys = useTemplateBookmarksStore((state) => state.keys)
+  const showsBookmark = starters.some((template) => {
+    const key = templateBookmarkKey(template)
+    return key !== null && bookmarkedKeys.includes(key)
+  })
 
   const content = (
     <>
@@ -64,6 +73,9 @@ export function GettingStartedSection() {
           <H2 className="text-xl font-semibold">{t('gettingStarted.title')}</H2>
           <P className="mt-1 text-muted-foreground">
             {t('gettingStarted.subtitle')}
+            {hasStarters && !showsBookmark && (
+              <> · {t('gettingStarted.bookmarkHint')}</>
+            )}
           </P>
         </div>
         {templateCount > 0 && (

@@ -175,3 +175,19 @@ def run(client: httpx.Client) -> None:
     output_path = f"/tmp/{run_id}.{attempt_count}"
     assert os.path.exists(output_path), f"expected zarr output at {output_path!r}, not found"
     logger.info(f"modelForecast scenario completed successfully, output at {output_path}")
+
+    _verify_checkpoint_display_name(client)
+
+
+def _verify_checkpoint_display_name(client: httpx.Client) -> None:
+    """Verify the checkpoint id resolves to the display name declared in install/artifacts.json."""
+    resolve_response = client.post(
+        "/blueprint/options/resolveDisplay",
+        json={"elements": [{"typeName": "artifact", "value": CHECKPOINT}]},
+        timeout=10,
+    )
+    resolve_response.raise_for_status()
+    resolved = resolve_response.json()["elements"]
+    assert len(resolved) == 1, f"expected a single resolved element, got: {resolved}"
+    assert resolved[0]["display"] == "AIFS Global o48", f"unexpected display name: {resolved[0]}"
+    logger.info("checkpoint display name resolved correctly")

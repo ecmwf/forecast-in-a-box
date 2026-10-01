@@ -67,14 +67,14 @@ function setupValidFableWithSink(): void {
 }
 
 /**
- * Navigate to the review step. "Review & Submit" moved into the split button's
- * caret menu when "Run Once" became the primary action.
+ * Navigate to the review step. "Review & submit" moved into the split button's
+ * caret menu when "Run once" became the primary action.
  */
 async function openReviewStep(
   screen: Awaited<ReturnType<typeof renderWithRouter>>,
 ): Promise<void> {
   await screen.getByRole('button', { name: /More submit options/i }).click()
-  await screen.getByRole('menuitem', { name: /Review & Submit/i }).click()
+  await screen.getByRole('menuitem', { name: /Review & submit/i }).click()
 }
 
 describe('Fable Builder Integration', () => {
@@ -91,8 +91,8 @@ describe('Fable Builder Integration', () => {
   it('renders the builder and loads the block catalogue', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
-    // Wait for catalogue to load - "Block Palette" appears in the sidebar header
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    // Wait for catalogue to load - "Block palette" appears in the sidebar header
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Verify the palette shows source blocks section
     await expect
@@ -117,7 +117,7 @@ describe('Fable Builder Integration', () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for palette to load
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Find the "Operational forecast source" button in the palette
     // For empty fables, validationState is null so all factories are available by default
@@ -152,7 +152,7 @@ describe('Fable Builder Integration', () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for palette to load
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Add a source block
     const addSourceButton = screen.getByRole('button', {
@@ -181,7 +181,7 @@ describe('Fable Builder Integration', () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for palette to load
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Add a source block
     await screen
@@ -205,7 +205,7 @@ describe('Fable Builder Integration', () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for palette to load
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Add and configure a source block
     await screen
@@ -217,8 +217,8 @@ describe('Fable Builder Integration', () => {
     // Verify fable is dirty
     expect(useFableBuilderStore.getState().isDirty).toBe(true)
 
-    // Click "Save Config" to open save popover
-    await screen.getByRole('button', { name: /Save Config/i }).click()
+    // Click "Save workflow" to open save popover
+    await screen.getByRole('button', { name: /Save workflow/i }).click()
 
     // Click "Save" in the popover to submit
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
@@ -242,7 +242,7 @@ describe('Fable Builder Integration', () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for catalogue to load
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up a valid fable with source + sink (both configured and connected)
     // Review & Submit requires valid configuration AND at least one output block
@@ -255,26 +255,26 @@ describe('Fable Builder Integration', () => {
       })
       .toBe(true)
 
-    // Open the split-button menu and pick "Review & Submit"
+    // Open the split-button menu and pick "Review & submit"
     await openReviewStep(screen)
 
     // Should transition to review step
     expect(useFableBuilderStore.getState().step).toBe('review')
 
-    // Review mode shows the sticky-header "Back to Edit" button
+    // Review mode shows the sticky-header "Back to edit" button
     await expect
-      .element(screen.getByRole('button', { name: /Back to Edit/i }))
+      .element(screen.getByRole('button', { name: /Back to edit/i }))
       .toBeVisible()
 
-    // And the "Start Run" button (the label is in a sm:inline span)
-    await expect.element(screen.getByText('Start Run')).toBeVisible()
+    // And the "Start run" button (the label is in a sm:inline span)
+    await expect.element(screen.getByText('Start run')).toBeVisible()
   })
 
   it('allows returning from review step to edit step', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for catalogue to load
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up a valid fable with source + sink
     setupValidFableWithSink()
@@ -290,19 +290,19 @@ describe('Fable Builder Integration', () => {
     await openReviewStep(screen)
     expect(useFableBuilderStore.getState().step).toBe('review')
 
-    // Click "Back to Edit" in the sticky header
-    await screen.getByRole('button', { name: /Back to Edit/i }).click()
+    // Click "Back to edit" in the sticky header
+    await screen.getByRole('button', { name: /Back to edit/i }).click()
 
     // Should be back in edit mode
     expect(useFableBuilderStore.getState().step).toBe('edit')
 
     // Palette should be visible again
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
   })
 
-  it('opens the submit dialog directly via "Run Once" without entering review', async () => {
+  it('opens the submit dialog directly via "Run once" without entering review', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     setupValidFableWithSink()
     await expect
@@ -311,17 +311,17 @@ describe('Fable Builder Integration', () => {
       })
       .toBe(true)
 
-    await screen.getByRole('button', { name: 'Run Once', exact: true }).click()
+    await screen.getByRole('button', { name: 'Run once', exact: true }).click()
 
     // The dialog opens straight from the canvas — step stays 'edit'.
     expect(useFableBuilderStore.getState().step).toBe('edit')
     expect(useFableBuilderStore.getState().submitDialogOpen).toBe(true)
-    await expect.element(screen.getByText('Run Forecast')).toBeVisible()
+    await expect.element(screen.getByText('Run forecast')).toBeVisible()
   })
 
-  it('opens the submit dialog on the schedule tab via "Run on Schedule"', async () => {
+  it('opens the submit dialog on the schedule tab via "Run on schedule"', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     setupValidFableWithSink()
     await expect
@@ -331,12 +331,12 @@ describe('Fable Builder Integration', () => {
       .toBe(true)
 
     await screen.getByRole('button', { name: /More submit options/i }).click()
-    await screen.getByRole('menuitem', { name: /Run on Schedule/i }).click()
+    await screen.getByRole('menuitem', { name: /Run on schedule/i }).click()
 
     expect(useFableBuilderStore.getState().submitDialogMode).toBe('schedule')
-    // Schedule mode swaps the primary action to "Create Schedule".
+    // Schedule mode swaps the primary action to "Create schedule".
     await expect
-      .element(screen.getByRole('button', { name: /Create Schedule/i }))
+      .element(screen.getByRole('button', { name: /Create schedule/i }))
       .toBeVisible()
   })
 
@@ -344,7 +344,7 @@ describe('Fable Builder Integration', () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // 1. Wait for initial load
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // 2. Add a source block via palette
     await screen
@@ -409,7 +409,7 @@ describe('Fable Builder Integration', () => {
     // Source + sink configuration completed above
 
     // 5. Save (open popover, then click Save)
-    await screen.getByRole('button', { name: /Save Config/i }).click()
+    await screen.getByRole('button', { name: /Save workflow/i }).click()
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
 
     // Wait for save to complete
@@ -431,11 +431,11 @@ describe('Fable Builder Integration', () => {
 
     // Verify we're in review mode
     await expect
-      .element(screen.getByRole('button', { name: /Back to Edit/i }))
+      .element(screen.getByRole('button', { name: /Back to edit/i }))
       .toBeVisible()
 
     // The Start Run button should be present
-    await expect.element(screen.getByText('Start Run')).toBeVisible()
+    await expect.element(screen.getByText('Start run')).toBeVisible()
     // Per-test timeout raised: the 8 s validation poll above can't fit the
     // default 5 s test budget.
   }, 15000)

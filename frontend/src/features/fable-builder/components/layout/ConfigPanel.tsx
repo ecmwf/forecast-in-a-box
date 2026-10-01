@@ -21,6 +21,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
+import { useBlockDisplayNames } from '@/features/fable-builder/hooks/useBlockDisplayNames'
 import { definableGlyphs } from '@/features/fable-builder/utils/definable-glyphs'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
 import { useReservedGlyphReason } from '@/features/glyphs/utils/reserved-names'
@@ -60,6 +61,7 @@ import { BlockValidationProvider } from '@/features/fable-builder/context/BlockV
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
+import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
 
 interface ConfigPanelProps {
   catalogue: BlockFactoryCatalogue
@@ -70,6 +72,8 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   // Use individual selectors to avoid creating new objects on every render
   const selectedBlockId = useFableBuilderStore((state) => state.selectedBlockId)
   const fable = useFableBuilderStore((state) => state.fable)
+  const blockNames = useBlockDisplayNames(fable)
+  const blockName = selectedBlockId ? blockNames[selectedBlockId] : undefined
   const resolvedConfigForBlock = useFableBuilderStore((state) =>
     state.selectedBlockId
       ? (state.validationState?.resolvedConfigurationOptions[
@@ -297,7 +301,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
             </div>
             <div className="min-w-0">
               <H2 className="truncate text-sm font-semibold">
-                {factory.title}
+                <BlockName name={blockName ?? factory.title} />
               </H2>
               <Badge variant="outline" className="mt-1 text-sm">
                 {metadata.label}
@@ -411,7 +415,9 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
                 {t('configPanel.deleteBlock')}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {t('configPanel.deleteConfirm', { title: factory.title })}
+                {t('configPanel.deleteConfirm', {
+                  title: blockName ?? factory.title,
+                })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

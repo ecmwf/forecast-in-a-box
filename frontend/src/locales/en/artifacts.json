@@ -1,37 +1,28 @@
 {
-  "title": "ML Models",
-  "subtitle": "Browse and manage machine learning model artifacts. Download models to make them available for forecasting.",
+  "title": "ML models",
+  "subtitle": "Browse and manage machine learning models. Download a model to make it available for forecasting.",
   "actions": {
     "refresh": "Refresh",
     "download": "Download",
-    "downloading": "Downloading...",
+    "downloading": "Downloading",
     "cancelDownload": "Cancel",
     "delete": "Delete",
-    "viewDetails": "View Details",
-    "backToArtifacts": "Back to Models",
-    "downloadFailed": "Model download failed"
+    "viewDetails": "View details",
+    "backToArtifacts": "Back to models",
+    "downloadFailed": "Model download failed",
+    "deleting": "Deleting"
   },
   "filters": {
-    "searchPlaceholder": "Search models by name or author..."
-  },
-  "viewToggle": {
-    "table": "Table view",
-    "card": "Card view"
+    "searchPlaceholder": "Search models",
+    "statusLabel": "Filter by status",
+    "all": "All",
+    "downloaded": "Downloaded",
+    "available": "Available"
   },
   "status": {
     "downloaded": "Downloaded",
-    "notDownloaded": "Not Downloaded",
-    "downloading": "Downloading {{progress}}%"
-  },
-  "downloadedSection": {
-    "title": "Downloaded Models",
-    "total": "{{count}} models"
-  },
-  "availableSection": {
-    "title": "Available Models",
-    "total": "{{count}} models",
-    "searchPlaceholder": "Search available models...",
-    "description": "These models are available for download. Once downloaded, they can be used for forecasting."
+    "downloading": "Downloading {{progress}}%",
+    "available": "Available"
   },
   "table": {
     "model": "Model",
@@ -39,25 +30,22 @@
     "status": "Status",
     "actions": "Actions"
   },
-  "pagination": {
-    "showing": "Showing {{start}}-{{end}} of {{total}}"
-  },
   "detail": {
     "description": "Description",
-    "platforms": "Supported Platforms",
-    "diskSize": "Disk Size",
+    "platforms": "Supported platforms",
+    "diskSize": "Disk size",
     "author": "Author",
     "url": "URL",
-    "pipConstraints": "Pip Package Constraints",
-    "inputStructure": "Input Structure",
-    "outputStructure": "Output Structure",
-    "inputCharacteristics": "Input Characteristics",
+    "pipConstraints": "Pip package constraints",
+    "inputStructure": "Input structure",
+    "outputStructure": "Output structure",
+    "inputCharacteristics": "Input characteristics",
     "noConstraints": "No package constraints",
     "noCharacteristics": "No characteristics available",
     "noInputStructure": "No input structure available",
     "noOutputStructure": "No output structure available",
-    "qubeMatrixTitle": "Data Qube Matrix",
-    "qubeTreeTitle": "Data Qube Tree",
+    "qubeMatrixTitle": "Data Qube matrix",
+    "qubeTreeTitle": "Data Qube tree",
     "qubePivotLabel": "Levels as rows",
     "qubeAxisParam": "param",
     "qubeAxisLevel": "level",
@@ -79,13 +67,11 @@
     "notCompatibleDetail": "Not compatible: {{detail}}"
   },
   "emptyState": {
-    "title": "No models found",
-    "description": "Try adjusting your search or filter criteria.",
     "noModels": "No models available",
-    "noModelsDescription": "No ML models are currently available in the artifact store."
+    "noModelsDescription": "No ML models are currently available in the model catalogue."
   },
   "confirmDelete": {
-    "title": "Delete Model",
+    "title": "Delete model",
     "description": "Are you sure you want to delete {{name}}? This will remove the downloaded model files.",
     "confirm": "Delete",
     "cancel": "Cancel"

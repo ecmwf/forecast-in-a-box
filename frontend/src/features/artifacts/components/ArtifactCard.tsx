@@ -8,156 +8,83 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * ArtifactCard Component
- *
- * Card view for an ML model artifact
- */
-
-import { Download, HardDrive, Trash2, X } from 'lucide-react'
+import { HardDrive } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { ArtifactActions } from './ArtifactActions'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
 import { ArtifactTagChips } from './ArtifactTagChips'
-import type {
-  ArtifactInfo,
-  CompositeArtifactId,
-} from '@/api/types/artifacts.types'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Spinner } from '@/components/ui/spinner'
+import type { ArtifactItemHandlers } from './ArtifactActions'
+import type { ArtifactInfo } from '@/api/types/artifacts.types'
+import { useDownloadProgress } from '@/api/hooks/useArtifacts'
 import { P } from '@/components/base/typography'
-import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 
-interface ArtifactCardProps {
+interface ArtifactCardProps extends ArtifactItemHandlers {
   artifact: ArtifactInfo
-  onDownload: (compositeId: CompositeArtifactId) => void
-  onDelete: (compositeId: CompositeArtifactId) => void
-  onCancelDownload?: (compositeId: CompositeArtifactId) => void
-  onViewDetails?: (artifact: ArtifactInfo) => void
-  isDownloading?: boolean
-  /** Download progress 0-100, only meaningful when isDownloading is true */
-  downloadProgress?: number
-  isDeleting?: boolean
+  isDeleting: boolean
 }
 
 export function ArtifactCard({
   artifact,
-  onDownload,
-  onDelete,
-  onCancelDownload,
-  onViewDetails,
-  isDownloading,
-  downloadProgress,
   isDeleting,
+  ...handlers
 }: ArtifactCardProps) {
   const { t } = useTranslation('artifacts')
+  const { isDownloading, progress } = useDownloadProgress(artifact.id)
+  const busyLabel = isDownloading
+    ? t('actions.downloading')
+    : isDeleting
+      ? t('actions.deleting')
+      : undefined
 
   return (
-    <Card
-      className={cn(
-        'group relative flex flex-col p-4 transition-all duration-300 hover:border-primary/50 sm:p-5',
-      )}
-    >
-      {/* Header */}
-      <div className="mb-3 flex items-start justify-between gap-2 sm:mb-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold transition-colors group-hover:text-primary sm:text-lg">
-            {artifact.displayName}
-          </h3>
-          <P className="mt-0.5 truncate font-medium text-muted-foreground">
-            {artifact.author}
-          </P>
+    <Card className="group w-full gap-0 py-0 transition-colors hover:border-primary/30">
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold">
+              {artifact.displayName}
+            </h3>
+            <P className="mt-0.5 truncate text-muted-foreground">
+              {artifact.author}
+            </P>
+          </div>
+          <ArtifactStatusBadge
+            isAvailable={artifact.isAvailable}
+            busyLabel={busyLabel}
+            className="shrink-0"
+          />
         </div>
-        <ArtifactStatusBadge
-          isAvailable={artifact.isAvailable}
-          downloadProgress={isDownloading ? downloadProgress : undefined}
-          className="shrink-0"
+
+        <div className="flex flex-wrap items-center gap-2">
+          {artifact.diskSize !== '-' && (
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
+              <HardDrive className="h-3.5 w-3.5" />
+              {artifact.diskSize}
+            </span>
+          )}
+          {artifact.platforms.map((platform) => (
+            <span
+              key={platform}
+              className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground"
+            >
+              {platform}
+            </span>
+          ))}
+          <ArtifactTagChips tags={artifact.tags} max={3} />
+          <ArtifactCompatibilityBadge artifact={artifact} />
+        </div>
+      </div>
+
+      <div className="flex items-center border-t border-border/60 px-5 py-3">
+        <ArtifactActions
+          artifact={artifact}
+          downloadProgress={isDownloading ? (progress ?? 0) : undefined}
+          isDeleting={isDeleting}
+          layout="card"
+          {...handlers}
         />
-      </div>
-
-      {/* Meta */}
-      <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-6">
-        {artifact.diskSize !== '-' && (
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
-            <HardDrive className="h-3.5 w-3.5" />
-            {artifact.diskSize}
-          </span>
-        )}
-        {artifact.platforms.map((platform) => (
-          <span
-            key={platform}
-            className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground"
-          >
-            {platform}
-          </span>
-        ))}
-        <ArtifactTagChips tags={artifact.tags} max={3} />
-        <ArtifactCompatibilityBadge artifact={artifact} />
-      </div>
-
-      {/* Download Progress Bar */}
-      {isDownloading && downloadProgress !== undefined && (
-        <div className="mb-3">
-          <Progress value={Math.round(downloadProgress)} />
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="mt-auto flex items-center gap-2">
-        <Button
-          variant="outline"
-          className="flex-1"
-          onClick={() => onViewDetails?.(artifact)}
-        >
-          {t('actions.viewDetails')}
-        </Button>
-        {artifact.isAvailable && !isDownloading ? (
-          <Button
-            variant="outline"
-            size="icon"
-            className="text-danger hover:text-danger"
-            onClick={() => onDelete(artifact.id)}
-            disabled={isDeleting}
-            aria-label={t('actions.delete')}
-          >
-            {isDeleting ? (
-              <Spinner className="h-4 w-4" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-          </Button>
-        ) : isDownloading ? (
-          <>
-            <Button
-              variant="outline"
-              className="border-primary text-primary hover:bg-primary/5"
-              disabled
-            >
-              <Spinner className="mr-1 h-4 w-4" />
-              {t('actions.downloading')}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="text-danger hover:text-danger"
-              onClick={() => onCancelDownload?.(artifact.id)}
-              aria-label={t('actions.cancelDownload')}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </>
-        ) : (
-          <Button
-            variant="outline"
-            className="border-primary text-primary hover:bg-primary/5"
-            onClick={() => onDownload(artifact.id)}
-          >
-            <Download className="mr-1 h-4 w-4" />
-            {t('actions.download')}
-          </Button>
-        )}
       </div>
     </Card>
   )

@@ -3,7 +3,8 @@ import json
 import pathlib
 
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, Payload, PayloadBuildingContext, from_source
+from earthkit.workflows.fluent import Action, NodeMetadataContext, create_task_instance, from_source
+from earthkit.workflows.metadata import Artifacts, Requirements
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
@@ -177,16 +178,16 @@ def _environment_spec() -> list[str]:
 
 def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
     spec = _environment_spec()
-    with PayloadBuildingContext(environment=spec):
-        # with PayloadBuildingContext(environment=["-e /home/dev/src/fiab-plugin-test"]): # TODO handle the ssh:// scenario intelligently
+    with NodeMetadataContext(requirements=Requirements(environment=spec)):
+        # with NodeMetadataContext(requirements=Requirements(environment=["-e /home/dev/src/fiab-plugin-test"])): # TODO handle the ssh:// scenario intelligently
         if factory_id == "source_42":
-            action = from_source(Payload("fiab_plugin_test.runtime.source_42"))
+            action = from_source(create_task_instance("fiab_plugin_test.runtime.source_42"))
         elif factory_id == "source_text":
             text = instance.configuration_values[TEXT]
             # NOTE an explicit null is a valid value here -- the default is imputed at runtime
             if text is not None and not isinstance(text, str):
                 return Either.error(f"Invalid type for {TEXT!r}: expected str or None, got {type(text).__name__}")
-            action = from_source(Payload("fiab_plugin_test.runtime.source_text", kwargs={"text": text}))
+            action = from_source(create_task_instance("fiab_plugin_test.runtime.source_text", static_input_kw={"text": text}))
         elif factory_id == "source_sleep":
             text = instance.configuration_values[TEXT]
             duration = instance.configuration_values[DURATION]
@@ -194,35 +195,39 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
                 return Either.error(f"Invalid type for {TEXT!r}: expected str, got {type(text).__name__}")
             if not isinstance(duration, float):
                 return Either.error(f"Invalid type for {DURATION!r}: expected float, got {type(duration).__name__}")
-            action = from_source(Payload("fiab_plugin_test.runtime.source_sleep", kwargs={"text": text, "duration": duration}))
+            action = from_source(
+                create_task_instance("fiab_plugin_test.runtime.source_sleep", static_input_kw={"text": text, "duration": duration})
+            )
         elif factory_id == "source_filesize":
             artifact_id = instance.configuration_values[CHECKPOINT]
             if not isinstance(artifact_id, CompositeArtifactId):
                 return Either.error(f"Invalid type for {CHECKPOINT!r}: expected artifact id, got {type(artifact_id).__name__}")
             local_path = ArtifactsProvider.get_artifact_local_path(artifact_id)
-            payload = Payload(
-                "fiab_plugin_test.runtime.source_filesize", kwargs={"path": str(local_path)}, metadata={"artifacts": [artifact_id]}
+            payload = create_task_instance(
+                "fiab_plugin_test.runtime.source_filesize",
+                static_input_kw={"path": str(local_path)},
             )
-            action = from_source(payload)
+            with NodeMetadataContext(artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(artifact_id): ""})):
+                action = from_source(payload)
         elif factory_id == "transform_increment":
             a = lookup[instance.input_ids["a"]]
             amount = instance.configuration_values[AMOUNT]
             if not isinstance(amount, int):
                 return Either.error(f"Invalid type for {AMOUNT!r}: expected int, got {type(amount).__name__}")
-            action = a.map(Payload("fiab_plugin_test.runtime.transform_increment", kwargs={"amount": amount}))
+            action = a.map(create_task_instance("fiab_plugin_test.runtime.transform_increment", static_input_kw={"amount": amount}))
         elif factory_id == "product_join":
             a = lookup[instance.input_ids["a"]]
             b = lookup[instance.input_ids["b"]]
-            action = a.join(b, dim="inputs").reduce(Payload("fiab_plugin_test.runtime.product_join"))
+            action = a.join(b, dim="inputs").reduce(create_task_instance("fiab_plugin_test.runtime.product_join"))
         elif factory_id == "sink_file":
             data = lookup[instance.input_ids["data"]]
             fname = instance.configuration_values[FNAME]
             if not isinstance(fname, str):
                 return Either.error(f"Invalid type for {FNAME!r}: expected str, got {type(fname).__name__}")
-            action = data.map(Payload("fiab_plugin_test.runtime.sink_file", kwargs={"fname": fname}))
+            action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_file", static_input_kw={"fname": fname}))
         elif factory_id == "sink_image":
             data = lookup[instance.input_ids["data"]]
-            action = data.map(Payload("fiab_plugin_test.runtime.sink_image"))
+            action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_image"))
         else:
             raise TypeError(factory_id)
         return Either.ok(action)

@@ -4,7 +4,8 @@ import os
 from typing import Callable, cast
 
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, PayloadBuildingContext
+from earthkit.workflows.fluent import Action, NodeMetadataContext
+from earthkit.workflows.metadata import Requirements
 
 from fiab_core.fable import (
     ActionLookup,
@@ -78,7 +79,7 @@ class QubedPluginBuilder:
         block: BlockInstance,
     ) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
         """Given a cascade builder of ActionLookup, a factory id from this Plugin, and a block instance corresponding to it, either update the builder with corresponding tasks or provide error"""
-        with PayloadBuildingContext(environment=self.base_environment):
+        with NodeMetadataContext(requirements=Requirements(environment=self.base_environment)):
             factory = self.block_builders[factory_id]
             rich_block = BlockInstanceRich.from_block(factory_id, block, factory.configuration_options)
             try:

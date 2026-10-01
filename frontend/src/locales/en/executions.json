@@ -12,9 +12,9 @@
     "maximizeCanvas": "Maximize canvas",
     "restoreCanvas": "Exit full screen (Esc)",
     "graphUnavailable": "Graph visualisation unavailable",
-    "graphUnavailableDescription": "The pipeline graph is not available for this run.",
+    "graphUnavailableDescription": "The workflow graph is not available for this run.",
     "specUnavailable": "Specification not available",
-    "specUnavailableDescription": "The original configuration was not stored for this run.",
+    "specUnavailableDescription": "The original workflow was not stored for this run.",
     "copySpec": "Copy",
     "copied": "Copied",
     "copyValue": "Copy value",
@@ -43,14 +43,14 @@
   },
   "actions": {
     "restart": "Restart",
-    "restartJob": "Restart Run",
+    "restartJob": "Restart run",
     "delete": "Delete",
-    "deleteJob": "Delete Run",
+    "deleteJob": "Delete run",
     "edit": "Edit",
-    "editDetails": "Edit Details",
+    "editDetails": "Edit details",
     "save": "Save",
-    "editConfiguration": "Edit Configuration",
-    "downloadLogs": "Download Full Logs",
+    "editConfiguration": "Edit workflow",
+    "downloadLogs": "Download full logs",
     "downloadLogsFailed": "Failed to download logs",
     "confirmRestart": "This will run the forecast again with the same specification. Continue?",
     "confirmDelete": "This will permanently delete this run and its results. This action cannot be undone."
@@ -64,7 +64,7 @@
     "run": "Run"
   },
   "submit": {
-    "title": "Run Forecast",
+    "title": "Run forecast",
     "name": "Name",
     "namePlaceholder": "Enter a name for this run",
     "namePlaceholderOptional": "Name this run to find it later (optional)",
@@ -74,7 +74,7 @@
     "tags": "Tags",
     "tagsPlaceholder": "Add a tag",
     "tagsPlaceholderOptional": "Tag this run for easy filtering (optional)",
-    "advancedTitle": "Advanced: Run Environment",
+    "advancedTitle": "Advanced: run environment",
     "hosts": "Hosts",
     "hostsPlaceholder": "Default (auto)",
     "workersPerHost": "Workers per host",
@@ -84,13 +84,13 @@
     "envValuePlaceholder": "Value",
     "addVariable": "Add variable",
     "cancel": "Cancel",
-    "submit": "Start Run",
+    "submit": "Start run",
     "submitting": "Submitting...",
-    "modeRunNow": "Run Once",
-    "modeSchedule": "Run on Schedule",
-    "createSchedule": "Create Schedule",
+    "modeRunNow": "Run once",
+    "modeSchedule": "Run on schedule",
+    "createSchedule": "Create schedule",
     "creatingSchedule": "Creating...",
-    "cronExpression": "Schedule Frequency",
+    "cronExpression": "Schedule frequency",
     "maxDelay": "Skip if delayed by (hours)",
     "maxDelayHelp": "If a scheduled run is delayed longer than this, it will be skipped instead of running late.",
     "scheduleCreated": "Schedule created successfully",
@@ -165,10 +165,10 @@
     },
     "noMatch": "No outputs match the current filter.",
     "viewer": {
-      "zoomHint": "Wheel to zoom · Drag to pan · Shift+drag to zoom into a region",
+      "zoomHint": "Wheel to zoom · Drag or W A S D to pan · Shift+drag to zoom into a region · 0 fit · 1 actual size",
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
-      "resetZoom": "Reset zoom",
+      "resetZoom": "Fit to screen",
       "close": "Close",
       "previousPage": "Previous page",
       "nextPage": "Next page",
@@ -176,7 +176,11 @@
       "nextOutput": "Next output",
       "pageOfTotal": "{{page}} / {{total}}",
       "pdfPageCount_one": "{{count}} page",
-      "pdfPageCount_other": "{{count}} pages"
+      "pdfPageCount_other": "{{count}} pages",
+      "keepView": "Keep zoom and position between outputs",
+      "filmstrip": "Outputs",
+      "toggleFilmstrip": "Show or hide the filmstrip",
+      "filmstripItem": "{{index}}: {{name}}"
     },
     "adapters": {
       "generic": {
@@ -274,7 +278,7 @@
     "legendAlt": "{{title}} legend"
   },
   "logs": {
-    "title": "Gateway Log",
+    "title": "Gateway log",
     "searchPlaceholder": "Filter logs...",
     "jumpToBottom": "Jump to bottom",
     "connected": "Connected",
@@ -283,7 +287,7 @@
     "executionEnded": "Run ended"
   },
   "errors": {
-    "executionFailed": "Run Failed",
+    "executionFailed": "Run failed",
     "copy": "Copy",
     "copied": "Copied",
     "copyFailed": "Couldn't copy the error message",
@@ -295,7 +299,7 @@
   },
   "empty": {
     "title": "No runs",
-    "description": "You haven't run a forecast yet. Start by creating a forecast configuration.",
+    "description": "You haven't run a forecast yet. Start by building a workflow.",
     "action": "Configure a forecast",
     "filtered": "No runs match your filters.",
     "clearFilters": "Clear filters"
@@ -322,6 +326,16 @@
   },
   "attempts": {
     "title": "Attempts",
-    "attempt": "Attempt {{number}}"
+    "attempt": "Attempt {{number}}",
+    "count_one": "{{count}} attempt",
+    "count_other": "{{count}} attempts",
+    "failedCount_one": "· {{count}} failed",
+    "failedCount_other": "· {{count}} failed",
+    "duration": {
+      "days": "{{a}} d {{b}} h",
+      "hours": "{{a}} h {{b}} m",
+      "minutes": "{{a}} m {{b}} s",
+      "seconds": "{{a}} s"
+    }
   }
 }

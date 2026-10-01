@@ -14,7 +14,7 @@
  * A single glyph row in the global glyphs list.
  */
 
-import { Braces, Pencil } from 'lucide-react'
+import { Braces, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { GlobalGlyphItem } from '@/api/types/fable.types'
 import { Button } from '@/components/ui/button'
@@ -24,11 +24,12 @@ import { useUser } from '@/hooks/useUser'
 interface GlyphListItemProps {
   glyph: GlobalGlyphItem
   onEdit: (glyph: GlobalGlyphItem) => void
+  onDelete: (glyph: GlobalGlyphItem) => void
 }
 
 const PASSTHROUGH_USER_ID = 'user'
 
-export function GlyphListItem({ glyph, onEdit }: GlyphListItemProps) {
+export function GlyphListItem({ glyph, onEdit, onDelete }: GlyphListItemProps) {
   const { t } = useTranslation('glyphs')
   const { data: user } = useUser()
 
@@ -40,6 +41,12 @@ export function GlyphListItem({ glyph, onEdit }: GlyphListItemProps) {
   } else {
     creatorLabel = glyph.created_by
   }
+  // Only hide Delete when the glyph is known to belong to someone else.
+  const canDelete =
+    glyph.created_by === PASSTHROUGH_USER_ID ||
+    user === undefined ||
+    user.id === glyph.created_by ||
+    user.is_superuser
 
   return (
     <div className="p-6 transition-colors hover:bg-muted/50">
@@ -60,7 +67,7 @@ export function GlyphListItem({ glyph, onEdit }: GlyphListItemProps) {
           <P className="line-clamp-1 text-muted-foreground">{glyph.value}</P>
         </div>
 
-        <div className="mt-2 flex w-full items-center justify-end sm:mt-0 sm:w-auto">
+        <div className="mt-2 flex w-full items-center justify-end gap-2 sm:mt-0 sm:w-auto">
           <Button
             variant="outline"
             size="sm"
@@ -70,6 +77,18 @@ export function GlyphListItem({ glyph, onEdit }: GlyphListItemProps) {
             <Pencil className="h-4 w-4" />
             {t('actions.edit')}
           </Button>
+          {canDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-danger hover:text-danger"
+              aria-label={t('actions.deleteLabel', { key: glyph.key })}
+              onClick={() => onDelete(glyph)}
+            >
+              <Trash2 className="h-4 w-4" />
+              {t('actions.delete')}
+            </Button>
+          )}
         </div>
       </div>
     </div>

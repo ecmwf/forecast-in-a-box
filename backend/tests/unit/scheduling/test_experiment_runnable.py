@@ -42,7 +42,7 @@ def _make_blueprint(job_def_id: str = "jd-1", version: int = 1) -> MagicMock:
     jd.blocks = {
         "source1": {
             "factory_id": {"plugin": {"store": "ecmwf", "local": "ecmwf-base"}, "factory": "ekdSource"},
-            "configuration_values": {"source": "ecmwf-open-data", "date": "2026-01-01", "expver": "0001"},
+            "configuration_values": {"source": "opendata", "date": "2026-01-01", "expver": "0001"},
             "input_ids": {},
         }
     }

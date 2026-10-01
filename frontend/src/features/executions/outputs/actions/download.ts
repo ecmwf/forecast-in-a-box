@@ -18,6 +18,16 @@ import { showToast } from '@/lib/toast'
 
 const log = createLogger('OutputAction.download')
 
+/** Download name from the block's display name, e.g. "map_plot.png". */
+export function outputFileName(item: OutputItem, extension: string): string {
+  const base = item.blockName
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '_')
+    .replace(/^_+|_+$/g, '')
+  return `${base || item.originalBlock}.${extension}`
+}
+
 async function runDownload(
   item: OutputItem,
   ctx: ActionContext,
@@ -29,7 +39,7 @@ async function runDownload(
       item.jobId,
       item.taskId,
     )
-    downloadBlob(blob, `${item.originalBlock}.${ctx.resolvedAdapter.extension}`)
+    downloadBlob(blob, outputFileName(item, ctx.resolvedAdapter.extension))
   } catch (err) {
     log.error('Failed to download output', {
       jobId: item.jobId,

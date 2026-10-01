@@ -653,7 +653,7 @@ describe('GeoViewer', () => {
     await screen.getByRole('button', { name: 'Edit annotation 2' }).click()
     await screen.getByLabelText('Label').fill('X9')
     // Palette is collapsed to the current swatch — expand, then pick.
-    await screen.getByRole('button', { name: 'Pin color' }).click()
+    await screen.getByRole('button', { name: 'Pin colour' }).click()
     await screen.getByRole('radio', { name: 'Red' }).click()
     await screen.getByRole('button', { name: 'Save', exact: true }).click()
     await expect

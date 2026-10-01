@@ -14,7 +14,9 @@ All the methods here are blocking -- see manager for nonblocking invocations.
 Supports both local (file://) and remote (ssh://) data directories.
 """
 
+import errno
 import logging
+import os
 import shlex
 import shutil
 import subprocess
@@ -135,6 +137,24 @@ def _download_artifact_local(
     checkpoint = artifact.common
     artifact_path = get_artifact_local_path(composite_id, data_dir_url)
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if checkpoint.url.startswith("file://"):
+        try:
+            logger.debug(f"Starting copy for {composite_id} from {checkpoint.url}")
+            src_path = Path(urllib.parse.urlparse(checkpoint.url).path).resolve()
+            target_path = str(artifact_path)
+            try:
+                os.link(src_path, target_path)
+                logger.info(f"Successfully hardlinked artifact {composite_id} to {artifact_path}")
+            except OSError as e:
+                if e.errno == errno.EXDEV:
+                    shutil.copy(src_path, target_path)
+                    logger.info(f"Successfully copied artifact {composite_id} to {artifact_path}")
+            if progress_callback:
+                progress_callback(100)
+        except Exception as e:
+            logger.error(f"Failed to copy artifact {composite_id}: {e}")
+        return
 
     temp_file = tempfile.NamedTemporaryFile(prefix="artifact_", suffix=".ckpt", delete=False)
     temp_path = Path(temp_file.name)

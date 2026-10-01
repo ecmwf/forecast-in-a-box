@@ -28,11 +28,13 @@ import logging
 from dataclasses import dataclass
 from typing import Any, cast
 
+from fiab_core.fable import PluginCompositeId
 from sqlalchemy import delete, select, update
 
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.plugin.errors import PluginErrors
 from forecastbox.domain.plugin.exceptions import PluginNotFound
+from forecastbox.domain.plugin.settings import PluginRefreshStrategy, PluginSettings
 from forecastbox.schemata.plugin import PluginState
 from forecastbox.utility.db import dbRetry, querySingle
 from forecastbox.utility.time import current_time
@@ -44,6 +46,9 @@ logger = logging.getLogger(__name__)
 class PluginStateRecord:
     plugin_id: str
     plugin_version: str
+    pip_source: str
+    module_name: str
+    update_strategy: PluginRefreshStrategy
     updated_at: dt.datetime
     plugin_errors: list[dict[str, Any]]
     excluded_templates: list[str]
@@ -52,11 +57,18 @@ class PluginStateRecord:
     asset_ingest_needed: bool
     enabled: bool
 
+    def to_settings(self) -> PluginSettings:
+        """Rebuild the pip-install/import spec this plugin was (last) installed with."""
+        return PluginSettings(pip_source=self.pip_source, module_name=self.module_name, update_strategy=self.update_strategy)
+
 
 def _to_plugin_state_record(row: PluginState) -> PluginStateRecord:
     return PluginStateRecord(
         plugin_id=cast(str, row.plugin_id),
         plugin_version=cast(str, row.plugin_version),
+        pip_source=cast(str, row.pip_source),
+        module_name=cast(str, row.module_name),
+        update_strategy=cast(PluginRefreshStrategy, row.update_strategy),
         updated_at=cast(dt.datetime, row.updated_at),
         plugin_errors=cast(list[dict[str, Any]], list(cast(Any, row.plugin_errors) or [])),
         excluded_templates=cast(list[str], list(cast(Any, row.excluded_templates) or [])),
@@ -71,6 +83,9 @@ def upsert_plugin_state(
     *,
     plugin_id: str,
     version: str | None = None,
+    pip_source: str | None = None,
+    module_name: str | None = None,
+    update_strategy: PluginRefreshStrategy | None = None,
     enabled: bool | None = None,
     plugin_errors: PluginErrors | None = None,
     excluded_templates: list[str] | None = None,
@@ -81,7 +96,7 @@ def upsert_plugin_state(
     On first install: creates a row with empty ``excluded_templates`` /
     ``glyph_remapping`` / ``template_errors`` defaults, ``asset_ingest_needed=True``,
     and ``enabled=True``.  All ``None`` arguments fall back to their defaults for
-    new rows.
+    new rows, except ``pip_source`` and ``module_name`` which are required.
 
     On subsequent calls: only the explicitly provided (non-``None``) arguments are
     written; ``None`` means "leave the stored value unchanged".  Pass an empty list
@@ -91,8 +106,9 @@ def upsert_plugin_state(
     an existing row: the flag was already set, the version changed, the plugin is
     being re-enabled, ``excluded_templates`` changed, or ``glyph_remapping`` changed.
 
-    Raises ``PluginNotFoundError`` if ``version`` is ``None`` and no existing row is found,
-    as that indicates a user error (updating a plugin that was never installed).
+    Raises ``PluginNotFoundError`` if ``version``, ``pip_source``, or ``module_name`` is
+    ``None`` and no existing row is found, as that indicates a user error (updating a
+    plugin that was never installed).
     """
     ref_time = current_time("dbref")
     plugin_errors_raw = [e.model_dump() for e in plugin_errors] if plugin_errors is not None else None
@@ -102,15 +118,18 @@ def upsert_plugin_state(
             result = session.execute(select(PluginState).where(PluginState.plugin_id == plugin_id))
             existing = result.scalar_one_or_none()
             if existing is None:
-                if version is None:
+                if version is None or pip_source is None or module_name is None:
                     raise PluginNotFound(
-                        f"upsert_plugin_state called with version=None for unknown plugin {plugin_id!r}; "
-                        "this plugin has no prior DB row and cannot be upserted without a version"
+                        f"upsert_plugin_state called without version/pip_source/module_name for unknown plugin {plugin_id!r}; "
+                        "this plugin has no prior DB row and cannot be upserted without those"
                     )
                 session.add(
                     PluginState(
                         plugin_id=plugin_id,
                         plugin_version=version,
+                        pip_source=pip_source,
+                        module_name=module_name,
+                        update_strategy=update_strategy if update_strategy is not None else "manual",
                         updated_at=ref_time,
                         plugin_errors=plugin_errors_raw if plugin_errors_raw is not None else [],
                         excluded_templates=excluded_templates if excluded_templates is not None else [],
@@ -136,6 +155,12 @@ def upsert_plugin_state(
                 }
                 if version is not None:
                     values["plugin_version"] = version
+                if pip_source is not None:
+                    values["pip_source"] = pip_source
+                if module_name is not None:
+                    values["module_name"] = module_name
+                if update_strategy is not None:
+                    values["update_strategy"] = update_strategy
                 if enabled is not None:
                     values["enabled"] = enabled
                 if plugin_errors_raw is not None:
@@ -166,6 +191,25 @@ def get_all_plugin_states() -> list[PluginStateRecord]:
             return [_to_plugin_state_record(row[0]) for row in result.all()]
 
     return dbRetry(function)
+
+
+def get_all_plugin_states_by_id() -> dict[PluginCompositeId, PluginStateRecord]:
+    """Return every persisted plugin, keyed by its parsed composite id.
+
+    This is the persisted install state -- the plugins to (re)load at every backend
+    startup, regardless of whether they were installed from a default id or through
+    a later ad-hoc install. Rows whose ``plugin_id`` does not parse as a
+    ``PluginCompositeId`` are skipped with a warning.
+    """
+    states: dict[PluginCompositeId, PluginStateRecord] = {}
+    for state in get_all_plugin_states():
+        try:
+            plugin_id = PluginCompositeId.from_str(state.plugin_id)
+        except Exception:
+            logger.warning(f"could not parse plugin_id {state.plugin_id!r} from DB; skipping")
+            continue
+        states[plugin_id] = state
+    return states
 
 
 def update_template_errors(*, plugin_id: str, template_errors: dict[str, str]) -> None:

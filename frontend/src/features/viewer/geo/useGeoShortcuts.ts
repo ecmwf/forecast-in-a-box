@@ -24,15 +24,14 @@
  * yields to it).
  */
 
-import { useEffect } from 'react'
 import {
   formatForDisplay,
-  getKeyStateTracker,
   useHotkey,
   useKeyHold,
 } from '@tanstack/react-hotkeys'
 import { COMPARE_MODES } from './types'
 import type { CompareMode } from './types'
+import { useHoldPan } from '@/hooks/useHoldPan'
 
 /** The viewer's keymap — badges, tooltips, and help all render from it. */
 export const COMPARE_KEYS = {
@@ -48,11 +47,6 @@ export const COMPARE_KEYS = {
   modes: ['1', '2', '3', '4', '5'],
   pan: ['W', 'A', 'S', 'D'],
 } as const
-
-/** Continuous pan speed (px/s) while a WASD/arrow key is held. */
-const PAN_SPEED_PX_PER_SEC = 900
-/** Cap per-frame dt so a backgrounded tab doesn't lurch on return. */
-const MAX_FRAME_S = 0.05
 
 /**
  * Arrows/WASD must yield to widgets that consume them: the swipe
@@ -154,64 +148,7 @@ export function useGeoShortcuts(handlers: {
     ...opts,
     enabled: onAnnotateDisarm.enabled,
   })
-  // Continuous panning: hold WASD/arrows and a rAF loop moves the shared
-  // camera at a constant velocity — OS key-repeat is laggy and choppy.
-  // Held-state truth is TanStack's tracker: it clears keyups the OS
-  // swallows during ⌘-chords (macOS) and clears on blur.
-  useEffect(() => {
-    const VEC: Record<string, [number, number]> = {
-      w: [0, -1],
-      s: [0, 1],
-      a: [-1, 0],
-      d: [1, 0],
-      arrowup: [0, -1],
-      arrowdown: [0, 1],
-      arrowleft: [-1, 0],
-      arrowright: [1, 0],
-    }
-    const tracker = getKeyStateTracker()
-    // Armed = passed the gates on keydown; panning needs armed AND held.
-    const armed = new Set<string>()
-    let raf = 0
-    let last = 0
-    const tick = (t: number) => {
-      for (const k of armed) if (!tracker.isKeyHeld(k)) armed.delete(k)
-      const dt = last ? Math.min(MAX_FRAME_S, (t - last) / 1000) : 0
-      last = t
-      let dx = 0
-      let dy = 0
-      for (const k of armed) {
-        dx += VEC[k][0]
-        dy += VEC[k][1]
-      }
-      if (dx || dy) {
-        onPan(dx * PAN_SPEED_PX_PER_SEC * dt, dy * PAN_SPEED_PX_PER_SEC * dt)
-      }
-      if (armed.size) {
-        raf = requestAnimationFrame(tick)
-      } else {
-        raf = 0
-        last = 0
-      }
-    }
-    const down = (e: KeyboardEvent) => {
-      // Modifier chords (⌘A, ⌥←, …) belong to the browser, never the pan.
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      const k = e.key.toLowerCase()
-      if (!(k in VEC) || panBlocked()) return
-      const el = e.target as HTMLElement | null
-      if (el?.closest('input, textarea, select, [contenteditable="true"]'))
-        return
-      e.preventDefault()
-      armed.add(k)
-      if (!raf) raf = requestAnimationFrame(tick)
-    }
-    window.addEventListener('keydown', down)
-    return () => {
-      window.removeEventListener('keydown', down)
-      cancelAnimationFrame(raf)
-    }
-  }, [onPan])
+  useHoldPan(onPan, { arrows: true, isBlocked: panBlocked })
 }
 
 /**

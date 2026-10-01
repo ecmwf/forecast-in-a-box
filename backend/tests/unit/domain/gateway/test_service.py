@@ -7,7 +7,7 @@ import pytest
 
 import forecastbox.domain.gateway.service as gateway_service
 from forecastbox.domain.gateway.exceptions import GatewayExited, GatewayNotRunning, GatewayNotStarted
-from forecastbox.utility.config import GatewayStartupParams, LocalGateway, RemoteGateway, StatusMessage, UnmanagedGateway, config
+from forecastbox.utility.config import GatewayStartupParams, LocalGateway, RemoteGateway, UnmanagedGateway, config
 
 
 def test_local_process_entrypoint_passes_shared_path(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -91,7 +91,7 @@ def test_launch_gateway_unmanaged_is_a_no_op(monkeypatch: pytest.MonkeyPatch, ca
 
 
 def test_ensure_gateway_returns_once_status_reports_running(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(gateway_service, "status_gateway", lambda: StatusMessage.gateway_running)
+    monkeypatch.setattr(gateway_service, "status_gateway", lambda: gateway_service.GATEWAY_RUNNING)
     sleeps: list[float] = []
     monkeypatch.setattr(gateway_service.time, "sleep", sleeps.append)
 
@@ -107,7 +107,7 @@ def test_ensure_gateway_retries_on_not_started_then_succeeds(monkeypatch: pytest
         calls["count"] += 1
         if calls["count"] < 3:
             raise GatewayNotStarted("not yet")
-        return StatusMessage.gateway_running
+        return gateway_service.GATEWAY_RUNNING
 
     monkeypatch.setattr(gateway_service, "status_gateway", _status_gateway)
     sleeps: list[float] = []

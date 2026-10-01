@@ -16,7 +16,7 @@ import { PresetCard } from '@/features/dashboard/components/PresetCard'
 import { H2, P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
 
-/** "My Configuration Presets" — a card grid of saved configs, each mirroring a Forecast Journal row. */
+/** "My Workflows" — a card grid of saved workflows, each mirroring a Forecast Journal row. */
 export function ConfigPresetsSection() {
   const { t } = useTranslation('dashboard')
   const { presets, hasPresets, isLoading, toggleFavourite } = useConfigPresets()

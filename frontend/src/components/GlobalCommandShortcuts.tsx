@@ -11,7 +11,7 @@
 /**
  * Global Command Shortcuts
  *
- * Registers app-wide keyboard sequences (e.g. `g` then `d`) for the navigation
+ * Registers app-wide keyboard sequences (e.g. `g` then `o`) for the navigation
  * commands that declare a `hotkey`. Each command is bound by its own child
  * component so `useHotkeySequence` is always called unconditionally (Rules of
  * Hooks). Renders no DOM.

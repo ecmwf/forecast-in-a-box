@@ -9,23 +9,25 @@
 
 """Unit tests for the plugin-installing warmup entrypoint.
 
-Covers the `-p` argument parsing, the ordering of the preparation steps, the fallback to a
-configured plugin when the stores do not know it, and the recoverable/non-recoverable failure
-distinction of the install loop.
+Covers reliance on `config.external.default_plugins`, the ordering of the preparation steps,
+the fallback to a configured plugin when the stores do not know it, the application of
+`config.external.default_plugins_settings` overrides, and the recoverable/non-recoverable
+failure distinction of the install loop.
 """
 
 import asyncio
 from collections.abc import Iterator
 from concurrent.futures import Future
 from typing import Awaitable, Generator
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from fiab_core.fable import PluginCompositeId, PluginId, PluginStoreId
 
 import forecastbox.entrypoint.warmup as warmup_module
 from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
-from forecastbox.utility.config import PluginSettings
+from forecastbox.domain.plugin.settings import PluginSettings
+from forecastbox.utility.config import DefaultPluginSettings
 from forecastbox.utility.packages import PackagesError
 
 _ALPHA = PluginCompositeId(store=PluginStoreId("store"), local=PluginId("alpha"))
@@ -70,8 +72,10 @@ def warmup_mocks() -> Iterator[dict[str, MagicMock]]:
         patch.object(warmup_module, "submit_refresh_catalog", parent.submit_refresh_catalog),
         patch.object(warmup_module, "initialize_stores", parent.initialize_stores),
         patch.object(warmup_module, "join_artifact_manager", parent.join_artifact_manager),
-        patch.object(warmup_module, "register_plugin_from_store", parent.register_plugin_from_store),
+        patch.object(warmup_module, "resolve_plugin_from_store", parent.resolve_plugin_from_store),
         patch.object(warmup_module, "update_single", parent.update_single),
+        patch.object(warmup_module, "upsert_plugin_state", parent.upsert_plugin_state),
+        patch.object(warmup_module, "unload_single", parent.unload_single),
         # NOTE see `_run_coro_without_touching_global_loop` for why we do not let the real
         # `asyncio.run` execute here
         patch.object(warmup_module.asyncio, "run", _run_coro_without_touching_global_loop),
@@ -82,29 +86,28 @@ def warmup_mocks() -> Iterator[dict[str, MagicMock]]:
 
         parent.start_db_schema.side_effect = lambda: _noop()
         parent.submit_refresh_catalog.return_value = catalog_future
-        parent.register_plugin_from_store.return_value = _SETTINGS
+        parent.resolve_plugin_from_store.return_value = _SETTINGS
         yield {"parent": parent}
 
 
 def test_defaults_to_configured_default_plugins(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    with patch.object(warmup_module, "_default_plugins", lambda: {_ALPHA: _SETTINGS}):
+    with patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]):
         warmup_module.warmup()
     parent.update_single.assert_called_once_with(_ALPHA, _SETTINGS, install=True, version=None)
 
 
-def test_explicit_plugins_are_installed_in_order(warmup_mocks: dict[str, MagicMock]) -> None:
+def test_multiple_default_plugins_are_installed_in_order(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    warmup_module.warmup(plugin="store:alpha, store:beta")
+    with patch.object(warmup_module.config.external, "default_plugins", [_ALPHA, _BETA]):
+        warmup_module.warmup()
     assert [call.args[0] for call in parent.update_single.call_args_list] == [_ALPHA, _BETA]
-    parent.update_single.reset_mock()
-    warmup_module.warmup(plugin="store:beta")
-    parent.update_single.assert_called_once_with(_BETA, _SETTINGS, install=True, version=None)
 
 
 def test_preparation_precedes_installation(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    warmup_module.warmup(plugin="store:alpha")
+    with patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]):
+        warmup_module.warmup()
     ordering = [call[0] for call in parent.mock_calls if not call[0].startswith("submit_refresh_catalog.")]
     assert ordering.index("start_db_schema") < ordering.index("update_single")
     assert ordering.index("start_artifact_provider") < ordering.index("update_single")
@@ -112,35 +115,37 @@ def test_preparation_precedes_installation(warmup_mocks: dict[str, MagicMock]) -
     assert ordering.index("update_single") < ordering.index("join_artifact_manager")
 
 
-@pytest.mark.parametrize("raw", ["no-store-prefix", "store:alpha,", ""])
-def test_invalid_plugin_id_is_rejected(warmup_mocks: dict[str, MagicMock], raw: str) -> None:
+def test_unknown_to_store_falls_back_to_db(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    with pytest.raises(ValueError):
-        warmup_module.warmup(plugin=raw)
-    parent.update_single.assert_not_called()
-
-
-def test_unknown_to_store_falls_back_to_config(warmup_mocks: dict[str, MagicMock]) -> None:
-    parent = warmup_mocks["parent"]
-    parent.register_plugin_from_store.side_effect = ValueError("plugin with id alpha not known to store store")
-    with patch.dict(warmup_module.config.external.plugins, {_ALPHA: _SETTINGS}, clear=False):
-        warmup_module.warmup(plugin="store:alpha")
+    parent.resolve_plugin_from_store.side_effect = ValueError("plugin with id alpha not known to store store")
+    db_state = MagicMock()
+    db_state.to_settings.return_value = _SETTINGS
+    with (
+        patch.object(warmup_module, "get_plugin_state", return_value=db_state),
+        patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]),
+    ):
+        warmup_module.warmup()
     parent.update_single.assert_called_once_with(_ALPHA, _SETTINGS, install=True, version=None)
 
 
 def test_unknown_plugin_fails(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
-    parent.register_plugin_from_store.side_effect = ValueError("plugin with id alpha not known to store store")
-    with pytest.raises(SystemExit):
-        warmup_module.warmup(plugin="store:alpha")
+    parent.resolve_plugin_from_store.side_effect = ValueError("plugin with id alpha not known to store store")
+    with (
+        patch.object(warmup_module, "get_plugin_state", return_value=None),
+        patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]),
+    ):
+        with pytest.raises(SystemExit):
+            warmup_module.warmup()
     parent.update_single.assert_not_called()
 
 
 def test_recoverable_failure_continues_and_exits_nonzero(warmup_mocks: dict[str, MagicMock]) -> None:
     parent = warmup_mocks["parent"]
     parent.update_single.side_effect = [RuntimeError("install failed for alpha"), None]
-    with pytest.raises(SystemExit) as exit_info:
-        warmup_module.warmup(plugin="store:alpha,store:beta")
+    with patch.object(warmup_module.config.external, "default_plugins", [_ALPHA, _BETA]):
+        with pytest.raises(SystemExit) as exit_info:
+            warmup_module.warmup()
     assert exit_info.value.code != 0
     assert [call.args[0] for call in parent.update_single.call_args_list] == [_ALPHA, _BETA]
     parent.join_artifact_manager.assert_called_once()
@@ -150,7 +155,62 @@ def test_recoverable_failure_continues_and_exits_nonzero(warmup_mocks: dict[str,
 def test_environment_failure_aborts_immediately(warmup_mocks: dict[str, MagicMock], error: Exception) -> None:
     parent = warmup_mocks["parent"]
     parent.update_single.side_effect = error
-    with pytest.raises(type(error)):
-        warmup_module.warmup(plugin="store:alpha,store:beta")
+    with patch.object(warmup_module.config.external, "default_plugins", [_ALPHA, _BETA]):
+        with pytest.raises(type(error)):
+            warmup_module.warmup()
     assert [call.args[0] for call in parent.update_single.call_args_list] == [_ALPHA]
     parent.join_artifact_manager.assert_called_once()
+
+
+def test_no_settings_override_skips_settings_application(warmup_mocks: dict[str, MagicMock]) -> None:
+    parent = warmup_mocks["parent"]
+    with (
+        patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]),
+        patch.object(warmup_module.config.external, "default_plugins_settings", {}),
+    ):
+        warmup_module.warmup()
+    parent.upsert_plugin_state.assert_not_called()
+    parent.unload_single.assert_not_called()
+    parent.update_single.assert_called_once_with(_ALPHA, _SETTINGS, install=True, version=None)
+
+
+def test_settings_override_is_persisted_and_reingested(warmup_mocks: dict[str, MagicMock]) -> None:
+    parent = warmup_mocks["parent"]
+    override = DefaultPluginSettings(excluded_templates=["foo"], glyph_remapping={"a": "b"})
+    with (
+        patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]),
+        patch.object(warmup_module.config.external, "default_plugins_settings", {_ALPHA: override}),
+    ):
+        warmup_module.warmup()
+    parent.upsert_plugin_state.assert_called_once_with(
+        plugin_id="store:alpha",
+        enabled=None,
+        excluded_templates=["foo"],
+        glyph_remapping={"a": "b"},
+        update_strategy=None,
+    )
+    parent.unload_single.assert_not_called()
+    # NOTE second call re-loads/re-ingests the plugin so the overridden exclusions/remapping apply
+    assert parent.update_single.call_args_list == [
+        call(_ALPHA, _SETTINGS, install=True, version=None),
+        call(_ALPHA, _SETTINGS, install=False, version=None),
+    ]
+
+
+def test_settings_override_disabling_plugin_unloads_instead_of_reingesting(warmup_mocks: dict[str, MagicMock]) -> None:
+    parent = warmup_mocks["parent"]
+    override = DefaultPluginSettings(is_enabled=False)
+    with (
+        patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]),
+        patch.object(warmup_module.config.external, "default_plugins_settings", {_ALPHA: override}),
+    ):
+        warmup_module.warmup()
+    parent.upsert_plugin_state.assert_called_once_with(
+        plugin_id="store:alpha",
+        enabled=False,
+        excluded_templates=None,
+        glyph_remapping=None,
+        update_strategy=None,
+    )
+    parent.unload_single.assert_called_once_with(_ALPHA)
+    parent.update_single.assert_called_once_with(_ALPHA, _SETTINGS, install=True, version=None)

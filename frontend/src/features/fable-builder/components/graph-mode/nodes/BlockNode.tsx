@@ -40,6 +40,7 @@ import { BlockErrorOverlay } from '@/features/fable-builder/components/graph-mod
 import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
+import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
 
 export type FableNode = Node<FableNodeData>
 
@@ -59,7 +60,7 @@ export const BlockNode = memo(function ({
   selected,
 }: NodeProps<FableNode>) {
   const { t } = useTranslation('configure')
-  const { factory, instance, catalogue } = data
+  const { factory, instance, catalogue, label } = data
   const metadata = BLOCK_KIND_METADATA[factory.kind]
   const IconComponent = getBlockKindIcon(factory.kind)
 
@@ -190,7 +191,7 @@ export const BlockNode = memo(function ({
                     {t('blockNode.deleteBlock')}
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    {t('blockNode.deleteConfirm', { title: factory.title })}
+                    {t('blockNode.deleteConfirm', { title: label })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -211,7 +212,7 @@ export const BlockNode = memo(function ({
         </div>
 
         <H3 className="mb-1 text-lg font-semibold text-foreground">
-          {factory.title}
+          <BlockName name={label} />
         </H3>
 
         <P className="mb-4 line-clamp-2 text-muted-foreground">

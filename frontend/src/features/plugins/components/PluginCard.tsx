@@ -8,294 +8,117 @@
  * does it submit to any jurisdiction.
  */
 
-/**
- * PluginCard Component
- *
- * Card view for a plugin
- */
-
 import { formatDistanceToNow } from 'date-fns'
-import { Download, ExternalLink, MoreVertical, Trash2 } from 'lucide-react'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getPyPIUrl } from '../utils/plugin-url'
 import { CapabilityBadges } from './CapabilityBadges'
+import { PluginActions, usePluginBusyLabel } from './PluginActions'
 import { PluginDiagnostics } from './PluginDiagnostics'
 import { PluginIcon } from './PluginIcon'
 import { PluginStatusBadge } from './PluginStatusBadge'
-import type { PluginCompositeId, PluginInfo } from '@/api/types/plugins.types'
-import { Button } from '@/components/ui/button'
+import type { PluginItemHandlers } from './PluginActions'
+import type { PluginOperation } from '@/api/hooks/usePlugins'
+import type { PluginInfo } from '@/api/types/plugins.types'
 import { Card } from '@/components/ui/card'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Spinner } from '@/components/ui/spinner'
 import { P } from '@/components/base/typography'
-import { PluginToggle } from '@/features/plugins/components/PluginToggle'
 import { cn } from '@/lib/utils'
 
-interface PluginCardProps {
+interface PluginCardProps extends PluginItemHandlers {
   plugin: PluginInfo
-  onToggle: (compositeId: PluginCompositeId, enabled: boolean) => void
-  /** Target enabled value while a toggle is in flight; undefined when idle. */
-  pendingEnabled?: boolean
-  onInstall: (compositeId: PluginCompositeId) => void
-  onUninstall: (compositeId: PluginCompositeId) => void
-  onUpdate: (compositeId: PluginCompositeId) => void
-  onViewDetails?: (plugin: PluginInfo) => void
-  isInstalling?: boolean
+  operation: PluginOperation | undefined
 }
 
 export function PluginCard({
   plugin,
-  onToggle,
-  pendingEnabled,
-  onInstall,
-  onUninstall,
-  onUpdate,
-  onViewDetails,
-  isInstalling,
+  operation,
+  ...handlers
 }: PluginCardProps) {
   const { t } = useTranslation('plugins')
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+  const busyLabel = usePluginBusyLabel(operation)
 
   // plugin.updatedAt is Z-suffixed UTC; don't route through serverTimeToLocal.
   const updatedTimeAgo = plugin.updatedAt
     ? formatDistanceToNow(new Date(plugin.updatedAt), { addSuffix: true })
     : null
-
-  // Use compact layout for uninstalled plugins
-  const isCompact = !plugin.isInstalled
-
-  // Any diagnostic, or a bare `errored` state; severity picks the amber vs red border.
   const hasDiagnostics = !!plugin.errorDetail || plugin.status === 'errored'
-
-  // PyPI URL derived from the pip source, when one exists
-  const pypiUrl = getPyPIUrl(plugin.pipSource)
+  const version =
+    plugin.version ??
+    (plugin.latestVersion !== 'unknown' ? plugin.latestVersion : null)
 
   return (
     <Card
       className={cn(
-        'group relative flex flex-col transition-all duration-300 hover:border-primary/50',
-        isCompact ? 'p-3 sm:p-4' : 'p-4 sm:p-5',
-        !plugin.isEnabled &&
-          plugin.isInstalled &&
-          'opacity-80 hover:opacity-100',
+        'group w-full gap-0 py-0 transition-colors hover:border-primary/30',
         hasDiagnostics &&
           (plugin.errorSeverity === 'warning'
             ? 'border-amber-200 dark:border-amber-800'
             : 'border-red-200 dark:border-red-800'),
       )}
     >
-      {/* Header */}
       <div
         className={cn(
-          'flex items-start justify-between gap-2',
-          isCompact ? 'mb-2' : 'mb-3 sm:mb-4',
+          'flex flex-1 flex-col gap-4 p-5',
+          plugin.isInstalled && !plugin.isEnabled && 'opacity-70',
         )}
       >
-        <div className="flex min-w-0 gap-2 sm:gap-3">
-          <PluginIcon plugin={plugin} size={isCompact ? 'sm' : 'md'} />
-          <div className="min-w-0 flex-1">
-            <h3
-              className={cn(
-                'truncate font-semibold transition-colors group-hover:text-primary',
-                isCompact ? 'text-sm' : 'text-base sm:text-lg',
-              )}
-            >
-              {plugin.name}
-            </h3>
-            <P className="mt-0.5 truncate font-medium text-muted-foreground">
-              {plugin.author}
-            </P>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 gap-3">
+            <PluginIcon plugin={plugin} />
+            <div className="min-w-0">
+              <h3 className="truncate text-base font-semibold">
+                {plugin.name}
+              </h3>
+              <P className="mt-0.5 truncate text-muted-foreground">
+                {plugin.author}
+              </P>
+            </div>
           </div>
+          <PluginStatusBadge
+            status={plugin.status}
+            hasUpdate={plugin.hasUpdate}
+            severity={plugin.errorSeverity}
+            isEnabled={plugin.isEnabled}
+            busyLabel={busyLabel}
+            className="shrink-0"
+          />
         </div>
-        <PluginStatusBadge
-          status={plugin.status}
-          hasUpdate={plugin.hasUpdate}
-          severity={plugin.errorSeverity}
-          isEnabled={plugin.isEnabled}
-          className="shrink-0"
-        />
-      </div>
 
-      {/* Description */}
-      {isCompact ? (
-        // Available plugins: expandable description
-        <button
-          type="button"
-          onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-          className={cn(
-            'mb-2 text-left text-sm leading-relaxed text-muted-foreground transition-colors hover:text-foreground',
-            !isDescriptionExpanded && 'line-clamp-1',
-          )}
-        >
-          {plugin.description}
-        </button>
-      ) : (
-        // Installed plugins: static truncated description
-        <P
-          className={cn(
-            'leading-relaxed text-muted-foreground',
-            'mb-3 line-clamp-2 sm:mb-5',
-          )}
-        >
+        <P className="line-clamp-2 min-h-10 text-muted-foreground">
           {plugin.description}
         </P>
-      )}
 
-      {/* Diagnostics — also shown for loaded plugins carrying warnings */}
-      {plugin.errorDetail && (
-        <PluginDiagnostics errors={plugin.errorDetail} className="mb-3 py-2" />
-      )}
-
-      {/* Capabilities - only show for installed plugins with capabilities */}
-      {plugin.isInstalled && plugin.capabilities.length > 0 && (
-        <div className="mb-3 sm:mb-4">
-          <CapabilityBadges capabilities={plugin.capabilities} />
-        </div>
-      )}
-
-      {/* Version Info */}
-      <div
-        className={cn(
-          'flex flex-wrap items-center gap-2',
-          isCompact ? 'mb-2' : 'mb-3 sm:mb-6',
+        {plugin.errorDetail && (
+          <PluginDiagnostics errors={plugin.errorDetail} className="py-2" />
         )}
-      >
-        {plugin.version ? (
-          // Installed plugin: show installed version
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
-            {t('item.version', { version: plugin.version })}
-          </span>
-        ) : (
-          // Available plugin: show latest version (hide if unknown)
-          plugin.latestVersion &&
-          plugin.latestVersion !== 'unknown' && (
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
-              {t('item.version', { version: plugin.latestVersion })}
+
+        <div className="mt-auto flex flex-wrap items-center gap-2">
+          {version && (
+            <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 font-mono text-sm font-medium text-muted-foreground">
+              {t('item.version', { version })}
             </span>
-          )
-        )}
-        {plugin.latestVersion &&
-          plugin.version &&
-          plugin.latestVersion !== plugin.version && (
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-100 px-2 py-0.5 font-mono text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+          )}
+          {plugin.hasUpdate && plugin.latestVersion && (
+            <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 font-mono text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
               {t('card.versionArrow', { version: plugin.latestVersion })}
             </span>
           )}
-        {updatedTimeAgo && (
-          <span className="text-sm text-muted-foreground">
-            {t('card.updatedAgo', { time: updatedTimeAgo })}
-          </span>
-        )}
+          {plugin.capabilities.length > 0 && (
+            <CapabilityBadges capabilities={plugin.capabilities} />
+          )}
+          {updatedTimeAgo && (
+            <span className="text-sm text-muted-foreground">
+              {t('card.updatedAgo', { time: updatedTimeAgo })}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Actions */}
-      <div className="mt-auto flex items-center gap-2">
-        {plugin.isInstalled ? (
-          <>
-            {plugin.hasUpdate ? (
-              <Button className="flex-1" onClick={() => onUpdate(plugin.id)}>
-                <Download className="mr-1 h-4 w-4" />
-                {t('actions.update')}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => onViewDetails?.(plugin)}
-              >
-                {t('actions.viewDetails')}
-              </Button>
-            )}
-            <PluginToggle
-              plugin={plugin}
-              pendingEnabled={pendingEnabled}
-              onToggle={onToggle}
-            />
-          </>
-        ) : (
-          <>
-            {pypiUrl ? (
-              <Button
-                variant="outline"
-                className="flex-1"
-                nativeButton={false}
-                render={
-                  <a href={pypiUrl} target="_blank" rel="noopener noreferrer" />
-                }
-              >
-                <ExternalLink className="mr-1 h-4 w-4" />
-                {t('actions.viewDetails')}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => onViewDetails?.(plugin)}
-              >
-                {t('actions.viewDetails')}
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              className="flex-1 border-primary text-primary hover:bg-primary/5"
-              onClick={() => onInstall(plugin.id)}
-              disabled={isInstalling}
-            >
-              {isInstalling ? (
-                <Spinner className="mr-1 h-4 w-4" />
-              ) : (
-                <Download className="mr-1 h-4 w-4" />
-              )}
-              {isInstalling ? t('actions.installing') : t('actions.install')}
-            </Button>
-          </>
-        )}
-        {plugin.isInstalled && (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="ghost" size="icon" />}
-            >
-              <MoreVertical className="h-5 w-5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {pypiUrl && (
-                <DropdownMenuItem
-                  render={
-                    <a
-                      href={pypiUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    />
-                  }
-                >
-                  {t('actions.viewOnPyPI')}
-                </DropdownMenuItem>
-              )}
-              {plugin.comment && (
-                <DropdownMenuItem disabled>
-                  <span className="text-xs text-muted-foreground">
-                    {plugin.comment}
-                  </span>
-                </DropdownMenuItem>
-              )}
-              {(pypiUrl || plugin.comment) && <DropdownMenuSeparator />}
-              <DropdownMenuItem
-                className="text-danger focus:text-danger"
-                onClick={() => onUninstall(plugin.id)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t('actions.uninstall')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+      <div className="flex items-center border-t border-border/60 px-5 py-3">
+        <PluginActions
+          plugin={plugin}
+          operation={operation}
+          layout="card"
+          {...handlers}
+        />
       </div>
     </Card>
   )

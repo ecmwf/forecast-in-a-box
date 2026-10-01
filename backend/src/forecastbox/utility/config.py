@@ -9,7 +9,6 @@
 
 import logging
 import os
-import threading
 import urllib.parse
 from enum import StrEnum
 from pathlib import Path
@@ -36,13 +35,6 @@ def _validate_url(url: str) -> bool:
     # TODO add DNS resolution attempt or something
     parse = urllib.parse.urlparse(url)
     return (parse.scheme is not None) and (parse.netloc is not None)
-
-
-class StatusMessage:
-    """Namespace class for status message sharing"""
-
-    # NOTE this class is here as this is a low place in hierarchy, and we dont want circular imports
-    gateway_running = "running"
 
 
 class ConcurrentPools(StrEnum):
@@ -164,24 +156,12 @@ class AuthSettings(FiabBaseModel):
         return errors
 
 
-PluginRefreshStrategy = Literal["automatic", "manual"]
-
-
-class PluginSettings(FiabBaseModel):
-    """A pip-installable plugin with an importible module"""
-
-    pip_source: str
-    """Name of the package if assuming PyPI, or a local path, git repo, ... Anything that pip accepts"""
-    module_name: str
-    """A string such that `importlib.import_module(module_name)` gives a module that has a `plugin` attribute of type fiab_core.plugin.Plugin`"""
-    update_strategy: PluginRefreshStrategy = "manual"
-    """Whether we should invoke `pip install --update <plugin>` on every launch, or let user handle that manually or via API"""
-
-
 PluginCompositeIdReadable = Annotated[
     PluginCompositeId, BeforeValidator(PluginCompositeId.from_str), PlainSerializer(PluginCompositeId.to_str, return_type=str)
 ]
-PluginsSettings = dict[PluginCompositeIdReadable, PluginSettings]
+DefaultPluginIds = list[PluginCompositeIdReadable]
+"""Ids of plugins to be installed automatically on first run. Not a record of currently
+installed plugins -- that lives in the plugin_state database table."""
 
 
 class PluginStoreConfig(FiabBaseModel):
@@ -195,13 +175,29 @@ class PluginStoreConfig(FiabBaseModel):
 PluginStoresConfig = dict[PluginStoreId, PluginStoreConfig]
 
 
-def _default_plugins() -> PluginsSettings:
-    return {
-        PluginCompositeIdReadable.from_str("ecmwf:ecmwf-base"): PluginSettings(
-            pip_source="fiab-plugin-ecmwf",
-            module_name="fiab_plugin_ecmwf",
-        ),
-    }
+PluginRefreshStrategy = Literal["automatic", "manual"]
+"""Whether a plugin should be pip-updated automatically on every launch (``automatic``)
+or left to manual/API updates (``manual``)."""
+
+
+class DefaultPluginSettings(FiabBaseModel):
+    """Optional settings overrides applied to a default plugin right after its install.
+
+    Every field defaults to ``None``, meaning "leave the value the install produced" --
+    only the fields a user wants to override need to be specified.
+    """
+
+    is_enabled: bool | None = None
+    excluded_templates: list[str] | None = None
+    glyph_remapping: dict[str, str] | None = None
+    update_strategy: PluginRefreshStrategy | None = None
+
+
+DefaultPluginsSettingsConfig = dict[PluginCompositeIdReadable, DefaultPluginSettings]
+
+
+def _default_plugins() -> DefaultPluginIds:
+    return [PluginCompositeIdReadable.from_str("ecmwf:ecmwf-base")]
 
 
 def _default_plugin_stores() -> PluginStoresConfig:
@@ -262,11 +258,24 @@ class ProductSettings(FiabBaseModel):
 
 
 class ExternalServicesSettings(FiabBaseModel):
-    plugins: PluginsSettings = Field(default_factory=_default_plugins)
+    default_plugins: DefaultPluginIds = Field(default_factory=_default_plugins)
+    """Ids of plugins installed automatically on first run. Does not reflect currently
+    installed plugins -- see the plugin_state database table for that."""
+    default_plugins_settings: DefaultPluginsSettingsConfig = Field(default_factory=dict)
+    """Optional settings overrides applied to a subset of default_plugins right after
+    their install. Keys not present in default_plugins are rejected."""
     plugin_stores: PluginStoresConfig = Field(default_factory=_default_plugin_stores)
     artifact_stores: ArtifactStoresConfig = Field(default_factory=_default_artifact_stores)
     model_repository: str = "https://sites.ecmwf.int/repository/fiab"
     """URL to the model repository."""
+
+    @model_validator(mode="after")
+    def validate_default_plugins_settings_subset(self) -> Self:
+        unknown = set(self.default_plugins_settings) - set(self.default_plugins)
+        if unknown:
+            unknown_str = sorted(PluginCompositeId.to_str(k) for k in unknown)
+            raise ValueError(f"default_plugins_settings contains ids not present in default_plugins: {unknown_str}")
+        return self
 
     def validate_runtime(self) -> list[str]:
         errors = []
@@ -473,4 +482,3 @@ def validate_runtime(config: FIABConfig) -> None:
 
 
 config = FIABConfig()
-config_edit_lock = threading.Lock()

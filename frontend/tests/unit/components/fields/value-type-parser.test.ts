@@ -360,6 +360,27 @@ describe('parseValueType', () => {
       })
     })
   })
+
+  describe('traits', () => {
+    // *TODO* once traits feed the UI, assert on the parsed trait info
+    // instead of just the base widget type.
+    it('ignores a trailing traits suffix on a plain type', () => {
+      expect(parseValueType('int{positive}')).toEqual({ type: 'int' })
+    })
+
+    it('ignores a traits suffix with an argument', () => {
+      expect(parseValueType('float{nonNegative,divisibleBy(3)}')).toEqual({
+        type: 'float',
+      })
+    })
+
+    it('ignores a traits suffix nested inside a list', () => {
+      expect(parseValueType('list[int{positive}]')).toEqual({
+        type: 'list',
+        itemType: 'int',
+      })
+    })
+  })
 })
 
 describe('getDefaultValueForType', () => {

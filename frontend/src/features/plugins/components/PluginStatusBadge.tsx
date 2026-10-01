@@ -43,6 +43,8 @@ interface PluginStatusBadgeProps {
   /** `settings_data.isEnabled` flag. Explicit `false` → "Disabled" regardless
    *  of load status. Omit to drive the badge by `status` alone. */
   isEnabled?: boolean
+  /** In-flight work, e.g. "Installing"; replaces the status. */
+  busyLabel?: string
   className?: string
 }
 
@@ -51,9 +53,20 @@ export function PluginStatusBadge({
   hasUpdate,
   severity,
   isEnabled,
+  busyLabel,
   className,
 }: PluginStatusBadgeProps) {
   const { t } = useTranslation('plugins')
+
+  if (busyLabel !== undefined) {
+    return (
+      <StatusBadge
+        variant={{ label: busyLabel, ...STATUS_BADGE_VARIANTS.busy }}
+        pulse
+        className={className}
+      />
+    )
+  }
 
   // Shared with the status filter so the two can't drift.
   const kind = pluginBadgeKind({

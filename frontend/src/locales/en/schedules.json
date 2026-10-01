@@ -1,12 +1,12 @@
 {
   "page": {
-    "title": "Scheduled runs",
-    "description": "Manage your scheduled forecast runs",
+    "title": "Schedules",
+    "description": "Workflows that run automatically on a schedule",
     "runsLink": "Runs"
   },
   "detail": {
     "backLink": "Schedules",
-    "untitledSchedule": "Untitled Schedule",
+    "untitledSchedule": "Untitled schedule",
     "enabled": "Enabled",
     "disabled": "Disabled",
     "createdBy": "Created by",
@@ -21,10 +21,10 @@
     "scheduledAt": "Scheduled at",
     "trigger": "Trigger",
     "status": "Status",
-    "jobId": "Job ID",
+    "jobId": "Run ID",
     "attempts": "Attempts",
     "rerun": "Re-run",
-    "configuration": "Configuration"
+    "configuration": "Workflow"
   },
   "filter": {
     "all": "All",
@@ -35,18 +35,18 @@
   "actions": {
     "enable": "Enable",
     "disable": "Disable",
-    "viewRuns": "View Runs",
-    "viewDetails": "View Details",
+    "viewRuns": "View runs",
+    "viewDetails": "View details",
     "rerun": "Re-run",
     "rerunSuccess": "Run re-triggered successfully",
     "enableSuccess": "Schedule enabled",
     "disableSuccess": "Schedule disabled",
-    "editSchedule": "Edit Schedule",
+    "editSchedule": "Edit schedule",
     "scheduleUpdated": "Schedule updated successfully"
   },
   "empty": {
-    "title": "No scheduled runs",
-    "description": "You haven't scheduled any runs yet. Create one from the forecast builder."
+    "title": "No schedules yet",
+    "description": "You haven't scheduled a workflow yet. In Configure, open the menu next to Run Once and choose Run on Schedule."
   },
   "list": {
     "loading": "Loading schedules...",

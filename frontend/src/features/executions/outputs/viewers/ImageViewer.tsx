@@ -11,6 +11,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Download,
+  Lock,
+  LockOpen,
   Maximize2,
   SkipBack,
   SkipForward,
@@ -23,13 +25,23 @@ import { downloadAction } from '../actions/download'
 import { useJobResultBlob } from '../useJobResult'
 import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
 import type { ViewerProps } from '../types'
+import { useHoldPan } from '@/hooks/useHoldPan'
 import { showToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
-const MIN_SCALE = 0.25
+const MIN_SCALE = 0.05
 const MAX_SCALE = 32
 const ZOOM_STEP = 1.2
 const MIN_MARQUEE_PX = 12
+// Zoom per wheel px; pinch sends much smaller deltas.
+const WHEEL_ZOOM_RATE = 0.002
+const PINCH_ZOOM_RATE = 0.01
+// Caps zoom per wheel event.
+const MAX_WHEEL_DELTA = 100
+// Screen px per source px before rendering turns pixelated.
+const PIXELATED_FROM = 2
+// Gap kept around a fitted image.
+const FIT_MARGIN_PX = 24
 
 interface Point {
   x: number
@@ -41,6 +53,17 @@ interface Marquee {
   end: Point
 }
 
+/** `scale` is screen px per image px; `offset` moves the image center. */
+interface View {
+  scale: number
+  offset: Point
+}
+
+interface Size {
+  width: number
+  height: number
+}
+
 export default function ImageViewer({
   item,
   adapter,
@@ -48,14 +71,23 @@ export default function ImageViewer({
   onPrev,
   onNext,
   navIndex,
+  footer,
 }: ViewerProps) {
   const { t } = useTranslation('executions')
-  const [blobUrl, setBlobUrl] = useState<string | null>(null)
-  const [scale, setScale] = useState(1)
-  const [offset, setOffset] = useState<Point>({ x: 0, y: 0 })
+  const [shownUrl, setShownUrl] = useState<string | null>(null)
+  const [imageSize, setImageSize] = useState<Size | null>(null)
+  const [view, setView] = useState<View>({ scale: 1, offset: { x: 0, y: 0 } })
   const [marquee, setMarquee] = useState<Marquee | null>(null)
+  const [dragging, setDragging] = useState(false)
+  // Keep the zoomed region when stepping, like a flip-book.
+  const [keepView, setKeepView] = useState(true)
   const dragRef = useRef<Point | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
+  const shownUrlRef = useRef<string | null>(null)
+  const imageSizeRef = useRef<Size | null>(null)
+  const keepViewRef = useRef(keepView)
+  keepViewRef.current = keepView
+  const { scale, offset } = view
 
   // SVG needs an explicit mime tag — `<img>` strict-checks it where it
   // sniffs raster. For raster, trust item.mimeType when the adapter
@@ -71,13 +103,48 @@ export default function ImageViewer({
   const { data, error } = useJobResultBlob(item.jobId, item.taskId)
   const blob = data?.blob
 
+  // Swap images only once the next one is decoded.
   useEffect(() => {
     if (!blob) return
-    const tagged = new Blob([blob], { type: renderMime })
-    const createdUrl = URL.createObjectURL(tagged)
-    setBlobUrl(createdUrl)
-    return () => URL.revokeObjectURL(createdUrl)
+    const url = URL.createObjectURL(new Blob([blob], { type: renderMime }))
+    const probe = new Image()
+    probe.src = url
+    let cancelled = false
+    void probe
+      .decode()
+      .catch(() => undefined)
+      .then(() => {
+        // Revoke after decode; earlier logs a failed load.
+        if (cancelled) {
+          URL.revokeObjectURL(url)
+          return
+        }
+        if (shownUrlRef.current) URL.revokeObjectURL(shownUrlRef.current)
+        shownUrlRef.current = url
+        const size = { width: probe.naturalWidth, height: probe.naturalHeight }
+        const prev = imageSizeRef.current
+        const stage = stageRef.current
+        imageSizeRef.current = size
+        setShownUrl(url)
+        setImageSize(size)
+        setView((v) =>
+          keepViewRef.current && prev
+            ? carryView(v, stage, prev, size)
+            : fitView(stage, size),
+        )
+        setMarquee(null)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [blob, renderMime])
+
+  useEffect(
+    () => () => {
+      if (shownUrlRef.current) URL.revokeObjectURL(shownUrlRef.current)
+    },
+    [],
+  )
 
   useEffect(() => {
     if (error) showToast.error(error.message)
@@ -85,16 +152,56 @@ export default function ImageViewer({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') return onClose()
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const center = { x: 0, y: 0 }
+      switch (e.key) {
+        case '+':
+        case '=':
+          return setView((v) => zoomAt(v, ZOOM_STEP, center))
+        case '-':
+          return setView((v) => zoomAt(v, 1 / ZOOM_STEP, center))
+        case '0':
+          return setView(fitView(stageRef.current, imageSizeRef.current))
+        case '1':
+          return setView((v) => zoomAt(v, 1 / v.scale, center))
+        case 'l':
+        case 'L':
+          return setKeepView((k) => !k)
+      }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onClose])
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    const direction = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP
-    setScale((s) => clamp(s * direction, MIN_SCALE, MAX_SCALE))
+  const pan = useCallback(
+    (dx: number, dy: number) =>
+      setView((v) => ({
+        ...v,
+        offset: { x: v.offset.x - dx, y: v.offset.y - dy },
+      })),
+    [],
+  )
+  useHoldPan(pan, { arrows: false })
+
+  // Native listener: React's onWheel is passive.
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+    function onWheel(e: WheelEvent) {
+      e.preventDefault()
+      const rate = e.ctrlKey ? PINCH_ZOOM_RATE : WHEEL_ZOOM_RATE
+      const delta = clamp(wheelPixels(e), -MAX_WHEEL_DELTA, MAX_WHEEL_DELTA)
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      setView((v) =>
+        zoomAt(v, Math.exp(-delta * rate), {
+          x: e.clientX - rect.left - rect.width / 2,
+          y: e.clientY - rect.top - rect.height / 2,
+        }),
+      )
+    }
+    stage.addEventListener('wheel', onWheel, { passive: false })
+    return () => stage.removeEventListener('wheel', onWheel)
   }, [])
 
   const stageLocal = (e: { clientX: number; clientY: number }): Point => {
@@ -115,6 +222,7 @@ export default function ImageViewer({
         x: e.clientX - offset.x,
         y: e.clientY - offset.y,
       }
+      setDragging(true)
     },
     [offset],
   )
@@ -125,18 +233,18 @@ export default function ImageViewer({
         setMarquee({ start: marquee.start, end: stageLocal(e) })
         return
       }
-      if (!dragRef.current) return
-      setOffset({
-        x: e.clientX - dragRef.current.x,
-        y: e.clientY - dragRef.current.y,
-      })
+      const drag = dragRef.current
+      if (!drag) return
+      setView((v) => ({
+        ...v,
+        offset: { x: e.clientX - drag.x, y: e.clientY - drag.y },
+      }))
     },
     [marquee],
   )
 
   const finalizeMarquee = useCallback(() => {
     if (!marquee || !stageRef.current) {
-      dragRef.current = null
       setMarquee(null)
       return
     }
@@ -168,10 +276,12 @@ export default function ImageViewer({
 
     // The image is positioned at the stage center plus `offset`, scaled.
     // Solve for the new offset that puts the marquee center at stage center.
-    setScale(nextScale)
-    setOffset({
-      x: ratio * (offset.x + (vcx - mcx)),
-      y: ratio * (offset.y + (vcy - mcy)),
+    setView({
+      scale: nextScale,
+      offset: {
+        x: ratio * (offset.x + (vcx - mcx)),
+        y: ratio * (offset.y + (vcy - mcy)),
+      },
     })
     setMarquee(null)
   }, [marquee, offset, scale])
@@ -182,18 +292,34 @@ export default function ImageViewer({
       return
     }
     dragRef.current = null
+    setDragging(false)
   }, [marquee, finalizeMarquee])
 
-  const reset = useCallback(() => {
-    setScale(1)
-    setOffset({ x: 0, y: 0 })
+  const reset = useCallback(
+    () => setView(fitView(stageRef.current, imageSizeRef.current)),
+    [],
+  )
+  // Double-click: 2x at the cursor when fitted, else fit.
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    const fitted = fitView(stageRef.current, imageSizeRef.current)
+    const rect = stageRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setView((v) =>
+      Math.abs(v.scale - fitted.scale) < 1e-3
+        ? zoomAt(v, 2, {
+            x: e.clientX - rect.left - rect.width / 2,
+            y: e.clientY - rect.top - rect.height / 2,
+          })
+        : fitted,
+    )
   }, [])
+  // Buttons zoom about the stage center.
   const zoomIn = useCallback(
-    () => setScale((s) => clamp(s * ZOOM_STEP, MIN_SCALE, MAX_SCALE)),
+    () => setView((v) => zoomAt(v, ZOOM_STEP, { x: 0, y: 0 })),
     [],
   )
   const zoomOut = useCallback(
-    () => setScale((s) => clamp(s / ZOOM_STEP, MIN_SCALE, MAX_SCALE)),
+    () => setView((v) => zoomAt(v, 1 / ZOOM_STEP, { x: 0, y: 0 })),
     [],
   )
 
@@ -221,7 +347,7 @@ export default function ImageViewer({
         onClick={(e) => e.stopPropagation()}
       >
         <span className="truncate font-mono text-sm text-white/80">
-          {item.originalBlock}
+          {item.blockName}
         </span>
         {navIndex && (
           <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
@@ -284,6 +410,20 @@ export default function ImageViewer({
           >
             <Maximize2 className="h-4 w-4" />
           </button>
+          <button
+            type="button"
+            aria-label={t('outputs.viewer.keepView')}
+            aria-pressed={keepView}
+            title={t('outputs.viewer.keepView')}
+            className={cn(viewerHeaderBtn, keepView && 'bg-white/15')}
+            onClick={() => setKeepView((k) => !k)}
+          >
+            {keepView ? (
+              <Lock className="h-4 w-4" />
+            ) : (
+              <LockOpen className="h-4 w-4" />
+            )}
+          </button>
         </div>
         <div className="h-5 w-px bg-white/15" />
         <button
@@ -312,26 +452,25 @@ export default function ImageViewer({
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose()
         }}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
       >
-        {blobUrl && (
+        {shownUrl && (
           <img
-            src={blobUrl}
-            alt={item.originalBlock}
+            src={shownUrl}
+            alt={item.blockName}
             draggable={false}
             onClick={(e) => e.stopPropagation()}
-            className="absolute top-1/2 left-1/2 max-h-[85vh] max-w-[85vw] origin-center object-contain select-none [image-rendering:pixelated]"
+            width={imageSize?.width}
+            height={imageSize?.height}
+            className="absolute top-1/2 left-1/2 max-w-none origin-center select-none"
             style={{
               transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-              cursor: marquee
-                ? 'crosshair'
-                : dragRef.current
-                  ? 'grabbing'
-                  : 'grab',
+              imageRendering: scale >= PIXELATED_FROM ? 'pixelated' : 'auto',
+              cursor: marquee ? 'crosshair' : dragging ? 'grabbing' : 'grab',
             }}
           />
         )}
@@ -352,10 +491,62 @@ export default function ImageViewer({
           {t('outputs.viewer.zoomHint')}
         </div>
       </div>
+
+      {footer}
     </div>
   )
 }
 
+/** Largest scale showing the whole image, centered. */
+function fitView(stage: HTMLElement | null, size: Size | null): View {
+  const rect = stage?.getBoundingClientRect()
+  const offset = { x: 0, y: 0 }
+  if (!rect || !size || !size.width || !size.height) return { scale: 1, offset }
+  const scale = Math.min(
+    (rect.width - 2 * FIT_MARGIN_PX) / size.width,
+    (rect.height - 2 * FIT_MARGIN_PX) / size.height,
+  )
+  return { scale: clamp(scale, MIN_SCALE, MAX_SCALE), offset }
+}
+
+/** Carries zoom (relative to fit) and position over to a new image. */
+function carryView(
+  view: View,
+  stage: HTMLElement | null,
+  from: Size,
+  to: Size,
+): View {
+  const zoom = view.scale / fitView(stage, from).scale
+  const scale = clamp(fitView(stage, to).scale * zoom, MIN_SCALE, MAX_SCALE)
+  return {
+    scale,
+    offset: {
+      x: (view.offset.x / (from.width * view.scale)) * to.width * scale,
+      y: (view.offset.y / (from.height * view.scale)) * to.height * scale,
+    },
+  }
+}
+
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
+}
+
+/** Zooms by `factor` around `anchor` (relative to the stage center). */
+function zoomAt(view: View, factor: number, anchor: Point): View {
+  const scale = clamp(view.scale * factor, MIN_SCALE, MAX_SCALE)
+  const ratio = scale / view.scale
+  return {
+    scale,
+    offset: {
+      x: anchor.x - (anchor.x - view.offset.x) * ratio,
+      y: anchor.y - (anchor.y - view.offset.y) * ratio,
+    },
+  }
+}
+
+/** Wheel delta in pixels, for any delta mode. */
+function wheelPixels(e: WheelEvent): number {
+  if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) return e.deltaY * 16
+  if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) return e.deltaY * 800
+  return e.deltaY
 }

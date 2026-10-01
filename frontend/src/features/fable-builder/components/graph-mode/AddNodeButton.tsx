@@ -24,6 +24,7 @@ import {
   factoryIdToKey,
   getBlockKindIcon,
   getFactory,
+  pluginIdToDisplayKey,
 } from '@/api/types/fable.types'
 import {
   Popover,
@@ -34,6 +35,11 @@ import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
+import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
+import {
+  collidingTitles,
+  qualifiedFactoryTitle,
+} from '@/features/fable-builder/utils/block-names'
 
 interface AddNodeButtonProps {
   sourceBlockId: BlockInstanceId
@@ -145,6 +151,14 @@ export const AddNodeButton = memo(function ({
   // Insert needs an output to continue the chain, so sinks are branch-only.
   const insertMode = addMode === 'insert' && canOfferInsert
 
+  const colliding = useMemo(() => collidingTitles(catalogue), [catalogue])
+  const titleOf = (id: PluginBlockFactoryId, factory: BlockFactory) =>
+    qualifiedFactoryTitle(
+      factory.title,
+      pluginIdToDisplayKey(id.plugin),
+      colliding,
+    )
+
   const filteredFactories = useMemo(() => {
     const byMode = insertMode
       ? availableFactories.filter(({ factory }) => factory.kind !== 'sink')
@@ -153,9 +167,10 @@ export const AddNodeButton = memo(function ({
 
     const searchLower = search.toLowerCase()
     return byMode.filter(
-      ({ factory }) =>
+      ({ id, factory }) =>
         factory.title.toLowerCase().includes(searchLower) ||
-        factory.description.toLowerCase().includes(searchLower),
+        factory.description.toLowerCase().includes(searchLower) ||
+        pluginIdToDisplayKey(id.plugin).toLowerCase().includes(searchLower),
     )
   }, [availableFactories, search, insertMode])
 
@@ -312,7 +327,7 @@ export const AddNodeButton = memo(function ({
                         />
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">
-                            {factory.title}
+                            <BlockName name={titleOf(id, factory)} />
                           </div>
                           <div className="line-clamp-1 text-sm text-muted-foreground">
                             {factory.description}

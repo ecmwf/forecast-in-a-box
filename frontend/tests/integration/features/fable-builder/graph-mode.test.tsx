@@ -354,7 +354,7 @@ describe('Graph Mode - Builder Integration', () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
     // Wait for catalogue to load
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up a fable and select a block
     const store = useFableBuilderStore.getState()
@@ -373,7 +373,7 @@ describe('Graph Mode - Builder Integration', () => {
   it('shows the empty configuration panel when no block is selected', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up a fable but do NOT select a block
     const store = useFableBuilderStore.getState()
@@ -406,7 +406,7 @@ describe('Graph Mode - Builder Integration', () => {
   it('shows input connections section for blocks with inputs', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up fable and select the sink (which has an input connection)
     const store = useFableBuilderStore.getState()
@@ -414,7 +414,7 @@ describe('Graph Mode - Builder Integration', () => {
     store.selectBlock('sink1')
 
     // Sink block has Input Connections section
-    await expect.element(screen.getByText('Input Connections')).toBeVisible()
+    await expect.element(screen.getByText('Input connections')).toBeVisible()
 
     // The input name "dataset" should appear as a label
     await expect.element(screen.getByLabelText('dataset')).toBeVisible()
@@ -423,7 +423,7 @@ describe('Graph Mode - Builder Integration', () => {
   it('updates block count in header as blocks are added', async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
 
-    await expect.element(screen.getByText('Block Palette')).toBeVisible()
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
 
     // Set up a 3-block fable
     const store = useFableBuilderStore.getState()

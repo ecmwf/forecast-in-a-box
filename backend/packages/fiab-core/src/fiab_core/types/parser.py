@@ -13,6 +13,7 @@ Parsers and utility methods for the types from definition.py
 
 from fiab_core.types.definitions import *
 from fiab_core.types.exceptions import NotFableType
+from fiab_core.types.traits import DivisibleBy, FableTrait, NonNegative, Positive
 
 
 def _normalize_enum_item(item: str) -> str:
@@ -54,7 +55,87 @@ def _split_by_parens(s: str) -> tuple[str, str, str]:
     return _split_by_delim(s, "(", ")")
 
 
+def _split_by_braces(s: str) -> tuple[str, str, str]:
+    """Split 'prefix{inner}remainder' into (prefix, inner, remainder)."""
+    return _split_by_delim(s, "{", "}")
+
+
+def _split_top_level(s: str, sep: str) -> list[str]:
+    """Split s by sep, ignoring occurrences of sep nested within parentheses."""
+    parts: list[str] = []
+    depth = 0
+    current = ""
+    for ch in s:
+        if ch == "(":
+            depth += 1
+            current += ch
+        elif ch == ")":
+            depth -= 1
+            current += ch
+        elif ch == sep and depth == 0:
+            parts.append(current)
+            current = ""
+        else:
+            current += ch
+    parts.append(current)
+    return parts
+
+
+_TRAIT_FACTORIES = {
+    "positive": Positive,
+    "nonNegative": NonNegative,
+    "divisibleBy": DivisibleBy,
+}
+
+
+def _parse_trait(trait_expr: str) -> FableTrait:
+    """Parse a single trait expression, eg 'positive' or 'divisibleBy(3)'."""
+    trait_expr = trait_expr.strip()
+    if "(" in trait_expr:
+        name, arg, remainder = _split_by_parens(trait_expr)
+        name = name.strip()
+        if remainder.strip():
+            raise NotFableType(f"Unexpected content after trait {name!r}: {remainder!r}")
+    else:
+        name = trait_expr
+        arg = None
+
+    factory = _TRAIT_FACTORIES.get(name)
+    if factory is None:
+        raise NotFableType(f"Unknown trait: {name!r}. Expected one of: {', '.join(_TRAIT_FACTORIES)}")
+
+    if factory is DivisibleBy:
+        if arg is None:
+            raise NotFableType("divisibleBy requires an argument, e.g. divisibleBy(3)")
+        return DivisibleBy(arg)
+    if arg is not None:
+        raise NotFableType(f"Trait {name!r} does not take an argument")
+    return factory()
+
+
+def _parse_traits(inner: str) -> list[FableTrait]:
+    """Parse the comma-separated content of a '{...}' trait suffix."""
+    parts = [p for p in _split_top_level(inner, ",") if p.strip()]
+    if not parts:
+        raise NotFableType("Trait expression '{}' must contain at least one trait")
+    return [_parse_trait(p) for p in parts]
+
+
 def _parse(type_expr: str) -> tuple[FableType, str]:
+    """Parse a type expression from the start of type_expr, including an optional trailing
+    '{trait1, trait2(arg), ...}' traits suffix, eg 'int{positive}' or 'float{nonNegative,divisibleBy(3)}'.
+
+    Returns ``(parsed_type, remainder)``, see _parse_bare for details.
+    """
+    parsed, remainder = _parse_bare(type_expr)
+    remainder = remainder.lstrip()
+    if remainder.startswith("{"):
+        _, traits_expr, remainder = _split_by_braces(remainder)
+        parsed.traits = _parse_traits(traits_expr)
+    return (parsed, remainder)
+
+
+def _parse_bare(type_expr: str) -> tuple[FableType, str]:
     """Parse a type expression from the start of type_expr.
 
     Returns ``(parsed_type, remainder)`` where ``remainder`` is the unparsed

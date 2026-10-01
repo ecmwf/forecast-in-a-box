@@ -16,11 +16,12 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import { STORAGE_KEYS, STORE_VERSIONS } from '@/lib/storage-keys'
+import { ecmwfPublicUrl } from '@/features/visualise/ecmwf-key'
 import { isLensProxyUrl } from '@/features/viewer/wms-capabilities'
 
-/** Store scope for a source: `lens` for any lens proxy, else the URL. */
+/** Store scope for a source: `lens` for any lens proxy, else the public URL. */
 export function styleScope(baseUrl: string): string {
-  return isLensProxyUrl(baseUrl) ? 'lens' : baseUrl
+  return isLensProxyUrl(baseUrl) ? 'lens' : ecmwfPublicUrl(baseUrl)
 }
 
 /** Record key for a pin. */

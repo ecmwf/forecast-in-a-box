@@ -11,7 +11,8 @@ import logging
 
 import numpy as np
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, Payload, from_source, merge
+from earthkit.workflows.fluent import Action, create_task_instance, from_source, merge
+from earthkit.workflows.metadata import NodeMetadata, Requirements
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -22,7 +23,7 @@ from fiab_core.fable import (
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Source, Transform
-from fiab_core.types import ClosedEnumType, DatetimeType, ListType, StringType
+from fiab_core.types import ClosedEnumType, DatetimeType, ListType, ParameterType, StringType
 from qubed import Qube
 
 from .block_utils import (
@@ -30,8 +31,6 @@ from .block_utils import (
     _axis_value_strings,
     _extract_dataset,
     _is_empty_qube,
-    _param_id_to_param_key,
-    _param_key_to_param_id,
     _parse_axis_value,
 )
 from .constants import (
@@ -61,7 +60,7 @@ class OperationalForecastSource(Source):
         SOURCE: BlockConfigurationOption(
             title="Source",
             description="Top level source for earthkit data",
-            value_type=ClosedEnumType(["mars", "ecmwf-open-data"]),
+            value_type=ClosedEnumType(["mars", "opendata", "opendata:google", "opendata:aws"]),
         ),
         FORECAST: BlockConfigurationOption(
             title="Forecast model",
@@ -108,12 +107,12 @@ class OperationalForecastSource(Source):
         time = self._convert_time(basetime.time().hour)
 
         source = block.config_as_str(SOURCE)
-        if source == "ecmwf-open-data":
-            metadata = {"environment": opendata_dependencies}
+        if source.startswith("opendata"):
+            requirements = Requirements(environment=opendata_dependencies)
         elif source == "mars":
-            metadata = {"environment": mars_dependencies}
+            requirements = Requirements(environment=mars_dependencies)
         else:
-            metadata = {}
+            requirements = Requirements()
 
         subqube = fc_qube.select({"time": time}).compress()
         actions = []
@@ -131,19 +130,18 @@ class OperationalForecastSource(Source):
                     np.asarray(
                         [
                             [
-                                Payload(
+                                create_task_instance(
                                     "fiab_plugin_ecmwf.runtime.source.earthkit_source",
-                                    [source],
-                                    {
-                                        "requests": [
+                                    static_input_ps=[
+                                        source,
+                                        [
                                             dict(
                                                 {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
                                                 param=ParamDBInstance.param_id_to_shortname(int(p)),
                                                 step=step,
                                             )
                                         ],
-                                    },
-                                    metadata=metadata,
+                                    ],
                                 )
                                 for p in datacube[PARAM]
                             ]
@@ -152,6 +150,7 @@ class OperationalForecastSource(Source):
                     ),
                     dims=[STEP, PARAM],
                     coords={STEP: datacube[STEP], PARAM: datacube[PARAM]},
+                    node_metadata=NodeMetadata(requirements=requirements),
                 )
                 expand_dims = [dim for dim, values in datacube.items() if (len(values) > 1 and dim not in [STEP, PARAM])]
                 if len(expand_dims) > 0:
@@ -216,20 +215,16 @@ class Select(Transform):
             raise ValueError(f"dimension {dimension} is not in the input dimensions: {input_dimensions}")
 
         input_values = _axis_value_strings(axis_values)
-        if dimension == PARAM:
-            axis_values = [_param_id_to_param_key(paramid) for paramid in axis_values]
-            input_values = axis_values
         if input_values:
-            restrictions[VALUES] = ListType(ClosedEnumType(input_values))
-
-        selected_values = [_parse_axis_value(value) for value in self._selected_values(block)]
+            subtype = ParameterType() if dimension == PARAM else StringType()
+            restrictions[VALUES] = ListType(ClosedEnumType(input_values, subtype=subtype))
+        axis_value_type = type(list(axis_values)[0]) if axis_values else _parse_axis_value
+        selected_values = [axis_value_type(value) for value in self._selected_values(block)]
 
         missing_values = [value for value in selected_values if value not in axis_values]
         if missing_values:
             raise ValueError(f"values {missing_values} are not in dimension {dimension}: {input_values}")
 
-        if dimension == PARAM:
-            selected_values = [_param_key_to_param_id(str(value)) for value in selected_values]
         output = select(input_dataset, {dimension: selected_values})
         if output.dataqube is None or _is_empty_qube(output.dataqube):
             raise ValueError(f"selection of values {selected_values} from dimension {dimension} produced an empty dataset")
@@ -244,7 +239,7 @@ class Select(Transform):
         input_task = block.input_ids["dataset"]
         dimension = self._selected_dimension(block)
         if dimension == PARAM:
-            values = [_param_key_to_param_id(value) for value in self._selected_values(block)]
+            values = [str(value) for value in self._selected_values(block)]
             selected = inputs[input_task].select({dimension: values}, expand=True)
         else:
             values = [_parse_axis_value(value) for value in self._selected_values(block)]

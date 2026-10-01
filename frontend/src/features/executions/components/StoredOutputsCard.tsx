@@ -28,7 +28,7 @@ import type {
 import type { RunOutputs } from '@/api/types/job.types'
 import type { LostTaskIds } from '@/features/executions/outputs/availability'
 import { classifyOutput } from '@/features/executions/outputs/availability'
-import { getFactory } from '@/api/types/fable.types'
+import { blockDisplayNames } from '@/features/fable-builder/utils/block-names'
 import {
   useLensStatus,
   useSkinnyWmsAvailable,
@@ -98,6 +98,7 @@ export function StoredOutputsCard({
   // One row per sink block — a sink fans out to one marker task per cascade
   // branch (e.g. per ensemble member), all pointing at the same directory.
   const rows = useMemo<Array<StoredOutputRow>>(() => {
+    const names = fable ? blockDisplayNames(fable, catalogue) : {}
     if (!outputs) return []
     const byBlock = new Map<string, StoredOutputRow>()
     for (const [taskId, meta] of Object.entries(outputs)) {
@@ -124,15 +125,10 @@ export function StoredOutputsCard({
         }
         continue
       }
-      const blockInstance = fable?.blocks[meta.original_block]
-      const factory =
-        catalogue && blockInstance
-          ? getFactory(catalogue, blockInstance.factory_id)
-          : undefined
       byBlock.set(meta.original_block, {
         blockId: meta.original_block,
         taskId,
-        title: factory?.title ?? meta.original_block,
+        title: names[meta.original_block] ?? meta.original_block,
         isAvailable: meta.is_available,
         lostReason:
           availability.state === 'lost' ? availability.reason : undefined,

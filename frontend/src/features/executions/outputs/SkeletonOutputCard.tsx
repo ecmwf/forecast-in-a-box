@@ -18,7 +18,7 @@ import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
 interface SkeletonOutputCardProps {
-  originalBlock: string
+  blockName: string
   /** Pulse only fires for currently-executing blocks; idle pending cards stay static. */
   isRunning?: boolean
 }
@@ -27,7 +27,7 @@ interface SkeletonOutputCardProps {
 const RUNNING_PULSE = 'animate-[pulse-strong_1.5s_ease-in-out_infinite]'
 
 export function SkeletonOutputCard({
-  originalBlock,
+  blockName,
   isRunning = false,
 }: SkeletonOutputCardProps) {
   const pulse = isRunning ? RUNNING_PULSE : 'animate-none'
@@ -43,9 +43,9 @@ export function SkeletonOutputCard({
         <Skeleton className={cn('h-4 w-3/4', pulse)} />
         <P
           className="truncate font-mono text-sm text-muted-foreground/70"
-          title={originalBlock}
+          title={blockName}
         >
-          {originalBlock}
+          {blockName}
         </P>
       </div>
 

@@ -21,6 +21,13 @@
  * `date-iso8601`) normalize to canonical kinds. Serialization is always
  * canonical. `optional[T]` is NOT part of this grammar anymore — the
  * legacy widget projection in value-type-parser.ts still peels it.
+ *
+ * Traits (fiab-core's `{trait1, trait2(arg), ...}` suffix, eg
+ * `int{positive}` or `float{nonNegative,divisibleBy(3)}`) are recognized
+ * and discarded during parsing so typed values carrying them still parse;
+ * they are not represented in `FableType` nor re-emitted by
+ * `serializeValueType`. *TODO* surface traits in the UI (e.g. richer
+ * field validation/hints) instead of ignoring them.
  */
 
 export type FableType =
@@ -227,8 +234,28 @@ function parseEnumItems(
     )
 }
 
-/** Parse a type from the start of `s`; returns the type and the unparsed tail. */
+/** Parse a type from the start of `s`; returns the type and the unparsed tail.
+ *
+ * Wraps `parsePrefixBare` to also consume (and discard) an optional trailing
+ * `{trait1, trait2(arg), ...}` suffix, mirroring the backend's `_parse`/`_parse_bare`
+ * split. Applied at every recursion level so nested occurrences (e.g.
+ * `list[int{positive}]`) parse too. */
 function parsePrefix(s: string): [FableType, string] | null {
+  const bare = parsePrefixBare(s)
+  if (!bare) return null
+  const [type, remainder] = bare
+  const afterBare = remainder.replace(/^\s+/, '')
+  if (afterBare.startsWith('{')) {
+    const split = splitDelimited(afterBare, '{', '}')
+    if (!split) return null
+    // *TODO* parse split[0] into trait descriptors and attach them to `type`
+    // instead of discarding them.
+    return [type, split[1]]
+  }
+  return [type, remainder]
+}
+
+function parsePrefixBare(s: string): [FableType, string] | null {
   const input = s.replace(/^\s+/, '')
   const lower = input.toLowerCase()
 

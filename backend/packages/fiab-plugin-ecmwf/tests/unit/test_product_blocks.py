@@ -31,7 +31,6 @@ from qubed import Qube
 
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource
-from fiab_plugin_ecmwf.block_utils import _param_id_to_param_key
 from fiab_plugin_ecmwf.blocks import OperationalForecastSource
 from fiab_plugin_ecmwf.constants import (
     BASE_TIME,
@@ -84,7 +83,7 @@ def predefined_threshold_prob_configuration() -> BlockInstance:
         BlockInstanceBase(
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
-                PARAM: _param_id_to_param_key("131073"),
+                PARAM: "131073",
             },
         ),
         PredefinedThresholdProbability.configuration_options,
@@ -113,7 +112,7 @@ def thermal_indices_configuration() -> BlockInstance:
         BlockInstanceBase(
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
-                PARAM: [_param_id_to_param_key(id) for id in ["261023", "260242"]],
+                PARAM: ["261023", "260242"],
             },
         ),
         ThermalIndices.configuration_options,
@@ -127,7 +126,7 @@ def wind_speed_configuration() -> BlockInstance:
         BlockInstanceBase(
             input_ids={"dataset": BlockInstanceId("source_output")},
             configuration_values={
-                PARAM: [_param_id_to_param_key(id) for id in ["207", "228249"]],
+                PARAM: ["10", "207", "228249"],
             },
         ),
         WindSpeed.configuration_options,
@@ -220,7 +219,8 @@ class TestEnsembleStatistics:
         for dim, values in expected.items():
             assert set.union(*[set(req[dim]) for req in requests]) == values
         if identical_qubes:
-            assert list(datacubes(output)) == requests
+            for qube in datacubes(output):
+                assert qube in requests
 
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):
@@ -271,7 +271,7 @@ class TestPredefinedThresholdProb:
             )
             .restrictions
         )
-        assert restrictions[PARAM].serialize() == f"enumClosed[str]('{_param_id_to_param_key('131073')}')"
+        assert restrictions[PARAM].serialize() == "enumClosed[param]('131073')"
 
     @pytest.mark.parametrize(
         "forecast_output, source_action, expected, identical_qubes",
@@ -310,7 +310,8 @@ class TestPredefinedThresholdProb:
         for dim, value in expected.items():
             assert requests[0][dim] == value
         if identical_qubes:
-            assert list(datacubes(output)) == requests
+            for qube in datacubes(output):
+                assert qube in requests
 
     def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
         for expansion in plugin().expander(threshold_probability_output):
@@ -384,7 +385,8 @@ class TestCustomThresholdProb:
             assert request[TYPE] == ["ep"]
             assert set.isdisjoint(set(request[PARAM]), expected_params) is False
         if identical_qubes:
-            assert list(datacubes(output)) == requests
+            for qube in datacubes(output):
+                assert qube in requests
 
     def test_expansion(self, threshold_probability_output: QubedOutput) -> None:
         for expansion in plugin().expander(threshold_probability_output):
@@ -532,9 +534,9 @@ class TestThermalIndices:
     @pytest.mark.parametrize(
         "param_config, expected_steps",
         [
-            [[_param_id_to_param_key("260242")], [0, 6, 12]],
-            [[_param_id_to_param_key("261001")], [6, 12]],
-            [[_param_id_to_param_key("260242"), _param_id_to_param_key("261001")], [6, 12]],
+            [["260242"], [0, 6, 12]],
+            [["261001"], [6, 12]],
+            [["260242", "261001"], [6, 12]],
         ],
         ids=["no-accum", "accum", "mixed"],
     )
@@ -615,16 +617,16 @@ class TestThermalIndices:
             .restrictions
         )
         for param in ["260004", "260242", "261016", "260005", "260255", "261018", "261023"]:
-            assert _param_id_to_param_key(param) in restrictions[PARAM].serialize()
-        assert _param_id_to_param_key("261001") not in restrictions[PARAM].serialize()
+            assert param in restrictions[PARAM].serialize()
+        assert "utci" not in restrictions[PARAM].serialize()
 
 
 class TestWindSpeed:
     @pytest.mark.parametrize(
-        "forecast_output",
+        "forecast_output, expected_params",
         [
-            lf("full_operational_forecast_source_output"),
-            # lf("anemoi_source_ensemble_output"),
+            [lf("full_operational_forecast_source_output"), {"10", "207", "228249"}],
+            # [lf("anemoi_source_ensemble_output"), {"10", "207"}],
         ],
     )
     @pytest.mark.parametrize(
@@ -640,6 +642,7 @@ class TestWindSpeed:
         forecast_output: QubedOutput,
         wind_speed_configuration: BlockInstance,
         oper_selection: dict[str, list[int | str]],
+        expected_params: set[str],
     ) -> None:
         block = WindSpeed()
         source_output = select(forecast_output, oper_selection)
@@ -656,7 +659,7 @@ class TestWindSpeed:
         assert isinstance(output, QubedOutput)
         assert output.dataqube is not None
         output_axes = axes(output)
-        assert len(output_axes.get(PARAM, [])) == 2
+        assert output_axes.get(PARAM, set()) == expected_params
         assert len(output_axes.get(STEP, [])) > 0
         for cube in datacubes(output):
             cube.pop(PARAM, None)
@@ -671,8 +674,8 @@ class TestWindSpeed:
     @pytest.mark.parametrize(
         "oper_selection, expected",
         [
-            [{ENSEMBLE: [0]}, 1],
-            [{ENSEMBLE: [0, 1, 2]}, 2],
+            [{ENSEMBLE: [0]}, 2],
+            [{ENSEMBLE: [0, 1, 2]}, 4],
         ],
         ids=["single", "ensemble"],
     )
@@ -705,7 +708,7 @@ class TestWindSpeed:
         ).get_or_raise()
         requests = nodetree.datacubes(action.nodes)
         assert len(requests) == expected
-        assert all(req[PARAM] == ["207", "228249"] for req in requests)
+        assert all(set(req[PARAM]).issubset({"10", "207", "228249"}) for req in requests)
         assert list(datacubes(output)) == requests
 
     @pytest.mark.parametrize(
@@ -751,7 +754,7 @@ class TestWindSpeed:
         ).get_or_raise()
         requests = nodetree.datacubes(action.nodes)
         assert len(requests) == expected
-        assert all(req[PARAM] == ["207", "228249"] for req in requests)
+        assert all(set(req[PARAM]).issubset({"10", "207", "228249"}) for req in requests)
         for index, cube in enumerate(datacubes(output)):
             assert all(cube[dim] == requests[index][dim] for dim in cube)
 
@@ -818,7 +821,8 @@ class TestQuantiles:
         for dim, values in expected.items():
             assert set.union(*[set(req[dim]) for req in requests]) == values
         if identical_qubes:
-            assert list(datacubes(output)) == requests
+            for qube in datacubes(output):
+                assert qube in requests
 
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):

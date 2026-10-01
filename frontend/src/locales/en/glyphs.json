@@ -1,7 +1,7 @@
 {
   "page": {
-    "title": "Global Variables",
-    "description": "Manage global variable definitions used in fable configuration interpolation."
+    "title": "Global variables",
+    "description": "Manage global variable definitions used in workflow interpolation."
   },
   "list": {
     "loading": "Loading variables..."
@@ -11,7 +11,7 @@
   },
   "empty": {
     "title": "No global variables",
-    "description": "Create a global variable to use ${variable} interpolation across all fable configurations."
+    "description": "Create a global variable to use ${variable} interpolation across all workflows."
   },
   "table": {
     "key": "Key",
@@ -24,22 +24,26 @@
     "label": "by"
   },
   "actions": {
-    "create": "Create Variable",
+    "create": "Create variable",
     "edit": "Edit",
     "save": "Save",
     "saving": "Saving...",
     "cancel": "Cancel",
     "createSuccess": "Variable created",
-    "updateSuccess": "Variable updated"
+    "updateSuccess": "Variable updated",
+    "delete": "Delete",
+    "deleteLabel": "Delete {{key}}",
+    "deleteSuccess": "Variable deleted",
+    "deleteFailed": "Could not delete the variable"
   },
   "form": {
-    "title": "Create Global Variable",
-    "editTitle": "Edit Global Variable",
+    "title": "Create global variable",
+    "editTitle": "Edit global variable",
     "key": "Key",
     "keyPlaceholder": "e.g. myVariable",
-    "keyHelp": "Used as ${key} in fable configurations",
+    "keyHelp": "Used as ${key} in workflows",
     "keyInvalid": "Key must start with a letter or underscore and contain only letters, digits and underscores. Hyphens, spaces and other characters are not allowed.",
-    "keyReservedIntrinsic": "This name is a built-in intrinsic glyph and cannot be used.",
+    "keyReservedIntrinsic": "This name is a built-in variable and cannot be used.",
     "keyReservedJinja": "This name is a Jinja filter or function and cannot be used.",
     "value": "Value",
     "valuePlaceholder": "The value to interpolate",
@@ -66,14 +70,14 @@
       "copyHintFilter": "Copies | {{name}} — append after a value",
       "copyHintGlobal": "Copies {{name}}() — call directly"
     },
-    "help": "Use ${name} syntax in block configuration values to reference dynamic variables.\n\nIntrinsic — system-provided, always available (e.g., runId, submitDatetime). startDatetime and attemptCount update on each retry.\n\nGlobal — user-defined key-value pairs shared across fables. Manage them via the admin page.\n\nLocal — scoped to this blueprint only. Override global variables of the same name.\n\nContext — injected automatically per-execution (e.g., by the scheduler). Not shown here.\n\nPrecedence: Intrinsic → Global → Local → Context.\nPinned variables (startDatetime, attemptCount) always use the intrinsic value.",
+    "help": "Use ${name} syntax in block configuration values to reference dynamic variables.\n\nIntrinsic — system-provided, always available (e.g., runId, submitDatetime). startDatetime and attemptCount update on each retry.\n\nGlobal — user-defined key-value pairs shared across workflows. Manage them via the admin page.\n\nLocal — scoped to this workflow only. Override global variables of the same name.\n\nContext — injected automatically per-execution (e.g., by the scheduler). Not shown here.\n\nPrecedence: Intrinsic → Global → Local → Context.\nPinned variables (startDatetime, attemptCount) always use the intrinsic value.",
     "intrinsic": "Intrinsic",
     "global": "Global",
     "local": "Local",
-    "localTooltip": "Variables scoped to this blueprint. Override global variables of the same name.",
+    "localTooltip": "Variables scoped to this workflow. Override global variables of the same name.",
     "noGlobal": "No global variables yet.",
     "noLocal": "No local variables.",
-    "addLocalHint": "Add one to override a global value for this blueprint only.",
+    "addLocalHint": "Add one to override a global value for this workflow only.",
     "createOne": "Create one",
     "addGlobal": "Add global variable",
     "manageAll": "Manage all",
@@ -101,8 +105,8 @@
       "scopeLabel": "Scope",
       "scopeLocal": "Local",
       "scopeGlobal": "Global",
-      "scopeLocalHint": "This configuration — travels with it when shared.",
-      "scopeGlobalHint": "This system — available to every configuration here.",
+      "scopeLocalHint": "This workflow — travels with it when shared.",
+      "scopeGlobalHint": "This system — available to every workflow here.",
       "valueLabel": "Value",
       "create": "Create",
       "cancel": "Cancel",
@@ -113,5 +117,11 @@
       "floorDayAction": "Truncate to date",
       "floorDayTooltip": "Appends `| floor_day` to truncate the expression to midnight"
     }
+  },
+  "confirmDelete": {
+    "title": "Delete {{key}}?",
+    "description": "Workflows that still reference {{key}} will fail to resolve it until they are updated.",
+    "cancel": "Cancel",
+    "confirm": "Delete"
   }
 }

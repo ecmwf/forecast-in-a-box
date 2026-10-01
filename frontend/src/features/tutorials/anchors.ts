@@ -43,6 +43,7 @@ export const TOUR = {
     addSource: 'visualise.add-source',
     hub: 'visualise.hub',
     knownWms: 'visualise.known-wms',
+    sourceTabWms: 'visualise.source-tab-wms',
     map: 'visualise.map',
     modeSwitcher: 'visualise.mode-switcher',
     help: 'visualise.help',

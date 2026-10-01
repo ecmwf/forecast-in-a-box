@@ -87,6 +87,9 @@ class CheckpointArtifact:
         """Get local path to the checkpoint artifact, assumes it is already locally available, does not trigger download"""
         return Path(ArtifactsProvider.get_artifact_local_path(self.artifact))
 
+    def get_url(self) -> str:
+        return ArtifactsProvider.get_artifacts_lookup()[self.artifact].common.url
+
     def _open_qube_json(self, qube_json: dict) -> Qube | dict[str, Qube]:
         """Open a qube from a json representation, handling both single qube and multiple qube cases."""
         if not "key" in qube_json:
