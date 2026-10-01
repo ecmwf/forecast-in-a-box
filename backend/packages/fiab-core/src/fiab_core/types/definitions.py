@@ -429,11 +429,13 @@ class ParameterType(StringType):
             paramdb = pymetkit.paramdb.ParamDB()
             paramid = int(value)
             shortname = paramdb.param_id_to_shortname(paramid)
-            longname = paramdb.param_id_to_longname(paramid)
-            units = paramdb.get_units(paramid)
-            return f"{longname} [{units}] ({shortname})"
-        except:
-            return value
+            if shortname is None:
+                raise WrongType("{paramid=} is not known to Metkit ParamDB")
+        except ImportError:
+            logger.warning("failed to import metkit for ParameterType validation")
+            pass
+
+        return value
 
     def serialize(self) -> str:
         return "param"
