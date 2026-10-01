@@ -9,233 +9,296 @@
 
 """
 Parsers and utility methods for the types from definition.py
+
+The grammar itself is declared in ``fable_types.lark`` (shipped with the package), and the
+parse tree is converted either into FableType instances via FableTypeTransformer, or into a
+plain json-like AST via AstDumpTransformer. The latter is a language-agnostic representation
+used by the conformance suite in ``tests/conformance``.
 """
 
-from fiab_core.types.definitions import *
+from importlib.resources import files
+from typing import Any
+
+import lark
+
+from fiab_core.types.definitions import (
+    ArtifactType,
+    BoundingBoxWSENType,
+    ClosedEnumType,
+    DatetimeType,
+    DateType,
+    FableType,
+    FloatType,
+    GeoDomainSingleType,
+    GeoDomainType,
+    IntType,
+    ListType,
+    NoneType,
+    OpenEnumType,
+    ParameterType,
+    StringType,
+    TimeDeltaType,
+    UnionType,
+)
 from fiab_core.types.exceptions import NotFableType
 from fiab_core.types.traits import DivisibleBy, FableTrait, NonNegative, Positive
 
+GRAMMAR = files("fiab_core.types").joinpath("fable_types.lark").read_text(encoding="utf-8")
+"""The lark grammar of Fable type expressions, read from the package resources."""
 
-def _normalize_enum_item(item: str) -> str:
-    item = item.strip()
-    if len(item) >= 2 and item[0] == item[-1] and item[0] in ("'", '"'):
-        return item[1:-1]
-    return item
+_PARSER = lark.Lark(GRAMMAR, parser="lalr", lexer="contextual", start=["start", "single_trait"])
+
+AstNode = dict[str, Any]
+"""A json-like node of the AST produced by AstDumpTransformer."""
 
 
-def _split_by_delim(s: str, open_ch: str, close_ch: str) -> tuple[str, str, str]:
-    """Split 'prefix<open_ch>inner<close_ch>remainder' into (prefix, inner, remainder).
+def _enum_item_value(token: lark.Token) -> str:
+    """Raw value of an enum item token, with surrounding quotes (if any) removed."""
+    if token.type in ("SQ_ITEM", "DQ_ITEM"):
+        return token.value[1:-1]
+    return token.value
 
-    The inner content is stripped of leading/trailing whitespace.
-    Raises NotFableType if open_ch is not found or if the delimiters are unmatched.
+
+class FableTypeTransformer(lark.Transformer[lark.Token, FableType]):
+    """Converts a parse tree of the Fable type grammar into a FableType instance."""
+
+    def start(self, children: list[FableType]) -> FableType:
+        return children[0]
+
+    def fable_type(self, children: list[Any]) -> FableType:
+        parsed: FableType = children[0]
+        if len(children) > 1:
+            parsed.traits = children[1]
+        return parsed
+
+    def string_type(self, _: list[Any]) -> FableType:
+        return StringType()
+
+    def int_type(self, _: list[Any]) -> FableType:
+        return IntType()
+
+    def float_type(self, _: list[Any]) -> FableType:
+        return FloatType()
+
+    def date_type(self, _: list[Any]) -> FableType:
+        return DateType()
+
+    def datetime_type(self, _: list[Any]) -> FableType:
+        return DatetimeType()
+
+    def time_delta_type(self, _: list[Any]) -> FableType:
+        return TimeDeltaType()
+
+    def none_type(self, _: list[Any]) -> FableType:
+        return NoneType()
+
+    def parameter_type(self, _: list[Any]) -> FableType:
+        return ParameterType()
+
+    def artifact_type(self, _: list[Any]) -> FableType:
+        return ArtifactType()
+
+    def geo_domain_single_type(self, _: list[Any]) -> FableType:
+        return GeoDomainSingleType()
+
+    def geo_domain_type(self, _: list[Any]) -> FableType:
+        return GeoDomainType()
+
+    def bounding_box_wsen_type(self, _: list[Any]) -> FableType:
+        return BoundingBoxWSENType()
+
+    def enum_items(self, children: list[lark.Token]) -> list[str]:
+        return [_enum_item_value(token) for token in children]
+
+    def closed_enum_type(self, children: list[Any]) -> FableType:
+        subtype, items = children
+        return ClosedEnumType(items, subtype)
+
+    def open_enum_type(self, children: list[Any]) -> FableType:
+        subtype, items = children
+        return OpenEnumType(items, subtype)
+
+    def list_type(self, children: list[FableType]) -> FableType:
+        return ListType(children[0])
+
+    def union_type(self, children: list[FableType]) -> FableType:
+        return UnionType(list(children))
+
+    def traits(self, children: list[FableTrait]) -> list[FableTrait]:
+        return list(children)
+
+    def single_trait(self, children: list[FableTrait]) -> FableTrait:
+        return children[0]
+
+    def positive(self, _: list[Any]) -> FableTrait:
+        return Positive()
+
+    def non_negative(self, _: list[Any]) -> FableTrait:
+        return NonNegative()
+
+    def divisible_by(self, children: list[lark.Token]) -> FableTrait:
+        return DivisibleBy(children[0].value)
+
+
+class AstDumpTransformer(lark.Transformer[lark.Token, AstNode]):
+    """Converts a parse tree of the Fable type grammar into a json-like AST.
+
+    Every type node is a dict with a ``name`` key (the FableType class name without the ``Type``
+    suffix), plus type-specific keys: ``item`` for List, ``types`` for Union, ``subtype`` and
+    ``items`` (raw strings, unquoted) for ClosedEnum/OpenEnum. A ``traits`` key holds the list of
+    traits, each a dict with a ``name`` and, for DivisibleBy, an ``arg`` (raw string), and is
+    present only when the type has any traits. Enum items are not validated against the subtype.
     """
-    open_pos = s.find(open_ch)
-    if open_pos == -1:
-        raise NotFableType(f"Expected {open_ch!r} in expression: {s!r}")
-    prefix = s[:open_pos]
-    depth = 0
-    for i in range(open_pos, len(s)):
-        ch = s[i]
-        if ch == open_ch:
-            depth += 1
-        elif ch == close_ch:
-            depth -= 1
-            if depth == 0:
-                return (prefix, s[open_pos + 1 : i].strip(), s[i + 1 :])
-    raise NotFableType(f"Unmatched {open_ch!r} in {prefix!r} expression")
+
+    def start(self, children: list[AstNode]) -> AstNode:
+        return children[0]
+
+    def fable_type(self, children: list[Any]) -> AstNode:
+        node: AstNode = children[0]
+        if len(children) > 1:
+            node = {**node, "traits": children[1]}
+        return node
+
+    def string_type(self, _: list[Any]) -> AstNode:
+        return {"name": "String"}
+
+    def int_type(self, _: list[Any]) -> AstNode:
+        return {"name": "Int"}
+
+    def float_type(self, _: list[Any]) -> AstNode:
+        return {"name": "Float"}
+
+    def date_type(self, _: list[Any]) -> AstNode:
+        return {"name": "Date"}
+
+    def datetime_type(self, _: list[Any]) -> AstNode:
+        return {"name": "Datetime"}
+
+    def time_delta_type(self, _: list[Any]) -> AstNode:
+        return {"name": "TimeDelta"}
+
+    def none_type(self, _: list[Any]) -> AstNode:
+        return {"name": "None"}
+
+    def parameter_type(self, _: list[Any]) -> AstNode:
+        return {"name": "Parameter"}
+
+    def artifact_type(self, _: list[Any]) -> AstNode:
+        return {"name": "Artifact"}
+
+    def geo_domain_single_type(self, _: list[Any]) -> AstNode:
+        return {"name": "GeoDomainSingle"}
+
+    def geo_domain_type(self, _: list[Any]) -> AstNode:
+        return {"name": "GeoDomain"}
+
+    def bounding_box_wsen_type(self, _: list[Any]) -> AstNode:
+        return {"name": "BoundingBoxWSEN"}
+
+    def enum_items(self, children: list[lark.Token]) -> list[str]:
+        return [_enum_item_value(token) for token in children]
+
+    def closed_enum_type(self, children: list[Any]) -> AstNode:
+        subtype, items = children
+        return {"name": "ClosedEnum", "subtype": subtype, "items": items}
+
+    def open_enum_type(self, children: list[Any]) -> AstNode:
+        subtype, items = children
+        return {"name": "OpenEnum", "subtype": subtype, "items": items}
+
+    def list_type(self, children: list[AstNode]) -> AstNode:
+        return {"name": "List", "item": children[0]}
+
+    def union_type(self, children: list[AstNode]) -> AstNode:
+        return {"name": "Union", "types": list(children)}
+
+    def traits(self, children: list[AstNode]) -> list[AstNode]:
+        return list(children)
+
+    def single_trait(self, children: list[AstNode]) -> AstNode:
+        return children[0]
+
+    def positive(self, _: list[Any]) -> AstNode:
+        return {"name": "Positive"}
+
+    def non_negative(self, _: list[Any]) -> AstNode:
+        return {"name": "NonNegative"}
+
+    def divisible_by(self, children: list[lark.Token]) -> AstNode:
+        return {"name": "DivisibleBy", "arg": children[0].value}
 
 
-def _split_by_brackets(s: str) -> tuple[str, str, str]:
-    """Split 'prefix[inner]remainder' into (prefix, inner, remainder)."""
-    return _split_by_delim(s, "[", "]")
+def _transform(tree: lark.Tree, transformer: lark.Transformer) -> Any:
+    """Apply the transformer, re-raising any exception from within the transformer callbacks as is."""
+    try:
+        return transformer.transform(tree)
+    except lark.exceptions.VisitError as e:
+        raise e.orig_exc from None
 
 
-def _split_by_parens(s: str) -> tuple[str, str, str]:
-    """Split 'prefix(inner)remainder' into (prefix, inner, remainder)."""
-    return _split_by_delim(s, "(", ")")
-
-
-def _split_by_braces(s: str) -> tuple[str, str, str]:
-    """Split 'prefix{inner}remainder' into (prefix, inner, remainder)."""
-    return _split_by_delim(s, "{", "}")
-
-
-def _split_top_level(s: str, sep: str) -> list[str]:
-    """Split s by sep, ignoring occurrences of sep nested within parentheses."""
-    parts: list[str] = []
-    depth = 0
-    current = ""
-    for ch in s:
-        if ch == "(":
-            depth += 1
-            current += ch
-        elif ch == ")":
-            depth -= 1
-            current += ch
-        elif ch == sep and depth == 0:
-            parts.append(current)
-            current = ""
-        else:
-            current += ch
-    parts.append(current)
-    return parts
-
-
-_TRAIT_FACTORIES = {
-    "positive": Positive,
-    "nonNegative": NonNegative,
-    "divisibleBy": DivisibleBy,
-}
-
-
-def _parse_trait(trait_expr: str) -> FableTrait:
-    """Parse a single trait expression, eg 'positive' or 'divisibleBy(3)'."""
-    trait_expr = trait_expr.strip()
-    if "(" in trait_expr:
-        name, arg, remainder = _split_by_parens(trait_expr)
-        name = name.strip()
-        if remainder.strip():
-            raise NotFableType(f"Unexpected content after trait {name!r}: {remainder!r}")
-    else:
-        name = trait_expr
-        arg = None
-
-    factory = _TRAIT_FACTORIES.get(name)
-    if factory is None:
-        raise NotFableType(f"Unknown trait: {name!r}. Expected one of: {', '.join(_TRAIT_FACTORIES)}")
-
-    if factory is DivisibleBy:
-        if arg is None:
-            raise NotFableType("divisibleBy requires an argument, e.g. divisibleBy(3)")
-        return DivisibleBy(arg)
-    if arg is not None:
-        raise NotFableType(f"Trait {name!r} does not take an argument")
-    return factory()
-
-
-def _parse_traits(inner: str) -> list[FableTrait]:
-    """Parse the comma-separated content of a '{...}' trait suffix."""
-    parts = [p for p in _split_top_level(inner, ",") if p.strip()]
-    if not parts:
-        raise NotFableType("Trait expression '{}' must contain at least one trait")
-    return [_parse_trait(p) for p in parts]
+def _longest_prefix(type_expr: str) -> int | None:
+    """Length of the longest prefix of type_expr which is a complete type expression, or None if there is none."""
+    interactive = _PARSER.parse_interactive(type_expr, start="start")
+    end: int | None = None
+    try:
+        for token in interactive.lexer_thread.lex(interactive.parser_state):
+            interactive.feed_token(token)
+            if "$END" in interactive.accepts():
+                end = token.end_pos
+    except lark.exceptions.UnexpectedInput:
+        pass
+    return end
 
 
 def _parse(type_expr: str) -> tuple[FableType, str]:
-    """Parse a type expression from the start of type_expr, including an optional trailing
-    '{trait1, trait2(arg), ...}' traits suffix, eg 'int{positive}' or 'float{nonNegative,divisibleBy(3)}'.
-
-    Returns ``(parsed_type, remainder)``, see _parse_bare for details.
-    """
-    parsed, remainder = _parse_bare(type_expr)
-    remainder = remainder.lstrip()
-    if remainder.startswith("{"):
-        _, traits_expr, remainder = _split_by_braces(remainder)
-        parsed.traits = _parse_traits(traits_expr)
-    return (parsed, remainder)
-
-
-def _parse_bare(type_expr: str) -> tuple[FableType, str]:
     """Parse a type expression from the start of type_expr.
 
-    Returns ``(parsed_type, remainder)`` where ``remainder`` is the unparsed
-    tail of the input string. At the outer call site, verify that the
-    remainder is empty (or whitespace-only) to ensure the full expression
-    was consumed.
-
-    Supports:
-    - Atomic types: 'str', 'int', 'float', 'date', 'datetime', 'timedelta', 'none', 'country', 'bboxWSEN'
-    - Enumerations: "enumClosed[str]('item1','item2')", "enumOpen[int](1,2)"
-    - Lists: 'list[int]', 'list[enumClosed[...](...)]', etc.
-    - Union: 'union[int,str]', "union[enumClosed[str]('a','b'),date]", etc.
-
-    Raises NotFableType if the expression cannot be parsed.
+    Returns ``(parsed_type, remainder)`` where ``remainder`` is the unparsed tail of the input
+    string (with leading whitespace stripped) following the longest prefix which is a complete
+    type expression. Raises NotFableType if no such prefix exists.
     """
-    type_expr = type_expr.lstrip()
+    try:
+        tree = _PARSER.parse(type_expr, start="start")
+        return (_transform(tree, FableTypeTransformer()), "")
+    except lark.exceptions.UnexpectedInput as e:
+        end = _longest_prefix(type_expr)
+        if end is None:
+            raise NotFableType(f"Invalid type expression {type_expr!r}: {e}") from None
+    tree = _PARSER.parse(type_expr[:end], start="start")
+    return (_transform(tree, FableTypeTransformer()), type_expr[end:].lstrip())
 
-    # Atomic types (no generics)
-    # NOTE be careful about prefixes! datetime must come before date, similarly for geodomain/Single
-    _ATOMIC = [
-        ("datetime", DatetimeType),
-        ("date", DateType),
-        ("timedelta", TimeDeltaType),
-        ("float", FloatType),
-        ("int", IntType),
-        ("none", NoneType),
-        ("str", StringType),
-        ("param", ParameterType),
-        ("artifact", ArtifactType),
-        ("geodomainSingle", GeoDomainSingleType),
-        ("bboxWSEN", BoundingBoxWSENType),
-        ("geodomain", GeoDomainType),
-    ]
-    for name, factory in _ATOMIC:
-        n = len(name)
-        if type_expr.startswith(name):
-            return (factory(), type_expr[n:])
 
-    # Enum types (enumClosed and enumOpen share identical logic)
-    # Grammar: enumClosed[subtype](item1,item2,...), e.g. enumClosed[int](1,2) or enumOpen[str]('a','b')
-    _ENUMS = {"enumClosed": ClosedEnumType, "enumOpen": OpenEnumType}
-    for prefix, factory in _ENUMS.items():
-        if type_expr.startswith(prefix):
-            _, subtype_expr, after_subtype = _split_by_brackets(type_expr)
-            subtype, subtype_remainder = _parse(subtype_expr)
-            if subtype_remainder.strip():
-                raise NotFableType(f"Unexpected content after enum subtype in {prefix}: {subtype_remainder!r}")
-            after_subtype = after_subtype.lstrip()
-            should_be_empty, items_str, remainder = _split_by_parens(after_subtype)
-            if should_be_empty:
-                raise NotFableType(f"{prefix} must be followed by '(' item, item, ... ')' after the subtype, gotten {should_be_empty}")
-            items = [_normalize_enum_item(item) for item in items_str.split(",") if item.strip()]
-            if not items:
-                raise NotFableType(f"{prefix} must contain at least one item")
-            return (factory(items, subtype), remainder)
-
-    # list[...]
-    if type_expr.startswith("list["):
-        _, inner, remainder = _split_by_brackets(type_expr)
-        inner_type, inner_remainder = _parse(inner)
-        if inner_remainder.strip():
-            raise NotFableType(f"Unexpected content after inner type in list: {inner_remainder!r}")
-        return (ListType(inner_type), remainder)
-
-    # union[...]
-    if type_expr.startswith("union["):
-        _, inner, remainder = _split_by_brackets(type_expr)
-        member_types: list[FableType] = []
-        remaining = inner
-        first = True
-        while remaining:
-            if not first:
-                if not remaining.startswith(","):
-                    raise NotFableType(f"Expected ',' between union member types, got {remaining!r}")
-                remaining = remaining[1:].lstrip()
-            first = False
-            t, remaining = _parse(remaining)
-            remaining = remaining.lstrip()
-            member_types.append(t)
-        if not member_types:
-            raise NotFableType("union must contain at least one type")
-        return (UnionType(member_types), remainder)
-
-    raise NotFableType(
-        f"Invalid type expression: {type_expr!r}. "
-        "Expected one of: str, int, float, date, datetime, timedelta, none, country, bboxWSEN, geodomain, "
-        "enumClosed[subtype](...), enumOpen[subtype](...), list[...], union[...]"
-    )
+def _parse_trait(trait_expr: str) -> FableTrait:
+    """Parse a single trait expression, eg 'positive' or 'divisibleBy(3)'. Raises NotFableType if invalid."""
+    try:
+        tree = _PARSER.parse(trait_expr, start="single_trait")
+    except lark.exceptions.UnexpectedInput as e:
+        raise NotFableType(f"Invalid trait expression {trait_expr!r}: {e}") from None
+    return _transform(tree, FableTypeTransformer())
 
 
 def parse(type_expr: str | FableType) -> FableType:
-    """Parse a complete Fable type expression."""
+    """Parse a complete Fable type expression. Raises ValueError if the expression is invalid."""
     if isinstance(type_expr, FableType):
         return type_expr
     if not isinstance(type_expr, str):
         raise ValueError(f"Expected a Fable type expression string, got {type(type_expr).__name__}")
     try:
         parsed, remainder = _parse(type_expr)
-        if remainder.strip():
+        if remainder:
             raise NotFableType(f"Unexpected trailing content in type expression: {remainder!r}")
     except NotFableType as exc:
         raise ValueError(str(exc)) from exc
     return parsed
+
+
+def dump_ast(type_expr: str) -> AstNode:
+    """Parse a complete Fable type expression into the json-like AST, see AstDumpTransformer.
+
+    Raises ValueError if the expression is syntactically invalid.
+    """
+    try:
+        tree = _PARSER.parse(type_expr, start="start")
+    except lark.exceptions.UnexpectedInput as e:
+        raise ValueError(f"Invalid type expression {type_expr!r}: {e}") from None
+    return _transform(tree, AstDumpTransformer())

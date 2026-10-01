@@ -1,0 +1,60 @@
+// (C) Copyright 2026- ECMWF.
+//
+// This software is licensed under the terms of the Apache Licence Version 2.0
+// which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+//
+// In applying this licence, ECMWF does not waive the privileges and immunities
+// granted to it by virtue of its status as an intergovernmental organisation
+// nor does it submit to any jurisdiction.
+
+// Grammar of Fable type expressions, eg `int`, `list[str]`, `union[int,none]`,
+// `enumClosed[str]('a','b')` or `float{nonNegative,divisibleBy(3)}`.
+//
+// The grammar is LALR(1) compatible and relies on the contextual lexer, and is
+// self-contained (no %import), to be consumable by other lark implementations as well.
+// Whitespace between tokens is ignored everywhere. The rule aliases (`-> xyz_type`)
+// correspond to the node names produced by the AstDumpTransformer in parser.py.
+
+start: fable_type
+
+// Entry point for parsing a standalone trait, eg `divisibleBy(3)`.
+single_trait: trait
+
+fable_type: bare_type traits?
+
+?bare_type: "str" -> string_type
+          | "int" -> int_type
+          | "float" -> float_type
+          | "date" -> date_type
+          | "datetime" -> datetime_type
+          | "timedelta" -> time_delta_type
+          | "none" -> none_type
+          | "param" -> parameter_type
+          | "artifact" -> artifact_type
+          | "geodomainSingle" -> geo_domain_single_type
+          | "geodomain" -> geo_domain_type
+          | "bboxWSEN" -> bounding_box_wsen_type
+          | "enumClosed" "[" fable_type "]" "(" enum_items ")" -> closed_enum_type
+          | "enumOpen" "[" fable_type "]" "(" enum_items ")" -> open_enum_type
+          | "list" "[" fable_type "]" -> list_type
+          | "union" "[" fable_type ("," fable_type)* ","? "]" -> union_type
+
+// Enum items are kept as raw strings, and converted by the enum's subtype afterwards.
+// Surrounding quotes are not part of the item value.
+enum_items: _enum_item ("," _enum_item)* ","?
+_enum_item: BARE_ITEM | SQ_ITEM | DQ_ITEM
+
+traits: "{" trait ("," trait)* ","? "}"
+?trait: "positive" -> positive
+      | "nonNegative" -> non_negative
+      | "divisibleBy" "(" TRAIT_ARG ")" -> divisible_by
+
+// A bare item may contain inner whitespace, but never leading or trailing whitespace.
+BARE_ITEM: /[^\s,()'"](?:[^,()'"]*[^\s,()'"])?/
+SQ_ITEM: /'[^']*'/
+DQ_ITEM: /"[^"]*"/
+// A number or an ISO 8601 duration, eg `3`, `1.5` or `PT6H`.
+TRAIT_ARG: /[^\s,(){}\[\]]+/
+
+WS: /[ \t\f\r\n]+/
+%ignore WS
