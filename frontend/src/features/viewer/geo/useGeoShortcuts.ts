@@ -13,7 +13,7 @@
  * inside form fields):
  *   B          toggle both sidebars
  *   1–5        switch comparison mode
- *   F          fit to globe
+ *   F          fit view
  *   C          copy the view to the clipboard
  *   E          export dialog
  *   H          help dialog
