@@ -16,7 +16,7 @@ plain json-like AST via AstDumpTransformer. The latter is a language-agnostic re
 used by the conformance suite in ``tests/conformance``.
 """
 
-from pathlib import Path
+from importlib.resources import files
 from typing import Any
 
 import lark
@@ -43,10 +43,10 @@ from fiab_core.types.definitions import (
 from fiab_core.types.exceptions import NotFableType
 from fiab_core.types.traits import DivisibleBy, FableTrait, NonNegative, Positive
 
-GRAMMAR_PATH = Path(__file__).parent / "fable_types.lark"
-"""Location of the lark grammar of Fable type expressions."""
+GRAMMAR = files("fiab_core.types").joinpath("fable_types.lark").read_text(encoding="utf-8")
+"""The lark grammar of Fable type expressions, read from the package resources."""
 
-_PARSER = lark.Lark.open(str(GRAMMAR_PATH), parser="lalr", lexer="contextual", start=["start", "single_trait"])
+_PARSER = lark.Lark(GRAMMAR, parser="lalr", lexer="contextual", start=["start", "single_trait"])
 
 AstNode = dict[str, Any]
 """A json-like node of the AST produced by AstDumpTransformer."""
