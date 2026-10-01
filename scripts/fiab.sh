@@ -33,9 +33,8 @@ This script by default:
 
 There are other commands available:
 - warmup -- executes the uv/python/pylock/venv checks and installs plugins, but
-  does not launch fiab itself. By default the default plugin is installed; pass
-  '-p store:local' (comma-separate for multiple, eg '-p ecmwf:ecmwf-base,x:y')
-  to choose which plugins to install instead
+  does not launch fiab itself. The plugins for installation are specified in
+  the corresponding config.toml
 - service -- as the regular run, but assumed to be executed by the systemd
   at the system start time
 - full-reinstall -- deletes the ~/.fiab and replaces itself with the most
@@ -282,7 +281,6 @@ ensureEnvironment() {
     maybePruneUvCache
 }
 
-# override used for eg running `pytest` instead
 COMMAND="${1:-run}"
 case "$COMMAND" in
     "help")
@@ -295,14 +293,6 @@ case "$COMMAND" in
         shift
         ensureEnvironment warmup "$@"
         python -m forecastbox.entrypoint.warmup "$@"
-        ;;
-    "offline")
-        # TODO we used to have FIAB_CACHE and FIAB_OFFLINE env vars in place, with the assumption
-        # that running in warmup mode would pre-install all job dependencies. This got broken
-        # in the recent development and there is no readily accessible iteration through supported
-        # jobs. We should fix it eventually
-        >&2 echo "offline mode not supported now"
-        exit 1
         ;;
     "service")
         ensureEnvironment
