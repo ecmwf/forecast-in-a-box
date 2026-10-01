@@ -409,11 +409,13 @@ export function GeoToolbar({
                         <Tooltip>
                           <TooltipTrigger
                             render={
-                              <button
-                                type="button"
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 aria-label={t('projections.globeSymbolsInfo')}
                                 aria-describedby={`${noteId}-${p.id}`}
-                                className="rounded-md p-1 text-muted-foreground hover:text-foreground"
+                                // Its own box: the hit halo would reach into the radio beside it.
+                                className="size-6 text-muted-foreground before:hidden"
                               />
                             }
                           >
