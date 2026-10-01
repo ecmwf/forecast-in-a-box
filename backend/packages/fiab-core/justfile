@@ -1,7 +1,8 @@
 val:
     uv run ty check src/ scripts/
-    uv run pytest
+    uv run pytest tests/unit
     uv run python scripts/parse_test_artifacts_catalog.py ../../../install/artifacts.json
+    uv run python scripts/run_types_conformance.py tests/conformance
 
 build:
     python -m build --installer uv .
