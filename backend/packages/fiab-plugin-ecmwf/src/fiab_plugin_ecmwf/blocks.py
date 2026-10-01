@@ -26,14 +26,14 @@ from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanc
 from fiab_core.types import ClosedEnumType, DatetimeType, ListType, ParameterType, StringType
 from qubed import Qube
 
-from .block_utils import (
+from fiab_plugin_ecmwf.block_utils import (
     ParamDBInstance,
     _axis_value_strings,
     _extract_dataset,
     _is_empty_qube,
     _parse_axis_value,
 )
-from .constants import (
+from fiab_plugin_ecmwf.constants import (
     BASE_TIME,
     DIMENSION,
     ENSEMBLE,
@@ -44,9 +44,9 @@ from .constants import (
     STEP,
     VALUES,
 )
-from .datasets import load_datasets
-from .environments import mars_dependencies, opendata_dependencies
-from .qubed_utils import axes, contains, dimensions, expand, select
+from fiab_plugin_ecmwf.datasets import load_datasets
+from fiab_plugin_ecmwf.environments import mars_dependencies, opendata_dependencies
+from fiab_plugin_ecmwf.qubed_utils import axes, contains, dimensions, expand, select
 
 logger = logging.getLogger(__name__)
 
