@@ -20,6 +20,7 @@ dependencies = [
     "pydantic",
     "qubed>=0.3.1,<0.4.4",
     "earthkit-workflows", # NOTE technically we would need just cascade.low.core and some fluent.core, not the whole runtime -- possibly split down there as well
+    "lark>=1.3.1",
 ]
 
 [dependency-groups]
@@ -42,3 +43,6 @@ line-length = 140
 
 lint.ignore = [ "E731", "ANN401" ]
 lint.select = ["I", "ANN"]
+
+[tool.setuptools.package-data]
+"fiab_core.types" = [ "*.lark" ]

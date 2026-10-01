@@ -1,0 +1,48 @@
+{"term": ""}
+{"term": "   "}
+{"term": "string"}
+{"term": "Int"}
+{"term": "integer"}
+{"term": "list"}
+{"term": "list[]"}
+{"term": "list[int"}
+{"term": "list int"}
+{"term": "list[int,str]"}
+{"term": "list[int garbage]"}
+{"term": "list[int]]"}
+{"term": "union"}
+{"term": "union[]"}
+{"term": "union[,]"}
+{"term": "union[int,,str]"}
+{"term": "union[int,str"}
+{"term": "union(int,str)"}
+{"term": "enumClosed[str]"}
+{"term": "enumClosed[str]()"}
+{"term": "enumOpen[str]()"}
+{"term": "enumClosed(a,b)"}
+{"term": "enumClosed[a,b"}
+{"term": "enumClosed[str](a,b"}
+{"term": "enumClosed[str](a,(b))"}
+{"term": "enumClosed[int](a,b)"}
+{"term": "enumClosed[date](tomorrow)"}
+{"term": "enumClosed[](1)"}
+{"term": "enumWhatever[str](a)"}
+{"term": "int,str"}
+{"term": "int str"}
+{"term": "int{}"}
+{"term": "int{unknownTrait}"}
+{"term": "int{divisibleBy}"}
+{"term": "int{divisibleBy()}"}
+{"term": "int{divisibleBy(abc)}"}
+{"term": "int{positive"}
+{"term": "int{positive}{nonNegative}"}
+{"term": "{positive}"}
+{"term": "positive"}
+{"term": "int{positive()}"}
+{"term": "date time"}
+{"term": "bbox"}
+{"term": "geoDomain"}
+{"term": "none[int]"}
+{"term": "str[]"}
+{"term": "list[str]suffix"}
+{"term": "dict[str,int]"}
