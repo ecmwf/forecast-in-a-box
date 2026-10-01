@@ -88,7 +88,7 @@ class ZarrSink(Sink):
             .concatenate(dim=temp_dim)
             .map(
                 create_task_instance(
-                    "fiab_plugin_ecmwf.runtime.sinks.write_zarr",
+                    "fiab_plugin_ecmwf.output.runtime.write_zarr",
                     static_input_kw={"path": block.config_as_str(PATH)},
                 ),
                 node_metadata=NodeMetadata(requirements=Requirements(environment=["zarr"])),
@@ -150,7 +150,7 @@ class GribSink(Sink):
 
         action = action.map(
             create_task_instance(
-                "fiab_plugin_ecmwf.runtime.sinks.write_grib",
+                "fiab_plugin_ecmwf.output.runtime.write_grib",
                 static_input_kw={"path": block.config_as_str(PATH)},
             )
         )
