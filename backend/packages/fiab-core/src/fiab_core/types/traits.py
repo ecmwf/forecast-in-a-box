@@ -18,9 +18,9 @@ from abc import ABC, abstractmethod
 from datetime import timedelta
 from typing import Any
 
-from cascade.low.func import Either
+from cascade.low.func import Either, assert_never
 
-from fiab_core.types.dt_util import try_parse_timedelta
+from fiab_core.types.dt_util import format_timedelta, try_parse_timedelta
 from fiab_core.types.exceptions import WrongType
 
 
@@ -81,19 +81,24 @@ class NonNegative(FableTrait):
 class DivisibleBy(FableTrait):
     """Requires the value to be evenly divisible by ``n``.
 
-    ``n`` is given either as a plain number (int/float, for Int/Float typed values) or as a
-    raw string, since the trait is declared independently of the type it is applied to -- a
-    string argument may be a plain number or an ISO 8601 duration (for TimeDelta). Both
-    interpretations are attempted eagerly at construction time, and the matching one is
-    picked at validation time based on the actual value's type.
+    ``n`` is declared independently of the type it is applied to, so it may be given as a
+    timedelta, a plain number (int/float, for Int/Float typed values), or a raw string (a
+    plain number or an ISO 8601 duration, for TimeDelta). Whichever form is given, both a
+    numeric and a duration interpretation are made available where possible, and the
+    matching one is picked at validation time based on the actual value's type.
     """
 
-    def __init__(self, n: int | float | str) -> None:
-        self.raw = n.strip() if isinstance(n, str) else str(n)
+    def __init__(self, n: timedelta | int | float | str) -> None:
         self.numeric: int | float | None = None
-        if isinstance(n, (int, float)):
+        self.duration: timedelta | None = None
+        if isinstance(n, timedelta):
+            self.duration = n
+            self.raw = format_timedelta(n)
+        elif isinstance(n, (int, float)):
             self.numeric = n
-        else:
+            self.raw = str(n)
+        elif isinstance(n, str):
+            self.raw = n.strip()
             try:
                 self.numeric = int(self.raw)
             except ValueError:
@@ -101,9 +106,11 @@ class DivisibleBy(FableTrait):
                     self.numeric = float(self.raw)
                 except ValueError:
                     self.numeric = None
-        self.duration: timedelta | None = try_parse_timedelta(self.raw)
-        if self.numeric is None and self.duration is None:
-            raise WrongType(f"divisibleBy argument {n!r} is neither a number nor a timedelta")
+            self.duration = try_parse_timedelta(self.raw)
+            if self.numeric is None and self.duration is None:
+                raise WrongType(f"divisibleBy argument {n!r} is neither a number nor a timedelta")
+        else:
+            assert_never(n)
 
     def serialize_main(self) -> str:
         return f"divisibleBy({self.raw})"

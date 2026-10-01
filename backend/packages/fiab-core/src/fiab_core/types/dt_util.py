@@ -72,3 +72,30 @@ def try_parse_timedelta(value: str) -> timedelta | None:
         return parse_timedelta(value)
     except WrongType:
         return None
+
+
+def format_timedelta(td: timedelta) -> str:
+    """Format a datetime.timedelta as an ISO 8601 duration string parseable by parse_timedelta.
+
+    Uses the same fixed-length components (weeks, days, hours, minutes, seconds) and is the
+    inverse of parse_timedelta, modulo the exact choice of components (e.g. 2 days are formatted
+    as '2D' rather than '0W2D').
+    """
+    total_seconds = abs(td.total_seconds())
+    days, remainder = divmod(total_seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    date_part = f"{int(days)}D" if days else ""
+    time_components = []
+    if hours:
+        time_components.append(f"{int(hours)}H")
+    if minutes:
+        time_components.append(f"{int(minutes)}M")
+    if seconds:
+        seconds_str = str(int(seconds)) if seconds == int(seconds) else str(seconds)
+        time_components.append(f"{seconds_str}S")
+    time_part = f"T{''.join(time_components)}" if time_components else ""
+
+    body = f"{date_part}{time_part}"
+    return f"P{body}" if body else "P0D"

@@ -24,6 +24,7 @@ from qubed import Qube
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiInputSource, AnemoiSource, AnemoiTransform
 from fiab_plugin_ecmwf.anemoi.utils import CheckpointArtifact, get_checkpoint_enum_type
+from fiab_plugin_ecmwf.block_utils import ENSEMBLE
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, datacubes, expand
 
 # ---------------------------------------------------------------------------
@@ -218,7 +219,7 @@ class TestAnemoiSourceValidate:
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": -1, "base_time": datetime(2024, 1, 1), "number": 1},
         )
-        with pytest.raises(BlockInstanceConfigurationError, match="is not positive"):
+        with pytest.raises(Exception, match="must be greater than checkpoint timestep"):
             AnemoiSource().validate(
                 block=block,
                 inputs={},
@@ -241,17 +242,15 @@ class TestAnemoiSourceValidate:
         with pytest.raises(Exception, match="must be a multiple of checkpoint timestep"):
             AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
-    def test_invalid_number_zero(self, dummy_checkpoint: CompositeArtifactId) -> None:
-        block = _make_block(
-            AnemoiSource,
-            {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": 0},
-        )
-        with pytest.raises(BlockInstanceConfigurationError, match="is not positive"):
-            AnemoiSource().validate(
-                block=block,
-                inputs={},
-                restrictions={},
-            )
+    def test_invalid_number_zero(self) -> None:
+        """Ensemble member count must be positive. This is enforced by the Positive trait declared
+        on the configuration option's value_type, checked at FableType.validate_convert time --
+        before a block's configuration values ever reach validate(), which is why this is tested
+        at the value_type level rather than via AnemoiSource().validate(...).
+        """
+        value_type = AnemoiSource.configuration_options[ENSEMBLE].value_type
+        with pytest.raises(WrongType, match="is not positive"):
+            value_type.validate_convert("0")
 
     def test_invalid_number_not_a_digit(self, dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_raw_block(
@@ -409,7 +408,7 @@ class TestAnemoiTransformValidate:
             {"checkpoint": dummy_checkpoint, "lead_time": -1},
             input_ids={"initial conditions": "src"},
         )
-        with pytest.raises(BlockInstanceConfigurationError, match="is not positive"):
+        with pytest.raises(Exception, match="must be greater than checkpoint timestep"):
             AnemoiTransform().validate(
                 block=block,
                 inputs={"initial conditions": anemoi_input_source_output},

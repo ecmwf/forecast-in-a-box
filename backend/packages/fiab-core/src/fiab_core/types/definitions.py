@@ -21,6 +21,9 @@ from fiab_core.types.traits import FableTrait
 
 logger = logging.getLogger(__name__)
 
+_Traits = FableTrait | list[FableTrait] | None
+"""Convenience alias accepted by FableType's constructor: a single trait, a list of them, or none."""
+
 # BASE CLASS FOR ALL REAL TYPES
 
 
@@ -31,7 +34,7 @@ class FableType(ABC):
     the main type conversion and are serialized as a ``{}`` suffix, eg ``int{positive}``.
     """
 
-    def __init__(self, traits: "FableTrait | list[FableTrait] | None" = None) -> None:
+    def __init__(self, traits: _Traits = None) -> None:
         """``traits`` may be a single FableTrait, a list of them, or None, for convenience at call sites
         that only need to attach a single trait, eg ``IntType(traits=Positive())``."""
         if traits is None:
@@ -243,9 +246,7 @@ class ClosedEnumType(FableType):
     to StringType for backwards compatibility.
     """
 
-    def __init__(
-        self, items: Iterable[Any], subtype: FableType = StringType(), traits: "FableTrait | list[FableTrait] | None" = None
-    ) -> None:
+    def __init__(self, items: Iterable[Any], subtype: FableType = StringType(), traits: _Traits = None) -> None:
         super().__init__(traits)
         self.subtype = subtype
         self.items = [self.subtype.validate_convert(item) for item in items]
@@ -271,9 +272,7 @@ class OpenEnumType(FableType):
     See ClosedEnumType for the meaning of ``items`` and ``subtype``.
     """
 
-    def __init__(
-        self, items: Iterable[Any], subtype: FableType = StringType(), traits: "FableTrait | list[FableTrait] | None" = None
-    ) -> None:
+    def __init__(self, items: Iterable[Any], subtype: FableType = StringType(), traits: _Traits = None) -> None:
         super().__init__(traits)
         self.subtype = subtype
         self.items = [self.subtype.validate_convert(item) for item in items]
@@ -290,7 +289,7 @@ class OpenEnumType(FableType):
 class ListType(FableType):
     """List type. Converts comma-separated string to a list by validating and converting each item."""
 
-    def __init__(self, item_type: FableType, traits: "FableTrait | list[FableTrait] | None" = None) -> None:
+    def __init__(self, item_type: FableType, traits: _Traits = None) -> None:
         super().__init__(traits)
         self.item_type = item_type
 
@@ -322,7 +321,7 @@ class ListType(FableType):
 class UnionType(FableType):
     """Union type. Tries each member type in order and returns the first successful conversion."""
 
-    def __init__(self, types: list[FableType], traits: "FableTrait | list[FableTrait] | None" = None) -> None:
+    def __init__(self, types: list[FableType], traits: _Traits = None) -> None:
         super().__init__(traits)
         self.types = types
 
@@ -354,7 +353,7 @@ class BoundingBoxWSENType(ListType):
     - south <= north;
     - west > east is allowed and means the box crosses the antimeridian."""
 
-    def __init__(self, traits: "FableTrait | list[FableTrait] | None" = None) -> None:
+    def __init__(self, traits: _Traits = None) -> None:
         super().__init__(IntType(), traits=traits)
 
     def validate_convert_main(self, value: Any) -> list[int]:
@@ -398,7 +397,7 @@ class GeoDomainSingleType(StringType):
 class GeoDomainType(UnionType):
     """An alias for a union over bounding box, list of single geo domains, and a single geo domain type."""
 
-    def __init__(self, traits: "FableTrait | list[FableTrait] | None" = None) -> None:
+    def __init__(self, traits: _Traits = None) -> None:
         super().__init__([BoundingBoxWSENType(), UnrestrictedGeoDomainAlias, ListType(GeoDomainSingleType())], traits=traits)
 
     def serialize_main(self) -> str:

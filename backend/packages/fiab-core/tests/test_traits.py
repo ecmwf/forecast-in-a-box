@@ -89,6 +89,34 @@ class TestDivisibleBy:
         assert DivisibleBy("3").serialize() == "divisibleBy(3)"
         assert DivisibleBy("P1D").serialize() == "divisibleBy(P1D)"
 
+    def test_accepts_int_argument(self) -> None:
+        t = DivisibleBy(3)
+        assert t.validate(9).e is None
+        assert t.validate(10).e is not None
+        assert t.serialize() == "divisibleBy(3)"
+
+    def test_accepts_float_argument(self) -> None:
+        t = DivisibleBy(1.5)
+        assert t.validate(3.0).e is None
+        assert t.validate(2.0).e is not None
+        assert t.serialize() == "divisibleBy(1.5)"
+
+    def test_accepts_timedelta_argument(self) -> None:
+        t = DivisibleBy(timedelta(hours=1))
+        assert t.validate(timedelta(hours=3)).e is None
+        assert t.validate(timedelta(minutes=30)).e is not None
+        assert t.serialize() == "divisibleBy(PT1H)"
+
+    def test_int_argument_does_not_apply_to_timedelta(self) -> None:
+        t = DivisibleBy(3)
+        result = t.validate(timedelta(days=3))
+        assert result.e is not None
+
+    def test_timedelta_argument_does_not_apply_to_int(self) -> None:
+        t = DivisibleBy(timedelta(hours=1))
+        result = t.validate(3)
+        assert result.e is not None
+
 
 class TestTraitsOnFableType:
     """Integration tests for traits mixed into FableType via the parser."""
