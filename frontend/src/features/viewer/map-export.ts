@@ -88,13 +88,10 @@ export function drawCompositedViewport(
   ctx.globalAlpha = 1
 }
 
-/**
- * Full-viewport composite of a rendered OL map onto a fresh canvas at
- * device-pixel resolution, on a white ground. Null when the container has
- * no size yet.
- */
+/** The rendered OL map at device pixels on `ground` (null: transparent); null before layout. */
 export function compositeMapToCanvas(
   container: HTMLElement,
+  ground: string | null = '#ffffff',
 ): HTMLCanvasElement | null {
   const width = container.clientWidth
   const height = container.clientHeight
@@ -105,8 +102,10 @@ export function compositeMapToCanvas(
   out.height = Math.round(height * dpr)
   const ctx = out.getContext('2d')
   if (!ctx) return null
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, out.width, out.height)
+  if (ground) {
+    ctx.fillStyle = ground
+    ctx.fillRect(0, 0, out.width, out.height)
+  }
   drawCompositedViewport(container, ctx, { originX: 0, originY: 0, scale: dpr })
   return out
 }

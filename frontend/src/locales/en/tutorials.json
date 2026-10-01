@@ -44,7 +44,7 @@
       },
       "map": {
         "title": "This is your map",
-        "body": "Drag to pan, scroll to zoom — try it. The toolbar above holds the view tools; press <v>F</v> any time to fit the whole globe."
+        "body": "Drag to pan, scroll to zoom — try it. The toolbar above holds the view tools; press <v>F</v> any time to fit the view."
       },
       "layer": {
         "title": "Put data on the map",

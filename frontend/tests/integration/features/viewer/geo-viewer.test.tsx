@@ -39,6 +39,7 @@ import {
 import type { CompareMode } from '@/features/viewer/geo/types'
 import type { ViewerUrlState } from '@/features/viewer/geo/view-url-state'
 import { GeoViewer } from '@/features/viewer/geo/GeoViewer'
+import { NAV_ZOOM_STEP } from '@/features/viewer/geo/map-nav'
 import { CompareHelpDialog } from '@/features/viewer/geo/CompareHelpDialog'
 import i18n from '@/lib/i18n'
 import { useStylePinsStore } from '@/stores/stylePinsStore'
@@ -186,6 +187,8 @@ function injectMapSizing(): () => void {
   style.textContent = `
       [class*='h-full'][class*='overflow-hidden'][class*='rounded-md'] { position: relative; height: 400px; }
       [class*='absolute'][class*='inset-0'] { position: absolute; inset: 0; }
+      [class*='absolute'][class*='top-2'][class*='right-2'] { position: absolute; top: 8px; right: 8px; z-index: 10; }
+      [class~='pointer-events-none'] { pointer-events: none; }
     `
   document.head.append(style)
   return () => style.remove()
@@ -280,6 +283,49 @@ describe('GeoViewer', () => {
       new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
     )
     await expect.element(divider).toHaveAttribute('aria-valuenow', '52')
+  })
+
+  it('moves the flat map from its pan and zoom controls and the +/- keys', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const removeSizing = injectMapSizing()
+    const onViewStateChange = vi.fn()
+    const camera = () =>
+      [...onViewStateChange.mock.calls]
+        .reverse()
+        .map((c) => (c[0] as Partial<ViewerUrlState>).camera)
+        .find((cam) => cam !== undefined)
+    try {
+      const screen = await render(
+        <Harness
+          portA={portA}
+          portB={portB}
+          onViewStateChange={onViewStateChange}
+        />,
+      )
+      await screen.getByText('2 m temperature').first().click()
+      await expect.poll(camera).toBeDefined()
+      const start = camera()!
+      // OL's own zoom buttons are gone: one control, shared with the globe.
+      expect(document.querySelector('.ol-zoom')).toBeNull()
+
+      await screen.getByRole('button', { name: 'Zoom in' }).click()
+      await expect
+        .poll(() => camera()?.zoom)
+        .toBeCloseTo(start.zoom + NAV_ZOOM_STEP, 2)
+      const lon = camera()!.lon
+      await screen
+        .getByRole('group', { name: 'Pan' })
+        .getByRole('button', { name: 'Pan right' })
+        .click()
+      await expect.poll(() => camera()?.lon).toBeGreaterThan(lon)
+
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '-', bubbles: true }),
+      )
+      await expect.poll(() => camera()?.zoom).toBeCloseTo(start.zoom, 2)
+    } finally {
+      removeSizing()
+    }
   })
 
   it('switches modes; flicker toggles the visible source', async () => {
@@ -443,6 +489,27 @@ describe('GeoViewer', () => {
     await expect.element(screen.getByText('Keyboard shortcuts')).toBeVisible()
     await expect.element(screen.getByText('Comparison modes')).toBeVisible()
     press('h')
+  })
+
+  it('shows the toolbar keys on ? until the next key', async () => {
+    const { portA, portB } = registerDefaultPair()
+    const screen = await render(<Harness portA={portA} portB={portB} />)
+    const fit = screen.getByRole('button', { name: 'Fit view' })
+    await expect.element(fit).toBeInTheDocument()
+    const badge = () => fit.element().querySelector('kbd')?.textContent ?? null
+    const press = (key: string, init: KeyboardEventInit = {}) => {
+      for (const type of ['keydown', 'keyup'])
+        document.dispatchEvent(
+          new KeyboardEvent(type, { key, bubbles: true, ...init }),
+        )
+    }
+
+    press('?', { code: 'Slash', shiftKey: true })
+    await expect.poll(badge).toBe('F')
+    // The next key hides them and still acts: B hides the sidebars.
+    press('b')
+    await expect.poll(badge).toBeNull()
+    await expect.element(screen.getByText('Active layers')).not.toBeVisible()
   })
 
   it('offers a basemap picker with an opacity slider', async () => {
@@ -1617,8 +1684,8 @@ describe('GeoViewer layer extents', () => {
       expect(bbox[2]).toBeLessThanOrEqual(3.6e6)
       expect(bbox[1]).toBeGreaterThanOrEqual(3.9e6)
       expect(bbox[3]).toBeLessThanOrEqual(11.3e6)
-      // Fit to globe frames the active layers, not the service bbox.
-      await screen.getByRole('button', { name: 'Fit to globe' }).click()
+      // Fit view frames the active layers, not the service bbox.
+      await screen.getByRole('button', { name: 'Fit view' }).click()
       await expect
         .poll(() => lastCamera(onViewStateChange)?.lon, { timeout: 8000 })
         .toBeCloseTo(10, 0)
@@ -1674,7 +1741,7 @@ describe('GeoViewer projections', () => {
       await screen.getByRole('button', { name: 'Projection & basemap' }).click()
       await screen
         .getByRole('radio', {
-          name: 'Arctic — polar stereographic',
+          name: /^Arctic — polar stereographic/,
           exact: true,
         })
         .click()
@@ -1912,6 +1979,39 @@ describe('GeoViewer layer browser grouping', () => {
         }),
       )
       .toBeInTheDocument()
+  })
+
+  it('opens a large, clustering catalog flat too', async () => {
+    const portA = nextPort++
+    const portB = nextPort++
+    // Fourteen titles, twelve of them in two prefix clusters.
+    const cluster = (prefix: string, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        name: `${prefix.replace(/ /g, '')}${i}`,
+        title: `${prefix} level ${i + 1}`,
+      }))
+    registerMockWmsServer(portA, {
+      layers: [
+        ...cluster('Carbon dioxide at', 6),
+        ...cluster('Ozone mixing ratio at', 6),
+        { name: 'ws', title: 'Wind speed 10m' },
+        { name: 'msl', title: 'Mean sea level pressure' },
+      ],
+    })
+    registerMockWmsServer(portB, { layers: [] })
+    const screen = await render(
+      <ProgressiveHarness portA={portA} portB={portB} withB={false} />,
+    )
+
+    await expect
+      .element(screen.getByText('Carbon dioxide at level 1'))
+      .toBeVisible()
+    expect(screen.getByText('6 layers').elements()).toHaveLength(0)
+    await expect
+      .element(screen.getByRole('button', { name: 'Group similar layers' }))
+      .toHaveAttribute('aria-pressed', 'false')
+    await screen.getByRole('button', { name: 'Group similar layers' }).click()
+    await expect.element(screen.getByText('6 layers').first()).toBeVisible()
   })
 
   it('the group toggle clusters flat full-title rows on demand', async () => {

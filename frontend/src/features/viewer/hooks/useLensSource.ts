@@ -59,6 +59,8 @@ export interface LensSource {
   bbox: [number, number, number, number] | null
   /** Advertised CRS codes (empty until loaded — see `supportsCrs`). */
   crs: ReadonlyArray<string>
+  /** Largest GetMap the server accepts, null when unadvertised. */
+  maxImageSize: readonly [number, number] | null
   error: string | null
   loadingLayers: boolean
   /** True between failed attempts while the retry ladder is running. */
@@ -107,6 +109,7 @@ export function useLensSource(baseUrl: string | null): LensSource {
     decorationLayers: query.data?.decorationLayers ?? NO_LAYERS,
     bbox: query.data?.bbox ?? null,
     crs: query.data?.crs ?? NO_CRS,
+    maxImageSize: query.data?.maxImageSize ?? null,
     error: query.error ? query.error.message : null,
     errorStatus:
       query.error instanceof CapabilitiesError

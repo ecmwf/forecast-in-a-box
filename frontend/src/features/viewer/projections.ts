@@ -33,28 +33,29 @@ import {
   getIntersection,
 } from 'ol/extent'
 import { isWorldBbox } from './wms-capabilities'
-import { DEFAULT_PROJECTION_ID, PROJECTION_IDS } from './projection-ids'
+import { DEFAULT_PROJECTION_ID, FLAT_PROJECTION_IDS } from './projection-ids'
+import type { Coordinate } from 'ol/coordinate'
 import type { Extent } from 'ol/extent'
 import type View from 'ol/View'
-import type { ProjectionId } from './projection-ids'
+import type { FlatProjectionId, ProjectionId } from './projection-ids'
 import type { Bbox } from './wms-capabilities'
 import type { PolarGraticule } from '@/lib/map/ol-outline'
 
-export type { ProjectionId }
+export type { FlatProjectionId, ProjectionId }
 
 export interface ViewerProjection {
-  id: ProjectionId
+  id: FlatProjectionId
   /** WMS CRS code (also the OL projection code). */
   code: string
   /** `visualise`-namespace label key. */
-  labelKey: `projections.${ProjectionId}`
+  labelKey: `projections.${FlatProjectionId}`
   /** proj4 definition; absent for OL built-ins. */
   proj4?: string
   /** Navigable extent (View constraint), projection units. */
   extent: Extent
   /** Geographic coverage [W, S, E, N] — graticule + bbox-fit guard. */
   worldExtent: Extent
-  /** "Fit to globe" target, projection units. */
+  /** "Fit view" target, projection units. */
   homeExtent: Extent
   /** View zoom floor. */
   minZoom: number
@@ -156,13 +157,14 @@ export const PROJECTIONS: ReadonlyArray<ViewerProjection> = [
 const BY_ID = new Map(PROJECTIONS.map((p) => [p.id, p]))
 
 export function getViewerProjection(
-  id?: ProjectionId | null,
+  id?: FlatProjectionId | null,
 ): ViewerProjection {
   return BY_ID.get(id ?? DEFAULT_PROJECTION_ID) ?? BY_ID.get('merc')!
 }
 
 /** Toolbar order, as ids. */
-export const PROJECTION_ORDER: ReadonlyArray<ProjectionId> = PROJECTION_IDS
+export const PROJECTION_ORDER: ReadonlyArray<FlatProjectionId> =
+  FLAT_PROJECTION_IDS
 
 /** Polar graticule geometry for the Outline basemap; undefined elsewhere. */
 export function polarGraticuleFor(
@@ -235,25 +237,33 @@ export function requestProjection(
   return twin
 }
 
-/** Metres per pixel at the view centre (scale hints, band checks). */
+/** Ground metres per projection unit at `at`; lat/lon takes its north-south scale. */
+export function metresPerUnitAt(
+  projection: Projection,
+  at: Coordinate,
+): number {
+  return projection.getUnits() === 'degrees'
+    ? (projection.getMetersPerUnit() ?? NaN)
+    : getPointResolution(projection, 1, at, 'm')
+}
+
+/** Ground m/px at the view centre: the flat map's look, matched by the globe. */
 export function groundResolution(view: View): number | null {
   const center = view.getCenter()
   const res = view.getResolution()
   if (!center || res === undefined) return null
-  const metres = getPointResolution(view.getProjection(), res, center, 'm')
+  const metres = res * metresPerUnitAt(view.getProjection(), center)
   return Number.isFinite(metres) && metres > 0 ? metres : null
 }
 
-/** View resolution that renders `metresPerPx` at the view centre. */
-export function viewResolutionFor(view: View, metresPerPx: number): number {
-  const center = view.getCenter() ?? getCenter(view.getProjection().getExtent())
-  const perUnit = getPointResolution(view.getProjection(), 1, center, 'm')
-  return Number.isFinite(perUnit) && perUnit > 0
-    ? metresPerPx / perUnit
-    : metresPerPx
+/** The view's m/px as WMS servers reckon scale (units x metres per unit): band hints. */
+export function bandMetres(view: View): number | null {
+  const res = view.getResolution()
+  if (res === undefined) return null
+  return res * (view.getProjection().getMetersPerUnit() ?? 1)
 }
 
-/** Metre band → this projection's resolution units (degrees for 4326). */
+/** Metre band -> this projection's resolution units (degrees for 4326). */
 export function bandResolution(view: View, metres: number): number {
   if (!Number.isFinite(metres)) return metres
   return metres / (view.getProjection().getMetersPerUnit() ?? 1)
@@ -277,8 +287,8 @@ export function carryCamera(
   ) {
     next = getCenter(target.homeExtent)
   }
-  const groundMpp = getPointResolution(pFrom, res, center, 'm')
-  const perUnit = getPointResolution(pTo, 1, next, 'm')
+  const groundMpp = res * metresPerUnitAt(pFrom, center)
+  const perUnit = metresPerUnitAt(pTo, next)
   const wanted =
     Number.isFinite(groundMpp) && Number.isFinite(perUnit) && perUnit > 0
       ? groundMpp / perUnit
@@ -293,7 +303,12 @@ export function carryCamera(
 /** WGS84 bbox as a view extent; null when the projection cannot frame it. */
 export function bboxExtentFor(p: ViewerProjection, bbox: Bbox): Extent | null {
   if (p.mercator || p.id === 'geo') {
-    return transformExtent(bbox, 'EPSG:4326', p.code)
+    // Latitudes past the projection's edge map to infinity: clip first.
+    return transformExtent(
+      getIntersection(bbox, p.worldExtent),
+      'EPSG:4326',
+      p.code,
+    )
   }
   if (isWorldBbox(bbox) || !containsExtent(p.worldExtent, bbox)) return null
   const extent = transformExtent(bbox, 'EPSG:4326', p.code, 8)

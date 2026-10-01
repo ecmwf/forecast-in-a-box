@@ -18,10 +18,13 @@ import type { PointerReadout } from '../hooks/usePointerReadout'
 
 export function PointerReadoutBadge({
   pointer,
+  label,
   crs,
   metres,
 }: {
   pointer: PointerReadout
+  /** Short projection name, e.g. "Mercator". */
+  label: string
   /** Projection code of the map, e.g. `EPSG:32661`. */
   crs: string
   /** Show the projected metres (working-grid projections only). */
@@ -29,13 +32,11 @@ export function PointerReadoutBadge({
 }) {
   return (
     <div className="pointer-events-none absolute bottom-3 left-3 z-10 grid gap-0.5 rounded-md border border-border bg-background/90 px-2.5 py-1 font-mono text-xs tabular-nums backdrop-blur-sm">
-      {metres ? (
-        <span>
-          <span className="text-muted-foreground">{crs}: </span>
-          {`(${Math.round(pointer.x)}, ${Math.round(pointer.y)}) m`}
-        </span>
-      ) : (
-        <span className="text-muted-foreground">{crs}</span>
+      <span className="text-muted-foreground">
+        {label} · {crs}
+      </span>
+      {metres && (
+        <span>{`(${Math.round(pointer.x)}, ${Math.round(pointer.y)}) m`}</span>
       )}
       <span>{formatLatLon(pointer.lat, pointer.lon)}</span>
     </div>

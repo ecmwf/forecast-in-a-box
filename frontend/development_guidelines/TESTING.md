@@ -69,7 +69,15 @@ npm run test:coverage   # With coverage
 npm run test:ui         # Interactive UI
 npm run test:e2e        # Playwright E2E - all tests against MSW mocks (fast, no backend needed)
 npm run test:e2e:stack  # Playwright E2E - all tests against real backend (port 8000)
+npm run test:globe      # 3D globe on real WebGL, local only: *.gpu.test.ts + the globe E2E
 ```
+
+`*.gpu.test.ts` files drive the real globe engine on WebGL; the default config, and so CI, skips them
+(minutes on CI's software renderer). `npm run test:gpu` runs just them.
+
+The `globe` project runs the full Chromium build: the default headless shell renders WebGL in
+software, which the app refuses for the globe. The spec skips itself without a hardware GPU (as on
+CI). Prefix `VITE_PORT=3100` while a dev server holds :3000.
 
 ## Coverage
 
@@ -82,7 +90,7 @@ npm run test:e2e:stack  # Playwright E2E - all tests against real backend (port 
 | `src/components/` | ~39%    | >50%   |
 | `src/features/`   | ~20%    | >50%   |
 
-**Test count:** 40 unit + 16 integration + 7 E2E = 63 test files
+**Test count:** 149 unit + 57 integration + 13 E2E = 219 test files
 
 ### What NOT to Test
 
@@ -99,9 +107,9 @@ tests/
 ├── utils/
 │   ├── render.tsx    # Custom render with providers
 │   └── factories.ts  # Test data factories
-├── unit/             # Unit tests (40 files - pure logic, hooks, stores, utils, components)
-├── integration/      # Integration tests (16 files - feature flows with MSW)
-└── e2e/              # Playwright E2E (7 test files, all run against both mock and real backend)
+├── unit/             # Unit tests (149 files - pure logic, hooks, stores, utils, components)
+├── integration/      # Integration tests (57 files - feature flows with MSW)
+└── e2e/              # Playwright E2E (13 test files; all but globe.spec.ts also run against the real backend)
     └── *.spec.ts           # Works with both playwright.config.ts (MSW) and playwright.config.stack.ts (real)
 ```
 

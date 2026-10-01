@@ -20,15 +20,16 @@ import {
   Copy,
   Download,
   Eraser,
-  Globe2,
+  Info,
   Layers,
   MessageSquarePlus,
   Ruler,
+  Scan,
   SquareDashed,
   Upload,
   ZoomIn,
 } from 'lucide-react'
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { firstNumber } from '../format'
 import { basemapFitsProjection } from '../ol-layers'
@@ -36,7 +37,7 @@ import {
   downloadAnnotationsGeojson,
   parseAnnotationsGeojson,
 } from './annotations'
-import { COMPARE_KEYS, keyLabel, useShortcutReveal } from './useGeoShortcuts'
+import { COMPARE_KEYS, keyLabel } from './useGeoShortcuts'
 import { COMPARE_MODES } from './types'
 import type { LinkMode } from './useCompareSelection'
 import type { SourceSlot } from './layer-pairing'
@@ -58,6 +59,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { P } from '@/components/base/typography'
 import { TOUR, tourActionAttr, tourAttr } from '@/features/tutorials/anchors'
 import { showToast } from '@/lib/toast'
@@ -68,11 +75,12 @@ import { cn } from '@/lib/utils'
 
 const log = createLogger('GeoToolbar')
 
-/** A projection entry; `blockedBy` names the source lacking its CRS. */
+/** A projection entry; `blockedBy` names the blocking source, or the reason (mode). */
 export interface ProjectionOption {
   id: ProjectionId
-  labelKey: ViewerProjection['labelKey']
+  labelKey: `projections.${ProjectionId}`
   blockedBy: string | null
+  blockedReason?: 'crs' | 'mode'
 }
 
 /** Shortcut badge shown while ⌘/Ctrl is held. */
@@ -136,8 +144,12 @@ export function GeoToolbar({
   basemapOpacity,
   onBasemapOpacityChange,
   projection,
+  projectionId,
   projections,
   onProjectionChange,
+  globeActive = false,
+  onGlobeIntent,
+  showKeys = false,
 }: {
   /** Single-source: comparison modes + link toggle hidden. */
   solo?: boolean
@@ -172,11 +184,22 @@ export function GeoToolbar({
   availableBasemaps: ReadonlyArray<BasemapOption>
   basemapOpacity: number
   onBasemapOpacityChange: (opacity: number) => void
+  /** The flat projection (basemap fit). */
   projection: ViewerProjection
+  /** What the map shows — the flat projection or the globe. */
+  projectionId: ProjectionId
   projections: ReadonlyArray<ProjectionOption>
   onProjectionChange: (id: ProjectionId) => void
+  /** On the 3D globe: map-click tools are unavailable. */
+  globeActive?: boolean
+  /** The projection menu opened and the globe is offered: warm it up. */
+  onGlobeIntent?: () => void
+  /** Shortcut badges on the buttons (toggled by `?`). */
+  showKeys?: boolean
 }) {
   const { t } = useTranslation('visualise')
+  // Describes each projection's note button (a short name, the note as description).
+  const noteId = useId()
   const annotationFileRef = useRef<HTMLInputElement>(null)
 
   const onAnnotationFiles = async (files: FileList | null) => {
@@ -193,7 +216,6 @@ export function GeoToolbar({
   }
 
   const { t: tExec } = useTranslation('executions')
-  const reveal = useShortcutReveal()
 
   return (
     <div className="space-y-2 rounded-md border border-border bg-muted/40 px-2.5 py-2">
@@ -260,7 +282,7 @@ export function GeoToolbar({
                 >
                   <KeyBadge
                     label={keyLabel(COMPARE_KEYS.modes[index])}
-                    show={reveal}
+                    show={showKeys}
                   />
                   {t(`modes.${id}`)}
                 </button>
@@ -304,13 +326,13 @@ export function GeoToolbar({
             className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
             disabled={!onFit}
             onClick={() => onFit?.()}
-            title={`${tExec('lens.fitGlobe')} (${keyLabel(COMPARE_KEYS.fit)})`}
-            aria-label={tExec('lens.fitGlobe')}
+            title={`${tExec('lens.fitView')} (${keyLabel(COMPARE_KEYS.fit)})`}
+            aria-label={tExec('lens.fitView')}
           >
-            <KeyBadge label={keyLabel(COMPARE_KEYS.fit)} show={reveal} />
-            <Globe2 className="h-4 w-4" />
+            <KeyBadge label={keyLabel(COMPARE_KEYS.fit)} show={showKeys} />
+            <Scan className="h-4 w-4" />
           </Button>
-          <Popover>
+          <Popover onOpenChange={(open) => open && onGlobeIntent?.()}>
             {/* Reads the current projection so the control is findable. */}
             <PopoverTrigger
               render={
@@ -326,11 +348,11 @@ export function GeoToolbar({
             >
               <KeyBadge
                 label={keyLabel(COMPARE_KEYS.projection)}
-                show={reveal}
+                show={showKeys}
               />
               <Layers className="h-4 w-4" />
               <span className="text-xs">
-                {t(`projections.short.${projection.id}`)}
+                {t(`projections.short.${projectionId}`)}
               </span>
               <ChevronDown className="h-3 w-3 opacity-60" />
             </PopoverTrigger>
@@ -344,12 +366,17 @@ export function GeoToolbar({
                 aria-label={t('projections.title')}
               >
                 {projections.map((p) => {
-                  const selected = p.id === projection.id
+                  const selected = p.id === projectionId
                   const hint =
-                    p.blockedBy !== null
-                      ? t('projections.blockedBy', { source: p.blockedBy })
-                      : null
-                  return (
+                    p.blockedBy === null
+                      ? null
+                      : p.blockedReason === 'mode'
+                        ? p.blockedBy
+                        : t('projections.blockedBy', { source: p.blockedBy })
+                  // Server-drawn symbols distort on the globe: an info icon says so.
+                  const note =
+                    p.id === 'globe' ? t('projections.globeSymbolsNote') : null
+                  const radio = (
                     <button
                       key={p.id}
                       type="button"
@@ -359,7 +386,7 @@ export function GeoToolbar({
                       title={hint ?? undefined}
                       onClick={() => onProjectionChange(p.id)}
                       className={cn(
-                        'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
+                        'flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
                         selected && 'bg-accent font-medium',
                       )}
                     >
@@ -376,6 +403,34 @@ export function GeoToolbar({
                       )}
                     </button>
                   )
+                  if (!note) return radio
+                  return (
+                    <div key={p.id} className="flex items-center gap-1">
+                      {radio}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={t('projections.globeSymbolsInfo')}
+                                aria-describedby={`${noteId}-${p.id}`}
+                                // Its own box: the hit halo would reach into the radio beside it.
+                                className="size-6 text-muted-foreground before:hidden"
+                              />
+                            }
+                          >
+                            <Info className="size-3.5" />
+                          </TooltipTrigger>
+                          <TooltipContent align="end">{note}</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <span id={`${noteId}-${p.id}`} className="sr-only">
+                        {note}
+                      </span>
+                    </div>
+                  )
                 })}
               </div>
               <P className="mt-1 border-t border-border px-2 pt-2 pb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -384,7 +439,9 @@ export function GeoToolbar({
               <div className="flex flex-col">
                 {availableBasemaps.map((b) => {
                   // Web basemaps are Mercator-only; the Outline stands in.
-                  const fits = basemapFitsProjection(b, projection)
+                  const fits =
+                    globeActive || basemapFitsProjection(b, projection)
+                  const unfitHint = t('basemaps.mercatorOnly')
                   return (
                     <button
                       key={b.id}
@@ -392,7 +449,7 @@ export function GeoToolbar({
                       onClick={() => onBasemapChange(b.id)}
                       aria-pressed={b.id === basemapId}
                       disabled={!fits}
-                      title={fits ? undefined : t('basemaps.mercatorOnly')}
+                      title={fits ? undefined : unfitHint}
                       className={cn(
                         'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
                         b.id === basemapId && 'bg-accent font-medium',
@@ -402,7 +459,7 @@ export function GeoToolbar({
                         <span>{t(b.labelKey)}</span>
                         {!fits && (
                           <span className="text-xs font-normal text-muted-foreground">
-                            {t('basemaps.mercatorOnly')}
+                            {unfitHint}
                           </span>
                         )}
                       </span>
@@ -433,127 +490,141 @@ export function GeoToolbar({
             </PopoverContent>
           </Popover>
           <span className="mx-1 h-5 w-px bg-border" />
-          <Button
-            variant={measureMode === 'line' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-            aria-pressed={measureMode === 'line'}
-            onClick={() =>
-              onMeasureMode(measureMode === 'line' ? 'none' : 'line')
-            }
-            title={t('measure.line')}
-            aria-label={t('measure.line')}
+          {/* Disabled buttons take no pointer events: the reason sits on their group. */}
+          <span
+            className="flex shrink-0 items-center gap-3"
+            title={globeActive ? t('globe.toolUnavailable') : undefined}
           >
-            <Ruler className="h-4 w-4" />
-          </Button>
-          {/* Area split-button: click = freeform, chevron picks the shape. */}
-          <span className="flex items-center">
             <Button
-              variant={
-                measureMode === 'area' || measureMode === 'box'
-                  ? 'secondary'
-                  : 'ghost'
-              }
+              variant={measureMode === 'line' ? 'secondary' : 'ghost'}
               size="icon"
               className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-              aria-pressed={measureMode === 'area' || measureMode === 'box'}
+              aria-pressed={measureMode === 'line'}
+              disabled={globeActive}
               onClick={() =>
-                onMeasureMode(
-                  measureMode === 'area' || measureMode === 'box'
-                    ? 'none'
-                    : 'area',
-                )
+                onMeasureMode(measureMode === 'line' ? 'none' : 'line')
               }
-              title={t('measure.area')}
-              aria-label={t('measure.area')}
+              title={t('measure.line')}
+              aria-label={t('measure.line')}
             >
-              <SquareDashed className="h-4 w-4" />
+              <Ruler className="h-4 w-4" />
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="-ml-1 h-7 w-6"
-                    title={t('measure.shapeMenu')}
-                    aria-label={t('measure.shapeMenu')}
-                  />
+            {/* Area split-button: click = freeform, chevron picks the shape. */}
+            <span className="flex items-center">
+              <Button
+                variant={
+                  measureMode === 'area' || measureMode === 'box'
+                    ? 'secondary'
+                    : 'ghost'
                 }
+                size="icon"
+                className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+                aria-pressed={measureMode === 'area' || measureMode === 'box'}
+                disabled={globeActive}
+                onClick={() =>
+                  onMeasureMode(
+                    measureMode === 'area' || measureMode === 'box'
+                      ? 'none'
+                      : 'area',
+                  )
+                }
+                title={t('measure.area')}
+                aria-label={t('measure.area')}
               >
-                <ChevronDown className="h-3 w-3" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-44">
-                <DropdownMenuItem onClick={() => onMeasureMode('area')}>
-                  {t('measure.freeform')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onMeasureMode('box')}>
-                  {t('measure.rectangle')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-            onClick={onMeasureClear}
-            title={t('measure.clear')}
-            aria-label={t('measure.clear')}
-          >
-            <Eraser className="h-4 w-4" />
-          </Button>
-          <span className="flex items-center">
+                <SquareDashed className="h-4 w-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="-ml-1 h-7 w-6"
+                      disabled={globeActive}
+                      title={t('measure.shapeMenu')}
+                      aria-label={t('measure.shapeMenu')}
+                    />
+                  }
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuItem onClick={() => onMeasureMode('area')}>
+                    {t('measure.freeform')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onMeasureMode('box')}>
+                    {t('measure.rectangle')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </span>
             <Button
-              variant={annotateArmed ? 'secondary' : 'ghost'}
+              variant="ghost"
               size="icon"
-              className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
-              aria-pressed={annotateArmed}
-              onClick={onAnnotateToggle}
-              title={`${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`}
-              aria-label={t('annotations.tool')}
+              className="h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+              disabled={globeActive}
+              onClick={onMeasureClear}
+              title={t('measure.clear')}
+              aria-label={t('measure.clear')}
             >
-              <KeyBadge label={keyLabel(COMPARE_KEYS.annotate)} show={reveal} />
-              <MessageSquarePlus className="h-4 w-4" />
+              <Eraser className="h-4 w-4" />
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="-ml-1 h-7 w-6"
-                    title={t('annotations.options')}
-                    aria-label={t('annotations.options')}
-                  />
-                }
+            <span className="flex items-center">
+              <Button
+                variant={annotateArmed ? 'secondary' : 'ghost'}
+                size="icon"
+                className="relative h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11"
+                aria-pressed={annotateArmed}
+                disabled={globeActive}
+                onClick={onAnnotateToggle}
+                title={`${t('annotations.tool')} (${keyLabel(COMPARE_KEYS.annotate)})`}
+                aria-label={t('annotations.tool')}
               >
-                <ChevronDown className="h-3 w-3" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-60">
-                <DropdownMenuItem
-                  onClick={() => annotationFileRef.current?.click()}
+                <KeyBadge
+                  label={keyLabel(COMPARE_KEYS.annotate)}
+                  show={showKeys}
+                />
+                <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="-ml-1 h-7 w-6"
+                      title={t('annotations.options')}
+                      aria-label={t('annotations.options')}
+                    />
+                  }
                 >
-                  <Upload className="h-3.5 w-3.5" />
-                  {t('annotations.import')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={annotations.length === 0}
-                  onClick={() => downloadAnnotationsGeojson(annotations)}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {t('annotations.export')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <input
-              ref={annotationFileRef}
-              type="file"
-              accept=".json,.geojson,application/geo+json,application/json"
-              className="hidden"
-              aria-label={t('annotations.import')}
-              onChange={(e) => void onAnnotationFiles(e.target.files)}
-            />
+                  <ChevronDown className="h-3 w-3" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-60">
+                  <DropdownMenuItem
+                    onClick={() => annotationFileRef.current?.click()}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    {t('annotations.import')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={annotations.length === 0}
+                    onClick={() => downloadAnnotationsGeojson(annotations)}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {t('annotations.export')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <input
+                ref={annotationFileRef}
+                type="file"
+                accept=".json,.geojson,application/geo+json,application/json"
+                className="hidden"
+                aria-label={t('annotations.import')}
+                onChange={(e) => void onAnnotationFiles(e.target.files)}
+              />
+            </span>
           </span>
           <span className="mx-1 h-5 w-px bg-border" />
           <span className="flex items-center">
@@ -565,7 +636,7 @@ export function GeoToolbar({
               title={`${tExec('lens.copyMap')} (${keyLabel(COMPARE_KEYS.copy)})`}
               aria-label={tExec('lens.copyMap')}
             >
-              <KeyBadge label={keyLabel(COMPARE_KEYS.copy)} show={reveal} />
+              <KeyBadge label={keyLabel(COMPARE_KEYS.copy)} show={showKeys} />
               <Copy className="h-4 w-4" />
             </Button>
             {copySlots && (
@@ -602,7 +673,7 @@ export function GeoToolbar({
             title={`${t('export.open')} (${keyLabel(COMPARE_KEYS.export)})`}
             aria-label={t('export.open')}
           >
-            <KeyBadge label={keyLabel(COMPARE_KEYS.export)} show={reveal} />
+            <KeyBadge label={keyLabel(COMPARE_KEYS.export)} show={showKeys} />
             <Download className="h-4 w-4" />
             {t('export.label')}
           </Button>
@@ -619,7 +690,7 @@ export function GeoToolbar({
               title={`${t('modes.loupeLatch')} (${keyLabel(COMPARE_KEYS.loupe)})`}
               aria-label={t('modes.loupeLatch')}
             >
-              <KeyBadge label={keyLabel(COMPARE_KEYS.loupe)} show={reveal} />
+              <KeyBadge label={keyLabel(COMPARE_KEYS.loupe)} show={showKeys} />
               <ZoomIn className="h-4 w-4" />
             </Button>
             <Popover>

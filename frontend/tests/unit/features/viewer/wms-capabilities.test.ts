@@ -794,6 +794,28 @@ describe('parseCapabilities — CRS', () => {
   })
 })
 
+describe('parseCapabilities — image size limits', () => {
+  const caps = (service: string) => `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0" xmlns="http://www.opengis.net/wms">
+  <Service><Name>WMS</Name>${service}</Service>
+  <Capability>
+    <Layer><Title>root</Title><Layer><Name>2t</Name><Title>2t</Title></Layer></Layer>
+  </Capability>
+</WMS_Capabilities>`
+
+  it('reads MaxWidth/MaxHeight; a missing side is unlimited', () => {
+    expect(
+      parseCapabilities(
+        caps('<MaxWidth>2048</MaxWidth><MaxHeight>1024</MaxHeight>'),
+      ).maxImageSize,
+    ).toEqual([2048, 1024])
+    expect(
+      parseCapabilities(caps('<MaxWidth>2048</MaxWidth>')).maxImageSize,
+    ).toEqual([2048, Infinity])
+    expect(parseCapabilities(caps('')).maxImageSize).toBeNull()
+  })
+})
+
 describe('parseCapabilities — per-layer bbox', () => {
   const xml = `<?xml version="1.0"?>
 <WMS_Capabilities version="1.3.0" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -954,6 +976,10 @@ describe('activeLayersBbox', () => {
     expect(activeLayersBbox(layers, [])).toBeNull()
     expect(isWorldBbox([-180, -90, 180, 90])).toBe(true)
     expect(isWorldBbox([-10, 40, 10, 60])).toBe(false)
+    // Half a grid cell over or short of the edges is still the world (DWD ICON).
+    expect(isWorldBbox([-180.125, -90.125, 179.875, 90.125])).toBe(true)
+    expect(isWorldBbox([0, -89.5, 360, 89.5])).toBe(true)
+    expect(isWorldBbox([-180, -80, 180, 80])).toBe(false)
   })
 })
 
@@ -970,6 +996,14 @@ describe('parseBbox fallbacks', () => {
       ),
     ).layers[0]
     expect(layer.bbox).toEqual([-23.53125, 29.46875, 62.53125, 70.53125])
+  })
+  it('keeps latitude first despite a half-cell overhang (DWD ICON)', () => {
+    const layer = parseCapabilities(
+      caps(
+        '<Layer><Name>icon</Name><Title>icon</Title><CRS>EPSG:4326</CRS><BoundingBox CRS="EPSG:4326" minx="-90.125" miny="-180.125" maxx="90.125" maxy="179.875"/></Layer>',
+      ),
+    ).layers[0]
+    expect(layer.bbox).toEqual([-180.125, -90.125, 179.875, 90.125])
   })
   it('accepts CRS:84 and lon-first EPSG:4326 as written', () => {
     const a = parseCapabilities(

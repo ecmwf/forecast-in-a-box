@@ -74,6 +74,8 @@ export interface ParsedCapabilities {
   bbox: [number, number, number, number]
   /** Every CRS/SRS code advertised anywhere in the layer tree. */
   crs: ReadonlyArray<string>
+  /** Largest GetMap image accepted (1.3.0 MaxWidth/MaxHeight; Infinity = unlimited side), null when unadvertised. */
+  maxImageSize: readonly [number, number] | null
 }
 
 /** Codes a server may advertise instead of the one we request. */
@@ -324,7 +326,22 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
     ;(isDecorationLayer(layer) ? decorationLayers : layers).push(layer)
   }
 
-  return { layers, decorationLayers, bbox, crs: [...crs] }
+  return {
+    layers,
+    decorationLayers,
+    bbox,
+    crs: [...crs],
+    maxImageSize: parseMaxImageSize(doc),
+  }
+}
+
+function parseMaxImageSize(doc: Document): readonly [number, number] | null {
+  const side = (tag: string) => {
+    const n = Number(doc.querySelector(`Service > ${tag}`)?.textContent)
+    return Number.isFinite(n) && n > 0 ? n : Infinity
+  }
+  const size = [side('MaxWidth'), side('MaxHeight')] as const
+  return size.every((n) => n === Infinity) ? null : size
 }
 
 /** Properties child layers inherit from ancestors (WMS 1.3.0 §7.2.4.8). */
@@ -529,11 +546,11 @@ function parseBbox(
     Number(geo.getAttribute(a)),
   )
   if (!box.every(Number.isFinite)) return null
-  // 1.3.0 EPSG:4326 is latitude-first; a |lat| > 90 betrays lon-first.
+  // 1.3.0 EPSG:4326 is latitude-first; |x| > 91 betrays lon-first (1 deg for half-cell overhangs).
   const latFirst =
     geo.getAttribute('CRS') === 'EPSG:4326' &&
-    Math.abs(box[0]) <= 90 &&
-    Math.abs(box[2]) <= 90
+    Math.abs(box[0]) <= 91 &&
+    Math.abs(box[2]) <= 91
   return latFirst
     ? [box[1], box[0], box[3], box[2]]
     : (box as [number, number, number, number])
@@ -1002,8 +1019,9 @@ export function layerRequestParams(
 export type Bbox = [number, number, number, number]
 
 /** Whole-globe bbox: nothing to clip. */
+/** Global, allowing half-cell overhangs or insets (DWD ICON: -180.125..179.875, +/-90.125). */
 export const isWorldBbox = (bbox: Bbox): boolean =>
-  bbox[0] <= -180 && bbox[1] <= -90 && bbox[2] >= 180 && bbox[3] >= 90
+  bbox[2] - bbox[0] >= 359 && bbox[1] <= -89 && bbox[3] >= 89
 
 /** Union of two bboxes; either may be absent. */
 export function unionBbox(a: Bbox | null, b: Bbox | null): Bbox | null {

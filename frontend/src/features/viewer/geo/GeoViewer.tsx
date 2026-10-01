@@ -48,19 +48,21 @@ import {
 } from '../ol-layers'
 import { DEFAULT_PROJECTION_ID } from '../projection-ids'
 import {
-  PROJECTIONS,
+  bandMetres,
+  bandResolution,
   carryCamera,
   getViewerProjection,
-  groundResolution,
-  viewResolutionFor,
+  viewerProjectionOf,
 } from '../projections'
+import { globeBasemapSpec } from '../globe/globe-layer-specs'
+import { LazyGlobeView } from '../globe/LazyGlobeView'
+import { globeStartCamera, useGlobeViewer } from '../globe/useGlobeViewer'
 import {
   activeLayersBbox,
   isLensProxyUrl,
   rebaseLensUrl,
   resolveStyle,
   skinnyWmsBasemap,
-  supportsCrs,
   unionBbox,
 } from '../wms-capabilities'
 import { StartupStatusPill } from '../components/StartupStatusPill'
@@ -76,9 +78,11 @@ import { AnnotationEditorDialog } from './AnnotationEditorDialog'
 import { useViewerAnnotations } from './useViewerAnnotations'
 import { useViewerUrlState } from './useViewerUrlState'
 import { useViewerExport } from './useViewerExport'
+import { useProjectionOptions } from './useProjectionOptions'
 import { useViewerTimeline } from './useViewerTimeline'
 import { downloadAnnotationsGeojson } from './annotations'
-import { useGeoShortcuts } from './useGeoShortcuts'
+import { useGeoShortcuts, useKeyBadges } from './useGeoShortcuts'
+import { panView, zoomView } from './map-nav'
 import { GeoTimeSlider } from './GeoTimeSlider'
 import { GeoActiveLayersPanel } from './GeoActiveLayersPanel'
 import { GeoLayerBrowser } from './GeoLayerBrowser'
@@ -94,9 +98,8 @@ import type { GeoPanelSide } from './useGeoPanelWidths'
 import type { MapAnnotation } from './annotations'
 import type { ContextOverlay } from './overlays'
 import type View from 'ol/View'
-import type { ProjectionId } from '../projection-ids'
+import type { FlatProjectionId } from '../projection-ids'
 import type { BboxAxisOrder } from '../projections'
-import type { ProjectionOption } from './GeoToolbar'
 import type { SourceSlot } from './layer-pairing'
 import type {
   CompareMapSource,
@@ -121,13 +124,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { P } from '@/components/base/typography'
 import { useMedia } from '@/hooks/useMedia'
-import { showToast } from '@/lib/toast'
 import {
   stylePinKey,
   styleScope,
   useStylePinsStore,
 } from '@/stores/stylePinsStore'
 import { preloadOutlineData } from '@/lib/map/ol-outline'
+import { useUiStore } from '@/stores/uiStore'
 
 export interface GeoViewerSource {
   /** Stable source identity (basket entry ref) — annotations bind to it. */
@@ -204,15 +207,19 @@ export function GeoViewer({
   // Mount snapshot — restoration must not react to later URL rewrites.
   const initialViewRef = useRef(initialViewState ?? null)
 
-  // One View per projection; a switch swaps in a new View, camera carried.
-  const [projectionId, setProjectionId] = useState<ProjectionId>(
-    () => initialViewRef.current?.projection ?? DEFAULT_PROJECTION_ID,
-  )
+  // A globe restore needs hardware WebGL; otherwise the view starts flat.
+  const [globeStart] = useState(() => globeStartCamera(initialViewRef.current))
+  const startOnGlobe = globeStart !== null
+
+  // One View per flat projection (camera carried); kept while on the globe.
   const [view, setView] = useState<View>(() => {
-    const projection = getViewerProjection(projectionId)
+    const restored = initialViewRef.current?.projection
+    const projection = getViewerProjection(
+      restored === 'globe' ? DEFAULT_PROJECTION_ID : restored,
+    )
     const next = createViewerView(projection)
     const cam = initialViewRef.current?.camera
-    if (cam) {
+    if (cam && !startOnGlobe) {
       next.setCenter(fromLonLat([cam.lon, cam.lat], projection.code))
       next.setZoom(cam.zoom)
       // A restored camera outranks the initial auto-fit.
@@ -225,18 +232,41 @@ export function GeoViewer({
   // Imperative users (pan, zoom, locate) read the live instance.
   const viewRef = useRef(view)
   viewRef.current = view
-  const projection = getViewerProjection(projectionId)
-  const changeProjection = useCallback((id: ProjectionId) => {
-    const current = viewRef.current
-    const target = getViewerProjection(id)
-    if (current.getProjection().getCode() === target.code) return
-    const next = createViewerView(target)
-    carryCamera(current, next, target)
-    next.set(AUTOFIT_KEY, true, true)
+  const projection = viewerProjectionOf(view)
+  const flatId = projection.id
+  const adoptFlatView = useCallback((next: View) => {
     viewRef.current = next
     setView(next)
-    setProjectionId(id)
   }, [])
+  const changeFlatProjection = useCallback(
+    (id: FlatProjectionId) => {
+      const current = viewRef.current
+      const target = getViewerProjection(id)
+      if (current.getProjection().getCode() === target.code) return
+      const next = createViewerView(target)
+      carryCamera(current, next, target)
+      next.set(AUTOFIT_KEY, true, true)
+      adoptFlatView(next)
+    },
+    [adoptFlatView],
+  )
+
+  // Source focus: a slot views only that source (UI collapses to it); null compares both.
+  const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
+
+  // -------- 3D globe (flat <-> globe handoff) --------
+  const globe = useGlobeViewer({
+    viewRef,
+    adoptFlatView,
+    changeFlatProjection,
+    flatId,
+    initialProjection: initialViewRef.current?.projection,
+    initialCamera: globeStart,
+    hasB,
+    focusSlot,
+    mode,
+  })
+  const { projectionId, changeProjection } = globe
 
   // -------- Pairing + selection --------
   const pairing = useMemo(
@@ -472,63 +502,31 @@ export function GeoViewer({
       setBasemapId(DEFAULT_BASEMAP_ID)
     }
   }, [availableBasemaps, basemapId, sourceA.loadingLayers])
-  // Off-Mercator the Outline stands in; the Carto choice is kept.
+  // Where the choice cannot be drawn the Outline stands in; the choice is kept.
+  const onGlobe = projectionId === 'globe'
   const effectiveBasemapId = useMemo(() => {
     const opt = availableBasemaps.find((o) => o.id === basemapId)
-    return opt && !basemapFitsProjection(opt, projection)
-      ? OUTLINE_BASEMAP.id
-      : basemapId
-  }, [availableBasemaps, basemapId, projection])
+    // Every offered basemap draws on the globe.
+    const fits = !opt || onGlobe || basemapFitsProjection(opt, projection)
+    return fits ? basemapId : OUTLINE_BASEMAP.id
+  }, [availableBasemaps, basemapId, projection, onGlobe])
+  // Under a handoff the flat map matches the globe's first frame: Carto only from Mercator.
+  const flatBasemapId =
+    globe.phase === 'flat' || flatId === 'merc'
+      ? effectiveBasemapId
+      : OUTLINE_BASEMAP.id
 
-  // Offered only when every loaded source advertises the CRS.
-  const projectionOptions = useMemo<ReadonlyArray<ProjectionOption>>(() => {
-    const sources = [
-      { src: sourceA, label: `A · ${a.label}` },
-      ...(b ? [{ src: sourceB, label: `B · ${b.label}` }] : []),
-    ]
-    return PROJECTIONS.map((p) => ({
-      id: p.id,
-      labelKey: p.labelKey,
-      // Mercator is never blocked: every server answers it in practice.
-      blockedBy:
-        p.id === DEFAULT_PROJECTION_ID
-          ? null
-          : (sources.find(
-              ({ src }) =>
-                !src.loadingLayers &&
-                src.error === null &&
-                !supportsCrs(src.crs, p.code),
-            )?.label ?? null),
-    }))
-    // Keyed on the meaningful bits — the source objects churn every render.
-  }, [
-    sourceA.crs,
-    sourceA.loadingLayers,
-    sourceA.error,
-    sourceB.crs,
-    sourceB.loadingLayers,
-    sourceB.error,
-    a.label,
-    b,
-  ])
-  // A source that lacks the current CRS (e.g. B just added) → Mercator.
-  useEffect(() => {
-    const current = projectionOptions.find((p) => p.id === projectionId)
-    if (!current?.blockedBy) return
-    showToast.info(
-      t('projections.snappedBack', {
-        source: current.blockedBy,
-        projection: t(current.labelKey),
-      }),
-    )
-    changeProjection(DEFAULT_PROJECTION_ID)
-  }, [projectionOptions, projectionId, changeProjection, t])
-  const cycleProjection = useCallback(() => {
-    const open = projectionOptions.filter((p) => p.blockedBy === null)
-    const idx = open.findIndex((p) => p.id === projectionId)
-    const next = open.at((idx + 1) % open.length)
-    if (next) changeProjection(next.id)
-  }, [projectionOptions, projectionId, changeProjection])
+  const { projectionOptions, cycleProjection } = useProjectionOptions({
+    sourceA,
+    sourceB,
+    aLabel: a.label,
+    bLabel: b?.label ?? null,
+    globe,
+    focusSlot,
+    mode,
+    projectionId,
+    changeProjection,
+  })
 
   // -------- URL view-state restore + report --------
   useViewerUrlState({
@@ -547,13 +545,16 @@ export function GeoViewer({
     timeLinkMode,
     offsetMs,
     basemapId,
+    globeCamera: globe.phase === 'globe' ? globe.camera : null,
   })
 
   // Time-step prefetch (default off — bandwidth-heavy).
   const [preloadTimeSteps, setPreloadTimeSteps] = useState(false)
 
   // Pinned legends, keyed `${slot}:${layerName}`.
-  const [pinnedLegends, setPinnedLegends] = useState<Set<string>>(new Set())
+  const [pinnedLegends, setPinnedLegends] = useState<Set<string>>(
+    () => new Set(),
+  )
   const togglePinLegend = useCallback((slot: SourceSlot, name: string) => {
     const key = `${slot}:${name}`
     setPinnedLegends((prev) => {
@@ -609,9 +610,6 @@ export function GeoViewer({
       }),
     [],
   )
-
-  // Source focus: a slot views only that source (UI collapses to it); null compares both.
-  const [focusSlot, setFocusSlot] = useState<SourceSlot | null>(null)
 
   // Swap: slot-keyed state follows the content. Replacement: pair-tuned
   // time linking resets (re-adding the SAME B keeps its settings).
@@ -758,6 +756,12 @@ export function GeoViewer({
     },
     [disarmAnnotate],
   )
+  // Map-click tools have no globe counterpart.
+  useEffect(() => {
+    if (globe.phase === 'flat') return
+    disarmAnnotate()
+    setMeasureMode('none')
+  }, [globe.phase, disarmAnnotate])
   // Sidebar attribution is derived, so a swap flips the shown letters.
   const annotationAttribution = useCallback(
     (ann: MapAnnotation) => {
@@ -774,35 +778,46 @@ export function GeoViewer({
 
   // Immediate, extent-constrained nudge — the WASD rAF loop calls this
   // each frame, so per-frame moves compose into one smooth pan.
-  const onPan = useCallback((dx: number, dy: number) => {
-    const current = viewRef.current
-    const center = current.getCenter()
-    const resolution = current.getResolution()
-    if (!center || resolution === undefined) return
-    const target: [number, number] = [
-      center[0] + dx * resolution,
-      center[1] - dy * resolution,
-    ]
-    current.setCenter(
-      current.getConstrainedCenter(target, resolution) ?? target,
-    )
-  }, [])
+  const {
+    pan: panGlobe,
+    zoomBy: zoomGlobe,
+    zoomToResolution: zoomGlobeToResolution,
+  } = globe
+  const onPan = useCallback(
+    (dx: number, dy: number) => {
+      if (!panGlobe(dx, dy)) panView(viewRef.current, dx, dy)
+    },
+    [panGlobe],
+  )
+  const onZoom = useCallback(
+    (delta: number) => {
+      if (!zoomGlobe(delta)) zoomView(viewRef.current, delta)
+    },
+    [zoomGlobe],
+  )
 
   // Live ground resolution (m/px) drives the panel's scale-band hints.
-  const [viewResolution, setViewResolution] = useState<number | null>(null)
+  const [flatResolution, setFlatResolution] = useState<number | null>(null)
+  const globeSettled = globe.phase === 'globe'
   useEffect(() => {
-    const update = () => setViewResolution(groundResolution(view))
+    if (globeSettled) return
+    const update = () => setFlatResolution(bandMetres(view))
     update()
     view.on('change:resolution', update)
     return () => view.un('change:resolution', update)
-  }, [view])
-  const onZoomToResolution = useCallback((res: number) => {
-    const current = viewRef.current
-    current.animate({
-      resolution: viewResolutionFor(current, res),
-      duration: 350,
-    })
-  }, [])
+  }, [view, globeSettled])
+  const viewResolution = globe.resolution ?? flatResolution
+  const onZoomToResolution = useCallback(
+    (res: number) => {
+      if (zoomGlobeToResolution(res)) return
+      const current = viewRef.current
+      current.animate({
+        resolution: bandResolution(current, res),
+        duration: 350,
+      })
+    },
+    [zoomGlobeToResolution],
+  )
 
   // -------- Export (map components register their capture action) ------
   const {
@@ -826,6 +841,7 @@ export function GeoViewer({
     slotIds: { a: a.id, b: bId },
   })
 
+  const keyBadges = useKeyBadges()
   useGeoShortcuts({
     onProjectionCycle: cycleProjection,
     // Any open → collapse both; else restore (one sheet only on phones).
@@ -842,7 +858,11 @@ export function GeoViewer({
     onCopy: () => copyView(null),
     onExport: () => setExportOpen(true),
     onHelp,
-    onAnnotate: toggleAnnotate,
+    onToggleBadges: keyBadges.toggle,
+    // Map-click tools have no globe counterpart.
+    onAnnotate: () => {
+      if (globe.phase === 'flat') toggleAnnotate()
+    },
     onAnnotateDisarm: {
       enabled:
         sheetOpen ||
@@ -856,6 +876,7 @@ export function GeoViewer({
       },
     },
     onPan,
+    onZoom,
   })
 
   // -------- User-uploaded GeoJSON context overlays --------
@@ -933,6 +954,7 @@ export function GeoViewer({
     bboxAxisOrder: isLensProxyUrl(a.baseUrl)
       ? 'xy'
       : (a.bboxAxisOrder ?? 'epsg'),
+    maxImageSize: sourceA.maxImageSize,
     resolveTime: resolveTimeA,
     onLoadResult: onLoadResultA,
     timeSteps: rawStepsA,
@@ -962,6 +984,7 @@ export function GeoViewer({
         bboxAxisOrder: isLensProxyUrl(b.baseUrl)
           ? 'xy'
           : (b.bboxAxisOrder ?? 'epsg'),
+        maxImageSize: sourceB.maxImageSize,
         resolveTime: resolveTimeB,
         onLoadResult: onLoadResultB,
         timeSteps: rawStepsB,
@@ -977,6 +1000,21 @@ export function GeoViewer({
         bbox: fitBbox,
       }
     : null
+
+  // -------- Globe wiring --------
+  const resolvedTheme = useUiStore((s) => s.resolvedTheme)
+  // The choice itself, not the flat fallback: a warm globe must not switch style mid-bend.
+  const globeBasemap = useMemo(
+    () =>
+      globeBasemapSpec(
+        availableBasemaps.find((o) => o.id === basemapId),
+        resolvedTheme,
+        basemapOpacity,
+      ),
+    [availableBasemaps, basemapId, resolvedTheme, basemapOpacity],
+  )
+  const globeOffered =
+    projectionOptions.find((p) => p.id === 'globe')?.blockedBy === null
 
   // -------- Capabilities load/error surface --------
   // Only A gates the whole viewer; a failing/loading B must not blank a
@@ -1070,6 +1108,7 @@ export function GeoViewer({
         onLinkModeChange={(next) => selection.setLinkMode(next)}
         linkDisabled={zeroOverlap}
         onFit={fitAction}
+        showKeys={keyBadges.shown}
         options={modeOptions}
         onOptionsChange={(patch) =>
           setModeOptions((prev) => ({ ...prev, ...patch }))
@@ -1089,8 +1128,11 @@ export function GeoViewer({
         onBasemapChange={setBasemapId}
         availableBasemaps={availableBasemaps}
         projection={projection}
+        projectionId={projectionId}
         projections={projectionOptions}
         onProjectionChange={changeProjection}
+        globeActive={globe.phase !== 'flat'}
+        onGlobeIntent={globeOffered ? globe.warmUp : undefined}
         basemapOpacity={basemapOpacity}
         onBasemapOpacityChange={setBasemapOpacity}
       />
@@ -1234,11 +1276,45 @@ export function GeoViewer({
           />
         )}
         <div
+          ref={globe.mapAreaRef}
           className="relative min-h-0 min-w-0 flex-1"
           {...tourAttr(TOUR.visualise.map)}
         >
           {startup && <StartupStatusPill {...startup} />}
-          {focusSlot === null && mode === 'side' && mapSourceB ? (
+          {(globe.phase !== 'flat' || (globe.warm && globeOffered)) && (
+            <LazyGlobeView
+              layout={globe.panels === 2 ? 'side' : 'single'}
+              sources={
+                globe.panels === 2 && mapSourceB
+                  ? [mapSourceA, mapSourceB]
+                  : [focusSlot === 'b' && mapSourceB ? mapSourceB : mapSourceA]
+              }
+              camera={globe.camera}
+              visible={globe.overlayVisible}
+              active={globe.phase === 'globe'}
+              live={globe.phase !== 'flat'}
+              basemap={globeBasemap}
+              loupe={{
+                sizePx: modeOptions.loupeSizePx,
+                zoom: modeOptions.loupeZoom,
+                latched: modeOptions.loupeLatched,
+                mirror: modeOptions.loupeMirror,
+              }}
+              pinnedLegends={pinnedLegendItems}
+              onUnpinLegend={unpinLegend}
+              registerEngine={globe.registerEngine}
+              onFailure={globe.onFailure}
+              onContextLost={globe.onContextLost}
+              onBasemapFailed={globe.onBasemapFailed}
+              onRegisterFit={onRegisterFit}
+              onRegisterFitBbox={onRegisterFitBbox}
+              onZoom={zoomGlobe}
+              onRegisterCapture={onRegisterCapture}
+            />
+          )}
+          {globe.phase === 'globe' ? null : focusSlot === null &&
+            mode === 'side' &&
+            mapSourceB ? (
             <DualMapView
               view={view}
               a={mapSourceA}
@@ -1259,7 +1335,7 @@ export function GeoViewer({
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
               onAnnotationMove={moveAnnotation}
-              basemapId={effectiveBasemapId}
+              basemapId={flatBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
               onRegisterFitBbox={onRegisterFitBbox}
@@ -1288,7 +1364,7 @@ export function GeoViewer({
               onAnnotationCreate={onAnnotationCreate}
               onAnnotationEdit={onAnnotationEdit}
               onAnnotationMove={moveAnnotation}
-              basemapId={effectiveBasemapId}
+              basemapId={flatBasemapId}
               basemapOpacity={basemapOpacity}
               onRegisterFit={onRegisterFit}
               onRegisterFitBbox={onRegisterFitBbox}

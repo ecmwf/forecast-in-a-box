@@ -34,6 +34,7 @@ type ShortcutId =
   | 'sidebars'
   | 'modes'
   | 'pan'
+  | 'zoom'
   | 'annotate'
   | 'fit'
   | 'projection'
@@ -43,6 +44,7 @@ type ShortcutId =
   | 'loupe'
   | 'swipe'
   | 'help'
+  | 'badges'
 
 const SHORTCUTS: ReadonlyArray<{
   keys: ReadonlyArray<string>
@@ -58,6 +60,7 @@ const SHORTCUTS: ReadonlyArray<{
     id: 'modes',
   },
   { keys: COMPARE_KEYS.pan.map(keyLabel), id: 'pan' },
+  { keys: COMPARE_KEYS.zoom, id: 'zoom' },
   { keys: [keyLabel(COMPARE_KEYS.annotate)], id: 'annotate' },
   { keys: [keyLabel(COMPARE_KEYS.fit)], id: 'fit' },
   { keys: [keyLabel(COMPARE_KEYS.projection)], id: 'projection' },
@@ -67,6 +70,7 @@ const SHORTCUTS: ReadonlyArray<{
   { keys: ['Z'], id: 'loupe' },
   { keys: [keyLabel('ArrowLeft'), keyLabel('ArrowRight')], id: 'swipe' },
   { keys: [keyLabel(COMPARE_KEYS.help)], id: 'help' },
+  { keys: [COMPARE_KEYS.badges], id: 'badges' },
 ]
 
 export function CompareHelpDialog({
@@ -161,9 +165,6 @@ export function CompareHelpDialog({
                 ))}
               </tbody>
             </table>
-            <P className="mt-1.5 text-xs text-muted-foreground">
-              {t('help.shortcuts.revealHint', { key: keyLabel('Mod') })}
-            </P>
           </section>
         </div>
       </DialogContent>

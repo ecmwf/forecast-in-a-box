@@ -75,6 +75,15 @@ export default [
     rules: { 'react-hooks/rules-of-hooks': 'error' },
   },
   {
+    // The globe folder follows the full hook rules, exhaustive deps included.
+    files: ['src/features/viewer/globe/**'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      ...reactHooks.configs.flat.recommended.rules,
+      'react-hooks/exhaustive-deps': 'error',
+    },
+  },
+  {
     files: ['!src/components/ui/**'],
     plugins: {
       'license-header': licenseHeader,

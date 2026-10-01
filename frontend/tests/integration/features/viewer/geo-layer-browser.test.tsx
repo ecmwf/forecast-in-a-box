@@ -29,6 +29,7 @@ function lensSource(overrides: Partial<LensSource> = {}): LensSource {
     decorationLayers: [],
     bbox: null,
     crs: [],
+    maxImageSize: null,
     error: null,
     errorStatus: null,
     loadingLayers: false,

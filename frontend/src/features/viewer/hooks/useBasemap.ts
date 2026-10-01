@@ -104,11 +104,7 @@ export function useBasemap(options: {
     if (!map || !oldLayer) return
     const projection = viewerProjectionOf(map.getView())
     const keyOf = (opt: BasemapOption) =>
-      opt.type === 'skinnywms'
-        ? `${opt.id}|${baseUrl}`
-        : opt.type === 'outline'
-          ? `${opt.id}|${theme}`
-          : opt.id
+      opt.type === 'skinnywms' ? `${opt.id}|${baseUrl}` : `${opt.id}|${theme}`
     if (appliedRef.current.map !== map) {
       // A (re)built map mounts the projection's default (useOlMapBase).
       appliedRef.current = { map, key: keyOf(defaultBasemapFor(projection)) }
@@ -144,7 +140,10 @@ export function useBasemap(options: {
         polarGraticuleFor(projection),
       )
     } else {
-      const tiled = makeBasemapLayer(opt.type === 'vector' ? opt : BASEMAPS[0])
+      const tiled = makeBasemapLayer(
+        opt.type === 'vector' ? opt : BASEMAPS[0],
+        theme,
+      )
       const source = tiled.getSource()
       source?.on('tileloadstart', incLoading)
       source?.on('tileloadend', decLoading)

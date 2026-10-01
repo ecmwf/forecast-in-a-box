@@ -10,10 +10,12 @@
 
 import { describe, expect, it } from 'vitest'
 import View from 'ol/View'
-import { get as getProjection, transform } from 'ol/proj'
+import { fromLonLat, get as getProjection, transform } from 'ol/proj'
 import { containsExtent, getCenter } from 'ol/extent'
 import {
   PROJECTIONS,
+  bandMetres,
+  bandResolution,
   carryCamera,
   getViewerProjection,
   groundResolution,
@@ -21,11 +23,11 @@ import {
   layerExtentFor,
   registerViewerProjections,
   requestProjection,
-  viewResolutionFor,
   viewerProjectionOf,
 } from '@/features/viewer/projections'
-import { createViewerView } from '@/features/viewer/hooks/useOlMapBase'
+import { createViewerView, fitView } from '@/features/viewer/hooks/useOlMapBase'
 import {
+  FLAT_PROJECTION_IDS,
   PROJECTION_IDS,
   isProjectionId,
 } from '@/features/viewer/projection-ids'
@@ -77,7 +79,10 @@ describe('projection registry', () => {
   })
 
   it('exposes the toolbar order and validates ids', () => {
-    expect(PROJECTIONS.map((p) => p.id)).toEqual([...PROJECTION_IDS])
+    // The globe is a URL id but not an OpenLayers projection.
+    expect(PROJECTIONS.map((p) => p.id)).toEqual([...FLAT_PROJECTION_IDS])
+    expect(PROJECTION_IDS).toEqual([...FLAT_PROJECTION_IDS, 'globe'])
+    expect(isProjectionId('globe')).toBe(true)
     expect(isProjectionId('npole')).toBe(true)
     expect(isProjectionId('EPSG:3857')).toBe(false)
     expect(getViewerProjection(undefined).id).toBe('merc')
@@ -100,14 +105,26 @@ describe('createViewerView', () => {
     expect(shown[3]).toBeGreaterThanOrEqual(90)
   })
 
-  it('keeps Mercator filling the window (no void)', () => {
+  it('lets Mercator zoom out until the whole world shows', () => {
     const view = createViewerView(getViewerProjection('merc'))
     const size: [number, number] = [2000, 980]
-    view.fit(getViewerProjection('merc').extent, { size })
+    view.setViewportSize(size)
+    view.setResolution(1e9)
     const shown = view.calculateExtent(size)
     const world = getViewerProjection('merc').extent
-    expect(shown[1]).toBeGreaterThanOrEqual(world[1] - 1)
-    expect(shown[3]).toBeLessThanOrEqual(world[3] + 1)
+    expect(shown[1]).toBeLessThanOrEqual(world[1] + 1)
+    expect(shown[3]).toBeGreaterThanOrEqual(world[3] - 1)
+  })
+
+  it('fits Mercator to the world width, so the window stays filled', () => {
+    const merc = getViewerProjection('merc')
+    const view = createViewerView(merc)
+    const size: [number, number] = [2000, 980]
+    view.setViewportSize(size)
+    fitView(view, merc.extent, size)
+    const shown = view.calculateExtent(size)
+    expect(shown[0]).toBeCloseTo(merc.extent[0], -1)
+    expect(shown[2]).toBeCloseTo(merc.extent[2], -1)
   })
 })
 
@@ -141,8 +158,25 @@ describe('carryCamera', () => {
     const view = createViewerView(getViewerProjection('geo'))
     view.setCenter([10, 50])
     view.setResolution(0.5)
-    const metres = groundResolution(view)!
-    expect(viewResolutionFor(view, metres)).toBeCloseTo(0.5, 4)
+    expect(bandResolution(view, bandMetres(view)!)).toBeCloseTo(0.5, 6)
+  })
+
+  it('reads lat/lon scale north-south, as servers do', () => {
+    const view = createViewerView(getViewerProjection('geo'))
+    view.setCenter([10, 70])
+    view.setResolution(0.01)
+    // A degree of latitude: not averaged with the shorter degree of longitude.
+    expect(groundResolution(view)! / 0.01).toBeCloseTo(111_319, -1)
+    expect(bandMetres(view)).toBeCloseTo(groundResolution(view)!, 6)
+  })
+
+  it('hints Mercator bands in server metres, not ground metres', () => {
+    const view = createViewerView(getViewerProjection('merc'))
+    view.setCenter(fromLonLat([0, 60]))
+    view.setResolution(1000)
+    // The layer stack gates on view units: hints must agree with it.
+    expect(bandMetres(view)).toBeCloseTo(1000, 6)
+    expect(groundResolution(view)).toBeCloseTo(500, 0)
   })
 })
 
@@ -178,6 +212,18 @@ describe('layerExtentFor', () => {
     expect(layerExtentFor(merc, [-180, -90, 180, 90])).toBe(merc.extent)
     expect(layerExtentFor(merc, [170, 40, -170, 60])).toBe(merc.extent)
     expect(layerExtentFor(npole, [-180, -55, 180, 85])).toBe(npole.extent)
+    // Half-cell overhangs are global too, not an empty Mercator extent.
+    expect(layerExtentFor(merc, [-180.125, -90.125, 179.875, 90.125])).toBe(
+      merc.extent,
+    )
+  })
+
+  it('clips a box past the Mercator edge instead of losing it to infinity', () => {
+    const merc = getViewerProjection('merc')
+    const extent = layerExtentFor(merc, [0, 60, 40, 90.125])
+    expect(extent.every(Number.isFinite)).toBe(true)
+    expect(extent[3]).toBeCloseTo(merc.extent[3], -3)
+    expect(extent[1]).toBeGreaterThan(0)
   })
 
   it('clips a regional bbox to the projection world', () => {

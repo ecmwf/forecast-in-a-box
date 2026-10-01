@@ -23,6 +23,8 @@ import { DEFAULT_PROJECTION_ID } from '../projection-ids'
 import { RUN_DIMENSION } from '../wms-capabilities'
 import type View from 'ol/View'
 import type { ProjectionId } from '../projection-ids'
+import type { GlobeCamera } from '../globe/engine'
+import type { SharedGlobeCamera } from '../globe/globe-camera'
 import type { LensSource } from '../hooks/useLensSource'
 import type { PairedLayer } from './layer-pairing'
 import type { CompareSelection } from './useCompareSelection'
@@ -56,6 +58,7 @@ export function useViewerUrlState({
   offsetMs,
   basemapId,
   projectionId,
+  globeCamera,
 }: {
   /** Mount snapshot of the URL state; later changes are ignored. */
   initial: ViewerUrlState | null
@@ -74,6 +77,8 @@ export function useViewerUrlState({
   offsetMs: number
   basemapId: string
   projectionId: ProjectionId
+  /** On the globe the camera comes from here, not the flat View. */
+  globeCamera: SharedGlobeCamera | null
 }): void {
   // -------- One-shot layer restore (per slot) --------
   const pendingLayersRef = useRef<{
@@ -238,7 +243,13 @@ export function useViewerUrlState({
     projectionId,
   ])
   useEffect(() => {
-    if (!onViewStateChange) return
+    if (!onViewStateChange || !globeCamera) return
+    const report = (camera: GlobeCamera) => onViewStateChange({ camera })
+    report(globeCamera.get())
+    return globeCamera.subscribe(report)
+  }, [onViewStateChange, globeCamera])
+  useEffect(() => {
+    if (!onViewStateChange || globeCamera) return
     const report = () => {
       const center = view.getCenter()
       const zoom = view.getZoom()
@@ -254,5 +265,5 @@ export function useViewerUrlState({
       view.on('change:resolution', report),
     ]
     return () => unByKey(keys)
-  }, [onViewStateChange, view])
+  }, [onViewStateChange, view, globeCamera])
 }

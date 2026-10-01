@@ -13,12 +13,22 @@
  * the route and URL-state modules stay out of the map chunk.
  */
 
-/** Toolbar order. */
-export const PROJECTION_IDS = ['merc', 'geo', 'npole', 'spole', 'laea'] as const
+/** OpenLayers projections, in toolbar order. */
+export const FLAT_PROJECTION_IDS = [
+  'merc',
+  'geo',
+  'npole',
+  'spole',
+  'laea',
+] as const
+
+/** Toolbar order; 'globe' is not an OL projection but the 3D globe mode. */
+export const PROJECTION_IDS = [...FLAT_PROJECTION_IDS, 'globe'] as const
 
 export type ProjectionId = (typeof PROJECTION_IDS)[number]
+export type FlatProjectionId = (typeof FLAT_PROJECTION_IDS)[number]
 
-export const DEFAULT_PROJECTION_ID: ProjectionId = 'merc'
+export const DEFAULT_PROJECTION_ID: FlatProjectionId = 'merc'
 
 export function isProjectionId(value: unknown): value is ProjectionId {
   return (
