@@ -59,6 +59,7 @@ dev *args:
     set -euo pipefail
 
     args=({{args}})
+    FIAB_FIRSTRUN_MARKER=.fiab/firstrun
 
     # NOTE on MacOS, empty array fails to expand in a for-safe way, hence we need
     # conditional expansion into itself (${var+"$var"} basically)
@@ -68,6 +69,7 @@ dev *args:
             pushd backend
             uv sync --extra runtime --all-packages
             rm -rf .fiab/*db
+            rm -f $FIAB_FIRSTRUN_MARKER
             popd
         fi
     done
@@ -109,5 +111,14 @@ dev *args:
         echo "1761908420:d0.0.1" > .fiab/pylock.toml.timestamp
     fi
     if [[ ! -d .venv ]] ; then uv sync --extra runtime --all-packages ; fi
+    if [ -f "$FIAB_FIRSTRUN_MARKER" ] ; then
+        >&2 echo ".fiab firstrun found, assuming this is not first run"
+        export FIAB_FIRSTRUN="false"
+    else
+        >&2 echo ".fiab firstrun not found, assuming this is first run"
+        export FIAB_FIRSTRUN="true"
+        touch "$FIAB_FIRSTRUN_MARKER" # TODO create this in the python command instead!
+    fi
+
     FIAB_ROOT=.fiab uv run --no-sync python -m forecastbox.entrypoint.main
     popd
