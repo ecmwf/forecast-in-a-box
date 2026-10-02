@@ -173,6 +173,7 @@ class CheckpointArtifact:
             post_processors.append({"extract_from_state": configuration.region_of_interest})
 
         return {
+            "pre_processors": list(configuration.pre_processors),
             "post_processors": post_processors,
             "env": configuration.control_options or {},
         }
@@ -195,9 +196,6 @@ class CheckpointArtifact:
         if ":" in source_name:
             input_source[source_name.split(":")[0]] = input_source.pop(source_name)
             source_name = source_name.split(":")[0]
-
-        if configuration.pre_processors is not None:
-            input_source[source_name].setdefault("pre_processors", []).extend(configuration.pre_processors)
 
         if configuration.input_options is None:
             return input_source
