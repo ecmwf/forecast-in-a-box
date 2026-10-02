@@ -29,6 +29,10 @@ The difference is where the file is expected to exist:
 
 To understand what should be in the file, consult the file `utility/config.py` in the backend codebase -- its the Pydantic model directly corresponding to that file.
 
+The `fiab.sh` works ok without any `config.toml` thanks to the code-based defaults, but `just dev` requires some overrides.
+Consult the [example](./example_dev_config.toml) -- this one is automatically copied if none is found when you run `just dev`.
+You can change it in the `<repo>/backend/.fiab` directory at will -- once a file is there, the `just dev` itself does not mutate it.
+
 ## Persistence
 
 Forecast-in-a-Box is persistent -- meaning plugin installation, job submission history, artifacts, and others remain even if you restart the process, the browser, the computer, the simulation of the world.
