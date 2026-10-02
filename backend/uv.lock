@@ -1182,8 +1182,8 @@ wheels = [
 
 [[package]]
 name = "earthkit-plots-dccms-styles"
-version = "0.1.dev8+g6dbd8cdef"
-source = { git = "https://github.com/metno/earthkit-plots-dccms-styles#6dbd8cdef1761ab3fa45602c646d145137243804" }
+version = "0.1.dev13+g0ab64ac01"
+source = { git = "https://github.com/metno/earthkit-plots-dccms-styles#0ab64ac015e74146e713bfd7ca5f726ac70c4fc5" }
 dependencies = [
     { name = "earthkit-plots", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
