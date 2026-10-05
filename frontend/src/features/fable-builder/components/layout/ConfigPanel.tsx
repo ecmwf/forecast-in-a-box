@@ -25,7 +25,10 @@ import { useBlockDisplayNames } from '@/features/fable-builder/hooks/useBlockDis
 import { definableGlyphs } from '@/features/fable-builder/utils/definable-glyphs'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
 import { useReservedGlyphReason } from '@/features/glyphs/utils/reserved-names'
-import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import {
+  findDownstreamBlocks,
+  useFableBuilderStore,
+} from '@/features/fable-builder/stores/fableBuilderStore'
 import {
   BLOCK_KIND_METADATA,
   getBlockConfigurationRestrictions,
@@ -121,20 +124,20 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   const availableSources = useMemo(() => {
     if (!selectedBlockId) return []
 
+    // Own consumers are excluded: wiring one in would close a cycle.
+    const downstream = findDownstreamBlocks(selectedBlockId, fable.blocks)
     return Object.entries(fable.blocks)
       .filter(([id, block]) => {
-        if (id === selectedBlockId) return false
+        if (id === selectedBlockId || downstream.has(id)) return false
         const blockFactory = getFactory(catalogue, block.factory_id)
         return (
-          blockFactory?.kind === 'source' || blockFactory?.kind === 'product'
+          blockFactory?.kind === 'source' ||
+          blockFactory?.kind === 'transform' ||
+          blockFactory?.kind === 'product'
         )
       })
-      .map(([id, block]) => ({
-        id,
-        block,
-        factory: getFactory(catalogue, block.factory_id),
-      }))
-  }, [fable.blocks, selectedBlockId, catalogue])
+      .map(([id]) => ({ id, name: blockNames[id] ?? id }))
+  }, [fable.blocks, selectedBlockId, catalogue, blockNames])
 
   function handleConfigChange(key: string, value: string): void {
     if (!selectedBlockId) return
@@ -435,7 +438,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
 
 interface AvailableSource {
   id: string
-  factory: { title?: string } | undefined
+  name: string
 }
 
 interface InputConnectionFieldProps {
@@ -453,8 +456,8 @@ function InputConnectionField({
 }: InputConnectionFieldProps): React.ReactNode {
   const { t } = useTranslation('configure')
   const displayValue = currentSourceId
-    ? availableSources.find((s) => s.id === currentSourceId)?.factory?.title ||
-      currentSourceId
+    ? (availableSources.find((s) => s.id === currentSourceId)?.name ??
+      currentSourceId)
     : t('configPanel.selectSource')
 
   return (
@@ -470,9 +473,9 @@ function InputConnectionField({
           <SelectValue>{displayValue}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {availableSources.map(({ id, factory: sourceFactory }) => (
+          {availableSources.map(({ id, name }) => (
             <SelectItem key={id} value={id}>
-              {sourceFactory?.title || id}
+              {name}
             </SelectItem>
           ))}
           {availableSources.length === 0 && (

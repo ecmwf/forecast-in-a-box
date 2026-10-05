@@ -85,6 +85,26 @@ function createMultiBlockFable(): FableBuilderV1 {
   }
 }
 
+/** source -> select (transform) -> product -> sink. */
+function createTransformChainFable(): FableBuilderV1 {
+  const { source1, product1, sink1 } = createMultiBlockFable().blocks
+  return {
+    blocks: {
+      source1,
+      select1: {
+        factory_id: {
+          plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+          factory: 'select',
+        },
+        configuration_values: { dimension: 'step', values: '6' },
+        input_ids: { dataset: 'source1' },
+      },
+      product1: { ...product1, input_ids: { dataset: 'select1' } },
+      sink1,
+    },
+  }
+}
+
 /**
  * Creates a simple fable with just a source block (no downstream connections).
  */
@@ -418,6 +438,48 @@ describe('Graph Mode - Builder Integration', () => {
 
     // The input name "dataset" should appear as a label
     await expect.element(screen.getByLabelText('dataset')).toBeVisible()
+  })
+
+  it('names a connected transform and offers it as an input', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+
+    const store = useFableBuilderStore.getState()
+    store.setFable(createTransformChainFable())
+    store.selectBlock('product1')
+
+    // Qualified: the mock catalogue has two "Select" factories.
+    const trigger = screen.getByLabelText('dataset')
+    await expect.element(trigger.getByText('Select · ecmwf-base')).toBeVisible()
+
+    await trigger.click()
+    await expect
+      .element(screen.getByRole('option', { name: 'Select · ecmwf-base' }))
+      .toBeVisible()
+    await expect
+      .element(
+        screen.getByRole('option', { name: 'Operational forecast source' }),
+      )
+      .toBeVisible()
+  })
+
+  it("does not offer a block's own consumers as its input", async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+
+    const store = useFableBuilderStore.getState()
+    store.setFable(createTransformChainFable())
+    store.selectBlock('select1')
+
+    await screen.getByLabelText('dataset').click()
+    await expect
+      .element(
+        screen.getByRole('option', { name: 'Operational forecast source' }),
+      )
+      .toBeVisible()
+    expect(
+      screen.getByRole('option', { name: 'Ensemble Statistics' }).elements(),
+    ).toHaveLength(0)
   })
 
   it('updates block count in header as blocks are added', async () => {
