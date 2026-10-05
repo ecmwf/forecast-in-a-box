@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next'
 import type { NodeProps } from '@xyflow/react'
 import type { BlockKind } from '@/api/types/fable.types'
 import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
+import type { ValueLabel } from '@/features/fable-builder/hooks/useConfigValueLabels'
 import { BLOCK_KIND_METADATA, getBlockKindIcon } from '@/api/types/fable.types'
 import {
   useBlockProgress,
@@ -31,6 +32,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useConfigValueLabels } from '@/features/fable-builder/hooks/useConfigValueLabels'
+import { ValueLabelDetails } from '@/features/fable-builder/components/shared/ValueLabelHint'
 import { showToast } from '@/lib/toast'
 import { cn, copyToClipboard } from '@/lib/utils'
 
@@ -125,6 +128,17 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
     nodeData.instance.configuration_values,
   ).filter(([, v]) => v !== '')
   const configOptions = nodeData.factory.configuration_options
+  // Show what the run used; the template stays reachable on hover.
+  // A null as-run value has nothing to show over the template.
+  const displayValues = Object.fromEntries(
+    configEntries.map(([key, value]) => [key, resolved?.[key] ?? value]),
+  )
+  const valueLabels = useConfigValueLabels(
+    displayValues,
+    Object.fromEntries(
+      configEntries.map(([key]) => [key, configOptions[key].value_type]),
+    ),
+  )
 
   return (
     <div
@@ -197,13 +211,13 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
         <TooltipProvider delay={120}>
           <div className="border-t border-border px-2 py-1">
             {configEntries.map(([key, value]) => {
-              // Show what the run used; the template stays reachable on hover.
-              // A null as-run value has nothing to show over the template.
               const asRun = resolved?.[key] ?? undefined
-              const display = asRun ?? value
+              const display = displayValues[key]
+              const valueLabel = valueLabels[key] as ValueLabel | undefined
               const fromTemplate = asRun !== undefined && asRun !== value
-              // The column truncates early, so anything longer needs the hover.
-              const needsHover = fromTemplate || display.length > 12
+              // Narrow column: long or labelled values get the hover.
+              const needsHover =
+                fromTemplate || valueLabel !== undefined || display.length > 12
               const valueClass = cn(
                 'max-w-[100px] truncate text-right font-mono text-sm',
                 // Marks a value that came from a variable; costs no width in a
@@ -222,10 +236,15 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
                   {needsHover ? (
                     <Tooltip>
                       <TooltipTrigger render={<span className={valueClass} />}>
-                        {display}
+                        {valueLabel?.compact ?? display}
                       </TooltipTrigger>
                       <TooltipContent className="max-w-sm p-1">
                         <div className="flex min-w-0 flex-col">
+                          {valueLabel && (
+                            <span className="px-2 pt-1.5 text-sm">
+                              <ValueLabelDetails label={valueLabel} />
+                            </span>
+                          )}
                           <CopyValueRow
                             text={display}
                             label={t('detail.copyValue')}
