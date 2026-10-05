@@ -57,7 +57,11 @@ export function useURLStateSync({
 
   const updateURL = useCallback(
     (newFable: FableBuilderV1) => {
-      const encoded = encodeFableToURL(newFable)
+      // Empty work clears the payload, else a reload restores deleted blocks.
+      const encoded =
+        Object.keys(newFable.blocks).length > 0
+          ? encodeFableToURL(newFable)
+          : null
       if (encoded === lastEncodedRef.current) return
 
       lastEncodedRef.current = encoded
@@ -66,7 +70,7 @@ export function useURLStateSync({
       // after — `updateURL` only runs once the debounce has already settled.
       isUpdatingURLRef.current = true
 
-      if (isStateTooLarge(encoded)) {
+      if (encoded !== null && isStateTooLarge(encoded)) {
         log.warn('Configuration is large. URL may not work in all browsers.', {
           encodedLength: encoded.length,
         })
@@ -74,7 +78,7 @@ export function useURLStateSync({
 
       navigate({
         to: '/configure',
-        search: { state: encoded },
+        search: encoded === null ? {} : { state: encoded },
         replace: true,
       })
 
@@ -85,9 +89,6 @@ export function useURLStateSync({
 
   useEffect(() => {
     if (!enabled || !initializedRef.current || isUpdatingURLRef.current) return
-
-    const blockCount = Object.keys(fable.blocks).length
-    if (blockCount === 0) return
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
