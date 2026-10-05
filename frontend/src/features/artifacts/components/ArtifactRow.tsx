@@ -9,6 +9,7 @@
  */
 
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 import { ArtifactActions } from './ArtifactActions'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
@@ -41,7 +42,13 @@ export function ArtifactRow({
     <CatalogueRow>
       <div className="min-w-0">
         <H4 className="truncate text-sm font-semibold">
-          {artifact.displayName}
+          <Link
+            to="/admin/artifacts/$artifactId"
+            params={{ artifactId: artifact.encodedId }}
+            className="hover:underline"
+          >
+            {artifact.displayName}
+          </Link>
         </H4>
         <P className="mt-0.5 truncate text-muted-foreground">
           {artifact.author}

@@ -10,6 +10,7 @@
 
 import { HardDrive } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 import { ArtifactActions } from './ArtifactActions'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
@@ -44,7 +45,13 @@ export function ArtifactCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold">
-              {artifact.displayName}
+              <Link
+                to="/admin/artifacts/$artifactId"
+                params={{ artifactId: artifact.encodedId }}
+                className="hover:underline"
+              >
+                {artifact.displayName}
+              </Link>
             </h3>
             <P className="mt-0.5 truncate text-muted-foreground">
               {artifact.author}

@@ -57,6 +57,16 @@ describe('Models page', () => {
     await expect.element(segment(screen, /^Available\s*2$/)).toBeVisible()
   })
 
+  it('links each model name to its detail page', async () => {
+    const screen = await renderPage()
+    await expect
+      .element(screen.getByRole('link', { name: 'AIFS Single MSE 1.1' }))
+      .toHaveAttribute(
+        'href',
+        '/admin/artifacts/ecmwf--aifs-single-mse-1.1_w_sdpa',
+      )
+  })
+
   it('narrows the list by status segment', async () => {
     const screen = await renderPage()
 
