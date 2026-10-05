@@ -347,4 +347,30 @@ describe('FieldRenderer Integration', () => {
       await expect.element(screen.getByText('Select an area…')).toBeVisible()
     })
   })
+
+  // Names come from the MSW artifact catalogue (list_models).
+  describe('Artifact field', () => {
+    const CHECKPOINTS =
+      "enumClosed[artifact]('ecmwf:aifs-ens-crps-1.0_w_sdpa','ecmwf:not-in-catalogue')"
+
+    it('shows the catalogue name instead of the wire id', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType={CHECKPOINTS}
+          initialValue="ecmwf:aifs-ens-crps-1.0_w_sdpa"
+        />,
+      )
+      const trigger = screen.getByRole('combobox')
+      await expect.element(trigger.getByText('AIFS ENS CRPS 1.0')).toBeVisible()
+
+      await trigger.click()
+      await expect
+        .element(screen.getByRole('option', { name: /AIFS ENS CRPS 1\.0/ }))
+        .toBeVisible()
+      // Unknown ids stay selectable under their wire id.
+      await expect
+        .element(screen.getByRole('option', { name: 'ecmwf:not-in-catalogue' }))
+        .toBeVisible()
+    })
+  })
 })

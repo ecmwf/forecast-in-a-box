@@ -300,30 +300,27 @@ describe('parseValueType', () => {
   })
 
   describe('artifact and param types', () => {
-    // Both are treated as plain strings for now: no catalog/param lookup is
-    // implemented on the frontend yet, so they must behave exactly like `str`.
-    it('parses "artifact" as string', () => {
-      expect(parseValueType('artifact')).toEqual({ type: 'string' })
+    it('parses "artifact" as a catalogue picker', () => {
+      expect(parseValueType('artifact')).toEqual({ type: 'artifact' })
     })
 
     it('parses "param" as string', () => {
       expect(parseValueType('param')).toEqual({ type: 'string' })
     })
 
-    it('parses optional[artifact] as string with optional flag', () => {
+    it('parses optional[artifact] as a picker with optional flag', () => {
       expect(parseValueType('optional[artifact]')).toEqual({
-        type: 'string',
+        type: 'artifact',
         optional: true,
       })
     })
 
-    it('parses enumClosed[artifact] like enumClosed[str]', () => {
+    it('parses enumClosed[artifact] as a picker restricted to its ids', () => {
       expect(
-        parseValueType("enumClosed[artifact]('fc:t:step0','fc:t:step6')"),
+        parseValueType("enumClosed[artifact]('ecmwf:aifs-a','ecmwf:aifs-b')"),
       ).toEqual({
-        type: 'enum',
-        options: ['fc:t:step0', 'fc:t:step6'],
-        closed: true,
+        type: 'artifact',
+        options: ['ecmwf:aifs-a', 'ecmwf:aifs-b'],
       })
     })
 
@@ -432,6 +429,13 @@ describe('getDefaultValueForType', () => {
     expect(getDefaultValueForType({ type: 'list', itemType: 'string' })).toBe(
       '',
     )
+  })
+
+  it('returns the first restricted id for an artifact picker', () => {
+    expect(
+      getDefaultValueForType({ type: 'artifact', options: ['ecmwf:a'] }),
+    ).toBe('ecmwf:a')
+    expect(getDefaultValueForType({ type: 'artifact' })).toBe('')
   })
 
   it('returns empty string for enum list type', () => {

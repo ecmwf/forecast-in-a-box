@@ -25,7 +25,7 @@
  * - list[enumClosed[str]('a','b')] → multi-select restricted to the listed items
  * - list[enum[str]('a','b')] → multi-select with suggestions, accept any string
  * - geodomain → geographic-area picker (presets / countries / draw a box)
- * - artifact → string input (catalog lookup / richer UI not yet implemented)
+ * - artifact / enum[artifact](…) → artifact catalogue picker
  * - param → string input (param name lookup not yet implemented)
  * - optional[T] → same widget as T, with optional=true flag (legacy — the
  *   current backend grammar has no optional wrapper)
@@ -33,7 +33,7 @@
  * `enum`/`enumList` carry `closed: boolean` (closed vs open);
  * anemoiSource's `input_source` ships the open form.
  *
- * str/int/float/artifact/param enum subtypes render as selects over the wire strings;
+ * str/int/float/param enum subtypes render as selects over the wire strings;
  * anything else the grammar knows but no widget exists for (other enum
  * subtypes, union, bboxWSEN, …) falls back to `unknown`.
  */
@@ -65,6 +65,12 @@ export type ParsedValueType =
       optional?: boolean
     }
   | { type: 'geodomain'; optional?: boolean }
+  | {
+      type: 'artifact'
+      /** Wire ids to choose from; absent means the whole catalogue. */
+      options?: Array<string>
+      optional?: boolean
+    }
   | { type: 'unknown'; raw: string; optional?: boolean }
 
 /**
@@ -89,15 +95,14 @@ export function parseValueType(valueType: string | undefined): ParsedValueType {
   return parsed ? flatten(parsed, trimmed) : { type: 'unknown', raw: trimmed }
 }
 
-/** str/int/float/artifact/param enums render as selects over the wire
- *  strings — artifact/param members serialize quoted like str items. */
+/** str/int/float/param enums render as selects over the wire strings —
+ *  param members serialize quoted like str items. */
 function isSelectEnum(t: FableType): t is Extract<FableType, { kind: 'enum' }> {
   return (
     t.kind === 'enum' &&
     (t.subtype.kind === 'str' ||
       t.subtype.kind === 'int' ||
       t.subtype.kind === 'float' ||
-      t.subtype.kind === 'artifact' ||
       t.subtype.kind === 'param')
   )
 }
@@ -106,8 +111,9 @@ function flatten(t: FableType, raw: string): ParsedValueType {
   switch (t.kind) {
     case 'str':
       return { type: 'string' }
-    // Reserved for future catalog/param lookups — plain strings until then.
     case 'artifact':
+      return { type: 'artifact' }
+    // Reserved for a future param lookup; a plain string until then.
     case 'param':
       return { type: 'string' }
     case 'int':
@@ -121,6 +127,9 @@ function flatten(t: FableType, raw: string): ParsedValueType {
     case 'geodomain':
       return { type: 'geodomain' }
     case 'enum':
+      if (t.subtype.kind === 'artifact') {
+        return { type: 'artifact', options: t.items.map(String) }
+      }
       if (isSelectEnum(t)) {
         return { type: 'enum', options: t.items.map(String), closed: t.closed }
       }
@@ -168,6 +177,8 @@ export function getDefaultValueForType(parsedType: ParsedValueType): string {
       return ''
     case 'geodomain':
       return ''
+    case 'artifact':
+      return parsedType.options?.[0] ?? ''
     case 'unknown':
       return ''
   }

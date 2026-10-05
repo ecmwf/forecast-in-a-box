@@ -9,6 +9,7 @@
  */
 
 import { useMemo } from 'react'
+import { ArtifactField } from './fields/ArtifactField'
 import { DateTimeField } from './fields/DateTimeField'
 import { EnumField } from './fields/EnumField'
 import { EnumListField } from './fields/EnumListField'
@@ -207,6 +208,20 @@ function renderField(
           configKey={configKey}
           value={value}
           onChange={onChange}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={className}
+        />
+      )
+
+    case 'artifact':
+      return (
+        <ArtifactField
+          id={id}
+          configKey={configKey}
+          value={value}
+          onChange={onChange}
+          options={parsedType.options}
           placeholder={placeholder}
           disabled={disabled}
           className={className}
