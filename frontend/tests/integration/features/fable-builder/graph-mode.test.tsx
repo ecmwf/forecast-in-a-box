@@ -9,9 +9,12 @@
  */
 
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { HttpResponse, http } from 'msw'
 import { renderWithRouter } from '@tests/utils/render'
+import { worker } from '@tests/test-extend'
 import { mockCatalogue } from '../../../../mocks/data/fable.data'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
+import { API_ENDPOINTS } from '@/api/endpoints'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
@@ -509,6 +512,29 @@ describe('Graph Mode - Builder Integration', () => {
 
     await expect.poll(() => handleY(sourceOut) - handleY(selectIn)).toBe(0)
     filler.remove()
+  })
+
+  it('shows a failed validation in the header status', async () => {
+    worker.use(
+      http.put(
+        API_ENDPOINTS.fable.expand,
+        () => new HttpResponse('Internal Server Error', { status: 500 }),
+      ),
+    )
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    useFableBuilderStore.getState().setFable(createMultiBlockFable())
+
+    const badge = screen.getByRole('button', { name: 'Validation failed' })
+    await expect.element(badge).toBeVisible()
+    await badge.click()
+    await expect
+      .element(
+        screen.getByText(
+          'The server failed while validating this workflow (HTTP 500).',
+        ),
+      )
+      .toBeVisible()
   })
 
   it("does not offer a block's own consumers as its input", async () => {

@@ -11,7 +11,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Package } from 'lucide-react'
+import { Package } from 'lucide-react'
 import { FableBuilderHeader } from './FableBuilderHeader'
 import { WorkbenchShelfBanner } from './WorkbenchShelfBanner'
 import { BlockPalette } from './layout/BlockPalette'
@@ -51,7 +51,6 @@ import {
 } from '@/api/hooks/useFable'
 import { useTemplateExampleValues } from '@/api/hooks/usePlugins'
 import { H2, P } from '@/components/base/typography'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useUser } from '@/hooks/useUser'
@@ -86,6 +85,9 @@ function getValidationErrorMessage(
     // Fall back to status-based message
     if (error.status === 422) {
       return t('page.validationError422')
+    }
+    if (error.status !== undefined && error.status >= 500) {
+      return t('page.validationError5xx', { status: error.status })
     }
   }
   return error.message || t('page.validationErrorGeneric')
@@ -538,25 +540,16 @@ export function FableBuilderPage({
           fableId={templateMode ? undefined : fableId}
           catalogue={catalogue}
           onConfigLoaded={() => setLoadedCheckPending(true)}
+          validationFailure={
+            validationError
+              ? getValidationErrorMessage(validationError, t)
+              : null
+          }
         />
 
         <WorkbenchShelfBanner />
 
-        {/* Wrapper is relative so the validation banner overlays absolutely —
-            toggling it must not shift the canvas. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          {validationError && (
-            <Alert
-              variant="destructive"
-              className="absolute top-2 right-4 left-4 z-10 shadow-lg"
-            >
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>{t('page.validationErrorTitle')}</AlertTitle>
-              <AlertDescription>
-                {getValidationErrorMessage(validationError, t)}
-              </AlertDescription>
-            </Alert>
-          )}
           {step === 'edit' ? (
             <EditStep catalogue={catalogue} isDesktop={isDesktop} />
           ) : (

@@ -38,9 +38,9 @@
     "noPluginsTitle": "No plugins enabled",
     "noPluginsDescription": "At least one plugin must be enabled to build workflows.",
     "managePlugins": "Manage plugins",
-    "validationErrorTitle": "Validation error",
     "validationError422": "Invalid workflow. Please fill in all required fields.",
     "validationErrorGeneric": "Failed to validate workflow. Please check your block settings.",
+    "validationError5xx": "The server failed while validating this workflow (HTTP {{status}}).",
     "untitledConfiguration": "Untitled workflow"
   },
   "header": {
@@ -85,6 +85,7 @@
     "valid": "Ready to run",
     "issues_one": "{{count}} issue to fix",
     "issues_other": "{{count}} issues to fix",
+    "failed": "Validation failed",
     "globalIssueLabel": "Workflow",
     "validatingConfiguration": "Validating workflow...",
     "configurationIssues": "Workflow issues",
@@ -92,7 +93,8 @@
       "invalidValue": "Open the block and pick a valid value for this option.",
       "missingConfig": "Fill in the required options in the configuration panel.",
       "noOutput": "Add an output block, for example a GRIB sink or a map plot.",
-      "unknownGlyph": "Define the variable under Variables, or replace it with a value."
+      "unknownGlyph": "Define the variable under Variables, or replace it with a value.",
+      "failed": "Running stays disabled until validation succeeds."
     }
   },
   "blockActions": {
