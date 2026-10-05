@@ -109,6 +109,30 @@ describe('Landing Page', () => {
         .element(screen.getByText('ArcX', { exact: true }))
         .toBeInTheDocument()
     })
+
+    it('links every partner without passing ranking', async () => {
+      const screen = await renderWithRouter(
+        <AuthContext.Provider value={unauthenticatedAuth}>
+          <Collaboration />
+        </AuthContext.Provider>,
+      )
+
+      await expect
+        .element(screen.getByText('ArcX', { exact: true }))
+        .toBeInTheDocument()
+      const links = screen.getByRole('link').elements()
+      expect(links.map((a) => a.getAttribute('href'))).toEqual([
+        'https://www.ecmwf.int',
+        'https://www.met.no',
+        'https://en.ilmatieteenlaitos.fi',
+        'https://destination-earth.eu',
+        'https://africa-knowledge-platform.ec.europa.eu/arcx',
+      ])
+      for (const a of links) {
+        expect(a.getAttribute('rel')).toBe('nofollow noopener noreferrer')
+        expect(a.getAttribute('target')).toBe('_blank')
+      }
+    })
   })
 
   describe('Full landing page layout', () => {

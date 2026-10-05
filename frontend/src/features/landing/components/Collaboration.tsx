@@ -9,11 +9,35 @@
  */
 
 import { useTranslation } from 'react-i18next'
+import type { ReactNode } from 'react'
 import { H2 } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 
-// Hairlines are the 1px gaps showing the border-coloured grid behind.
-const CELL = 'flex items-center justify-center bg-background p-12'
+// Hairlines are the 1px gaps showing the border-coloured grid behind;
+// multiply blends opaque white logo backgrounds into the hover wash.
+const CELL =
+  'flex items-center justify-center bg-background p-12 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset [&_img]:mix-blend-multiply dark:[&_img]:mix-blend-normal'
+
+function PartnerLink({
+  href,
+  className,
+  children,
+}: {
+  href: string
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="nofollow noopener noreferrer"
+      className={cn(CELL, className)}
+    >
+      {children}
+    </a>
+  )
+}
 
 export function Collaboration() {
   const { t } = useTranslation('landing')
@@ -25,21 +49,24 @@ export function Collaboration() {
         </div>
         {/* Met institutes fill the first row, EU programmes the second. */}
         <div className="mx-auto grid max-w-4xl auto-rows-fr gap-px border bg-border sm:grid-cols-2 lg:grid-cols-6">
-          <div className={cn(CELL, 'lg:col-span-2')}>
+          <PartnerLink href="https://www.ecmwf.int" className="lg:col-span-2">
             <img
               src="/logos/org/ECMWF.png"
               alt={t('brand.ecmwf')}
               className="w-50 object-contain"
             />
-          </div>
-          <div className={cn(CELL, 'lg:col-span-2')}>
+          </PartnerLink>
+          <PartnerLink href="https://www.met.no" className="lg:col-span-2">
             <img
               src="/logos/org/MetNorway.png"
               alt={t('brand.metNorway')}
               className="w-50 object-contain"
             />
-          </div>
-          <div className={cn(CELL, 'lg:col-span-2')}>
+          </PartnerLink>
+          <PartnerLink
+            href="https://en.ilmatieteenlaitos.fi"
+            className="lg:col-span-2"
+          >
             <img
               src="/logos/org/FMI.png"
               alt={t('brand.fmi')}
@@ -50,23 +77,29 @@ export function Collaboration() {
               alt={t('brand.fmi')}
               className="hidden h-14 w-auto dark:block"
             />
-          </div>
-          <div className={cn(CELL, 'lg:col-span-3')}>
+          </PartnerLink>
+          <PartnerLink
+            href="https://destination-earth.eu"
+            className="lg:col-span-3"
+          >
             <img
               src="/logos/org/destine-fund.png"
               alt={t('brand.destinE')}
               className="w-50 object-contain"
             />
-          </div>
+          </PartnerLink>
           {/* ArcX has no logo of its own; its materials set the name in type. */}
-          <div className={cn(CELL, 'flex-col sm:col-span-2 lg:col-span-3')}>
+          <PartnerLink
+            href="https://africa-knowledge-platform.ec.europa.eu/arcx"
+            className="flex-col sm:col-span-2 lg:col-span-3"
+          >
             <span className="text-3xl font-bold tracking-tight">
               {t('brand.arcx')}
             </span>
             <span className="mt-1 text-center text-xs text-muted-foreground">
               {t('brand.arcxFull')}
             </span>
-          </div>
+          </PartnerLink>
         </div>
       </div>
     </section>
