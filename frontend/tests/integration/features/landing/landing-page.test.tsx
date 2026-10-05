@@ -92,14 +92,22 @@ describe('Landing Page', () => {
   })
 
   describe('Collaboration', () => {
-    it('renders the collaboration section', async () => {
+    it('names every partner', async () => {
       const screen = await renderWithRouter(
         <AuthContext.Provider value={unauthenticatedAuth}>
           <Collaboration />
         </AuthContext.Provider>,
       )
 
-      expect(screen.container.innerHTML.length).toBeGreaterThan(0)
+      // FMI ships a light and a dark logo; only CSS hides one of them.
+      for (const name of ['ECMWF', 'MetNorway', 'FMI', 'DestinE']) {
+        await expect
+          .element(screen.getByRole('img', { name, exact: true }).first())
+          .toBeInTheDocument()
+      }
+      await expect
+        .element(screen.getByText('ArcX', { exact: true }))
+        .toBeInTheDocument()
     })
   })
 

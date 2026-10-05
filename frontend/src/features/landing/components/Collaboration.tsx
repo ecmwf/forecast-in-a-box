@@ -10,6 +10,10 @@
 
 import { useTranslation } from 'react-i18next'
 import { H2 } from '@/components/base/typography'
+import { cn } from '@/lib/utils'
+
+// Hairlines are the 1px gaps showing the border-coloured grid behind.
+const CELL = 'flex items-center justify-center bg-background p-12'
 
 export function Collaboration() {
   const { t } = useTranslation('landing')
@@ -19,27 +23,49 @@ export function Collaboration() {
         <div className="mx-auto mb-12 max-w-xl text-center text-balance md:mb-16">
           <H2 className="border-0 pb-0 text-4xl">{t('collaboration.title')}</H2>
         </div>
-        <div className="relative mx-auto grid max-w-4xl divide-x border bg-background sm:grid-cols-2 lg:grid-cols-3">
-          <div className="flex items-center justify-center p-12">
+        {/* Met institutes fill the first row, EU programmes the second. */}
+        <div className="mx-auto grid max-w-4xl auto-rows-fr gap-px border bg-border sm:grid-cols-2 lg:grid-cols-6">
+          <div className={cn(CELL, 'lg:col-span-2')}>
             <img
               src="/logos/org/ECMWF.png"
               alt={t('brand.ecmwf')}
-              className="object-contain"
+              className="w-50 object-contain"
             />
           </div>
-          <div className="flex items-center justify-center p-12">
+          <div className={cn(CELL, 'lg:col-span-2')}>
             <img
               src="/logos/org/MetNorway.png"
               alt={t('brand.metNorway')}
-              className="object-contain"
+              className="w-50 object-contain"
             />
           </div>
-          <div className="flex items-center justify-center border-t p-12 sm:col-span-2 lg:col-span-1">
+          <div className={cn(CELL, 'lg:col-span-2')}>
+            <img
+              src="/logos/org/FMI.png"
+              alt={t('brand.fmi')}
+              className="h-14 w-auto dark:hidden"
+            />
+            <img
+              src="/logos/org/FMI-dark.png"
+              alt={t('brand.fmi')}
+              className="hidden h-14 w-auto dark:block"
+            />
+          </div>
+          <div className={cn(CELL, 'lg:col-span-3')}>
             <img
               src="/logos/org/destine-fund.png"
               alt={t('brand.destinE')}
-              className="object-contain"
+              className="w-50 object-contain"
             />
+          </div>
+          {/* ArcX has no logo of its own; its materials set the name in type. */}
+          <div className={cn(CELL, 'flex-col sm:col-span-2 lg:col-span-3')}>
+            <span className="text-3xl font-bold tracking-tight">
+              {t('brand.arcx')}
+            </span>
+            <span className="mt-1 text-center text-xs text-muted-foreground">
+              {t('brand.arcxFull')}
+            </span>
           </div>
         </div>
       </div>

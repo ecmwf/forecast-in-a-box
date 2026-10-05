@@ -39,7 +39,10 @@
     "earthkit": "EarthKit",
     "ecmwf": "ECMWF",
     "metNorway": "MetNorway",
-    "destinE": "DestinE"
+    "fmi": "FMI",
+    "destinE": "DestinE",
+    "arcx": "ArcX",
+    "arcxFull": "Africa Regional Centres of Excellence"
   },
   "about": {
     "eyebrow": "About Forecast-in-a-Box",
