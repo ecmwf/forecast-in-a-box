@@ -28,6 +28,7 @@ import { AlertCircle, Braces } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { GlyphTextInput } from './GlyphTextInput'
 import { Button } from '@/components/ui/button'
+import { Reveal } from '@/components/common/Reveal'
 import {
   InputGroup,
   InputGroupAddon,
@@ -177,9 +178,9 @@ export function GlyphFieldWrapper({
         ) : (
           plain
         )}
-        {errorMessage && (
-          <p className="mt-1 truncate text-xs text-danger">{errorMessage}</p>
-        )}
+        <Reveal open={errorMessage !== null}>
+          <p className="truncate pt-1 text-xs text-danger">{errorMessage}</p>
+        </Reveal>
         {missingGlyphNames?.map((name) => (
           <DefineVariableButton key={name} name={name} />
         ))}
@@ -287,9 +288,9 @@ export function GlyphFieldWrapper({
         </InputGroupAddon>
       </InputGroup>
 
-      {errorMessage && (
-        <p className="mt-1 truncate text-xs text-danger">{errorMessage}</p>
-      )}
+      <Reveal open={errorMessage !== null}>
+        <p className="truncate pt-1 text-xs text-danger">{errorMessage}</p>
+      </Reveal>
 
       {missingGlyphNames?.map((name) => (
         <DefineVariableButton key={name} name={name} />

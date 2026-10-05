@@ -36,6 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Reveal } from '@/components/common/Reveal'
 import { useFieldErrors } from '@/features/fable-builder/context/BlockValidationContext'
 import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
 
@@ -182,9 +183,9 @@ export function EnumListField({
             </ComboboxList>
           </ComboboxContent>
         </Combobox>
-        {errorMessage && (
-          <p className="mt-1 truncate text-xs text-danger">{errorMessage}</p>
-        )}
+        <Reveal open={errorMessage !== null}>
+          <p className="truncate pt-1 text-xs text-danger">{errorMessage}</p>
+        </Reveal>
       </div>
     </TooltipProvider>
   )

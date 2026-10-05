@@ -59,6 +59,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
+import { Reveal } from '@/components/common/Reveal'
 import { GlyphReferencePanel } from '@/features/fable-builder/components/shared/GlyphReferencePanel'
 import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
@@ -330,76 +331,80 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
         )}
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4">
         {/* Backend block errors that map to no specific field — verbatim. */}
-        {mappedErrors.unmapped.length > 0 && (
-          <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
-            {mappedErrors.unmapped.map((message) => (
-              <P key={message} className="text-sm text-danger">
-                {message}
-              </P>
-            ))}
-          </div>
-        )}
-        {inputs.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Link2 className="h-4 w-4" />
-              {t('configPanel.inputConnections')}
-            </div>
-            <div className="space-y-3">
-              {inputs.map((inputName) => (
-                <InputConnectionField
-                  key={inputName}
-                  inputName={inputName}
-                  currentSourceId={selectedBlock.input_ids[inputName] || ''}
-                  availableSources={availableSources}
-                  onInputChange={handleInputChange}
-                />
+        <Reveal open={mappedErrors.unmapped.length > 0}>
+          <div className="pb-6">
+            <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+              {mappedErrors.unmapped.map((message) => (
+                <P key={message} className="text-sm text-danger">
+                  {message}
+                </P>
               ))}
             </div>
-            <Separator />
           </div>
-        )}
-
-        {configOptions.length > 0 && (
-          <BlockValidationProvider
-            resolvedConfig={resolvedConfigForBlock}
-            fieldErrors={mappedErrors.byConfigKey}
-            missingGlyphs={definableMissingGlyphs}
-          >
+        </Reveal>
+        <div className="space-y-6">
+          {inputs.length > 0 && (
             <div className="space-y-3">
-              <div className="text-sm font-medium">
-                {t('configPanel.configuration')}
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Link2 className="h-4 w-4" />
+                {t('configPanel.inputConnections')}
               </div>
-              <div className="space-y-4">
-                {configOptions.map(([key, option]) => (
-                  <FieldRenderer
-                    key={key}
-                    id={`config-${key}`}
-                    configKey={key}
-                    valueType={configRestrictions[key] ?? option.value_type}
-                    value={selectedBlock.configuration_values[key] || ''}
-                    onChange={(value) => handleConfigChange(key, value)}
-                    label={option.title || key}
-                    description={option.description}
-                    inputClassName="h-9"
+              <div className="space-y-3">
+                {inputs.map((inputName) => (
+                  <InputConnectionField
+                    key={inputName}
+                    inputName={inputName}
+                    currentSourceId={selectedBlock.input_ids[inputName] || ''}
+                    availableSources={availableSources}
+                    onInputChange={handleInputChange}
                   />
                 ))}
               </div>
-              {/* mt-10 reserves clearance for the last field's absolute
+              <Separator />
+            </div>
+          )}
+
+          {configOptions.length > 0 && (
+            <BlockValidationProvider
+              resolvedConfig={resolvedConfigForBlock}
+              fieldErrors={mappedErrors.byConfigKey}
+              missingGlyphs={definableMissingGlyphs}
+            >
+              <div className="space-y-3">
+                <div className="text-sm font-medium">
+                  {t('configPanel.configuration')}
+                </div>
+                <div className="space-y-4">
+                  {configOptions.map(([key, option]) => (
+                    <FieldRenderer
+                      key={key}
+                      id={`config-${key}`}
+                      configKey={key}
+                      valueType={configRestrictions[key] ?? option.value_type}
+                      value={selectedBlock.configuration_values[key] || ''}
+                      onChange={(value) => handleConfigChange(key, value)}
+                      label={option.title || key}
+                      description={option.description}
+                      inputClassName="h-9"
+                    />
+                  ))}
+                </div>
+                {/* mt-10 reserves clearance for the last field's absolute
                     preview/nudge/error stack so they don't overlap the
                     reference panel. */}
-              <GlyphReferencePanel className="mt-10" />
-            </div>
-          </BlockValidationProvider>
-        )}
+                <GlyphReferencePanel className="mt-10" />
+              </div>
+            </BlockValidationProvider>
+          )}
 
-        {configOptions.length === 0 && inputs.length === 0 && (
-          <div className="py-4 text-center text-sm text-muted-foreground">
-            {t('configPanel.noConfigOptions')}
-          </div>
-        )}
+          {configOptions.length === 0 && inputs.length === 0 && (
+            <div className="py-4 text-center text-sm text-muted-foreground">
+              {t('configPanel.noConfigOptions')}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="border-t border-border p-4">
