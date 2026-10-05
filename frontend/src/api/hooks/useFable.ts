@@ -29,6 +29,7 @@ import type {
   GlyphListResponse,
   IntrinsicGlyphItem,
   PluginBlockFactoryId,
+  ResolveDisplayResponse,
 } from '@/api/types/fable.types'
 import type { BlueprintListFilters } from '@/api/endpoints/fable'
 import {
@@ -41,6 +42,7 @@ import {
   listBlueprints,
   listGlobalGlyphs,
   listGlyphFunctions,
+  resolveDisplay,
   retrieveFable,
   updateBlueprint,
   upsertFable,
@@ -65,6 +67,8 @@ export const fableKeys = {
   globalGlyphs: (page?: number, pageSize?: number) =>
     [...fableKeys.all, 'globalGlyphs', page, pageSize] as const,
   globalGlyph: (id: string) => [...fableKeys.all, 'globalGlyph', id] as const,
+  paramLabels: (ids: ReadonlyArray<string>) =>
+    [...fableKeys.all, 'paramLabels', ids.join(',')] as const,
 }
 
 export function useBlockCatalogue(language?: string) {
@@ -158,6 +162,46 @@ export function useFableValidation(
     },
     retryDelay: QUERY_CONSTANTS.RETRY_DELAY.ON_503,
   })
+}
+
+/** Only numeric GRIB param ids resolve. */
+const PARAM_ID = /^\d+$/
+
+const NO_LABELS: ReadonlyMap<string, string> = new Map()
+
+function toLabelMap(
+  response: ResolveDisplayResponse,
+): ReadonlyMap<string, string> {
+  const labels = new Map<string, string>()
+  for (const { value, display } of response.elements) {
+    if (display) labels.set(value, display)
+  }
+  return labels
+}
+
+/** Backend display strings for param ids; unresolved ids are absent. */
+export function useParamLabels(
+  values: ReadonlyArray<string>,
+): ReadonlyMap<string, string> {
+  const ids = useMemo(
+    () => [...new Set(values.filter((v) => PARAM_ID.test(v)))].sort(),
+    [values],
+  )
+  const { data } = useQuery({
+    queryKey: fableKeys.paramLabels(ids),
+    queryFn: () =>
+      resolveDisplay(ids.map((value) => ({ typeName: 'param', value }))),
+    select: toLabelMap,
+    enabled: ids.length > 0,
+    // Param ids never change meaning.
+    staleTime: Infinity,
+    gcTime: 60 * 60 * 1000,
+    placeholderData: keepPreviousData,
+    retry: retryRetrieve,
+    // Older backends lack the route; ids then show raw.
+    meta: { expectedErrorStatuses: [404] },
+  })
+  return data ?? NO_LABELS
 }
 
 export function useListBlueprints(

@@ -17,6 +17,7 @@ import type { ReactNode } from 'react'
 import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
+  ResolvableValue,
 } from '@/api/types/fable.types'
 import {
   fableKeys,
@@ -24,6 +25,7 @@ import {
   useBlockFactory,
   useFable,
   useFableValidation,
+  useParamLabels,
   useUpsertFable,
 } from '@/api/hooks/useFable'
 import { API_ENDPOINTS } from '@/api/endpoints'
@@ -583,5 +585,91 @@ describe('useBlockFactory', () => {
       .element(screen.getByTestId('factory'))
       .toHaveTextContent('no-factory')
     await expect.element(screen.getByTestId('notFound')).toHaveTextContent('ok')
+  })
+})
+
+describe('useParamLabels', () => {
+  afterEach(() => {
+    worker.resetHandlers()
+  })
+
+  /** Records every request body; resolves 167 only. */
+  function recordRequests(): Array<Array<ResolvableValue>> {
+    const requests: Array<Array<ResolvableValue>> = []
+    worker.use(
+      http.post(API_ENDPOINTS.fable.resolveDisplay, async ({ request }) => {
+        const { elements } = (await request.json()) as {
+          elements: Array<ResolvableValue>
+        }
+        requests.push(elements)
+        return HttpResponse.json({
+          elements: elements.map((e) => ({
+            ...e,
+            display: e.value === '167' ? '2 metre temperature [K] (2t)' : null,
+          })),
+        })
+      }),
+    )
+    return requests
+  }
+
+  function Labels({ values }: { values: Array<string> }) {
+    const labels = useParamLabels(values)
+    return <div data-testid="labels">{JSON.stringify([...labels])}</div>
+  }
+
+  it('sends each numeric id once and omits unresolved ones', async () => {
+    const requests = recordRequests()
+    const screen = await renderWithQueryClient(
+      <Labels values={['167', '999', '167', '2t', '${p}', '']} />,
+    )
+    await expect
+      .element(screen.getByTestId('labels'))
+      .toHaveTextContent('[["167","2 metre temperature [K] (2t)"]]')
+    expect(requests).toEqual([
+      [
+        { typeName: 'param', value: '167' },
+        { typeName: 'param', value: '999' },
+      ],
+    ])
+  })
+
+  it('shares one request between components asking for the same ids', async () => {
+    const requests = recordRequests()
+    const screen = await renderWithQueryClient(
+      <>
+        <Labels values={['151', '167']} />
+        <Labels values={['167', '151']} />
+      </>,
+    )
+    await expect
+      .element(screen.getByTestId('labels').first())
+      .toHaveTextContent('[["167","2 metre temperature [K] (2t)"]]')
+    expect(requests).toHaveLength(1)
+  })
+
+  it('sends nothing without numeric ids', async () => {
+    const requests = recordRequests()
+    const screen = await renderWithQueryClient(
+      <Labels values={['2t', '${p}']} />,
+    )
+    await expect.element(screen.getByTestId('labels')).toHaveTextContent('[]')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(requests).toHaveLength(0)
+  })
+
+  it('treats a 404 as no labels and does not retry', async () => {
+    let calls = 0
+    worker.use(
+      http.post(API_ENDPOINTS.fable.resolveDisplay, () => {
+        calls += 1
+        return HttpResponse.json({ detail: 'Not Found' }, { status: 404 })
+      }),
+    )
+    const screen = await renderWithQueryClient(<Labels values={['167']} />)
+    await expect.poll(() => calls).toBe(1)
+    await expect.element(screen.getByTestId('labels')).toHaveTextContent('[]')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(calls).toBe(1)
   })
 })
