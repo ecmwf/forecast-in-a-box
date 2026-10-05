@@ -216,10 +216,7 @@ describe('ImageViewer', () => {
     ;(
       screen.getByRole('button', { name: 'next' }).element() as HTMLElement
     ).click()
-    // The next output is fetched and decoded: slow CI runners outlast the 1 s default.
-    await expect
-      .poll(() => image().getAttribute('src'), { timeout: 5000 })
-      .not.toBe(firstSrc)
+    await expect.poll(() => image().getAttribute('src')).not.toBe(firstSrc)
     expect(image().style.transform).toBe(zoomed)
   })
 })
