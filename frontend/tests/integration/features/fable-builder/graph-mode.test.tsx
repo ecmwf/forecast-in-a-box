@@ -9,12 +9,16 @@
  */
 
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { HttpResponse, http } from 'msw'
+import { HttpResponse, delay, http } from 'msw'
 import { renderWithRouter } from '@tests/utils/render'
 import { worker } from '@tests/test-extend'
-import { mockCatalogue } from '../../../../mocks/data/fable.data'
+import {
+  calculateExpansion,
+  mockCatalogue,
+} from '../../../../mocks/data/fable.data'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import { FableBuilderV1Schema } from '@/api/types/fable.types'
 import { FableBuilderPage } from '@/features/fable-builder/components/FableBuilderPage'
 import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
 import {
@@ -535,6 +539,68 @@ describe('Graph Mode - Builder Integration', () => {
         ),
       )
       .toBeVisible()
+  })
+
+  it("does not bring an edited block's old errors back while revalidating", async () => {
+    const EMPTY = "Configuration option 'values' cannot be empty"
+    // Empty values fail at once; the fixed workflow validates slowly.
+    worker.use(
+      http.put(API_ENDPOINTS.fable.expand, async ({ request }) => {
+        const fable = FableBuilderV1Schema.parse(await request.json())
+        const empty = !fable.blocks.select1.configuration_values.values
+        if (!empty) await delay(2000)
+        const expansion = calculateExpansion(fable)
+        return HttpResponse.json({
+          ...expansion,
+          block_errors: empty ? { select1: [EMPTY] } : {},
+        })
+      }),
+    )
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    const fable = createTransformChainFable()
+    fable.blocks.select1.configuration_values.values = ''
+    useFableBuilderStore.getState().setFable(fable)
+    await expect.element(screen.getByText(EMPTY).first()).toBeVisible()
+
+    useFableBuilderStore.getState().updateBlockConfig('select1', 'values', '6')
+
+    // Past the debounce, the slow check is in flight: the old error stays gone.
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    expect(screen.getByText(EMPTY).elements()).toHaveLength(0)
+  })
+
+  it('keeps the config panel steady while an edited block revalidates', async () => {
+    const EMPTY = "Configuration option 'values' cannot be empty"
+    worker.use(
+      http.put(API_ENDPOINTS.fable.expand, async ({ request }) => {
+        const fable = FableBuilderV1Schema.parse(await request.json())
+        const empty = !fable.blocks.select1.configuration_values.values
+        if (!empty) await delay(2000)
+        const expansion = calculateExpansion(fable)
+        return HttpResponse.json({
+          ...expansion,
+          block_errors: empty ? { select1: [EMPTY] } : {},
+        })
+      }),
+    )
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    const fable = createTransformChainFable()
+    fable.blocks.select1.configuration_values.values = ''
+    useFableBuilderStore.getState().setFable(fable)
+    useFableBuilderStore.getState().selectBlock('select1')
+    await expect
+      .poll(() => screen.getByText(EMPTY).elements().length)
+      .toBeGreaterThan(0)
+
+    useFableBuilderStore.getState().updateBlockConfig('select1', 'values', '6')
+    await new Promise((resolve) => setTimeout(resolve, 800))
+
+    // The panel holds its last errors (no layout jump); the canvas drops them.
+    const shown = screen.getByText(EMPTY).elements()
+    expect(shown.length).toBeGreaterThan(0)
+    expect(shown.every((element) => !element.closest('.react-flow'))).toBe(true)
   })
 
   it("does not offer a block's own consumers as its input", async () => {

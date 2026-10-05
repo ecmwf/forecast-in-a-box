@@ -430,6 +430,8 @@ export interface BlockValidationState {
   configurationRestrictions: Record<string, string>
   /** Unknown glyph names per option, from /blueprint/expand. */
   missingGlyphs: Record<string, Array<string>>
+  /** Edited since this result; errors dropped until the next check. */
+  stale?: boolean
 }
 
 export interface FableValidationState {

@@ -267,11 +267,15 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
     ...(pendingRestrictions ?? {}),
     ...(liveConfigRestrictions ?? cachedConfigRestrictions ?? {}),
   }
-  if (validationState && selectedBlockId) {
+  // Stale stand-in result: keep the last errors, as in the null gap.
+  const selectedBlockState = validationState?.blockStates[selectedBlockId ?? '']
+  const errorsSettled =
+    validationState !== null && selectedBlockState?.stale !== true
+  if (errorsSettled && selectedBlockId) {
     lastMappedErrorsRef.current[selectedBlockId] = liveMappedErrors
   }
   const mappedErrors =
-    validationState || !selectedBlockId
+    errorsSettled || !selectedBlockId
       ? liveMappedErrors
       : (lastMappedErrorsRef.current[selectedBlockId] ?? liveMappedErrors)
   const definableMissingGlyphs = definableGlyphs(

@@ -22,7 +22,10 @@ import { FableGraphCanvas } from './graph-mode/FableGraphCanvas'
 import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
 import { TemplateParamsDialog } from './TemplateParamsDialog'
 import type { TFunction } from 'i18next'
-import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
+import type {
+  BlockFactoryCatalogue,
+  FableBuilderV1,
+} from '@/api/types/fable.types'
 import type { TemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { deriveTemplateParameters } from '@/features/fable-builder/utils/template-parameters'
@@ -38,6 +41,10 @@ import { useTutorialsStore } from '@/stores/tutorialsStore'
 import { shelveBenchIfDirty } from '@/features/fable-builder/stores/workbenchShelfStore'
 import { hasUnterminatedGlyph } from '@/features/fable-builder/utils/glyph-display'
 import { decodeFableFromURL } from '@/features/fable-builder/utils/url-state'
+import {
+  dropBlockErrors,
+  staleBlockIds,
+} from '@/features/fable-builder/utils/stale-validation'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useMedia } from '@/hooks/useMedia'
 import { GlyphProvider } from '@/features/fable-builder/context/GlyphContext'
@@ -254,8 +261,11 @@ export function FableBuilderPage({
     data: validationResult,
     isLoading: isValidating,
     isFetching: isRevalidating,
+    isPlaceholderData: isStaleValidation,
     error: validationError,
   } = useFableValidation(debouncedFable, !fableHasOpenGlyph)
+  // The fable the last real (non-placeholder) result was computed for.
+  const validatedFableRef = useRef<FableBuilderV1 | null>(null)
 
   // Fresh intent: reset now — also mid-session; dirty work parks on the shelf.
   useEffect(() => {
@@ -480,12 +490,27 @@ export function FableBuilderPage({
   }, [isValidating, isRevalidating, setIsValidating])
 
   useEffect(() => {
-    if (validationResult) {
-      setValidationState(
-        toValidationState(validationResult, debouncedFable, catalogue),
-      )
+    if (!validationResult) return
+    const state = toValidationState(validationResult, debouncedFable, catalogue)
+    if (!isStaleValidation || validatedFableRef.current === null) {
+      validatedFableRef.current = debouncedFable
+      setValidationState(state)
+      return
     }
-  }, [catalogue, debouncedFable, validationResult, setValidationState])
+    // Placeholder (previous) result: drop what it says about edited blocks.
+    setValidationState(
+      dropBlockErrors(
+        state,
+        staleBlockIds(validatedFableRef.current, debouncedFable),
+      ),
+    )
+  }, [
+    catalogue,
+    debouncedFable,
+    validationResult,
+    isStaleValidation,
+    setValidationState,
+  ])
 
   if (catalogueLoading || (fableId && fableLoading)) {
     return (
