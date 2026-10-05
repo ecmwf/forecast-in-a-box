@@ -590,17 +590,16 @@ describe('Graph Mode - Builder Integration', () => {
     fable.blocks.select1.configuration_values.values = ''
     useFableBuilderStore.getState().setFable(fable)
     useFableBuilderStore.getState().selectBlock('select1')
-    await expect
-      .poll(() => screen.getByText(EMPTY).elements().length)
-      .toBeGreaterThan(0)
+    // The backend message lands on its field in the panel.
+    const fieldError = screen.getByText('Missing required value')
+    await expect.element(fieldError).toBeVisible()
 
     useFableBuilderStore.getState().updateBlockConfig('select1', 'values', '6')
     await new Promise((resolve) => setTimeout(resolve, 800))
 
     // The panel holds its last errors (no layout jump); the canvas drops them.
-    const shown = screen.getByText(EMPTY).elements()
-    expect(shown.length).toBeGreaterThan(0)
-    expect(shown.every((element) => !element.closest('.react-flow'))).toBe(true)
+    await expect.element(fieldError).toBeInTheDocument()
+    expect(screen.getByText(EMPTY).elements()).toHaveLength(0)
   })
 
   it("does not offer a block's own consumers as its input", async () => {
