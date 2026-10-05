@@ -26,7 +26,7 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
@@ -37,6 +37,7 @@ import type {
   CompositeArtifactId,
   MlModelDetail,
 } from '@/api/types/artifacts.types'
+import { useQubeParamLabels } from '@/features/artifacts/hooks/useQubeParamLabels'
 import { formatBytes } from '@/api/types/artifacts.types'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -70,6 +71,12 @@ export function ArtifactDetailPage({
   isDeleting,
 }: ArtifactDetailPageProps) {
   const { t } = useTranslation('artifacts')
+  const paramLabels = useQubeParamLabels(
+    useMemo(
+      () => [detail.input_qube, detail.output_qube],
+      [detail.input_qube, detail.output_qube],
+    ),
+  )
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -231,7 +238,7 @@ export function ArtifactDetailPage({
           {t('detail.inputStructure')}
         </H2>
         {detail.input_qube.children.length > 0 ? (
-          <QubeTree node={detail.input_qube} />
+          <QubeTree node={detail.input_qube} paramLabels={paramLabels} />
         ) : (
           <P className="text-sm text-muted-foreground">
             {t('detail.noInputStructure')}
@@ -245,7 +252,7 @@ export function ArtifactDetailPage({
           {t('detail.outputStructure')}
         </H2>
         {detail.output_qube.children.length > 0 ? (
-          <QubeTree node={detail.output_qube} />
+          <QubeTree node={detail.output_qube} paramLabels={paramLabels} />
         ) : (
           <P className="text-sm text-muted-foreground">
             {t('detail.noOutputStructure')}

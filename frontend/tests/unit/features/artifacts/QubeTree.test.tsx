@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { renderWithProviders } from '@tests/utils/render'
 import type { QubeNode } from '@/api/types/artifacts.types'
 import { QubeTree } from '@/features/artifacts/components/QubeTree'
@@ -196,6 +196,24 @@ describe('QubeTree (Dimensional Matrix)', () => {
 
     // After pivot, the row header axis label should be the level axis.
     await expect.element(screen.getByText('level').first()).toBeVisible()
+  })
+
+  it('names the param and level in a cell hover', async () => {
+    // No app CSS in tests: give the empty cells a hoverable size.
+    const style = document.createElement('style')
+    style.textContent = '[role="cell"]{min-width:12px;min-height:12px}'
+    document.head.appendChild(style)
+    onTestFinished(() => style.remove())
+    const labels = new Map([['w', 'Vertical velocity [Pa s**-1] (w)']])
+    const screen = await renderWithProviders(
+      <QubeTree node={sampleQube} paramLabels={labels} />,
+    )
+    await screen.getByRole('cell').nth(12).hover()
+    await expect
+      .element(
+        screen.getByText('Vertical velocity [Pa s\u207B\u00B9] (w) @ 1000 hPa'),
+      )
+      .toBeVisible()
   })
 
   it('renders the empty-state message when root has no children', async () => {
