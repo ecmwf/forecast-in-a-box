@@ -10,6 +10,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  displayKindOf,
   getDefaultValueForType,
   parseValueType,
 } from '@/components/base/fields/value-type-parser'
@@ -324,20 +325,54 @@ describe('parseValueType', () => {
       })
     })
 
-    it('parses enumOpen[param] like enumOpen[str]', () => {
-      expect(parseValueType("enumOpen[param]('2t','msl')")).toEqual({
+    it('parses enumOpen[param] as a labelled enum', () => {
+      expect(parseValueType("enumOpen[param]('167','151')")).toEqual({
         type: 'enum',
-        options: ['2t', 'msl'],
+        options: ['167', '151'],
         closed: false,
+        lookup: 'param',
       })
     })
 
-    it('parses list[enumClosed[param]] like list[enumClosed[str]]', () => {
-      expect(parseValueType('list[enumClosed[param](2t,msl)]')).toEqual({
+    it('parses list[enumClosed[param]] as a labelled enum list', () => {
+      expect(parseValueType("list[enumClosed[param]('167','151')]")).toEqual({
         type: 'enumList',
-        options: ['2t', 'msl'],
+        options: ['167', '151'],
         closed: true,
+        lookup: 'param',
       })
+    })
+
+    it('parses list[param] as a labelled tag list', () => {
+      expect(parseValueType('list[param]')).toEqual({
+        type: 'list',
+        itemType: 'string',
+        lookup: 'param',
+      })
+    })
+
+    it('keeps str enums unlabelled', () => {
+      expect(
+        parseValueType("list[enumClosed[str]('a','b')]"),
+      ).not.toHaveProperty('lookup')
+    })
+  })
+
+  describe('displayKindOf', () => {
+    it.each([
+      ['param', 'param'],
+      ['list[param]', 'param'],
+      ["enumClosed[param]('167')", 'param'],
+      ["list[enumClosed[param]('167','151')]", 'param'],
+      ['artifact', 'artifact'],
+      ["enumClosed[artifact]('ecmwf:a')", 'artifact'],
+      ['str', null],
+      ["list[enumClosed[str]('a')]", null],
+      ['int{positive}', null],
+      [undefined, null],
+      ['not a type[[', null],
+    ])('%s → %s', (valueType, kind) => {
+      expect(displayKindOf(valueType)).toBe(kind)
     })
   })
 

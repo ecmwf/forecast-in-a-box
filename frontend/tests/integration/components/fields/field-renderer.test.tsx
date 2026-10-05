@@ -348,6 +348,118 @@ describe('FieldRenderer Integration', () => {
     })
   })
 
+  // Labels come from the MSW resolveDisplay handler (mockParamDisplays).
+  describe('Parameter fields', () => {
+    const PARAM_LIST = "list[enumClosed[param]('151','165','167','999')]"
+
+    it('labels chips with shortnames and stores ids', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType={PARAM_LIST}
+          initialValue="167,151"
+        />,
+      )
+      const chip = screen.getByText('2t', { exact: true })
+      await expect.element(chip).toBeVisible()
+      await expect
+        .element(screen.getByText('msl', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('167,151')
+
+      await chip.hover()
+      await expect
+        .element(
+          screen.getByText('2 metre temperature [K] (2t)', { exact: true }),
+        )
+        .toBeVisible()
+    })
+
+    it('finds a parameter by name or id and stores its id', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={PARAM_LIST} />,
+      )
+      const input = screen.getByPlaceholder('Add item...')
+      await input.fill('temperature')
+      await expect
+        .element(screen.getByRole('option', { name: /2 metre temperature/ }))
+        .toBeVisible()
+      expect(screen.getByRole('option').elements()).toHaveLength(1)
+
+      await input.fill('165')
+      const wind = screen.getByRole('option', { name: /10 metre U wind/ })
+      await expect.element(wind).toBeVisible()
+      await wind.click()
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('165')
+    })
+
+    it('lists ids the backend cannot resolve as they are', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={PARAM_LIST} />,
+      )
+      await screen.getByPlaceholder('Add item...').fill('999')
+      await expect
+        .element(screen.getByRole('option', { name: '999' }))
+        .toBeVisible()
+    })
+
+    it('keeps a value the options no longer offer visible', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType={PARAM_LIST}
+          initialValue="2t-167,151"
+        />,
+      )
+      const stale = screen.getByText('2t-167', { exact: true })
+      await expect.element(stale).toBeVisible()
+      await expect
+        .element(screen.getByText('msl', { exact: true }))
+        .toBeVisible()
+
+      await stale.hover()
+      await expect
+        .element(
+          screen.getByText(
+            '2t-167 is no longer offered by the input. Remove it.',
+          ),
+        )
+        .toBeVisible()
+    })
+
+    it('labels list[param] tags', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType="list[param]" initialValue="167" />,
+      )
+      const tag = screen.getByText('2t', { exact: true })
+      await expect.element(tag).toBeVisible()
+      await tag.hover()
+      await expect
+        .element(
+          screen.getByText('2 metre temperature [K] (2t)', { exact: true }),
+        )
+        .toBeVisible()
+    })
+
+    it('shows the full label in a single-parameter select', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer
+          valueType="enumClosed[param]('167','151')"
+          initialValue="167"
+        />,
+      )
+      await expect
+        .element(
+          screen
+            .getByRole('combobox')
+            .getByText('2 metre temperature [K] (2t)'),
+        )
+        .toBeVisible()
+    })
+  })
+
   // Names come from the MSW artifact catalogue (list_models).
   describe('Artifact field', () => {
     const CHECKPOINTS =

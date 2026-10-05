@@ -202,7 +202,8 @@
   "field": {
     "selectPlaceholder": "Select an option...",
     "addItemPlaceholder": "Add item...",
-    "noMatches": "No matches"
+    "noMatches": "No matches",
+    "staleValue": "{{value}} is no longer offered by the input. Remove it."
   },
   "geoDomain": {
     "placeholder": "Select an area…",

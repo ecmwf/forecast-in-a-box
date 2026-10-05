@@ -167,6 +167,7 @@ function renderField(
           value={value}
           onChange={onChange}
           options={parsedType.options}
+          lookup={parsedType.lookup}
           placeholder={placeholder}
           disabled={disabled}
           className={className}
@@ -184,6 +185,7 @@ function renderField(
           disabled={disabled}
           className={className}
           itemType={parsedType.itemType}
+          lookup={'lookup' in parsedType ? parsedType.lookup : undefined}
         />
       )
 
@@ -195,6 +197,8 @@ function renderField(
           value={value}
           onChange={onChange}
           options={parsedType.options}
+          closed={parsedType.closed}
+          lookup={parsedType.lookup}
           placeholder={placeholder}
           disabled={disabled}
           className={className}

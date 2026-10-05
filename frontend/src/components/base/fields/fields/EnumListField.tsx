@@ -8,7 +8,16 @@
  * does it submit to any jurisdiction.
  */
 
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  ParamHintTooltip,
+  ParamOptionLabel,
+  matchesParam,
+} from './ParamOptionLabel'
+import type { DisplayLookup } from '@/components/base/fields/value-type-parser'
+import { paramLabel } from '@/components/base/fields/param-display'
+import { useParamLabels } from '@/api/hooks/useFable'
 import {
   Combobox,
   ComboboxChip,
@@ -21,7 +30,14 @@ import {
   ComboboxValue,
   useComboboxAnchor,
 } from '@/components/ui/combobox'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useFieldErrors } from '@/features/fable-builder/context/BlockValidationContext'
+import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
 
 export interface EnumListFieldProps {
   id: string
@@ -33,6 +49,8 @@ export interface EnumListFieldProps {
   /** `list[enumClosed[…]]` (closed, default) vs `list[enum[…]]` (open;
    * free-form not wired yet, kept for forward compat). */
   closed?: boolean
+  /** Label options and chips via a backend lookup instead of raw ids. */
+  lookup?: DisplayLookup
   placeholder?: string
   disabled?: boolean
   className?: string
@@ -56,6 +74,8 @@ export function EnumListField({
   value,
   onChange,
   options,
+  closed = true,
+  lookup,
   placeholder,
   disabled,
 }: EnumListFieldProps) {
@@ -63,9 +83,18 @@ export function EnumListField({
   const resolvedPlaceholder = placeholder ?? t('field.addItemPlaceholder')
   const items = parseListValue(value)
   const anchor = useComboboxAnchor()
-  // Hide persisted values no longer in `options`; storage keeps them until
-  // the next edit (we don't fire onChange on render).
-  const validItems = items.filter((v) => options.includes(v))
+  // Stale: closed options no longer offer it (glyphs resolve server-side).
+  const isStale = (v: string) =>
+    closed && !options.includes(v) && !containsGlyphs(v)
+  const labelIds = useMemo(
+    () =>
+      lookup === 'param'
+        ? [...new Set([...options, ...parseListValue(value)])]
+        : [],
+    [lookup, options, value],
+  )
+  const labels = useParamLabels(labelIds)
+  const labelled = labels.size > 0
 
   // No GlyphFieldWrapper: glyph mode is meaningless for multi-select, and
   // its InputGroup chrome fights the Combobox's own chip container. Render
@@ -79,50 +108,84 @@ export function EnumListField({
     : null
 
   return (
-    <div>
-      <Combobox<string, true>
-        multiple
-        autoHighlight
-        items={[...options]}
-        value={validItems}
-        onValueChange={(next) => onChange(serializeListValue(next))}
-        disabled={disabled}
-      >
-        <ComboboxChips
-          ref={anchor}
-          className={hasFieldError ? 'border-destructive' : undefined}
+    <TooltipProvider delay={120}>
+      <div>
+        <Combobox<string, true>
+          multiple
+          autoHighlight
+          items={[...options]}
+          value={items}
+          onValueChange={(next) => onChange(serializeListValue(next))}
+          itemToStringLabel={
+            labelled ? (v: string) => paramLabel(v, labels, 'full') : undefined
+          }
+          filter={
+            labelled
+              ? (item: string, query: string) =>
+                  matchesParam(item, query, labels)
+              : undefined
+          }
+          disabled={disabled}
         >
-          <ComboboxValue>
-            {(values: Array<string>) => (
-              <>
-                {values.map((v) => (
-                  <ComboboxChip key={v}>{v}</ComboboxChip>
-                ))}
-                <ComboboxChipsInput
-                  id={id}
-                  placeholder={
-                    values.length === 0 ? resolvedPlaceholder : undefined
-                  }
-                  disabled={disabled}
-                />
-              </>
-            )}
-          </ComboboxValue>
-        </ComboboxChips>
-        <ComboboxContent anchor={anchor}>
-          <ComboboxEmpty>{t('field.noMatches')}</ComboboxEmpty>
-          <ComboboxList>
-            {(item: string) => (
-              <ComboboxItem key={item} value={item}>
-                {item}
-              </ComboboxItem>
-            )}
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
-      {errorMessage && (
-        <p className="mt-1 truncate text-xs text-danger">{errorMessage}</p>
-      )}
-    </div>
+          <ComboboxChips
+            ref={anchor}
+            className={hasFieldError ? 'border-destructive' : undefined}
+          >
+            <ComboboxValue>
+              {(values: Array<string>) => (
+                <>
+                  {values.map((v) =>
+                    isStale(v) ? (
+                      <Tooltip key={v}>
+                        <TooltipTrigger
+                          render={
+                            <ComboboxChip className="bg-destructive/10 text-danger">
+                              {v}
+                            </ComboboxChip>
+                          }
+                        />
+                        <TooltipContent side="top" sideOffset={6}>
+                          {t('field.staleValue', { value: v })}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <ParamHintTooltip key={v} id={v} labels={labels}>
+                        <ComboboxChip>
+                          {paramLabel(v, labels, 'compact')}
+                        </ComboboxChip>
+                      </ParamHintTooltip>
+                    ),
+                  )}
+                  <ComboboxChipsInput
+                    id={id}
+                    placeholder={
+                      values.length === 0 ? resolvedPlaceholder : undefined
+                    }
+                    disabled={disabled}
+                  />
+                </>
+              )}
+            </ComboboxValue>
+          </ComboboxChips>
+          <ComboboxContent anchor={anchor}>
+            <ComboboxEmpty>{t('field.noMatches')}</ComboboxEmpty>
+            <ComboboxList>
+              {(item: string) => (
+                <ComboboxItem key={item} value={item}>
+                  {labelled ? (
+                    <ParamOptionLabel id={item} labels={labels} />
+                  ) : (
+                    item
+                  )}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+        {errorMessage && (
+          <p className="mt-1 truncate text-xs text-danger">{errorMessage}</p>
+        )}
+      </div>
+    </TooltipProvider>
   )
 }
