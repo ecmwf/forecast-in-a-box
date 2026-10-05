@@ -460,6 +460,25 @@ describe('Graph Mode - Builder Integration', () => {
       .toBeVisible()
   })
 
+  it('labels parameter ids on block badges', async () => {
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+
+    const fable = createMultiBlockFable()
+    fable.blocks.sink1 = {
+      factory_id: {
+        plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+        factory: 'mapPlotSink',
+      },
+      configuration_values: { param: '167,151' },
+      input_ids: { dataset: 'product1' },
+    }
+    useFableBuilderStore.getState().setFable(fable)
+
+    const badge = screen.getByText('2t, msl', { exact: true })
+    await expect.element(badge).toBeVisible()
+  })
+
   it("does not offer a block's own consumers as its input", async () => {
     const screen = await renderWithRouter(<FableBuilderPage />)
     await expect.element(screen.getByText('Block palette')).toBeVisible()

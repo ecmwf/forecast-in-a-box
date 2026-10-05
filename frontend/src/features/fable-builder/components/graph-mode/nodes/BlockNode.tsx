@@ -8,15 +8,21 @@
  * does it submit to any jurisdiction.
  */
 
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { Plus, Settings, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { Node, NodeProps } from '@xyflow/react'
 import type { FableNodeData } from '@/features/fable-builder/utils/fable-to-graph'
+import type {
+  BlockConfigurationOption,
+  BlockValidationState,
+} from '@/api/types/fable.types'
+import type { ValueLabel } from '@/features/fable-builder/hooks/useConfigValueLabels'
 import { AddNodeButton } from '@/features/fable-builder/components/graph-mode/AddNodeButton'
 import { useNodeDimensions } from '@/features/fable-builder/hooks/useNodeDimensions'
+import { useConfigValueLabels } from '@/features/fable-builder/hooks/useConfigValueLabels'
 import {
   useBlockValidation,
   useFableBuilderStore,
@@ -41,6 +47,8 @@ import { parseGlyphSegments } from '@/features/fable-builder/utils/glyph-display
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
+import { ValueLabelHint } from '@/features/fable-builder/components/shared/ValueLabelHint'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 export type FableNode = Node<FableNodeData>
 
@@ -118,6 +126,28 @@ export const BlockNode = memo(function ({
   // Count only configured (non-empty) values — empty keys aren't shown as
   // badges, so they must not inflate the "+N more" count.
   const remainingConfigCount = configuredEntries.length - configSummary.length
+
+  // Last-known restrictions; validationState is null mid-edit.
+  const restrictionsRef = useRef<Record<string, string>>({})
+  if (validationState) {
+    // The keys may be absent at runtime; casts surface undefined.
+    const blockState = validationState.blockStates[id] as
+      BlockValidationState | undefined
+    restrictionsRef.current = blockState?.configurationRestrictions ?? {}
+  }
+  const valueLabels = useConfigValueLabels(
+    Object.fromEntries(configSummary.map(([key, v]) => [key, String(v)])),
+    Object.fromEntries(
+      configSummary.map(([key]) => [
+        key,
+        (restrictionsRef.current[key] as string | undefined) ??
+          (
+            factory.configuration_options[key] as
+              BlockConfigurationOption | undefined
+          )?.value_type,
+      ]),
+    ),
+  )
 
   return (
     <div
@@ -220,48 +250,52 @@ export const BlockNode = memo(function ({
         </P>
 
         {configSummary.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {configSummary.map(([key, value]) => {
-              const stringValue = String(value)
-              const truncated =
-                stringValue.length > 15
-                  ? `${stringValue.slice(0, 15)}...`
-                  : stringValue
-              const segments = parseGlyphSegments(truncated)
-              const hasGlyphs = segments.some((s) => s.isGlyph)
-              return (
-                <span
-                  key={key}
-                  className={cn(
-                    'rounded-md border px-2 py-0.5 text-xs font-bold',
-                    metadata.bgColor,
-                    metadata.borderColor,
-                    metadata.color,
-                  )}
-                >
-                  {hasGlyphs
-                    ? segments.map((seg, i) =>
-                        seg.isGlyph ? (
-                          <span
-                            key={i}
-                            className="rounded-md bg-primary/15 px-0.5 font-mono text-primary"
-                          >
-                            {seg.text}
-                          </span>
-                        ) : (
-                          <span key={i}>{seg.text}</span>
-                        ),
-                      )
-                    : truncated}
+          <TooltipProvider delay={120}>
+            <div className="flex flex-wrap gap-1.5">
+              {configSummary.map(([key, value]) => {
+                const valueLabel = valueLabels[key] as ValueLabel | undefined
+                const stringValue = valueLabel?.compact ?? String(value)
+                const truncated =
+                  stringValue.length > 15
+                    ? `${stringValue.slice(0, 15)}...`
+                    : stringValue
+                const segments = parseGlyphSegments(truncated)
+                const hasGlyphs = segments.some((s) => s.isGlyph)
+                return (
+                  <ValueLabelHint key={key} label={valueLabel}>
+                    <span
+                      className={cn(
+                        'rounded-md border px-2 py-0.5 text-xs font-bold',
+                        metadata.bgColor,
+                        metadata.borderColor,
+                        metadata.color,
+                      )}
+                    >
+                      {hasGlyphs
+                        ? segments.map((seg, i) =>
+                            seg.isGlyph ? (
+                              <span
+                                key={i}
+                                className="rounded-md bg-primary/15 px-0.5 font-mono text-primary"
+                              >
+                                {seg.text}
+                              </span>
+                            ) : (
+                              <span key={i}>{seg.text}</span>
+                            ),
+                          )
+                        : truncated}
+                    </span>
+                  </ValueLabelHint>
+                )
+              })}
+              {remainingConfigCount > 0 && (
+                <span className="rounded-md border bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
+                  {t('blockNode.moreCount', { count: remainingConfigCount })}
                 </span>
-              )
-            })}
-            {remainingConfigCount > 0 && (
-              <span className="rounded-md border bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
-                {t('blockNode.moreCount', { count: remainingConfigCount })}
-              </span>
-            )}
-          </div>
+              )}
+            </div>
+          </TooltipProvider>
         )}
       </div>
       <BlockErrorOverlay errors={errors} />
