@@ -15,14 +15,16 @@
  * - Renders hero section with heading
  * - Shows FiabStack section
  * - Globe component loads via lazy loading
+ * - Get started opens the one-click install dialog
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { IntroGlobeSection } from '@/features/landing/components/IntroGlobeSection'
 import { FiabStackSection } from '@/features/landing/components/FiabStackSection'
 import { Collaboration } from '@/features/landing/components/Collaboration'
+import { INSTALL_COMMAND } from '@/features/landing/components/GetStartedDialog'
 import { PublicLayout } from '@/components/layout/PublicLayout'
 import { AuthContext } from '@/features/auth/AuthContext'
 
@@ -40,6 +42,52 @@ const unauthenticatedAuth: AuthContextValue = {
 }
 
 describe('Landing Page', () => {
+  // Unstyled browser tests: keep the dialog above Base UI's fixed backdrop.
+  beforeAll(() => {
+    const style = document.createElement('style')
+    style.textContent =
+      '[data-slot="dialog-content"]{position:fixed;z-index:50}'
+    document.head.appendChild(style)
+  })
+
+  describe('Get started', () => {
+    it('copies the install command in one click', async () => {
+      const writeText = vi
+        .spyOn(navigator.clipboard, 'writeText')
+        .mockResolvedValue(undefined)
+      const screen = await renderWithRouter(
+        <AuthContext.Provider value={unauthenticatedAuth}>
+          <IntroGlobeSection />
+        </AuthContext.Provider>,
+      )
+
+      await screen.getByRole('button', { name: 'Get started' }).click()
+      await screen.getByRole('button', { name: 'Copy install command' }).click()
+
+      // Exact text, no trailing newline: pasting must not run it.
+      expect(writeText).toHaveBeenCalledWith(INSTALL_COMMAND)
+      expect(INSTALL_COMMAND).toBe(
+        'curl -fsSLo fiab.sh https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/main/scripts/fiab.sh && bash fiab.sh',
+      )
+      await expect.element(screen.getByText('Copied')).toBeVisible()
+      writeText.mockRestore()
+    })
+
+    it('still offers sign-in to registered users', async () => {
+      const signIn = vi.fn()
+      const screen = await renderWithRouter(
+        <AuthContext.Provider value={{ ...unauthenticatedAuth, signIn }}>
+          <IntroGlobeSection />
+        </AuthContext.Provider>,
+      )
+
+      await screen.getByRole('button', { name: 'Get started' }).click()
+      await screen.getByRole('button', { name: 'Sign in' }).click()
+
+      expect(signIn).toHaveBeenCalledOnce()
+    })
+  })
+
   describe('IntroGlobeSection', () => {
     it('renders the hero heading', async () => {
       const screen = await renderWithRouter(
