@@ -1,5 +1,8 @@
 val:
     uv run ty check src tests
+    # the metadata generator builds fiab-core pydantic models, so type-check it to keep the
+    # emitted artifacts.json payload in sync with the schema (see fiab_core.artifacts)
+    uv run ty check scripts/get_metadata_from_anemoi.py
     just test
 
 test:
