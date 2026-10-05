@@ -463,7 +463,8 @@
   },
   "ecmwfKey": {
     "title": "ECMWF API key",
-    "description": "Unlocks the layers your ECMWF account is entitled to on the ECMWF WMS server. The key is kept in this browser only.",
+    "optional": "Optional",
+    "description": "Unlocks the extra layers your ECMWF account is entitled to on the ECMWF WMS server; its public layers work without a key. The key is kept in this browser only.",
     "keyPage": "Find your key at api.ecmwf.int",
     "label": "API key",
     "placeholder": "Paste your key",

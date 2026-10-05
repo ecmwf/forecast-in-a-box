@@ -15,6 +15,7 @@ import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { FormEvent } from 'react'
 import { Link, P } from '@/components/base/typography'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -96,7 +97,15 @@ export function EcmwfKeyDialog() {
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('ecmwfKey.title')}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {t('ecmwfKey.title')}{' '}
+            <Badge
+              variant="outline"
+              className="font-normal text-muted-foreground"
+            >
+              {t('ecmwfKey.optional')}
+            </Badge>
+          </DialogTitle>
           <DialogDescription>{t('ecmwfKey.description')}</DialogDescription>
         </DialogHeader>
         {current !== null && (

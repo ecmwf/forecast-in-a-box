@@ -36,6 +36,13 @@ describe('EcmwfKeyDialog', () => {
     })
   })
 
+  it('marks the key as optional', async () => {
+    const screen = await renderWithProviders(<EcmwfKeyDialog />)
+    await expect
+      .element(screen.getByRole('dialog', { name: 'ECMWF API key Optional' }))
+      .toBeVisible()
+  })
+
   it('stores a key the ECMWF server accepts and closes', async () => {
     const screen = await renderWithProviders(<EcmwfKeyDialog />)
     await screen.getByLabelText('API key').fill(KEY)
