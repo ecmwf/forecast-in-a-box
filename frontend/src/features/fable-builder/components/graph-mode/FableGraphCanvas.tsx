@@ -41,6 +41,15 @@ import { useMedia } from '@/hooks/useMedia'
 import { TOUR, tourAttr } from '@/features/tutorials/anchors'
 import { cn } from '@/lib/utils'
 
+/** Debounce for the resize relayout. */
+const RESIZE_RELAYOUT_DELAY_MS = 150
+
+function heightsOf(dims: NodeDimensions): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(dims).map(([id, { height }]) => [id, height]),
+  )
+}
+
 interface FableGraphCanvasProps {
   catalogue: BlockFactoryCatalogue
 }
@@ -97,6 +106,8 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
   const [measurePending, setMeasurePending] = useState(false)
   // Full-graph replacement: additionally hidden until the measured layout.
   const [settling, setSettling] = useState(false)
+  // Card heights the last layout used.
+  const layoutHeightsRef = useRef<Record<string, number>>({})
 
   // Real node sizes, read from the DOM — neither xyflow's dimension events
   // nor its internal store deliver measurements in this controlled setup.
@@ -129,6 +140,7 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
         return
       }
       if (ready) {
+        layoutHeightsRef.current = heightsOf(dims)
         setNodes((current) =>
           layoutNodes(current, edges, { direction: layoutDirection }, dims),
         )
@@ -167,7 +179,9 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
 
     const { nodes: newNodes, edges: newEdges } = fableToGraph(fable, catalogue)
 
+    // Pre-render heights; the resize relayout below corrects them.
     const dimensions = measuredDimensions()
+    layoutHeightsRef.current = heightsOf(dimensions)
     const layouted = layoutNodes(
       newNodes,
       newEdges,
@@ -211,6 +225,43 @@ function FableGraphCanvasInner({ catalogue }: FableGraphCanvasProps) {
     measuredDimensions,
     setNodes,
     setEdges,
+  ])
+
+  // Re-centre cards whose height changed after layout (handles sit mid-height).
+  const nodeIds = nodes.map((node) => node.id).join(',')
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || measurePending) return
+    let timer = 0
+    const observer = new ResizeObserver(() => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        const dims = measuredDimensions()
+        const drifted = Object.entries(dims).some(([id, { height }]) => {
+          const laidOut = layoutHeightsRef.current[id] as number | undefined
+          return laidOut !== undefined && Math.abs(height - laidOut) > 1
+        })
+        if (!drifted) return
+        layoutHeightsRef.current = heightsOf(dims)
+        setNodes((current) =>
+          layoutNodes(current, edges, { direction: layoutDirection }, dims),
+        )
+      }, RESIZE_RELAYOUT_DELAY_MS)
+    })
+    container
+      .querySelectorAll('.react-flow__node')
+      .forEach((element) => observer.observe(element))
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(timer)
+    }
+  }, [
+    nodeIds,
+    edges,
+    layoutDirection,
+    measurePending,
+    measuredDimensions,
+    setNodes,
   ])
 
   // Position viewport once on initial load based on layout direction

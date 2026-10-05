@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { renderWithRouter } from '@tests/utils/render'
 import { mockCatalogue } from '../../../../mocks/data/fable.data'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
@@ -477,6 +477,38 @@ describe('Graph Mode - Builder Integration', () => {
 
     const badge = screen.getByText('2t, msl', { exact: true })
     await expect.element(badge).toBeVisible()
+  })
+
+  it('re-centres blocks when a card changes height after layout', async () => {
+    const { layoutDirection } = useFableBuilderStore.getState()
+    onTestFinished(() =>
+      useFableBuilderStore.getState().setLayoutDirection(layoutDirection),
+    )
+    useFableBuilderStore.getState().setLayoutDirection('LR')
+    const screen = await renderWithRouter(<FableBuilderPage />)
+    await expect.element(screen.getByText('Block palette')).toBeVisible()
+    useFableBuilderStore.getState().setFable(createTransformChainFable())
+
+    const handleY = (selector: string) => {
+      const rect = document.querySelector(selector)!.getBoundingClientRect()
+      return Math.round(rect.top + rect.height / 2)
+    }
+    const sourceOut = '[data-nodeid="source1"].react-flow__handle.source'
+    const selectIn = '[data-nodeid="select1"].react-flow__handle.target'
+    await expect
+      .poll(() => document.querySelector(selectIn) !== null)
+      .toBe(true)
+    await expect.poll(() => handleY(sourceOut) - handleY(selectIn)).toBe(0)
+
+    const card = document.querySelector(
+      '[data-id="select1"] [data-block-kind]',
+    )!
+    const filler = document.createElement('div')
+    filler.style.height = '80px'
+    card.appendChild(filler)
+
+    await expect.poll(() => handleY(sourceOut) - handleY(selectIn)).toBe(0)
+    filler.remove()
   })
 
   it("does not offer a block's own consumers as its input", async () => {
