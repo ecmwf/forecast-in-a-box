@@ -99,7 +99,6 @@
         "values": "Not yet — set Values to <v>72</v>."
       },
       "product": {
-        "param": "Not yet — set Parameter to <v>2t</v>.",
         "statistic": "Not yet — set Statistic to <v>mean</v>."
       },
       "sink": {
@@ -153,13 +152,13 @@
         "title": "Compute a product",
         "body": "Now do it yourself: click the + on the Select block and pick \"{{productBlock}}\". It lands wired, unconfigured, and selected — the next half of this step fills it in.",
         "fillTitle": "Configure the statistics",
-        "fillBody": "Set Parameter to <v>2t</v> (2-metre temperature) and Statistic to <v>mean</v> — the average over all ensemble members. The tour moves on with these values once the block validates."
+        "fillBody": "Set Statistic to <v>mean</v> — the average over all ensemble members. The tour moves on with these values once the block validates."
       },
       "output": {
         "title": "Finish with an output",
         "body": "Same again: click the + on the statistics block and pick \"{{outputBlock}}\". It renders the result as an image.",
         "fillTitle": "Configure the plot",
-        "fillBody": "Set Parameters to <v>2t</v>, Domain to <v>global</v>, Format to <v>png</v>, and both Group by and Split by to <v>none</v>. Once the badge says \"Valid\" with these values, the pipeline is complete."
+        "fillBody": "Set Parameters to <v>2t</v> (2-metre temperature), Domain to <v>global</v>, Format to <v>png</v>, and both Group by and Split by to <v>none</v>. Once the badge says \"Valid\" with these values, the pipeline is complete."
       },
       "run": {
         "title": "Run it",

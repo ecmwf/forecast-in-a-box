@@ -67,10 +67,7 @@ function createMultiBlockFable(): FableBuilderV1 {
           plugin: { store: 'ecmwf', local: 'ecmwf-base' },
           factory: 'ensembleStatistics',
         },
-        configuration_values: {
-          param: '2t',
-          statistic: 'mean',
-        },
+        configuration_values: { statistic: 'mean' },
         input_ids: { dataset: 'source1' },
       },
       sink1: {

@@ -100,11 +100,6 @@ export const mockCatalogue: BlockFactoryCatalogue = {
         title: 'Ensemble Statistics',
         description: 'Computes ensemble mean or standard deviation',
         configuration_options: {
-          param: {
-            title: 'Parameter',
-            description: "Parameter name like '2t'",
-            value_type: 'str',
-          },
           statistic: {
             title: 'Statistic',
             description: 'Statistic to compute over the ensemble',
