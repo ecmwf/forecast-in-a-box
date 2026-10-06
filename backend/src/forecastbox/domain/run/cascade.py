@@ -13,10 +13,13 @@ import time
 from pathlib import Path
 from typing import Literal
 
+from cascade.controller.report import JobId
 from cascade.gateway.api import (
     JobSpec,
     LocalProcesses,
     ResultDeletionRequest,
+    ShutdownRequest,
+    ShutdownResponse,
     SlurmCluster,
     SshCluster,
     SubmitJobRequest,
@@ -164,7 +167,20 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
     return submit_job_response
 
 
-def delete_cascade_job(cascade_job_id: str) -> None:
-    # TODO we actually have no cascade job deletion request! Once there is one, implement and replace
-    request = ResultDeletionRequest(datasets={cascade_job_id: []})  # type: ignore[invalid-argument-type]
+def delete_cascade_datasets(cascade_job_id: str) -> None:
+    """Delete all datasets of the given job in the gateway. Errors reported by the gateway are ignored."""
+    request = ResultDeletionRequest(datasets={JobId(cascade_job_id): []})
     request_response(request, get_gateway_url())
+
+
+def stop_cascade_job(cascade_job_id: str) -> ShutdownResponse:
+    """Ask the gateway to terminate the single given job. The gateway itself keeps running.
+
+    Not to be confused with a `ShutdownRequest` without `only_these`, which shuts down the whole gateway.
+    """
+    request = ShutdownRequest(only_these=[JobId(cascade_job_id)])
+    # TODO current gateway's shutdown is heavy and blocking, thus a long timeout. Remove once improved.
+    # Note that even once the gateway responds fast, the termination itself may fail or take long, so the
+    # reconciliation of the `stopping` status in `service.poll_and_update` is to stay.
+    response = request_response(request, get_gateway_url(), 15_000)
+    return response  # type: ignore[return-value]

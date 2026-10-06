@@ -21,8 +21,10 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayExited,
     GatewayNotRunning,
     GatewayNotStarted,
+    GatewayStopInProgress,
 )
-from forecastbox.domain.gateway.service import launch_gateway, status_gateway, stop_gateway
+from forecastbox.domain.gateway.service import launch_gateway, status_gateway, submit_stop_gateway
+from forecastbox.utility.concurrency.manager import SubmissionRejected
 from forecastbox.utility.config import ROUTE_PREFIX, UnmanagedGateway, config
 
 PREFIX = f"{ROUTE_PREFIX}/gateway"
@@ -59,10 +61,15 @@ async def get_status() -> str:
 
 @router.post("/kill")
 async def kill_gateway() -> str:
+    """Request the gateway to be stopped. The stop happens in the background, poll `/status` for the outcome."""
     if isinstance(config.cascade.gateway, UnmanagedGateway):
         raise HTTPException(400, "This instance does not manage the gateway")
     try:
-        stop_gateway()
+        submit_stop_gateway()
     except GatewayNotRunning:
         raise HTTPException(400, "Gateway is not running")
-    return "killed"
+    except GatewayStopInProgress:
+        raise HTTPException(409, "Gateway stop already in progress")
+    except SubmissionRejected as e:
+        raise HTTPException(503, f"Gateway stop could not be enqueued: {e}")
+    return "stopping"

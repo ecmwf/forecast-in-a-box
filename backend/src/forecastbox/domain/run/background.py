@@ -33,17 +33,34 @@ from forecastbox.domain.glyphs.resolution import (
     merge_glyph_values,
 )
 from forecastbox.domain.run import db
-from forecastbox.domain.run.cascade import delete_cascade_job, execute_cascade
+from forecastbox.domain.run.cascade import execute_cascade, stop_cascade_job
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.detail import store_compilation_detail
-from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
+from forecastbox.domain.run.stop import stop_cascade_and_mark
 from forecastbox.domain.run.types import RunId
+from forecastbox.schemata.run import RunStatus
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.memcache import TooLargeEntry
 from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
+
+
+def _abort_if_not_proceeding(run_id: RunId, attempt_count: int, expected: str) -> bool:
+    """Return whether the submission must not proceed, because the Run is gone or its status is not ``expected``.
+
+    A Run found ``stopping`` (a stop arrived before there was any cascade job to stop) is moved to ``stopped``.
+    """
+    record = db.get_run_unchecked(run_id, attempt_count)
+    if record is None:
+        logger.debug(f"run no longer exists, aborting submission: {run_id=}, {attempt_count=}")
+        return True
+    if record.status == "stopping":
+        logger.debug(f"run stopped before submission, aborting: {run_id=}, {attempt_count=}")
+        db.update_run_runtime(run_id, attempt_count, expected_status="stopping", status="stopped")
+        return True
+    return record.status != expected
 
 
 def execute_background(
@@ -64,6 +81,8 @@ def execute_background(
     """
     logger.debug(f"starting background compilation of {run_id=}")
 
+    # NOTE every status write is a compare-and-swap against this, which tracks what we last wrote ourselves
+    current_status: RunStatus = "submitted"
     try:
         start_time = current_time("glyph_resolution")
         intrinsic_values: dict[str, str] = cast(
@@ -101,12 +120,20 @@ def execute_background(
         persisted_context = compiler_runtime_context.model_copy(
             update={"glyphs": used_glyphs, "resolution": compilation_result.resolved_configuration_options}
         )
-        db.update_run_runtime(
+        if not db.update_run_runtime(
             run_id,
             attempt_count,
+            expected_status=current_status,
             compiler_runtime_context=persisted_context.model_dump(exclude_unset=True),
             status="preparing",
-        )
+        ):
+            # NOTE lost to a concurrent stop or deletion
+            _abort_if_not_proceeding(run_id, attempt_count, expected="preparing")
+            return
+        current_status = "preparing"
+
+        if _abort_if_not_proceeding(run_id, attempt_count, expected="preparing"):
+            return
 
         logger.debug(f"starting background submission of {run_id=}")
         response = execute_cascade(compilation_result.execution_spec)
@@ -126,27 +153,27 @@ def execute_background(
                 outputs=compilation_result.run_outputs.model_dump(),
             )
             get_id = lambda: f"{run_id=}, {attempt_count=}, {auth_context=}, cascade_job_id={response.job_id}"
+            job_id = cast(str, response.job_id)  # NOTE cast due to ty being confused
 
-            def delete_cascade() -> None:
+            # NOTE the stop endpoint cannot issue a cascade call before the cascade_job_id is persisted, so we check
+            # for the stopping status here, after the persist, and do the stop on our own. Similarly for the deletion.
+            record = db.get_run_unchecked(run_id, attempt_count)
+            if record is None:
+                logger.warning(f"run vanished after submission by itself: {get_id()}. Issuing cascade stop.")
                 try:
-                    delete_cascade_job(cast(str, response.job_id))  # NOTE cast due to ty being confused
+                    stop_cascade_job(job_id)
                 except Exception as e:
-                    logger.warning(f"cascade deletion of {get_id()} failed with {e!r}. Ignoring.")
-
-            try:
-                run_record = db.get_run(run_id, attempt_count, auth_context=auth_context)
-                if run_record.is_deleted:
-                    logger.debug(f"deleting cascade entity right after submission due to run entity deleted: {get_id()}.")
-                    delete_cascade()
-            except RunNotFound:
-                logger.warning(f"RunNotFound of run submitted by itself: {get_id()}. Issuing CascadeDelete.")
-                delete_cascade()
-            except RunAccessDenied:
-                logger.warning(f"RunAccessDenied to run submitted by itself: {get_id()}. Ignoring.")
+                    logger.warning(f"cascade stop of {get_id()} failed with {e!r}. Ignoring.")
+            elif record.status == "stopping":
+                logger.debug(f"stopping cascade job right after submission due to stop requested: {get_id()}.")
+                stop_cascade_and_mark(run_id, attempt_count, job_id)
         else:
             error = (response.error or "no error provided by cascade")[:255]
-            db.update_run_runtime(run_id, attempt_count, status="failed", error=error)
+            if not db.update_run_runtime(run_id, attempt_count, expected_status=current_status, status="failed", error=error):
+                _abort_if_not_proceeding(run_id, attempt_count, expected=current_status)
     except Exception as e:
         logger.exception(f"execute_background failed for run {run_id!r} attempt {attempt_count}: {repr(e)}")
         logger.debug(f"updating background data of {run_id=}")
-        db.update_run_runtime(run_id, attempt_count, status="failed", error=repr(e)[:255])
+        if not db.update_run_runtime(run_id, attempt_count, expected_status=current_status, status="failed", error=repr(e)[:255]):
+            # NOTE lost to a concurrent stop, which has no cascade job to act on
+            _abort_if_not_proceeding(run_id, attempt_count, expected=current_status)

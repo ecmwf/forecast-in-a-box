@@ -29,7 +29,7 @@ import pathlib
 import sys
 import zipfile
 from datetime import datetime as _dt
-from typing import Any, get_args
+from typing import Any, cast, get_args
 
 import cloudpickle
 import httpx
@@ -1638,6 +1638,35 @@ def test_blueprint_nullable_option(tmpdir: Any, backend_client_user: httpx.Clien
 # ---------------------------------------------------------------------------
 
 
+def _make_builder_sleeper() -> BlueprintBuilder:
+    """A source sleeping for 30s, followed by a sink."""
+    sleeper = RoutableBlock(
+        instance_id=BlockInstanceId("sleeper"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("source_sleep"),
+        instance=BlockInstance(
+            configuration_values=_config({"text": "hello", "duration": "30"}),
+            input_ids={},
+        ),
+    )
+    sink = RoutableBlock(
+        instance_id=BlockInstanceId("sink"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_file"),
+        instance=BlockInstance(
+            configuration_values=_config({"fname": "/dev/null"}),
+            input_ids={"data": BlockInstanceId("sleeper")},
+        ),
+    )
+    builder = BlueprintBuilder(
+        blocks=[
+            sleeper,
+            sink.model_copy(update={"instance_id": BlockInstanceId("sleeper_sink")}),
+        ]
+    )
+    return builder
+
+
 def _make_builder_source_and_sink(tmpdir: str) -> BlueprintBuilder:
     """Minimal two-block blueprint: source_42 → sink_file.
 
@@ -1731,7 +1760,7 @@ def test_run_restart_attempt_conflict(backend_client_user: httpx.Client) -> None
 
 
 def test_run_delete_ok(tmpdir: Any, backend_client_user: httpx.Client) -> None:
-    """Create a run, wait for completion, delete it, verify it disappears."""
+    """Create a run, wait for completion, delete it, verify it disappears. Then check delete/stop of in-progress and completed runs."""
     builder = _make_builder_source_and_sink(tmpdir)
     save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
     assert save_resp.is_success, save_resp.text
@@ -1757,6 +1786,42 @@ def test_run_delete_ok(tmpdir: Any, backend_client_user: httpx.Client) -> None:
     list_after = backend_client_user.get("/run/list").raise_for_status().json()
     assert list_after["total"] == total_before - 1
     assert run_id not in [r["run_id"] for r in list_after["runs"]]
+
+    # --- a) a sleeper job cannot be deleted right away, only once stopped ---
+    sleeper_run_id, sleeper_attempt = _create_run(backend_client_user, _make_builder_sleeper())
+    refused = backend_client_user.post("/run/delete", json={"run_id": sleeper_run_id, "attempt_count": sleeper_attempt})
+    assert refused.status_code == 409, refused.text
+    # NOTE we dont care whether the stop is applied at compile or at submitted time
+    stop_resp = backend_client_user.post("/run/stop", json={"run_id": sleeper_run_id, "attempt_count": sleeper_attempt})
+    assert stop_resp.is_success, stop_resp.text
+    _ensure_run_status(backend_client_user, sleeper_run_id, {"stopped"})
+    _ensure_deleted(backend_client_user, sleeper_run_id, sleeper_attempt)
+    assert backend_client_user.get("/run/get", params={"run_id": sleeper_run_id}).status_code == 404
+
+    # --- b) a sleeper job can be stopped right away, and stays in the list ---
+    stop_run_id, stop_attempt = _create_run(backend_client_user, _make_builder_sleeper())
+    stop_resp = backend_client_user.post("/run/stop", json={"run_id": stop_run_id, "attempt_count": stop_attempt})
+    assert stop_resp.is_success, stop_resp.text
+    _ensure_run_status(backend_client_user, stop_run_id, {"stopped"})
+    # stopping again is accepted
+    again = backend_client_user.post("/run/stop", json={"run_id": stop_run_id, "attempt_count": stop_attempt})
+    assert again.is_success, again.text
+    # the run is retained, and remains stopped
+    detail = _ensure_run_status(backend_client_user, stop_run_id, {"stopped"})
+    assert detail == "stopped"
+    listed = backend_client_user.get("/run/list", timeout=30).raise_for_status().json()["runs"]
+    assert [r["status"] for r in listed if r["run_id"] == stop_run_id] == ["stopped"]
+    _ensure_deleted(backend_client_user, stop_run_id, stop_attempt)
+
+    # --- c) a completed job cannot be stopped ---
+    done_run_id, done_attempt = _create_run(backend_client_user, _make_builder_source_and_sink(tmpdir))
+    ensure_completed_v2(backend_client_user, done_run_id, sleep=1, attempts=120)
+    refused = backend_client_user.post("/run/stop", json={"run_id": done_run_id, "attempt_count": done_attempt})
+    assert refused.status_code == 409, refused.text
+    assert backend_client_user.get("/run/get", params={"run_id": done_run_id}).json()["status"] == "completed"
+    # and a stop of an unknown run is a 404
+    missing = backend_client_user.post("/run/stop", json={"run_id": "nonexistent-run-id", "attempt_count": 1})
+    assert missing.status_code == 404
 
 
 def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> None:
@@ -1840,6 +1905,64 @@ def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, a
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} never reached 'running'")
 
 
+def _wait_gateway_not_started(client: httpx.Client, sleep: float = 1.0, attempts: int = 60) -> None:
+    def do_action() -> Any:
+        resp = client.get("/gateway/status", timeout=10)
+        assert resp.is_success, resp.text
+        return resp.json()
+
+    retry_until(
+        do_action,
+        lambda status: True if status == "not started" else None,
+        attempts=attempts,
+        sleep=sleep,
+        error_msg="gateway did not stop",
+    )
+
+
+def _ensure_run_status(client: httpx.Client, run_id: str, wanted: set[str], sleep: float = 1.0, attempts: int = 60) -> str:
+    """Poll until the run reports one of the wanted statuses.
+
+    While the gateway is busy with a stop, the polls may time out in the gateway and report `unknown`
+    which is a transient state here and is thus retried.
+    """
+
+    def do_action() -> Any:
+        resp = client.get("/run/get", params={"run_id": run_id}, timeout=30)
+        assert resp.is_success, resp.text
+        return resp.json()
+
+    def verify_ok(data: Any) -> str | None:
+        return data["status"] if data["status"] in wanted else None
+
+    return cast(
+        str, retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} never reached any of {wanted}")
+    )
+
+
+def _ensure_deleted(client: httpx.Client, run_id: str, attempt_count: int, sleep: float = 1.0, attempts: int = 60) -> None:
+    """Issue delete until it is accepted. The gateway may be busy with a previous stop and the delete then fails with 5xx."""
+
+    def do_action() -> Any:
+        return client.post("/run/delete", json={"run_id": run_id, "attempt_count": attempt_count}, timeout=30)
+
+    def verify_ok(resp: httpx.Response) -> bool | None:
+        if resp.is_success:
+            return True
+        assert resp.status_code >= 500, resp.text
+        return None
+
+    retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} could not be deleted")
+
+
+def _create_run(client: httpx.Client, builder: BlueprintBuilder) -> tuple[str, int]:
+    save_resp = client.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
+    assert save_resp.is_success, save_resp.text
+    run_resp = client.post("/run/create", json={"blueprint_id": save_resp.json()["blueprint_id"]})
+    assert run_resp.is_success, run_resp.text
+    return run_resp.json()["run_id"], run_resp.json()["attempt_count"]
+
+
 # @pytest.mark.skip("leaves hanging process behind")
 def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: httpx.Client) -> None:
     """Kill the gateway while a job is active; verify the expected status transitions.
@@ -1877,30 +2000,7 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
     assert content_resp.content.decode("utf-8").startswith("file://")
 
     # --- Step 2: submit a long-running sleeper job ---
-    sleeper = RoutableBlock(
-        instance_id=BlockInstanceId("sleeper"),
-        plugin=testPluginId,
-        factory=BlockFactoryId("source_sleep"),
-        instance=BlockInstance(
-            configuration_values=_config({"text": "hello", "duration": "30"}),
-            input_ids={},
-        ),
-    )
-    sink = RoutableBlock(
-        instance_id=BlockInstanceId("sink"),
-        plugin=testPluginId,
-        factory=BlockFactoryId("sink_file"),
-        instance=BlockInstance(
-            configuration_values=_config({"fname": "/dev/null"}),
-            input_ids={"data": BlockInstanceId("sleeper")},
-        ),
-    )
-    builder = BlueprintBuilder(
-        blocks=[
-            sleeper,
-            sink.model_copy(update={"instance_id": BlockInstanceId("sleeper_sink")}),
-        ]
-    )
+    builder = _make_builder_sleeper()
     save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
     assert save_resp.is_success, save_resp.text
     blueprint_id = save_resp.json()["blueprint_id"]
@@ -1912,9 +2012,10 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
     _wait_until_running(backend_client_user, run_id)
 
     # --- Step 3: kill the gateway ---
-    # TODO reduce the timeout once the gateway killing inside cascade becomes fast
-    kill_resp = backend_client_user.post("/gateway/kill", timeout=15)
+    # NOTE the kill is processed in the background, and blocks the gateway for a while
+    kill_resp = backend_client_user.post("/gateway/kill")
     assert kill_resp.is_success, kill_resp.text
+    _wait_gateway_not_started(backend_client_user)
 
     # Polling while the gateway is down returns "unknown"
     status_resp = backend_client_user.get("/run/get", params={"run_id": run_id}, timeout=30)
