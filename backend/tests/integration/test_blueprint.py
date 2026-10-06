@@ -1913,7 +1913,7 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
 
     # --- Step 3: kill the gateway ---
     # TODO reduce the timeout once the gateway killing inside cascade becomes fast
-    kill_resp = backend_client_user.post("/gateway/kill", timeout=10)
+    kill_resp = backend_client_user.post("/gateway/kill", timeout=15)
     assert kill_resp.is_success, kill_resp.text
 
     # Polling while the gateway is down returns "unknown"
