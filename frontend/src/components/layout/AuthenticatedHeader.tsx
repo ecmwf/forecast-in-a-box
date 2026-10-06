@@ -320,17 +320,21 @@ export function AuthenticatedHeader() {
                 </>
               )}
 
-              {/* Sign Out */}
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  onClick={handleSignOut}
-                  className="text-danger focus:text-danger"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {t('userMenu.signOut')}
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
+              {/* Passthrough mode has no session to end. */}
+              {isAuthenticated && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={handleSignOut}
+                      className="text-danger focus:text-danger"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {t('userMenu.signOut')}
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 

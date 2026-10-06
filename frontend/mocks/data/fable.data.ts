@@ -100,11 +100,6 @@ export const mockCatalogue: BlockFactoryCatalogue = {
         title: 'Ensemble Statistics',
         description: 'Computes ensemble mean or standard deviation',
         configuration_options: {
-          param: {
-            title: 'Parameter',
-            description: "Parameter name like '2t'",
-            value_type: 'str',
-          },
           statistic: {
             title: 'Statistic',
             description: 'Statistic to compute over the ensemble',
@@ -285,6 +280,18 @@ export function getBlocksByKind(
   }
 
   return result
+}
+
+/** resolveDisplay strings per GRIB param id. */
+export const mockParamDisplays: Record<string, string> = {
+  '129': 'Geopotential [m**2 s**-2] (z)',
+  '130': 'Temperature [K] (t)',
+  '151': 'Mean sea level pressure [Pa] (msl)',
+  '165': '10 metre U wind component [m s**-1] (10u)',
+  '166': '10 metre V wind component [m s**-1] (10v)',
+  '167': '2 metre temperature [K] (2t)',
+  '168': '2 metre dewpoint temperature [K] (2d)',
+  '228': 'Total precipitation [m] (tp)',
 }
 
 /**

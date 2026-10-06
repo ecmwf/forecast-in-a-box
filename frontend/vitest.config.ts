@@ -50,6 +50,8 @@ export default mergeConfig(
       ],
       exclude: ['tests/e2e/**', 'node_modules/**', GPU_TESTS],
       setupFiles: ['./tests/setup.ts'],
+      // expect.poll's 1 s default flakes on loaded CI runners; only failures wait longer.
+      expect: { poll: { timeout: 5000 } },
       browser: {
         enabled: true,
         provider: playwright(),

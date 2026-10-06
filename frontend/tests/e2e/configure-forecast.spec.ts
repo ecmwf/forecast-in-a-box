@@ -219,7 +219,7 @@ test.describe('Fable Builder - Graph Mode', () => {
               plugin: { store: 'ecmwf', local: 'ecmwf-base' },
               factory: 'ensembleStatistics',
             },
-            configuration_values: { param: '2t', statistic: 'mean' },
+            configuration_values: { statistic: 'mean' },
             input_ids: { dataset: 'block_source_1' },
           },
           block_sink_1: {

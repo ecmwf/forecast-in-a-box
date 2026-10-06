@@ -53,9 +53,12 @@ function hintKeyFor(message: string): HintKey | null {
 export function ValidationStatusBadge({
   className,
   catalogue,
+  failure = null,
 }: {
   className?: string
   catalogue?: BlockFactoryCatalogue
+  /** Why the validation request itself failed; outranks any earlier result. */
+  failure?: string | null
 }) {
   const { t } = useTranslation('configure')
   const validationState = useFableBuilderStore((state) => state.validationState)
@@ -109,6 +112,32 @@ export function ValidationStatusBadge({
         <Loader2 className="h-3 w-3 animate-spin" />
         {t('validationStatus.validating')}
       </Badge>
+    )
+  }
+
+  if (failure !== null) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Badge
+              variant="destructive"
+              render={<button type="button" />}
+              className={cn('cursor-pointer gap-1', className)}
+              {...anchor}
+            />
+          }
+        >
+          <AlertCircle className="h-3 w-3" />
+          {t('validationStatus.failed')}
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-80 p-3 text-sm">
+          <p className="text-danger">{failure}</p>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {t('validationStatus.hints.failed')}
+          </p>
+        </PopoverContent>
+      </Popover>
     )
   }
 

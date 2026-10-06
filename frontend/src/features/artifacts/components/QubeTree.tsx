@@ -37,13 +37,25 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { Switch } from '@/components/ui/switch'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { P } from '@/components/base/typography'
+import { ParamHintTooltip } from '@/components/base/fields/fields/ParamOptionLabel'
+import { paramLabel } from '@/components/base/fields/param-display'
 import { cn } from '@/lib/utils'
 
 export interface QubeTreeProps {
   node: QubeNode
+  /** Param labels keyed by id or shortname. */
+  paramLabels?: ReadonlyMap<string, string>
   className?: string
 }
+
+const NO_LABELS: ReadonlyMap<string, string> = new Map()
 
 interface MatrixSection {
   /** Stable key for React lists. */
@@ -63,7 +75,11 @@ interface MatrixSection {
   presence: Set<string>
 }
 
-export function QubeTree({ node, className }: QubeTreeProps) {
+export function QubeTree({
+  node,
+  paramLabels = NO_LABELS,
+  className,
+}: QubeTreeProps) {
   const { t } = useTranslation('artifacts')
   const [pivoted, setPivoted] = useState(false)
   const switchId = useId()
@@ -83,6 +99,7 @@ export function QubeTree({ node, className }: QubeTreeProps) {
     return (
       <AifsMatrixView
         node={node}
+        labels={paramLabels}
         pivoted={pivoted}
         switchId={switchId}
         onPivotChange={setPivoted}
@@ -96,19 +113,36 @@ export function QubeTree({ node, className }: QubeTreeProps) {
 
 function AifsMatrixView({
   node,
+  labels,
   pivoted,
   switchId,
   onPivotChange,
   className,
 }: {
   node: QubeNode
+  labels: ReadonlyMap<string, string>
   pivoted: boolean
   switchId: string
   onPivotChange: (next: boolean) => void
   className?: string
 }) {
   const { t } = useTranslation('artifacts')
-  const sections = useMemo(() => processQube(node, t), [node, t])
+  const rawSections = useMemo(() => processQube(node, t), [node, t])
+  // Sort by shown label so id- and shortname-keyed qubes line up.
+  const sections = useMemo(
+    () =>
+      labels.size === 0
+        ? rawSections
+        : rawSections.map((section) => ({
+            ...section,
+            params: [...section.params].sort((a, b) =>
+              paramLabel(a, labels, 'compact').localeCompare(
+                paramLabel(b, labels, 'compact'),
+              ),
+            ),
+          })),
+    [rawSections, labels],
+  )
   const hasMatrixSection = sections.some((s) => s.levels !== null)
 
   return (
@@ -133,11 +167,18 @@ function AifsMatrixView({
         ) : null}
       </header>
 
-      <div className="space-y-4">
-        {sections.map((section) => (
-          <SectionView key={section.id} section={section} pivoted={pivoted} />
-        ))}
-      </div>
+      <TooltipProvider delay={120}>
+        <div className="space-y-4">
+          {sections.map((section) => (
+            <SectionView
+              key={section.id}
+              section={section}
+              pivoted={pivoted}
+              labels={labels}
+            />
+          ))}
+        </div>
+      </TooltipProvider>
     </Card>
   )
 }
@@ -253,9 +294,11 @@ function isAifsShaped(root: QubeNode): boolean {
 function SectionView({
   section,
   pivoted,
+  labels,
 }: {
   section: MatrixSection
   pivoted: boolean
+  labels: ReadonlyMap<string, string>
 }) {
   const { t } = useTranslation('artifacts')
 
@@ -284,9 +327,13 @@ function SectionView({
       <CollapsibleContent>
         <div className="mt-3 pl-5">
           {section.levels !== null ? (
-            <DimensionalMatrix section={section} pivoted={pivoted} />
+            <DimensionalMatrix
+              section={section}
+              pivoted={pivoted}
+              labels={labels}
+            />
           ) : (
-            <SurfaceList section={section} />
+            <SurfaceList section={section} labels={labels} />
           )}
         </div>
       </CollapsibleContent>
@@ -297,9 +344,11 @@ function SectionView({
 function DimensionalMatrix({
   section,
   pivoted,
+  labels,
 }: {
   section: MatrixSection
   pivoted: boolean
+  labels: ReadonlyMap<string, string>
 }) {
   const { t } = useTranslation('artifacts')
   const [hover, setHover] = useState<{ row?: number; col?: number }>({})
@@ -312,10 +361,12 @@ function DimensionalMatrix({
   const rows = pivoted ? sortedLevels : section.params
   const cols = pivoted ? section.params : sortedLevels
 
+  const formatParam = (value: number | string): string =>
+    paramLabel(String(value), labels, 'compact')
   const formatRow = (value: number | string): string =>
-    pivoted ? formatLevel(value as number, t) : String(value)
+    pivoted ? formatLevel(value as number, t) : formatParam(value)
   const formatCol = (value: number | string): string =>
-    pivoted ? String(value) : formatLevel(value as number, t)
+    pivoted ? formatParam(value) : formatLevel(value as number, t)
 
   const isPresent = (row: number | string, col: number | string): boolean => {
     const param = pivoted ? col : row
@@ -349,57 +400,73 @@ function DimensionalMatrix({
           {pivoted ? t('detail.qubeAxisLevel') : t('detail.qubeAxisParam')}
         </div>
         {cols.map((col, colIdx) => (
-          <div
+          <ParamHintTooltip
             key={String(col)}
-            role="columnheader"
-            className={cn(
-              headerCellClasses,
-              hover.col === colIdx
-                ? 'rounded-t bg-muted/60 text-foreground'
-                : 'text-muted-foreground',
-            )}
-            onMouseEnter={() => setHover({ col: colIdx })}
+            id={pivoted ? String(col) : ''}
+            labels={labels}
           >
-            {formatCol(col)}
-          </div>
+            <div
+              role="columnheader"
+              className={cn(
+                headerCellClasses,
+                hover.col === colIdx
+                  ? 'rounded-t bg-muted/60 text-foreground'
+                  : 'text-muted-foreground',
+              )}
+              onMouseEnter={() => setHover({ col: colIdx })}
+            >
+              {formatCol(col)}
+            </div>
+          </ParamHintTooltip>
         ))}
       </div>
 
       {rows.map((row, rowIdx) => (
         <div key={String(row)} role="row" className="contents">
-          <div
-            role="rowheader"
-            className={cn(
-              'px-1 py-1 pr-3 text-right font-mono text-xs font-medium transition-colors',
-              hover.row === rowIdx
-                ? 'rounded-l bg-muted/60 text-foreground'
-                : 'text-foreground/80',
-            )}
-            onMouseEnter={() => setHover({ row: rowIdx })}
-          >
-            {formatRow(row)}
-          </div>
+          <ParamHintTooltip id={pivoted ? '' : String(row)} labels={labels}>
+            <div
+              role="rowheader"
+              className={cn(
+                'px-1 py-1 pr-3 text-right font-mono text-xs font-medium transition-colors',
+                hover.row === rowIdx
+                  ? 'rounded-l bg-muted/60 text-foreground'
+                  : 'text-foreground/80',
+              )}
+              onMouseEnter={() => setHover({ row: rowIdx })}
+            >
+              {formatRow(row)}
+            </div>
+          </ParamHintTooltip>
           {cols.map((col, colIdx) => {
             const present = isPresent(row, col)
-            const tooltip = pivoted
-              ? `${col} @ ${formatLevel(row as number, t)}`
-              : `${row} @ ${formatLevel(col as number, t)}`
+            const param = String(pivoted ? col : row)
+            const level = (pivoted ? row : col) as number
+            const tooltip = `${paramLabel(param, labels, 'full')} @ ${formatLevel(level, t)}`
             const inRow = hover.row === rowIdx
             const inCol = hover.col === colIdx
             return (
-              <div
-                key={String(col)}
-                role="cell"
-                className={cn(
-                  dataCellClasses,
-                  (inRow || inCol) && 'bg-muted/40',
-                  inRow && inCol && 'bg-muted/70',
-                )}
-                title={tooltip}
-                onMouseEnter={() => setHover({ row: rowIdx, col: colIdx })}
-              >
-                <Cell present={present} />
-              </div>
+              <Tooltip key={String(col)}>
+                <TooltipTrigger
+                  render={
+                    <div
+                      role="cell"
+                      className={cn(
+                        dataCellClasses,
+                        (inRow || inCol) && 'bg-muted/40',
+                        inRow && inCol && 'bg-muted/70',
+                      )}
+                      onMouseEnter={() =>
+                        setHover({ row: rowIdx, col: colIdx })
+                      }
+                    />
+                  }
+                >
+                  <Cell present={present} />
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6}>
+                  {tooltip}
+                </TooltipContent>
+              </Tooltip>
             )
           })}
         </div>
@@ -422,18 +489,21 @@ function Cell({ present }: { present: boolean }) {
   )
 }
 
-function SurfaceList({ section }: { section: MatrixSection }) {
+function SurfaceList({
+  section,
+  labels,
+}: {
+  section: MatrixSection
+  labels: ReadonlyMap<string, string>
+}) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {section.params.map((param) => (
-        <Badge
-          key={param}
-          variant="secondary"
-          className="font-mono"
-          title={param}
-        >
-          {param}
-        </Badge>
+        <ParamHintTooltip key={param} id={param} labels={labels}>
+          <Badge variant="secondary" className="font-mono">
+            {paramLabel(param, labels, 'compact')}
+          </Badge>
+        </ParamHintTooltip>
       ))}
     </div>
   )

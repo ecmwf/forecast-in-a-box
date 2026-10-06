@@ -42,6 +42,7 @@ import type {
   MlModelOverview,
 } from '@/api/types/artifacts.types'
 import {
+  artifactLabels,
   decodeArtifactId,
   encodeArtifactId,
   toArtifactInfo,
@@ -105,6 +106,26 @@ export function useArtifacts() {
     isLoading: query.isLoading,
     refetch: query.refetch,
   }
+}
+
+function toArtifactLabels(
+  models: Array<MlModelOverview>,
+): ReadonlyMap<string, string> {
+  return artifactLabels(models.map(toArtifactInfo))
+}
+
+const NO_ARTIFACT_LABELS: ReadonlyMap<string, string> = new Map()
+
+/** Catalogue label per artifact wire id; shares the `useArtifacts` query. */
+export function useArtifactLabels(enabled = true): ReadonlyMap<string, string> {
+  const { data } = useQuery({
+    queryKey: artifactKeys.list(),
+    queryFn: listModels,
+    staleTime: 60 * 1000,
+    enabled,
+    select: toArtifactLabels,
+  })
+  return data ?? NO_ARTIFACT_LABELS
 }
 
 /**

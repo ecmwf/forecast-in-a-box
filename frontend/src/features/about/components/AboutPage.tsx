@@ -29,27 +29,41 @@ const STEPS: ReadonlyArray<{
   { key: 'dissemination', kind: 'sink' },
 ]
 
-const PARTNER_LOGOS = [
+const PARTNER_LOGOS: ReadonlyArray<{
+  key: 'ecmwf' | 'metNorway' | 'fmi' | 'destinE'
+  src: string
+  darkSrc?: string
+  href: string
+  size: string
+}> = [
   // Widths compensate for the padding baked into the ECMWF and MET Norway PNGs.
   {
     key: 'ecmwf',
     src: '/logos/org/ECMWF.png',
     href: 'https://www.ecmwf.int',
-    size: 'w-48',
+    size: 'w-44',
   },
   {
     key: 'metNorway',
     src: '/logos/org/MetNorway.png',
     href: 'https://www.met.no',
-    size: 'w-44',
+    size: 'w-40',
+  },
+  {
+    key: 'fmi',
+    src: '/logos/org/FMI.png',
+    darkSrc: '/logos/org/FMI-dark.png',
+    href: 'https://en.ilmatieteenlaitos.fi',
+    size: 'h-12 w-auto',
   },
   {
     key: 'destinE',
     src: '/logos/org/destine.png',
     href: DESTINE_URL,
-    size: 'w-56',
+    size: 'w-44',
   },
-] as const
+]
+const ARCX_URL = 'https://africa-knowledge-platform.ec.europa.eu/arcx'
 
 const TOOL_LOGOS = [
   { key: 'anemoi', src: '/logos/packages/anemoi.webp', href: ANEMOI_URL },
@@ -145,20 +159,44 @@ export function AboutPage() {
 
       <section className={`${SECTION} pt-20`}>
         <H2 className="border-0 pb-0 text-2xl">{t('collaboration.title')}</H2>
-        <div className="mt-10 grid divide-y divide-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          {PARTNER_LOGOS.map(({ key, src, href, size }) => (
+        {/* One row from lg; the 1px gaps over bg-border draw the hairlines. */}
+        <div className="mt-10 grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-5">
+          {PARTNER_LOGOS.map(({ key, src, darkSrc, href, size }) => (
             <a
               key={key}
               href={href}
-              className="flex items-center justify-center px-8 py-5"
+              className="flex items-center justify-center bg-background px-8 py-5"
             >
               <img
                 src={src}
                 alt={t(`brand.${key}`)}
-                className={cn(size, 'h-auto object-contain')}
+                className={cn(
+                  'h-auto object-contain',
+                  size,
+                  darkSrc && 'dark:hidden',
+                )}
               />
+              {darkSrc && (
+                <img
+                  src={darkSrc}
+                  alt={t(`brand.${key}`)}
+                  className={cn(size, 'hidden object-contain dark:block')}
+                />
+              )}
             </a>
           ))}
+          {/* ArcX has no logo of its own; its materials set the name in type. */}
+          <a
+            href={ARCX_URL}
+            className="flex flex-col items-center justify-center bg-background px-8 py-5 text-center sm:col-span-2 lg:col-span-1"
+          >
+            <span className="text-2xl font-bold tracking-tight">
+              {t('brand.arcx')}
+            </span>
+            <span className="text-xs text-balance text-muted-foreground">
+              {t('brand.arcxFull')}
+            </span>
+          </a>
         </div>
         <P className="mt-10 mb-4 text-sm font-semibold tracking-wide text-foreground/70 uppercase">
           {t('about.people.builtWith')}

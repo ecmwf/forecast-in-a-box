@@ -19,12 +19,45 @@ import type { DimensionNarrowing } from '@/features/fable-builder/lib/qube-narro
 import { computeQubeMetrics } from '@/features/fable-builder/lib/qube-metrics'
 import { dimensionColor } from '@/features/fable-builder/lib/dimension-colors'
 import { qubeToRequest } from '@/features/fable-builder/lib/qube-to-request'
+import { useParamLabels } from '@/api/hooks/useFable'
+import { paramLabel } from '@/components/base/fields/param-display'
+import { ParamHintTooltip } from '@/components/base/fields/fields/ParamOptionLabel'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 type Tab = 'dimensions' | 'selection'
+
+// Qube axes carry no Fable type; this one holds GRIB param ids by convention.
+const PARAM_AXIS = 'param'
+const NO_LABELS: ReadonlyMap<string, string> = new Map()
+const NO_VALUES: Array<string> = []
+
+/** Sorts labelled values by their shown label. */
+function byLabel(
+  dim: QubeDimension,
+  labels: ReadonlyMap<string, string>,
+): QubeDimension {
+  if (labels.size === 0) return dim
+  const shown = (value: string) => paramLabel(value, labels, 'compact')
+  return {
+    ...dim,
+    values: [...dim.values].sort((a, b) => shown(a).localeCompare(shown(b))),
+  }
+}
+
+function valueMatches(
+  value: string,
+  search: string,
+  labels: ReadonlyMap<string, string>,
+): boolean {
+  return (
+    value.toLowerCase().includes(search) ||
+    (labels.get(value)?.toLowerCase().includes(search) ?? false)
+  )
+}
 
 function ColorDot({ name }: { name: string }) {
   return (
@@ -64,11 +97,13 @@ function DimensionRow({
   narrowing,
   highlighted,
   search,
+  labels,
 }: {
   dim: QubeDimension
   narrowing: DimensionNarrowing | undefined
   highlighted: boolean
   search: string
+  labels: ReadonlyMap<string, string>
 }) {
   const { t } = useTranslation('configure')
   const [open, setOpen] = useState(false)
@@ -78,7 +113,7 @@ function DimensionRow({
   // Auto-reveal a dimension's values when the search matches one of them.
   const valueMatch =
     search !== '' &&
-    dim.values.some((value) => value.toLowerCase().includes(search))
+    dim.values.some((value) => valueMatches(value, search, labels))
   const showValues = open || valueMatch
 
   // Selecting this dimension's spectrum bar reveals and scrolls to its row.
@@ -104,9 +139,11 @@ function DimensionRow({
           {dim.key}
         </span>
         {fixedValue != null && (
-          <span className="truncate font-mono text-xs text-muted-foreground">
-            {fixedValue}
-          </span>
+          <ParamHintTooltip id={fixedValue} labels={labels}>
+            <span className="truncate font-mono text-xs text-muted-foreground">
+              {paramLabel(fixedValue, labels, 'compact')}
+            </span>
+          </ParamHintTooltip>
         )}
         <span className="ml-auto flex items-center gap-2">
           {narrowing != null && (
@@ -131,20 +168,20 @@ function DimensionRow({
       {showValues && count > 0 && (
         <div className="flex flex-wrap gap-1 px-3 pt-1 pb-2">
           {dim.values.map((value) => {
-            const isMatch =
-              search !== '' && value.toLowerCase().includes(search)
+            const isMatch = search !== '' && valueMatches(value, search, labels)
             return (
-              <Badge
-                key={value}
-                variant="secondary"
-                className={cn(
-                  'font-mono',
-                  isMatch &&
-                    'border border-primary/50 bg-primary/10 text-primary',
-                )}
-              >
-                {value}
-              </Badge>
+              <ParamHintTooltip key={value} id={value} labels={labels}>
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    'font-mono',
+                    isMatch &&
+                      'border border-primary/50 bg-primary/10 text-primary',
+                  )}
+                >
+                  {paramLabel(value, labels, 'compact')}
+                </Badge>
+              </ParamHintTooltip>
             )
           })}
         </div>
@@ -181,6 +218,13 @@ export function QubeInspector({
     [narrowing],
   )
 
+  const paramLabels = useParamLabels(
+    metrics.dimensions.find((dim) => dim.key === PARAM_AXIS)?.values ??
+      NO_VALUES,
+  )
+  const labelsFor = (key: string) =>
+    key === PARAM_AXIS ? paramLabels : NO_LABELS
+
   const hasFixed = metrics.dimensions.some((dim) => dim.values.length <= 1)
   const search = query.trim().toLowerCase()
   // Most-varying dimensions first, then alphabetical — the qube's tree order
@@ -192,7 +236,9 @@ export function QubeInspector({
       // Match the axis name or any of its coordinate values.
       return (
         dim.key.toLowerCase().includes(search) ||
-        dim.values.some((value) => value.toLowerCase().includes(search))
+        dim.values.some((value) =>
+          valueMatches(value, search, labelsFor(dim.key)),
+        )
       )
     })
     .sort(
@@ -322,17 +368,20 @@ export function QubeInspector({
             )}
           </div>
 
-          <ul className="flex flex-col">
-            {visibleDimensions.map((dim) => (
-              <DimensionRow
-                key={dim.key}
-                dim={dim}
-                narrowing={narrowingByDim.get(dim.key)}
-                highlighted={highlighted === dim.key}
-                search={search}
-              />
-            ))}
-          </ul>
+          <TooltipProvider delay={120}>
+            <ul className="flex flex-col">
+              {visibleDimensions.map((dim) => (
+                <DimensionRow
+                  key={dim.key}
+                  dim={byLabel(dim, labelsFor(dim.key))}
+                  narrowing={narrowingByDim.get(dim.key)}
+                  highlighted={highlighted === dim.key}
+                  search={search}
+                  labels={labelsFor(dim.key)}
+                />
+              ))}
+            </ul>
+          </TooltipProvider>
 
           <div className="border-t border-border pt-2 text-center font-mono text-xs text-muted-foreground">
             {metrics.dimensions.map((dim) => dim.values.length).join(' × ')} ={' '}

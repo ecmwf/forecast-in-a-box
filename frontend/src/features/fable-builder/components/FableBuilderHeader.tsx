@@ -66,6 +66,8 @@ interface FableBuilderHeaderProps {
   catalogue: BlockFactoryCatalogue
   /** Fired after a config file was parsed and applied to the store */
   onConfigLoaded?: () => void
+  /** Why the last validation request failed; null when it didn't. */
+  validationFailure?: string | null
 }
 
 /** Tags shown in the header before folding the rest into a +N. */
@@ -75,6 +77,7 @@ export function FableBuilderHeader({
   fableId,
   catalogue,
   onConfigLoaded,
+  validationFailure = null,
 }: FableBuilderHeaderProps) {
   const { t } = useTranslation('configure')
   const [savePopoverOpen, setSavePopoverOpen] = useState(false)
@@ -242,7 +245,12 @@ export function FableBuilderHeader({
                 </H1>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {hasBlocks && <ValidationStatusBadge catalogue={catalogue} />}
+                {hasBlocks && (
+                  <ValidationStatusBadge
+                    catalogue={catalogue}
+                    failure={validationFailure}
+                  />
+                )}
                 <DraftStatus className="hidden sm:inline-flex" />
                 {tags.length > 0 && (
                   <span className="hidden min-w-0 items-center gap-1 sm:flex">

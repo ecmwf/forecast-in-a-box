@@ -34,12 +34,29 @@
   "collaboration": {
     "title": "A Collaboration between"
   },
+  "getStarted": {
+    "title": "Run Forecast-in-a-Box on your machine",
+    "description": "Paste this into a terminal on macOS or Linux. It installs Forecast-in-a-Box into ~/.fiab and opens it in your browser. No account or admin rights needed.",
+    "copy": "Copy install command",
+    "copied": "Copied",
+    "copiedAnnouncement": "Install command copied to clipboard",
+    "copyFailed": "Couldn't copy automatically. Copy the command from here:",
+    "nextTime": "Next time, just run <code>bash fiab.sh</code>. Upgrades are offered inside the app.",
+    "userGuide": "User guide",
+    "viewScript": "View script",
+    "troubleshooting": "Troubleshooting",
+    "registered": "Registered for the hosted trial?",
+    "signIn": "Sign in"
+  },
   "brand": {
     "anemoi": "Anemoi",
     "earthkit": "EarthKit",
     "ecmwf": "ECMWF",
     "metNorway": "MetNorway",
-    "destinE": "DestinE"
+    "fmi": "FMI",
+    "destinE": "DestinE",
+    "arcx": "ArcX",
+    "arcxFull": "Africa Regional Centres of Excellence"
   },
   "about": {
     "eyebrow": "About Forecast-in-a-Box",

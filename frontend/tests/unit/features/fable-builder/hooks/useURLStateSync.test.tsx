@@ -270,6 +270,35 @@ describe('useURLStateSync', () => {
     })
   })
 
+  describe('emptied work', () => {
+    it('clears the URL payload once every block is deleted', async () => {
+      await render(<TestComponent />)
+      useFableBuilderStore.setState({
+        fable: {
+          blocks: {
+            block1: {
+              factory_id: {
+                plugin: { store: 'ecmwf', local: 'p' },
+                factory: 'f',
+              },
+              configuration_values: {},
+              input_ids: {},
+            },
+          },
+        },
+      })
+      await expect
+        .poll(() => mockNavigate.mock.calls.at(-1)?.[0])
+        .toMatchObject({ search: { state: 'encoded-state' } })
+
+      useFableBuilderStore.setState({ fable: { blocks: {} } })
+
+      await expect
+        .poll(() => mockNavigate.mock.calls.at(-1)?.[0])
+        .toEqual({ to: '/configure', search: {}, replace: true })
+    })
+  })
+
   describe('large state detection', () => {
     it('calls isStateTooLarge with encoded state', async () => {
       mockEncodeFableToURL.mockReturnValue('test-encoded')

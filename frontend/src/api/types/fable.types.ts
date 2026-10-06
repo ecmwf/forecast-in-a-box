@@ -240,6 +240,27 @@ export type GlyphFunctionsResponse = z.infer<
   typeof GlyphFunctionsResponseSchema
 >
 
+/** A resolveDisplay input; `typeName` is a bare type such as `param`. */
+export interface ResolvableValue {
+  typeName: string
+  value: string
+}
+
+/** Response from POST /blueprint/options/resolveDisplay, in request order. */
+export const ResolveDisplayResponseSchema = z.object({
+  elements: z.array(
+    z.object({
+      typeName: z.string(),
+      value: z.string(),
+      display: z.string().nullable(),
+    }),
+  ),
+})
+
+export type ResolveDisplayResponse = z.infer<
+  typeof ResolveDisplayResponseSchema
+>
+
 export const FableValidationExpansionSchema = z.object({
   global_errors: z.array(z.string()),
   block_errors: z.record(z.string(), z.array(z.string())),
@@ -409,6 +430,8 @@ export interface BlockValidationState {
   configurationRestrictions: Record<string, string>
   /** Unknown glyph names per option, from /blueprint/expand. */
   missingGlyphs: Record<string, Array<string>>
+  /** Edited since this result; errors dropped until the next check. */
+  stale?: boolean
 }
 
 export interface FableValidationState {

@@ -12,9 +12,14 @@ import { useCallback, useState } from 'react'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { GlyphFieldWrapper } from './GlyphFieldWrapper'
+import { ParamHintTooltip } from './ParamOptionLabel'
 import type { KeyboardEvent } from 'react'
+import type { DisplayLookup } from '@/components/base/fields/value-type-parser'
+import { paramLabel } from '@/components/base/fields/param-display'
+import { useParamLabels } from '@/api/hooks/useFable'
 import { Badge } from '@/components/ui/badge'
 import { InputGroupInput } from '@/components/ui/input-group'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export interface ListFieldProps {
@@ -30,7 +35,11 @@ export interface ListFieldProps {
    * aren't parseable integers and hints the keyboard to numeric.
    */
   itemType?: 'string' | 'int'
+  /** Label entries via a backend lookup; the stored value stays the id. */
+  lookup?: DisplayLookup
 }
+
+const NO_ITEMS: Array<string> = []
 
 /**
  * Parse a comma-separated string into an array of strings
@@ -63,6 +72,7 @@ export function ListField({
   disabled,
   className,
   itemType = 'string',
+  lookup,
 }: ListFieldProps) {
   const { t } = useTranslation('common')
   const resolvedPlaceholder = placeholder ?? t('field.addItemPlaceholder')
@@ -83,6 +93,7 @@ export function ListField({
         placeholder={resolvedPlaceholder}
         disabled={disabled}
         itemType={itemType}
+        lookup={lookup}
       />
     </GlyphFieldWrapper>
   )
@@ -96,11 +107,13 @@ function ListFieldConcrete({
   disabled,
   className,
   itemType = 'string',
+  lookup,
 }: Omit<ListFieldProps, 'configKey'>) {
   const { t } = useTranslation('common')
   const resolvedPlaceholder = placeholder ?? t('field.addItemPlaceholder')
   const [inputValue, setInputValue] = useState('')
   const items = parseListValue(value)
+  const labels = useParamLabels(lookup === 'param' ? items : NO_ITEMS)
 
   const addItem = useCallback(
     (newItem: string) => {
@@ -150,48 +163,50 @@ function ListFieldConcrete({
   // data-slot opts into InputGroup's h-auto + items-stretch so the field
   // grows when chips wrap and the inline-start `{}` toggle stays aligned.
   return (
-    <div
-      data-slot="input-group-content"
-      className={cn(
-        'flex min-w-0 flex-1 flex-wrap items-center gap-1.5 py-1',
-        className,
-      )}
-    >
-      {items.map((item, index) => (
-        <Badge
-          key={`${item}-${index}`}
-          variant="secondary"
-          className="gap-1 pr-1"
-        >
-          {item}
-          {!disabled && (
-            <button
-              type="button"
-              onClick={() => removeItem(index)}
-              className="ml-1 rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
-              aria-label={t('removeTag', { tag: item })}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </Badge>
-      ))}
-      <InputGroupInput
-        id={id}
-        type="text"
-        inputMode={itemType === 'int' ? 'numeric' : undefined}
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => {
-          if (inputValue.trim()) {
-            addItem(inputValue)
-          }
-        }}
-        placeholder={resolvedPlaceholder}
-        disabled={disabled}
-        className="h-7 min-w-[6rem] flex-1 !px-0"
-      />
-    </div>
+    <TooltipProvider delay={120}>
+      <div
+        data-slot="input-group-content"
+        className={cn(
+          'flex min-w-0 flex-1 flex-wrap items-center gap-1.5 py-1',
+          className,
+        )}
+      >
+        {items.map((item, index) => (
+          <ParamHintTooltip key={`${item}-${index}`} id={item} labels={labels}>
+            <Badge variant="secondary" className="gap-1 pr-1">
+              {paramLabel(item, labels, 'compact')}
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={() => removeItem(index)}
+                  className="ml-1 rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
+                  aria-label={t('removeTag', {
+                    tag: paramLabel(item, labels, 'full'),
+                  })}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </Badge>
+          </ParamHintTooltip>
+        ))}
+        <InputGroupInput
+          id={id}
+          type="text"
+          inputMode={itemType === 'int' ? 'numeric' : undefined}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => {
+            if (inputValue.trim()) {
+              addItem(inputValue)
+            }
+          }}
+          placeholder={resolvedPlaceholder}
+          disabled={disabled}
+          className="h-7 min-w-[6rem] flex-1 !px-0"
+        />
+      </div>
+    </TooltipProvider>
   )
 }

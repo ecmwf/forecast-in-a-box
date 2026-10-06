@@ -27,6 +27,11 @@ export const CompositeArtifactIdSchema = z.object({
 
 export type CompositeArtifactId = z.infer<typeof CompositeArtifactIdSchema>
 
+/** Config-value wire form; mirrors `CompositeArtifactId.to_str`. */
+export function artifactIdToWire(id: CompositeArtifactId): string {
+  return `${id.artifact_store_id}:${id.artifact_local_id}`
+}
+
 /**
  * Encode a CompositeArtifactId for use in URL path segments.
  * Format: "storeId--localId"
@@ -176,4 +181,22 @@ export function toArtifactInfo(model: MlModelOverview): ArtifactInfo {
     isLocallyCompatible: model.is_locally_compatible,
     localCompatibilityDetail: model.local_compatibility_detail,
   }
+}
+
+/** Label per wire id; shared display names get the local id appended. */
+export function artifactLabels(
+  artifacts: ReadonlyArray<ArtifactInfo>,
+): ReadonlyMap<string, string> {
+  const nameCounts = new Map<string, number>()
+  for (const { displayName } of artifacts) {
+    nameCounts.set(displayName, (nameCounts.get(displayName) ?? 0) + 1)
+  }
+  return new Map(
+    artifacts.map(({ id, displayName }) => [
+      artifactIdToWire(id),
+      (nameCounts.get(displayName) ?? 0) > 1
+        ? `${displayName} · ${id.artifact_local_id}`
+        : displayName,
+    ]),
+  )
 }

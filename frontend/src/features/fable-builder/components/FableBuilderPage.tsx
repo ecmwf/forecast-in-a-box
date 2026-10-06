@@ -11,7 +11,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Package } from 'lucide-react'
+import { Package } from 'lucide-react'
 import { FableBuilderHeader } from './FableBuilderHeader'
 import { WorkbenchShelfBanner } from './WorkbenchShelfBanner'
 import { BlockPalette } from './layout/BlockPalette'
@@ -22,7 +22,10 @@ import { FableGraphCanvas } from './graph-mode/FableGraphCanvas'
 import { ReviewStep as ReviewStepComponent } from './review/ReviewStep'
 import { TemplateParamsDialog } from './TemplateParamsDialog'
 import type { TFunction } from 'i18next'
-import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
+import type {
+  BlockFactoryCatalogue,
+  FableBuilderV1,
+} from '@/api/types/fable.types'
 import type { TemplateParameters } from '@/features/fable-builder/utils/template-parameters'
 import { SubmitRunDialog } from '@/features/executions/components/SubmitRunDialog'
 import { deriveTemplateParameters } from '@/features/fable-builder/utils/template-parameters'
@@ -38,6 +41,10 @@ import { useTutorialsStore } from '@/stores/tutorialsStore'
 import { shelveBenchIfDirty } from '@/features/fable-builder/stores/workbenchShelfStore'
 import { hasUnterminatedGlyph } from '@/features/fable-builder/utils/glyph-display'
 import { decodeFableFromURL } from '@/features/fable-builder/utils/url-state'
+import {
+  dropBlockErrors,
+  staleBlockIds,
+} from '@/features/fable-builder/utils/stale-validation'
 import { useDebounce } from '@/hooks/useDebounce'
 import { useMedia } from '@/hooks/useMedia'
 import { GlyphProvider } from '@/features/fable-builder/context/GlyphContext'
@@ -51,7 +58,6 @@ import {
 } from '@/api/hooks/useFable'
 import { useTemplateExampleValues } from '@/api/hooks/usePlugins'
 import { H2, P } from '@/components/base/typography'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useUser } from '@/hooks/useUser'
@@ -86,6 +92,9 @@ function getValidationErrorMessage(
     // Fall back to status-based message
     if (error.status === 422) {
       return t('page.validationError422')
+    }
+    if (error.status !== undefined && error.status >= 500) {
+      return t('page.validationError5xx', { status: error.status })
     }
   }
   return error.message || t('page.validationErrorGeneric')
@@ -252,8 +261,11 @@ export function FableBuilderPage({
     data: validationResult,
     isLoading: isValidating,
     isFetching: isRevalidating,
+    isPlaceholderData: isStaleValidation,
     error: validationError,
   } = useFableValidation(debouncedFable, !fableHasOpenGlyph)
+  // The fable the last real (non-placeholder) result was computed for.
+  const validatedFableRef = useRef<FableBuilderV1 | null>(null)
 
   // Fresh intent: reset now — also mid-session; dirty work parks on the shelf.
   useEffect(() => {
@@ -478,12 +490,27 @@ export function FableBuilderPage({
   }, [isValidating, isRevalidating, setIsValidating])
 
   useEffect(() => {
-    if (validationResult) {
-      setValidationState(
-        toValidationState(validationResult, debouncedFable, catalogue),
-      )
+    if (!validationResult) return
+    const state = toValidationState(validationResult, debouncedFable, catalogue)
+    if (!isStaleValidation || validatedFableRef.current === null) {
+      validatedFableRef.current = debouncedFable
+      setValidationState(state)
+      return
     }
-  }, [catalogue, debouncedFable, validationResult, setValidationState])
+    // Placeholder (previous) result: drop what it says about edited blocks.
+    setValidationState(
+      dropBlockErrors(
+        state,
+        staleBlockIds(validatedFableRef.current, debouncedFable),
+      ),
+    )
+  }, [
+    catalogue,
+    debouncedFable,
+    validationResult,
+    isStaleValidation,
+    setValidationState,
+  ])
 
   if (catalogueLoading || (fableId && fableLoading)) {
     return (
@@ -538,25 +565,16 @@ export function FableBuilderPage({
           fableId={templateMode ? undefined : fableId}
           catalogue={catalogue}
           onConfigLoaded={() => setLoadedCheckPending(true)}
+          validationFailure={
+            validationError
+              ? getValidationErrorMessage(validationError, t)
+              : null
+          }
         />
 
         <WorkbenchShelfBanner />
 
-        {/* Wrapper is relative so the validation banner overlays absolutely —
-            toggling it must not shift the canvas. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          {validationError && (
-            <Alert
-              variant="destructive"
-              className="absolute top-2 right-4 left-4 z-10 shadow-lg"
-            >
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>{t('page.validationErrorTitle')}</AlertTitle>
-              <AlertDescription>
-                {getValidationErrorMessage(validationError, t)}
-              </AlertDescription>
-            </Alert>
-          )}
           {step === 'edit' ? (
             <EditStep catalogue={catalogue} isDesktop={isDesktop} />
           ) : (

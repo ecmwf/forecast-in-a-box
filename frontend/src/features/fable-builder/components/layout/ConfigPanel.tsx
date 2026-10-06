@@ -25,7 +25,10 @@ import { useBlockDisplayNames } from '@/features/fable-builder/hooks/useBlockDis
 import { definableGlyphs } from '@/features/fable-builder/utils/definable-glyphs'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
 import { useReservedGlyphReason } from '@/features/glyphs/utils/reserved-names'
-import { useFableBuilderStore } from '@/features/fable-builder/stores/fableBuilderStore'
+import {
+  findDownstreamBlocks,
+  useFableBuilderStore,
+} from '@/features/fable-builder/stores/fableBuilderStore'
 import {
   BLOCK_KIND_METADATA,
   getBlockConfigurationRestrictions,
@@ -56,6 +59,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
+import { Reveal } from '@/components/common/Reveal'
 import { GlyphReferencePanel } from '@/features/fable-builder/components/shared/GlyphReferencePanel'
 import { BlockValidationProvider } from '@/features/fable-builder/context/BlockValidationContext'
 import { mapBlockErrorsToFields } from '@/features/fable-builder/utils/map-block-errors-to-fields'
@@ -121,20 +125,20 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   const availableSources = useMemo(() => {
     if (!selectedBlockId) return []
 
+    // Own consumers are excluded: wiring one in would close a cycle.
+    const downstream = findDownstreamBlocks(selectedBlockId, fable.blocks)
     return Object.entries(fable.blocks)
       .filter(([id, block]) => {
-        if (id === selectedBlockId) return false
+        if (id === selectedBlockId || downstream.has(id)) return false
         const blockFactory = getFactory(catalogue, block.factory_id)
         return (
-          blockFactory?.kind === 'source' || blockFactory?.kind === 'product'
+          blockFactory?.kind === 'source' ||
+          blockFactory?.kind === 'transform' ||
+          blockFactory?.kind === 'product'
         )
       })
-      .map(([id, block]) => ({
-        id,
-        block,
-        factory: getFactory(catalogue, block.factory_id),
-      }))
-  }, [fable.blocks, selectedBlockId, catalogue])
+      .map(([id]) => ({ id, name: blockNames[id] ?? id }))
+  }, [fable.blocks, selectedBlockId, catalogue, blockNames])
 
   function handleConfigChange(key: string, value: string): void {
     if (!selectedBlockId) return
@@ -264,11 +268,15 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
     ...(pendingRestrictions ?? {}),
     ...(liveConfigRestrictions ?? cachedConfigRestrictions ?? {}),
   }
-  if (validationState && selectedBlockId) {
+  // Stale stand-in result: keep the last errors, as in the null gap.
+  const selectedBlockState = validationState?.blockStates[selectedBlockId ?? '']
+  const errorsSettled =
+    validationState !== null && selectedBlockState?.stale !== true
+  if (errorsSettled && selectedBlockId) {
     lastMappedErrorsRef.current[selectedBlockId] = liveMappedErrors
   }
   const mappedErrors =
-    validationState || !selectedBlockId
+    errorsSettled || !selectedBlockId
       ? liveMappedErrors
       : (lastMappedErrorsRef.current[selectedBlockId] ?? liveMappedErrors)
   const definableMissingGlyphs = definableGlyphs(
@@ -323,76 +331,80 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
         )}
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4">
         {/* Backend block errors that map to no specific field — verbatim. */}
-        {mappedErrors.unmapped.length > 0 && (
-          <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
-            {mappedErrors.unmapped.map((message) => (
-              <P key={message} className="text-sm text-danger">
-                {message}
-              </P>
-            ))}
-          </div>
-        )}
-        {inputs.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Link2 className="h-4 w-4" />
-              {t('configPanel.inputConnections')}
-            </div>
-            <div className="space-y-3">
-              {inputs.map((inputName) => (
-                <InputConnectionField
-                  key={inputName}
-                  inputName={inputName}
-                  currentSourceId={selectedBlock.input_ids[inputName] || ''}
-                  availableSources={availableSources}
-                  onInputChange={handleInputChange}
-                />
+        <Reveal open={mappedErrors.unmapped.length > 0}>
+          <div className="pb-6">
+            <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+              {mappedErrors.unmapped.map((message) => (
+                <P key={message} className="text-sm text-danger">
+                  {message}
+                </P>
               ))}
             </div>
-            <Separator />
           </div>
-        )}
-
-        {configOptions.length > 0 && (
-          <BlockValidationProvider
-            resolvedConfig={resolvedConfigForBlock}
-            fieldErrors={mappedErrors.byConfigKey}
-            missingGlyphs={definableMissingGlyphs}
-          >
+        </Reveal>
+        <div className="space-y-6">
+          {inputs.length > 0 && (
             <div className="space-y-3">
-              <div className="text-sm font-medium">
-                {t('configPanel.configuration')}
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Link2 className="h-4 w-4" />
+                {t('configPanel.inputConnections')}
               </div>
-              <div className="space-y-4">
-                {configOptions.map(([key, option]) => (
-                  <FieldRenderer
-                    key={key}
-                    id={`config-${key}`}
-                    configKey={key}
-                    valueType={configRestrictions[key] ?? option.value_type}
-                    value={selectedBlock.configuration_values[key] || ''}
-                    onChange={(value) => handleConfigChange(key, value)}
-                    label={option.title || key}
-                    description={option.description}
-                    inputClassName="h-9"
+              <div className="space-y-3">
+                {inputs.map((inputName) => (
+                  <InputConnectionField
+                    key={inputName}
+                    inputName={inputName}
+                    currentSourceId={selectedBlock.input_ids[inputName] || ''}
+                    availableSources={availableSources}
+                    onInputChange={handleInputChange}
                   />
                 ))}
               </div>
-              {/* mt-10 reserves clearance for the last field's absolute
+              <Separator />
+            </div>
+          )}
+
+          {configOptions.length > 0 && (
+            <BlockValidationProvider
+              resolvedConfig={resolvedConfigForBlock}
+              fieldErrors={mappedErrors.byConfigKey}
+              missingGlyphs={definableMissingGlyphs}
+            >
+              <div className="space-y-3">
+                <div className="text-sm font-medium">
+                  {t('configPanel.configuration')}
+                </div>
+                <div className="space-y-4">
+                  {configOptions.map(([key, option]) => (
+                    <FieldRenderer
+                      key={key}
+                      id={`config-${key}`}
+                      configKey={key}
+                      valueType={configRestrictions[key] ?? option.value_type}
+                      value={selectedBlock.configuration_values[key] || ''}
+                      onChange={(value) => handleConfigChange(key, value)}
+                      label={option.title || key}
+                      description={option.description}
+                      inputClassName="h-9"
+                    />
+                  ))}
+                </div>
+                {/* mt-10 reserves clearance for the last field's absolute
                     preview/nudge/error stack so they don't overlap the
                     reference panel. */}
-              <GlyphReferencePanel className="mt-10" />
-            </div>
-          </BlockValidationProvider>
-        )}
+                <GlyphReferencePanel className="mt-10" />
+              </div>
+            </BlockValidationProvider>
+          )}
 
-        {configOptions.length === 0 && inputs.length === 0 && (
-          <div className="py-4 text-center text-sm text-muted-foreground">
-            {t('configPanel.noConfigOptions')}
-          </div>
-        )}
+          {configOptions.length === 0 && inputs.length === 0 && (
+            <div className="py-4 text-center text-sm text-muted-foreground">
+              {t('configPanel.noConfigOptions')}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="border-t border-border p-4">
@@ -435,7 +447,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
 
 interface AvailableSource {
   id: string
-  factory: { title?: string } | undefined
+  name: string
 }
 
 interface InputConnectionFieldProps {
@@ -453,8 +465,8 @@ function InputConnectionField({
 }: InputConnectionFieldProps): React.ReactNode {
   const { t } = useTranslation('configure')
   const displayValue = currentSourceId
-    ? availableSources.find((s) => s.id === currentSourceId)?.factory?.title ||
-      currentSourceId
+    ? (availableSources.find((s) => s.id === currentSourceId)?.name ??
+      currentSourceId)
     : t('configPanel.selectSource')
 
   return (
@@ -470,9 +482,9 @@ function InputConnectionField({
           <SelectValue>{displayValue}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {availableSources.map(({ id, factory: sourceFactory }) => (
+          {availableSources.map(({ id, name }) => (
             <SelectItem key={id} value={id}>
-              {sourceFactory?.title || id}
+              {name}
             </SelectItem>
           ))}
           {availableSources.length === 0 && (

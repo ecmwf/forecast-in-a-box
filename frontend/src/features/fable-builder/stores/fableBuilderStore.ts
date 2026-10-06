@@ -57,9 +57,9 @@ function getDefaultLayoutDirection(): LayoutDirection {
 /**
  * Breadth-first walk of every block transitively downstream of `startId`
  * (i.e. blocks that consume its output, directly or via intermediaries).
- * Shared by `removeBlockCascade` and `duplicateBlockWithChildren`.
+ * Shared by `removeBlockCascade`, `duplicateBlockWithChildren` and ConfigPanel.
  */
-function findDownstreamBlocks(
+export function findDownstreamBlocks(
   startId: BlockInstanceId,
   blocks: Record<BlockInstanceId, BlockInstance>,
 ): Set<BlockInstanceId> {

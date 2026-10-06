@@ -75,6 +75,8 @@ export const API_ENDPOINTS = {
     glyphsGlobalPost: `${API_PREFIX}/blueprint/glyphs/global/post`,
     /** POST - Delete a global glyph by ID */
     glyphsGlobalDelete: `${API_PREFIX}/blueprint/glyphs/global/delete`,
+    /** POST - Resolve param/artifact option values to display strings */
+    resolveDisplay: `${API_PREFIX}/blueprint/options/resolveDisplay`,
   },
 
   /**

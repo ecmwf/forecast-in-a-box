@@ -231,7 +231,7 @@ export const ForecastRunRow = memo(function ({
         )}
 
         {/* Actions */}
-        <div className="mt-2 flex w-full items-center justify-between gap-6 sm:mt-0 sm:w-auto sm:justify-end">
+        <div className="mt-2 flex w-full items-center justify-between gap-6 sm:mt-0 sm:w-auto sm:shrink-0 sm:justify-end">
           <RunAction run={run} />
 
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -311,7 +311,7 @@ function RunAction({ run }: { run: ForecastRunViewModel }) {
       to="/execute/$jobId"
       params={{ jobId: run.runId }}
       className={cn(
-        'hit-target-y text-sm font-semibold hover:underline',
+        'hit-target-y text-sm font-semibold whitespace-nowrap hover:underline',
         variant.className,
       )}
     >
