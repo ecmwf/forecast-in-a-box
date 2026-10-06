@@ -26,6 +26,7 @@
     "fix": "prettier --write . && eslint --fix .",
     "analyze": "vite build --mode analyze",
     "validate:fix": "npm run fix && npm run check && npm run test:run && npm run test:e2e && npm run build",
+    "validate:local": "npm run fix && npm run check && npm run test:run && npm run test:gpu && VITE_PORT=${VITE_PORT:-3100} npm run test:e2e && npm run build",
     "validate:ci": "npm run check && npm run test:run && npm run test:e2e && npm run build"
   },
   "dependencies": {

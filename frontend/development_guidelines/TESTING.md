@@ -70,6 +70,7 @@ npm run test:ui         # Interactive UI
 npm run test:e2e        # Playwright E2E - all tests against MSW mocks (fast, no backend needed)
 npm run test:e2e:stack  # Playwright E2E - all tests against real backend (port 8000)
 npm run test:globe      # 3D globe, local only: *.gpu.test.ts(x) + the globe E2E
+npm run validate:local  # Before pushing: fix, check, all Vitest incl. GPU, all E2E on :3100, build
 ```
 
 `*.gpu.test.ts` files drive the real globe engine on WebGL; the default config, and so CI, skips them
