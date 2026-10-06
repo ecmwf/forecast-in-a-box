@@ -1840,7 +1840,7 @@ def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, a
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} never reached 'running'")
 
 
-@pytest.mark.skip("leaves hanging process behind")
+# @pytest.mark.skip("leaves hanging process behind")
 def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: httpx.Client) -> None:
     """Kill the gateway while a job is active; verify the expected status transitions.
 
@@ -1912,8 +1912,8 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
     _wait_until_running(backend_client_user, run_id)
 
     # --- Step 3: kill the gateway ---
-    # TODO this leaves the workers hanging. We need some solution to collect them properly
-    kill_resp = backend_client_user.post("/gateway/kill")
+    # TODO reduce the timeout once the gateway killing inside cascade becomes fast
+    kill_resp = backend_client_user.post("/gateway/kill", timeout=10)
     assert kill_resp.is_success, kill_resp.text
 
     # Polling while the gateway is down returns "unknown"
