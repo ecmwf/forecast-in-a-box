@@ -143,7 +143,8 @@ export function useViewerExport({
   // Combined view joins side-by-side maps into one image — the clipboard
   // holds a single item.
   const copyView = (only: SourceSlot | null) => {
-    if (!captureAction) return
+    // The ref: a key press can land before the registration re-render.
+    if (!captureActionRef.current) return
     copyToClipboard(
       'image/png',
       composeCaptures({
