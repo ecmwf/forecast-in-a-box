@@ -285,7 +285,8 @@ def stop_gateway() -> None:
                 raise GatewayNotRunning("Gateway is not running")
             logger.debug("gateway shutdown message")
             m = api.ShutdownRequest()
-            client.request_response(m, gateway_connection.gateway_url, 4_000)
+            # TODO current gateway's shutdown is heavy and blocking, thus a long timeout. Remove once improved
+            client.request_response(m, gateway_connection.gateway_url, 10_000)
             logger.debug("gateway terminate and join")
 
             process = gateway_connection.process
