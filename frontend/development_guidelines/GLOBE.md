@@ -91,7 +91,7 @@ reloads MapLibre's style mid-bend.
 
 | Invariant                                         | Test                                                             |
 |---------------------------------------------------|------------------------------------------------------------------|
-| One instant per frame; export waits for it        | `globe-registration` "after a time step", `globe-viewer` capture |
+| One instant per frame; export waits for it        | `globe-registration` "after a time step", `globe-capture`       |
 | Far side never over the near side while bending   | `globe-registration` "while bending"                             |
 | Points move evenly on screen                      | `globe-registration` "while bending"                             |
 | Nothing sweeps across the view (dateline in view) | `globe-registration` "while bending"                             |
