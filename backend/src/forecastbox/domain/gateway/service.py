@@ -25,6 +25,7 @@ from cascade.gateway import api, client
 from cascade.gateway.server import serve
 from cascade.low.func import Either, assert_never
 
+from forecastbox.domain.gateway.events import GatewayStopFailedEvent, GatewayStoppedEvent
 from forecastbox.domain.gateway.exceptions import (
     GatewayAlreadyRunning,
     GatewayExited,
@@ -36,6 +37,7 @@ from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility import tunnel
 from forecastbox.utility.concurrency.manager import TaskName, execution_manager
 from forecastbox.utility.config import ConcurrentPools, LocalGateway, RemoteGateway, UnmanagedGateway, config
+from forecastbox.utility.dispatcher import Event, EventName, submit_event
 
 logger = logging.getLogger(__name__)
 
@@ -313,13 +315,19 @@ def stop_gateway() -> None:
             assert_never(gateway_connection)
 
 
+def _submit_stop_notification(event: GatewayStoppedEvent | GatewayStopFailedEvent, event_name: str) -> None:
+    try:
+        submit_event(Event(name=EventName(event_name), payload=event))
+    except Exception as error:
+        logger.exception(f"failed to submit gateway stop notification {event_name!r}: {repr(error)}")
+
+
 def submit_stop_gateway() -> None:
     """Enqueue `stop_gateway` on the general pool, unmonitored, and return without waiting for it.
 
     Raises ``GatewayNotRunning`` if there is no gateway to stop, ``GatewayStopInProgress`` if
     a previously submitted stop has not finished yet, and ``SubmissionRejected`` if the pool does not
-    accept the task. Failures of the stop itself are only logged; the caller is expected to observe the
-    outcome via `status_gateway`.
+    accept the task. Completion and failure are reported through gateway notification events.
     """
     connection = GatewayConnectionManager.gateway_connection
     if connection is None or (isinstance(connection, LocalProcess) and connection.process.exitcode is not None):
@@ -330,10 +338,14 @@ def submit_stop_gateway() -> None:
     def task() -> None:
         try:
             stop_gateway()
-        except GatewayNotRunning:
+        except GatewayNotRunning as error:
             logger.warning("background gateway stop found gateway not running")
-        except Exception:
+            _submit_stop_notification(GatewayStopFailedEvent(error=repr(error)), "gateway.stop_failed")
+        except Exception as error:
             logger.exception("background gateway stop failed")
+            _submit_stop_notification(GatewayStopFailedEvent(error=repr(error)), "gateway.stop_failed")
+        else:
+            _submit_stop_notification(GatewayStoppedEvent(), "gateway.stopped")
         finally:
             GatewayConnectionManager.stop_lock.release()
 

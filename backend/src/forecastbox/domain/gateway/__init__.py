@@ -11,6 +11,7 @@
 Manages the Gateway domain -- process lifecycle and connection URL used by
 other domains to execute and inspect workflow jobs.
 
-Depends on utility config and Cascade runtime bindings.
+Depends on utility config and Cascade runtime bindings. Loosely coupled with the Notification domain
+through dispatcher events emitted when a gateway stop operation completes.
 Depended on by Run domain and gateway/status routes.
 """
