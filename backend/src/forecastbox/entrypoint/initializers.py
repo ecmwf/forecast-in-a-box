@@ -51,6 +51,7 @@ from forecastbox.utility.dispatcher import (
 from forecastbox.utility.dispatcher import (
     stop_request as dispatcher_stop_request,
 )
+from forecastbox.utility.http_pools import start_http_pools, stop_http_pools
 from forecastbox.utility.initializer import Initializer, Initializers
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
@@ -264,6 +265,7 @@ def build_initializers() -> Initializers:
     initializers = [
         Initializer("db_schema", start=start_db_schema),
         Initializer("execution_runtime", start=_start_execution_runtime, stop=_stop_execution_runtime),
+        Initializer("http_pools", start=start_http_pools, stop=stop_http_pools),
         Initializer("broadcaster", start=_start_broadcaster),
         Initializer("artifact_stores", start=_start_artifact_stores),
         Initializer("artifact_provider", start=start_artifact_provider),
