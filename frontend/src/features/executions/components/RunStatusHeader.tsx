@@ -224,6 +224,7 @@ export function RunStatusHeader({
   idLineExtra,
 }: RunStatusHeaderProps) {
   const { t } = useTranslation(['executions', 'journal'])
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const terminal = isTerminalStatus(status)
   const elapsed = useElapsedTime(createdAt, terminal)
   const timeZone = useAppTimeZone()
@@ -334,38 +335,47 @@ export function RunStatusHeader({
             </Button>
           )}
 
-          <AlertDialog>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button variant="ghost" size="icon" />}
-              >
-                <MoreVertical className="h-5 w-5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-auto min-w-fit">
-                {/* Hidden at lg+, where it is shown as a button instead. */}
-                {onEditConfig && (
-                  <DropdownMenuItem
-                    onClick={onEditConfig}
-                    className="whitespace-nowrap lg:hidden"
-                  >
-                    <Settings2 className="mr-2 h-4 w-4" />
-                    {t('actions.editConfiguration')}
-                  </DropdownMenuItem>
-                )}
-                <AlertDialogTrigger
-                  nativeButton={false}
-                  render={
-                    <DropdownMenuItem
-                      variant="destructive"
-                      disabled={isDeletePending}
-                    />
-                  }
+          <DropdownMenu>
+            {/* Active runs keep only Edit workflow, itself a button at lg+. */}
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('journal:item.moreOptions')}
+                  className={cn(
+                    !terminal && (onEditConfig ? 'lg:hidden' : 'hidden'),
+                  )}
+                />
+              }
+            >
+              <MoreVertical className="h-5 w-5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-auto min-w-fit">
+              {/* Hidden at lg+, where it is shown as a button instead. */}
+              {onEditConfig && (
+                <DropdownMenuItem
+                  onClick={onEditConfig}
+                  className="whitespace-nowrap lg:hidden"
+                >
+                  <Settings2 className="mr-2 h-4 w-4" />
+                  {t('actions.editConfiguration')}
+                </DropdownMenuItem>
+              )}
+              {/* Only finished runs can be deleted; active ones are stopped. */}
+              {terminal && (
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={isDeletePending}
+                  onClick={() => setDeleteOpen(true)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   {t('actions.delete')}
-                </AlertDialogTrigger>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>{t('actions.deleteJob')}</AlertDialogTitle>

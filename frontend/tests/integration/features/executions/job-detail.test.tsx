@@ -19,6 +19,7 @@
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
 import {
@@ -222,6 +223,27 @@ describe('RunDetailPage Integration', () => {
       expect(
         screen.getByRole('button', { name: 'Stop', exact: true }).elements(),
       ).toHaveLength(0)
+    })
+
+    it('offers no Delete on an active run', async () => {
+      const screen = await renderDetailPage('job-running-002')
+      await screen.getByRole('button', { name: 'More options' }).click()
+      await expect
+        .element(screen.getByRole('menuitem', { name: 'Edit workflow' }))
+        .toBeInTheDocument()
+      expect(
+        screen.getByRole('menuitem', { name: 'Delete' }).elements(),
+      ).toHaveLength(0)
+      await userEvent.keyboard('{Escape}')
+    })
+
+    it('keeps Delete on a finished run', async () => {
+      const screen = await renderDetailPage('job-completed-001')
+      await screen.getByRole('button', { name: 'More options' }).click()
+      await expect
+        .element(screen.getByRole('menuitem', { name: 'Delete' }))
+        .toBeInTheDocument()
+      await userEvent.keyboard('{Escape}')
     })
 
     it('reports calmly when the run finished before the stop', async () => {

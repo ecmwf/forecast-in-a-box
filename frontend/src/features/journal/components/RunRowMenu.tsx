@@ -28,7 +28,7 @@ import type { FableRetrieveResponse } from '@/api/types/fable.types'
 import type { ForecastRunViewModel } from '@/features/journal/types'
 import { useUpsertFable } from '@/api/hooks/useFable'
 import { useDeleteJob, useStopJob } from '@/api/hooks/useJobs'
-import { isStoppableStatus } from '@/api/types/job.types'
+import { isStoppableStatus, isTerminalStatus } from '@/api/types/job.types'
 import { buildPreviousRunComparison } from '@/features/visualise/compare-runs'
 import {
   isOneoffBlueprint,
@@ -213,13 +213,15 @@ export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
               {t('executions:actions.stopping')}
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem
-            onClick={() => setDeleteOpen(true)}
-            className="text-danger focus:text-danger"
-          >
-            <Trash2 className="h-4 w-4" />
-            {t('item.delete')}
-          </DropdownMenuItem>
+          {isTerminalStatus(run.status) && (
+            <DropdownMenuItem
+              onClick={() => setDeleteOpen(true)}
+              className="text-danger focus:text-danger"
+            >
+              <Trash2 className="h-4 w-4" />
+              {t('item.delete')}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

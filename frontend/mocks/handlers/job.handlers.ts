@@ -300,6 +300,16 @@ export const jobHandlers = [
       )
     }
 
+    const status = getExecution(executionId)?.status
+    if (status && !['completed', 'failed', 'stopped'].includes(status)) {
+      return HttpResponse.json(
+        {
+          detail: `Run ${executionId} has status '${status}', only completed, failed or stopped runs can be deleted.`,
+        },
+        { status: 409 },
+      )
+    }
+
     const deleted = deleteExecution(executionId)
 
     if (!deleted) {

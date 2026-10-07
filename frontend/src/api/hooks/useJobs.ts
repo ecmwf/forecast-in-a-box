@@ -163,8 +163,13 @@ export function useDeleteJob() {
 
   return useMutation<void, Error, { runId: string; attemptCount: number }>({
     mutationFn: ({ runId, attemptCount }) => deleteJob(runId, attemptCount),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: jobKeys.all })
+    // 409: not finished; callers show the backend's reason instead.
+    meta: { expectedErrorStatuses: [409] },
+    onSuccess: (_data, { runId }) => {
+      // Gone for good: a refetch would only 404 behind the navigation.
+      queryClient.removeQueries({ queryKey: jobKeys.status(runId) })
+      void queryClient.invalidateQueries({ queryKey: jobKeys.all })
+      void queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
     },
   })
 }
