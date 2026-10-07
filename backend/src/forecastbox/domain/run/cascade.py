@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
+from cascade.controller.report import JobId
 from cascade.gateway.api import (
     JobSpec,
     LocalProcesses,
@@ -164,7 +165,7 @@ def execute_cascade(spec: ExecutionSpecification) -> SubmitJobResponse:
     return submit_job_response
 
 
-def delete_cascade_job(cascade_job_id: str) -> None:
-    # TODO we actually have no cascade job deletion request! Once there is one, implement and replace
-    request = ResultDeletionRequest(datasets={cascade_job_id: []})  # type: ignore[invalid-argument-type]
+def delete_cascade_datasets(cascade_job_id: str) -> None:
+    """Delete all datasets of the given job in the gateway. Errors reported by the gateway are ignored."""
+    request = ResultDeletionRequest(datasets={JobId(cascade_job_id): []})
     request_response(request, get_gateway_url())

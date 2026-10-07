@@ -20,7 +20,7 @@ from sqlalchemy import JSON, Boolean, Column, ForeignKeyConstraint, Integer, Str
 from forecastbox.schemata.jobs import Base
 from forecastbox.utility.time import UTCDateTime
 
-RunStatus = Literal["submitted", "preparing", "running", "completed", "failed", "unknown"]
+RunStatus = Literal["submitted", "preparing", "running", "stopping", "stopped", "completed", "failed", "unknown"]
 
 
 class Run(Base):

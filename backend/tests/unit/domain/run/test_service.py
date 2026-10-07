@@ -11,6 +11,7 @@ from fiab_core.fable import BlockInstanceId
 from forecastbox.domain.run import service
 from forecastbox.domain.run.cascade import RunOutputCharacteristic, RunOutputs
 from forecastbox.domain.run.db import RunRecord
+from forecastbox.domain.run.exceptions import RunConcurrencyIssue, RunNotFound
 
 
 def test_get_mime_of_output_returns_declared_mime() -> None:
@@ -289,3 +290,113 @@ async def test_poll_and_update_completed_job_with_changed_gateway_exposes_cached
     assert detail.status == "completed"
     assert detail.available_task_ids == [TaskId("task-text")]
     assert detail.lost_task_ids == {TaskId("task-image"): "Gateway Proc changed"}
+
+
+def _stopping_execution() -> SimpleNamespace:
+    execution = _make_running_execution(None)
+    execution.status = "stopping"
+    return execution
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_stopping_still_running_reissues_stop() -> None:
+    response = _make_cascade_response([], pct="50.00")
+    update_mock = MagicMock(return_value=True)
+    submit_mock = MagicMock()
+    with (
+        patch("forecastbox.domain.run.service.client.request_response", return_value=response),
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=update_mock),
+        patch("forecastbox.domain.run.service.submit_stop_cascade", new=submit_mock),
+    ):
+        detail = await service.poll_and_update(cast(RunRecord, _stopping_execution()))
+    assert detail.status == "stopping"
+    submit_mock.assert_called_once_with("run-1", 1, "job-1")
+    update_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_stopping_unknown_to_gateway_becomes_stopped() -> None:
+    response = SimpleNamespace(progresses={}, datasets={}, error=None, completed_task_ids=None, planned_task_ids=None)
+    update_mock = MagicMock(return_value=True)
+    with (
+        patch("forecastbox.domain.run.service.client.request_response", return_value=response),
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=update_mock),
+    ):
+        detail = await service.poll_and_update(cast(RunRecord, _stopping_execution()))
+    assert detail.status == "stopped"
+    assert update_mock.call_args.kwargs["expected_status"] == "stopping"
+    assert update_mock.call_args.kwargs["status"] == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_stopping_completed_overrides_stopping() -> None:
+    response = _make_cascade_response([], completed=True, pct="100.00")
+    update_mock = MagicMock(return_value=True)
+    with (
+        patch("forecastbox.domain.run.service.client.request_response", return_value=response),
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=update_mock),
+    ):
+        detail = await service.poll_and_update(cast(RunRecord, _stopping_execution()))
+    assert detail.status == "completed"
+    assert update_mock.call_args.kwargs["expected_status"] == "stopping"
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_rereads_when_status_write_loses() -> None:
+    """A lost compare-and-swap leads to re-reading the run and polling again on the fresh record."""
+    response = _make_cascade_response([], pct="50.00")
+    stale = _make_running_execution(None)
+    fresh = _stopping_execution()
+    update_mock = MagicMock(return_value=False)
+    submit_mock = MagicMock()
+    with (
+        patch("forecastbox.domain.run.service.client.request_response", return_value=response),
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=update_mock),
+        patch("forecastbox.domain.run.service.run_db.get_run_unchecked", return_value=fresh),
+        patch("forecastbox.domain.run.service.submit_stop_cascade", new=submit_mock),
+    ):
+        detail = await service.poll_and_update(cast(RunRecord, stale))
+    assert detail.status == "stopping"
+    assert update_mock.call_args.kwargs["expected_status"] == "running"
+    submit_mock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_stopped_makes_no_gateway_call() -> None:
+    execution = _stopping_execution()
+    execution.status = "stopped"
+    with patch("forecastbox.domain.run.service.client.request_response") as rr:
+        detail = await service.poll_and_update(cast(RunRecord, execution))
+    assert detail.status == "stopped"
+    rr.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_gives_up_when_status_write_keeps_losing() -> None:
+    response = _make_cascade_response([], pct="50.00")
+    execution = _make_running_execution(None)
+    with (
+        patch("forecastbox.domain.run.service.client.request_response", return_value=response),
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=MagicMock(return_value=False)),
+        patch("forecastbox.domain.run.service.run_db.get_run_unchecked", return_value=execution),
+    ):
+        with pytest.raises(RunConcurrencyIssue):
+            await service.poll_and_update(cast(RunRecord, execution))
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_raises_not_found_when_run_vanishes_during_retry() -> None:
+    response = _make_cascade_response([], pct="50.00")
+    with (
+        patch("forecastbox.domain.run.service.client.request_response", return_value=response),
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=MagicMock(return_value=False)),
+        patch("forecastbox.domain.run.service.run_db.get_run_unchecked", return_value=None),
+    ):
+        with pytest.raises(RunNotFound):
+            await service.poll_and_update(cast(RunRecord, _make_running_execution(None)))

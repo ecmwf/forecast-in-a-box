@@ -30,10 +30,12 @@ from forecastbox.domain.gateway.exceptions import (
     GatewayExited,
     GatewayNotRunning,
     GatewayNotStarted,
+    GatewayStopInProgress,
 )
 from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility import tunnel
-from forecastbox.utility.config import LocalGateway, RemoteGateway, UnmanagedGateway, config
+from forecastbox.utility.concurrency.manager import TaskName, execution_manager
+from forecastbox.utility.config import ConcurrentPools, LocalGateway, RemoteGateway, UnmanagedGateway, config
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,8 @@ def _initial_connection() -> GatewayConnection | None:
 
 class GatewayConnectionManager:
     lock: threading.Lock = threading.Lock()
+    stop_lock: threading.Lock = threading.Lock()
+    """Held for the duration of a background `stop_gateway`, acquired non-blockingly by `submit_stop_gateway`."""
     gateway_connection: GatewayConnection | None = _initial_connection()
 
 
@@ -286,7 +290,7 @@ def stop_gateway() -> None:
             logger.debug("gateway shutdown message")
             m = api.ShutdownRequest()
             # TODO current gateway's shutdown is heavy and blocking, thus a long timeout. Remove once improved
-            client.request_response(m, gateway_connection.gateway_url, 10_000)
+            client.request_response(m, gateway_connection.gateway_url, 15_000)
             logger.debug("gateway terminate and join")
 
             process = gateway_connection.process
@@ -307,6 +311,37 @@ def stop_gateway() -> None:
             raise NotImplementedError("RemoteUrl gateway cannot be stopped by backend")
         else:
             assert_never(gateway_connection)
+
+
+def submit_stop_gateway() -> None:
+    """Enqueue `stop_gateway` on the general pool, unmonitored, and return without waiting for it.
+
+    Raises ``GatewayNotRunning`` if there is no gateway to stop, ``GatewayStopInProgress`` if
+    a previously submitted stop has not finished yet, and ``SubmissionRejected`` if the pool does not
+    accept the task. Failures of the stop itself are only logged; the caller is expected to observe the
+    outcome via `status_gateway`.
+    """
+    connection = GatewayConnectionManager.gateway_connection
+    if connection is None or (isinstance(connection, LocalProcess) and connection.process.exitcode is not None):
+        raise GatewayNotRunning("Gateway is not running")
+    if not GatewayConnectionManager.stop_lock.acquire(blocking=False):
+        raise GatewayStopInProgress("Gateway stop is already in progress")
+
+    def task() -> None:
+        try:
+            stop_gateway()
+        except GatewayNotRunning:
+            logger.warning("background gateway stop found gateway not running")
+        except Exception:
+            logger.exception("background gateway stop failed")
+        finally:
+            GatewayConnectionManager.stop_lock.release()
+
+    try:
+        execution_manager.submit_unmonitored(ConcurrentPools.General, TaskName("gateway.stop"), task)
+    except BaseException:
+        GatewayConnectionManager.stop_lock.release()
+        raise
 
 
 async def shutdown_processes() -> None:

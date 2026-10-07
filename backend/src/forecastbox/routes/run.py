@@ -37,13 +37,21 @@ from pydantic import Field
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.gateway.service import get_gateway_url, get_logs_directory
-from forecastbox.domain.run import db, service
-from forecastbox.domain.run.cascade import RunOutputs, delete_cascade_job
+from forecastbox.domain.run import db, service, stop
+from forecastbox.domain.run.cascade import RunOutputs, delete_cascade_datasets
 from forecastbox.domain.run.detail import retrieve_compilation_detail
-from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunAccessDenied, RunNotFound
+from forecastbox.domain.run.exceptions import (
+    CompilationDetailCorrupted,
+    CompilationDetailNotFound,
+    RunAccessDenied,
+    RunConcurrencyIssue,
+    RunNotDeletable,
+    RunNotFound,
+    RunNotStoppable,
+)
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
-from forecastbox.utility.concurrency.manager import execution_manager
+from forecastbox.utility.concurrency.manager import SubmissionRejected, execution_manager
 from forecastbox.utility.config import ROUTE_PREFIX
 from forecastbox.utility.httpx import get_encoding
 from forecastbox.utility.pagination import PaginationSpec
@@ -96,7 +104,7 @@ class RunOutputsResponse(FiabBaseModel):
 
 
 # duplicated from db.py for domain separation
-RunDetailStatus = Literal["submitted", "preparing", "running", "completed", "failed", "unknown"]
+RunDetailStatus = Literal["submitted", "preparing", "running", "stopping", "stopped", "completed", "failed", "unknown"]
 
 
 class RunDetailResponse(FiabBaseModel):
@@ -140,6 +148,13 @@ class RunRestartResponse(FiabBaseModel):
 
 class RunDeleteRequest(FiabBaseModel):
     """Identifies the attempt to delete."""
+
+    run_id: RunId
+    attempt_count: int
+
+
+class RunStopRequest(FiabBaseModel):
+    """Identifies the attempt to stop."""
 
     run_id: RunId
     attempt_count: int
@@ -306,7 +321,14 @@ async def list_runs(
             ),
         )
     )
-    details = [_to_run_detail(await service.poll_and_update(e)) for e in executions]
+    details = []
+    for e in executions:
+        try:
+            details.append(_to_run_detail(await service.poll_and_update(e)))
+        except RunNotFound:
+            continue  # NOTE deleted while we were polling
+        except RunConcurrencyIssue as ex:
+            raise HTTPException(status_code=503, detail=str(ex))
     return RunListResponse(runs=details, total=total, page=pagination.page, page_size=pagination.page_size, total_pages=total_pages)
 
 
@@ -327,6 +349,8 @@ async def get_run(
         raise HTTPException(status_code=404, detail=f"Run {spec.run_id!r} not found.")
     except RunAccessDenied:
         raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.run_id!r}.")
+    except RunConcurrencyIssue as e:
+        raise HTTPException(status_code=503, detail=str(e))
     return _to_run_detail(domain_detail)
 
 
@@ -369,23 +393,68 @@ async def delete_run(
     request: RunDeleteRequest,
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> None:
-    """Delete an execution from the database and cascade."""
+    """Delete a completed, failed or stopped run from the database, and its datasets from cascade.
+
+    A run in any other status is refused with 409, it needs to be stopped first.
+    """
     spec = RunLookup(run_id=request.run_id, attempt_count=request.attempt_count)
     run_record = await _resolve_run_record(spec, auth_context)
+    try:
+        stop.ensure_deletable(run_record)
+    except RunNotDeletable as e:
+        raise HTTPException(409, str(e))
     if run_record.cascade_job_id is not None:
-        # NOTE the else branch of this effectively lives in the background submission, which checks for entity being deleted after upserting cascade_job_id, and issuing a delete on its own
         try:
-            delete_cascade_job(run_record.cascade_job_id)
+            # NOTE errors reported by gateway are ignored, most likely the job has been evicted already.
+            # A timeout, such as due to a busy gateway, is reported, and we dont delete the db entity to not increase inconsistency
+            delete_cascade_datasets(run_record.cascade_job_id)
         except Exception as e:
-            # NOTE we don't delete the db entity to not increase inconsistency
             raise HTTPException(500, f"Job deletion failed: {e}")
     try:
-        await execution_manager.await_jobs_db("run.delete", partial(db.soft_delete_run, request.run_id, auth_context=auth_context))
+        await execution_manager.await_jobs_db(
+            "run.delete", partial(stop.soft_delete_run_cas, request.run_id, request.attempt_count, auth_context=auth_context)
+        )
     except RunNotFound:
         # NOTE could only happen in a double delete which is from caller's PoV ok
         logger.warning(f"presumably double delete on {request=}, ignoring")
     except RunAccessDenied:
         raise HTTPException(status_code=403, detail=f"Access denied to execution {spec.run_id!r}.")
+    except RunNotDeletable as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.post("/stop")
+async def stop_run(
+    request: RunStopRequest,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> None:
+    """Request stopping of a run that has not completed, failed, or been stopped yet.
+
+    The run is marked `stopping`, and the actual termination in cascade is enqueued and happens
+    in the background. The run becomes `stopped` once cascade confirms, which is reconciled
+    by the status polling. Stopping a run that is already stopping or stopped is accepted.
+    Returns 409 for a run in a status that does not allow stopping.
+    """
+    try:
+        run_record = cast(
+            db.RunRecord,
+            await execution_manager.await_jobs_db(
+                "run.stop", partial(stop.stop_run, request.run_id, request.attempt_count, auth_context=auth_context)
+            ),
+        )
+    except RunNotFound:
+        raise HTTPException(status_code=404, detail=f"Run {request.run_id!r} not found.")
+    except RunAccessDenied:
+        raise HTTPException(status_code=403, detail=f"Access denied to execution {request.run_id!r}.")
+    except RunNotStoppable as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if run_record.status == "stopping" and run_record.cascade_job_id is not None:
+        # NOTE if there is no cascade_job_id yet, the background submission checks for the stopping status once it has one
+        try:
+            stop.submit_stop_cascade(request.run_id, request.attempt_count, run_record.cascade_job_id)
+        except SubmissionRejected as e:
+            # NOTE the run stays stopping, and gets the stop re-issued during polling
+            raise HTTPException(status_code=503, detail=f"Stop was recorded but could not be enqueued: {e}")
 
 
 @router.post("/restart")
