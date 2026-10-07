@@ -215,6 +215,30 @@ describe('RunDetailPage Integration', () => {
         .toBeVisible()
     })
 
+    it('keeps Stopping while the busy gateway reads it as unknown', async () => {
+      const screen = await renderDetailPage('job-running-002')
+      await confirmStop(screen)
+      await expect
+        .element(screen.getByText('Stopping', { exact: true }))
+        .toBeVisible()
+
+      // The backend answers `unknown` while the gateway executes the stop.
+      const run = getExecution('job-running-002')!
+      injectMockExecution({ ...run, status: 'unknown' })
+      await new Promise((resolve) => setTimeout(resolve, 3500))
+      await expect
+        .element(screen.getByText('Stopping', { exact: true }))
+        .toBeVisible()
+      expect(
+        screen.getByText('Unknown', { exact: true }).elements(),
+      ).toHaveLength(0)
+
+      injectMockExecution({ ...run, status: 'stopped' })
+      await expect
+        .element(screen.getByText('Stopped', { exact: true }))
+        .toBeVisible()
+    })
+
     it('offers no Stop on a finished run', async () => {
       const screen = await renderDetailPage('job-completed-001')
       await expect

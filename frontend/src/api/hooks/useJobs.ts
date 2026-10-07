@@ -38,6 +38,7 @@ import { upsertFable } from '@/api/endpoints/fable'
 import { withOneoffTag } from '@/lib/system-tags'
 import { showToast } from '@/lib/toast'
 import { scheduleKeys } from '@/api/hooks/useSchedules'
+import { shareRunDetail, shareRunList } from '@/api/hooks/run-status-sharing'
 
 export const jobKeys = {
   all: ['jobs'] as const,
@@ -60,6 +61,9 @@ export function useJobStatus(jobId: string | undefined) {
       return status === 'submitted' ? 2000 : 3000
     },
     refetchOnWindowFocus: false,
+    // Busy while the gateway stops a run; the next poll catches up.
+    meta: { expectedErrorStatuses: [503] },
+    structuralSharing: shareRunDetail,
   })
 }
 
@@ -95,6 +99,8 @@ export function useRecentRuns(count: number) {
       data.runs.slice(0, Math.min(count, RECENT_RUNS_WINDOW)),
     refetchInterval: 10000,
     refetchOnWindowFocus: false,
+    meta: { expectedErrorStatuses: [503] },
+    structuralSharing: shareRunList,
   })
 }
 
@@ -108,6 +114,8 @@ export function useJobsStatus(
     queryFn: () => getJobsStatus(page, pageSize, status),
     refetchInterval: 10000,
     refetchOnWindowFocus: false,
+    meta: { expectedErrorStatuses: [503] },
+    structuralSharing: shareRunList,
   })
 }
 
