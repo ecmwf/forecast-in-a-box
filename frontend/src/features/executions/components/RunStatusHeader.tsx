@@ -13,6 +13,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  CircleStop,
+  Loader2,
   MoreVertical,
   Pencil,
   RotateCcw,
@@ -21,7 +23,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { JobStatus } from '@/api/types/job.types'
-import { isTerminalStatus } from '@/api/types/job.types'
+import { isStoppableStatus, isTerminalStatus } from '@/api/types/job.types'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import {
   formatInZone,
@@ -60,13 +62,17 @@ interface RunStatusHeaderProps {
   status: JobStatus
   progress: string
   createdAt: string | null
+  /** Last status change; for a stopped run, when it stopped. */
+  updatedAt?: string | null
   onRestart: () => void
+  onStop: () => void
   onDelete: () => void
   /** Open the fable's source configuration in the builder. */
   onEditConfig?: () => void
   /** Open the run-metadata edit dialog (name, description, tags). */
   onEditMetadata?: () => void
   isRestartPending: boolean
+  isStopPending: boolean
   isDeletePending: boolean
   /** Subtext hidden when planned is null/undefined/empty. */
   completedBlockCount?: number | null
@@ -153,6 +159,50 @@ function RestartDialog({
   )
 }
 
+function StopDialog({
+  onStop,
+  isStopPending,
+}: {
+  onStop: () => void
+  isStopPending: boolean
+}) {
+  const { t } = useTranslation('executions')
+  const [open, setOpen] = useState(false)
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger
+        render={
+          <Button variant="outline" size="sm" disabled={isStopPending}>
+            <CircleStop className="mr-1.5 h-4 w-4" />
+            {t('actions.stop')}
+          </Button>
+        }
+      />
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('actions.stopJob')}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t('actions.confirmStop')}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t('actions.keepRunning')}</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={() => {
+              onStop()
+              setOpen(false)
+            }}
+          >
+            {t('actions.stopRun')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
 export function RunStatusHeader({
   jobId,
   name,
@@ -160,11 +210,14 @@ export function RunStatusHeader({
   status,
   progress,
   createdAt,
+  updatedAt,
   onRestart,
+  onStop,
   onDelete,
   onEditConfig,
   onEditMetadata,
   isRestartPending,
+  isStopPending,
   isDeletePending,
   completedBlockCount,
   plannedBlockCount,
@@ -178,6 +231,11 @@ export function RunStatusHeader({
   const startedAt =
     terminal && createdAt
       ? `${formatInZone(serverTimeToLocal(createdAt), timeZone, 'yyyy-MM-dd HH:mm')} ${timeZoneOffsetLabel(timeZone)}`
+      : null
+
+  const stoppedAt =
+    status === 'stopped' && updatedAt
+      ? `${formatInZone(serverTimeToLocal(updatedAt), timeZone, 'yyyy-MM-dd HH:mm')} ${timeZoneOffsetLabel(timeZone)}`
       : null
 
   const progressPercent = parseFloat(progress) || 0
@@ -243,6 +301,17 @@ export function RunStatusHeader({
                 total: plannedBlockCount,
               })}
             </span>
+          )}
+
+          {isStoppableStatus(status) && (
+            <StopDialog onStop={onStop} isStopPending={isStopPending} />
+          )}
+
+          {status === 'stopping' && (
+            <Button variant="outline" size="sm" disabled>
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              {t('actions.stopping')}
+            </Button>
           )}
 
           {terminal && (
@@ -314,6 +383,12 @@ export function RunStatusHeader({
           </AlertDialog>
         </div>
       </div>
+
+      {stoppedAt !== null && (
+        <P className="text-sm text-muted-foreground">
+          {t('detail.stoppedNotice', { date: stoppedAt })}
+        </P>
+      )}
 
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
         <div

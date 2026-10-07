@@ -13,6 +13,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import i18n from 'i18next'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type {
   CompilationDetailResponse,
@@ -31,9 +32,12 @@ import {
   getJobStatus,
   getJobsStatus,
   restartJob,
+  stopJob,
 } from '@/api/endpoints/job'
 import { upsertFable } from '@/api/endpoints/fable'
 import { withOneoffTag } from '@/lib/system-tags'
+import { showToast } from '@/lib/toast'
+import { scheduleKeys } from '@/api/hooks/useSchedules'
 
 export const jobKeys = {
   all: ['jobs'] as const,
@@ -118,6 +122,38 @@ export function useRestartJob() {
     mutationFn: ({ runId, attemptCount }) => restartJob(runId, attemptCount),
     onSuccess: (_data, { runId }) => {
       queryClient.invalidateQueries({ queryKey: jobKeys.status(runId) })
+    },
+  })
+}
+
+/** Stop an active run; its cached detail reads `stopping` at once. */
+export function useStopJob() {
+  const queryClient = useQueryClient()
+
+  return useMutation<void, Error, { runId: string; attemptCount: number }>({
+    mutationFn: ({ runId, attemptCount }) => stopJob(runId, attemptCount),
+    meta: { expectedErrorStatuses: [409, 503] },
+    onMutate: ({ runId }) => {
+      queryClient.setQueryData<JobExecutionDetail>(
+        jobKeys.status(runId),
+        (detail) =>
+          detail && !isTerminalStatus(detail.status)
+            ? { ...detail, status: 'stopping' }
+            : detail,
+      )
+    },
+    onError: (error) => {
+      if (!(error instanceof ApiClientError)) return
+      // 409: it finished first; 503: recorded, the backend retries the stop.
+      if (error.status === 409) {
+        showToast.info(i18n.t('executions:actions.stopAlreadyFinished'))
+      } else if (error.status === 503) {
+        showToast.info(i18n.t('executions:actions.stopQueued'))
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: jobKeys.all })
+      void queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
     },
   })
 }

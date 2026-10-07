@@ -133,6 +133,13 @@ export function isTerminalStatus(status: JobStatus): boolean {
   return TERMINAL_STATUSES.has(status)
 }
 
+/** Statuses `/run/stop` accepts; finished runs are deleted instead. */
+export function isStoppableStatus(status: JobStatus): boolean {
+  return (
+    status === 'submitted' || status === 'preparing' || status === 'running'
+  )
+}
+
 export type JobExecuteResponse = z.infer<typeof JobExecuteResponseSchema>
 export type RunOutputMetadata = z.infer<typeof RunOutputMetadataSchema>
 export type RunOutputs = z.infer<typeof RunOutputsSchema>

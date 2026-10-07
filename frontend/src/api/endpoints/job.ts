@@ -193,3 +193,14 @@ export async function deleteJob(
     attempt_count: attemptCount,
   })
 }
+
+/** Ask the backend to stop an active run; it turns `stopping`, then `stopped`. */
+export async function stopJob(
+  runId: string,
+  attemptCount: number,
+): Promise<void> {
+  return apiClient.post(API_ENDPOINTS.job.stop, {
+    run_id: runId,
+    attempt_count: attemptCount,
+  })
+}

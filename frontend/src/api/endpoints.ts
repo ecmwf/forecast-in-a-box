@@ -167,6 +167,8 @@ export const API_ENDPOINTS = {
     logs: `${API_PREFIX}/run/logs`,
     /** POST - Delete an execution (body: { run_id, attempt_count }) */
     delete: `${API_PREFIX}/run/delete`,
+    /** POST - Stop an active run (body: { run_id, attempt_count }) */
+    stop: `${API_PREFIX}/run/stop`,
   },
 
   /**

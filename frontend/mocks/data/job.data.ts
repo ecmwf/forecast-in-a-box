@@ -332,6 +332,37 @@ export function restartExecution(
   return { run_id: executionId, attempt_count }
 }
 
+/** Mock settle time of a stop, as the backend's poll would reconcile it. */
+const STOP_SETTLE_MS = 1000
+
+/** Mirrors `/run/stop` (ecmwf#770): active runs stop, repeats are no-ops. */
+export function stopExecution(
+  executionId: string,
+): 'ok' | 'notFound' | 'notStoppable' {
+  const exec = executionsState[executionId] as JobExecutionDetail | undefined
+  if (!exec) return 'notFound'
+  if (exec.status === 'stopping' || exec.status === 'stopped') return 'ok'
+  if (!['submitted', 'preparing', 'running'].includes(exec.status)) {
+    return 'notStoppable'
+  }
+  executionsState[executionId] = {
+    ...exec,
+    status: 'stopping',
+    updated_at: new Date().toISOString(),
+  }
+  setTimeout(() => {
+    const current = executionsState[executionId] as
+      JobExecutionDetail | undefined
+    if (current?.status !== 'stopping') return
+    executionsState[executionId] = {
+      ...current,
+      status: 'stopped',
+      updated_at: new Date().toISOString(),
+    }
+  }, STOP_SETTLE_MS)
+  return 'ok'
+}
+
 export function deleteExecution(executionId: string): boolean {
   if (!(executionId in executionsState)) return false
   delete executionsState[executionId]

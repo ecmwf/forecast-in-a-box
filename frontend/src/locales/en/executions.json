@@ -21,7 +21,8 @@
     "copyTemplate": "Copy template",
     "copyFailed": "Couldn't copy to clipboard",
     "specCopyFailed": "Couldn't copy specification",
-    "startedAt": "Started {{date}}"
+    "startedAt": "Started {{date}}",
+    "stoppedNotice": "Stopped {{date}}. Outputs produced before the stop are kept."
   },
   "status": {
     "submitted": "Submitted",
@@ -46,6 +47,14 @@
   "actions": {
     "restart": "Restart",
     "restartJob": "Restart run",
+    "stop": "Stop",
+    "stopping": "Stopping…",
+    "stopJob": "Stop this run?",
+    "confirmStop": "The computation stops. Outputs produced so far are kept, and you can restart the run later.",
+    "keepRunning": "Keep running",
+    "stopRun": "Stop run",
+    "stopAlreadyFinished": "The run had already finished.",
+    "stopQueued": "Stop recorded. It is retried shortly.",
     "delete": "Delete",
     "deleteJob": "Delete run",
     "edit": "Edit",
