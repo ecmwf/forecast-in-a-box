@@ -18,7 +18,10 @@
 import { useState } from 'react'
 import { userEvent } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
+import { HttpResponse, http } from 'msw'
 import { renderWithProviders } from '@tests/utils/render'
+import { worker } from '@tests/../mocks/browser'
+import { API_ENDPOINTS } from '@/api/endpoints'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
 
 /**
@@ -476,13 +479,76 @@ describe('FieldRenderer Integration', () => {
       await expect.element(trigger.getByText('AIFS ENS CRPS 1.0')).toBeVisible()
 
       await trigger.click()
-      await expect
-        .element(screen.getByRole('option', { name: /AIFS ENS CRPS 1\.0/ }))
-        .toBeVisible()
+      const option = screen.getByRole('option', { name: /AIFS ENS CRPS 1\.0/ })
+      await expect.element(option).toBeVisible()
+      // Download status replaces the size.
+      await expect.element(option.getByText('Downloaded')).toBeVisible()
+      expect(option.element().textContent).not.toMatch(/\d\s?[KMG]B/)
       // Unknown ids stay selectable under their wire id.
       await expect
         .element(screen.getByRole('option', { name: 'ecmwf:not-in-catalogue' }))
         .toBeVisible()
+    })
+
+    describe('with two models sharing a display name', () => {
+      const model = (localId: string) => ({
+        composite_id: {
+          artifact_store_id: 'ecmwf',
+          artifact_local_id: localId,
+        },
+        display_name: 'AIFS ENS CRPS 1.0',
+        display_author: 'ECMWF',
+        disk_size_bytes: 1,
+        supported_platforms: [],
+        tags: {},
+        is_available: false,
+        is_locally_compatible: true,
+        local_compatibility_detail: null,
+      })
+      const useTwins = () =>
+        worker.use(
+          http.get(`*${API_ENDPOINTS.artifacts.listModels}`, () =>
+            HttpResponse.json([model('crps_sdpa'), model('crps_flash')]),
+          ),
+        )
+
+      it('keeps the bare name when only one of them is offered', async () => {
+        useTwins()
+        const screen = await renderWithProviders(
+          <ControlledFieldRenderer
+            valueType="enumClosed[artifact]('ecmwf:crps_sdpa')"
+            initialValue="ecmwf:crps_sdpa"
+          />,
+        )
+        await expect
+          .element(
+            screen
+              .getByRole('combobox')
+              .getByText('AIFS ENS CRPS 1.0', { exact: true }),
+          )
+          .toBeVisible()
+      })
+
+      it('tells them apart by id when both are offered', async () => {
+        useTwins()
+        const screen = await renderWithProviders(
+          <ControlledFieldRenderer valueType="artifact" initialValue="" />,
+        )
+        await screen.getByRole('combobox').click()
+        const flash = screen.getByRole('option', { name: /crps_flash/ })
+        await expect
+          .element(flash.getByText('crps_flash', { exact: true }))
+          .toBeVisible()
+        // The one-line trigger carries the id in its label instead.
+        await flash.click()
+        await expect
+          .element(
+            screen
+              .getByRole('combobox')
+              .getByText('AIFS ENS CRPS 1.0 · crps_flash'),
+          )
+          .toBeVisible()
+      })
     })
   })
 })
