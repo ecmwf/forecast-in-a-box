@@ -81,4 +81,4 @@ Steps 1-8 are independent of one another and can be done in any order.
 
 * Closing a sync client from the event loop thread does not guarantee that a thread blocked in a socket read is woken immediately. It will fail at the latest at the read timeout of the profile (60 seconds for `Download`). If prompt cancellation is needed, add a cooperative cancel flag checked between chunks in the download loop.
 * Profile settings are hardcoded, and are to be tuned during the migration.
-* The pools use httpx defaults for TLS and `trust_env` (proxy environment variables are respected).
+* The pools share one `ssl.SSLContext` built by `httpx.create_ssl_context()` (default CA bundle, `SSL_CERT_FILE` and `SSL_CERT_DIR` respected), and `trust_env` stays at its httpx default (proxy environment variables are respected).

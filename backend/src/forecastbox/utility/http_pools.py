@@ -22,6 +22,8 @@ Thread safety:
 - `httpx.AsyncClient` must only be used from the event loop thread on which `start_http_pools` ran.
 - the registry is replaced as a whole by start and stop, so readers never observe a partial state.
 
+All clients share a single `ssl.SSLContext`, built once at start.
+
 Callers must not close the retrieved clients, and must not enter them as context managers.
 """
 
@@ -119,11 +121,15 @@ def start_http_pools() -> None:
         raise HttpPoolsAlreadyStarted("http pools are already started")
     sync: dict[HttpProfile, httpx.Client] = {}
     asynchronous: dict[HttpProfile, httpx.AsyncClient] = {}
+    # NOTE building an ssl context loads the CA bundle, which is costly -- one is shared by all clients
+    ssl_context = httpx.create_ssl_context()
     try:
         for profile, settings in _PROFILES.items():
-            sync[profile] = httpx.Client(timeout=settings.timeout, limits=settings.limits, follow_redirects=settings.follow_redirects)
+            sync[profile] = httpx.Client(
+                verify=ssl_context, timeout=settings.timeout, limits=settings.limits, follow_redirects=settings.follow_redirects
+            )
             asynchronous[profile] = httpx.AsyncClient(
-                timeout=settings.timeout, limits=settings.limits, follow_redirects=settings.follow_redirects
+                verify=ssl_context, timeout=settings.timeout, limits=settings.limits, follow_redirects=settings.follow_redirects
             )
     except BaseException:
         # NOTE async clients that were never used hold no resources, so only the sync ones are closed
