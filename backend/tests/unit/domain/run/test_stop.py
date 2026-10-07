@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from cascade.gateway import api
 
-from forecastbox.domain.run import cascade, stop
+from forecastbox.domain.run import stop
 from forecastbox.domain.run.types import RunId
 
 RUN = RunId("run-1")
@@ -11,10 +11,10 @@ RUN = RunId("run-1")
 
 def test_stop_cascade_job_sends_single_job_shutdown_with_long_timeout() -> None:
     with (
-        patch("forecastbox.domain.run.cascade.request_response", return_value=api.ShutdownResponse(error=None)) as rr,
-        patch("forecastbox.domain.run.cascade.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.stop.request_response", return_value=api.ShutdownResponse(error=None)) as rr,
+        patch("forecastbox.domain.run.stop.get_gateway_url", return_value="tcp://gw"),
     ):
-        cascade.stop_cascade_job("job-1")
+        stop.stop_cascade_job("job-1")
     request = rr.call_args.args[0]
     assert isinstance(request, api.ShutdownRequest)
     assert request.only_these == ["job-1"]

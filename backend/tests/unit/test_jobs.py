@@ -30,6 +30,7 @@ import forecastbox.domain.blueprint.db as blueprint_db
 import forecastbox.domain.experiment.db as experiment_db
 import forecastbox.domain.experiment.scheduling.db as scheduling_db
 import forecastbox.domain.run.db as run_db
+import forecastbox.domain.run.stop as stop
 from forecastbox.domain.blueprint.exceptions import BlueprintAccessDenied, BlueprintNotFound
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.exceptions import ExperimentAccessDenied, ExperimentNotFound
@@ -512,7 +513,7 @@ def test_jobs_run_soft_delete(mem_session_maker_both: sessionmaker[Session]) -> 
     )
 
     run_db.update_run_runtime(exec_id, 1, expected_status="submitted", status="completed")
-    run_db.soft_delete_run(exec_id, 1, auth_context=_admin)
+    stop.soft_delete_run_cas(exec_id, 1, auth_context=_admin)
 
     with pytest.raises(RunNotFound):
         run_db.get_run(exec_id, auth_context=_admin)
@@ -687,7 +688,7 @@ def test_run_delete_own(mem_session_maker_both: sessionmaker[Session]) -> None:
     job_id, job_v = blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exec_id, _, __ = run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     run_db.update_run_runtime(exec_id, 1, expected_status="submitted", status="failed")
-    run_db.soft_delete_run(exec_id, 1, auth_context=_user1)
+    stop.soft_delete_run_cas(exec_id, 1, auth_context=_user1)
     with pytest.raises(RunNotFound):
         run_db.get_run(exec_id, auth_context=_admin)
 
@@ -697,7 +698,7 @@ def test_run_delete_other_user_denied(mem_session_maker_both: sessionmaker[Sessi
     job_id, job_v = blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exec_id, _, __ = run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     with pytest.raises(RunAccessDenied):
-        run_db.soft_delete_run(exec_id, 1, auth_context=_user2)
+        stop.soft_delete_run_cas(exec_id, 1, auth_context=_user2)
 
 
 def test_run_delete_admin_can_delete_any(mem_session_maker_both: sessionmaker[Session]) -> None:
@@ -705,7 +706,7 @@ def test_run_delete_admin_can_delete_any(mem_session_maker_both: sessionmaker[Se
     job_id, job_v = blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exec_id, _, __ = run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="submitted")
     run_db.update_run_runtime(exec_id, 1, expected_status="submitted", status="completed")
-    run_db.soft_delete_run(exec_id, 1, auth_context=_admin)
+    stop.soft_delete_run_cas(exec_id, 1, auth_context=_admin)
     with pytest.raises(RunNotFound):
         run_db.get_run(exec_id, auth_context=_admin)
 
@@ -729,28 +730,28 @@ def test_run_update_status_is_compare_and_swap(mem_session_maker_both: sessionma
 @pytest.mark.parametrize("status", ["submitted", "preparing", "running"])
 def test_run_stop_marks_stopping(mem_session_maker_both: sessionmaker[Session], status: str) -> None:
     exec_id = _new_run(status)
-    record = run_db.stop_run(exec_id, 1, auth_context=_user1)
+    record = stop.stop_run(exec_id, 1, auth_context=_user1)
     assert record.status == "stopping"
     # idempotent
-    assert run_db.stop_run(exec_id, 1, auth_context=_user1).status == "stopping"
+    assert stop.stop_run(exec_id, 1, auth_context=_user1).status == "stopping"
     run_db.update_run_runtime(exec_id, 1, expected_status="stopping", status="stopped")
-    assert run_db.stop_run(exec_id, 1, auth_context=_user1).status == "stopped"
+    assert stop.stop_run(exec_id, 1, auth_context=_user1).status == "stopped"
 
 
 @pytest.mark.parametrize("status", ["completed", "failed", "unknown"])
 def test_run_stop_refused_for_terminal(mem_session_maker_both: sessionmaker[Session], status: str) -> None:
     exec_id = _new_run(status)
     with pytest.raises(RunNotStoppable):
-        run_db.stop_run(exec_id, 1, auth_context=_user1)
+        stop.stop_run(exec_id, 1, auth_context=_user1)
     assert run_db.get_run(exec_id, auth_context=_admin).status == status
 
 
 def test_run_stop_access_and_not_found(mem_session_maker_both: sessionmaker[Session]) -> None:
     exec_id = _new_run("running")
     with pytest.raises(RunAccessDenied):
-        run_db.stop_run(exec_id, 1, auth_context=_user2)
+        stop.stop_run(exec_id, 1, auth_context=_user2)
     with pytest.raises(RunNotFound):
-        run_db.stop_run(RunId("nonexistent"), 1, auth_context=_admin)
+        stop.stop_run(RunId("nonexistent"), 1, auth_context=_admin)
 
 
 def test_run_stop_rereads_when_losing_the_race(mem_session_maker_both: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch) -> None:
@@ -769,7 +770,7 @@ def test_run_stop_rereads_when_losing_the_race(mem_session_maker_both: sessionma
 
     monkeypatch.setattr(run_db, "get_run", racing_get_run)
     with pytest.raises(RunNotStoppable):
-        run_db.stop_run(exec_id, 1, auth_context=_user1)
+        stop.stop_run(exec_id, 1, auth_context=_user1)
     assert calls == 2
     assert real_get_run(exec_id, auth_context=_admin).status == "completed"
 
@@ -778,7 +779,7 @@ def test_run_stop_rereads_when_losing_the_race(mem_session_maker_both: sessionma
 def test_run_delete_refused_for_non_terminal(mem_session_maker_both: sessionmaker[Session], status: str) -> None:
     exec_id = _new_run(status)
     with pytest.raises(RunNotDeletable):
-        run_db.soft_delete_run(exec_id, 1, auth_context=_user1)
+        stop.soft_delete_run_cas(exec_id, 1, auth_context=_user1)
     assert run_db.get_run(exec_id, auth_context=_admin).status == status
 
 
@@ -786,5 +787,5 @@ def test_run_delete_keeps_non_terminal_attempts(mem_session_maker_both: sessionm
     job_id, job_v = blueprint_db.upsert_blueprint(auth_context=_user1, source="user_defined", created_by="user1")
     exec_id, _, __ = run_db.upsert_run(blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="completed")
     run_db.upsert_run(run_id=exec_id, blueprint_id=job_id, blueprint_version=job_v, created_by="user1", status="running")
-    run_db.soft_delete_run(exec_id, 1, auth_context=_user1)
+    stop.soft_delete_run_cas(exec_id, 1, auth_context=_user1)
     assert run_db.get_run(exec_id, auth_context=_admin).attempt_count == 2

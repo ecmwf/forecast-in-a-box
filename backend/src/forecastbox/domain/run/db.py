@@ -31,7 +31,7 @@ from sqlalchemy import func, select, update
 import forecastbox.schemata.jobs as _jobs_module
 from forecastbox.domain.blueprint.types import BlueprintId
 from forecastbox.domain.experiment.types import ExperimentDefinitionId
-from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotDeletable, RunNotFound, RunNotStoppable
+from forecastbox.domain.run.exceptions import RunAccessDenied, RunNotFound
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.run import Run, RunStatus
 from forecastbox.utility.auth import AuthContext
@@ -216,44 +216,6 @@ def update_run_runtime(run_id: RunId, attempt_count: int, *, expected_status: Ru
     return dbRetry(function)
 
 
-STOPPABLE_STATUSES: frozenset[RunStatus] = frozenset(cast(tuple[RunStatus, ...], ("submitted", "preparing", "running")))
-"""Statuses from which a stop may be requested."""
-
-STOPPED_STATUSES: frozenset[RunStatus] = frozenset(cast(tuple[RunStatus, ...], ("stopping", "stopped")))
-"""Statuses in which a stop has already been requested."""
-
-TERMINAL_STATUSES: frozenset[RunStatus] = frozenset(cast(tuple[RunStatus, ...], ("completed", "failed", "stopped")))
-"""Statuses in which no computation is going on anymore, so that the Run may be deleted."""
-
-_CAS_ATTEMPTS = 5
-
-
-def stop_run(run_id: RunId, attempt_count: int, *, auth_context: AuthContext) -> RunRecord:
-    """Mark a specific attempt of a Run as ``stopping`` and return the resulting record.
-
-    Does not contact cascade. Idempotent: a Run already ``stopping`` or ``stopped`` is returned as is.
-    The status transition is a compare-and-swap against the status read just before; if it
-    loses, the Run is read again and the decision is made anew.
-
-    Raises ``RunNotFound`` and ``RunAccessDenied`` as ``get_run`` does.
-    Raises ``RunNotStoppable`` if the status is not one of ``submitted``, ``preparing``, ``running``
-    (or already stopping/stopped), or if the status keeps changing concurrently.
-    """
-    for _ in range(_CAS_ATTEMPTS):
-        record = get_run(run_id, attempt_count, auth_context=auth_context)
-        if record.status in STOPPED_STATUSES:
-            return record
-        if record.status not in STOPPABLE_STATUSES:
-            raise RunNotStoppable(f"Run {run_id!r} has status {record.status!r} and cannot be stopped.")
-        if update_run_runtime(run_id, attempt_count, expected_status=record.status, status="stopping"):
-            # NOTE we read again to see a cascade_job_id possibly written in the meantime
-            fresh = get_run_unchecked(run_id, attempt_count)
-            if fresh is None:
-                raise RunNotFound(f"Run {run_id!r} not found.")
-            return fresh
-    raise RunNotStoppable(f"Run {run_id!r} is being modified concurrently, retry later.")
-
-
 def list_runs(*, auth_context: AuthContext, offset: int = 0, limit: int | None = None) -> Iterable[RunRecord]:
     """Return the latest non-deleted attempt of every Run, with optional paging.
 
@@ -302,40 +264,29 @@ def count_runs(*, auth_context: AuthContext) -> int:
     return dbRetry(function)
 
 
-def soft_delete_run(run_id: RunId, attempt_count: int, *, auth_context: AuthContext) -> None:
-    """Mark a specific attempt of a Run as deleted, along with all other attempts that are terminal.
+def soft_delete_run(run_id: RunId, attempt_count: int, *, expected_status: RunStatus, also_hide_statuses: Iterable[RunStatus]) -> bool:
+    """Mark a specific attempt of a Run as deleted if it has the expected status, in a single transaction.
 
-    Attempts that are not terminal stay visible. The deletion of the specific attempt is a compare-and-swap
-    against the status read just before; if it loses, the Run is read again and the decision is made anew.
-
-    Raises ``RunNotFound`` if the attempt does not exist.
-    Raises ``RunAccessDenied`` if the actor is an authenticated non-admin who does not own the execution.
-    Raises ``RunNotDeletable`` if the attempt has not reached a terminal status (completed, failed, stopped),
-    or if the status keeps changing concurrently.
+    Other attempts of the same Run whose status is among ``also_hide_statuses`` are marked deleted as well.
+    Returns whether the specific attempt was updated; if not, nothing is changed. No actor-level auth.
     """
-    for _ in range(_CAS_ATTEMPTS):
-        record = get_run(run_id, attempt_count, auth_context=auth_context)
-        if record.status not in TERMINAL_STATUSES:
-            raise RunNotDeletable(f"Run {run_id!r} has status {record.status!r}, only completed, failed or stopped runs can be deleted.")
-        stmt = (
-            update(Run)
-            .where(Run.run_id == run_id, Run.attempt_count == attempt_count, Run.status == record.status, Run.is_deleted.is_(False))
-            .values(is_deleted=True)
-        )
+    stmt = (
+        update(Run)
+        .where(Run.run_id == run_id, Run.attempt_count == attempt_count, Run.status == expected_status, Run.is_deleted.is_(False))
+        .values(is_deleted=True)
+    )
+    others = update(Run).where(Run.run_id == run_id, Run.status.in_(list(also_hide_statuses))).values(is_deleted=True)
 
-        def function(i: int) -> bool:
-            with _jobs_module.sync_session_maker() as session:
-                result = session.execute(stmt)
-                if cast(Any, result).rowcount != 1:
-                    session.rollback()
-                    return False
-                session.execute(update(Run).where(Run.run_id == run_id, Run.status.in_(TERMINAL_STATUSES)).values(is_deleted=True))
-                session.commit()
-                return True
+    def function(i: int) -> bool:
+        with _jobs_module.sync_session_maker() as session:
+            if cast(Any, session.execute(stmt)).rowcount != 1:
+                session.rollback()
+                return False
+            session.execute(others)
+            session.commit()
+            return True
 
-        if dbRetry(function):
-            return
-    raise RunNotDeletable(f"Run {run_id!r} is being modified concurrently, retry later.")
+    return dbRetry(function)
 
 
 def list_runs_by_experiment(

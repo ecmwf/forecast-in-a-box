@@ -30,6 +30,10 @@ class RunNotDeletable(Exception):
     """Raised when a delete is requested for a Run that has not reached a terminal status."""
 
 
+class RunConcurrencyIssue(Exception):
+    """Raised when a Run keeps being modified concurrently and the operation gave up on it."""
+
+
 class CompilationDetailNotFound(Exception):
     """Raised when no cached CompilationDetail exists for the given run."""
 

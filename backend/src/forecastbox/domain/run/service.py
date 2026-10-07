@@ -46,7 +46,7 @@ from forecastbox.domain.run.background import execute_background
 from forecastbox.domain.run.cascade import RunOutputCharacteristic, RunOutputs, stored_output_max_length
 from forecastbox.domain.run.db import CompilerRuntimeContext, RunRecord
 from forecastbox.domain.run.detail import retrieve_compilation_detail
-from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunNotFound
+from forecastbox.domain.run.exceptions import CompilationDetailCorrupted, CompilationDetailNotFound, RunConcurrencyIssue, RunNotFound
 from forecastbox.domain.run.stop import submit_stop_cascade
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.run import RunStatus
@@ -265,10 +265,13 @@ async def poll_and_update(execution: RunRecord, detailed_report: bool = False) -
     A Run that is ``stopping`` is reconciled with the gateway: if the gateway still reports the job as
     running, the stop is issued again; if it reports a completion or failure, that is recorded; if it
     does not know the job anymore, the Run becomes ``stopped``.
+
+    Raises ``RunNotFound`` if the Run disappeared in the meantime, and ``RunConcurrencyIssue``
+    if it kept being modified concurrently.
     """
     for _ in range(_POLL_ATTEMPTS):
         try:
-            return await _poll_and_update_once(execution, detailed_report, may_retry=True)
+            return await _poll_and_update_once(execution, detailed_report)
         except _StaleRecord:
             fresh = cast(
                 RunRecord | None,
@@ -277,12 +280,12 @@ async def poll_and_update(execution: RunRecord, detailed_report: bool = False) -
                 ),
             )
             if fresh is None:
-                break
+                raise RunNotFound(f"Run {execution.run_id!r} not found.")
             execution = fresh
-    return await _poll_and_update_once(execution, detailed_report, may_retry=False)
+    raise RunConcurrencyIssue(f"Run {execution.run_id!r} is being modified concurrently, retry later.")
 
 
-async def _poll_and_update_once(execution: RunRecord, detailed_report: bool, may_retry: bool) -> RunDetail:
+async def _poll_and_update_once(execution: RunRecord, detailed_report: bool) -> RunDetail:
     run_id = execution.run_id
     actual_attempt = execution.attempt_count
     cascade_job_id = execution.cascade_job_id
@@ -355,7 +358,7 @@ async def _poll_and_update_once(execution: RunRecord, detailed_report: bool, may
             "run.runtime.update",
             partial(run_db.update_run_runtime, run_id, actual_attempt, expected_status=status, status=new_status, **fields),
         )
-        if not updated and may_retry:
+        if not updated:
             raise _StaleRecord
 
     if status in ("submitted", "preparing", "running", "stopping", "unknown") and cascade_job_id:

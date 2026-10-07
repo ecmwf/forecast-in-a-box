@@ -11,6 +11,7 @@ from fiab_core.fable import BlockInstanceId
 from forecastbox.domain.run import service
 from forecastbox.domain.run.cascade import RunOutputCharacteristic, RunOutputs
 from forecastbox.domain.run.db import RunRecord
+from forecastbox.domain.run.exceptions import RunConcurrencyIssue, RunNotFound
 
 
 def test_get_mime_of_output_returns_declared_mime() -> None:
@@ -372,3 +373,30 @@ async def test_poll_and_update_stopped_makes_no_gateway_call() -> None:
         detail = await service.poll_and_update(cast(RunRecord, execution))
     assert detail.status == "stopped"
     rr.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_gives_up_when_status_write_keeps_losing() -> None:
+    response = _make_cascade_response([], pct="50.00")
+    execution = _make_running_execution(None)
+    with (
+        patch("forecastbox.domain.run.service.client.request_response", return_value=response),
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=MagicMock(return_value=False)),
+        patch("forecastbox.domain.run.service.run_db.get_run_unchecked", return_value=execution),
+    ):
+        with pytest.raises(RunConcurrencyIssue):
+            await service.poll_and_update(cast(RunRecord, execution))
+
+
+@pytest.mark.asyncio
+async def test_poll_and_update_raises_not_found_when_run_vanishes_during_retry() -> None:
+    response = _make_cascade_response([], pct="50.00")
+    with (
+        patch("forecastbox.domain.run.service.client.request_response", return_value=response),
+        patch("forecastbox.domain.run.service.get_gateway_url", return_value="tcp://gw"),
+        patch("forecastbox.domain.run.service.run_db.update_run_runtime", new=MagicMock(return_value=False)),
+        patch("forecastbox.domain.run.service.run_db.get_run_unchecked", return_value=None),
+    ):
+        with pytest.raises(RunNotFound):
+            await service.poll_and_update(cast(RunRecord, _make_running_execution(None)))

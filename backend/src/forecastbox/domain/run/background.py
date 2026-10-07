@@ -33,11 +33,11 @@ from forecastbox.domain.glyphs.resolution import (
     merge_glyph_values,
 )
 from forecastbox.domain.run import db
-from forecastbox.domain.run.cascade import execute_cascade, stop_cascade_job
+from forecastbox.domain.run.cascade import execute_cascade
 from forecastbox.domain.run.compile import compile_builder, resolve_intrinsic_glyph_values
 from forecastbox.domain.run.db import CompilerRuntimeContext
 from forecastbox.domain.run.detail import store_compilation_detail
-from forecastbox.domain.run.stop import stop_cascade_and_mark
+from forecastbox.domain.run.stop import stop_cascade_and_mark, stop_cascade_job
 from forecastbox.domain.run.types import RunId
 from forecastbox.schemata.run import RunStatus
 from forecastbox.utility.auth import AuthContext
