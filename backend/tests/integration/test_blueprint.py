@@ -1886,21 +1886,6 @@ def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, a
     retry_until(do_action, verify_ok, attempts=attempts, sleep=sleep, error_msg=f"Run {run_id} never reached 'running'")
 
 
-def _wait_gateway_not_started(client: httpx.Client, sleep: float = 1.0, attempts: int = 60) -> None:
-    def do_action() -> Any:
-        resp = client.get("/gateway/status", timeout=10)
-        assert resp.is_success, resp.text
-        return resp.json()
-
-    retry_until(
-        do_action,
-        lambda status: True if status == "not started" else None,
-        attempts=attempts,
-        sleep=sleep,
-        error_msg="gateway did not stop",
-    )
-
-
 def _ensure_run_status(client: httpx.Client, run_id: str, wanted: set[str], sleep: float = 1.0, attempts: int = 60) -> str:
     """Poll until the run reports one of the wanted statuses.
 
@@ -1979,9 +1964,18 @@ def test_gateway_restart_with_in_progress_job(tmpdir: Any, backend_client_user: 
 
     # --- Step 3: kill the gateway ---
     # NOTE the kill is processed in the background, and blocks the gateway for a while
-    kill_resp = backend_client_user.post("/gateway/kill")
-    assert kill_resp.is_success, kill_resp.text
-    _wait_gateway_not_started(backend_client_user)
+    with connect_notification_websocket(backend_client_user) as websocket:
+        kill_resp = backend_client_user.post("/gateway/kill")
+        assert kill_resp.is_success, kill_resp.text
+        notification, _ = wait_next_notification(websocket, "gateway", "gatewayStopped", total_timeout=60)
+        assert notification.text == "Gateway stopped successfully"
+        assert notification.detailRoute == "/api/v1/gateway/status"
+        assert notification.refreshRoutes == ["/api/v1/gateway/status"]
+
+        # Confirm the notification is consistent with the gateway status endpoint.
+        status_resp = backend_client_user.get("/gateway/status", timeout=10)
+        assert status_resp.is_success, status_resp.text
+        assert status_resp.json() == "not started"
 
     # Polling while the gateway is down returns "unknown"
     status_resp = backend_client_user.get("/run/get", params={"run_id": run_id}, timeout=30)

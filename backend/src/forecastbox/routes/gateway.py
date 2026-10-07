@@ -61,7 +61,7 @@ async def get_status() -> str:
 
 @router.post("/kill")
 async def kill_gateway() -> str:
-    """Request the gateway to be stopped. The stop happens in the background, poll `/status` for the outcome."""
+    """Request the gateway to be stopped. The stop happens in the background and reports its outcome through a notification."""
     if isinstance(config.cascade.gateway, UnmanagedGateway):
         raise HTTPException(400, "This instance does not manage the gateway")
     try:
