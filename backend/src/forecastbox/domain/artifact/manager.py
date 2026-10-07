@@ -166,7 +166,7 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
         logger.exception(f"failed to submit download-completed notification for {composite_id}: {repr(e)}")
 
 
-def submit_artifact_download(composite_id: CompositeArtifactId) -> Either[int, str]:  # ty: ignore[invalid-type-arguments]
+def submit_artifact_download(composite_id: CompositeArtifactId, retry: bool = False) -> Either[int, str]:  # ty: ignore[invalid-type-arguments]
     """Submit artifact download task. Returns progress (0-100) on success or ongoing download, error message on failure."""
     with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
         if not result:
@@ -179,8 +179,9 @@ def submit_artifact_download(composite_id: CompositeArtifactId) -> Either[int, s
             progress = ArtifactManager.ongoing_downloads[composite_id]
             if isinstance(progress, int):
                 return Either.ok(progress)
-            else:
+            elif not retry:
                 return Either.error(progress)
+            logger.debug(f"Retrying artifact download for {composite_id}")
         ArtifactManager._ensure_pool()
         ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.set(composite_id, 0)
 
