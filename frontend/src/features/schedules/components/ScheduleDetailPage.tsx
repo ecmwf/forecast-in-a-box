@@ -48,7 +48,10 @@ import { EditScheduleDialog } from '@/features/schedules/components/EditSchedule
 import { RunCanvas } from '@/features/executions/components/RunCanvas'
 import { StatCard } from '@/features/dashboard/components/StatCard'
 import { scheduleRunToViewModel } from '@/features/journal/adapters'
-import { filterRuns } from '@/features/journal/utils/filter-runs'
+import {
+  filterRuns,
+  withStoppedFilter,
+} from '@/features/journal/utils/filter-runs'
 import { pageSlice } from '@/features/journal/utils/page-slice'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
@@ -293,7 +296,11 @@ export function ScheduleDetailPage() {
                 setRunFilter(filter)
                 setRunsPage(1)
               }}
-              filters={SCHEDULE_RUN_FILTERS}
+              filters={withStoppedFilter(
+                SCHEDULE_RUN_FILTERS,
+                runViewModels.some((run) => run.status === 'stopped'),
+                runFilter,
+              )}
               groupBy={runGroupBy}
               onGroupByChange={setRunGroupBy}
             />

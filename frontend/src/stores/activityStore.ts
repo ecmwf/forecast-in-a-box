@@ -26,7 +26,7 @@ import { devtools, persist } from 'zustand/middleware'
 import { STORAGE_KEYS, STORE_VERSIONS } from '@/lib/storage-keys'
 
 export type ActivityTaskType = 'plugin' | 'download' | 'job'
-export type ActivityTaskStatus = 'active' | 'completed' | 'failed'
+export type ActivityTaskStatus = 'active' | 'completed' | 'failed' | 'stopped'
 
 export interface ActivityTask {
   id: string

@@ -132,19 +132,24 @@ function useCollectJobs() {
         id: job.run_id.slice(0, 8),
       })
       const isTerminal = isTerminalStatus(job.status)
-      const outcome = {
-        status:
-          job.status === 'completed'
-            ? ('completed' as const)
-            : ('failed' as const),
-        description:
-          job.status === 'completed'
-            ? i18n.t('common:activity.jobCompleted')
-            : i18n.t('common:activity.jobFailed', {
+      const outcome =
+        job.status === 'completed' || job.status === 'stopped'
+          ? {
+              status: job.status,
+              description: i18n.t(
+                job.status === 'completed'
+                  ? 'common:activity.jobCompleted'
+                  : 'common:activity.jobStopped',
+              ),
+              completedAt: Date.now(),
+            }
+          : {
+              status: 'failed' as const,
+              description: i18n.t('common:activity.jobFailed', {
                 error: job.error ?? i18n.t('common:activity.unknownError'),
               }),
-        completedAt: Date.now(),
-      }
+              completedAt: Date.now(),
+            }
 
       const existingTask = tasks[id]
       if (existingTask) {

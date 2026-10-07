@@ -27,6 +27,8 @@
     "submitted": "Submitted",
     "preparing": "Preparing",
     "running": "Running",
+    "stopping": "Stopping",
+    "stopped": "Stopped",
     "completed": "Completed",
     "failed": "Failed",
     "unknown": "Unknown"
@@ -312,6 +314,7 @@
     "running": "Running",
     "completed": "Completed",
     "failed": "Failed",
+    "stopped": "Stopped",
     "searchPlaceholder": "Search runs..."
   },
   "list": {

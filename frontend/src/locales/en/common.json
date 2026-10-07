@@ -47,6 +47,7 @@
     "downloadComplete": "Download complete",
     "jobLabel": "Run {{id}}",
     "jobCompleted": "Completed",
+    "jobStopped": "Stopped",
     "jobFailed": "Failed: {{error}}",
     "unknownError": "Unknown error"
   },

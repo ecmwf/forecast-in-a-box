@@ -218,6 +218,7 @@ export function RunStatusHeader({
             className={cn(
               'rounded-full px-2.5 py-0.5 text-sm font-medium',
               getStatusBadgeClasses(status),
+              status === 'stopping' && 'animate-pulse',
             )}
           >
             {t(`status.${status}`)}
@@ -244,7 +245,7 @@ export function RunStatusHeader({
             </span>
           )}
 
-          {(status === 'completed' || status === 'failed') && (
+          {terminal && (
             <RestartDialog
               onRestart={onRestart}
               isRestartPending={isRestartPending}

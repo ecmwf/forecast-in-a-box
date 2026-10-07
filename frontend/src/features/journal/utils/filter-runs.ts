@@ -9,6 +9,7 @@
  */
 
 import type { ForecastRunViewModel, RunFilter } from '@/features/journal/types'
+import type { JobStatus } from '@/api/types/job.types'
 import type {
   FacetKey,
   ParsedQuery,
@@ -39,6 +40,29 @@ function matchesFacet(
   return run.tags.some((tag) => tag.toLowerCase().includes(needle))
 }
 
+/** Statuses per tab: preparing waits with Submitted, stopping is still Running. */
+const TAB_STATUSES: Record<
+  Exclude<RunFilter, 'all' | 'bookmarked'>,
+  ReadonlyArray<JobStatus>
+> = {
+  submitted: ['submitted', 'preparing'],
+  running: ['running', 'stopping'],
+  completed: ['completed'],
+  failed: ['failed'],
+  stopped: ['stopped'],
+}
+
+/** Stopped is rare, so its tab appears only once a run was stopped. */
+export function withStoppedFilter(
+  filters: ReadonlyArray<RunFilter>,
+  hasStopped: boolean,
+  active: RunFilter,
+): ReadonlyArray<RunFilter> {
+  if (!hasStopped && active !== 'stopped') return filters
+  const at = filters.indexOf('failed') + 1
+  return [...filters.slice(0, at), 'stopped', ...filters.slice(at)]
+}
+
 /** Apply the status/bookmark tab filter plus a faceted query.
  * `displayDateFor` must match the row's rendered date; defaults to the
  * raw server prefix for tests. */
@@ -52,7 +76,7 @@ export function filterRuns(
   const byTab = runs.filter((run) => {
     if (filter === 'all') return true
     if (filter === 'bookmarked') return run.isBookmarked
-    return run.status === filter
+    return TAB_STATUSES[filter].includes(run.status)
   })
 
   return applyFacetQuery(byTab, query, {
