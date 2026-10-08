@@ -51,19 +51,31 @@ function useCollectDownloads() {
       nameByKey.set(a.encodedId, a.displayName)
     }
 
-    // Add or update active downloads
+    // Add or update active and failed downloads
     for (const [key, dl] of Object.entries(downloads)) {
       const id = `download:${key}`
       const label = nameByKey.get(key) ?? key.replace('--', '/')
       const progress = dl.progress
+      const existing = tasks[id]
+      if (dl.error !== undefined) {
+        const failed = {
+          status: 'failed' as const,
+          description: i18n.t('common:activity.downloadFailed', {
+            error: dl.error,
+          }),
+          completedAt: Date.now(),
+        }
+        if (existing?.status === 'active') updateTask(id, failed)
+        continue
+      }
       const description =
         dl.status === 'submitting'
           ? i18n.t('common:activity.downloadStarting')
           : i18n.t('common:activity.downloadProgress', { progress })
 
-      const existing = tasks[id]
       if (existing) {
-        updateTask(id, { progress, description })
+        // A retry reactivates a failed task.
+        updateTask(id, { status: 'active', progress, description })
       } else if (!dismissed[id]) {
         addTask({
           id,

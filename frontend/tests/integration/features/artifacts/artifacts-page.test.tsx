@@ -19,6 +19,8 @@ import { API_ENDPOINTS } from '@/api/endpoints'
 import { resetDownloadState } from '@/api/hooks/useArtifacts'
 import { Route } from '@/routes/_authenticated/admin/artifacts.index'
 import { useUiStore } from '@/stores/uiStore'
+import { useActivityStore } from '@/stores/activityStore'
+import { useActivityCollector } from '@/hooks/useActivityCollector'
 
 const ArtifactsPage = Route.options.component!
 
@@ -150,8 +152,23 @@ describe('Models page', () => {
       },
       'HTTPError(503 Service Unavailable)',
     )
-    const screen = await renderPage()
+    // The notification centre reports the failure.
+    function Collector() {
+      useActivityCollector()
+      return null
+    }
+    useActivityStore.setState({ tasks: {}, dismissed: {} })
+    const screen = await renderWithRouter(
+      <>
+        <ArtifactsPage />
+        <Collector />
+      </>,
+    )
     await screen.getByRole('button', { name: 'Download' }).last().click()
+    const downloadTask = () =>
+      Object.values(useActivityStore.getState().tasks).find(
+        (task) => task?.type === 'download',
+      )
 
     const failed = screen.getByText('Download failed')
     await expect.element(failed).toBeVisible()
@@ -161,11 +178,14 @@ describe('Models page', () => {
       .toBeVisible()
     const retry = screen.getByRole('button', { name: 'Retry download' })
     await expect.element(retry).toBeVisible()
+    await expect.poll(() => downloadTask()?.status).toBe('failed')
+    expect(downloadTask()?.description).toContain('HTTPError(503')
 
     // The click sends retry=true.
     await retry.click()
     await expect.element(screen.getByText('Downloading').first()).toBeVisible()
     expect(screen.getByText('Download failed').elements()).toHaveLength(0)
+    await expect.poll(() => downloadTask()?.status).toBe('active')
   })
 
   // Mutating test: keep last.
