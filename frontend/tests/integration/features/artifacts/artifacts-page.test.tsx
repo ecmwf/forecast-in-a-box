@@ -10,11 +10,12 @@
 
 /** Mutating tests run last: MSW artifact state persists within the file. */
 
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { HttpResponse, http } from 'msw'
 import { worker } from '@tests/test-extend'
 import { renderWithRouter } from '@tests/utils/render'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import { resetDownloadState } from '@/api/hooks/useArtifacts'
 import { Route } from '@/routes/_authenticated/admin/artifacts.index'
 import { useUiStore } from '@/stores/uiStore'
 
@@ -39,6 +40,9 @@ describe('Models page', () => {
       '[data-slot="alert-dialog-content"]{position:fixed;top:0;z-index:50}'
     document.head.appendChild(style)
   })
+
+  // Download polls outlive a test.
+  afterEach(() => resetDownloadState())
 
   beforeEach(() => {
     localStorage.clear()
@@ -102,7 +106,7 @@ describe('Models page', () => {
     })
   })
 
-  it('blocks incompatible downloads; shows progress in place and cancels', async () => {
+  it('blocks incompatible downloads and shows progress in place', async () => {
     const overview = (id: string, name: string, compatible: boolean) => ({
       composite_id: { artifact_store_id: 'ecmwf', artifact_local_id: id },
       display_name: name,
@@ -127,13 +131,10 @@ describe('Models page', () => {
 
     await expect.element(downloads.first()).toBeDisabled()
     await downloads.last().click()
-    await expect
-      .element(screen.getByRole('button', { name: 'Cancel' }))
-      .toBeVisible()
     await expect.element(screen.getByText('Downloading').first()).toBeVisible()
-
-    await screen.getByRole('button', { name: 'Cancel' }).click()
-    await expect.element(downloads.last()).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'Cancel' }).elements(),
+    ).toHaveLength(0)
   })
 
   // Mutating test: keep last.

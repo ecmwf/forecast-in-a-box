@@ -25,7 +25,6 @@ import { cn } from '@/lib/utils'
 
 export interface ArtifactItemHandlers {
   onDownload: (compositeId: CompositeArtifactId) => void
-  onCancelDownload: (compositeId: CompositeArtifactId) => void
   onDelete: (compositeId: CompositeArtifactId) => void
   onViewDetails: (artifact: ArtifactInfo) => void
 }
@@ -45,7 +44,6 @@ export function ArtifactActions({
   isDeleting,
   layout,
   onDownload,
-  onCancelDownload,
   onDelete,
   onViewDetails,
 }: ArtifactActionsProps) {
@@ -57,8 +55,6 @@ export function ArtifactActions({
         className="w-full"
         label={t('actions.downloading')}
         progress={downloadProgress}
-        onCancel={() => onCancelDownload(artifact.id)}
-        cancelLabel={t('actions.cancelDownload')}
       />
     )
   }

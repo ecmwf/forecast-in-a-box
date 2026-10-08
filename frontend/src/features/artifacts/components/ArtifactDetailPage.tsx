@@ -24,7 +24,6 @@ import {
   HardDrive,
   Trash2,
   TriangleAlert,
-  X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -54,7 +53,6 @@ export interface ArtifactDetailPageProps {
   detail: MlModelDetail
   onDownload: (compositeId: CompositeArtifactId) => void
   onDelete: (compositeId: CompositeArtifactId) => void
-  onCancelDownload?: (compositeId: CompositeArtifactId) => void
   isDownloading?: boolean
   /** Download progress 0-100, only meaningful when isDownloading is true */
   downloadProgress?: number
@@ -65,7 +63,6 @@ export function ArtifactDetailPage({
   detail,
   onDownload,
   onDelete,
-  onCancelDownload,
   isDownloading,
   downloadProgress,
   isDeleting,
@@ -158,21 +155,10 @@ export function ArtifactDetailPage({
               {t('actions.delete')}
             </Button>
           ) : isDownloading ? (
-            <>
-              <Button size="sm" disabled>
-                <Spinner className="mr-1 h-4 w-4" />
-                {t('actions.downloading')}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-danger hover:text-danger"
-                onClick={() => onCancelDownload?.(detail.composite_id)}
-              >
-                <X className="mr-1 h-4 w-4" />
-                {t('actions.cancelDownload')}
-              </Button>
-            </>
+            <Button size="sm" disabled>
+              <Spinner className="mr-1 h-4 w-4" />
+              {t('actions.downloading')}
+            </Button>
           ) : (
             <Button
               size="sm"

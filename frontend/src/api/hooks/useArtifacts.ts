@@ -254,6 +254,8 @@ async function startDownloadPolling(
       interval: DOWNLOAD_POLL_INTERVAL,
       signal: controller.signal,
       onProgress: (r) => {
+        // Ignore a response landing after abort.
+        if (controller.signal.aborted) return
         useDownloadStore.getState().setProgress(key, {
           compositeId,
           progress: r.progress ?? 0,
@@ -266,15 +268,26 @@ async function startDownloadPolling(
     await onComplete?.()
     return response
   } finally {
-    abortControllers.delete(key)
-    downloadWakers.delete(key)
-    removePendingDownload(key)
-    useDownloadStore.getState().removeProgress(key)
+    // A newer poll owns this key (after a reset).
+    if (abortControllers.get(key) === controller) {
+      abortControllers.delete(key)
+      downloadWakers.delete(key)
+      removePendingDownload(key)
+      useDownloadStore.getState().removeProgress(key)
+    }
   }
 }
 
+/** Abort all download polls and clear the store (tests only). */
+export function resetDownloadState(): void {
+  for (const controller of abortControllers.values()) controller.abort()
+  abortControllers.clear()
+  downloadWakers.clear()
+  useDownloadStore.setState({ downloads: {} })
+}
+
 /**
- * Download action callbacks (start / cancel).
+ * Download action callbacks.
  *
  * Subscribes to *no* store slice, so a consumer that only triggers downloads
  * never re-renders on a progress tick. Also resumes any pending downloads on
@@ -321,12 +334,7 @@ export function useDownloadActions() {
     [queryClient],
   )
 
-  const cancel = useCallback((compositeId: CompositeArtifactId) => {
-    const key = encodeArtifactId(compositeId)
-    abortControllers.get(key)?.abort()
-  }, [])
-
-  return { mutate, cancel }
+  return { mutate }
 }
 
 /**
@@ -363,7 +371,7 @@ export function useDownloadingKeys(): Array<string> {
  * `useDownloadActions`, to avoid re-rendering on every progress tick.
  */
 export function useDownloadModel() {
-  const { mutate, cancel } = useDownloadActions()
+  const { mutate } = useDownloadActions()
   const downloads = useDownloadStore((state) => state.downloads)
 
   const isDownloading = useCallback(
@@ -386,7 +394,6 @@ export function useDownloadModel() {
     mutate,
     isDownloading,
     getProgress,
-    cancel,
     downloads,
   }
 }

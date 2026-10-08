@@ -73,7 +73,7 @@ function ArtifactsPage() {
     useState<DeleteArtifactTarget | null>(null)
 
   const { artifacts, isLoading, refetch } = useArtifacts()
-  const { mutate: download, cancel: cancelDownload } = useDownloadActions()
+  const { mutate: download } = useDownloadActions()
   const deleteModel = useDeleteModel()
   const downloadingKeys = useDownloadingKeys()
   const deletingKeys = useDeletingKeys()
@@ -123,7 +123,6 @@ function ArtifactsPage() {
 
   const handlers = {
     onDownload: download,
-    onCancelDownload: cancelDownload,
     onDelete: (id: ArtifactInfo['id']) => {
       const artifact = artifacts.find(
         (a) => a.encodedId === encodeArtifactId(id),
