@@ -1,3 +1,6 @@
+default:
+    @just --list
+
 dbuild:
     docker build -t forecast-in-a-box -f Dockerfile .
 
