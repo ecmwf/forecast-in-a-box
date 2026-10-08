@@ -53,4 +53,10 @@ export interface ForecastRunViewModel {
 
 /** Status quick-filter tabs — a curated subset of `JobStatus`, plus `all`/`bookmarked`. */
 export type RunFilter =
-  'all' | 'submitted' | 'running' | 'completed' | 'failed' | 'bookmarked'
+  | 'all'
+  | 'submitted'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'stopped'
+  | 'bookmarked'

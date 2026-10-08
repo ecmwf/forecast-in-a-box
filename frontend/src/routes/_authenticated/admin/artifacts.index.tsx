@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
 import type { DeleteArtifactTarget } from '@/features/artifacts/components/ConfirmDeleteArtifactDialog'
 import type { SortOption } from '@/components/common/catalogue/useStableOrder'
-import { encodeArtifactId } from '@/api/types/artifacts.types'
+import { artifactIdToWire, encodeArtifactId } from '@/api/types/artifacts.types'
 import {
   useArtifacts,
   useDeleteModel,
@@ -56,8 +56,10 @@ function matchesFilter(artifact: ArtifactInfo, filter: ArtifactFilter) {
   return artifact.isAvailable === (filter === 'downloaded')
 }
 
+// Same-name variants sort by id.
 const byName = (a: ArtifactInfo, b: ArtifactInfo) =>
-  a.displayName.localeCompare(b.displayName)
+  a.displayName.localeCompare(b.displayName) ||
+  a.id.artifact_local_id.localeCompare(b.id.artifact_local_id)
 
 function ArtifactsPage() {
   const { t } = useTranslation(['artifacts', 'common'])
@@ -73,7 +75,7 @@ function ArtifactsPage() {
     useState<DeleteArtifactTarget | null>(null)
 
   const { artifacts, isLoading, refetch } = useArtifacts()
-  const { mutate: download, cancel: cancelDownload } = useDownloadActions()
+  const { mutate: download } = useDownloadActions()
   const deleteModel = useDeleteModel()
   const downloadingKeys = useDownloadingKeys()
   const deletingKeys = useDeletingKeys()
@@ -84,9 +86,13 @@ function ArtifactsPage() {
       (a) =>
         !query ||
         a.displayName.toLowerCase().includes(query) ||
-        a.author.toLowerCase().includes(query),
+        a.author.toLowerCase().includes(query) ||
+        artifactIdToWire(a.id).toLowerCase().includes(query),
     )
   }, [artifacts, searchQuery])
+  // As in the picker: store ids only with several stores.
+  const showStore =
+    new Set(artifacts.map((a) => a.id.artifact_store_id)).size > 1
 
   const sortOptions: Array<SortOption<ArtifactInfo>> = [
     { key: 'name', label: t('table.model'), compare: byName },
@@ -123,7 +129,6 @@ function ArtifactsPage() {
 
   const handlers = {
     onDownload: download,
-    onCancelDownload: cancelDownload,
     onDelete: (id: ArtifactInfo['id']) => {
       const artifact = artifacts.find(
         (a) => a.encodedId === encodeArtifactId(id),
@@ -211,6 +216,7 @@ function ArtifactsPage() {
             <ArtifactCard
               artifact={artifact}
               isDeleting={deletingKeys.includes(artifact.encodedId)}
+              showStore={showStore}
               {...handlers}
             />
           )}
@@ -218,6 +224,7 @@ function ArtifactsPage() {
             <ArtifactRow
               artifact={artifact}
               isDeleting={deletingKeys.includes(artifact.encodedId)}
+              showStore={showStore}
               {...handlers}
             />
           )}

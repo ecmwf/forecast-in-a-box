@@ -13,6 +13,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import i18n from 'i18next'
 import type { FableBuilderV1 } from '@/api/types/fable.types'
 import type {
   CompilationDetailResponse,
@@ -31,9 +32,13 @@ import {
   getJobStatus,
   getJobsStatus,
   restartJob,
+  stopJob,
 } from '@/api/endpoints/job'
 import { upsertFable } from '@/api/endpoints/fable'
 import { withOneoffTag } from '@/lib/system-tags'
+import { showToast } from '@/lib/toast'
+import { scheduleKeys } from '@/api/hooks/useSchedules'
+import { shareRunDetail, shareRunList } from '@/api/hooks/run-status-sharing'
 
 export const jobKeys = {
   all: ['jobs'] as const,
@@ -56,6 +61,9 @@ export function useJobStatus(jobId: string | undefined) {
       return status === 'submitted' ? 2000 : 3000
     },
     refetchOnWindowFocus: false,
+    // Busy while the gateway stops a run; the next poll catches up.
+    meta: { expectedErrorStatuses: [503] },
+    structuralSharing: shareRunDetail,
   })
 }
 
@@ -91,6 +99,8 @@ export function useRecentRuns(count: number) {
       data.runs.slice(0, Math.min(count, RECENT_RUNS_WINDOW)),
     refetchInterval: 10000,
     refetchOnWindowFocus: false,
+    meta: { expectedErrorStatuses: [503] },
+    structuralSharing: shareRunList,
   })
 }
 
@@ -104,6 +114,8 @@ export function useJobsStatus(
     queryFn: () => getJobsStatus(page, pageSize, status),
     refetchInterval: 10000,
     refetchOnWindowFocus: false,
+    meta: { expectedErrorStatuses: [503] },
+    structuralSharing: shareRunList,
   })
 }
 
@@ -122,13 +134,50 @@ export function useRestartJob() {
   })
 }
 
+/** Stop an active run; its cached detail reads `stopping` at once. */
+export function useStopJob() {
+  const queryClient = useQueryClient()
+
+  return useMutation<void, Error, { runId: string; attemptCount: number }>({
+    mutationFn: ({ runId, attemptCount }) => stopJob(runId, attemptCount),
+    meta: { expectedErrorStatuses: [409, 503] },
+    onMutate: ({ runId }) => {
+      queryClient.setQueryData<JobExecutionDetail>(
+        jobKeys.status(runId),
+        (detail) =>
+          detail && !isTerminalStatus(detail.status)
+            ? { ...detail, status: 'stopping' }
+            : detail,
+      )
+    },
+    onError: (error) => {
+      if (!(error instanceof ApiClientError)) return
+      // 409: it finished first; 503: recorded, the backend retries the stop.
+      if (error.status === 409) {
+        showToast.info(i18n.t('executions:actions.stopAlreadyFinished'))
+      } else if (error.status === 503) {
+        showToast.info(i18n.t('executions:actions.stopQueued'))
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: jobKeys.all })
+      void queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
+    },
+  })
+}
+
 export function useDeleteJob() {
   const queryClient = useQueryClient()
 
   return useMutation<void, Error, { runId: string; attemptCount: number }>({
     mutationFn: ({ runId, attemptCount }) => deleteJob(runId, attemptCount),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: jobKeys.all })
+    // 409: not finished; callers show the backend's reason instead.
+    meta: { expectedErrorStatuses: [409] },
+    onSuccess: (_data, { runId }) => {
+      // Gone for good: a refetch would only 404 behind the navigation.
+      queryClient.removeQueries({ queryKey: jobKeys.status(runId) })
+      void queryClient.invalidateQueries({ queryKey: jobKeys.all })
+      void queryClient.invalidateQueries({ queryKey: scheduleKeys.all })
     },
   })
 }

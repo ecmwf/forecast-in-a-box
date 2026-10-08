@@ -45,8 +45,10 @@
     "downloadStarting": "Starting download...",
     "downloadProgress": "Downloading {{progress}}%",
     "downloadComplete": "Download complete",
+    "downloadFailed": "Failed: {{error}}",
     "jobLabel": "Run {{id}}",
     "jobCompleted": "Completed",
+    "jobStopped": "Stopped",
     "jobFailed": "Failed: {{error}}",
     "unknownError": "Unknown error"
   },

@@ -13,26 +13,29 @@ import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { ArtifactActions } from './ArtifactActions'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
+import { ArtifactIdLine } from './ArtifactIdLine'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
 import { ArtifactTagChips } from './ArtifactTagChips'
 import type { ArtifactItemHandlers } from './ArtifactActions'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
 import { useDownloadProgress } from '@/api/hooks/useArtifacts'
-import { P } from '@/components/base/typography'
 import { Card } from '@/components/ui/card'
 
 interface ArtifactCardProps extends ArtifactItemHandlers {
   artifact: ArtifactInfo
   isDeleting: boolean
+  /** Prefix ids with their store. */
+  showStore: boolean
 }
 
 export function ArtifactCard({
   artifact,
   isDeleting,
+  showStore,
   ...handlers
 }: ArtifactCardProps) {
   const { t } = useTranslation('artifacts')
-  const { isDownloading, progress } = useDownloadProgress(artifact.id)
+  const { isDownloading, progress, error } = useDownloadProgress(artifact.id)
   const busyLabel = isDownloading
     ? t('actions.downloading')
     : isDeleting
@@ -44,22 +47,30 @@ export function ArtifactCard({
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold">
-              <Link
-                to="/admin/artifacts/$artifactId"
-                params={{ artifactId: artifact.encodedId }}
-                className="hover:underline"
-              >
-                {artifact.displayName}
-              </Link>
-            </h3>
-            <P className="mt-0.5 truncate text-muted-foreground">
-              {artifact.author}
-            </P>
+            <div className="flex min-w-0 items-baseline gap-2">
+              <h3 className="truncate text-base font-semibold">
+                <Link
+                  to="/admin/artifacts/$artifactId"
+                  params={{ artifactId: artifact.encodedId }}
+                  className="hover:underline"
+                >
+                  {artifact.displayName}
+                </Link>
+              </h3>
+              <span className="shrink-0 text-sm text-muted-foreground">
+                {artifact.author}
+              </span>
+            </div>
+            <ArtifactIdLine
+              id={artifact.id}
+              showStore={showStore}
+              className="mt-0.5"
+            />
           </div>
           <ArtifactStatusBadge
             isAvailable={artifact.isAvailable}
             busyLabel={busyLabel}
+            downloadError={error}
             className="shrink-0"
           />
         </div>
@@ -88,6 +99,7 @@ export function ArtifactCard({
         <ArtifactActions
           artifact={artifact}
           downloadProgress={isDownloading ? (progress ?? 0) : undefined}
+          downloadError={error}
           isDeleting={isDeleting}
           layout="card"
           {...handlers}

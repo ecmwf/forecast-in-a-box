@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import type { JobExecutionDetail, JobStatus } from '@/api/types/job.types'
+import { isTerminalStatus } from '@/api/types/job.types'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import {
   Popover,
@@ -31,6 +32,8 @@ const DOT_CLASS: Record<JobStatus, string> = {
   submitted: 'bg-blue-500',
   preparing: 'bg-blue-500',
   running: 'bg-amber-500',
+  stopping: 'bg-slate-400',
+  stopped: 'bg-slate-400',
   completed: 'bg-emerald-500',
   failed: 'bg-red-500',
   unknown: 'bg-gray-400',
@@ -151,10 +154,9 @@ export function RunAttemptTimeline({
 
 /** Run time in its two largest units, e.g. "2 m 24 s". */
 function duration(attempt: JobExecutionDetail, t: TFunction<'executions'>) {
-  const end =
-    attempt.status === 'completed' || attempt.status === 'failed'
-      ? new Date(attempt.updated_at)
-      : new Date()
+  const end = isTerminalStatus(attempt.status)
+    ? new Date(attempt.updated_at)
+    : new Date()
   const secs = Math.max(
     0,
     Math.round((end.getTime() - new Date(attempt.created_at).getTime()) / 1000),

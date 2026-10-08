@@ -9,7 +9,10 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { JobExecutionDetailSchema } from '@/api/types/job.types'
+import {
+  JobExecutionDetailSchema,
+  isTerminalStatus,
+} from '@/api/types/job.types'
 
 const baseDetail = {
   run_id: 'run-1',
@@ -106,5 +109,27 @@ describe('JobExecutionDetailSchema', () => {
         completed_block_ids: 'not-an-array',
       }),
     ).toThrow()
+  })
+})
+
+describe('run status (ecmwf#770)', () => {
+  it('accepts stopping and stopped', () => {
+    for (const status of ['stopping', 'stopped']) {
+      expect(
+        JobExecutionDetailSchema.parse({ ...baseDetail, status }).status,
+      ).toBe(status)
+    }
+  })
+
+  it('reads a status it does not know as unknown instead of failing', () => {
+    expect(
+      JobExecutionDetailSchema.parse({ ...baseDetail, status: 'paused' })
+        .status,
+    ).toBe('unknown')
+  })
+
+  it('treats stopped as finished and stopping as still active', () => {
+    expect(isTerminalStatus('stopped')).toBe(true)
+    expect(isTerminalStatus('stopping')).toBe(false)
   })
 })

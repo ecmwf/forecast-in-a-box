@@ -12,7 +12,10 @@
 
 import { describe, expect, it } from 'vitest'
 import type { ForecastRunViewModel } from '@/features/journal/types'
-import { filterRuns } from '@/features/journal/utils/filter-runs'
+import {
+  filterRuns,
+  withStoppedFilter,
+} from '@/features/journal/utils/filter-runs'
 import { parseQuery } from '@/features/journal/facets/parse-query'
 
 function run(overrides: Partial<ForecastRunViewModel>): ForecastRunViewModel {
@@ -151,5 +154,37 @@ describe('filterRuns', () => {
     expect(
       ids(filterRuns(runs, 'completed', parseQuery('tag:europe'))),
     ).toEqual(['r-done'])
+  })
+})
+
+describe('status tabs (ecmwf#770)', () => {
+  const lifecycle = [
+    run({ runId: 'r-sub', status: 'submitted' }),
+    run({ runId: 'r-prep', status: 'preparing' }),
+    run({ runId: 'r-run', status: 'running' }),
+    run({ runId: 'r-stopping', status: 'stopping' }),
+    run({ runId: 'r-stopped', status: 'stopped' }),
+  ]
+  const tabIds = (filter: Parameters<typeof filterRuns>[1]) =>
+    filterRuns(lifecycle, filter, parseQuery('')).map((r) => r.runId)
+
+  it('lists preparing under Submitted and stopping under Running', () => {
+    expect(tabIds('submitted')).toEqual(['r-sub', 'r-prep'])
+    expect(tabIds('running')).toEqual(['r-run', 'r-stopping'])
+    expect(tabIds('stopped')).toEqual(['r-stopped'])
+  })
+
+  it('shows the Stopped tab only once a run was stopped', () => {
+    const base = ['all', 'running', 'failed', 'bookmarked'] as const
+    expect(withStoppedFilter(base, false, 'all')).toEqual(base)
+    expect(withStoppedFilter(base, true, 'all')).toEqual([
+      'all',
+      'running',
+      'failed',
+      'stopped',
+      'bookmarked',
+    ])
+    // A shared ?status=stopped link keeps its tab.
+    expect(withStoppedFilter(base, false, 'stopped')).toContain('stopped')
   })
 })

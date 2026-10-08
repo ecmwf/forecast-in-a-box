@@ -26,6 +26,7 @@ import {
   BrushCleaning,
   Check,
   ChevronRight,
+  CircleStop,
   Download,
   HelpCircle,
   Play,
@@ -397,11 +398,13 @@ function ActivityTaskRow({
 function getStatusIcon(task: ActivityTask) {
   if (task.status === 'completed') return Check
   if (task.status === 'failed') return AlertCircle
+  if (task.status === 'stopped') return CircleStop
   return TYPE_CONFIG[task.type].icon
 }
 
 function getStatusColor(task: ActivityTask): string {
-  if (task.status === 'completed') return 'bg-muted-foreground/50'
+  if (task.status === 'completed' || task.status === 'stopped')
+    return 'bg-muted-foreground/50'
   // Failed is conveyed by the AlertCircle icon, not a red pill.
   if (task.status === 'failed') return NEUTRAL_BADGE_BG
   return TYPE_CONFIG[task.type].badgeColor

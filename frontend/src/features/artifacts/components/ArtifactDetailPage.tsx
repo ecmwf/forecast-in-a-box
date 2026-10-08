@@ -18,18 +18,20 @@
 import {
   ArrowLeft,
   Check,
+  CircleAlert,
   Copy,
   Download,
   ExternalLink,
   HardDrive,
+  RotateCcw,
   Trash2,
   TriangleAlert,
-  X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
+import { ArtifactIdLine } from './ArtifactIdLine'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
 import { ArtifactTagChips } from './ArtifactTagChips'
 import { QubeTree } from './QubeTree'
@@ -54,10 +56,11 @@ export interface ArtifactDetailPageProps {
   detail: MlModelDetail
   onDownload: (compositeId: CompositeArtifactId) => void
   onDelete: (compositeId: CompositeArtifactId) => void
-  onCancelDownload?: (compositeId: CompositeArtifactId) => void
   isDownloading?: boolean
   /** Download progress 0-100, only meaningful when isDownloading is true */
   downloadProgress?: number
+  /** Set after a failed download; the button retries. */
+  downloadError?: string
   isDeleting?: boolean
 }
 
@@ -65,9 +68,9 @@ export function ArtifactDetailPage({
   detail,
   onDownload,
   onDelete,
-  onCancelDownload,
   isDownloading,
   downloadProgress,
+  downloadError,
   isDeleting,
 }: ArtifactDetailPageProps) {
   const { t } = useTranslation('artifacts')
@@ -97,10 +100,12 @@ export function ArtifactDetailPage({
         <div className="min-w-0 flex-1">
           <H1 className="text-2xl">{detail.display_name}</H1>
           <P className="mt-1 text-muted-foreground">{detail.display_author}</P>
+          <ArtifactIdLine id={detail.composite_id} className="mt-0.5" />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <ArtifactStatusBadge
               isAvailable={detail.is_available}
               downloadProgress={isDownloading ? downloadProgress : undefined}
+              downloadError={downloadError}
             />
             <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-sm font-medium text-muted-foreground">
               <HardDrive className="h-3.5 w-3.5" />
@@ -158,34 +163,37 @@ export function ArtifactDetailPage({
               {t('actions.delete')}
             </Button>
           ) : isDownloading ? (
-            <>
-              <Button size="sm" disabled>
-                <Spinner className="mr-1 h-4 w-4" />
-                {t('actions.downloading')}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-danger hover:text-danger"
-                onClick={() => onCancelDownload?.(detail.composite_id)}
-              >
-                <X className="mr-1 h-4 w-4" />
-                {t('actions.cancelDownload')}
-              </Button>
-            </>
+            <Button size="sm" disabled>
+              <Spinner className="mr-1 h-4 w-4" />
+              {t('actions.downloading')}
+            </Button>
           ) : (
             <Button
               size="sm"
               onClick={() => onDownload(detail.composite_id)}
               disabled={!detail.is_locally_compatible}
             >
-              <Download className="mr-1 h-4 w-4" />
-              {t('actions.download')}
+              {downloadError === undefined ? (
+                <Download className="mr-1 h-4 w-4" />
+              ) : (
+                <RotateCcw className="mr-1 h-4 w-4" />
+              )}
+              {downloadError === undefined
+                ? t('actions.download')
+                : t('actions.retryDownload')}
             </Button>
           )}
         </div>
       </div>
 
+      {downloadError !== undefined && !isDownloading && (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertDescription>
+            {t('detail.downloadFailed', { error: downloadError })}
+          </AlertDescription>
+        </Alert>
+      )}
       {/* Full incompatibility reason from the backend */}
       {!detail.is_locally_compatible && detail.local_compatibility_detail && (
         <Alert className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400">

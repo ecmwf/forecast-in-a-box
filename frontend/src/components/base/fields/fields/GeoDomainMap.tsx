@@ -240,31 +240,30 @@ export default function GeoDomainMap({
     // Cursor feedback: pointer over a country (select); resize/move over the box or its handles (draw).
     map.on('pointermove', (event) => {
       if (event.dragging) return
-      const element = map.getTargetElement()
       if (disabledRef.current) {
-        element.style.cursor = ''
+        container.style.cursor = ''
         return
       }
       if (modeRef.current === 'select') {
         const overCountry = map.hasFeatureAtPixel(event.pixel, {
           layerFilter: (layer) => layer === countriesLayer,
         })
-        element.style.cursor = overCountry ? 'pointer' : ''
+        container.style.cursor = overCountry ? 'pointer' : ''
         return
       }
       const extent = boxExtent()
       if (extent) {
         const handle = hitHandle(event.pixel, extent)
         if (handle) {
-          element.style.cursor = handle.cursor
+          container.style.cursor = handle.cursor
           return
         }
         if (containsXY(extent, event.coordinate[0], event.coordinate[1])) {
-          element.style.cursor = 'move'
+          container.style.cursor = 'move'
           return
         }
       }
-      element.style.cursor = 'crosshair'
+      container.style.cursor = 'crosshair'
     })
 
     // Re-render the stored box (or nothing) after a discarded sketch.
@@ -325,7 +324,7 @@ export default function GeoDomainMap({
             role: handle.role,
             moved: false,
           }
-          map.getTargetElement().style.cursor = handle.cursor
+          container.style.cursor = handle.cursor
           return true
         }
         if (containsXY(extent, event.coordinate[0], event.coordinate[1])) {
@@ -335,7 +334,7 @@ export default function GeoDomainMap({
             last: event.coordinate,
             moved: false,
           }
-          map.getTargetElement().style.cursor = 'move'
+          container.style.cursor = 'move'
           return true
         }
         return false

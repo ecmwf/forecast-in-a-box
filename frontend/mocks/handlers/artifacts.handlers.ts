@@ -384,6 +384,19 @@ function findModel(id: CompositeArtifactId) {
  */
 const ongoingDownloads = new Map<string, number>()
 
+/** Failed downloads; cleared by a `retry=true` request. */
+const failedDownloads = new Map<string, string>()
+
+const pendingFailures = new Map<string, string>()
+
+/** Fail the next poll of a running download (tests only). */
+export function failNextDownloadPoll(
+  id: CompositeArtifactId,
+  reason: string,
+): void {
+  pendingFailures.set(artifactKey(id), reason)
+}
+
 /** Advance progress by 20-40% per poll, capped at 100. */
 function advanceProgress(key: string): number {
   const current = ongoingDownloads.get(key) ?? 0
@@ -405,6 +418,8 @@ function advanceProgress(key: string): number {
  */
 export function resetArtifactsHandlerState(): void {
   ongoingDownloads.clear()
+  failedDownloads.clear()
+  pendingFailures.clear()
 }
 
 /** Mirror of the backend's ArtifactDownloadFinishedEvent.as_client_notification. */
@@ -486,6 +501,21 @@ export const artifactsHandlers = [
     }
 
     const key = artifactKey(body)
+    const retry = new URL(request.url).searchParams.get('retry') === 'true'
+    const failure = failedDownloads.get(key)
+    if (failure !== undefined) {
+      if (!retry) {
+        return HttpResponse.json({ detail: failure }, { status: 400 })
+      }
+      failedDownloads.delete(key)
+    }
+    const pending = pendingFailures.get(key)
+    if (pending !== undefined && ongoingDownloads.has(key)) {
+      pendingFailures.delete(key)
+      ongoingDownloads.delete(key)
+      failedDownloads.set(key, pending)
+      return HttpResponse.json({ detail: pending }, { status: 400 })
+    }
     const isNew = !ongoingDownloads.has(key)
 
     if (isNew) {

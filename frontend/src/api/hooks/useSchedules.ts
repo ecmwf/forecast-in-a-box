@@ -22,6 +22,7 @@ import type {
   ScheduleRunsResponse,
   ScheduleUpdate,
 } from '@/api/types/schedule.types'
+import { shareRunList } from '@/api/hooks/run-status-sharing'
 import {
   createSchedule,
   deleteSchedule,
@@ -94,6 +95,7 @@ export function useScheduleRuns(
     queryFn: () => getScheduleRuns(experimentId!, page, pageSize, status),
     enabled: !!experimentId,
     refetchInterval: 30000,
+    structuralSharing: shareRunList,
   })
 }
 

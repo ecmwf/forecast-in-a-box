@@ -17,8 +17,9 @@
  * - Error state for nonexistent jobs
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
 import {
@@ -30,6 +31,7 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import {
+  getExecution,
   injectMockExecution,
   mixedAvailabilityExecution,
   opaqueMimeExecution,
@@ -40,6 +42,7 @@ import type { AuthContextValue } from '@/features/auth/AuthContext'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { RunDetailPage } from '@/features/executions/components/RunDetailPage'
 import i18n from '@/lib/i18n'
+import { showToast } from '@/lib/toast'
 
 vi.mock('@/hooks/useMedia', () => ({
   useMedia: () => true,
@@ -162,6 +165,132 @@ describe('RunDetailPage Integration', () => {
       // The MoreVertical icon button should be present
       const buttons = screen.getByRole('button')
       await expect.element(buttons.first()).toBeVisible()
+    })
+  })
+
+  describe('stop (ecmwf#770)', () => {
+    // Unstyled browser tests: keep the dialog above Base UI's fixed backdrop.
+    beforeAll(() => {
+      const style = document.createElement('style')
+      style.textContent =
+        '[data-slot="alert-dialog-content"]{position:fixed;z-index:50}'
+      document.head.appendChild(style)
+    })
+
+    async function confirmStop(
+      screen: Awaited<ReturnType<typeof renderDetailPage>>,
+    ) {
+      await screen.getByRole('button', { name: 'Stop', exact: true }).click()
+      await expect
+        .element(
+          screen
+            .getByRole('alertdialog')
+            .getByText(/Outputs produced so far are kept/),
+        )
+        .toBeVisible()
+      await screen.getByRole('button', { name: 'Stop run' }).click()
+    }
+
+    it('stops a running run and settles on Stopped', async () => {
+      const screen = await renderDetailPage('job-running-002')
+      await confirmStop(screen)
+
+      // Transparent at once: the status and the button say it is stopping.
+      await expect
+        .element(screen.getByText('Stopping', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'Stopping…' }))
+        .toBeDisabled()
+
+      // Settled: neutral notice, and the run can be restarted.
+      await expect
+        .element(screen.getByText('Stopped', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText(/Outputs produced before the stop are kept/))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'Restart' }))
+        .toBeVisible()
+    })
+
+    it('keeps Stopping while the busy gateway reads it as unknown', async () => {
+      const screen = await renderDetailPage('job-running-002')
+      await confirmStop(screen)
+      await expect
+        .element(screen.getByText('Stopping', { exact: true }))
+        .toBeVisible()
+
+      // The backend answers `unknown` while the gateway executes the stop.
+      const run = getExecution('job-running-002')!
+      injectMockExecution({ ...run, status: 'unknown' })
+      await new Promise((resolve) => setTimeout(resolve, 3500))
+      await expect
+        .element(screen.getByText('Stopping', { exact: true }))
+        .toBeVisible()
+      expect(
+        screen.getByText('Unknown', { exact: true }).elements(),
+      ).toHaveLength(0)
+
+      injectMockExecution({ ...run, status: 'stopped' })
+      await expect
+        .element(screen.getByText('Stopped', { exact: true }))
+        .toBeVisible()
+    })
+
+    it('offers no Stop on a finished run', async () => {
+      const screen = await renderDetailPage('job-completed-001')
+      await expect
+        .element(screen.getByRole('button', { name: 'Restart' }))
+        .toBeVisible()
+      expect(
+        screen.getByRole('button', { name: 'Stop', exact: true }).elements(),
+      ).toHaveLength(0)
+    })
+
+    it('offers no Delete on an active run', async () => {
+      const screen = await renderDetailPage('job-running-002')
+      await screen.getByRole('button', { name: 'More options' }).click()
+      await expect
+        .element(screen.getByRole('menuitem', { name: 'Edit workflow' }))
+        .toBeInTheDocument()
+      expect(
+        screen.getByRole('menuitem', { name: 'Delete' }).elements(),
+      ).toHaveLength(0)
+      await userEvent.keyboard('{Escape}')
+    })
+
+    it('keeps Delete on a finished run', async () => {
+      const screen = await renderDetailPage('job-completed-001')
+      await screen.getByRole('button', { name: 'More options' }).click()
+      await expect
+        .element(screen.getByRole('menuitem', { name: 'Delete' }))
+        .toBeInTheDocument()
+      await userEvent.keyboard('{Escape}')
+    })
+
+    it('reports calmly when the run finished before the stop', async () => {
+      const info = vi.spyOn(showToast, 'info')
+      const error = vi.spyOn(showToast, 'error')
+      const screen = await renderDetailPage('job-running-002')
+      await screen.getByRole('button', { name: 'Stop', exact: true }).click()
+      // It completes while the dialog is open: the backend answers 409.
+      injectMockExecution({
+        ...getExecution('job-running-002')!,
+        status: 'completed',
+      })
+      await screen.getByRole('button', { name: 'Stop run' }).click()
+
+      await expect
+        .poll(() => info.mock.calls.flat())
+        .toContain('The run had already finished.')
+      expect(error).not.toHaveBeenCalled()
+      await expect
+        .element(screen.getByText('Completed', { exact: true }))
+        .toBeVisible()
+      info.mockRestore()
+      error.mockRestore()
     })
   })
 

@@ -8,14 +8,16 @@
  * does it submit to any jurisdiction.
  */
 
-/** The run row's ⋯ menu — edit config, preset toggle, delete (with confirm). */
+/** The run row's ⋯ menu — edit config, preset toggle, stop or delete (with confirm). */
 
 import { useState } from 'react'
 import {
   BookmarkMinus,
   BookmarkPlus,
   CalendarClock,
+  CircleStop,
   Columns2,
+  Loader2,
   MoreVertical,
   Pencil,
   Trash2,
@@ -25,7 +27,8 @@ import { useNavigate } from '@tanstack/react-router'
 import type { FableRetrieveResponse } from '@/api/types/fable.types'
 import type { ForecastRunViewModel } from '@/features/journal/types'
 import { useUpsertFable } from '@/api/hooks/useFable'
-import { useDeleteJob } from '@/api/hooks/useJobs'
+import { useDeleteJob, useStopJob } from '@/api/hooks/useJobs'
+import { isStoppableStatus, isTerminalStatus } from '@/api/types/job.types'
 import { buildPreviousRunComparison } from '@/features/visualise/compare-runs'
 import {
   isOneoffBlueprint,
@@ -57,11 +60,13 @@ interface RunRowMenuProps {
 }
 
 export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
-  const { t } = useTranslation('journal')
+  const { t } = useTranslation(['journal', 'executions'])
   const navigate = useNavigate()
   const upsertFable = useUpsertFable()
   const deleteJob = useDeleteJob()
+  const stopJob = useStopJob()
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [stopOpen, setStopOpen] = useState(false)
   const [comparing, setComparing] = useState(false)
 
   async function handleCompareWithPrevious() {
@@ -196,15 +201,64 @@ export function RunRowMenu({ run, blueprint }: RunRowMenuProps) {
             {isPreset ? t('item.removeFromPreset') : t('item.saveAsPreset')}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setDeleteOpen(true)}
-            className="text-danger focus:text-danger"
-          >
-            <Trash2 className="h-4 w-4" />
-            {t('item.delete')}
-          </DropdownMenuItem>
+          {isStoppableStatus(run.status) && (
+            <DropdownMenuItem onClick={() => setStopOpen(true)}>
+              <CircleStop className="h-4 w-4" />
+              {t('executions:actions.stopRun')}
+            </DropdownMenuItem>
+          )}
+          {run.status === 'stopping' && (
+            <DropdownMenuItem disabled>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t('executions:actions.stopping')}
+            </DropdownMenuItem>
+          )}
+          {isTerminalStatus(run.status) && (
+            <DropdownMenuItem
+              onClick={() => setDeleteOpen(true)}
+              className="text-danger focus:text-danger"
+            >
+              <Trash2 className="h-4 w-4" />
+              {t('item.delete')}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <AlertDialog open={stopOpen} onOpenChange={setStopOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('executions:actions.stopJob')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('executions:actions.confirmStop')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setStopOpen(false)}
+            >
+              {t('executions:actions.keepRunning')}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                stopJob.mutate({
+                  runId: run.runId,
+                  attemptCount: run.attemptCount,
+                })
+                setStopOpen(false)
+              }}
+            >
+              {t('executions:actions.stopRun')}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>

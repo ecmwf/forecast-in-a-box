@@ -19,6 +19,8 @@ const ALL_STATUSES: Array<JobStatus> = [
   'submitted',
   'preparing',
   'running',
+  'stopping',
+  'stopped',
   'completed',
   'failed',
 ]
@@ -42,6 +44,11 @@ describe('getStatusBadgeClasses', () => {
 
   it('returns red classes for failed', () => {
     expect(getStatusBadgeClasses('failed')).toContain('bg-red-50')
+  })
+
+  it('keeps stopping and stopped neutral, not red', () => {
+    expect(getStatusBadgeClasses('stopping')).toContain('bg-slate-100')
+    expect(getStatusBadgeClasses('stopped')).toContain('bg-slate-100')
   })
 
   it('returns a non-empty string for every status', () => {

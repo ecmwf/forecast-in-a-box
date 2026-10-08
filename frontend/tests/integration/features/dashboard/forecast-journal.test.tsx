@@ -85,6 +85,37 @@ describe('ForecastJournal Integration', () => {
     })
   })
 
+  describe('row actions (ecmwf#770)', () => {
+    async function openRowMenu(runId: string) {
+      const screen = await renderJournal()
+      await screen
+        .getByTestId(`run-row-${runId}`)
+        .getByRole('button', { name: 'More options' })
+        .click()
+      return screen
+    }
+
+    it('offers Stop, not Delete, for an active run', async () => {
+      const screen = await openRowMenu('job-running-002')
+      await expect
+        .element(screen.getByRole('menuitem', { name: 'Stop run' }))
+        .toBeVisible()
+      expect(
+        screen.getByRole('menuitem', { name: 'Delete' }).elements(),
+      ).toHaveLength(0)
+    })
+
+    it('offers Delete, not Stop, for a finished run', async () => {
+      const screen = await openRowMenu('job-completed-001')
+      await expect
+        .element(screen.getByRole('menuitem', { name: 'Delete' }))
+        .toBeVisible()
+      expect(
+        screen.getByRole('menuitem', { name: 'Stop run' }).elements(),
+      ).toHaveLength(0)
+    })
+  })
+
   describe('bookmarking', () => {
     it('toggles a bookmark from the row', async () => {
       const screen = await renderJournal()

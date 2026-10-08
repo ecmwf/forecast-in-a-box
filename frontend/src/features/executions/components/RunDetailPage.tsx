@@ -47,7 +47,12 @@ import { STORAGE_KEYS } from '@/lib/storage-keys'
 import { showToast } from '@/lib/toast'
 import { ApiClientError } from '@/api/client'
 import { useBlockCatalogue, useFableRetrieve } from '@/api/hooks/useFable'
-import { useDeleteJob, useJobStatus, useRestartJob } from '@/api/hooks/useJobs'
+import {
+  useDeleteJob,
+  useJobStatus,
+  useRestartJob,
+  useStopJob,
+} from '@/api/hooks/useJobs'
 import { CoreVersionMismatchBadge } from '@/components/common/CoreVersionMismatchBadge'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { Button } from '@/components/ui/button'
@@ -116,6 +121,7 @@ export function RunDetailPage() {
   const statusQuery = useJobStatus(jobId)
   const restartMutation = useRestartJob()
   const deleteMutation = useDeleteJob()
+  const stopMutation = useStopJob()
 
   const jobData = statusQuery.data
   const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
@@ -180,6 +186,10 @@ export function RunDetailPage() {
         },
       },
     )
+  }
+
+  const handleStop = () => {
+    stopMutation.mutate({ runId: jobId, attemptCount: jobData!.attempt_count })
   }
 
   const handleDelete = () => {
@@ -267,11 +277,14 @@ export function RunDetailPage() {
         status={jobData.status}
         progress={jobData.progress ?? '0'}
         createdAt={jobData.created_at}
+        updatedAt={jobData.updated_at}
         onRestart={handleRestart}
+        onStop={handleStop}
         onDelete={handleDelete}
         onEditConfig={canEditConfig ? handleEditConfig : undefined}
         onEditMetadata={() => setMetadataOpen(true)}
         isRestartPending={restartMutation.isPending}
+        isStopPending={stopMutation.isPending}
         isDeletePending={deleteMutation.isPending}
         completedBlockCount={jobData.completed_block_ids?.length ?? null}
         plannedBlockCount={jobData.planned_block_ids?.length ?? null}

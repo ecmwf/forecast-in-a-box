@@ -45,10 +45,10 @@ export function usePointerReadout(
     const onLeave = () => setPointer(null)
     map.on('pointermove', onMove)
     const target = map.getTargetElement()
-    target.addEventListener('mouseleave', onLeave)
+    target?.addEventListener('mouseleave', onLeave)
     return () => {
       map.un('pointermove', onMove)
-      target.removeEventListener('mouseleave', onLeave)
+      target?.removeEventListener('mouseleave', onLeave)
     }
   }, [mapRef, mapVersion])
 

@@ -53,9 +53,12 @@ export async function getModelDetails(
  */
 export async function downloadModel(
   compositeId: CompositeArtifactId,
+  retry = false,
 ): Promise<ArtifactActionResponse> {
+  // retry=true restarts a failed download.
   return apiClient.post(API_ENDPOINTS.artifacts.downloadModel, compositeId, {
     schema: ArtifactActionResponseSchema,
+    ...(retry && { params: { retry: true } }),
   })
 }
 

@@ -24,7 +24,10 @@ import { P } from '@/components/base/typography'
 import { useJobStatusCounts } from '@/api/hooks/useJobStatusCounts'
 import { useServerTime } from '@/api/hooks/useSchedules'
 import { useForecastRuns } from '@/features/journal/data/useForecastRuns'
-import { filterRuns } from '@/features/journal/utils/filter-runs'
+import {
+  filterRuns,
+  withStoppedFilter,
+} from '@/features/journal/utils/filter-runs'
 import { pageSlice } from '@/features/journal/utils/page-slice'
 import { addToken, parseQuery } from '@/features/journal/facets/parse-query'
 import { ForecastRunList } from '@/features/journal/components/ForecastRunList'
@@ -106,9 +109,10 @@ export function RunListPage() {
     () => ({
       all: totalRuns,
       submitted: statusCounts.submitted + statusCounts.preparing,
-      running: statusCounts.running,
+      running: statusCounts.running + statusCounts.stopping,
       completed: statusCounts.completed,
       failed: statusCounts.failed,
+      stopped: statusCounts.stopped,
     }),
     [statusCounts, totalRuns],
   )
@@ -199,7 +203,11 @@ export function RunListPage() {
                 setActiveFilter(filter)
                 setPage(1)
               }}
-              filters={EXECUTIONS_FILTERS}
+              filters={withStoppedFilter(
+                EXECUTIONS_FILTERS,
+                statusCounts.stopped > 0,
+                activeFilter,
+              )}
               groupBy={groupBy}
               onGroupByChange={setGroupBy}
             />

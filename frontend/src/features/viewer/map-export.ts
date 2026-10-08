@@ -90,9 +90,10 @@ export function drawCompositedViewport(
 
 /** The rendered OL map at device pixels on `ground` (null: transparent); null before layout. */
 export function compositeMapToCanvas(
-  container: HTMLElement,
+  container: HTMLElement | null | undefined,
   ground: string | null = '#ffffff',
 ): HTMLCanvasElement | null {
+  if (!container) return null
   const width = container.clientWidth
   const height = container.clientHeight
   if (width === 0 || height === 0) return null

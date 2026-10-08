@@ -10,13 +10,17 @@
 
 /** Mutating tests run last: MSW artifact state persists within the file. */
 
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { HttpResponse, http } from 'msw'
 import { worker } from '@tests/test-extend'
 import { renderWithRouter } from '@tests/utils/render'
+import { failNextDownloadPoll } from '../../../../mocks/handlers/artifacts.handlers'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import { resetDownloadState } from '@/api/hooks/useArtifacts'
 import { Route } from '@/routes/_authenticated/admin/artifacts.index'
 import { useUiStore } from '@/stores/uiStore'
+import { useActivityStore } from '@/stores/activityStore'
+import { useActivityCollector } from '@/hooks/useActivityCollector'
 
 const ArtifactsPage = Route.options.component!
 
@@ -39,6 +43,9 @@ describe('Models page', () => {
       '[data-slot="alert-dialog-content"]{position:fixed;top:0;z-index:50}'
     document.head.appendChild(style)
   })
+
+  // Download polls outlive a test.
+  afterEach(() => resetDownloadState())
 
   beforeEach(() => {
     localStorage.clear()
@@ -102,18 +109,18 @@ describe('Models page', () => {
     })
   })
 
-  it('blocks incompatible downloads; shows progress in place and cancels', async () => {
-    const overview = (id: string, name: string, compatible: boolean) => ({
-      composite_id: { artifact_store_id: 'ecmwf', artifact_local_id: id },
-      display_name: name,
-      display_author: 'ECMWF',
-      disk_size_bytes: 1_000_000,
-      supported_platforms: ['linux'],
-      tags: {},
-      is_available: false,
-      is_locally_compatible: compatible,
-      local_compatibility_detail: compatible ? null : 'No GPU on this host.',
-    })
+  const overview = (id: string, name: string, compatible: boolean) => ({
+    composite_id: { artifact_store_id: 'ecmwf', artifact_local_id: id },
+    display_name: name,
+    display_author: 'ECMWF',
+    disk_size_bytes: 1_000_000,
+    supported_platforms: ['linux'],
+    tags: {},
+    is_available: false,
+    is_locally_compatible: compatible,
+    local_compatibility_detail: compatible ? null : 'No GPU on this host.',
+  })
+  const listTwo = () =>
     worker.use(
       http.get(API_ENDPOINTS.artifacts.listModels, () =>
         HttpResponse.json([
@@ -122,18 +129,91 @@ describe('Models page', () => {
         ]),
       ),
     )
+
+  it('tells same-name variants apart by id, and finds them by it', async () => {
+    worker.use(
+      http.get(API_ENDPOINTS.artifacts.listModels, () =>
+        HttpResponse.json([
+          overview('aifs-ens-crps-1.0_w_sdpa', 'AIFS ENS CRPS 1.0', true),
+          overview(
+            'aifs-ens-crps-1.0_w_flash_attn',
+            'AIFS ENS CRPS 1.0',
+            false,
+          ),
+        ]),
+      ),
+    )
+    const screen = await renderWithRouter(<ArtifactsPage />)
+    const ids = () =>
+      screen
+        .getByText(/^aifs-ens-crps-1\.0_w_/)
+        .all()
+        .map((p) => p.element().textContent)
+
+    // One store: local ids, sorted by id within a name.
+    await expect
+      .poll(ids)
+      .toEqual(['aifs-ens-crps-1.0_w_flash_attn', 'aifs-ens-crps-1.0_w_sdpa'])
+    await screen.getByPlaceholder('Search models').fill('sdpa')
+    await expect.poll(ids).toEqual(['aifs-ens-crps-1.0_w_sdpa'])
+  })
+
+  it('blocks incompatible downloads and shows progress in place', async () => {
+    listTwo()
     const screen = await renderPage()
     const downloads = screen.getByRole('button', { name: 'Download' })
 
     await expect.element(downloads.first()).toBeDisabled()
     await downloads.last().click()
-    await expect
-      .element(screen.getByRole('button', { name: 'Cancel' }))
-      .toBeVisible()
     await expect.element(screen.getByText('Downloading').first()).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Cancel' }).elements(),
+    ).toHaveLength(0)
+  })
 
-    await screen.getByRole('button', { name: 'Cancel' }).click()
-    await expect.element(downloads.last()).toBeEnabled()
+  it('keeps a failed download visible and retries it (ecmwf#775)', async () => {
+    listTwo()
+    failNextDownloadPoll(
+      {
+        artifact_store_id: 'ecmwf',
+        artifact_local_id: 'aifs-single-mse-1.1_w_sdpa',
+      },
+      'HTTPError(503 Service Unavailable)',
+    )
+    // The notification centre reports the failure.
+    function Collector() {
+      useActivityCollector()
+      return null
+    }
+    useActivityStore.setState({ tasks: {}, dismissed: {} })
+    const screen = await renderWithRouter(
+      <>
+        <ArtifactsPage />
+        <Collector />
+      </>,
+    )
+    await screen.getByRole('button', { name: 'Download' }).last().click()
+    const downloadTask = () =>
+      Object.values(useActivityStore.getState().tasks).find(
+        (task) => task?.type === 'download',
+      )
+
+    const failed = screen.getByText('Download failed')
+    await expect.element(failed).toBeVisible()
+    await failed.hover()
+    await expect
+      .element(screen.getByText('HTTPError(503 Service Unavailable)'))
+      .toBeVisible()
+    const retry = screen.getByRole('button', { name: 'Retry download' })
+    await expect.element(retry).toBeVisible()
+    await expect.poll(() => downloadTask()?.status).toBe('failed')
+    expect(downloadTask()?.description).toContain('HTTPError(503')
+
+    // The click sends retry=true.
+    await retry.click()
+    await expect.element(screen.getByText('Downloading').first()).toBeVisible()
+    expect(screen.getByText('Download failed').elements()).toHaveLength(0)
+    await expect.poll(() => downloadTask()?.status).toBe('active')
   })
 
   // Mutating test: keep last.

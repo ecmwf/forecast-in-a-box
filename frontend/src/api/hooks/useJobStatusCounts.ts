@@ -19,6 +19,7 @@ import type {
   JobStatus,
 } from '@/api/types/job.types'
 import { getJobsStatus } from '@/api/endpoints/job'
+import { shareRunList } from '@/api/hooks/run-status-sharing'
 import { jobKeys } from '@/api/hooks/useJobs'
 
 /** Newest runs the counts and the runs page cover; each row costs the
@@ -47,6 +48,8 @@ function computeCounts(data: JobExecutionList): JobStatusCounts {
     submitted: 0,
     preparing: 0,
     running: 0,
+    stopping: 0,
+    stopped: 0,
     completed: 0,
     failed: 0,
     unknown: 0,
@@ -86,6 +89,8 @@ const EMPTY_COUNTS: JobStatusCounts = {
     submitted: 0,
     preparing: 0,
     running: 0,
+    stopping: 0,
+    stopped: 0,
     completed: 0,
     failed: 0,
     unknown: 0,
@@ -106,6 +111,7 @@ export function useJobStatusCounts() {
     queryKey: jobKeys.list(1, RUN_WINDOW),
     queryFn: () => getJobsStatus(1, RUN_WINDOW),
     select: computeCounts,
+    structuralSharing: shareRunList,
     refetchInterval: RUN_WINDOW_INTERVAL_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,

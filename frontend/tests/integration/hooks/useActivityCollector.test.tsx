@@ -67,6 +67,17 @@ describe('useActivityCollector dismissals', () => {
     expect(state().dismissed[TASK_ID]).toBeUndefined()
   })
 
+  it('reports a stopped run as stopped, not as a failure', async () => {
+    await renderWithProviders(<Collector />, { queryClient })
+    await expect.poll(() => state().tasks[TASK_ID]?.status).toBe('active')
+
+    const run = getExecution(RUN_ID)!
+    injectMockExecution({ ...run, status: 'stopped' })
+    await poll()
+    await expect.poll(() => state().tasks[TASK_ID]?.status).toBe('stopped')
+    expect(state().tasks[TASK_ID]?.description).toBe('Stopped')
+  })
+
   it('forgets a dismissal once the run leaves the recent list', async () => {
     useActivityStore.setState({ dismissed: { 'job:long-gone': true } })
     await renderWithProviders(<Collector />, { queryClient })
