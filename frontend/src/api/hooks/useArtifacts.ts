@@ -231,6 +231,7 @@ export function wakeDownloadPolling(compositeId: CompositeArtifactId): void {
 async function startDownloadPolling(
   compositeId: CompositeArtifactId,
   onComplete?: () => Promise<unknown>,
+  retry = false,
 ) {
   const key = encodeArtifactId(compositeId)
 
@@ -247,9 +248,15 @@ async function startDownloadPolling(
     .getState()
     .setProgress(key, { compositeId, progress: 0, status: 'submitting' })
 
+  // Only the first request retries; polls just read.
+  let retryNext = retry
   try {
     const response = await createPollingTask({
-      poll: () => downloadModel(compositeId),
+      poll: () => {
+        const withRetry = retryNext
+        retryNext = false
+        return downloadModel(compositeId, withRetry)
+      },
       until: (r) => r.status === 'available',
       interval: DOWNLOAD_POLL_INTERVAL,
       signal: controller.signal,
@@ -320,15 +327,19 @@ export function useDownloadActions() {
     }
   }, [queryClient])
 
+  // A click retries a failed download; resumes don't.
   const mutate = useCallback(
     (compositeId: CompositeArtifactId) => {
-      startDownloadPolling(compositeId, () =>
-        Promise.all([
-          queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
-          queryClient.invalidateQueries({
-            queryKey: artifactKeys.detail(compositeId),
-          }),
-        ]),
+      startDownloadPolling(
+        compositeId,
+        () =>
+          Promise.all([
+            queryClient.invalidateQueries({ queryKey: artifactKeys.list() }),
+            queryClient.invalidateQueries({
+              queryKey: artifactKeys.detail(compositeId),
+            }),
+          ]),
+        true,
       ).catch(handleDownloadError)
     },
     [queryClient],
