@@ -27,7 +27,7 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
 
 ## Migration order
 
-1. **Status route** (`routes/status.py`).
+1. **Status route** (`routes/status.py`). [DONE]
    Replace blocking `requests.get` with `await get_async(HttpProfile.Default).get(..., timeout=5)`.
    Adapt exception handling from `requests` to `httpx` exceptions.
    Remove `requests` from the dependencies (pyproject.toml).
