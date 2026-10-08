@@ -27,35 +27,37 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
 
 ## Migration order
 
-1. **Lens proxy** (`domain/lens/proxy.py`).
-   Replace the module global `_client`, `get_client` and `aclose_client` with `get_async(HttpProfile.Proxy)`.
-   Remove the `lens_proxy_client` initializer and its `_stop_lens_proxy_client`.
-   Remove `_TIMEOUT` (it is now the `Proxy` profile).
-2. **Admin** (`domain/admin/__init__.py`, two `async with httpx.AsyncClient()`).
-   Use `get_async(HttpProfile.Default)`.
-3. **Status route** (`routes/status.py`).
+1. **Status route** (`routes/status.py`). [DONE]
    Replace blocking `requests.get` with `await get_async(HttpProfile.Default).get(..., timeout=5)`.
    Adapt exception handling from `requests` to `httpx` exceptions.
-4. **Plugin versions route** (`routes/plugins.py::_source2Versions`).
+   Remove `requests` from the dependencies (pyproject.toml).
+2. **Plugin versions route** (`routes/plugins.py::_source2Versions`).
    The function runs in a thread, so use `get_sync(HttpProfile.Default)`. Remove the `TODO pool those?`.
-5. **Plugin stores** (`domain/plugin/store.py::initialize_stores`).
+3. **Plugin stores** (`domain/plugin/store.py::initialize_stores`).
    Use `get_sync(HttpProfile.Default)` and drop the `with`.
-6. **Artifact catalog** (`domain/artifact/catalog.py::get_artifacts_catalog`).
+4. **Artifact catalog** (`domain/artifact/catalog.py::get_artifacts_catalog`).
    Use `get_sync(HttpProfile.Default)` and drop the `with`.
-7. **Artifact download** (`domain/artifact/io.py`).
+5. **Artifact download** (`domain/artifact/io.py`).
    Use `get_sync(HttpProfile.Download)` and drop the `with` and the explicit `timeout=300.0`.
    Streaming (`client.stream`) is still used as a context manager, as that is per-response and not per-client.
    Handle the exception raised when the client is closed during shutdown as a cancellation: log it, and clean up the temp file (the existing error path likely already does so -- verify).
-8. **OIDC** (`domain/auth/oidc.py`).
-   `httpx_oauth` creates its own clients internally. Check the `get_httpx_client` hook of `OpenID`, and supply a factory that returns the shared async client -- but only if the library does not close the returned client on exit (otherwise leave as is, and note it here).
-9. **Bootstrap checks** (`entrypoint/bootstrap/checks.py`).
+6. **Bootstrap checks** (`entrypoint/bootstrap/checks.py`).
    These run in a separate thread/process-phase parallel to the backend, possibly before it is up, so they must not use the registry. Leave them as they are (short lived local `httpx.Client`).
-   Only unify their settings if desired; no registry usage.
-10. **Cleanup**.
-    Remove `requests` from the dependencies if no usage remains (`grep -rn "import requests"`).
-    Delete this document, and document `http_pools` in `backend/development.md`.
+   Only unify their settings; no registry usage.
+7. **Lens proxy** (`domain/lens/proxy.py`).
+   Replace the module global `_client`, `get_client` and `aclose_client` with `get_async(HttpProfile.Proxy)`.
+   Remove the `lens_proxy_client` initializer and its `_stop_lens_proxy_client`.
+   Remove `_TIMEOUT` (it is now the `Proxy` profile).
+8. **Admin** (`domain/admin/__init__.py`, two `async with httpx.AsyncClient()`).
+   Use `get_async(HttpProfile.Default)`.
+9. **OIDC** (`domain/auth/oidc.py`).
+   `httpx_oauth` creates its own clients internally. Check the `get_httpx_client` hook of `OpenID`, and supply a factory that returns the shared async client -- but only if the library does not close the returned client on exit (otherwise leave as is, and note it here).
 
-Steps 1-8 are independent of one another and can be done in any order.
+Steps are independent of one another and can be done in any order.
+When a step is done, edit this file by adding `[DONE]` to the corresponding step line.
+
+## Cleanup step
+When prompted to do cleanup step, check that all individual migration steps are marked as done in this document, then delete this document, and document `http_pools` in `backend/development.md`.
 
 ## How to migrate a call site
 
