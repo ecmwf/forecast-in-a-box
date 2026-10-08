@@ -130,6 +130,34 @@ describe('Models page', () => {
       ),
     )
 
+  it('tells same-name variants apart by id, and finds them by it', async () => {
+    worker.use(
+      http.get(API_ENDPOINTS.artifacts.listModels, () =>
+        HttpResponse.json([
+          overview('aifs-ens-crps-1.0_w_sdpa', 'AIFS ENS CRPS 1.0', true),
+          overview(
+            'aifs-ens-crps-1.0_w_flash_attn',
+            'AIFS ENS CRPS 1.0',
+            false,
+          ),
+        ]),
+      ),
+    )
+    const screen = await renderWithRouter(<ArtifactsPage />)
+    const ids = () =>
+      screen
+        .getByText(/^aifs-ens-crps-1\.0_w_/)
+        .all()
+        .map((p) => p.element().textContent)
+
+    // One store: local ids, sorted by id within a name.
+    await expect
+      .poll(ids)
+      .toEqual(['aifs-ens-crps-1.0_w_flash_attn', 'aifs-ens-crps-1.0_w_sdpa'])
+    await screen.getByPlaceholder('Search models').fill('sdpa')
+    await expect.poll(ids).toEqual(['aifs-ens-crps-1.0_w_sdpa'])
+  })
+
   it('blocks incompatible downloads and shows progress in place', async () => {
     listTwo()
     const screen = await renderPage()

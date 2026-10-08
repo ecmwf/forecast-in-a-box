@@ -31,6 +31,7 @@ import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
+import { ArtifactIdLine } from './ArtifactIdLine'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
 import { ArtifactTagChips } from './ArtifactTagChips'
 import { QubeTree } from './QubeTree'
@@ -99,6 +100,7 @@ export function ArtifactDetailPage({
         <div className="min-w-0 flex-1">
           <H1 className="text-2xl">{detail.display_name}</H1>
           <P className="mt-1 text-muted-foreground">{detail.display_author}</P>
+          <ArtifactIdLine id={detail.composite_id} className="mt-0.5" />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <ArtifactStatusBadge
               isAvailable={detail.is_available}

@@ -12,22 +12,26 @@ import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { ArtifactActions } from './ArtifactActions'
 import { ArtifactCompatibilityBadge } from './ArtifactCompatibilityBadge'
+import { ArtifactIdLine } from './ArtifactIdLine'
 import { ArtifactStatusBadge } from './ArtifactStatusBadge'
 import { ArtifactTagChips } from './ArtifactTagChips'
 import type { ArtifactItemHandlers } from './ArtifactActions'
 import type { ArtifactInfo } from '@/api/types/artifacts.types'
 import { useDownloadProgress } from '@/api/hooks/useArtifacts'
-import { H4, P } from '@/components/base/typography'
+import { H4 } from '@/components/base/typography'
 import { CatalogueRow } from '@/components/common/catalogue/CatalogueView'
 
 interface ArtifactRowProps extends ArtifactItemHandlers {
   artifact: ArtifactInfo
   isDeleting: boolean
+  /** Prefix ids with their store. */
+  showStore: boolean
 }
 
 export function ArtifactRow({
   artifact,
   isDeleting,
+  showStore,
   ...handlers
 }: ArtifactRowProps) {
   const { t } = useTranslation('artifacts')
@@ -41,18 +45,25 @@ export function ArtifactRow({
   return (
     <CatalogueRow>
       <div className="min-w-0">
-        <H4 className="truncate text-sm font-semibold">
-          <Link
-            to="/admin/artifacts/$artifactId"
-            params={{ artifactId: artifact.encodedId }}
-            className="hover:underline"
-          >
-            {artifact.displayName}
-          </Link>
-        </H4>
-        <P className="mt-0.5 truncate text-muted-foreground">
-          {artifact.author}
-        </P>
+        <div className="flex min-w-0 items-baseline gap-2">
+          <H4 className="truncate text-sm font-semibold">
+            <Link
+              to="/admin/artifacts/$artifactId"
+              params={{ artifactId: artifact.encodedId }}
+              className="hover:underline"
+            >
+              {artifact.displayName}
+            </Link>
+          </H4>
+          <span className="shrink-0 text-sm text-muted-foreground">
+            {artifact.author}
+          </span>
+        </div>
+        <ArtifactIdLine
+          id={artifact.id}
+          showStore={showStore}
+          className="mt-0.5"
+        />
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {artifact.platforms.map((platform) => (
             <span
