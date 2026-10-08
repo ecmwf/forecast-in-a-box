@@ -33,7 +33,7 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
    Remove `requests` from the dependencies (pyproject.toml).
 2. **Plugin versions route** (`routes/plugins.py::_source2Versions`). [DONE]
    The function runs in a thread, so use `get_sync(HttpProfile.Default)`. Remove the `TODO pool those?`.
-3. **Plugin stores** (`domain/plugin/store.py::initialize_stores`).
+3. **Plugin stores** (`domain/plugin/store.py::initialize_stores`). [DONE]
    Use `get_sync(HttpProfile.Default)` and drop the `with`.
 4. **Artifact catalog** (`domain/artifact/catalog.py::get_artifacts_catalog`).
    Use `get_sync(HttpProfile.Default)` and drop the `with`.

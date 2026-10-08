@@ -29,6 +29,7 @@
 * all imports belong to top level of the file, dont import inside function definitions unless necessiated by runtime (and in that case, always add explanatory comment at the site)
 * dont alias in imports unless there is a name collision, or unless its a standard shortcut: `datetime as dt`, `multiprocessing as mp`, `numpy as np`, `xarray as xr`, `earthkit.data as ekd`
 * never use python keywords and builtins as variable names -- for example, don't use `id` variable, prefer `id_<something>` or `id_`
+* prefer existing code in `utility` submodules over writing it from scratch -- for example, don't use directly `requests` or `httpx.Client`, instead use `utility.http_pools`; don't manually convert `datetime` objects to string with `strftime`, instead use `utility.time.value_dt2str`, etc.
 
 # High Level Code Organization and Placement
 When adding new code, make sure you place it in the right submodule:

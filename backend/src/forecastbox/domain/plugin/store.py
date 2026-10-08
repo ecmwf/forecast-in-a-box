@@ -32,6 +32,7 @@ from forecastbox.domain.plugin.submit import submit_update_single
 from forecastbox.utility.concurrency.manager import ConcurrentPools, TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import PluginStoreConfig, PluginStoreId, PluginStoresConfig, config
+from forecastbox.utility.http_pools import HttpProfile, get_sync
 from forecastbox.utility.httpx import fetch_content
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
@@ -127,11 +128,11 @@ def stores_ready() -> bool:
 
 def initialize_stores(plugin_stores_config: PluginStoresConfig) -> None:
     # assumed to be submitted through ConcurrentPools.Io
-    with httpx.Client() as client:
-        # a thread pool / async could work here but we dont expect many stores here
-        stores = {key: fetch_store(client, value) for key, value in plugin_stores_config.items()}
-        for store in stores.values():
-            populate_store(store, client)
+    client = get_sync(HttpProfile.Default)
+    # a thread pool / async could work here but we dont expect many stores here
+    stores = {key: fetch_store(client, value) for key, value in plugin_stores_config.items()}
+    for store in stores.values():
+        populate_store(store, client)
     with timed_acquire(StoresManager.stores_lock, 600) as result:
         if not result:
             raise ValueError("failed to acquire lock")
