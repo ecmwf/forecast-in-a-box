@@ -9,7 +9,9 @@
 
 """Unit tests for plugin route helpers — version/specifier parsing logic and /versions route."""
 
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import _patch as PatchType
 
 import httpx
 import pytest
@@ -36,6 +38,7 @@ from pyrsistent import pmap
 from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.store import PluginRemoteInfo, PluginStoreEntry
 from forecastbox.routes.plugins import get_plugin_versions, get_template_example_values, install_plugin, update_plugin
+from forecastbox.utility.http_pools import HttpProfile
 
 # ---------------------------------------------------------------------------
 # Helpers that mirror the route logic without depending on FastAPI/HTTP stack
@@ -129,7 +132,10 @@ _STORE_ENTRY = PluginStoreEntry(
 _REMOTE_INFO = PluginRemoteInfo(version="1.2.0")
 
 
-from unittest.mock import _patch as PatchType
+@pytest.fixture(autouse=True)
+def mock_http_pool() -> Iterator[None]:
+    with patch("forecastbox.routes.plugins.get_sync", return_value=MagicMock(spec=httpx.Client)):
+        yield
 
 
 def _patch_versions(versions: list[str]) -> PatchType:
@@ -189,14 +195,16 @@ async def test_versions_falls_back_to_db_when_not_in_store() -> None:
 
 @pytest.mark.asyncio
 async def test_versions_pip_source_passed_to_get_package_versions() -> None:
-    with _patch_store(), _patch_fiabcore("1.0.0"):
-        with patch("forecastbox.routes.plugins.get_package_versions", return_value=iter([])) as mock_gpv:
-            await get_plugin_versions(_COMPOSITE_ID)
-    mock_gpv.assert_called_once()
-    assert mock_gpv.call_args is not None
-    args = mock_gpv.call_args.args
-    assert args[0] == "fiab-plugin-ecmwf"
-    assert isinstance(args[1], httpx.Client)
+    client = MagicMock(spec=httpx.Client)
+    with (
+        _patch_store(),
+        _patch_fiabcore("1.0.0"),
+        patch("forecastbox.routes.plugins.get_sync", return_value=client) as mock_get_sync,
+        patch("forecastbox.routes.plugins.get_package_versions", return_value=iter([])) as mock_gpv,
+    ):
+        await get_plugin_versions(_COMPOSITE_ID)
+    mock_get_sync.assert_called_once_with(HttpProfile.Default)
+    mock_gpv.assert_called_once_with("fiab-plugin-ecmwf", client)
 
 
 @pytest.mark.asyncio

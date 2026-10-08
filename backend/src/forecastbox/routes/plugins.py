@@ -18,7 +18,6 @@ import logging
 from functools import partial
 from typing import Annotated, cast
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from fiab_core.fable import BlockInstanceId, BlueprintTemplateExampleInput, ConfigurationOptionId, PluginCompositeId
@@ -37,6 +36,7 @@ from forecastbox.domain.plugin.submit import submit_uninstall_single, submit_unl
 from forecastbox.routes.admin import get_admin_user
 from forecastbox.utility.concurrency.manager import execution_manager
 from forecastbox.utility.config import ROUTE_PREFIX
+from forecastbox.utility.http_pools import HttpProfile, get_sync
 from forecastbox.utility.packages import get_package_versions
 from forecastbox.utility.pydantic import FiabBaseModel
 
@@ -127,8 +127,8 @@ async def _pluginId2settings(pluginCompositeId: PluginCompositeId) -> PluginSett
 
 
 def _source2Versions(pipSource: str) -> PluginVersions:
-    with httpx.Client() as client:  # TODO pool those?
-        available = get_package_versions(pipSource, client)
+    client = get_sync(HttpProfile.Default)
+    available = get_package_versions(pipSource, client)
     compatible = get_compatible_versions(pipSource, available)
     sorted_versions = sorted(compatible, key=lambda v: Version(v), reverse=True)
     return PluginVersions(versions=sorted_versions)

@@ -31,7 +31,7 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
    Replace blocking `requests.get` with `await get_async(HttpProfile.Default).get(..., timeout=5)`.
    Adapt exception handling from `requests` to `httpx` exceptions.
    Remove `requests` from the dependencies (pyproject.toml).
-2. **Plugin versions route** (`routes/plugins.py::_source2Versions`).
+2. **Plugin versions route** (`routes/plugins.py::_source2Versions`). [DONE]
    The function runs in a thread, so use `get_sync(HttpProfile.Default)`. Remove the `TODO pool those?`.
 3. **Plugin stores** (`domain/plugin/store.py::initialize_stores`).
    Use `get_sync(HttpProfile.Default)` and drop the `with`.
