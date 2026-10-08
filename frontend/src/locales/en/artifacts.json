@@ -4,6 +4,8 @@
   "actions": {
     "refresh": "Refresh",
     "download": "Download",
+    "retry": "Retry",
+    "retryDownload": "Retry download",
     "downloading": "Downloading",
     "delete": "Delete",
     "viewDetails": "View details",
@@ -21,7 +23,8 @@
   "status": {
     "downloaded": "Downloaded",
     "downloading": "Downloading {{progress}}%",
-    "available": "Available"
+    "available": "Available",
+    "downloadFailed": "Download failed"
   },
   "table": {
     "model": "Model",
@@ -55,7 +58,8 @@
     "qubeLevelValue": "{{level}} hPa",
     "copyConstraint": "Copy value",
     "constraintCopyFailed": "Could not copy to clipboard",
-    "notFound": "Model not found: {{id}}"
+    "notFound": "Model not found: {{id}}",
+    "downloadFailed": "Download failed: {{error}}"
   },
   "tags": {
     "overflow": "+{{count}}"

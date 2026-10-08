@@ -8,7 +8,7 @@
  * does it submit to any jurisdiction.
  */
 
-import { Download, Eye, Trash2 } from 'lucide-react'
+import { Download, Eye, RotateCcw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
   ArtifactInfo,
@@ -33,6 +33,8 @@ interface ArtifactActionsProps extends ArtifactItemHandlers {
   artifact: ArtifactInfo
   /** 0-100 while downloading. */
   downloadProgress: number | undefined
+  /** Set after a failed download; the button retries. */
+  downloadError?: string
   isDeleting: boolean
   layout: 'card' | 'row'
 }
@@ -41,6 +43,7 @@ interface ArtifactActionsProps extends ArtifactItemHandlers {
 export function ArtifactActions({
   artifact,
   downloadProgress,
+  downloadError,
   isDeleting,
   layout,
   onDownload,
@@ -68,9 +71,16 @@ export function ArtifactActions({
       className="border-primary/40 text-primary hover:bg-primary/5"
       onClick={() => onDownload(artifact.id)}
       disabled={!artifact.isLocallyCompatible}
+      aria-label={
+        downloadError === undefined ? undefined : t('actions.retryDownload')
+      }
     >
-      <Download className="h-4 w-4" />
-      {t('actions.download')}
+      {downloadError === undefined ? (
+        <Download className="h-4 w-4" />
+      ) : (
+        <RotateCcw className="h-4 w-4" />
+      )}
+      {downloadError === undefined ? t('actions.download') : t('actions.retry')}
     </Button>
   )
 

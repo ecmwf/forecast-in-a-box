@@ -69,6 +69,7 @@ function ArtifactDetailRoute() {
         onDelete={(id) => setPendingDelete({ id, name: detail.display_name })}
         isDownloading={downloadModel.isDownloading(detail.composite_id)}
         downloadProgress={downloadModel.getProgress(detail.composite_id)}
+        downloadError={downloadModel.getError(detail.composite_id)}
         isDeleting={deleteModel.isPending}
       />
       <ConfirmDeleteArtifactDialog

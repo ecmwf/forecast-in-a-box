@@ -16,6 +16,12 @@
 import { useTranslation } from 'react-i18next'
 import type { StatusBadgeVariant } from '@/components/common/StatusBadge'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import {
   STATUS_BADGE_VARIANTS,
   StatusBadge,
 } from '@/components/common/StatusBadge'
@@ -26,6 +32,8 @@ interface ArtifactStatusBadgeProps {
   downloadProgress?: number
   /** In-flight work, e.g. "Deleting"; progress shows elsewhere. */
   busyLabel?: string
+  /** Failure reason, shown on hover. */
+  downloadError?: string
   className?: string
 }
 
@@ -33,6 +41,7 @@ export function ArtifactStatusBadge({
   isAvailable,
   downloadProgress,
   busyLabel,
+  downloadError,
   className,
 }: ArtifactStatusBadgeProps) {
   const { t } = useTranslation('artifacts')
@@ -48,6 +57,24 @@ export function ArtifactStatusBadge({
         pulse
         className={className}
       />
+    )
+  }
+
+  if (downloadError !== undefined) {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={<span className={cn('inline-flex', className)} />}
+        >
+          <StatusBadge
+            variant={{
+              label: t('status.downloadFailed'),
+              ...STATUS_BADGE_VARIANTS.error,
+            }}
+          />
+        </TooltipTrigger>
+        <TooltipContent>{downloadError}</TooltipContent>
+      </Tooltip>
     )
   }
 

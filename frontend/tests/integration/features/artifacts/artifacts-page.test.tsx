@@ -14,6 +14,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { HttpResponse, http } from 'msw'
 import { worker } from '@tests/test-extend'
 import { renderWithRouter } from '@tests/utils/render'
+import { failNextDownloadPoll } from '../../../../mocks/handlers/artifacts.handlers'
 import { API_ENDPOINTS } from '@/api/endpoints'
 import { resetDownloadState } from '@/api/hooks/useArtifacts'
 import { Route } from '@/routes/_authenticated/admin/artifacts.index'
@@ -106,18 +107,18 @@ describe('Models page', () => {
     })
   })
 
-  it('blocks incompatible downloads and shows progress in place', async () => {
-    const overview = (id: string, name: string, compatible: boolean) => ({
-      composite_id: { artifact_store_id: 'ecmwf', artifact_local_id: id },
-      display_name: name,
-      display_author: 'ECMWF',
-      disk_size_bytes: 1_000_000,
-      supported_platforms: ['linux'],
-      tags: {},
-      is_available: false,
-      is_locally_compatible: compatible,
-      local_compatibility_detail: compatible ? null : 'No GPU on this host.',
-    })
+  const overview = (id: string, name: string, compatible: boolean) => ({
+    composite_id: { artifact_store_id: 'ecmwf', artifact_local_id: id },
+    display_name: name,
+    display_author: 'ECMWF',
+    disk_size_bytes: 1_000_000,
+    supported_platforms: ['linux'],
+    tags: {},
+    is_available: false,
+    is_locally_compatible: compatible,
+    local_compatibility_detail: compatible ? null : 'No GPU on this host.',
+  })
+  const listTwo = () =>
     worker.use(
       http.get(API_ENDPOINTS.artifacts.listModels, () =>
         HttpResponse.json([
@@ -126,6 +127,9 @@ describe('Models page', () => {
         ]),
       ),
     )
+
+  it('blocks incompatible downloads and shows progress in place', async () => {
+    listTwo()
     const screen = await renderPage()
     const downloads = screen.getByRole('button', { name: 'Download' })
 
@@ -135,6 +139,33 @@ describe('Models page', () => {
     expect(
       screen.getByRole('button', { name: 'Cancel' }).elements(),
     ).toHaveLength(0)
+  })
+
+  it('keeps a failed download visible and retries it (ecmwf#775)', async () => {
+    listTwo()
+    failNextDownloadPoll(
+      {
+        artifact_store_id: 'ecmwf',
+        artifact_local_id: 'aifs-single-mse-1.1_w_sdpa',
+      },
+      'HTTPError(503 Service Unavailable)',
+    )
+    const screen = await renderPage()
+    await screen.getByRole('button', { name: 'Download' }).last().click()
+
+    const failed = screen.getByText('Download failed')
+    await expect.element(failed).toBeVisible()
+    await failed.hover()
+    await expect
+      .element(screen.getByText('HTTPError(503 Service Unavailable)'))
+      .toBeVisible()
+    const retry = screen.getByRole('button', { name: 'Retry download' })
+    await expect.element(retry).toBeVisible()
+
+    // The click sends retry=true.
+    await retry.click()
+    await expect.element(screen.getByText('Downloading').first()).toBeVisible()
+    expect(screen.getByText('Download failed').elements()).toHaveLength(0)
   })
 
   // Mutating test: keep last.

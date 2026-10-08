@@ -26,6 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export interface ArtifactFieldProps {
@@ -48,7 +53,24 @@ interface Choice {
 /** Quiet note on downloaded models; every model stays selectable. */
 function DownloadStatus({ artifact }: { artifact: ArtifactInfo }) {
   const { t } = useTranslation('artifacts')
-  const { isDownloading, progress } = useDownloadProgress(artifact.id)
+  const { isDownloading, progress, error } = useDownloadProgress(artifact.id)
+  if (error !== undefined) {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Badge
+              variant="outline"
+              className="ml-auto shrink-0 font-normal text-danger"
+            />
+          }
+        >
+          {t('status.downloadFailed')}
+        </TooltipTrigger>
+        <TooltipContent>{error}</TooltipContent>
+      </Tooltip>
+    )
+  }
   if (!isDownloading && !artifact.isAvailable) return null
   return (
     <Badge

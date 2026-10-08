@@ -15,13 +15,18 @@
  * StringField, NumberField, DateTimeField, EnumField, ListField
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { userEvent } from 'vitest/browser'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { HttpResponse, http } from 'msw'
 import { renderWithProviders } from '@tests/utils/render'
 import { worker } from '@tests/../mocks/browser'
+import { failNextDownloadPoll } from '../../../../mocks/handlers/artifacts.handlers'
 import { API_ENDPOINTS } from '@/api/endpoints'
+import {
+  resetDownloadState,
+  useDownloadActions,
+} from '@/api/hooks/useArtifacts'
 import { FieldRenderer } from '@/components/base/fields/FieldRenderer'
 
 /**
@@ -488,6 +493,38 @@ describe('FieldRenderer Integration', () => {
       await expect
         .element(screen.getByRole('option', { name: 'ecmwf:not-in-catalogue' }))
         .toBeVisible()
+    })
+
+    describe('after a failed download', () => {
+      afterEach(() => resetDownloadState())
+
+      it('marks the checkpoint, with the reason on hover', async () => {
+        const id = {
+          artifact_store_id: 'ecmwf',
+          artifact_local_id: 'aifs-single-mse-1.1_w_sdpa',
+        }
+        failNextDownloadPoll(id, 'HTTPError(503)')
+        function StartDownload() {
+          const { mutate } = useDownloadActions()
+          useEffect(() => mutate(id), [mutate])
+          return null
+        }
+        const screen = await renderWithProviders(
+          <>
+            <ControlledFieldRenderer
+              valueType="enumClosed[artifact]('ecmwf:aifs-single-mse-1.1_w_sdpa')"
+              initialValue=""
+            />
+            <StartDownload />
+          </>,
+        )
+
+        await screen.getByRole('combobox').click()
+        const badge = screen.getByRole('option').getByText('Download failed')
+        await expect.element(badge).toBeVisible()
+        await badge.hover()
+        await expect.element(screen.getByText('HTTPError(503)')).toBeVisible()
+      })
     })
 
     describe('with two models sharing a display name', () => {

@@ -32,7 +32,7 @@ export function ArtifactCard({
   ...handlers
 }: ArtifactCardProps) {
   const { t } = useTranslation('artifacts')
-  const { isDownloading, progress } = useDownloadProgress(artifact.id)
+  const { isDownloading, progress, error } = useDownloadProgress(artifact.id)
   const busyLabel = isDownloading
     ? t('actions.downloading')
     : isDeleting
@@ -60,6 +60,7 @@ export function ArtifactCard({
           <ArtifactStatusBadge
             isAvailable={artifact.isAvailable}
             busyLabel={busyLabel}
+            downloadError={error}
             className="shrink-0"
           />
         </div>
@@ -88,6 +89,7 @@ export function ArtifactCard({
         <ArtifactActions
           artifact={artifact}
           downloadProgress={isDownloading ? (progress ?? 0) : undefined}
+          downloadError={error}
           isDeleting={isDeleting}
           layout="card"
           {...handlers}

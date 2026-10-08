@@ -146,6 +146,8 @@ export interface DownloadProgress {
   /** 0-100 */
   progress: number
   status: string
+  /** Set when the download failed. */
+  error?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -244,9 +246,8 @@ async function startDownloadPolling(
   // Persist to localStorage so we can resume after page refresh
   savePendingDownload(key)
 
-  useDownloadStore
-    .getState()
-    .setProgress(key, { compositeId, progress: 0, status: 'submitting' })
+  const store = useDownloadStore.getState()
+  store.setProgress(key, { compositeId, progress: 0, status: 'submitting' })
 
   // Only the first request retries; polls just read.
   let retryNext = retry
@@ -263,7 +264,7 @@ async function startDownloadPolling(
       onProgress: (r) => {
         // Ignore a response landing after abort.
         if (controller.signal.aborted) return
-        useDownloadStore.getState().setProgress(key, {
+        store.setProgress(key, {
           compositeId,
           progress: r.progress ?? 0,
           status: r.status,
@@ -273,14 +274,29 @@ async function startDownloadPolling(
     })
     // Keep the progress entry until the list shows the model as downloaded.
     await onComplete?.()
+    store.removeProgress(key)
     return response
-  } finally {
+  } catch (error) {
     // A newer poll owns this key (after a reset).
+    if (abortControllers.get(key) !== controller) throw error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      store.removeProgress(key)
+    } else {
+      const last = useDownloadStore.getState().downloads[key] as
+        DownloadProgress | undefined
+      store.setProgress(key, {
+        compositeId,
+        progress: last?.progress ?? 0,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+    throw error
+  } finally {
     if (abortControllers.get(key) === controller) {
       abortControllers.delete(key)
       downloadWakers.delete(key)
       removePendingDownload(key)
-      useDownloadStore.getState().removeProgress(key)
     }
   }
 }
@@ -360,14 +376,21 @@ export function useDownloadProgress(compositeId: CompositeArtifactId) {
     key in state.downloads ? state.downloads[key] : undefined,
   )
   return {
-    isDownloading: entry !== undefined,
+    isDownloading: entry !== undefined && entry.error === undefined,
     progress: entry?.progress,
+    error: entry?.error,
   }
 }
 
 /** Encoded ids of downloading models; stable across progress ticks. */
 export function useDownloadingKeys(): Array<string> {
-  return useDownloadStore(useShallow((state) => Object.keys(state.downloads)))
+  return useDownloadStore(
+    useShallow((state) =>
+      Object.keys(state.downloads).filter(
+        (key) => state.downloads[key].error === undefined,
+      ),
+    ),
+  )
 }
 
 /**
@@ -387,8 +410,17 @@ export function useDownloadModel() {
 
   const isDownloading = useCallback(
     (compositeId: CompositeArtifactId): boolean => {
-      return encodeArtifactId(compositeId) in downloads
+      const entry = downloads[encodeArtifactId(compositeId)] as
+        DownloadProgress | undefined
+      return entry !== undefined && entry.error === undefined
     },
+    [downloads],
+  )
+
+  const getError = useCallback(
+    (compositeId: CompositeArtifactId): string | undefined =>
+      (downloads[encodeArtifactId(compositeId)] as DownloadProgress | undefined)
+        ?.error,
     [downloads],
   )
 
@@ -405,6 +437,7 @@ export function useDownloadModel() {
     mutate,
     isDownloading,
     getProgress,
+    getError,
     downloads,
   }
 }
