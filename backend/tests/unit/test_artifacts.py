@@ -98,6 +98,13 @@ def tmpdir_path() -> Generator[Path, None, None]:
         yield Path(tmpdir)
 
 
+@pytest.fixture
+def mock_catalog_http_client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    client = MagicMock()
+    monkeypatch.setattr("forecastbox.domain.artifact.catalog.get_sync", lambda _profile: client)
+    return client
+
+
 def test_composite_artifact_id() -> None:
     """Test CompositeArtifactId creation and hashing"""
     id1 = CompositeArtifactId(artifact_store_id=ArtifactStoreId("store1"), artifact_local_id=ArtifactLocalId("model1"))
@@ -144,7 +151,12 @@ def test_composite_artifact_id_from_str_missing_colon() -> None:
         CoreCompositeArtifactId.from_str("no_colon_here")
 
 
-def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_common: Any, sample_checkpoint: Any) -> None:
+def test_get_artifacts_catalog(
+    sample_artifact_stores_config: Any,
+    sample_common: Any,
+    sample_checkpoint: Any,
+    mock_catalog_http_client: MagicMock,
+) -> None:
     """Test getting artifacts catalog from multiple stores"""
     store1_data = {
         "display_name": "Store 1",
@@ -173,36 +185,36 @@ def test_get_artifacts_catalog(sample_artifact_stores_config: Any, sample_common
         },
     }
 
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_client_class.return_value.__enter__.return_value = mock_client
+    mock_responses = []
+    for data in [store1_data, store2_data]:
+        mock_response = MagicMock()
+        mock_response.content = json.dumps(data).encode()
+        mock_response.raise_for_status = MagicMock()
+        mock_responses.append(mock_response)
 
-        mock_responses = []
-        for data in [store1_data, store2_data]:
-            mock_response = MagicMock()
-            mock_response.content = json.dumps(data).encode()
-            mock_response.raise_for_status = MagicMock()
-            mock_responses.append(mock_response)
+    mock_catalog_http_client.get.side_effect = mock_responses
 
-        mock_client.get.side_effect = mock_responses
+    catalog = get_artifacts_catalog(sample_artifact_stores_config)
 
-        catalog = get_artifacts_catalog(sample_artifact_stores_config)
+    assert len(catalog) == 3
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1")) in catalog
+    assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model2")) in catalog
+    assert CompositeArtifactId(ArtifactStoreId("store2"), ArtifactLocalId("model3")) in catalog
 
-        assert len(catalog) == 3
-        assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1")) in catalog
-        assert CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model2")) in catalog
-        assert CompositeArtifactId(ArtifactStoreId("store2"), ArtifactLocalId("model3")) in catalog
-
-        for composite_id, artifact in catalog.items():
-            assert isinstance(artifact, ArtifactResolved)
-            assert artifact.artifact_type == "AnemoiCheckpoint"
-            assert isinstance(artifact.common, CommonArtifactMetadata)
-            assert artifact.common.display_name == "Test Model"
-            assert artifact.is_locally_compatible is True
-            assert artifact.local_compatibility_detail is None
+    for composite_id, artifact in catalog.items():
+        assert isinstance(artifact, ArtifactResolved)
+        assert artifact.artifact_type == "AnemoiCheckpoint"
+        assert isinstance(artifact.common, CommonArtifactMetadata)
+        assert artifact.common.display_name == "Test Model"
+        assert artifact.is_locally_compatible is True
+        assert artifact.local_compatibility_detail is None
 
 
-def test_get_artifacts_catalog_from_git_tag(sample_common: Any, sample_checkpoint: Any) -> None:
+def test_get_artifacts_catalog_from_git_tag(
+    sample_common: Any,
+    sample_checkpoint: Any,
+    mock_catalog_http_client: MagicMock,
+) -> None:
     """Test that gittag stores fetch artifacts from the highest c-tag."""
     store_data = {
         "display_name": "Store 1",
@@ -234,17 +246,14 @@ def test_get_artifacts_catalog_from_git_tag(sample_common: Any, sample_checkpoin
     else:
         mock_versions.append(f"v{core_version.major - 1}.{core_version.minor}.{core_version.micro}.0")
         expected_version = mock_versions[1]
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_client_class.return_value.__enter__.return_value = mock_client
-        with patch("forecastbox.domain.artifact.catalog.get_all_repo_tags", return_value=iter(mock_versions)):
-            with patch("forecastbox.domain.artifact.catalog.fetch_content") as mock_fetch:
-                mock_fetch.return_value = json.dumps(store_data).encode()
+    with patch("forecastbox.domain.artifact.catalog.get_all_repo_tags", return_value=iter(mock_versions)):
+        with patch("forecastbox.domain.artifact.catalog.fetch_content") as mock_fetch:
+            mock_fetch.return_value = json.dumps(store_data).encode()
 
-                catalog = get_artifacts_catalog(config)
+            catalog = get_artifacts_catalog(config)
 
     expected_url = f"https://raw.githubusercontent.com/ecmwf/forecast-in-a-box/refs/tags/{expected_version}/install/artifacts.json"
-    mock_fetch.assert_called_once_with(expected_url, mock_client)
+    mock_fetch.assert_called_once_with(expected_url, mock_catalog_http_client)
     assert len(catalog) == 1
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1"))
     assert composite_id in catalog
@@ -258,17 +267,14 @@ def test_artifact_store_config_requires_placeholder_for_gittag() -> None:
         )
 
 
-def test_get_artifacts_catalog_with_error(sample_artifact_stores_config: Any) -> None:
+def test_get_artifacts_catalog_with_error(sample_artifact_stores_config: Any, mock_catalog_http_client: MagicMock) -> None:
     """Test get_artifacts_catalog raises when there's a network error"""
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_client_class.return_value.__enter__.return_value = mock_client
-        mock_client.get.side_effect = httpx.HTTPError("Network error")
-        with pytest.raises(httpx.HTTPError):
-            get_artifacts_catalog(sample_artifact_stores_config)
+    mock_catalog_http_client.get.side_effect = httpx.HTTPError("Network error")
+    with pytest.raises(httpx.HTTPError):
+        get_artifacts_catalog(sample_artifact_stores_config)
 
 
-def test_get_artifacts_catalog_unsupported_method() -> None:
+def test_get_artifacts_catalog_unsupported_method(mock_catalog_http_client: MagicMock) -> None:
     """Test get_artifacts_catalog with unsupported store method raises"""
     from typing import Literal, cast
 
@@ -285,7 +291,12 @@ def test_get_artifacts_catalog_unsupported_method() -> None:
         get_artifacts_catalog(config)
 
 
-def test_get_artifacts_catalog_from_local_file(tmpdir_path: Path, sample_common: Any, sample_checkpoint: Any) -> None:
+def test_get_artifacts_catalog_from_local_file(
+    tmpdir_path: Path,
+    sample_common: Any,
+    sample_checkpoint: Any,
+    mock_catalog_http_client: MagicMock,
+) -> None:
     """Test that get_artifacts_catalog loads from a local JSON file when the URL is a valid file path"""
     store_data = {
         "display_name": "Local Store",
