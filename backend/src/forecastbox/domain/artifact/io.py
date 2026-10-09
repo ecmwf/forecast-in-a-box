@@ -30,6 +30,7 @@ from fiab_core.artifacts import ArtifactLocalId, ArtifactResolved, ArtifactStore
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, artifacts_subdir, get_artifact_local_path
 from forecastbox.utility import tunnel
+from forecastbox.utility.http_pools import HttpProfile, get_sync
 from forecastbox.utility.tunnel import CommandHandle
 
 logger = logging.getLogger(__name__)
@@ -156,29 +157,29 @@ def _download_artifact_local(
             logger.error(f"Failed to copy artifact {composite_id}: {e}")
         return
 
+    client = get_sync(HttpProfile.Download)
     temp_file = tempfile.NamedTemporaryFile(prefix="artifact_", suffix=".ckpt", delete=False)
     temp_path = Path(temp_file.name)
     temp_file.close()
 
     try:
-        with httpx.Client(follow_redirects=True, timeout=300.0) as client:
-            logger.debug(f"Starting download for {composite_id} from {checkpoint.url} to {temp_path}")
-            with client.stream("GET", checkpoint.url) as response:
-                response.raise_for_status()
-                total = int(response.headers.get("Content-Length", 0))
-                downloaded = 0
-                chunk_size = 1024 * 1024  # 1MB chunks
+        logger.debug(f"Starting download for {composite_id} from {checkpoint.url} to {temp_path}")
+        with client.stream("GET", checkpoint.url) as response:
+            response.raise_for_status()
+            total = int(response.headers.get("Content-Length", 0))
+            downloaded = 0
+            chunk_size = 1024 * 1024  # 1MB chunks
 
-                with open(temp_path, "wb") as file:
-                    for chunk in response.iter_bytes(chunk_size):
-                        if chunk:
-                            file.write(chunk)
-                            downloaded += len(chunk)
-                            if total > 0:
-                                progress = int(float(downloaded) / total * 100)
-                                logger.debug(f"Download progress: {progress}%")
-                                if progress_callback:
-                                    progress_callback(progress)
+            with open(temp_path, "wb") as file:
+                for chunk in response.iter_bytes(chunk_size):
+                    if chunk:
+                        file.write(chunk)
+                        downloaded += len(chunk)
+                        if total > 0:
+                            progress = int(float(downloaded) / total * 100)
+                            logger.debug(f"Download progress: {progress}%")
+                            if progress_callback:
+                                progress_callback(progress)
 
         logger.debug(f"Download completed for {composite_id}, total bytes: {downloaded}")
         shutil.move(str(temp_path), str(artifact_path))
@@ -187,7 +188,10 @@ def _download_artifact_local(
     except Exception as e:
         if temp_path.exists():
             temp_path.unlink()
-        logger.error(f"Failed to download artifact {composite_id}: {e}")
+        if client.is_closed and isinstance(e, (httpx.TransportError, RuntimeError)):
+            logger.info(f"Artifact download cancelled because the HTTP client closed: {composite_id}")
+        else:
+            logger.error(f"Failed to download artifact {composite_id}: {e}")
         raise
 
 
