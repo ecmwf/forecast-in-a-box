@@ -35,6 +35,7 @@ from forecastbox.domain.artifact.io import (
     list_storage,
 )
 from forecastbox.utility.config import ArtifactStoreConfig, ArtifactStoresConfig
+from forecastbox.utility.http_pools import HttpProfile
 from forecastbox.utility.tunnel import CommandHandle
 
 
@@ -102,6 +103,19 @@ def tmpdir_path() -> Generator[Path, None, None]:
 def mock_catalog_http_client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     client = MagicMock()
     monkeypatch.setattr("forecastbox.domain.artifact.catalog.get_sync", lambda _profile: client)
+    return client
+
+
+@pytest.fixture
+def mock_download_http_client(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    client = MagicMock()
+    client.is_closed = False
+
+    def get_sync(profile: HttpProfile) -> MagicMock:
+        assert profile is HttpProfile.Download
+        return client
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.get_sync", get_sync)
     return client
 
 
@@ -464,102 +478,100 @@ def test_get_artifact_local_path_invalid_characters() -> None:
             get_artifact_local_path(invalid_id, tmpdir_url)
 
 
-def test_download_artifact_success(tmpdir_path: Path, sample_artifact: Any) -> None:
+def test_download_artifact_success(tmpdir_path: Path, sample_artifact: Any, mock_download_http_client: MagicMock) -> None:
     """Test successful artifact download"""
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
-
     mock_content = b"fake checkpoint data"
+    mock_response = MagicMock()
+    mock_response.headers = {"Content-Length": str(len(mock_content))}
+    mock_response.iter_bytes.return_value = [mock_content]
+    mock_response.raise_for_status = MagicMock()
+    mock_download_http_client.stream.return_value.__enter__.return_value = mock_response
 
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.headers = {"Content-Length": str(len(mock_content))}
-        mock_response.iter_bytes.return_value = [mock_content]
-        mock_response.raise_for_status = MagicMock()
+    download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
-        mock_client.__enter__.return_value = mock_client
-        mock_client.stream.return_value.__enter__.return_value = mock_response
-        mock_client_class.return_value = mock_client
-
-        download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
-
-        # Verify the file was downloaded
-        artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
-
-        assert artifact_path.exists()
-        assert artifact_path.read_bytes() == mock_content
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.read_bytes() == mock_content
+    mock_download_http_client.stream.assert_called_once_with("GET", sample_artifact.common.url)
 
 
-def test_download_artifact_creates_directory(tmpdir_path: Path, sample_artifact: Any) -> None:
+def test_download_artifact_creates_directory(tmpdir_path: Path, sample_artifact: Any, mock_download_http_client: MagicMock) -> None:
     """Test download_artifact creates necessary parent directory"""
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
-
     mock_content = b"fake checkpoint data"
+    mock_response = MagicMock()
+    mock_response.headers = {"Content-Length": str(len(mock_content))}
+    mock_response.iter_bytes.return_value = [mock_content]
+    mock_response.raise_for_status = MagicMock()
+    mock_download_http_client.stream.return_value.__enter__.return_value = mock_response
 
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.headers = {"Content-Length": str(len(mock_content))}
-        mock_response.iter_bytes.return_value = [mock_content]
-        mock_response.raise_for_status = MagicMock()
+    download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
-        mock_client.__enter__.return_value = mock_client
-        mock_client.stream.return_value.__enter__.return_value = mock_response
-        mock_client_class.return_value = mock_client
-
-        download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
-
-        artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
-        assert artifact_path.exists()
-        assert artifact_path.is_file()
-        assert artifact_path.parent.is_dir()
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.is_file()
+    assert artifact_path.parent.is_dir()
 
 
-def test_download_artifact_http_error(tmpdir_path: Path, sample_artifact: Any) -> None:
+def test_download_artifact_http_error(tmpdir_path: Path, sample_artifact: Any, mock_download_http_client: MagicMock) -> None:
     """Test download_artifact handles HTTP errors"""
     composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = httpx.HTTPStatusError("404 Not Found", request=MagicMock(), response=MagicMock())
+    mock_download_http_client.stream.return_value.__enter__.return_value = mock_response
 
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError("404 Not Found", request=MagicMock(), response=MagicMock())
-
-        mock_client.__enter__.return_value = mock_client
-        mock_client.stream.return_value.__enter__.return_value = mock_response
-        mock_client_class.return_value = mock_client
-
-        with pytest.raises(httpx.HTTPStatusError):
-            download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
-
-
-def test_download_artifact_chunked_download(tmpdir_path: Path, sample_artifact: Any) -> None:
-    """Test download_artifact handles chunked downloads"""
-    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
-
-    # Simulate chunked download
-    chunk1 = b"chunk1"
-    chunk2 = b"chunk2"
-    chunk3 = b"chunk3"
-    total_content = chunk1 + chunk2 + chunk3
-
-    with patch("httpx.Client") as mock_client_class:
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.headers = {"Content-Length": str(len(total_content))}
-        mock_response.iter_bytes.return_value = [chunk1, chunk2, chunk3]
-        mock_response.raise_for_status = MagicMock()
-
-        mock_client.__enter__.return_value = mock_client
-        mock_client.stream.return_value.__enter__.return_value = mock_response
-        mock_client_class.return_value = mock_client
-
+    with pytest.raises(httpx.HTTPStatusError):
         download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
 
-        # Verify all chunks were written
-        artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
 
-        assert artifact_path.exists()
-        assert artifact_path.read_bytes() == total_content
+def test_download_artifact_cleans_up_when_client_closes(
+    tmpdir_path: Path,
+    sample_artifact: Any,
+    mock_download_http_client: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test a shutdown-closing HTTP client cancels the download and removes its temporary file."""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    real_named_temporary_file = tempfile.NamedTemporaryFile
+    temporary_paths: list[Path] = []
+
+    def named_temporary_file(*args: Any, **kwargs: Any) -> Any:
+        kwargs["dir"] = tmpdir_path
+        temporary_file = real_named_temporary_file(*args, **kwargs)
+        temporary_paths.append(Path(temporary_file.name))
+        return temporary_file
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.tempfile.NamedTemporaryFile", named_temporary_file)
+    mock_download_http_client.is_closed = True
+    mock_download_http_client.stream.side_effect = httpx.ReadError("client closed")
+    caplog.set_level("INFO")
+
+    with pytest.raises(httpx.ReadError, match="client closed"):
+        download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
+
+    assert len(temporary_paths) == 1
+    assert not temporary_paths[0].exists()
+    assert "Artifact download cancelled because the HTTP client closed" in caplog.text
+
+
+def test_download_artifact_chunked_download(tmpdir_path: Path, sample_artifact: Any, mock_download_http_client: MagicMock) -> None:
+    """Test download_artifact handles chunked downloads"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    chunks = [b"chunk1", b"chunk2", b"chunk3"]
+    total_content = b"".join(chunks)
+    mock_response = MagicMock()
+    mock_response.headers = {"Content-Length": str(len(total_content))}
+    mock_response.iter_bytes.return_value = chunks
+    mock_response.raise_for_status = MagicMock()
+    mock_download_http_client.stream.return_value.__enter__.return_value = mock_response
+
+    download_artifact(composite_id, sample_artifact, f"file://{tmpdir_path}")
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.read_bytes() == total_content
 
 
 # ---------------------------------------------------------------------------

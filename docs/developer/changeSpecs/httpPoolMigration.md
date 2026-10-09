@@ -37,7 +37,7 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
    Use `get_sync(HttpProfile.Default)` and drop the `with`.
 4. **Artifact catalog** (`domain/artifact/catalog.py::get_artifacts_catalog`). [DONE]
    Use `get_sync(HttpProfile.Default)` and drop the `with`.
-5. **Artifact download** (`domain/artifact/io.py`).
+5. **Artifact download** (`domain/artifact/io.py`). [DONE]
    Use `get_sync(HttpProfile.Download)` and drop the `with` and the explicit `timeout=300.0`.
    Streaming (`client.stream`) is still used as a context manager, as that is per-response and not per-client.
    Handle the exception raised when the client is closed during shutdown as a cancellation: log it, and clean up the temp file (the existing error path likely already does so -- verify).
