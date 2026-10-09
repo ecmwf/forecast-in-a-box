@@ -35,7 +35,7 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
    The function runs in a thread, so use `get_sync(HttpProfile.Default)`. Remove the `TODO pool those?`.
 3. **Plugin stores** (`domain/plugin/store.py::initialize_stores`). [DONE]
    Use `get_sync(HttpProfile.Default)` and drop the `with`.
-4. **Artifact catalog** (`domain/artifact/catalog.py::get_artifacts_catalog`).
+4. **Artifact catalog** (`domain/artifact/catalog.py::get_artifacts_catalog`). [DONE]
    Use `get_sync(HttpProfile.Default)` and drop the `with`.
 5. **Artifact download** (`domain/artifact/io.py`).
    Use `get_sync(HttpProfile.Download)` and drop the `with` and the explicit `timeout=300.0`.
