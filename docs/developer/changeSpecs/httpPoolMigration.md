@@ -41,7 +41,7 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
    Use `get_sync(HttpProfile.Download)` and drop the `with` and the explicit `timeout=300.0`.
    Streaming (`client.stream`) is still used as a context manager, as that is per-response and not per-client.
    Handle the exception raised when the client is closed during shutdown as a cancellation: log it, and clean up the temp file (the existing error path likely already does so -- verify).
-6. **Bootstrap checks** (`entrypoint/bootstrap/checks.py`).
+6. **Bootstrap checks** (`entrypoint/bootstrap/checks.py`). [DONE]
    These run in a separate thread/process-phase parallel to the backend, possibly before it is up, so they must not use the registry. Leave them as they are (short lived local `httpx.Client`).
    Only unify their settings; no registry usage.
 7. **Lens proxy** (`domain/lens/proxy.py`).
