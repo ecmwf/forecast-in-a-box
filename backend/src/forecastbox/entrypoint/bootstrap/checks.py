@@ -81,7 +81,7 @@ def _wait_for(client: httpx.Client, url: str, attempts: int, condition: Callable
 
 def check_backend_ready(config: FIABConfig, handles: ChildProcessGroup | None = None, attempts: int = 20) -> None:
     try:
-        with httpx.Client() as client:
+        with httpx.Client(follow_redirects=True) as client:
             _wait_for(client, config.backend.local_url() + f"{ROUTE_PREFIX}/status", attempts, _call_succ)
     except StartupError as e:
         logger.error(f"failed to start the backend: {e}")
