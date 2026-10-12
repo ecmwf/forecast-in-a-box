@@ -1,0 +1,6 @@
+{
+  "blocks": {
+    "filesize": {"factory_id": "source_filesize", "instance": {"configuration_values": {"checkpoint": "ecmwf:aifs-global-o48"}, "input_ids": {}}},
+    "sink": {"factory_id": "sink_file", "instance": {"configuration_values": {"fname": "/tmp/size.txt"}, "input_ids": {"data": "filesize"}}}
+  }
+}

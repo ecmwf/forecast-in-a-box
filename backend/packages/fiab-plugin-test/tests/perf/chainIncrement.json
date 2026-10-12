@@ -1,0 +1,7 @@
+{
+  "blocks": {
+    "source": {"factory_id": "source_42", "instance": {"configuration_values": {}, "input_ids": {}}},
+    "increment": {"factory_id": "transform_increment", "instance": {"configuration_values": {"amount": "2"}, "input_ids": {"a": "source"}}},
+    "sink": {"factory_id": "sink_file", "instance": {"configuration_values": {"fname": "/tmp/out.txt"}, "input_ids": {"data": "increment"}}}
+  }
+}
