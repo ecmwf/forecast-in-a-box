@@ -1,0 +1,7 @@
+{
+  "blocks": {
+    "text": {"factory_id": "source_text", "instance": {"configuration_values": {"text": "hello world"}, "input_ids": {}}},
+    "sleep": {"factory_id": "source_sleep", "instance": {"configuration_values": {"text": "slept", "duration": "0.5"}, "input_ids": {}}},
+    "sink": {"factory_id": "sink_file", "instance": {"configuration_values": {"fname": "/tmp/text.txt"}, "input_ids": {"data": "text"}}}
+  }
+}

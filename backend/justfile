@@ -10,3 +10,36 @@ test:
 
 dev:
     just -f ../justfile dev
+
+# Runs the plugin performance suite over every packages/*/tests/perf, printing a tsv to stdout.
+# If baseline is given, eg `just perf 5.0.0`, additionally runs against the released plugin wheels of that version.
+perf baseline="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export UV_COMPILE_BYTECODE=1
+    script=packages/fiab-core/scripts/performanceSuite/run.py
+    artifacts=../install/artifacts.json
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+    if [ -z "{{baseline}}" ]; then
+        printf 'key\twarmup_ms\tmean_ms\tvar_ms2\n'
+    else
+        printf 'key\twarmup_ms\tmean_ms\tvar_ms2\tbase_warmup_ms\tbase_mean_ms\tbase_var_ms2\n'
+    fi
+    for perf_dir in packages/*/tests/perf; do
+        [ -d "$perf_dir" ] || continue
+        plugin_dir=${perf_dir%/tests/perf}
+        dist=$(basename "$plugin_dir")
+        module=${dist//-/_}
+        echo "running perf suite for $dist" >&2
+        uv run --isolated --no-project --with-editable packages/fiab-core --with-editable "$plugin_dir" \
+            python "$script" "$perf_dir" --module "$module" --artifacts "$artifacts" --label "$dist" > "$tmp/current.tsv"
+        if [ -z "{{baseline}}" ]; then
+            cat "$tmp/current.tsv"
+        else
+            echo "running baseline perf suite for $dist=={{baseline}}" >&2
+            uv run --isolated --no-project --with "$dist=={{baseline}}" \
+                python "$script" "$perf_dir" --module "$module" --artifacts "$artifacts" --label "$dist" > "$tmp/baseline.tsv"
+            join -t $'\t' -a 1 -e '-' -o auto <(sort -t $'\t' -k1,1 "$tmp/current.tsv") <(sort -t $'\t' -k1,1 "$tmp/baseline.tsv")
+        fi
+    done

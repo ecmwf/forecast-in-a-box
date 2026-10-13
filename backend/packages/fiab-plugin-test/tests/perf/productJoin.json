@@ -1,0 +1,8 @@
+{
+  "blocks": {
+    "sourceA": {"factory_id": "source_42", "instance": {"configuration_values": {}, "input_ids": {}}},
+    "sourceB": {"factory_id": "source_42", "instance": {"configuration_values": {}, "input_ids": {}}},
+    "join": {"factory_id": "product_join", "instance": {"configuration_values": {}, "input_ids": {"a": "sourceA", "b": "sourceB"}}},
+    "image": {"factory_id": "sink_image", "instance": {"configuration_values": {}, "input_ids": {"data": "join"}}}
+  }
+}
