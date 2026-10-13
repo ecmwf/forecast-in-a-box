@@ -12,7 +12,7 @@
 """Measures the duration of a plugin's import, and of validate/expand/compile of individual blocks.
 
 Usage:
-    python run.py <plugin-dir>/tests/perf --module <module_name> --artifacts <artifacts.json> [--label <label>]
+    python -m performanceSuite.pluginPerf <plugin-dir>/tests/perf --module <module_name> --artifacts <artifacts.json> [--label <label>]
 
 Every ``*.json`` file in the given directory is a case, of the form::
 
@@ -34,12 +34,7 @@ Output is a tsv on stdout, without header, with columns: key, warmup_ms, mean_ms
 ``<label>/<case>/<block>/<phase>``, with phase being one of validate, expand, compile, or ``<label>/-/-/import``
 and ``<label>/-/-/plugin_init`` for the single-sample measurements (which have ``-`` in warmup and var).
 
-Constraints on the cases, compared to blueprints processed by the backend:
- - no glyphs, no jinja expressions -- any string value containing ``${`` is rejected
- - all configuration options of the factory must be present, no extra are allowed, default values are not imputed
- - all blocks belong to the plugin under test
- - blocks are declared in topological order, ie, every input id references a block declared earlier
- - environment, local glyphs, example values and other template fields are not supported
+The constraints on the cases are described in the package docstring of performanceSuite. The ``skipped`` flag is honoured.
 
 Additionally, compared to the backend, these are not performed: glyph resolution, duplicate/cycle detection, expansion
 by other plugins, possible sources listing, restrictions serialization, graph merging and deduplication, graph2job,
@@ -53,43 +48,24 @@ the same NodeMetadataContext(builder=...) as in the backend.
 
 import argparse
 import importlib
-import json
 import statistics
 import sys
-import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypeVar
 
-from earthkit.workflows.fluent import Action, NodeMetadataContext
-from earthkit.workflows.metadata import BuilderMetadata
-from pydantic import BaseModel
+from earthkit.workflows.fluent import Action
 
 import fiab_core.tools.blocks  # noqa: F401 # NOTE preloaded so that its import time is not attributed to the plugin
 import fiab_core.tools.plugins  # noqa: F401 # NOTE preloaded so that its import time is not attributed to the plugin
-from fiab_core.artifacts import ArtifactsProvider, ArtifactStoreId, parse_json
-from fiab_core.fable import (
-    ActionLookup,
-    BlockFactory,
-    BlockInstance,
-    BlockInstanceId,
-    BlockInstanceOutput,
-    BlueprintTemplateBlock,
-    ConfigurationOptionId,
-    NoOutput,
-)
+from fiab_core.fable import ActionLookup, BlockInstance, BlockInstanceId, BlockInstanceOutput, NoOutput
 from fiab_core.plugin import Plugin
+from performanceSuite import PerfCase, compile_block, prepare_block, register_fake_artifacts_provider, validate_block
 
 REPEATS = 3
-ARTIFACT_STORE_ID = ArtifactStoreId("ecmwf")
 
 T = TypeVar("T")
-
-
-class PerfCase(BaseModel):
-    blocks: dict[BlockInstanceId, BlueprintTemplateBlock]
-    skipped: str | None = None
 
 
 class Measurement:
@@ -124,13 +100,6 @@ def time_repeated(fn: Callable[[], T]) -> tuple[T, Measurement]:
     return result, Measurement(warmup, samples)
 
 
-def register_fake_artifacts_provider(artifacts_path: Path) -> None:
-    lookup = dict(parse_json(ARTIFACT_STORE_ID, artifacts_path.read_text(), lambda _common, _specific: (True, None)))
-    fake_root = Path(tempfile.gettempdir()) / "fiabPerfSuiteNonexistent"
-    ArtifactsProvider.register_get_artifacts_lookup(lambda: lookup)
-    ArtifactsProvider.register_get_artifact_local_path(lambda c: fake_root / c.artifact_store_id / c.artifact_local_id)
-
-
 def load_plugin(module_name: str, label: str) -> Plugin:
     module, import_ns = time_once(lambda: importlib.import_module(module_name))
     emit(f"{label}/-/-/import", Measurement(None, [import_ns]))
@@ -139,31 +108,6 @@ def load_plugin(module_name: str, label: str) -> Plugin:
         raise TypeError(f"{module_name}.plugin() returned {type(plugin)}, expected Plugin")
     emit(f"{label}/-/-/plugin_init", Measurement(None, [init_ns]))
     return plugin
-
-
-def contains_glyph(value: Any) -> bool:
-    if isinstance(value, str):
-        return "${" in value
-    if isinstance(value, (list, tuple)):
-        return any(contains_glyph(v) for v in value)
-    if isinstance(value, dict):
-        return any(contains_glyph(k) or contains_glyph(v) for k, v in value.items())
-    return False
-
-
-def convert_configuration_values(context: str, instance: BlockInstance, factory: BlockFactory) -> BlockInstance:
-    """Checks the case constraints and returns the instance with deserialized configuration values"""
-    declared = set(factory.configuration_options.keys())
-    given = set(instance.configuration_values.keys())
-    if declared != given:
-        raise ValueError(f"{context}: configuration options mismatch, missing {declared - given}, extra {given - declared}")
-    converted: dict[ConfigurationOptionId, Any] = {}
-    for option_id, option in factory.configuration_options.items():
-        raw = instance.configuration_values[option_id]
-        if contains_glyph(raw):
-            raise ValueError(f"{context}: option {option_id!r} contains a glyph, which is not supported: {raw!r}")
-        converted[option_id] = option.value_type.validate_convert(raw)
-    return instance.model_copy(update={"configuration_values": converted})
 
 
 def run_case(plugin: Plugin, case_path: Path, label: str) -> None:
@@ -177,21 +121,11 @@ def run_case(plugin: Plugin, case_path: Path, label: str) -> None:
 
     for block_id, block in case.blocks.items():
         context = f"{case_path}:{block_id}"
-        factory = plugin.catalogue.factories.get(block.factory_id)
-        if factory is None:
-            raise ValueError(f"{context}: factory {block.factory_id!r} not in the plugin's catalogue")
-        for source_id in block.instance.input_ids.values():
-            if source_id not in outputs:
-                raise ValueError(f"{context}: input {source_id!r} not declared before this block")
-        instance = convert_configuration_values(context, block.instance, factory)
+        instance, inputs = prepare_block(plugin, context, block, outputs)
         instances[block_id] = instance
-        inputs = {input_name: outputs[source_id] for input_name, source_id in instance.input_ids.items()}
 
-        validation, measurement = time_repeated(lambda: plugin.validator(block.factory_id, instance, inputs))
-        if validation.result.t is None:
-            raise ValueError(f"{context}: validation failed with {validation.result.e}")
+        output, measurement = time_repeated(lambda: validate_block(plugin, context, block, instance, inputs))
         emit(f"{label}/{case_name}/{block_id}/validate", measurement)
-        output = validation.result.t
         outputs[block_id] = output
 
         if not isinstance(output, NoOutput):
@@ -203,14 +137,7 @@ def run_case(plugin: Plugin, case_path: Path, label: str) -> None:
         context = f"{case_path}:{block_id}"
         instance = instances[block_id]
 
-        def compile_block() -> Action:
-            with NodeMetadataContext(builder=BuilderMetadata(blockId=block_id)):
-                result = plugin.compiler(action_lookup, block.factory_id, instance)
-            if result.t is None:
-                raise ValueError(f"{context}: compile failed with {result.e}")
-            return result.t
-
-        action, measurement = time_repeated(compile_block)
+        action, measurement = time_repeated(lambda: compile_block(plugin, context, block_id, block, instance, action_lookup))
         emit(f"{label}/{case_name}/{block_id}/compile", measurement)
         action_lookup[block_id] = action
 
