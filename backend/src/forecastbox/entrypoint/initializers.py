@@ -54,7 +54,7 @@ from forecastbox.utility.dispatcher import (
 )
 from forecastbox.utility.http_pools import start_http_pools, stop_http_pools
 from forecastbox.utility.initializer import Initializer, Initializers
-from forecastbox.utility.metkit import get_paramdb
+from forecastbox.utility.metkit import param_id_to_shortname, shortname_to_param_id
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
 logger = logging.getLogger(__name__)
@@ -146,9 +146,8 @@ def _start_artifact_stores() -> None:
 def register_fiabcore_providers() -> None:
     ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
     ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path))
-    paramdb = get_paramdb()
-    MetkitParamResolver.register_param_id_to_shortname(paramdb.param_id_to_shortname)
-    MetkitParamResolver.register_shortname_to_param_id(paramdb.shortname_to_param_id)
+    MetkitParamResolver.register_param_id_to_shortname(param_id_to_shortname)
+    MetkitParamResolver.register_shortname_to_param_id(shortname_to_param_id)
 
 
 # The two barriers below let independent `Initializer` steps be gated on one another
