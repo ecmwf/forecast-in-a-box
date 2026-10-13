@@ -64,6 +64,7 @@ dev = [
   "ty==0.0.2",
   "prek",
   "ruff>=0.15.8",
+  "pyinstrument>=5.1.3",
 ]
 
 [tool.setuptools_scm]
