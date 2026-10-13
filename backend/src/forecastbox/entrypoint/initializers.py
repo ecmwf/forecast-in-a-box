@@ -25,6 +25,7 @@ from concurrent.futures import Future
 from typing import TypeVar
 
 from fiab_core.artifacts import ArtifactsProvider
+from fiab_core.metkit import MetkitParamResolver
 
 import forecastbox.domain
 import forecastbox.schemata
@@ -53,6 +54,7 @@ from forecastbox.utility.dispatcher import (
 )
 from forecastbox.utility.http_pools import start_http_pools, stop_http_pools
 from forecastbox.utility.initializer import Initializer, Initializers
+from forecastbox.utility.metkit import get_paramdb
 from forecastbox.utility.tunnel import shutdown as shutdown_tunnels
 
 logger = logging.getLogger(__name__)
@@ -141,9 +143,12 @@ def _start_artifact_stores() -> None:
     submit_initialize_stores()
 
 
-def start_artifact_provider() -> None:
+def register_fiabcore_providers() -> None:
     ArtifactsProvider.register_get_artifacts_lookup(lambda: ArtifactManager.catalog)
     ArtifactsProvider.register_get_artifact_local_path(lambda composite_id: get_artifact_local_path(composite_id, config.backend.data_path))
+    paramdb = get_paramdb()
+    MetkitParamResolver.register_param_id_to_shortname(paramdb.param_id_to_shortname)
+    MetkitParamResolver.register_shortname_to_param_id(paramdb.shortname_to_param_id)
 
 
 # The two barriers below let independent `Initializer` steps be gated on one another
@@ -268,7 +273,7 @@ def build_initializers() -> Initializers:
         Initializer("http_pools", start=start_http_pools, stop=stop_http_pools),
         Initializer("broadcaster", start=_start_broadcaster),
         Initializer("artifact_stores", start=_start_artifact_stores),
-        Initializer("artifact_provider", start=start_artifact_provider),
+        Initializer("fiabcore_providers", start=register_fiabcore_providers),
         Initializer("artifact_manager", start=_start_artifact_manager, stop=_stop_artifact_manager),
         Initializer("plugin_catalog", start=_start_plugin_catalog),
         Initializer("gateway", start=_start_gateway),

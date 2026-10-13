@@ -14,9 +14,13 @@ from pathlib import Path
 
 import pytest
 from fiab_core.artifacts import AnemoiCheckpoint, ArtifactResolved, ArtifactsProvider, CommonArtifactMetadata, CompositeArtifactId
+from fiab_core.metkit import MetkitParamResolver
+from pymetkit.paramdb import ParamDB
 from qubed import Qube
 
-from fiab_plugin_ecmwf.qubed_utils import expand
+paramdb = ParamDB()
+MetkitParamResolver.register_param_id_to_shortname(paramdb.param_id_to_shortname)
+MetkitParamResolver.register_shortname_to_param_id(paramdb.shortname_to_param_id)
 
 DUMMY_QUBE = Qube.from_datacube(
     {

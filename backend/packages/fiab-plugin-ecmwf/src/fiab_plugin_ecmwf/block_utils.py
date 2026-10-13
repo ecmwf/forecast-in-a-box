@@ -2,10 +2,7 @@ from typing import Any
 
 from fiab_core.fable import QubedOutput
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
-from pymetkit.paramdb import ParamDB
 from qubed import Qube
-
-ParamDBInstance = ParamDB()
 
 
 def _extract_dataset(inputs: dict[str, QubedOutput], name: str) -> QubedOutput:

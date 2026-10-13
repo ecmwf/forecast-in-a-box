@@ -39,6 +39,7 @@ dependencies = [
   "jinja2",
   "orjson",
   "psutil",
+  "pymetkit>=1.21.0.28",
   "pydantic-settings",
   "pyrsistent",
   "python-multipart",

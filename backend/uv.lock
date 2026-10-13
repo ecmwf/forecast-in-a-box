@@ -1607,7 +1607,6 @@ dependencies = [
     { name = "earthkit-workflows-anemoi", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "fiab-core", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pproc-core", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
-    { name = "pymetkit", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
 ]
 
 [package.optional-dependencies]
@@ -1634,7 +1633,6 @@ requires-dist = [
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
     { name = "pproc-core", specifier = ">=0.4.0" },
-    { name = "pymetkit", specifier = ">=1.21.0.28" },
 ]
 provides-extras = ["runtime"]
 
@@ -1830,6 +1828,7 @@ dependencies = [
     { name = "orjson", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "psutil", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pydantic-settings", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pymetkit", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pyrsistent", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "python-multipart", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "skinnywms", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -1872,6 +1871,7 @@ requires-dist = [
     { name = "orjson" },
     { name = "psutil" },
     { name = "pydantic-settings" },
+    { name = "pymetkit", specifier = ">=1.21.0.28" },
     { name = "pyrsistent" },
     { name = "python-multipart" },
     { name = "skinnywms", specifier = ">=0.13.1" },

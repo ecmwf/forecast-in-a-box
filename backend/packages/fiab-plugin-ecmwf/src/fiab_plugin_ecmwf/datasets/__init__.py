@@ -4,9 +4,8 @@ from importlib.resources import files
 from typing import Optional
 
 import yaml
+from fiab_core.metkit import MetkitParamResolver
 from qubed import Qube
-
-from fiab_plugin_ecmwf.block_utils import ParamDBInstance
 
 
 @dataclass(init=False, frozen=True, eq=True, slots=True)
@@ -19,7 +18,7 @@ class ForecastDataset:
             for index, cube in enumerate(datacubes):
                 cube = cube.copy()
                 cube["param"] = [
-                    str(ParamDBInstance.shortname_to_param_id(shortname, context={k: cube[k] for k in ["class", "stream", "type"]}))
+                    str(MetkitParamResolver.shortname_to_param_id(shortname, context={k: cube[k] for k in ["class", "stream", "type"]}))
                     for shortname in cube["param"]
                 ]
                 datacubes[index] = cube

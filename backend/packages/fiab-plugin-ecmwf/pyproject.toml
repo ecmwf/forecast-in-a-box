@@ -21,7 +21,6 @@ dependencies = [
     "earthkit-workflows>=0.18.0",
     "earthkit-workflows-anemoi>=0.8.0",
     "pproc-core>=0.4.0",
-    "pymetkit>=1.21.0.28", 
 ]
 
 optional-dependencies.runtime = [
