@@ -7,6 +7,18 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+"""
+We need to be careful with metkit -- it brings the whole compiled stack together with it,
+and due to the lack of code/package isolation, it would force it at the runtime level in any
+plugin using fiab-core. That may be problematic, for example due to eckitlib bringing
+libproj, which colud conflict with eg pyproj's libproj and giving us a segfault at runtime.
+
+Therefore, a dependency injection is applied, where backend, with a safe pymetkit dependency,
+can register a ParamDB. At runtime, this correctly crashes -- if a plugin genuinely needs
+pymetkit at runtime, it should do so directly, while declaring it itself in the corresponding
+block's environment needs.
+"""
+
 from collections.abc import Callable
 
 

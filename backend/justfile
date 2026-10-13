@@ -1,3 +1,6 @@
+default:
+    @just --list
+
 val:
     uv run ty check src/
     uv run ty check tests/unit
@@ -35,7 +38,7 @@ pluginPerf baseline="":
         dist=$(basename "$plugin_dir")
         module=${dist//-/_}
         echo "running perf suite for $dist" >&2
-        uv run --isolated --no-project --with-editable packages/fiab-core --with-editable "$plugin_dir" \
+        uv run --isolated --no-project --with-editable packages/fiab-core --with-editable "$plugin_dir" --with 'pymetkit>=1.21.0.28' \
             python -m performanceSuite.pluginPerf "$perf_dir" --module "$module" --artifacts "$artifacts" --label "$dist" > "$tmp/current.tsv"
         if [ -z "{{baseline}}" ]; then
             cat "$tmp/current.tsv"
