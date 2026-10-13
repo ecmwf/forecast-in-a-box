@@ -19,6 +19,7 @@ from fiab_core.types import ArtifactType, ParameterType
 from fiab_core.types.parser import parse
 
 from forecastbox.domain.artifact.manager import ArtifactManager
+from forecastbox.utility.metkit import get_paramdb
 from forecastbox.utility.pydantic import FiabBaseModel
 
 
@@ -46,10 +47,7 @@ def _resolve_artifact_display(value: str) -> str | None:
 
 def _resolve_parameter_display(value: str) -> str | None:
     """Resolve a parameter id into a human-readable description, or None if resolution fails."""
-    # TODO eventually utilize the paramDB provider/singleton, for better perf
-    import pymetkit.paramdb
-
-    paramdb = pymetkit.paramdb.ParamDB()
+    paramdb = get_paramdb()
     try:
         paramid = int(value)
         shortname = paramdb.param_id_to_shortname(paramid)

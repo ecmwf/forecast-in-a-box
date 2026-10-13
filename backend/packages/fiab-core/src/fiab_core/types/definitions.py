@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Iterable, Literal, get_args
 
 import fiab_core  # to satisfy the type checker for artifacts annotation
+from fiab_core.metkit import MetkitParamResolver
 from fiab_core.types.dt_util import parse_timedelta
 from fiab_core.types.exceptions import NotNoneInput, NotStringInput, WrongType
 from fiab_core.types.traits import FableTrait
@@ -441,16 +442,13 @@ class ParameterType(StringType):
     def validate_convert_main(self, value: Any) -> str:
         value: str = super().validate_convert_main(value)
         try:
-            import pymetkit.paramdb  # type: ignore[import]
-
-            paramdb = pymetkit.paramdb.ParamDB()
             paramid = int(value)
-            shortname = paramdb.param_id_to_shortname(paramid)
+            shortname = MetkitParamResolver.param_id_to_shortname(paramid)
+        except RuntimeError as error:
+            logger.warning(f"no Metkit parameter resolver -- will not validate: {error!r}")
+        else:
             if shortname is None:
                 raise WrongType("{paramid=} is not known to Metkit ParamDB")
-        except ImportError:
-            logger.warning("failed to import metkit for ParameterType validation")
-            pass
 
         return value
 

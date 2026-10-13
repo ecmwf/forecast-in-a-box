@@ -21,13 +21,13 @@ from fiab_core.fable import (
     ConfigurationOptionRestriction,
     QubedOutput,
 )
+from fiab_core.metkit import MetkitParamResolver
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Source, Transform
 from fiab_core.types import ClosedEnumType, DatetimeType, ListType, ParameterType, StringType
 from qubed import Qube
 
 from fiab_plugin_ecmwf.block_utils import (
-    ParamDBInstance,
     _axis_value_strings,
     _extract_dataset,
     _is_empty_qube,
@@ -137,7 +137,7 @@ class OperationalForecastSource(Source):
                                         [
                                             dict(
                                                 {k: (v if len(v) > 1 else v[0]) for k, v in datacube.items()},
-                                                param=ParamDBInstance.param_id_to_shortname(int(p)),
+                                                param=MetkitParamResolver.param_id_to_shortname(int(p)),
                                                 step=step,
                                             )
                                         ],

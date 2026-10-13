@@ -29,6 +29,7 @@ from typing import Any
 from earthkit.workflows.fluent import Action, NodeMetadataContext
 from earthkit.workflows.metadata import BuilderMetadata
 from pydantic import BaseModel
+from pymetkit.paramdb import ParamDB
 
 from fiab_core.artifacts import ArtifactsProvider, ArtifactStoreId, parse_json
 from fiab_core.fable import (
@@ -40,11 +41,14 @@ from fiab_core.fable import (
     BlueprintTemplateBlock,
     ConfigurationOptionId,
 )
+from fiab_core.metkit import MetkitParamResolver
 from fiab_core.plugin import Plugin
 
 ARTIFACT_STORE_ID = ArtifactStoreId("ecmwf")
 
 PHASES = ("validate", "expand", "compile")
+
+ParamDBInstance = ParamDB()
 
 
 class PerfCase(BaseModel):
@@ -57,6 +61,10 @@ def register_fake_artifacts_provider(artifacts_path: Path) -> None:
     fake_root = Path(tempfile.gettempdir()) / "fiabPerfSuiteNonexistent"
     ArtifactsProvider.register_get_artifacts_lookup(lambda: lookup)
     ArtifactsProvider.register_get_artifact_local_path(lambda c: fake_root / c.artifact_store_id / c.artifact_local_id)
+    param_id_to_shortname = lambda param_id: ParamDBInstance.param_id_to_shortname(param_id)
+    shortname_to_param_id = lambda shortname, context: ParamDBInstance.shortname_to_param_id(shortname, context=context)
+    MetkitParamResolver.register_param_id_to_shortname(param_id_to_shortname)
+    MetkitParamResolver.register_shortname_to_param_id(shortname_to_param_id)
 
 
 def contains_glyph(value: Any) -> bool:

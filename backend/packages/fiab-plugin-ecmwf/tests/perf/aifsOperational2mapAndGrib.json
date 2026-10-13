@@ -1,5 +1,4 @@
 {
-  "skipped": "too slow to run at the moment, to be troubleshot",
   "blocks": {
     "source": {
       "factory_id": "anemoiSource",

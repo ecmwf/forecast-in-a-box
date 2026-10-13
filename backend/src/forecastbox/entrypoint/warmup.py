@@ -49,7 +49,7 @@ from forecastbox.domain.plugin.loading import unload_single, update_single
 from forecastbox.domain.plugin.settings import PluginSettings
 from forecastbox.domain.plugin.store import initialize_stores, resolve_plugin_from_store
 from forecastbox.entrypoint.bootstrap.config import setup_process
-from forecastbox.entrypoint.initializers import start_artifact_provider, start_db_schema
+from forecastbox.entrypoint.initializers import register_fiabcore_providers, start_db_schema
 from forecastbox.utility.config import DefaultPluginSettings, config, validate_runtime
 from forecastbox.utility.packages import PackagesError
 
@@ -130,7 +130,7 @@ def warmup() -> None:
     logger.info(f"warmup starting for plugins {[PluginCompositeId.to_str(e) for e in plugin_ids]}")
 
     asyncio.run(start_db_schema())
-    start_artifact_provider()
+    register_fiabcore_providers()
     catalog_refresh = submit_refresh_catalog()
     initialize_stores(config.external.plugin_stores)
     catalog_refresh.result(timeout=CATALOG_TIMEOUT_SEC)
