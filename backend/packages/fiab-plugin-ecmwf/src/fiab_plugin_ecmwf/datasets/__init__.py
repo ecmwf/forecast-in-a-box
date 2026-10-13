@@ -8,22 +8,10 @@ from fiab_core.metkit import MetkitParamResolver
 from qubed import Qube
 
 
-@dataclass(init=False, frozen=True, eq=True, slots=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class ForecastDataset:
     datacubes: list[dict]
     member_zero: Optional[dict] = None
-
-    def __init__(self, datacubes: list[dict], member_zero: Optional[dict] = None, shortname_to_paramid: bool = True) -> None:
-        if shortname_to_paramid:
-            for index, cube in enumerate(datacubes):
-                cube = cube.copy()
-                cube["param"] = [
-                    str(MetkitParamResolver.shortname_to_param_id(shortname, context={k: cube[k] for k in ["class", "stream", "type"]}))
-                    for shortname in cube["param"]
-                ]
-                datacubes[index] = cube
-        object.__setattr__(self, "datacubes", datacubes)
-        object.__setattr__(self, "member_zero", member_zero)
 
     def as_qube(self, ens_dim: str = "number", include_member_zero: bool = False, **extra: dict) -> Qube:
         qube = Qube.empty()
