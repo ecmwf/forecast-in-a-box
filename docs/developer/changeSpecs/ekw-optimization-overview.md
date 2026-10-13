@@ -55,13 +55,14 @@ references are against `earthkit-workflows==0.19.0` as installed in `backend/.ve
 | file | summary | depends on | expected gain (this case) |
 |---|---|---|---|
 | `ekw-optimization-sealedPayloads.md` | make payloads and metadata immutable after construction ("sealed"), shallow-share them, remove the redundant deep copies | -- | most of the 84 s deepcopy |
+| `ekw-optimization-metadataDataclasses.md` | replace the pydantic metadata models (`Requirements`, `Artifacts`, `BuilderMetadata`, `NodeMetadata`) with frozen slotted dataclasses, with pure merge functions | -- (shares `FrozenDict` with sealedPayloads) | 25-35 s without hoisting; simpler sharing with it |
 | `ekw-optimization-nodeMetadata.md` | resolve `NodeMetadata` once per call site instead of per node, share sealed instances | sealedPayloads (for sharing) | most of the 51 s |
 | `ekw-optimization-nodeNaming.md` | compute the payload digest once, derive node names cheaply | sealedPayloads (for caching the digest) | most of the 11.5 s, plus sha256 cost |
 | `ekw-optimization-preparedPayload.md` | factor `Node.__init__` into a per-call `prepare` step and a per-node `bind` step, used by `map`/`reduce`/`broadcast` | all three above | ties the above together and removes the remaining per-node overhead |
 | `ekw-optimization-expansionStructure.md` | smaller structural fixes in `expand_as_qube`, `transform`, `nodetree_from_dict` | -- | a few seconds, more for larger fan-outs |
 
-Suggested order: sealedPayloads, then nodeMetadata and nodeNaming (in parallel), then
-preparedPayload, with expansionStructure at any point. Each spec should be a separate PR
+Suggested order: sealedPayloads and metadataDataclasses, then nodeMetadata and
+nodeNaming (in parallel), then preparedPayload, with expansionStructure at any point. Each spec should be a separate PR
 to earthkit-workflows with its own before/after measurement.
 
 ## Design principle for sharing

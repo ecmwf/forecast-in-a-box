@@ -1,7 +1,11 @@
 # ekw optimization: node metadata resolution
 
 See `ekw-optimization-overview.md` for context and measurement. Sharing relies on
-`ekw-optimization-sealedPayloads.md` (the `seal` helper).
+`ekw-optimization-sealedPayloads.md` (the `seal` helper). If
+`ekw-optimization-metadataDataclasses.md` lands first (recommended), the metadata types
+are frozen dataclasses and the pure merge functions are already defined there. The
+`model_construct` and `seal` advice below then does not apply. The hoisting (sections
+3-5) remains the relevant part of this spec.
 
 ## Problem
 
