@@ -247,7 +247,7 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
         elif factory_id == "sink_image":
             data = lookup[instance.input_ids["data"]]
             images = instance.configuration_values[IMAGES]
-            if not isinstance(images, int) or isinstance(images, bool):
+            if not isinstance(images, int):
                 return Either.error(f"Invalid type for {IMAGES!r}: expected int, got {type(images).__name__}")
             if images < 1:
                 return Either.error(f"Invalid value for {IMAGES!r}: expected at least 1, got {images}")
