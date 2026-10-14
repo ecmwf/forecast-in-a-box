@@ -24,6 +24,7 @@ from fiab_core.fable import (
     QubedOutput,
     RawOutput,
 )
+from fiab_core.metkit import MetkitParamResolver
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Sink
 from fiab_core.types import ClosedEnumType, GeoDomainType, ListType, ParameterType, StringType
@@ -63,8 +64,16 @@ def _coord_value_str(value: Any) -> str:
     return str(value.item()) if isinstance(value, np.generic) else str(value)
 
 
+def _display_value(dim: str, value: str) -> str:
+    """Returns the human readable form of a dimension value, using the shortname for params."""
+    return MetkitParamResolver.param_id_to_shortname(int(value)) if dim == PARAM else value
+
+
 def _set_plot_builder_metadata(action: Action, title: str) -> None:
-    """Sets display name and dimension kvs on each plot node, based on its coordinates along the node array dims."""
+    """Sets display name and dimension kvs on each plot node, based on its coordinates along the node array dims.
+
+    Dimension kvs hold the raw coordinate values, the display name uses param shortnames.
+    """
     for _, narray in nodetree_arrays(action.nodes):
         it = np.nditer(narray, flags=["multi_index", "refs_ok"])  # type: ignore[call-overload]
         for node in it:
@@ -72,7 +81,7 @@ def _set_plot_builder_metadata(action: Action, title: str) -> None:
                 (str(dim), _coord_value_str(narray.coords[dim].values[idx])) for dim, idx in zip(narray.dims, it.multi_index, strict=True)
             ]
             builder = node[()].metadata.builder  # type: ignore[index]
-            builder.display_name = f"{title} ({', '.join(f'{k}={v}' for k, v in kvs)})" if kvs else title
+            builder.display_name = f"{title} ({', '.join(f'{k}={_display_value(k, v)}' for k, v in kvs)})" if kvs else title
             builder.dimension_kvs = kvs
 
 
