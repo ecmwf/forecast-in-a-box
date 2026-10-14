@@ -756,6 +756,50 @@ class TestMapPlotSink:
         action = block.compile(inputs={BlockInstanceId("source_output"): sample_forecast_source_action}, block=config).get_or_raise()
         assert action.nodes.dims == dims
 
+    @pytest.mark.parametrize(
+        "params, splitby, expected_kvs",
+        [
+            [["167"], [], [[]]],
+            [["151", "167"], ["param"], [[("param", "151")], [("param", "167")]]],
+            [
+                ["151", "167"],
+                ["number", "step"],
+                [[("step", str(step)), ("number", str(number))] for step in (0, 6, 12) for number in range(5)],
+            ],
+        ],
+    )
+    def test_compile_sets_builder_metadata(
+        self,
+        sample_forecast_source_output: QubedOutput,
+        sample_forecast_source_action: Action,
+        params: list[str],
+        splitby: list[str],
+        expected_kvs: list[list[tuple[str, str]]],
+    ) -> None:
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockFactoryId("mapPlotSink"),
+            BlockInstanceBase(
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {"param": params, "domain": ["global"], "format": "png", "groupby": "none", "splitby": splitby}
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        block.validate(block=config, inputs={"dataset": sample_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
+        action = block.compile(inputs={BlockInstanceId("source_output"): sample_forecast_source_action}, block=config).get_or_raise()
+
+        sinks = action.graph().sinks
+        assert len(sinks) == len(expected_kvs)
+        assert all("map_plot" in node.payload.definition.entrypoint for node in sinks)
+        actual_kvs = sorted(node.metadata.builder.dimension_kvs or [] for node in sinks)
+        assert actual_kvs == sorted(expected_kvs)
+        for node in sinks:
+            kvs = node.metadata.builder.dimension_kvs
+            expected_name = f"Map Plot ({', '.join(f'{k}={v}' for k, v in kvs)})" if kvs else "Map Plot"
+            assert node.metadata.builder.display_name == expected_name
+
     def _get_map_plot_domain(self, action: Action) -> object:
         for _, arr in nodetree_arrays(action.nodes):
             for node in arr.values.flat:
