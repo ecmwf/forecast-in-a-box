@@ -4,7 +4,7 @@ import pathlib
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, NodeMetadataContext, create_task_instance, from_source
-from earthkit.workflows.metadata import Artifacts, BuilderMetadata, Requirements
+from earthkit.workflows.metadata import Artifacts, BuilderMetadata, NodeMetadata, Requirements
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
@@ -32,6 +32,7 @@ DURATION = ConfigurationOptionId("duration")
 CHECKPOINT = ConfigurationOptionId("checkpoint")
 AMOUNT = ConfigurationOptionId("amount")
 FNAME = ConfigurationOptionId("fname")
+IMAGES = ConfigurationOptionId("images")
 
 
 def _get_checkpoint_enum_type() -> FableType:
@@ -105,8 +106,15 @@ catalogue = lambda: BlockFactoryCatalogue(
         BlockFactoryId("sink_image"): BlockFactory(
             kind="sink",
             title="Image",
-            description="Generates a png image, using the input number as the grayscale",
-            configuration_options={},
+            description="Generates png images, one per task, using the input number shifted by 10 * task index as the grayscale",
+            configuration_options={
+                IMAGES: BlockConfigurationOption(
+                    title="Images",
+                    description="How many images to generate, each as its own task",
+                    value_type=IntType(),
+                    default_value="1",
+                )
+            },
             inputs=["data"],
         ),
     }
@@ -179,6 +187,13 @@ def _environment_spec() -> list[str]:
         return regular
 
 
+def _sink_image_task(data: Action, idx: int) -> Action:
+    """Maps the sink_image runtime with the given task index, labelling the resulting node by that index."""
+    payload = create_task_instance("fiab_plugin_test.runtime.sink_image", static_input_kw={"idx": idx})
+    builder = BuilderMetadata(display_name=f"Image #{idx}", dimension_kvs=[("idx", str(idx))])
+    return data.map(payload, node_metadata=NodeMetadata(builder=builder))
+
+
 def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockInstance) -> Either[Action, Error]:  # ty:ignore[invalid-type-arguments] # semigroup
     spec = _environment_spec()
     with NodeMetadataContext(requirements=Requirements(environment=spec)):
@@ -231,8 +246,12 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
                 action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_file", static_input_kw={"fname": fname}))
         elif factory_id == "sink_image":
             data = lookup[instance.input_ids["data"]]
-            with NodeMetadataContext(builder=_SINK_BUILDER_METADATA):
-                action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_image"))
+            images = instance.configuration_values[IMAGES]
+            if not isinstance(images, int) or isinstance(images, bool):
+                return Either.error(f"Invalid type for {IMAGES!r}: expected int, got {type(images).__name__}")
+            if images < 1:
+                return Either.error(f"Invalid value for {IMAGES!r}: expected at least 1, got {images}")
+            action = data.transform(_sink_image_task, [(idx,) for idx in range(images)], dim="idx")
         else:
             raise TypeError(factory_id)
         return Either.ok(action)

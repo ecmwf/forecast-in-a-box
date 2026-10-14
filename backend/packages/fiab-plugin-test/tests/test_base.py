@@ -12,10 +12,13 @@ import struct
 from unittest.mock import MagicMock, patch
 
 import pytest
+from cascade.low.func import Either
+from earthkit.workflows.fluent import Action
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     BlockFactoryId,
     BlockInstance,
+    BlockInstanceId,
     ConfigurationOptionId,
     RawOutput,
 )
@@ -180,6 +183,50 @@ def test_sink_image_modulo_256() -> None:
     result_low = sink_image(42)
     result_high = sink_image(42 + 256)
     assert result_low == result_high
+
+
+def test_sink_image_idx_shifts_value() -> None:
+    """The task index shifts the grayscale value by 10 per index."""
+    assert sink_image(42, idx=0) == sink_image(42)
+    assert sink_image(42, idx=3) == sink_image(72)
+    assert sink_image(42, idx=1) != sink_image(42)
+
+
+def _compile_sink_image(images: object) -> Either[Action, str]:  # ty:ignore[invalid-type-arguments] # semigroup
+    source = compiler({}, BlockFactoryId("source_42"), BlockInstance(configuration_values={}, input_ids={})).t
+    assert source is not None
+    instance = BlockInstance(
+        configuration_values={ConfigurationOptionId("images"): images},
+        input_ids={"data": BlockInstanceId("source")},
+    )
+    return compiler({BlockInstanceId("source"): source}, BlockFactoryId("sink_image"), instance)
+
+
+def test_compiler_sink_image_single() -> None:
+    result = _compile_sink_image(1)
+    assert result.t is not None, f"compiler returned error: {result.e}"
+    sinks = result.t.graph().sinks
+    assert len(sinks) == 1
+    assert sinks[0].payload.static_input_kw == {"idx": 0}
+    assert sinks[0].metadata.builder.display_name == "Image #0"
+    assert sinks[0].metadata.builder.dimension_kvs == [("idx", "0")]
+
+
+def test_compiler_sink_image_multiple() -> None:
+    result = _compile_sink_image(3)
+    assert result.t is not None, f"compiler returned error: {result.e}"
+    sinks = sorted(result.t.graph().sinks, key=lambda n: n.payload.static_input_kw["idx"])
+    assert len(sinks) == 3
+    assert len({n.name for n in sinks}) == 3
+    for idx, node in enumerate(sinks):
+        assert node.payload.static_input_kw == {"idx": idx}
+        assert node.metadata.builder.display_name == f"Image #{idx}"
+        assert node.metadata.builder.dimension_kvs == [("idx", str(idx))]
+
+
+def test_compiler_sink_image_invalid_images() -> None:
+    assert _compile_sink_image(0).e is not None
+    assert _compile_sink_image("3").e is not None
 
 
 def test_sink_file_returns_bytes_locator(tmp_path: pathlib.Path) -> None:
