@@ -92,6 +92,8 @@ stored_output_max_length = 10 * 1024**2
 
 class RunOutputCharacteristic(FiabBaseModel):
     mime_type: str = "application/octet-stream"
+    display_name: str | None = None
+    dimension_kvs: list[tuple[str, str]] | None = None
     original_block: BlockInstanceId
     value: str | None = Field(
         default=None,

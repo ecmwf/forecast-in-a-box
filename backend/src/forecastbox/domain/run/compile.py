@@ -138,6 +138,8 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
     task_detail: dict[TaskId, TaskDetail] = {}
     # Maps sink block ids to mime type used in RunOutputs (only relevant for external outputs).
     block_to_mime: dict[BlockInstanceId, str] = {}
+    block_to_display_name: dict[BlockInstanceId, str | None] = {}
+    block_to_dimension_kvs: dict[BlockInstanceId, list[tuple[str, str]] | None] = {}
     sink_tasks: set[TaskId] = set()
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str | None]] = {}
 
@@ -197,7 +199,12 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
 
             block_output = block_outputs.get(blockId)
             if not isinstance(block_output, NoOutput):
-                block_to_mime[blockId] = block_output.mime_type if isinstance(block_output, RawOutput) else "application/octet-stream"
+                if isinstance(block_output, RawOutput):
+                    block_to_mime[blockId] = block_output.mime_type
+                    block_to_display_name[blockId] = block_output.display_name
+                    block_to_dimension_kvs[blockId] = block_output.dimension_kvs
+                else:
+                    block_to_mime[blockId] = "application/octet-stream"
 
             graph += block_graph
 
@@ -217,6 +224,8 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
         task_id: RunOutputCharacteristic(
             original_block=task_detail[task_id].block,
             mime_type=block_to_mime[task_detail[task_id].block],
+            display_name=block_to_display_name.get(task_detail[task_id].block),
+            dimension_kvs=block_to_dimension_kvs.get(task_detail[task_id].block),
         )
         for task_id in sink_tasks
     }

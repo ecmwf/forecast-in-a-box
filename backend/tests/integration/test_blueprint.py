@@ -1845,6 +1845,11 @@ def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> N
     assert output_entries[sink_file_task_id]["mime_type"] == "text/plain"
     assert output_entries[sink_image_task_id]["mime_type"] == "image/png"
 
+    # Verify display_name and dimension_kvs declared by the plugin are propagated
+    for task_id in (sink_file_task_id, sink_image_task_id):
+        assert output_entries[task_id]["display_name"] == "The Display Name"
+        assert output_entries[task_id]["dimension_kvs"] == [["dimOne", "valOne"]]
+
     content_resp = backend_client_user.get(
         "/run/outputContent",
         params={"run_id": run_id, "dataset_id": sink_file_task_id},

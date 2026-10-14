@@ -118,13 +118,30 @@ def validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[
     if factory_id == BlockFactoryId("transform_increment"):
         restrictions = {AMOUNT: parse("enumClosed[int](1,2,3)")}
     if factory_id in ("sink_file",):
-        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
+        return BlockValidation(
+            Either.ok(
+                RawOutput(type_fqn="bytes", mime_type="text/plain", display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])
+            ),
+            restrictions,
+        )
     elif factory_id in ("sink_image",):
-        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png")), restrictions)
+        return BlockValidation(
+            Either.ok(
+                RawOutput(type_fqn="bytes", mime_type="image/png", display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])
+            ),
+            restrictions,
+        )
     elif factory_id in ("source_sleep", "source_text", "source_filesize"):
-        return BlockValidation(Either.ok(RawOutput(type_fqn="str", mime_type="text/plain")), restrictions)
+        return BlockValidation(
+            Either.ok(
+                RawOutput(type_fqn="str", mime_type="text/plain", display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])
+            ),
+            restrictions,
+        )
     elif factory_id in ("source_42", "transform_increment", "product_join"):
-        return BlockValidation(Either.ok(RawOutput(type_fqn="int")), restrictions)
+        return BlockValidation(
+            Either.ok(RawOutput(type_fqn="int", display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])), restrictions
+        )
     else:
         raise TypeError(f"unexpected factory {factory_id}")
 
