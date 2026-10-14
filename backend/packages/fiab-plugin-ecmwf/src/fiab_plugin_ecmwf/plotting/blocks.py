@@ -157,8 +157,11 @@ class MapPlotSink(Sink):
                     # "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
                 },
             ),
+            # NOTE the eckitlib pin is a hotfix due to proj in newer eckits clashing with pyproj, leading to a segfault
             node_metadata=NodeMetadata(
-                requirements=Requirements(environment=["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11"])
+                requirements=Requirements(
+                    environment=["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11", "eckitlib<=2.2.0.27"]
+                )
             ),
         )
         return Either.ok(action)
