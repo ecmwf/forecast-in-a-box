@@ -120,27 +120,43 @@ def validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[
     if factory_id in ("sink_file",):
         return BlockValidation(
             Either.ok(
-                RawOutput(type_fqn="bytes", mime_type="text/plain", display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])
+                RawOutput(
+                    type_fqn="bytes",
+                    mime_type="text/plain",
+                    display_names={"0": "The Display Name"},
+                    dimension_kvs={"0": [("dimOne", "valOne")]},
+                )
             ),
             restrictions,
         )
     elif factory_id in ("sink_image",):
         return BlockValidation(
             Either.ok(
-                RawOutput(type_fqn="bytes", mime_type="image/png", display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])
+                RawOutput(
+                    type_fqn="bytes",
+                    mime_type="image/png",
+                    display_names={"0": "The Display Name"},
+                    dimension_kvs={"0": [("dimOne", "valOne")]},
+                )
             ),
             restrictions,
         )
     elif factory_id in ("source_sleep", "source_text", "source_filesize"):
         return BlockValidation(
             Either.ok(
-                RawOutput(type_fqn="str", mime_type="text/plain", display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])
+                RawOutput(
+                    type_fqn="str",
+                    mime_type="text/plain",
+                    display_names={"0": "The Display Name"},
+                    dimension_kvs={"0": [("dimOne", "valOne")]},
+                )
             ),
             restrictions,
         )
     elif factory_id in ("source_42", "transform_increment", "product_join"):
         return BlockValidation(
-            Either.ok(RawOutput(type_fqn="int", display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])), restrictions
+            Either.ok(RawOutput(type_fqn="int", display_names={"0": "The Display Name"}, dimension_kvs={"0": [("dimOne", "valOne")]})),
+            restrictions,
         )
     else:
         raise TypeError(f"unexpected factory {factory_id}")

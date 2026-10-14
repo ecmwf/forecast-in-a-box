@@ -141,10 +141,12 @@ class RawOutput(FiabCoreBaseModel):
     # processing, ie, its a known media object, set the mime_type
     type_fqn: str = "typing.Any"
     mime_type: str = "application/octet-stream"
-    # optional textual description of the output, analogous to a thumbnail
-    display_name: str | None = None
-    # optional key-value pairs describing the output position, for filtering and sorting
-    dimension_kvs: list[tuple[str, str]] | None = None
+    # Optional per-output metadata. A single block may produce multiple outputs; the keys of both
+    # maps correspond to the `DatasetId.output` field of the produced datasets.
+    # display_names: textual description of the output, analogous to a thumbnail
+    display_names: dict[str, str] | None = None
+    # dimension_kvs: key-value pairs describing the output position, for filtering and sorting
+    dimension_kvs: dict[str, list[tuple[str, str]]] | None = None
 
 
 def is_textual(mime_type: str) -> bool:
