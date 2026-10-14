@@ -95,9 +95,8 @@ class RunCreateResponse(FiabBaseModel):
 
 class RunOutputDetail(FiabBaseModel):
     mime_type: str
-    # keys correspond to DatasetId.output
-    display_names: dict[str, str] | None = None
-    dimension_kvs: dict[str, list[tuple[str, str]]] | None = None
+    display_name: str | None = None
+    dimension_kvs: list[tuple[str, str]] | None = None
     original_block: BlockInstanceId
     is_available: bool
 
@@ -192,7 +191,7 @@ def _to_run_detail(domain_detail: service.RunDetail) -> RunDetailResponse:
             outputs={
                 task_id: RunOutputDetail(
                     mime_type=char.mime_type,
-                    display_names=char.display_names,
+                    display_name=char.display_name,
                     dimension_kvs=char.dimension_kvs,
                     original_block=char.original_block,
                     is_available=task_id in available,

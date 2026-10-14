@@ -4,7 +4,7 @@ import pathlib
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, NodeMetadataContext, create_task_instance, from_source
-from earthkit.workflows.metadata import Artifacts, Requirements
+from earthkit.workflows.metadata import Artifacts, BuilderMetadata, Requirements
 from fiab_core.artifacts import ArtifactsProvider, CompositeArtifactId
 from fiab_core.fable import (
     ActionLookup,
@@ -113,51 +113,21 @@ catalogue = lambda: BlockFactoryCatalogue(
 )
 
 
+_SINK_BUILDER_METADATA = BuilderMetadata(display_name="The Display Name", dimension_kvs=[("dimOne", "valOne")])
+
+
 def validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[str, BlockInstanceOutput]) -> BlockValidation:
     restrictions: ConfigurationOptionRestriction = {}
     if factory_id == BlockFactoryId("transform_increment"):
         restrictions = {AMOUNT: parse("enumClosed[int](1,2,3)")}
     if factory_id in ("sink_file",):
-        return BlockValidation(
-            Either.ok(
-                RawOutput(
-                    type_fqn="bytes",
-                    mime_type="text/plain",
-                    display_names={"0": "The Display Name"},
-                    dimension_kvs={"0": [("dimOne", "valOne")]},
-                )
-            ),
-            restrictions,
-        )
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
     elif factory_id in ("sink_image",):
-        return BlockValidation(
-            Either.ok(
-                RawOutput(
-                    type_fqn="bytes",
-                    mime_type="image/png",
-                    display_names={"0": "The Display Name"},
-                    dimension_kvs={"0": [("dimOne", "valOne")]},
-                )
-            ),
-            restrictions,
-        )
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png")), restrictions)
     elif factory_id in ("source_sleep", "source_text", "source_filesize"):
-        return BlockValidation(
-            Either.ok(
-                RawOutput(
-                    type_fqn="str",
-                    mime_type="text/plain",
-                    display_names={"0": "The Display Name"},
-                    dimension_kvs={"0": [("dimOne", "valOne")]},
-                )
-            ),
-            restrictions,
-        )
+        return BlockValidation(Either.ok(RawOutput(type_fqn="str", mime_type="text/plain")), restrictions)
     elif factory_id in ("source_42", "transform_increment", "product_join"):
-        return BlockValidation(
-            Either.ok(RawOutput(type_fqn="int", display_names={"0": "The Display Name"}, dimension_kvs={"0": [("dimOne", "valOne")]})),
-            restrictions,
-        )
+        return BlockValidation(Either.ok(RawOutput(type_fqn="int")), restrictions)
     else:
         raise TypeError(f"unexpected factory {factory_id}")
 
@@ -257,10 +227,12 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
             fname = instance.configuration_values[FNAME]
             if not isinstance(fname, str):
                 return Either.error(f"Invalid type for {FNAME!r}: expected str, got {type(fname).__name__}")
-            action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_file", static_input_kw={"fname": fname}))
+            with NodeMetadataContext(builder=_SINK_BUILDER_METADATA):
+                action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_file", static_input_kw={"fname": fname}))
         elif factory_id == "sink_image":
             data = lookup[instance.input_ids["data"]]
-            action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_image"))
+            with NodeMetadataContext(builder=_SINK_BUILDER_METADATA):
+                action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_image"))
         else:
             raise TypeError(factory_id)
         return Either.ok(action)
