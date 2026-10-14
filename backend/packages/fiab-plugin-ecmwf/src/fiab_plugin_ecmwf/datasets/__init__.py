@@ -4,7 +4,6 @@ from importlib.resources import files
 from typing import Optional
 
 import yaml
-from fiab_core.metkit import MetkitParamResolver
 from qubed import Qube
 
 
