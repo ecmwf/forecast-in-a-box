@@ -110,6 +110,9 @@ environments = [
     "sys_platform == 'darwin'",
     "sys_platform == 'linux'",
 ]
+required-environments = [
+    "platform_python_implementation == 'CPython'"
+]
 
 [tool.uv.sources]
 fiab-core = {workspace = true}
