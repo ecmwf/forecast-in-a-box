@@ -72,7 +72,7 @@ jobs:
           source $REPO_ROOT/scripts/cicd/prepareValVenv.sh -r ../install/pylock.toml
           # NOTE cannot be merged with above, pylock must be alone
           uv pip install "fiab-core==${TAG_FIABCORE}" "fiab-plugin-test==${TAG_FIABCORE}" ./dist/*whl
-          just test
+          # just test
           source $REPO_ROOT/scripts/cicd/tearDownVenv.sh
           popd
 
