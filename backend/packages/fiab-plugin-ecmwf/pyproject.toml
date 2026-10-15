@@ -34,6 +34,7 @@ optional-dependencies.runtime = [
 dev = [
   "ty==0.0.2",
   "pytest_lazy_fixtures",
+  "pymetkit", # due to test-time injection
 ]
 
 [tool.setuptools_scm]
