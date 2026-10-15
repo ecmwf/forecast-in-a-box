@@ -7,7 +7,7 @@ test:
     set -euo pipefail
     # TODO the same issue as in fiab-core -- during release, we dont have the ambient
     # venv's pymetkit. The --extra/--group settings are *ignored* when running outside of a project
-    if [ "${RELEASE:-}" == "1" ] ; then uv pip install pymetkit ; fi
+    if [ "${RELEASE:-}" == "1" ] ; then uv pip install pymetkit pytest_lazy_fixtures ; fi
     uv run pytest ./tests/unit && uv run --extra runtime pytest ./tests/runtime
 
 build:
