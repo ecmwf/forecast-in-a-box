@@ -2,6 +2,15 @@
 
 This document describes how to launch the Forecast-in-a-Box as a developer -- assuming you want to develop it, or develop a particular plugin within it.
 
+## Required Tools
+
+Tools that are expected to be found on `$PATH`:
+* `curl` - get data off the web (the only dependency needed by `scripts/fiab.sh`)
+* `just` - run project commands
+* `uv` - efficiently create and manage Python virtual environments
+* `npm` - Node package manager
+* `docker` - build and run Docker container images (optional)
+
 ## How to Launch
 
 There are two ways of launching:
