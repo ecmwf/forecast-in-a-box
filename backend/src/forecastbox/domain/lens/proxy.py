@@ -47,12 +47,12 @@ URL handling -- the client's responsibility
   `/api/v1/lens/proxy/<id>/wms?...` reaches the lens as `/wms?...`.
 - Clients MUST address the lens using that prefix and MUST treat it as the base
   origin+path of the lens. Because the base has a non-root path, clients that consume
-  absolute URLs emitted by the lens (see below) must rebase those URLs onto this
-  prefix rather than using them verbatim.
+  absolute URLs emitted by the lens in case the lens is not honoring the X-Forwarded-*
+  (see below) must rebase those URLs onto this prefix rather than using them verbatim.
 - The proxy sets X-Forwarded-Proto / -Host / -Prefix and a Forwarded header describing
   the external mount point. A forwarded-header-aware lens SHOULD use these to emit
-  correct absolute self-URLs. skinnyWMS does not, hence the client-side rebasing
-  requirement below.
+  correct absolute self-URLs. skinnyWMS honors the X-Forwarded-*, but ignores
+  the Forwarded, which is sufficient.
 
 URL handling -- the lens's responsibility
 -----------------------------------------
@@ -60,10 +60,10 @@ URL handling -- the lens's responsibility
   (e.g. via a WSGI SCRIPT_NAME / ProxyFix equivalent) when constructing absolute
   self-URLs, so that clients receive URLs already pointing at the proxy path.
 - A lens that instead bakes its internal bind address (e.g. http://0.0.0.0:<port>/...)
-  into structured, machine-parseable responses (like a WMS GetCapabilities document)
-  is tolerable ONLY if clients can and do rebase those URLs onto the proxy prefix. A
-  lens that bakes absolute self-origin URLs into opaque payloads that clients cannot
-  rewrite is NOT proxyable by this mechanism.
+  into structured, machine-parseable responses is tolerable ONLY if clients can and
+  do rebase those URLs onto the proxy prefix. A lens that bakes absolute self-origin
+  URLs into opaque payloads that clients cannot rewrite is NOT proxyable by
+  this mechanism.
 - A lens MUST NOT rely on being reachable on its own port from outside the backend
   host; the only supported ingress is this proxy.
 

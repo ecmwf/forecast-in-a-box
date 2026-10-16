@@ -133,10 +133,14 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
         cmd = ["uv", "run", "gunicorn", "--bind", f"127.0.0.1:{port}", "skinnywms.wmssvr:application"]
         env = {
             **os.environ,
+            # So that responses such as GetCapabilities refer to client-visible proxy urls,
+            # instead of localhost-based ones
+            "SKINNYWMS_TRUST_XFORWARDED": "1",
             "SKINNYWMS_DATA_PATH": local_path,
-            # Browser clients (the in-app WMS viewer, crossOrigin tile requests)
+            # In case the clients (the in-app WMS viewer, crossOrigin tile requests, ogw)
             # call the lens directly on its own port, i.e. cross-origin.
             # SkinnyWMS honours this via flask-cors on all endpoints.
+            # *DEPRECATED* -- remove the xforwarded-based path verified
             "SKINNYWMS_CORS_ORIGINS": "*",
             # Equivalent of --enable-reference-time-dimension: fields from different
             # forecast runs sharing a validity time are exposed via DIM_REFERENCE_TIME
