@@ -1699,8 +1699,8 @@ def _make_builder_source_and_sink(tmpdir: str) -> BlueprintBuilder:
     )
 
 
-def _make_builder_source_and_two_sinks(tmpdir: str) -> BlueprintBuilder:
-    """Blueprint with source_42 → sink_file and source_42 → sink_image."""
+def _make_builder_source_and_two_sinks(tmpdir: str, images: int = 1) -> BlueprintBuilder:
+    """Blueprint with source_42 → sink_file and source_42 → sink_image, the latter producing `images` outputs."""
     source_42 = RoutableBlock(
         instance_id=BlockInstanceId("source_42"),
         plugin=testPluginId,
@@ -1724,7 +1724,7 @@ def _make_builder_source_and_two_sinks(tmpdir: str) -> BlueprintBuilder:
         plugin=testPluginId,
         factory=BlockFactoryId("sink_image"),
         instance=BlockInstance(
-            configuration_values={},
+            configuration_values=_config({"images": str(images)}),
             input_ids={"data": BlockInstanceId("source_42")},
         ),
     )
@@ -1807,7 +1807,7 @@ def test_delete_stop_ok(tmpdir: Any, backend_client_user: httpx.Client) -> None:
 
 def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> None:
     """Execute a run, wait for completion, then retrieve output content via outputContent."""
-    builder = _make_builder_source_and_two_sinks(tmpdir)
+    builder = _make_builder_source_and_two_sinks(tmpdir, images=3)
     save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
     assert save_resp.is_success, save_resp.text
     blueprint_id = save_resp.json()["blueprint_id"]
@@ -1834,16 +1834,23 @@ def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> N
     sink_file_task_id = sink_file_tasks[0]
 
     sink_image_tasks = [t for t in available_tasks if "sink_image" in t]
-    assert len(sink_image_tasks) == 1, f"Expected exactly one sink_image task, got: {available_tasks}"
-    sink_image_task_id = sink_image_tasks[0]
+    assert len(sink_image_tasks) == 3, f"Expected exactly three sink_image tasks, got: {available_tasks}"
 
     # Verify original_block points to the correct block instance IDs from the blueprint
     assert output_entries[sink_file_task_id]["original_block"] == "my_sink"
-    assert output_entries[sink_image_task_id]["original_block"] == "my_image_sink"
+    for task_id in sink_image_tasks:
+        assert output_entries[task_id]["original_block"] == "my_image_sink"
 
     # Verify declared mime_type matches the actual content-type returned by outputContent
     assert output_entries[sink_file_task_id]["mime_type"] == "text/plain"
-    assert output_entries[sink_image_task_id]["mime_type"] == "image/png"
+    for task_id in sink_image_tasks:
+        assert output_entries[task_id]["mime_type"] == "image/png"
+
+    # Verify display_name and dimension_kvs declared by the plugin are propagated
+    assert output_entries[sink_file_task_id]["display_name"] == "The Display Name"
+    assert output_entries[sink_file_task_id]["dimension_kvs"] == [["dimOne", "valOne"]]
+    image_labels = sorted((output_entries[t]["display_name"], output_entries[t]["dimension_kvs"]) for t in sink_image_tasks)
+    assert image_labels == [(f"Image #{idx}", [["idx", str(idx)]]) for idx in range(3)]
 
     content_resp = backend_client_user.get(
         "/run/outputContent",
@@ -1862,13 +1869,18 @@ def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> N
         assert content_resp2.headers.get("content-type", "").startswith("text/plain")
         assert content_resp2.content.decode("ascii").startswith("file://")
 
-    image_resp = backend_client_user.get(
-        "/run/outputContent",
-        params={"run_id": run_id, "dataset_id": sink_image_task_id},
-    )
-    assert image_resp.is_success, image_resp.text
-    assert image_resp.headers.get("content-type", "").startswith("image/png")
-    assert len(image_resp.content) > 0
+    image_contents = set()
+    for task_id in sink_image_tasks:
+        image_resp = backend_client_user.get(
+            "/run/outputContent",
+            params={"run_id": run_id, "dataset_id": task_id},
+        )
+        assert image_resp.is_success, image_resp.text
+        assert image_resp.headers.get("content-type", "").startswith("image/png")
+        assert len(image_resp.content) > 0
+        image_contents.add(image_resp.content)
+    # Each task index yields a distinct grayscale value
+    assert len(image_contents) == 3
 
 
 def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, attempts: int = 60) -> None:

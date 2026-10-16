@@ -138,6 +138,8 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
     task_detail: dict[TaskId, TaskDetail] = {}
     # Maps sink block ids to mime type used in RunOutputs (only relevant for external outputs).
     block_to_mime: dict[BlockInstanceId, str] = {}
+    # Maps any produced cascade TaskId -> builder metadata of its node (display name, dimensions).
+    task_builder: dict[TaskId, BuilderMetadata] = {}
     sink_tasks: set[TaskId] = set()
     resolved_configuration_options: dict[BlockInstanceId, dict[ConfigurationOptionId, str | None]] = {}
 
@@ -208,6 +210,7 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
             raise ValueError(f"compile failed: missing blockId metadata on task {node.name}")
         task_id, detail = fluentNode_to_detail(node, cast(BlockInstanceId, task_block_id))
         task_detail[task_id] = detail
+        task_builder[task_id] = node.metadata.builder
     job_instance = graph2job(graph)
     _hotfix_gpu_availability(job_instance)
 
@@ -217,6 +220,8 @@ def compile_builder(blueprint: BlueprintBuilder, glyph_values: dict[str, str]) -
         task_id: RunOutputCharacteristic(
             original_block=task_detail[task_id].block,
             mime_type=block_to_mime[task_detail[task_id].block],
+            display_name=task_builder[task_id].display_name,
+            dimension_kvs=task_builder[task_id].dimension_kvs,
         )
         for task_id in sink_tasks
     }

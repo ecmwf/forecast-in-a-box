@@ -756,6 +756,62 @@ class TestMapPlotSink:
         action = block.compile(inputs={BlockInstanceId("source_output"): sample_forecast_source_action}, block=config).get_or_raise()
         assert action.nodes.dims == dims
 
+    @pytest.mark.parametrize(
+        "params, splitby, expected",
+        [
+            [["167"], [], [([], "Map Plot")]],
+            [
+                ["151", "167"],
+                ["param"],
+                [([("param", "151")], "Map Plot (param=msl)"), ([("param", "167")], "Map Plot (param=2t)")],
+            ],
+            [
+                ["151", "167"],
+                ["param", "step"],
+                [
+                    ([("param", param), ("step", str(step))], f"Map Plot (param={shortname}, step={step})")
+                    for param, shortname in (("151", "msl"), ("167", "2t"))
+                    for step in (0, 6, 12)
+                ],
+            ],
+            [
+                ["151", "167"],
+                ["number", "step"],
+                [
+                    ([("step", str(step)), ("number", str(number))], f"Map Plot (step={step}, number={number})")
+                    for step in (0, 6, 12)
+                    for number in range(5)
+                ],
+            ],
+        ],
+    )
+    def test_compile_sets_builder_metadata(
+        self,
+        sample_forecast_source_output: QubedOutput,
+        sample_forecast_source_action: Action,
+        params: list[str],
+        splitby: list[str],
+        expected: list[tuple[list[tuple[str, str]], str]],
+    ) -> None:
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockFactoryId("mapPlotSink"),
+            BlockInstanceBase(
+                input_ids={"dataset": BlockInstanceId("source_output")},
+                configuration_values=_config(
+                    {"param": params, "domain": ["global"], "format": "png", "groupby": "none", "splitby": splitby}
+                ),
+            ),
+            MapPlotSink.configuration_options,
+        )
+        block.validate(block=config, inputs={"dataset": sample_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
+        action = block.compile(inputs={BlockInstanceId("source_output"): sample_forecast_source_action}, block=config).get_or_raise()
+
+        sinks = action.graph().sinks
+        assert all("map_plot" in node.payload.definition.entrypoint for node in sinks)
+        actual = sorted((node.metadata.builder.dimension_kvs or [], node.metadata.builder.display_name or "") for node in sinks)
+        assert actual == sorted(expected)
+
     def _get_map_plot_domain(self, action: Action) -> object:
         for _, arr in nodetree_arrays(action.nodes):
             for node in arr.values.flat:

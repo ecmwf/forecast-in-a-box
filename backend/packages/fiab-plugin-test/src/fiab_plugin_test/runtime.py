@@ -47,9 +47,9 @@ def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
     return struct.pack(">I", len(data)) + payload + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
 
 
-def sink_image(data: int) -> bytes:
-    """Generate a 64x64 grayscale PNG image filled with the given value (mod 256)."""
-    pixel = data % 256
+def sink_image(data: int, idx: int = 0) -> bytes:
+    """Generate a 64x64 grayscale PNG image filled with `data + idx * 10` (mod 256)."""
+    pixel = (data + idx * 10) % 256
     width = height = 64
 
     signature = b"\x89PNG\r\n\x1a\n"
