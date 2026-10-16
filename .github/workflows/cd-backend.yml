@@ -35,7 +35,9 @@ jobs:
     steps:
       - uses: extractions/setup-just@v3
       - uses: astral-sh/setup-uv@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24 # keep in sync with frontend/.node-version
       - run: |
           # NOTE dont use action checkout, doesnt coop with auth
           BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
