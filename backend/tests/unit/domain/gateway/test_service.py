@@ -60,7 +60,7 @@ def test_launch_gateway_local_forwards_shared_path_to_process_args(monkeypatch: 
     )
     monkeypatch.setenv("FIAB_BACKEND_LOG_DIRECTORY", "/tmp/fiab")
     monkeypatch.setattr(gateway_service.tunnel, "claim_free_port", lambda: 45678)
-    monkeypatch.setattr(gateway_service.platform, "get_mp_ctx", lambda _: _FakeCtx())
+    monkeypatch.setattr(gateway_service, "_get_mp_ctx", lambda: _FakeCtx())
     monkeypatch.setattr(gateway_service.GatewayConnectionManager, "gateway_connection", None)
 
     gateway_service.launch_gateway()
@@ -80,7 +80,7 @@ def test_launch_gateway_unmanaged_is_a_no_op(monkeypatch: pytest.MonkeyPatch, ca
     def _fail_tunnel_setup(*args: Any, **kwargs: Any) -> Any:
         raise AssertionError("remote tunnel must not be set up for an unmanaged gateway")
 
-    monkeypatch.setattr(gateway_service.platform, "get_mp_ctx", _fail_get_mp_ctx)
+    monkeypatch.setattr(gateway_service, "_get_mp_ctx", _fail_get_mp_ctx)
     monkeypatch.setattr(gateway_service.tunnel, "setup", _fail_tunnel_setup)
 
     with caplog.at_level("WARNING"):

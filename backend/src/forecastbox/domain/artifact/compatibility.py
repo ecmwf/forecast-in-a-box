@@ -22,13 +22,13 @@ class PlatformInfo:
 
 
 def _linux_list_gpus() -> list[str]:
-    output = subprocess.check_output(["nvidia-smi", "-L"], encoding="utf-8")
+    output = subprocess.check_output(["nvidia-smi", "-L"], encoding="utf-8", timeout=5)
     return output.splitlines()
 
 
 def _linux_query_gpu_memory() -> list[str]:
     cmd = ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,nounits,noheader"]
-    output = subprocess.check_output(cmd, encoding="utf-8")
+    output = subprocess.check_output(cmd, encoding="utf-8", timeout=5)
     return output.splitlines()
 
 
@@ -90,7 +90,7 @@ def _sum_visible_gpu_memory(gpu_memory: list[int], visible: str | None, device_u
 def _macos_total_memory() -> int:
     # sysctl reports bytes; convert to MiB.
     cmd = ["sysctl", "-n", "hw.memsize"]
-    mem_bytes = int(subprocess.check_output(cmd).strip())
+    mem_bytes = int(subprocess.check_output(cmd, timeout=5).strip())
     return mem_bytes // (1024**2)
 
 

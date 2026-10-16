@@ -177,7 +177,7 @@ class CommandResult:
 def _run_command(cmd: Sequence[str]) -> CommandResult:
     logger.debug(f"running {list(cmd)}")
     try:
-        result = subprocess.run(list(cmd), check=False, capture_output=True, text=True)
+        result = subprocess.run(list(cmd), check=False, capture_output=True, text=True, timeout=5)
     except FileNotFoundError as ex:
         msg = repr(ex)
         logger.error(f"failed to launch {list(cmd)}: {msg}")

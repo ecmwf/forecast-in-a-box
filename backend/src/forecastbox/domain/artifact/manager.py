@@ -211,11 +211,18 @@ def join_artifact_manager(timeout_sec: int) -> None:
     """Wait for background executor to finish pending tasks."""
     barrier = (time.perf_counter_ns() / 1e9) + timeout_sec
     with timed_acquire(ArtifactManager.lock, timeout_sec) as result:
+        # TODO we would ideally signal all possibly running tasks that
+        # they should not attempt to lock anymore -- otherwise we need
+        # to wait for the lock timeout to elapse for those tasks to
+        # terminate. Lets make sure we handle shutdown properly as we migrate
+        # the artifacts manager to `utility.concurrency`
         if not result:
             logger.error("failed to lock for joining artifact manager")
         else:
             if ArtifactManager.executor is not None:
                 budget = barrier - (time.perf_counter_ns() / 1e9)
+                # TODO we dont use the budget here, but we actually cant, because there is no timeout on the shutdown!
+                # Lets make sure we handle shutdown properly as we migrate the artifacts manager to `utility.concurrency`
                 ArtifactManager.executor.shutdown(wait=True, cancel_futures=False)
                 logger.info("artifact manager executor joined")
 
