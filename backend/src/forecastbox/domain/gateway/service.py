@@ -10,7 +10,9 @@
 """Gateway lifecycle and URL management for the backend."""
 
 import logging
+import multiprocessing as mp
 import os
+import sys
 import threading
 import time
 import urllib.parse
@@ -20,7 +22,6 @@ from multiprocessing.process import BaseProcess
 from typing import cast
 
 from cascade.deployment.logging import LoggingConfig
-from cascade.executor import platform
 from cascade.gateway import api, client
 from cascade.gateway.server import serve
 from cascade.low.func import Either, assert_never
@@ -109,6 +110,10 @@ def _local_process_entrypoint(cascade_url: str, log_base: str | None, max_concur
         pass
 
 
+def _get_mp_ctx() -> mp.context.SpawnContext | mp.context.ForkServerContext:
+    return mp.get_context("spawn") if sys.platform == "darwin" else mp.get_context("forkserver")
+
+
 def launch_gateway() -> None:
     with GatewayConnectionManager.lock:
         gateway = config.cascade.gateway
@@ -121,14 +126,16 @@ def launch_gateway() -> None:
             startup_params = gateway.startup_params
             max_concurrent_jobs = startup_params.max_concurrent_jobs
             shared_path = startup_params.shared_path
-            # NOTE we dont use gateway.startup_params logging base, because backend used to derive
-            # the directory already. And we must not modify config live as we dont want to persist
-            # that value later
+            # NOTE we dont use gateway.startup_params logging base, because backend already derived
+            # the directory. And we must not modify config with it live as we dont want to persist
+            # that value in case the config gets modified by the user using the admin api
             logs_directory = LogDirectory(os.environ[BACKEND_LOG_DIRECTORY_ENV])
-            logger.debug(f"logging base is at {logs_directory.name}")
             logs_base = None if os.getenv("FIAB_LOGSTDOUT", "nay") == "yea" else logs_directory.name + os.sep
             gateway_url = f"tcp://localhost:{tunnel.claim_free_port()}"
-            process = platform.get_mp_ctx("gateway").Process(
+            # NOTE similarly to cascade, we always spawn on MacOS because xpc_connection_invalid tends
+            # to pop up otherwise. On Linux, we cannot fork because we may already have bunch of threads,
+            # http clients, subprocess, etc running
+            process = _get_mp_ctx().Process(
                 target=_local_process_entrypoint,
                 args=(gateway_url, logs_base, max_concurrent_jobs, shared_path),
             )  # type: ignore[unresolved-attribute] # context

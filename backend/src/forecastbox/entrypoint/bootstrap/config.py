@@ -14,6 +14,8 @@ from cascade.executor.config import logging_config
 
 from forecastbox.utility.config import FIABConfig
 
+logger = logging.getLogger(__name__)
+
 BACKEND_LOG_DIRECTORY_ENV = "FIAB_BACKEND_LOG_DIRECTORY"
 
 
@@ -32,6 +34,7 @@ def init_logging_base(config: FIABConfig) -> str:
         log_directory = mkdtemp(prefix=f"fiabLogs-{timestamp}")
     else:
         log_directory = mkdtemp(prefix=timestamp, dir=cascade_logging_base)
+    logger.debug(f"logging base is at {log_directory}")
     os.environ[BACKEND_LOG_DIRECTORY_ENV] = log_directory
     return log_directory
 
