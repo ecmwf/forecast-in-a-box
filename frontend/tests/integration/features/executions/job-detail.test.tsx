@@ -21,6 +21,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { HttpResponse, http } from 'msw'
 import { I18nextProvider } from 'react-i18next'
 import {
   Outlet,
@@ -38,7 +39,9 @@ import {
   resetJobsState,
   resolvedConfigExecution,
 } from '@tests/../mocks/data/job.data'
+import { worker } from '@tests/test-extend'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
+import { API_ENDPOINTS } from '@/api/endpoints'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { RunDetailPage } from '@/features/executions/components/RunDetailPage'
 import i18n from '@/lib/i18n'
@@ -380,6 +383,89 @@ describe('RunDetailPage Integration', () => {
       const screen = await renderDetailPage('job-running-002')
       await expect.element(screen.getByText(/Pending: 1/)).toBeVisible()
       await expect.element(screen.getByText('Group by')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('validated option types on the canvas', () => {
+    const block = (
+      id: string,
+      factory: string,
+      values: Record<string, string>,
+      inputs: Record<string, string> = {},
+    ) => ({
+      instance_id: id,
+      plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+      factory,
+      instance: { configuration_values: values, input_ids: inputs },
+    })
+
+    it('labels params a Select narrows to params, and leaves steps raw', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.fable.get, () =>
+          HttpResponse.json({
+            blueprint_id: 'select-labels',
+            version: 1,
+            builder: {
+              blocks: [
+                block('src', 'operationalForecastSource', {}),
+                block(
+                  'selParam',
+                  'select',
+                  { dimension: 'param', values: '167,151' },
+                  { dataset: 'src' },
+                ),
+                block(
+                  'selStep',
+                  'select',
+                  { dimension: 'step', values: '24,0,3,6' },
+                  { dataset: 'selParam' },
+                ),
+              ],
+            },
+            display_name: 'Select labels',
+            display_description: '',
+            tags: [],
+            parent_id: null,
+            created_at: '2026-10-17T00:00:00+00:00',
+            updated_at: '2026-10-17T00:00:00+00:00',
+          }),
+        ),
+        http.put(API_ENDPOINTS.fable.expand, () =>
+          HttpResponse.json({
+            global_errors: [],
+            block_errors: {},
+            possible_sources: [],
+            possible_expansions: {},
+            configuration_restrictions: {
+              selParam: { values: "list[enumClosed[param]('151','167')]" },
+              selStep: { values: "list[enumClosed[str]('0','24','3','6')]" },
+            },
+          }),
+        ),
+        // Resolves any id, so a wrong lookup would show.
+        http.post(API_ENDPOINTS.fable.resolveDisplay, async ({ request }) => {
+          const { elements } = (await request.json()) as {
+            elements: Array<{ typeName: string; value: string }>
+          }
+          return HttpResponse.json({
+            elements: elements.map((e) => ({
+              ...e,
+              display: `Param ${e.value} [K] (p${e.value})`,
+            })),
+          })
+        }),
+      )
+      injectMockExecution({
+        ...resolvedConfigExecution,
+        run_id: 'job-select-011',
+        blueprint_id: 'select-labels',
+        resolution: null,
+      })
+      const screen = await renderDetailPage('job-select-011')
+
+      await expect.element(screen.getByText('p167, p151')).toBeVisible()
+      await expect.element(screen.getByText('24,0,3,6')).toBeVisible()
+      await expect.element(screen.getByText(/p24/)).not.toBeInTheDocument()
     })
   })
 

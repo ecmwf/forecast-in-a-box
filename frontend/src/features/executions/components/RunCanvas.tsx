@@ -36,6 +36,7 @@ import type {
 } from '@/api/types/fable.types'
 import type { JobStatus } from '@/api/types/job.types'
 import type { NodeDimensions } from '@/features/fable-builder/utils/layout-blocks'
+import { useFableValidation } from '@/api/hooks/useFable'
 import { useMedia } from '@/hooks/useMedia'
 import { CanvasMiniMap } from '@/components/common/CanvasMiniMap'
 import { withMeasured } from '@/components/common/canvas-measured'
@@ -65,6 +66,17 @@ export function useResolvedConfigFor(
   blockId: string,
 ): Record<string, string | null> | undefined {
   return useContext(ResolvedConfigContext)[blockId]
+}
+
+const ValueTypesContext = createContext<Record<string, Record<string, string>>>(
+  {},
+)
+
+/** Option types narrowed by validation. */
+export function useValueTypesFor(
+  blockId: string,
+): Record<string, string> | undefined {
+  return useContext(ValueTypesContext)[blockId]
 }
 
 export interface BlockProgressInfo {
@@ -102,6 +114,8 @@ const FIT_MAX_ZOOM = 1
 
 /** Stable identity so an absent map does not remount every consumer. */
 const EMPTY_RESOLVED: Record<string, Record<string, string>> = {}
+
+const EMPTY_TYPES: Record<string, Record<string, string>> = {}
 
 const nodeTypes: Record<string, typeof RunNode> = {
   sourceBlock: RunNode,
@@ -353,9 +367,14 @@ function RunCanvasInner({
 }
 
 export function RunCanvas(props: RunCanvasProps) {
+  const { data: validation } = useFableValidation(props.fable)
   return (
     <ReactFlowProvider>
-      <RunCanvasInner {...props} />
+      <ValueTypesContext
+        value={validation?.configuration_restrictions ?? EMPTY_TYPES}
+      >
+        <RunCanvasInner {...props} />
+      </ValueTypesContext>
     </ReactFlowProvider>
   )
 }
