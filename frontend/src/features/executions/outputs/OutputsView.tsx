@@ -19,16 +19,30 @@ import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { registerFirstPartyAdapters } from './adapters'
 import { GRIB_DIR_MIME } from './adapters/grib'
-import { compareDims, outputTitle } from './dims'
+import {
+  compareDimValues,
+  compareDims,
+  dimValue,
+  dimValueCounts,
+  matchesDimFilter,
+  outputTitle,
+  parseDimFilter,
+  serializeDimFilter,
+  stepGrid,
+} from './dims'
+import { DimFilterMenu } from './DimFilterMenu'
 import { MimeFilterChips } from './MimeFilterChips'
 import { OutputCard } from './OutputCard'
 import { resolveAdapter } from './registry'
 import { SkeletonOutputCard } from './SkeletonOutputCard'
+import { StepGridMenu } from './StepGridMenu'
 import { Filmstrip } from './viewers/Filmstrip'
 import { useDimFormat } from './useDimFormat'
 import { needsSniff, useResolvedMimes } from './useResolvedMimes'
 import { classifyOutput } from './availability'
 import type { LostTaskIds } from './availability'
+import type { DimFilter } from './dims'
+import type { DimFormat } from './useDimFormat'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { OutputAdapter, OutputItem } from './types'
 import { isTerminalStatus } from '@/api/types/job.types'
@@ -56,7 +70,9 @@ registerFirstPartyAdapters()
 // Single source of truth for the group-by enum: derive the type from the array
 // so adding an option only requires touching this list and the i18n key map.
 const GROUP_BY_OPTIONS = ['none', 'block', 'mime', 'block-and-mime'] as const
-export type GroupBy = (typeof GROUP_BY_OPTIONS)[number]
+/** Grouping by a split coordinate is `dim:<key>`, e.g. `dim:param`. */
+const DIM_PREFIX = 'dim:'
+export type GroupBy = (typeof GROUP_BY_OPTIONS)[number] | `dim:${string}`
 
 /** Responsive card track — shared by the output grid and the loading
  * skeletons so both reflow identically. */
@@ -206,7 +222,63 @@ export function OutputsView({
   }, [items, effectiveMime])
 
   const activeMimes = useMemo(() => parseMimes(search.mimes), [search.mimes])
-  const groupBy: GroupBy = search.groupBy ?? 'none'
+
+  /** Varying coordinates with their values, outer to inner. */
+  const splitDims = useMemo(
+    () =>
+      [...dimValueCounts(items)]
+        .map(([key, counts]) => [key, counts.map(([value]) => value)] as const)
+        .filter(([, values]) => values.length > 1),
+    [items],
+  )
+  const splitKeys = useMemo(() => splitDims.map(([key]) => key), [splitDims])
+
+  /** Day x hour grid for multi-day steps. */
+  const stepLayout = useMemo(() => {
+    const steps = splitDims.find(([key]) => key === 'step')?.[1].map(Number)
+    const grid = steps ? stepGrid(steps) : null
+    return steps && grid ? { steps, grid } : null
+  }, [splitDims])
+
+  /** URL coordinate filter, limited to coordinates that vary. */
+  const dimFilter = useMemo<DimFilter>(
+    () =>
+      Object.fromEntries(
+        Object.entries(parseDimFilter(search.dims)).filter(([key]) =>
+          splitKeys.includes(key),
+        ),
+      ),
+    [search.dims, splitKeys],
+  )
+
+  /** Per-step counts under the other filters, and produced steps. */
+  const stepStats = useMemo(() => {
+    const counts = new Map<number, number>()
+    const produced = new Set<number>()
+    const { step: _, ...others } = dimFilter
+    for (const item of items) {
+      const raw = dimValue(item, 'step')
+      if (raw === undefined || !matchesDimFilter(item, others)) continue
+      if (
+        activeMimes.length > 0 &&
+        !activeMimes.includes(effectiveMime(item))
+      ) {
+        continue
+      }
+      const step = Number(raw)
+      counts.set(step, (counts.get(step) ?? 0) + 1)
+      if (item.isAvailable) produced.add(step)
+    }
+    return { counts, produced }
+  }, [items, dimFilter, activeMimes, effectiveMime])
+
+  const requestedGroupBy: GroupBy = search.groupBy ?? 'none'
+  // Unknown coordinate: flat grid.
+  const groupBy: GroupBy =
+    requestedGroupBy.startsWith(DIM_PREFIX) &&
+    !splitKeys.includes(requestedGroupBy.slice(DIM_PREFIX.length))
+      ? 'none'
+      : requestedGroupBy
 
   const setActiveMimes = (next: ReadonlyArray<string>): void => {
     void navigate({
@@ -215,6 +287,25 @@ export function OutputsView({
       search: (prev) => ({
         ...prev,
         mimes: next.length > 0 ? next.join(',') : undefined,
+      }),
+      replace: true,
+    })
+  }
+
+  /** `null` clears the coordinate's filter; `[]` keeps none of its values. */
+  const setDimValues = (
+    key: string,
+    values: ReadonlyArray<string> | null,
+  ): void => {
+    const others = Object.entries(dimFilter).filter(([k]) => k !== key)
+    void navigate({
+      to: '/execute/$jobId',
+      params: { jobId },
+      search: (prev) => ({
+        ...prev,
+        dims: serializeDimFilter(
+          Object.fromEntries(values ? [...others, [key, values]] : others),
+        ),
       }),
       replace: true,
     })
@@ -262,6 +353,15 @@ export function OutputsView({
     return blocks.size
   }, [items, blockSkeletons, storedStats])
 
+  /** Block groupings need several blocks; coordinate ones need a split. */
+  const groupByOptions = useMemo<Array<GroupBy>>(
+    () => [
+      ...(distinctBlockCount > 1 ? GROUP_BY_OPTIONS : (['none'] as const)),
+      ...splitKeys.map((key): GroupBy => `${DIM_PREFIX}${key}`),
+    ],
+    [distinctBlockCount, splitKeys],
+  )
+
   /** Available items still awaiting a sniff. A `?mimes=` filter can't decide
    * them yet, so they stand in as skeletons rather than a premature empty
    * state. */
@@ -300,6 +400,7 @@ export function OutputsView({
       ) {
         continue
       }
+      if (!matchesDimFilter(item, dimFilter)) continue
       // Unretained outputs are summarised in one notice, not shown as cards.
       if (item.lostReason !== undefined) {
         lost += 1
@@ -315,7 +416,23 @@ export function OutputsView({
       visiblePendingCount: pending,
       visibleLostCount: lost,
     }
-  }, [items, blockSkeletons, activeMimes, effectiveMime, status])
+  }, [items, blockSkeletons, activeMimes, dimFilter, effectiveMime, status])
+
+  const groups = useMemo(
+    () => groupOutputs(visibleItems, groupBy, effectiveMime),
+    [visibleItems, groupBy, effectiveMime],
+  )
+
+  /** Viewer order follows the rendered sections. */
+  const navItems = useMemo(
+    () =>
+      groups
+        ? groups.flatMap((group) =>
+            (group.children ?? [group]).flatMap((section) => section.items),
+          )
+        : visibleItems,
+    [groups, visibleItems],
+  )
 
   const isRunning = !isTerminalStatus(status)
   const failed = status === 'failed'
@@ -365,14 +482,17 @@ export function OutputsView({
     )
   }
 
-  // Fold stored markers into the tally so it spans the whole run.
-  const shownAvailable = visibleAvailableCount + storedStats.available
-  const totalAvailable = availableCount + storedStats.available
-  const shownPending = visiblePendingCount + storedStats.pending
-  const shownLost = visibleLostCount + storedStats.lost
+  // Stored markers count only while unfiltered.
+  const filtered = activeMimes.length > 0 || Object.keys(dimFilter).length > 0
+  const stored = filtered ? { available: 0, pending: 0, lost: 0 } : storedStats
+  const shownAvailable = visibleAvailableCount + stored.available
+  const totalAvailable = availableCount + stored.available
+  const shownPending = visiblePendingCount + stored.pending
+  const shownLost = visibleLostCount + stored.lost
   const toolbar = (
     <div className="flex w-full flex-wrap items-center justify-between gap-3">
-      <P className="text-muted-foreground">
+      {/* Min width keeps the toolbar wrap stable. */}
+      <P className="min-w-64 text-muted-foreground">
         {t('outputs.generated')}: {shownAvailable}
         {shownAvailable !== totalAvailable && ` / ${totalAvailable}`}
         {shownPending > 0 && (
@@ -392,8 +512,41 @@ export function OutputsView({
             onChange={setActiveMimes}
           />
         )}
-        {distinctBlockCount > 1 && (
-          <GroupBySelect value={groupBy} onChange={setGroupBy} />
+        {splitDims.map(([key, values]) =>
+          key === 'step' && stepLayout ? (
+            <StepGridMenu
+              key={key}
+              name={dimFormat.key(key)}
+              grid={stepLayout.grid}
+              steps={stepLayout.steps}
+              counts={stepStats.counts}
+              produced={stepStats.produced}
+              selected={'step' in dimFilter ? dimFilter.step.map(Number) : null}
+              onChange={(next) =>
+                setDimValues('step', next && next.map(String))
+              }
+            />
+          ) : (
+            <DimFilterMenu
+              key={key}
+              name={dimFormat.key(key)}
+              values={values}
+              selected={dimFilter[key] ?? []}
+              shortLabel={(value) => dimFormat.short(key, value)}
+              fullLabel={(value) => dimFormat.value(key, value, 'full')}
+              onChange={(next) =>
+                setDimValues(key, next.length > 0 ? next : null)
+              }
+            />
+          ),
+        )}
+        {groupByOptions.length > 1 && (
+          <GroupBySelect
+            value={groupBy}
+            options={groupByOptions}
+            format={dimFormat}
+            onChange={setGroupBy}
+          />
         )}
       </div>
     </div>
@@ -457,8 +610,10 @@ export function OutputsView({
           <>
             <GroupedGrid
               groupBy={groupBy}
+              groups={groups}
               items={visibleItems}
               runningBlockSet={runningBlockSet}
+              dimFormat={dimFormat}
               effectiveMime={effectiveMime}
               onOpenViewer={(item, adapter) =>
                 setActiveViewer({ item, adapter })
@@ -488,7 +643,7 @@ export function OutputsView({
         <ActiveViewerHost
           ActiveViewer={ActiveViewer}
           activeViewer={activeViewer}
-          visibleItems={visibleItems}
+          navItems={navItems}
           effectiveMime={effectiveMime}
           setActiveViewer={setActiveViewer}
         />
@@ -500,7 +655,8 @@ export function OutputsView({
 interface ActiveViewerHostProps {
   ActiveViewer: NonNullable<OutputAdapter['Viewer']>
   activeViewer: { item: OutputItem; adapter: OutputAdapter }
-  visibleItems: ReadonlyArray<OutputItem>
+  /** Visible outputs in rendered order. */
+  navItems: ReadonlyArray<OutputItem>
   effectiveMime: (item: OutputItem) => string
   setActiveViewer: (
     next: { item: OutputItem; adapter: OutputAdapter } | null,
@@ -511,7 +667,7 @@ interface ActiveViewerHostProps {
 function ActiveViewerHost({
   ActiveViewer,
   activeViewer,
-  visibleItems,
+  navItems,
   effectiveMime,
   setActiveViewer,
 }: ActiveViewerHostProps) {
@@ -523,8 +679,8 @@ function ActiveViewerHost({
   )
   // Pending outputs and ones without a viewer (GRIB) would close it.
   const viewable = useMemo(
-    () => visibleItems.filter((it) => it.isAvailable && adapterFor(it).Viewer),
-    [visibleItems, adapterFor],
+    () => navItems.filter((it) => it.isAvailable && adapterFor(it).Viewer),
+    [navItems, adapterFor],
   )
   const activeIndex = viewable.findIndex(
     (it) => it.taskId === activeViewer.item.taskId,
@@ -589,109 +745,127 @@ function ActiveViewerHost({
   )
 }
 
+type GroupKind = 'block' | 'mime' | 'dim'
+
+interface OutputGroup {
+  kind: GroupKind
+  /** Block id, mime, or coordinate value ('' for outputs without one). */
+  key: string
+  items: ReadonlyArray<OutputItem>
+  /** Content-type sections inside a block section. */
+  children?: ReadonlyArray<OutputGroup>
+}
+
+/** Sections in render order; null renders one flat grid. */
+function groupOutputs(
+  items: ReadonlyArray<OutputItem>,
+  groupBy: GroupBy,
+  effectiveMime: (item: OutputItem) => string,
+): Array<OutputGroup> | null {
+  const byMime = (list: ReadonlyArray<OutputItem>): Array<OutputGroup> =>
+    groupByKey(list, effectiveMime).map(([key, mimeItems]) => ({
+      kind: 'mime',
+      key,
+      items: mimeItems,
+    }))
+  switch (groupBy) {
+    case 'none':
+      return null
+    case 'mime':
+      return byMime(items)
+    case 'block':
+    case 'block-and-mime':
+      return groupByKey(items, (i) => i.originalBlock).map(
+        ([key, blockItems]) => ({
+          kind: 'block',
+          key,
+          items: blockItems,
+          children:
+            groupBy === 'block-and-mime' ? byMime(blockItems) : undefined,
+        }),
+      )
+    default: {
+      const dim = groupBy.slice(DIM_PREFIX.length)
+      return groupByKey(items, (i) => dimValue(i, dim) ?? '')
+        .sort(([a], [b]) =>
+          a === '' || b === ''
+            ? Number(a === '') - Number(b === '')
+            : compareDimValues(a, b),
+        )
+        .map(([key, dimItems]) => ({ kind: 'dim', key, items: dimItems }))
+    }
+  }
+}
+
 interface GroupedGridProps {
   groupBy: GroupBy
+  groups: ReadonlyArray<OutputGroup> | null
   items: ReadonlyArray<OutputItem>
   runningBlockSet: ReadonlySet<string>
+  dimFormat: DimFormat
   effectiveMime: (item: OutputItem) => string
   onOpenViewer: (item: OutputItem, adapter: OutputAdapter) => void
 }
 
 function GroupedGrid({
   groupBy,
+  groups,
   items,
   runningBlockSet,
+  dimFormat,
   effectiveMime,
   onOpenViewer,
 }: GroupedGridProps) {
-  if (groupBy === 'none') {
-    return (
-      <FlexGrid
-        items={items}
-        runningBlockSet={runningBlockSet}
-        effectiveMime={effectiveMime}
-        onOpenViewer={onOpenViewer}
-      />
-    )
+  const { t } = useTranslation('executions')
+  const grid = (gridItems: ReadonlyArray<OutputItem>) => (
+    <FlexGrid
+      items={gridItems}
+      runningBlockSet={runningBlockSet}
+      effectiveMime={effectiveMime}
+      onOpenViewer={onOpenViewer}
+    />
+  )
+  if (!groups) return grid(items)
+
+  const title = (group: OutputGroup): React.ReactNode => {
+    switch (group.kind) {
+      case 'block':
+        return group.items[0].blockName
+      case 'mime':
+        return <MimeSectionLabel mime={group.key} />
+      case 'dim':
+        return group.key === ''
+          ? t('outputs.sections.otherOutputs')
+          : dimFormat.value(groupBy.slice(DIM_PREFIX.length), group.key, 'full')
+    }
   }
 
-  if (groupBy === 'block') {
-    const groups = groupByKey(items, (i) => i.originalBlock)
-    return (
-      <div className="space-y-5">
-        {groups.map(([block, groupItems]) => (
-          <Section
-            key={block}
-            title={groupItems[0].blockName}
-            count={groupItems.length}
-            blockId={block}
-          >
-            <FlexGrid
-              items={groupItems}
-              runningBlockSet={runningBlockSet}
-              effectiveMime={effectiveMime}
-              onOpenViewer={onOpenViewer}
-            />
-          </Section>
-        ))}
-      </div>
-    )
-  }
-
-  if (groupBy === 'mime') {
-    const groups = groupByKey(items, effectiveMime)
-    return (
-      <div className="space-y-5">
-        {groups.map(([mime, groupItems]) => (
-          <Section
-            key={mime}
-            title={<MimeSectionLabel mime={mime} />}
-            count={groupItems.length}
-          >
-            <FlexGrid
-              items={groupItems}
-              runningBlockSet={runningBlockSet}
-              effectiveMime={effectiveMime}
-              onOpenViewer={onOpenViewer}
-            />
-          </Section>
-        ))}
-      </div>
-    )
-  }
-
-  // 'block-and-mime': outer = block, inner = mime
-  const byBlock = groupByKey(items, (i) => i.originalBlock)
   return (
-    <div className="space-y-6">
-      {byBlock.map(([block, blockItems]) => {
-        const byMime = groupByKey(blockItems, effectiveMime)
-        return (
-          <Section
-            key={block}
-            title={blockItems[0].blockName}
-            count={blockItems.length}
-            blockId={block}
-          >
+    <div className={groupBy === 'block-and-mime' ? 'space-y-6' : 'space-y-5'}>
+      {groups.map((group) => (
+        <Section
+          key={group.key}
+          title={title(group)}
+          count={group.items.length}
+          blockId={group.kind === 'block' ? group.key : undefined}
+        >
+          {group.children ? (
             <div className="space-y-4">
-              {byMime.map(([mime, mimeItems]) => (
+              {group.children.map((child) => (
                 <Subsection
-                  key={mime}
-                  title={<MimeSectionLabel mime={mime} />}
-                  count={mimeItems.length}
+                  key={child.key}
+                  title={title(child)}
+                  count={child.items.length}
                 >
-                  <FlexGrid
-                    items={mimeItems}
-                    runningBlockSet={runningBlockSet}
-                    effectiveMime={effectiveMime}
-                    onOpenViewer={onOpenViewer}
-                  />
+                  {grid(child.items)}
                 </Subsection>
               ))}
             </div>
-          </Section>
-        )
-      })}
+          ) : (
+            grid(group.items)
+          )}
+        </Section>
+      ))}
     </div>
   )
 }
@@ -818,12 +992,20 @@ function MimeSectionLabel({ mime }: { mime: string }) {
 
 function GroupBySelect({
   value,
+  options,
+  format,
   onChange,
 }: {
   value: GroupBy
+  options: ReadonlyArray<GroupBy>
+  format: DimFormat
   onChange: (next: GroupBy) => void
 }) {
   const { t } = useTranslation('executions')
+  const label = (option: GroupBy): string =>
+    isStaticGroupBy(option)
+      ? t(groupByI18nKey(option))
+      : format.key(option.slice(DIM_PREFIX.length))
   return (
     <div className="flex items-center gap-2">
       <span className="text-sm text-muted-foreground">
@@ -831,12 +1013,12 @@ function GroupBySelect({
       </span>
       <Select value={value} onValueChange={(v) => onChange(v as GroupBy)}>
         <SelectTrigger className="h-8 w-44 text-sm">
-          <SelectValue />
+          <SelectValue>{label(value)}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {GROUP_BY_OPTIONS.map((option) => (
+          {options.map((option) => (
             <SelectItem key={option} value={option}>
-              {t(groupByI18nKey(option))}
+              {label(option)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -845,8 +1027,14 @@ function GroupBySelect({
   )
 }
 
-function groupByI18nKey(
+function isStaticGroupBy(
   option: GroupBy,
+): option is (typeof GROUP_BY_OPTIONS)[number] {
+  return (GROUP_BY_OPTIONS as ReadonlyArray<string>).includes(option)
+}
+
+function groupByI18nKey(
+  option: (typeof GROUP_BY_OPTIONS)[number],
 ):
   | 'outputs.groupBy.none'
   | 'outputs.groupBy.block'

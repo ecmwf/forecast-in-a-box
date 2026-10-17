@@ -409,6 +409,80 @@ describe('RunDetailPage Integration', () => {
         '2t · step 36',
       ])
     })
+
+    it('groups by a coordinate with full parameter names', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage(
+        'job-split-007',
+        '?groupBy=dim:param',
+      )
+      await expect
+        .element(screen.getByText('Mean sea level pressure [Pa] (msl)'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText('2 metre temperature [K] (2t)'))
+        .toBeVisible()
+    })
+
+    it('filters by a coordinate from its menu', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('msl · step 0')).toBeVisible()
+      await screen.getByText('Parameter: All').click()
+      await screen
+        .getByRole('option', { name: '2 metre temperature [K] (2t)' })
+        .click()
+      await expect
+        .element(screen.getByText('msl · step 0'))
+        .not.toBeInTheDocument()
+      await expect.element(screen.getByText('2t · step 12')).toBeVisible()
+    })
+
+    it('filters steps with the day by hour checkboxes', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('2t · step 12')).toBeVisible()
+      await screen.getByText('Step: All').click()
+
+      await screen.getByRole('checkbox', { name: '+12 h' }).click()
+      // Steps 0 and 24 share the 0h row and remain.
+      await expect.element(screen.getByText('Step: 0 h')).toBeVisible()
+      expect(subtitles(screen)).toEqual([
+        'msl · step 0',
+        'msl · step 24',
+        '2t · step 0',
+        '2t · step 24',
+      ])
+
+      await screen.getByRole('checkbox', { name: 'All steps' }).click()
+      await expect.element(screen.getByText('Step: All')).toBeVisible()
+      await screen.getByRole('checkbox', { name: 'All steps' }).click()
+      await expect.element(screen.getByText('Step: None')).toBeVisible()
+      await expect
+        .element(screen.getByText('No outputs match the current filter.'))
+        .toBeVisible()
+
+      // Unstyled, an unchecked box has no size.
+      ;(
+        screen.getByRole('checkbox', { name: 'Day 1' }).element() as HTMLElement
+      ).click()
+      await expect
+        .element(screen.getByText('Step: day 1', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('checkbox', { name: 'All steps' }))
+        .toHaveAttribute('aria-checked', 'mixed')
+    })
+
+    it('restores a step filter from the URL', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007', '?dims=step=24')
+      await expect.element(screen.getByText('2t · step 24')).toBeVisible()
+      expect(subtitles(screen)).toEqual(['msl · step 24', '2t · step 24'])
+      await expect
+        .element(screen.getByText('Step: day 1 · 0 h', { exact: true }))
+        .toBeVisible()
+    })
   })
 
   describe('validated option types on the canvas', () => {

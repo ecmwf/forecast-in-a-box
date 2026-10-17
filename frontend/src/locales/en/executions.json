@@ -178,11 +178,35 @@
       "stepValue": "step {{value}}",
       "numberValue": "member {{value}}",
       "levelistValue": "level {{value}}",
-      "otherValue": "{{key}} {{value}}"
+      "otherValue": "{{key}} {{value}}",
+      "all": "{{dim}}: All",
+      "none": "{{dim}}: None",
+      "some": "{{dim}}: {{values}}",
+      "count": "{{dim}}: {{count}} of {{total}}",
+      "search": "Search",
+      "noMatch": "No match",
+      "showAll": "Show all"
+    },
+    "steps": {
+      "day": "D{{day}}",
+      "dayAria": "Day {{day}}",
+      "hour": "+{{hour}} h",
+      "hourShort": "{{hour}}h",
+      "cell": "Step {{step}}",
+      "kept": "{{count}} of {{total}} outputs",
+      "stepCount_one": "{{count}} step",
+      "stepCount_other": "{{count}} steps",
+      "daysOf_one": "day {{days}}",
+      "daysOf_other": "days {{days}}",
+      "hoursOf": "{{hours}} h",
+      "all": "All",
+      "allAria": "All steps",
+      "pendingNote": "Faded steps are not produced yet."
     },
     "sections": {
       "unknownBlock": "Unknown block",
-      "unknownMime": "Unknown content type"
+      "unknownMime": "Unknown content type",
+      "otherOutputs": "Other outputs"
     },
     "noMatch": "No outputs match the current filter.",
     "viewer": {
