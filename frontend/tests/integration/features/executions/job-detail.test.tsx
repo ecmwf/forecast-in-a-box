@@ -483,6 +483,30 @@ describe('RunDetailPage Integration', () => {
         .element(screen.getByText('Step: day 1 · 0 h', { exact: true }))
         .toBeVisible()
     })
+
+    it('steps across parameters and through time in the viewer', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('msl · step 0')).toBeVisible()
+      await screen.getByRole('button', { name: 'View' }).first().click()
+      const header = (label: string) =>
+        screen.getByText(`map_plot · ${label}`, { exact: true })
+      await expect.element(header('msl · step 0')).toBeVisible()
+
+      await userEvent.keyboard('{ArrowDown}')
+      await expect.element(header('2t · step 0')).toBeVisible()
+      await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+      await expect.element(header('2t · step 24')).toBeVisible()
+      await userEvent.keyboard('{End}')
+      await expect.element(header('2t · step 36')).toBeVisible()
+      await userEvent.keyboard('{Home}')
+      await expect.element(header('2t · step 0')).toBeVisible()
+
+      await userEvent.keyboard(' ')
+      await expect
+        .element(header('2t · step 12'), { timeout: 3000 })
+        .toBeVisible()
+    })
   })
 
   describe('validated option types on the canvas', () => {

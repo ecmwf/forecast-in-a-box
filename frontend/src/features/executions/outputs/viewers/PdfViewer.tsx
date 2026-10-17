@@ -25,6 +25,7 @@ import { outputTitle } from '../dims'
 import { useJobResultBlob } from '../useJobResult'
 import { pdfjs } from './pdfjs'
 import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
+import { useDialogFocus } from './useDialogFocus'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { ViewerProps } from '../types'
 import { createLogger } from '@/lib/logger'
@@ -167,11 +168,14 @@ export default function PdfViewer({
   )
   const totalPages = doc?.numPages ?? 0
 
+  const dialogRef = useDialogFocus<HTMLDivElement>()
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex flex-col bg-black/85"
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex flex-col bg-black/85 outline-none"
       onClick={(e) => {
         // Close on direct backdrop clicks; children stop propagation.
         if (e.target === e.currentTarget) onClose()

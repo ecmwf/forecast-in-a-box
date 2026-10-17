@@ -225,7 +225,14 @@
       "keepView": "Keep zoom and position between outputs",
       "filmstrip": "Outputs",
       "toggleFilmstrip": "Show or hide the filmstrip",
-      "filmstripItem": "{{index}}: {{name}}"
+      "filmstripItem": "{{index}}: {{name}}",
+      "play": "Play through {{dim}}",
+      "pause": "Pause",
+      "previousValue": "Previous {{dim}}",
+      "nextValue": "Next {{dim}}",
+      "dimensions": "Output coordinates",
+      "spaceKey": "Space",
+      "timeline": "Forecast steps"
     },
     "adapters": {
       "generic": {

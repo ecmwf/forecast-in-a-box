@@ -86,6 +86,52 @@ export function dimValueCounts(
   )
 }
 
+/** Items sharing every coordinate but `key` with `current`, ordered by it. */
+export function dimLine(
+  items: ReadonlyArray<OutputItem>,
+  current: OutputItem,
+  key: string,
+): Array<[value: string, item: OutputItem]> {
+  if (dimValue(current, key) === undefined) return []
+  const fixed = (current.dims ?? []).filter(([k]) => k !== key)
+  const line: Array<[string, OutputItem]> = []
+  for (const item of items) {
+    if (item.originalBlock !== current.originalBlock) continue
+    const value = dimValue(item, key)
+    if (value === undefined) continue
+    if (fixed.every(([k, v]) => dimValue(item, k) === v)) {
+      line.push([value, item])
+    }
+  }
+  return line.sort(([a], [b]) => compareDimValues(a, b))
+}
+
+/** The item one value along `key` from `current`, other coordinates fixed. */
+export function dimNeighbor(
+  items: ReadonlyArray<OutputItem>,
+  current: OutputItem,
+  key: string,
+  delta: 1 | -1,
+  wrap = false,
+): OutputItem | null {
+  const line = dimLine(items, current, key)
+  const index = line.findIndex(([, item]) => item.taskId === current.taskId)
+  if (index < 0) return null
+  const next = wrap
+    ? (index + delta + line.length) % line.length
+    : index + delta
+  const target = line.at(next)?.[1]
+  return next >= 0 && target && target.taskId !== current.taskId ? target : null
+}
+
+/** Block plus all but the innermost coordinate. */
+export function segmentKey(item: OutputItem): string {
+  return JSON.stringify([
+    item.originalBlock,
+    orderDims(item.dims ?? []).slice(0, -1),
+  ])
+}
+
 /** `param=167,151;step=6`; values must not contain `,` `;` or `=`. */
 export function parseDimFilter(raw: string | undefined): DimFilter {
   const filter: Record<string, Array<string>> = {}

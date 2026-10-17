@@ -12,9 +12,10 @@
  * items, and a lazy viewer for the active selection. */
 
 import { AlertTriangle, CloudOff, Package } from 'lucide-react'
-import { Suspense, useCallback, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { registerFirstPartyAdapters } from './adapters'
@@ -22,11 +23,15 @@ import { GRIB_DIR_MIME } from './adapters/grib'
 import {
   compareDimValues,
   compareDims,
+  dimLine,
+  dimNeighbor,
   dimValue,
   dimValueCounts,
   matchesDimFilter,
+  orderDims,
   outputTitle,
   parseDimFilter,
+  segmentKey,
   serializeDimFilter,
   stepGrid,
 } from './dims'
@@ -36,8 +41,10 @@ import { OutputCard } from './OutputCard'
 import { resolveAdapter } from './registry'
 import { SkeletonOutputCard } from './SkeletonOutputCard'
 import { StepGridMenu } from './StepGridMenu'
+import { DimNavigator } from './viewers/DimNavigator'
 import { Filmstrip } from './viewers/Filmstrip'
 import { useDimFormat } from './useDimFormat'
+import { prefetchJobResultBlob } from './useJobResult'
 import { needsSniff, useResolvedMimes } from './useResolvedMimes'
 import { classifyOutput } from './availability'
 import type { LostTaskIds } from './availability'
@@ -73,6 +80,9 @@ const GROUP_BY_OPTIONS = ['none', 'block', 'mime', 'block-and-mime'] as const
 /** Grouping by a split coordinate is `dim:<key>`, e.g. `dim:param`. */
 const DIM_PREFIX = 'dim:'
 export type GroupBy = (typeof GROUP_BY_OPTIONS)[number] | `dim:${string}`
+
+/** Delay between frames while playing through a coordinate. */
+const PLAY_INTERVAL_MS = 700
 
 /** Responsive card track — shared by the output grid and the loading
  * skeletons so both reflow identically. */
@@ -424,15 +434,23 @@ export function OutputsView({
   )
 
   /** Viewer order follows the rendered sections. */
-  const navItems = useMemo(
-    () =>
-      groups
-        ? groups.flatMap((group) =>
-            (group.children ?? [group]).flatMap((section) => section.items),
-          )
-        : visibleItems,
-    [groups, visibleItems],
-  )
+  const { navItems, sectionOf } = useMemo(() => {
+    if (!groups) return { navItems: visibleItems, sectionOf: segmentKey }
+    const sections = new Map<string, string>()
+    const ordered: Array<OutputItem> = []
+    for (const group of groups) {
+      for (const section of group.children ?? [group]) {
+        for (const item of section.items) {
+          sections.set(item.taskId, `${group.key}\n${section.key}`)
+          ordered.push(item)
+        }
+      }
+    }
+    return {
+      navItems: ordered,
+      sectionOf: (item: OutputItem) => sections.get(item.taskId) ?? '',
+    }
+  }, [groups, visibleItems])
 
   const isRunning = !isTerminalStatus(status)
   const failed = status === 'failed'
@@ -644,6 +662,8 @@ export function OutputsView({
           ActiveViewer={ActiveViewer}
           activeViewer={activeViewer}
           navItems={navItems}
+          sectionOf={sectionOf}
+          dimFormat={dimFormat}
           effectiveMime={effectiveMime}
           setActiveViewer={setActiveViewer}
         />
@@ -657,20 +677,25 @@ interface ActiveViewerHostProps {
   activeViewer: { item: OutputItem; adapter: OutputAdapter }
   /** Visible outputs in rendered order. */
   navItems: ReadonlyArray<OutputItem>
+  sectionOf: (item: OutputItem) => string
+  dimFormat: DimFormat
   effectiveMime: (item: OutputItem) => string
   setActiveViewer: (
     next: { item: OutputItem; adapter: OutputAdapter } | null,
   ) => void
 }
 
-/** Wires prev/next/hotkeys and the filmstrip; mounts only while open. */
+/** Navigation, hotkeys, playback and filmstrip; mounts only while open. */
 function ActiveViewerHost({
   ActiveViewer,
   activeViewer,
   navItems,
+  sectionOf,
+  dimFormat,
   effectiveMime,
   setActiveViewer,
 }: ActiveViewerHostProps) {
+  const queryClient = useQueryClient()
   const showFilmstrip = useUiStore((state) => state.outputFilmstrip)
   const setShowFilmstrip = useUiStore((state) => state.setOutputFilmstrip)
   const adapterFor = useCallback(
@@ -685,14 +710,40 @@ function ActiveViewerHost({
   const activeIndex = viewable.findIndex(
     (it) => it.taskId === activeViewer.item.taskId,
   )
+  // Latest copy of the opened item.
+  const item = activeIndex >= 0 ? viewable[activeIndex] : activeViewer.item
   const prevItem = activeIndex > 0 ? viewable[activeIndex - 1] : null
   const nextItem =
     activeIndex >= 0 && activeIndex < viewable.length - 1
       ? viewable[activeIndex + 1]
       : null
 
+  // Play steps the innermost coordinate, up/down the next.
+  const orderedDims = orderDims(item.dims ?? [])
+  const fastKey = orderedDims.at(-1)?.[0]
+  const slowKey = orderedDims.at(-2)?.[0]
+  const upItem = slowKey ? dimNeighbor(viewable, item, slowKey, -1) : null
+  const downItem = slowKey ? dimNeighbor(viewable, item, slowKey, 1) : null
+  const playNext = fastKey
+    ? dimNeighbor(viewable, item, fastKey, 1, true)
+    : null
+  const [playing, setPlaying] = useState(false)
+  const isPlaying = playing && playNext !== null
+
+  // Series along the innermost coordinate.
+  const line = fastKey ? dimLine(viewable, item, fastKey) : []
+  const series = line.map(([, it]) => it)
+  const firstItem = series.length > 1 ? series[0] : null
+  const lastItem = series.length > 1 ? (series.at(-1) ?? null) : null
+  // Shift+arrows: +-24 h.
+  const step = fastKey === 'step' ? Number(dimValue(item, 'step')) : NaN
+  const nextDay = line.find(([v]) => Number(v) >= step + 24)?.[1] ?? null
+  const prevDay =
+    line.filter(([v]) => Number(v) <= step - 24).at(-1)?.[1] ?? null
+
   const stepTo = useCallback(
-    (item: OutputItem) => setActiveViewer({ item, adapter: adapterFor(item) }),
+    (next: OutputItem) =>
+      setActiveViewer({ item: next, adapter: adapterFor(next) }),
     [setActiveViewer, adapterFor],
   )
 
@@ -702,23 +753,80 @@ function ActiveViewerHost({
   const goNext = useCallback(() => {
     if (nextItem) stepTo(nextItem)
   }, [nextItem, stepTo])
+  const goUp = useCallback(() => {
+    if (upItem) stepTo(upItem)
+  }, [upItem, stepTo])
+  const goDown = useCallback(() => {
+    if (downItem) stepTo(downItem)
+  }, [downItem, stepTo])
+  const togglePlay = useCallback(() => setPlaying((p) => !p), [])
+  const goTo = (target: OutputItem | null) => () => {
+    if (target && target.taskId !== item.taskId) stepTo(target)
+  }
+
+  useEffect(() => {
+    if (!isPlaying || !fastKey) return
+    // Prefetch the next two frames.
+    const after = dimNeighbor(viewable, playNext, fastKey, 1, true)
+    for (const frame of [playNext, after]) {
+      if (frame) {
+        void prefetchJobResultBlob(queryClient, frame.jobId, frame.taskId)
+      }
+    }
+    const timer = window.setTimeout(() => stepTo(playNext), PLAY_INTERVAL_MS)
+    return () => window.clearTimeout(timer)
+  }, [isPlaying, playNext, fastKey, viewable, queryClient, stepTo])
+
+  // Keep Space from also clicking a focused button.
+  const canPlay = playNext !== null
+  useEffect(() => {
+    if (!canPlay) return
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && e.target instanceof Element) {
+        if (e.target.closest('button')) e.preventDefault()
+      }
+    }
+    window.addEventListener('keyup', onKeyUp, true)
+    return () => window.removeEventListener('keyup', onKeyUp, true)
+  }, [canPlay])
 
   // Arrow + vi-style output nav (PDF page nav stays on header buttons).
   useHotkey('ArrowLeft', goPrev, { enabled: !!prevItem, ignoreInputs: true })
   useHotkey('K', goPrev, { enabled: !!prevItem, ignoreInputs: true })
   useHotkey('ArrowRight', goNext, { enabled: !!nextItem, ignoreInputs: true })
   useHotkey('J', goNext, { enabled: !!nextItem, ignoreInputs: true })
+  useHotkey('ArrowUp', goUp, { enabled: !!upItem, ignoreInputs: true })
+  useHotkey('ArrowDown', goDown, { enabled: !!downItem, ignoreInputs: true })
+  useHotkey('Space', togglePlay, { enabled: !!playNext, ignoreInputs: true })
+  useHotkey('Shift+ArrowLeft', goTo(prevDay), {
+    enabled: !!prevDay,
+    ignoreInputs: true,
+  })
+  useHotkey('Shift+ArrowRight', goTo(nextDay), {
+    enabled: !!nextDay,
+    ignoreInputs: true,
+  })
+  useHotkey('Home', goTo(firstItem), {
+    enabled: !!firstItem,
+    ignoreInputs: true,
+  })
+  useHotkey('End', goTo(lastItem), { enabled: !!lastItem, ignoreInputs: true })
   useHotkey('T', () => setShowFilmstrip(!showFilmstrip), {
     enabled: viewable.length > 1,
     ignoreInputs: true,
   })
+
+  const hasDims = orderedDims.length > 0
+  // Split outputs show their series, others all.
+  const filmstripItems = series.length > 1 ? series : viewable
+  const hasFilmstrip = showFilmstrip && filmstripItems.length > 1
 
   return (
     <Suspense fallback={null}>
       <ActiveViewer
         // Keyed by type, so the viewer stays up across items.
         key={activeViewer.adapter.id}
-        item={activeViewer.item}
+        item={item}
         adapter={activeViewer.adapter}
         onClose={() => {
           setActiveViewer(null)
@@ -731,13 +839,41 @@ function ActiveViewerHost({
             : undefined
         }
         footer={
-          showFilmstrip && viewable.length > 1 ? (
-            <Filmstrip
-              items={viewable}
-              activeTaskId={activeViewer.item.taskId}
-              adapterFor={adapterFor}
-              onSelect={stepTo}
-            />
+          hasDims || hasFilmstrip ? (
+            <>
+              {hasDims && (
+                <DimNavigator
+                  item={item}
+                  items={viewable}
+                  format={dimFormat}
+                  fastKey={fastKey}
+                  slowKey={slowKey}
+                  playing={isPlaying}
+                  canPlay={playNext !== null}
+                  onTogglePlay={togglePlay}
+                  onSelect={stepTo}
+                />
+              )}
+              {hasFilmstrip && (
+                <Filmstrip
+                  items={filmstripItems}
+                  activeTaskId={item.taskId}
+                  adapterFor={adapterFor}
+                  onSelect={stepTo}
+                  sectionOf={series.length > 1 ? undefined : sectionOf}
+                  badgeOf={
+                    series.length > 1 && fastKey
+                      ? (it) =>
+                          dimFormat.value(
+                            fastKey,
+                            dimValue(it, fastKey) ?? '',
+                            'compact',
+                          )
+                      : undefined
+                  }
+                />
+              )}
+            </>
           ) : undefined
         }
       />

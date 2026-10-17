@@ -14,12 +14,15 @@ import type { OutputDim } from '@/features/executions/outputs/dims'
 import {
   compareDimValues,
   compareDims,
+  dimLine,
+  dimNeighbor,
   dimValueCounts,
   formatRuns,
   matchesDimFilter,
   orderDims,
   outputTitle,
   parseDimFilter,
+  segmentKey,
   serializeDimFilter,
   stepDay,
   stepGrid,
@@ -117,6 +120,47 @@ describe('dimValueCounts', () => {
   })
 })
 
+describe('dimNeighbor', () => {
+  const at = (taskId: string) => grid.find((i) => i.taskId === taskId)!
+
+  it('steps one coordinate and keeps the others fixed', () => {
+    expect(dimNeighbor(grid, at('151/6'), 'step', 1)?.taskId).toBe('151/12')
+    expect(dimNeighbor(grid, at('151/6'), 'param', 1)?.taskId).toBe('167/6')
+    expect(dimNeighbor(grid, at('167/6'), 'param', -1)?.taskId).toBe('151/6')
+  })
+
+  it('stops at the ends unless wrapping', () => {
+    expect(dimNeighbor(grid, at('151/12'), 'step', 1)).toBeNull()
+    expect(dimNeighbor(grid, at('151/0'), 'step', -1)).toBeNull()
+    expect(dimNeighbor(grid, at('151/12'), 'step', 1, true)?.taskId).toBe(
+      '151/0',
+    )
+  })
+
+  it('skips gaps and ignores other blocks', () => {
+    const sparse = grid.filter((i) => i.taskId !== '151/6')
+    expect(dimNeighbor(sparse, at('151/0'), 'step', 1)?.taskId).toBe('151/12')
+    const foreign = item('x', [['step', '3']], 'other_block')
+    expect(dimNeighbor([foreign, at('151/0')], at('151/0'), 'step', 1)).toBe(
+      null,
+    )
+  })
+
+  it('returns null for a single value or a missing coordinate', () => {
+    const lone = item('lone', [['step', '0']])
+    expect(dimNeighbor([lone], lone, 'step', 1, true)).toBeNull()
+    expect(dimNeighbor(grid, at('151/0'), 'number', 1)).toBeNull()
+  })
+})
+
+describe('segmentKey', () => {
+  it('ignores the innermost coordinate', () => {
+    const [a, b, , d] = grid
+    expect(segmentKey(a)).toBe(segmentKey(b))
+    expect(segmentKey(a)).not.toBe(segmentKey(d))
+  })
+})
+
 describe('dim filter', () => {
   it('round-trips through the URL form', () => {
     const filter = { param: ['167', '151'], step: ['6'] }
@@ -149,6 +193,18 @@ describe('outputTitle', () => {
       'Map Plot · msl · step 0',
     )
     expect(outputTitle(grid[0])).toBe('Map Plot')
+  })
+})
+
+describe('dimLine', () => {
+  it('lists one series in order, other coordinates fixed', () => {
+    const at = grid.find((i) => i.taskId === '167/6')!
+    expect(dimLine(grid, at, 'step').map(([v, i]) => [v, i.taskId])).toEqual([
+      ['0', '167/0'],
+      ['6', '167/6'],
+      ['12', '167/12'],
+    ])
+    expect(dimLine(grid, at, 'number')).toEqual([])
   })
 })
 
