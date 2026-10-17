@@ -10,6 +10,7 @@
 
 import { ImageOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { outputTitle } from '../dims'
 import { useJobResultBlob } from '../useJobResult'
 import { useInViewOnce } from './useInViewOnce'
 import type { OutputAdapter, OutputItem, ThumbnailProps } from '../types'
@@ -56,7 +57,7 @@ export function ImageThumbnail({ item, adapter }: ThumbnailProps) {
       {url ? (
         <img
           src={url}
-          alt={item.blockName}
+          alt={outputTitle(item)}
           className="h-full w-full object-cover"
         />
       ) : (

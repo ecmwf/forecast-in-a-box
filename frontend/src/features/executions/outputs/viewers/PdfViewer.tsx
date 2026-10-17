@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { downloadAction } from '../actions/download'
+import { outputTitle } from '../dims'
 import { useJobResultBlob } from '../useJobResult'
 import { pdfjs } from './pdfjs'
 import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
@@ -181,7 +182,7 @@ export default function PdfViewer({
         onClick={(e) => e.stopPropagation()}
       >
         <span className="truncate font-mono text-sm text-white/80">
-          {item.blockName}
+          {outputTitle(item)}
         </span>
         {navIndex && (
           <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-1">

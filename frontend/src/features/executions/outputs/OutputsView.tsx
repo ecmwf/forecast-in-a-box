@@ -19,11 +19,13 @@ import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { registerFirstPartyAdapters } from './adapters'
 import { GRIB_DIR_MIME } from './adapters/grib'
+import { compareDims, outputTitle } from './dims'
 import { MimeFilterChips } from './MimeFilterChips'
 import { OutputCard } from './OutputCard'
 import { resolveAdapter } from './registry'
 import { SkeletonOutputCard } from './SkeletonOutputCard'
 import { Filmstrip } from './viewers/Filmstrip'
+import { useDimFormat } from './useDimFormat'
 import { needsSniff, useResolvedMimes } from './useResolvedMimes'
 import { classifyOutput } from './availability'
 import type { LostTaskIds } from './availability'
@@ -97,10 +99,9 @@ export function OutputsView({
     adapter: OutputAdapter
   } | null>(null)
 
-  /** Default order: by block (alphabetic), available before pending within
-   * the same block, taskId for stable tiebreak. Keeps items from the same
-   * block adjacent in the flat grid, and preserved as section/item order in
-   * the grouped views. */
+  const dimFormat = useDimFormat(outputs)
+
+  /** Block, coordinates (time last), taskId; pending items hold their slot. */
   const items = useMemo<Array<OutputItem>>(() => {
     if (!outputs) return []
     const list = Object.entries(outputs)
@@ -112,12 +113,22 @@ export function OutputsView({
           taskId,
           lostTaskIds,
         )
+        const dims = meta.dimension_kvs ?? undefined
+        const split = dims !== undefined && dims.length > 0
+        // Plugin label only for outputs without coordinates.
+        const label =
+          meta.dimension_kvs == null
+            ? (meta.display_name ?? undefined)
+            : undefined
         return {
           jobId,
           taskId,
           mimeType: meta.mime_type,
           originalBlock: meta.original_block,
           blockName: blockNames?.[meta.original_block] ?? meta.original_block,
+          dims,
+          subtitle: split ? dimFormat.dims(dims, 'compact') : label,
+          subtitleFull: split ? dimFormat.dims(dims, 'full') : label,
           isAvailable: meta.is_available,
           lostReason:
             availability.state === 'lost' ? availability.reason : undefined,
@@ -130,11 +141,12 @@ export function OutputsView({
       if (a.originalBlock !== b.originalBlock) {
         return a.originalBlock < b.originalBlock ? -1 : 1
       }
-      if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1
+      const byDims = compareDims(a, b)
+      if (byDims !== 0) return byDims
       return a.taskId < b.taskId ? -1 : 1
     })
     return list
-  }, [jobId, outputs, lostTaskIds, blockNames])
+  }, [jobId, outputs, lostTaskIds, blockNames, dimFormat])
 
   /** GRIB markers aren't grid cards, but still count toward the header tally
    * and block count. */
@@ -432,7 +444,7 @@ export function OutputsView({
               {pendingSniffItems.map((item) => (
                 <SkeletonOutputCard
                   key={item.taskId}
-                  blockName={item.blockName}
+                  label={outputTitle(item)}
                 />
               ))}
             </div>
@@ -741,7 +753,7 @@ function FlexGridItem({
           onOpenViewer={onOpenViewer}
         />
       ) : (
-        <SkeletonOutputCard blockName={item.blockName} isRunning={isRunning} />
+        <SkeletonOutputCard label={outputTitle(item)} isRunning={isRunning} />
       )}
     </div>
   )

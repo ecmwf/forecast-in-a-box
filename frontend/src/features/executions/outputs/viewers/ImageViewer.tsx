@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { downloadAction } from '../actions/download'
+import { outputTitle } from '../dims'
 import { useJobResultBlob } from '../useJobResult'
 import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
 import type { ViewerProps } from '../types'
@@ -347,7 +348,7 @@ export default function ImageViewer({
         onClick={(e) => e.stopPropagation()}
       >
         <span className="truncate font-mono text-sm text-white/80">
-          {item.blockName}
+          {outputTitle(item)}
         </span>
         {navIndex && (
           <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
@@ -461,7 +462,7 @@ export default function ImageViewer({
         {shownUrl && (
           <img
             src={shownUrl}
-            alt={item.blockName}
+            alt={outputTitle(item)}
             draggable={false}
             onClick={(e) => e.stopPropagation()}
             width={imageSize?.width}

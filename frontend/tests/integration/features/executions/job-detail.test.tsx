@@ -38,6 +38,7 @@ import {
   opaqueMimeExecution,
   resetJobsState,
   resolvedConfigExecution,
+  splitPlotExecution,
 } from '@tests/../mocks/data/job.data'
 import { worker } from '@tests/test-extend'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
@@ -383,6 +384,30 @@ describe('RunDetailPage Integration', () => {
       const screen = await renderDetailPage('job-running-002')
       await expect.element(screen.getByText(/Pending: 1/)).toBeVisible()
       await expect.element(screen.getByText('Group by')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('split outputs (#798)', () => {
+    const subtitles = (screen: Awaited<ReturnType<typeof renderDetailPage>>) =>
+      screen
+        .getByText(/step \d+$/)
+        .elements()
+        .map((el) => el.textContent)
+
+    it('orders outputs by coordinates, keeping pending slots in place', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('2t · step 36')).toBeVisible()
+      expect(subtitles(screen)).toEqual([
+        'msl · step 0',
+        'msl · step 12',
+        'msl · step 24',
+        'map_plot · msl · step 36',
+        '2t · step 0',
+        '2t · step 12',
+        '2t · step 24',
+        '2t · step 36',
+      ])
     })
   })
 

@@ -10,6 +10,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { outputTitle } from '../dims'
 import type { OutputAdapter, OutputItem } from '../types'
 import { cn } from '@/lib/utils'
 
@@ -57,7 +58,7 @@ export function Filmstrip({
               aria-current={active || undefined}
               aria-label={t('outputs.viewer.filmstripItem', {
                 index: index + 1,
-                name: item.blockName,
+                name: outputTitle(item),
               })}
               onClick={() => onSelect(item)}
               className={cn(
@@ -72,8 +73,8 @@ export function Filmstrip({
                   <Icon className="h-6 w-6 text-white/60" />
                 </div>
               )}
-              <span className="absolute right-1 bottom-1 rounded-sm bg-black/65 px-1 font-mono text-xs text-white tabular-nums">
-                {index + 1}
+              <span className="absolute right-1 bottom-1 max-w-[calc(100%-0.5rem)] truncate rounded-sm bg-black/65 px-1 font-mono text-xs text-white tabular-nums">
+                {item.subtitle ?? index + 1}
               </span>
             </button>
           )

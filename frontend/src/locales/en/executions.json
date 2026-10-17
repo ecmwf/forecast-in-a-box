@@ -170,6 +170,16 @@
       "mime": "Content type",
       "blockAndMime": "Block + content type"
     },
+    "dims": {
+      "param": "Parameter",
+      "step": "Step",
+      "number": "Member",
+      "levelist": "Level",
+      "stepValue": "step {{value}}",
+      "numberValue": "member {{value}}",
+      "levelistValue": "level {{value}}",
+      "otherValue": "{{key}} {{value}}"
+    },
     "sections": {
       "unknownBlock": "Unknown block",
       "unknownMime": "Unknown content type"

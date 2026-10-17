@@ -39,9 +39,14 @@ export const JobExecuteResponseSchema = z.object({
   attempt_count: z.number(),
 })
 
-/** routes/run.py: RunOutputDetail */
+/** routes/run.py: RunOutputDetail; the #798 labels are absent on older runs. */
 export const RunOutputMetadataSchema = z.object({
   mime_type: z.string(),
+  display_name: z.string().nullish().catch(null),
+  dimension_kvs: z
+    .array(z.tuple([z.string(), z.string()]))
+    .nullish()
+    .catch(null),
   original_block: z.string(),
   is_available: z.boolean(),
 })

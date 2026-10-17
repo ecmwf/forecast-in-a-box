@@ -14,6 +14,11 @@ import { outputFileName } from './actions/download'
 import type { OutputAdapter, OutputItem } from './types'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { P } from '@/components/base/typography'
 import { cn } from '@/lib/utils'
 import { BlockName } from '@/features/fable-builder/components/shared/BlockName'
@@ -89,12 +94,27 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
         <P className="truncate font-medium" title={item.blockName}>
           <BlockName name={item.blockName} />
         </P>
-        <P
-          className="truncate font-mono text-sm text-muted-foreground/70"
-          title={item.taskId}
-        >
-          {filename}
-        </P>
+        {item.subtitle ? (
+          <P className="truncate font-mono text-sm text-muted-foreground">
+            {item.subtitleFull && item.subtitleFull !== item.subtitle ? (
+              <Tooltip>
+                <TooltipTrigger render={<span />}>
+                  {item.subtitle}
+                </TooltipTrigger>
+                <TooltipContent>{item.subtitleFull}</TooltipContent>
+              </Tooltip>
+            ) : (
+              item.subtitle
+            )}
+          </P>
+        ) : (
+          <P
+            className="truncate font-mono text-sm text-muted-foreground/70"
+            title={item.taskId}
+          >
+            {filename}
+          </P>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-1.5">
