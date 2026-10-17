@@ -117,6 +117,13 @@ describe('ValidationStatusBadge — issues popover', () => {
     expect(useFableBuilderStore.getState().selectedBlockId).toBe('b1')
   })
 
+  it('keeps a Validating badge while a cleared result awaits the next check', async () => {
+    useFableBuilderStore.getState().setValidationState(null)
+    const screen = await renderWithProviders(<ValidationStatusBadge />)
+
+    await expect.element(screen.getByText('Validating')).toBeVisible()
+  })
+
   it('renders the Ready to run badge when there are no issues', async () => {
     useFableBuilderStore.getState().setValidationState({
       ...erroredState,
