@@ -34,8 +34,9 @@ import {
 } from '@tanstack/react-router'
 import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
 import { resetJobsState } from '@tests/../mocks/data/job.data'
-import type { RunOutputs } from '@/api/types/job.types'
+import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
+import { lensOwner } from '@/features/visualise/lens-owners'
 import i18n from '@/lib/i18n'
 
 // Matches the job-completed-001 seed: its `task-out-grib` marker output's
@@ -61,7 +62,11 @@ const outputsWithMarkers: RunOutputs = {
   },
 }
 
-async function renderCard(outputs: RunOutputs | null, runName?: string) {
+async function renderCard(
+  outputs: RunOutputs | null,
+  runName?: string,
+  status: JobStatus = 'completed',
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -73,6 +78,8 @@ async function renderCard(outputs: RunOutputs | null, runName?: string) {
     component: () => (
       <StoredOutputsCard
         jobId="job-completed-001"
+        status={status}
+        attempt={1}
         outputs={outputs}
         runName={runName}
       />
@@ -140,6 +147,40 @@ describe('StoredOutputsCard', () => {
     ).toHaveLength(0)
   })
 
+  it('holds lens actions until the sink has written every file', async () => {
+    const writing: RunOutputs = {
+      ...outputsWithMarkers,
+      'task-out-grib-2': {
+        ...outputsWithMarkers['task-out-grib-2'],
+        is_available: false,
+      },
+    }
+    const { screen } = await renderCard(writing, undefined, 'running')
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+    await expect.element(screen.getByText('1 of 2 files written')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: /^visualise$/i }))
+      .toBeDisabled()
+    await expect
+      .element(screen.getByRole('button', { name: /start wms server/i }))
+      .toBeDisabled()
+  })
+
+  it('enables lens actions once the run ends, even with a file missing', async () => {
+    const partial: RunOutputs = {
+      ...outputsWithMarkers,
+      'task-out-grib-2': {
+        ...outputsWithMarkers['task-out-grib-2'],
+        is_available: false,
+      },
+    }
+    const { screen } = await renderCard(partial, undefined, 'failed')
+    await expect.element(screen.getByText('2 files')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: /^visualise$/i }))
+      .toBeEnabled()
+  })
+
   it('disables lens actions when SkinnyWMS is not installed on the server', async () => {
     resetLensState({ skinnyWmsInstalled: false })
     const { screen } = await renderCard(outputsWithMarkers)
@@ -171,6 +212,10 @@ describe('StoredOutputsCard', () => {
     // The lens serves the run-private directory from the payload.
     expect(listMockLenses()[0].lens_params.local_path).toBe(
       '/data/output/job-completed-001_1',
+    )
+    // Recorded as this run attempt's lens.
+    expect(lensOwner(listMockLenses()[0].lens_instance_id)).toBe(
+      'job-completed-001#1',
     )
 
     // Copy writes the WMS URL to the clipboard (no throw).

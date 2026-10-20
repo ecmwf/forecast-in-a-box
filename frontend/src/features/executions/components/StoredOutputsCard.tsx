@@ -25,7 +25,7 @@ import type {
   BlockFactoryCatalogue,
   FableBuilderV1,
 } from '@/api/types/fable.types'
-import type { RunOutputs } from '@/api/types/job.types'
+import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { LostTaskIds } from '@/features/executions/outputs/availability'
 import { classifyOutput } from '@/features/executions/outputs/availability'
 import { blockDisplayNames } from '@/features/fable-builder/utils/block-names'
@@ -36,9 +36,13 @@ import {
   useStopLens,
 } from '@/api/hooks/useLens'
 import { buildAbsoluteWmsCapabilitiesUrl } from '@/api/endpoints/lens'
-import { useStoredDirPath } from '@/features/executions/outputs/stored-dir'
+import {
+  isSinkComplete,
+  useStoredDirPath,
+} from '@/features/executions/outputs/stored-dir'
 import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
 import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
+import { lensOwnerKey, setLensOwner } from '@/features/visualise/lens-owners'
 import { showToast } from '@/lib/toast'
 import { cn, copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -63,6 +67,9 @@ function splitPath(path: string): { dir: string; name: string } {
 
 interface StoredOutputsCardProps {
   jobId: string
+  /** Run status and attempt: lens actions wait until a sink is complete. */
+  status: JobStatus
+  attempt: number
   outputs: RunOutputs | null
   /** Reasons for outputs that are no longer retrievable. */
   lostTaskIds?: LostTaskIds
@@ -83,10 +90,14 @@ interface StoredOutputRow {
   lostReason?: string
   /** Number of GRIB marker tasks the sink fanned out to. */
   count: number
+  /** Marker tasks already written. */
+  written: number
 }
 
 export function StoredOutputsCard({
   jobId,
+  status,
+  attempt,
   outputs,
   lostTaskIds = {},
   fable,
@@ -111,6 +122,7 @@ export function StoredOutputsCard({
       const existing = byBlock.get(meta.original_block)
       if (existing) {
         existing.count += 1
+        if (meta.is_available) existing.written += 1
         // Prefer an available marker as the representative payload source.
         if (!existing.isAvailable && meta.is_available) {
           existing.taskId = taskId
@@ -133,6 +145,7 @@ export function StoredOutputsCard({
         lostReason:
           availability.state === 'lost' ? availability.reason : undefined,
         count: 1,
+        written: meta.is_available ? 1 : 0,
       })
     }
     return Array.from(byBlock.values())
@@ -152,6 +165,11 @@ export function StoredOutputsCard({
             key={row.blockId}
             jobId={jobId}
             row={row}
+            complete={isSinkComplete(
+              { written: row.written, total: row.count },
+              status,
+            )}
+            owner={lensOwnerKey(jobId, attempt)}
             runName={runName}
           />
         ))}
@@ -163,10 +181,16 @@ export function StoredOutputsCard({
 function StoredOutputRowItem({
   jobId,
   row,
+  complete,
+  owner,
   runName,
 }: {
   jobId: string
   row: StoredOutputRow
+  /** Sink finished writing; a lens scans its folder once. */
+  complete: boolean
+  /** Run attempt a started lens belongs to. */
+  owner: string
   runName?: string
 }) {
   const { t } = useTranslation('executions')
@@ -212,11 +236,14 @@ function StoredOutputRowItem({
 
   /** Start the SkinnyWMS lens on the resolved directory. */
   const startServer = () => {
-    if (lensId || !dirPath) return
+    if (lensId || !dirPath || !complete) return
     startMutation.mutate(
       { localPath: dirPath },
       {
-        onSuccess: (id) => setLensId(id),
+        onSuccess: (id) => {
+          setLensOwner(id, owner)
+          setLensId(id)
+        },
         onError: (err) => showToast.error(err.message),
       },
     )
@@ -256,7 +283,7 @@ function StoredOutputRowItem({
   }
 
   const isStarting = startMutation.isPending || (!!lensId && !running)
-  const startDisabled = wmsUnavailable || !dirPath || isStarting
+  const startDisabled = wmsUnavailable || !dirPath || !complete || isStarting
   const startTitle = wmsUnavailable
     ? t('storedOutputs.wmsUnavailable')
     : t('storedOutputs.startWms')
@@ -277,7 +304,12 @@ function StoredOutputRowItem({
           <P className="truncate text-sm font-medium">{row.title}</P>
           {row.count > 1 && (
             <span className="shrink-0 text-sm text-muted-foreground">
-              {t('storedOutputs.fileCount', { n: row.count })}
+              {complete
+                ? t('storedOutputs.fileCount', { n: row.count })
+                : t('storedOutputs.fileCountWriting', {
+                    written: row.written,
+                    n: row.count,
+                  })}
             </span>
           )}
         </div>
@@ -317,6 +349,7 @@ function StoredOutputRowItem({
             size="sm"
             variant="outline"
             onClick={visualise}
+            disabled={!complete}
             className="gap-1.5"
           >
             <Earth className="h-3.5 w-3.5" />

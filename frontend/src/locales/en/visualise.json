@@ -100,6 +100,7 @@
     "loadingAria": "Loading map imagery",
     "resolving": "Locating output directory…",
     "starting": "Starting lens server…",
+    "waitingForRun": "Waiting for the run to write its files ({{written}} of {{total}})…",
     "failed": "Lens server failed",
     "dirError": "Could not resolve the output directory",
     "retry": "Retry",

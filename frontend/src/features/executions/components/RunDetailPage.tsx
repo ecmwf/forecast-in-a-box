@@ -400,6 +400,8 @@ export function RunDetailPage() {
                 >
                   <StoredOutputsCard
                     jobId={jobId}
+                    status={jobData.status}
+                    attempt={jobData.attempt_count}
                     outputs={jobData.outputs}
                     lostTaskIds={jobData.lost_task_ids}
                     fable={fableData?.builder}

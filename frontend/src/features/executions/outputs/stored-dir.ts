@@ -16,10 +16,43 @@
  */
 
 import { queryOptions, useQuery } from '@tanstack/react-query'
+import { GRIB_DIR_MIME } from './adapters/grib'
+import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import { getJobResultHead } from '@/api/endpoints/job'
+import { isTerminalStatus } from '@/api/types/job.types'
 
 /** The directory payload is a short path — cap the fetch defensively. */
 const DIR_PAYLOAD_BYTES = 1024
+
+/** Marker tasks of one GRIB sink, from run metadata: finished and expected. */
+export interface SinkProgress {
+  written: number
+  total: number
+}
+
+export function gribSinkProgress(
+  outputs: RunOutputs | null | undefined,
+  blockId: string,
+): SinkProgress {
+  let written = 0
+  let total = 0
+  for (const meta of Object.values(outputs ?? {})) {
+    if (meta.mime_type !== GRIB_DIR_MIME || meta.original_block !== blockId) {
+      continue
+    }
+    total += 1
+    if (meta.is_available) written += 1
+  }
+  return { written, total }
+}
+
+/** Every marker task finished, or the run has ended; no file access. */
+export function isSinkComplete(
+  progress: SinkProgress,
+  status: JobStatus,
+): boolean {
+  return progress.written === progress.total || isTerminalStatus(status)
+}
 
 export function storedDirQueryOptions(jobId: string, taskId: string) {
   return queryOptions({

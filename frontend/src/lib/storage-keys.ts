@@ -92,6 +92,8 @@ export const STORAGE_KEYS = {
   visualise: {
     /** Last-used A/B slot pair; seeds the slots on a bare /visualise visit */
     lastPair: 'fiab.visualise.last-pair',
+    /** Run attempt each lens was started for (keyed by lens instance id) */
+    lensOwners: 'fiab.visualise.lens-owners',
   },
 
   /**
