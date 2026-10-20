@@ -4345,7 +4345,7 @@ wheels = [
 
 [[package]]
 name = "skinnywms"
-version = "0.13.1"
+version = "0.13.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dask", extra = ["array"] },
@@ -4360,9 +4360,9 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "xarray" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f6/e4/ef21e2bca214b7c88d5813edead9ca9143013860c39a8a5f2baf563efba4/skinnywms-0.13.1.tar.gz", hash = "sha256:b0b96ccd7a43a4371ea2d9f5c15cfe360644433f03443630ed98077f71ddf303", size = 18547712, upload-time = "2026-09-24T09:12:55.677Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/11/2230f2ee30cb6b5946d535a5e5ebcd92292af398ea02c3929bfb0d65ef8c/skinnywms-0.13.2.tar.gz", hash = "sha256:9701c853f183e3fa7c8f5488e1ad39acf60974a705771731e42f8affab84e9f2", size = 18550183, upload-time = "2026-10-20T09:28:42.38Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/a2/501eeb5875207beb10c63785ed4b23887763e30af8b0a5a6161f6c154881/skinnywms-0.13.1-py3-none-any.whl", hash = "sha256:e0615439fff1b4ed6b418a2a16525c19e661a5996dca19ab69576a029467dd32", size = 19027702, upload-time = "2026-09-24T09:12:53.083Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/c1/7cfe9ebbab32e0cc4bc61cc4b6f936254f465199b873caa5eac2247e62a6/skinnywms-0.13.2-py3-none-any.whl", hash = "sha256:a7d3f7c973d6614644b7098ff0c5846cca6c680daa9966293077d8938ff40275", size = 19029641, upload-time = "2026-10-20T09:28:39.312Z" },
 ]
 
 [[package]]
