@@ -21,6 +21,7 @@
  */
 
 import ImageLayer from 'ol/layer/Image'
+import { HALF_SIZE } from 'ol/proj/epsg3857'
 import ImageWMS from 'ol/source/ImageWMS'
 import { toWmsEndpoint } from './wms-capabilities'
 import type { LoadFunction } from 'ol/Image'
@@ -161,6 +162,52 @@ export function loadWasAborted(img: unknown): boolean {
   return img instanceof HTMLImageElement && img.dataset.fiabAborted === '1'
 }
 
+/** BBOX bounds per CRS as [minX, minY, maxX, maxY] in request axis order. */
+function crsBounds(
+  crs: string,
+  version: string,
+): [number, number, number, number] | null {
+  switch (crs.toUpperCase()) {
+    case 'EPSG:3857':
+    case 'EPSG:900913':
+      return [-HALF_SIZE, -HALF_SIZE, HALF_SIZE, HALF_SIZE]
+    case 'EPSG:4326':
+      return version.startsWith('1.3')
+        ? [-90, -180, 90, 180]
+        : [-180, -90, 180, 90]
+    case 'CRS:84':
+      return [-180, -90, 180, 90]
+    default:
+      return null
+  }
+}
+
+/** Trims a GetMap BBOX to its CRS bounds; whole-pixel rounding can push a
+ *  world-clamped box past +-180, which SkinnyWMS draws wrapped or blank. */
+export function clampGetMapBbox(src: string): string {
+  const param = (name: string) =>
+    new RegExp(`([?&]${name}=)([^&]*)`, 'i').exec(src)
+  const bbox = param('BBOX')
+  const crs = param('CRS') ?? param('SRS')
+  if (!bbox || !crs) return src
+  const version = decodeURIComponent(param('VERSION')?.[2] ?? '1.3.0')
+  const bounds = crsBounds(decodeURIComponent(crs[2]), version)
+  const values = decodeURIComponent(bbox[2]).split(',').map(Number)
+  if (!bounds || values.length !== 4 || !values.every(Number.isFinite)) {
+    return src
+  }
+  const clamped = values.map((v, i) =>
+    Math.min(Math.max(v, bounds[i % 2]), bounds[(i % 2) + 2]),
+  )
+  if (clamped.every((v, i) => v === values[i])) return src
+  return (
+    src.slice(0, bbox.index) +
+    bbox[1] +
+    encodeURIComponent(clamped.join(',')) +
+    src.slice(bbox.index + bbox[0].length)
+  )
+}
+
 /** Fetch-based GetMap loader: a superseded request (pan/zoom/scrub) aborts
  *  the previous one — at most one in flight per source, always the latest. */
 export function cancellingImageLoader(): LoadFunction {
@@ -172,7 +219,7 @@ export function cancellingImageLoader(): LoadFunction {
     const img = image.getImage() as HTMLImageElement
     img.dataset.fiabRequestUrl = src
     delete img.dataset.fiabAborted
-    fetch(src, { signal: controller.signal })
+    fetch(clampGetMapBbox(src), { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`GetMap ${res.status}`)
         const blob = await res.blob()
