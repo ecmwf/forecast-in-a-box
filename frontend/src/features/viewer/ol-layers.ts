@@ -208,6 +208,48 @@ export function clampGetMapBbox(src: string): string {
   )
 }
 
+/** Transient proxy answers worth another try. */
+const RETRY_STATUSES: ReadonlySet<number> = new Set([502, 503, 504])
+/** Backoff before each GetMap retry. */
+const RETRY_DELAYS_MS = [300, 1000] as const
+
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason)
+      return
+    }
+    const timer = window.setTimeout(resolve, ms)
+    signal.addEventListener(
+      'abort',
+      () => {
+        window.clearTimeout(timer)
+        reject(signal.reason)
+      },
+      { once: true },
+    )
+  })
+}
+
+/** Retries network errors and transient statuses until superseded. */
+async function fetchWithRetry(
+  url: string,
+  signal: AbortSignal,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const retriesLeft = attempt < RETRY_DELAYS_MS.length
+    try {
+      const res = await fetch(url, { signal })
+      if (res.ok || !RETRY_STATUSES.has(res.status) || !retriesLeft) {
+        return res
+      }
+    } catch (err) {
+      if (signal.aborted || !retriesLeft) throw err
+    }
+    await abortableDelay(RETRY_DELAYS_MS[attempt], signal)
+  }
+}
+
 /** Fetch-based GetMap loader: a superseded request (pan/zoom/scrub) aborts
  *  the previous one — at most one in flight per source, always the latest. */
 export function cancellingImageLoader(): LoadFunction {
@@ -219,7 +261,7 @@ export function cancellingImageLoader(): LoadFunction {
     const img = image.getImage() as HTMLImageElement
     img.dataset.fiabRequestUrl = src
     delete img.dataset.fiabAborted
-    fetch(clampGetMapBbox(src), { signal: controller.signal })
+    fetchWithRetry(clampGetMapBbox(src), controller.signal)
       .then(async (res) => {
         if (!res.ok) throw new Error(`GetMap ${res.status}`)
         const blob = await res.blob()

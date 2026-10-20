@@ -99,6 +99,84 @@ describe('cancellingImageLoader', () => {
     await vi.waitFor(() => expect(img.src).toContain('data:image/gif'))
   })
 
+  it('retries a transient 502, then shows the image', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('bad gateway', { status: 502 }))
+      .mockResolvedValueOnce(pngResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const { wrapper, img } = fakeImage()
+    load(wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(img.src).toMatch(/^blob:/), {
+      timeout: 3000,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries a network error', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(pngResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const { wrapper, img } = fakeImage()
+    load(wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(img.src).toMatch(/^blob:/), {
+      timeout: 3000,
+    })
+  })
+
+  it('fails once the retries run out', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response('starting', { status: 503 })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const { wrapper, img } = fakeImage()
+    load(wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(img.src).toContain('data:image/gif'), {
+      timeout: 4000,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not retry other errors', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response('nope', { status: 500 })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const { wrapper, img } = fakeImage()
+    load(wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(img.src).toContain('data:image/gif'))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops retrying once superseded', async () => {
+    const fetchMock = vi.fn((url: string) =>
+      Promise.resolve(
+        url.includes('T00')
+          ? new Response('bad gateway', { status: 502 })
+          : pngResponse(),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const first = fakeImage()
+    const second = fakeImage()
+    load(first.wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    load(second.wrapper, 'http://wms.test/?TIME=T06')
+    await vi.waitFor(() => expect(loadWasAborted(first.img)).toBe(true))
+    // Past the first backoff: the superseded load must not refetch.
+    await new Promise((r) => setTimeout(r, 500))
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url.includes('T00')),
+    ).toHaveLength(1)
+  })
+
   it('fetches the BBOX trimmed to the world, attributing the original URL', () => {
     const fetchMock = vi.fn(() => new Promise<Response>(() => {}))
     vi.stubGlobal('fetch', fetchMock)
