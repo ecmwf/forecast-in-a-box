@@ -9,6 +9,7 @@
  */
 
 import { Download } from 'lucide-react'
+import { outputTitle } from '../dims'
 import { fetchJobResultBlob } from '../useJobResult'
 import type { ActionContext, OutputAction, OutputItem } from '../types'
 import { createLogger } from '@/lib/logger'
@@ -18,9 +19,9 @@ import { showToast } from '@/lib/toast'
 
 const log = createLogger('OutputAction.download')
 
-/** Download name from the block's display name, e.g. "map_plot.png". */
+/** Download name from the output's title, e.g. "map_plot_2t_step_6.png". */
 export function outputFileName(item: OutputItem, extension: string): string {
-  const base = item.blockName
+  const base = outputTitle(item)
     .trim()
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, '_')

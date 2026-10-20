@@ -21,6 +21,7 @@ import {
   useBlockProgress,
   useResolvedConfigFor,
   useShowConfig,
+  useValueTypesFor,
 } from '@/features/executions/components/RunCanvas'
 import {
   useIsBlockHovered,
@@ -124,6 +125,7 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
 
   const inputNames = Object.keys(nodeData.instance.input_ids)
   const resolved = useResolvedConfigFor(nodeData.instanceId)
+  const valueTypes = useValueTypesFor(nodeData.instanceId)
   const configEntries = Object.entries(
     nodeData.instance.configuration_values,
   ).filter(([, v]) => v !== '')
@@ -136,7 +138,10 @@ export const RunNode = memo(function ({ data, type }: NodeProps) {
   const valueLabels = useConfigValueLabels(
     displayValues,
     Object.fromEntries(
-      configEntries.map(([key]) => [key, configOptions[key].value_type]),
+      configEntries.map(([key]) => [
+        key,
+        valueTypes?.[key] ?? configOptions[key].value_type,
+      ]),
     ),
   )
 

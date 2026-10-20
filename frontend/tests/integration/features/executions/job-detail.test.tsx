@@ -21,6 +21,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { HttpResponse, http } from 'msw'
 import { I18nextProvider } from 'react-i18next'
 import {
   Outlet,
@@ -37,8 +38,11 @@ import {
   opaqueMimeExecution,
   resetJobsState,
   resolvedConfigExecution,
+  splitPlotExecution,
 } from '@tests/../mocks/data/job.data'
+import { worker } from '@tests/test-extend'
 import type { AuthContextValue } from '@/features/auth/AuthContext'
+import { API_ENDPOINTS } from '@/api/endpoints'
 import { AuthContext } from '@/features/auth/AuthContext'
 import { RunDetailPage } from '@/features/executions/components/RunDetailPage'
 import i18n from '@/lib/i18n'
@@ -380,6 +384,211 @@ describe('RunDetailPage Integration', () => {
       const screen = await renderDetailPage('job-running-002')
       await expect.element(screen.getByText(/Pending: 1/)).toBeVisible()
       await expect.element(screen.getByText('Group by')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('split outputs (#798)', () => {
+    const subtitles = (screen: Awaited<ReturnType<typeof renderDetailPage>>) =>
+      screen
+        .getByText(/step \d+$/)
+        .elements()
+        .map((el) => el.textContent)
+
+    it('orders outputs by coordinates, keeping pending slots in place', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('2t · step 36')).toBeVisible()
+      expect(subtitles(screen)).toEqual([
+        'msl · step 0',
+        'msl · step 12',
+        'msl · step 24',
+        'map_plot · msl · step 36',
+        '2t · step 0',
+        '2t · step 12',
+        '2t · step 24',
+        '2t · step 36',
+      ])
+    })
+
+    it('groups by a coordinate with full parameter names', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage(
+        'job-split-007',
+        '?groupBy=dim:param',
+      )
+      await expect
+        .element(screen.getByText('Mean sea level pressure [Pa] (msl)'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText('2 metre temperature [K] (2t)'))
+        .toBeVisible()
+    })
+
+    it('filters by a coordinate from its menu', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('msl · step 0')).toBeVisible()
+      await screen.getByText('Parameter: All').click()
+      await screen
+        .getByRole('option', { name: '2 metre temperature [K] (2t)' })
+        .click()
+      await expect
+        .element(screen.getByText('msl · step 0'))
+        .not.toBeInTheDocument()
+      await expect.element(screen.getByText('2t · step 12')).toBeVisible()
+    })
+
+    it('filters steps with the day by hour checkboxes', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('2t · step 12')).toBeVisible()
+      await screen.getByText('Step: All').click()
+
+      await screen.getByRole('checkbox', { name: '+12 h' }).click()
+      // Steps 0 and 24 share the 0h row and remain.
+      await expect.element(screen.getByText('Step: 0 h')).toBeVisible()
+      expect(subtitles(screen)).toEqual([
+        'msl · step 0',
+        'msl · step 24',
+        '2t · step 0',
+        '2t · step 24',
+      ])
+
+      await screen.getByRole('checkbox', { name: 'All steps' }).click()
+      await expect.element(screen.getByText('Step: All')).toBeVisible()
+      await screen.getByRole('checkbox', { name: 'All steps' }).click()
+      await expect.element(screen.getByText('Step: None')).toBeVisible()
+      await expect
+        .element(screen.getByText('No outputs match the current filter.'))
+        .toBeVisible()
+
+      // Unstyled, an unchecked box has no size.
+      ;(
+        screen.getByRole('checkbox', { name: 'Day 1' }).element() as HTMLElement
+      ).click()
+      await expect
+        .element(screen.getByText('Step: day 1', { exact: true }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('checkbox', { name: 'All steps' }))
+        .toHaveAttribute('aria-checked', 'mixed')
+    })
+
+    it('restores a step filter from the URL', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007', '?dims=step=24')
+      await expect.element(screen.getByText('2t · step 24')).toBeVisible()
+      expect(subtitles(screen)).toEqual(['msl · step 24', '2t · step 24'])
+      await expect
+        .element(screen.getByText('Step: day 1 · 0 h', { exact: true }))
+        .toBeVisible()
+    })
+
+    it('steps across parameters and through time in the viewer', async () => {
+      injectMockExecution(splitPlotExecution)
+      const screen = await renderDetailPage('job-split-007')
+      await expect.element(screen.getByText('msl · step 0')).toBeVisible()
+      await screen.getByRole('button', { name: 'View' }).first().click()
+      const header = (label: string) =>
+        screen.getByText(`map_plot · ${label}`, { exact: true })
+      await expect.element(header('msl · step 0')).toBeVisible()
+
+      await userEvent.keyboard('{ArrowDown}')
+      await expect.element(header('2t · step 0')).toBeVisible()
+      await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+      await expect.element(header('2t · step 24')).toBeVisible()
+      await userEvent.keyboard('{End}')
+      await expect.element(header('2t · step 36')).toBeVisible()
+      await userEvent.keyboard('{Home}')
+      await expect.element(header('2t · step 0')).toBeVisible()
+
+      await userEvent.keyboard(' ')
+      await expect
+        .element(header('2t · step 12'), { timeout: 3000 })
+        .toBeVisible()
+    })
+  })
+
+  describe('validated option types on the canvas', () => {
+    const block = (
+      id: string,
+      factory: string,
+      values: Record<string, string>,
+      inputs: Record<string, string> = {},
+    ) => ({
+      instance_id: id,
+      plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+      factory,
+      instance: { configuration_values: values, input_ids: inputs },
+    })
+
+    it('labels params a Select narrows to params, and leaves steps raw', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.fable.get, () =>
+          HttpResponse.json({
+            blueprint_id: 'select-labels',
+            version: 1,
+            builder: {
+              blocks: [
+                block('src', 'operationalForecastSource', {}),
+                block(
+                  'selParam',
+                  'select',
+                  { dimension: 'param', values: '167,151' },
+                  { dataset: 'src' },
+                ),
+                block(
+                  'selStep',
+                  'select',
+                  { dimension: 'step', values: '24,0,3,6' },
+                  { dataset: 'selParam' },
+                ),
+              ],
+            },
+            display_name: 'Select labels',
+            display_description: '',
+            tags: [],
+            parent_id: null,
+            created_at: '2026-10-17T00:00:00+00:00',
+            updated_at: '2026-10-17T00:00:00+00:00',
+          }),
+        ),
+        http.put(API_ENDPOINTS.fable.expand, () =>
+          HttpResponse.json({
+            global_errors: [],
+            block_errors: {},
+            possible_sources: [],
+            possible_expansions: {},
+            configuration_restrictions: {
+              selParam: { values: "list[enumClosed[param]('151','167')]" },
+              selStep: { values: "list[enumClosed[str]('0','24','3','6')]" },
+            },
+          }),
+        ),
+        // Resolves any id, so a wrong lookup would show.
+        http.post(API_ENDPOINTS.fable.resolveDisplay, async ({ request }) => {
+          const { elements } = (await request.json()) as {
+            elements: Array<{ typeName: string; value: string }>
+          }
+          return HttpResponse.json({
+            elements: elements.map((e) => ({
+              ...e,
+              display: `Param ${e.value} [K] (p${e.value})`,
+            })),
+          })
+        }),
+      )
+      injectMockExecution({
+        ...resolvedConfigExecution,
+        run_id: 'job-select-011',
+        blueprint_id: 'select-labels',
+        resolution: null,
+      })
+      const screen = await renderDetailPage('job-select-011')
+
+      await expect.element(screen.getByText('p167, p151')).toBeVisible()
+      await expect.element(screen.getByText('24,0,3,6')).toBeVisible()
+      await expect.element(screen.getByText(/p24/)).not.toBeInTheDocument()
     })
   })
 

@@ -17,6 +17,7 @@ import { FileText } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useJobResultBlob } from '../useJobResult'
+import { useInViewOnce } from './useInViewOnce'
 import type { ThumbnailProps } from '../types'
 import { createLogger } from '@/lib/logger'
 
@@ -28,22 +29,7 @@ export function PdfThumbnail({ item }: ThumbnailProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [pageCount, setPageCount] = useState<number | null>(null)
   const [rendered, setRendered] = useState(false)
-  const [shouldRender, setShouldRender] = useState(false)
-
-  useEffect(() => {
-    if (!ref.current) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setShouldRender(true)
-          observer.disconnect()
-        }
-      },
-      { rootMargin: '200px' },
-    )
-    observer.observe(ref.current)
-    return () => observer.disconnect()
-  }, [])
+  const shouldRender = useInViewOnce(ref)
 
   // Deferred until the card scrolls into view; shares the blob cache with the
   // full PDF viewer for this same output.

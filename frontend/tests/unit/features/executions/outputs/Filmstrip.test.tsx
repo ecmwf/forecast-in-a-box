@@ -41,4 +41,26 @@ describe('Filmstrip', () => {
     await screen.getByRole('button', { name: '3: plot-c' }).click()
     expect(onSelect).toHaveBeenCalledWith(items[2])
   })
+
+  it('labels split outputs and divides sections', async () => {
+    const split = items.map((item, index) => ({
+      ...item,
+      blockName: 'Map Plot',
+      subtitle: `step ${index * 6}`,
+    }))
+    const screen = await renderWithProviders(
+      <Filmstrip
+        items={split}
+        activeTaskId="a"
+        adapterFor={() => gribStoredAdapter}
+        onSelect={vi.fn()}
+        sectionOf={(item) => (item.taskId === 'c' ? 'second' : 'first')}
+      />,
+    )
+
+    await expect
+      .element(screen.getByRole('button', { name: '2: Map Plot · step 6' }))
+      .toHaveTextContent('step 6')
+    expect(screen.getByRole('separator').elements()).toHaveLength(1)
+  })
 })

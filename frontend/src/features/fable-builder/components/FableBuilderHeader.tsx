@@ -244,7 +244,8 @@ export function FableBuilderHeader({
                   {displayName}
                 </H1>
               </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {/* Badge height keeps the header steady. */}
+              <div className="flex min-h-5 items-center gap-2 text-sm text-muted-foreground">
                 {hasBlocks && (
                   <ValidationStatusBadge
                     catalogue={catalogue}

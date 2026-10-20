@@ -9,8 +9,10 @@
  */
 
 import { ImageOff } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { outputTitle } from '../dims'
 import { useJobResultBlob } from '../useJobResult'
+import { useInViewOnce } from './useInViewOnce'
 import type { OutputAdapter, OutputItem, ThumbnailProps } from '../types'
 
 /** Browser-rendering mime: trust the stored mime if the adapter advertises it
@@ -23,12 +25,14 @@ function browserImageMime(item: OutputItem, adapter: OutputAdapter): string {
 }
 
 export function ImageThumbnail({ item, adapter }: ThumbnailProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const inView = useInViewOnce(ref)
   const [url, setUrl] = useState<string | null>(null)
-  // Shared cache — the full viewer for this same output reuses this blob.
+  // Fetched once near the viewport; the full viewer reuses this blob.
   const { data, isError } = useJobResultBlob(
     item.jobId,
     item.taskId,
-    item.isAvailable,
+    inView && item.isAvailable,
   )
   const blob = data?.blob
 
@@ -49,11 +53,11 @@ export function ImageThumbnail({ item, adapter }: ThumbnailProps) {
   }
 
   return (
-    <div className="aspect-video overflow-hidden rounded-md bg-muted">
+    <div ref={ref} className="aspect-video overflow-hidden rounded-md bg-muted">
       {url ? (
         <img
           src={url}
-          alt={item.blockName}
+          alt={outputTitle(item)}
           className="h-full w-full object-cover"
         />
       ) : (

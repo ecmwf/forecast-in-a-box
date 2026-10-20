@@ -17,6 +17,7 @@ import type {
   JobExecuteRequest,
   JobExecuteResponse,
   JobExecutionDetail,
+  RunOutputMetadata,
 } from '@/api/types/job.types'
 
 const now = new Date()
@@ -211,6 +212,51 @@ export const opaqueMimeExecution: JobExecutionDetail = {
   },
   completed_block_ids: null,
   planned_block_ids: null,
+}
+
+function splitPlotOutput(
+  param: string,
+  short: string,
+  step: string,
+  isAvailable: boolean,
+): RunOutputMetadata {
+  return {
+    mime_type: 'image/png',
+    display_name: `Map Plot (param=${short}, step=${step})`,
+    dimension_kvs: [
+      ['param', param],
+      ['step', step],
+    ],
+    original_block: 'map_plot',
+    is_available: isAvailable,
+  }
+}
+
+/** Test-only split Map Plot (param x step); see {@link injectMockExecution}. */
+export const splitPlotExecution: JobExecutionDetail = {
+  run_id: 'job-split-007',
+  attempt_count: 1,
+  status: 'running',
+  created_at: oneHourAgo,
+  updated_at: oneHourAgo,
+  blueprint_id: 'def-007',
+  blueprint_version: 1,
+  error: null,
+  progress: '80',
+  cascade_job_id: 'cascade-007',
+  lost_task_ids: {},
+  outputs: {
+    'map_plot:9c': splitPlotOutput('167', '2t', '24', true),
+    'map_plot:1a': splitPlotOutput('151', 'msl', '12', true),
+    'map_plot:f0': splitPlotOutput('167', '2t', '0', true),
+    'map_plot:4b': splitPlotOutput('151', 'msl', '0', true),
+    'map_plot:77': splitPlotOutput('167', '2t', '12', true),
+    'map_plot:d8': splitPlotOutput('167', '2t', '36', true),
+    'map_plot:5e': splitPlotOutput('151', 'msl', '24', true),
+    'map_plot:c3': splitPlotOutput('151', 'msl', '36', false),
+  },
+  completed_block_ids: [],
+  planned_block_ids: ['map_plot'],
 }
 
 /** Test-only fixture: completed run of the glyphed `template-typed-inputs`

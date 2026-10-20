@@ -21,9 +21,11 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { downloadAction } from '../actions/download'
+import { outputTitle } from '../dims'
 import { useJobResultBlob } from '../useJobResult'
 import { pdfjs } from './pdfjs'
 import { kbdBadge, viewerHeaderBtn } from './viewerHeaderBtn'
+import { useDialogFocus } from './useDialogFocus'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { ViewerProps } from '../types'
 import { createLogger } from '@/lib/logger'
@@ -166,11 +168,14 @@ export default function PdfViewer({
   )
   const totalPages = doc?.numPages ?? 0
 
+  const dialogRef = useDialogFocus<HTMLDivElement>()
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex flex-col bg-black/85"
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex flex-col bg-black/85 outline-none"
       onClick={(e) => {
         // Close on direct backdrop clicks; children stop propagation.
         if (e.target === e.currentTarget) onClose()
@@ -181,7 +186,7 @@ export default function PdfViewer({
         onClick={(e) => e.stopPropagation()}
       >
         <span className="truncate font-mono text-sm text-white/80">
-          {item.blockName}
+          {outputTitle(item)}
         </span>
         {navIndex && (
           <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-1">

@@ -106,14 +106,14 @@ export function ValidationStatusBadge({
     return list
   }, [validationState, fable, catalogue, t])
 
-  if (isValidating) {
-    return (
-      <Badge variant="secondary" className={cn('gap-1', className)} {...anchor}>
-        <Loader2 className="h-3 w-3 animate-spin" />
-        {t('validationStatus.validating')}
-      </Badge>
-    )
-  }
+  const validatingBadge = (
+    <Badge variant="secondary" className={cn('gap-1', className)} {...anchor}>
+      <Loader2 className="h-3 w-3 animate-spin" />
+      {t('validationStatus.validating')}
+    </Badge>
+  )
+
+  if (isValidating) return validatingBadge
 
   if (failure !== null) {
     return (
@@ -141,9 +141,8 @@ export function ValidationStatusBadge({
     )
   }
 
-  if (!validationState) {
-    return null
-  }
+  // Cleared between an edit and the next check.
+  if (!validationState) return validatingBadge
 
   if (issues.length === 0) {
     return (
