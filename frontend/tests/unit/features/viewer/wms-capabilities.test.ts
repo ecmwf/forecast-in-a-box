@@ -144,7 +144,28 @@ describe('parseCapabilities', () => {
   it('throws on malformed XML', () => {
     expect(() => parseCapabilities('<WMS_Capabilities><unclosed')).toThrow()
   })
+
+  it('throws the server message of an exception report', () => {
+    expect(() => parseCapabilities(SKINNYWMS_EXCEPTION)).toThrow(
+      new CapabilitiesError(
+        'parse',
+        'GetCapabilities exception: End of resource reached when reading message (c_int(-45))',
+      ),
+    )
+  })
 })
+
+/** SkinnyWMS answer (HTTP 200) when its first scan hits a half-written GRIB file. */
+const SKINNYWMS_EXCEPTION = `<?xml version='1.0' encoding="UTF-8"?>
+<ServiceExceptionReport version="1.3.0"
+  xmlns="http://www.opengis.net/ogc"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.opengis.net/ogc http://schemas.opengis.net/wms/1.3.0/exceptions_1_3_0.xsd">
+<ServiceException code="skinnywms.errors.WMSError"><![CDATA[
+End of resource reached when reading message (c_int(-45))
+]]>
+</ServiceException>
+</ServiceExceptionReport>`
 
 // External-server shapes the lens never produces (WMS 1.3.0 §7.2.4.8).
 describe('parseCapabilities — inheritance & interop', () => {
@@ -647,6 +668,18 @@ describe('fetchCapabilities', () => {
     )
     const parsed = await fetchCapabilities('http://localhost:9999')
     expect(parsed.layers.length).toBeGreaterThan(0)
+  })
+
+  it('fails an exception report served with HTTP 200, keeping its message', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve(new Response(SKINNYWMS_EXCEPTION, { status: 200 })),
+    )
+    await expect(fetchCapabilities('http://localhost:9999')).rejects.toSatisfy(
+      (err) =>
+        err instanceof CapabilitiesError &&
+        err.kind === 'parse' &&
+        err.message.includes('End of resource reached'),
+    )
   })
 
   it('surfaces HTTP errors with the status', async () => {
