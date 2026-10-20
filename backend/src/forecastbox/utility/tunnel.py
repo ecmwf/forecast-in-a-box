@@ -75,7 +75,7 @@ def _ssh_run(
     too early -- we use this when we setup a long running ssh tunnel, because
     those we want to explicitly exit ourselves, after we have sent a gateway
     termination command over it."""
-    return subprocess.run(list(args), check=check, capture_output=True, text=True, start_new_session=start_new_session, timeout=5)
+    return subprocess.run(list(args), check=check, capture_output=True, text=True, start_new_session=start_new_session, timeout=300)
 
 
 def _is_bind_failure(exc: subprocess.CalledProcessError) -> bool:
