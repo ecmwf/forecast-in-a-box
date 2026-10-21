@@ -5,6 +5,7 @@
 #   - the libquadmath0 is conditional on x86 (amd64), because on aarch/arm it should be natively present
 # - packages (gdal) for that fiona unbuildable wheel required by ek plots < 1.0
 # - packages (glib) for the skinnywms
+# - packages (libudunits2-dev) for the cfunits
 # - no fiab itself, thats in either Dockerfile-dev or Dockerfile-release
 
 FROM debian:stable-slim
@@ -16,8 +17,10 @@ RUN : \
     && if [ "$TARGETARCH" == "amd64" ] ; then apt-get install -y libquadmath0 ; fi \
     && apt-get install -y gdal-bin libgdal-dev g++ \
     && apt-get install -y libglib2.0-0t64 \
+    && apt-get install -y libudunits2-dev \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --user-group --create-home --shell /bin/false fiab \
     && : ;
 
+ENV UDUNITS2_XML_PATH=/usr/share/xml/udunits/udunits2.xml
 USER fiab
