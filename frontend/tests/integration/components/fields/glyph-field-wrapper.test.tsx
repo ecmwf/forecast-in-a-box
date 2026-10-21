@@ -66,17 +66,20 @@ function WithGlyphs({
   glyphs = TEST_GLYPHS,
   resolvedConfig = null,
   fieldErrors = null,
+  sharedOutputPaths = null,
 }: {
   children: React.ReactNode
   glyphs?: Array<GlyphInfo>
   resolvedConfig?: Record<string, string> | null
   fieldErrors?: Record<string, Array<string>> | null
+  sharedOutputPaths?: Record<string, string | null> | null
 }) {
   return (
     <GlyphContext.Provider value={glyphs}>
       <BlockValidationProvider
         resolvedConfig={resolvedConfig}
         fieldErrors={fieldErrors}
+        sharedOutputPaths={sharedOutputPaths}
       >
         {children}
       </BlockValidationProvider>
@@ -88,12 +91,14 @@ function ControlledStringField(props: {
   initialValue?: string
   resolvedConfig?: Record<string, string> | null
   fieldErrors?: Record<string, Array<string>> | null
+  sharedOutputPaths?: Record<string, string | null> | null
 }) {
   const [value, setValue] = useState(props.initialValue ?? '')
   return (
     <WithGlyphs
       resolvedConfig={props.resolvedConfig ?? null}
       fieldErrors={props.fieldErrors ?? null}
+      sharedOutputPaths={props.sharedOutputPaths ?? null}
     >
       <GlyphFieldWrapper
         id="test-field"
@@ -460,6 +465,50 @@ describe('GlyphFieldWrapper Integration', () => {
         .toBeVisible()
       // Combobox still rendered (no glyph toggle)
       await expect.element(screen.getByRole('combobox')).toBeVisible()
+    })
+  })
+
+  describe('Run folder nudge', () => {
+    it('warns about a shared folder and applies the run folder fix', async () => {
+      const fix = '/tmp/out/${runId}__${attemptCount}/[shortName].grib'
+      const screen = await renderWithProviders(
+        <ControlledStringField
+          initialValue="/tmp/out/[shortName].grib"
+          sharedOutputPaths={{ value: fix }}
+        />,
+      )
+      await expect
+        .element(screen.getByText('Not a per-run folder'))
+        .toBeVisible()
+      await screen.getByRole('button', { name: 'Use run folder' }).click()
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent(fix)
+    })
+
+    it('warns without a fix button when no fix applies', async () => {
+      const screen = await renderWithProviders(
+        <ControlledStringField
+          initialValue="${outputRoot}"
+          sharedOutputPaths={{ value: null }}
+        />,
+      )
+      await expect.element(screen.getByTestId('run-folder-nudge')).toBeVisible()
+      await expect
+        .element(screen.getByRole('button', { name: 'Use run folder' }))
+        .not.toBeInTheDocument()
+    })
+
+    it('stays hidden for other fields', async () => {
+      const screen = await renderWithProviders(
+        <ControlledStringField
+          initialValue="/tmp/out/[shortName].grib"
+          sharedOutputPaths={{ other_key: null }}
+        />,
+      )
+      await expect
+        .element(screen.getByTestId('run-folder-nudge'))
+        .not.toBeInTheDocument()
     })
   })
 })

@@ -23,7 +23,7 @@
  * available in context.
  */
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { AlertCircle, Braces } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { GlyphTextInput } from './GlyphTextInput'
@@ -46,6 +46,7 @@ import {
   useFieldErrors,
   useMissingGlyphs,
   useResolvedConfig,
+  useSharedOutputPaths,
 } from '@/features/fable-builder/context/BlockValidationContext'
 import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
 import {
@@ -85,6 +86,11 @@ export interface GlyphFieldWrapperProps {
 }
 
 type FieldMode = 'concrete' | 'glyph'
+
+const NUDGE_CLASS =
+  'mt-1 flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-400'
+const NUDGE_ACTION_CLASS =
+  'h-6 border-amber-500/60 px-2 text-xs text-amber-700 hover:bg-amber-500/10 dark:text-amber-400'
 
 /** Italic "resolves to …" line with the full value in a tooltip. */
 export function ResolvedPreview({ preview }: { preview: string }) {
@@ -150,6 +156,7 @@ export function GlyphFieldWrapper({
     : null
 
   const missingGlyphNames = useMissingGlyphs()?.[configKey] ?? null
+  const sharedOutputPaths = useSharedOutputPaths()
   const valueHasGlyphs = containsGlyphs(value)
 
   // No glyphs / glyph mode disabled → children, error text and preview only.
@@ -225,6 +232,15 @@ export function GlyphFieldWrapper({
     resolvedPreview !== null &&
     previewHasTimeComponent(resolvedPreview)
   const dateNudgeFixAvailable = dateNudgeVisible && canApplyFloorDay(value)
+
+  // Nudge when a sink's output path is shared across runs.
+  const runFolderNudgeVisible =
+    !hasFieldError &&
+    sharedOutputPaths !== null &&
+    configKey in sharedOutputPaths
+  const runFolderFix = runFolderNudgeVisible
+    ? sharedOutputPaths[configKey]
+    : null
 
   function handleApplyFloorDay() {
     const next = applyFloorDay(value)
@@ -302,7 +318,7 @@ export function GlyphFieldWrapper({
       {showPreview && <ResolvedPreview preview={resolvedPreview} />}
 
       {dateNudgeVisible && (
-        <div className="mt-1 flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+        <div className={NUDGE_CLASS}>
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate">
             {t('field.datePreview.hasTime')}
@@ -315,7 +331,7 @@ export function GlyphFieldWrapper({
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-6 border-amber-500/60 px-2 text-xs text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                    className={NUDGE_ACTION_CLASS}
                     onClick={handleApplyFloorDay}
                   />
                 }
@@ -324,6 +340,58 @@ export function GlyphFieldWrapper({
               </TooltipTrigger>
               <TooltipContent side="left" className="max-w-64">
                 {t('field.datePreview.floorDayTooltip')}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      )}
+
+      {runFolderNudgeVisible && (
+        <div className={NUDGE_CLASS} data-testid="run-folder-nudge">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="min-w-0 flex-1 truncate" />}
+            >
+              {t('field.runFolder.shared')}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-72">
+              {t('field.runFolder.details')}
+            </TooltipContent>
+          </Tooltip>
+          {runFolderFix !== null && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={NUDGE_ACTION_CLASS}
+                    onClick={() => onChange(runFolderFix)}
+                  />
+                }
+              >
+                {t('field.runFolder.action')}
+              </TooltipTrigger>
+              <TooltipContent
+                side="left"
+                className="max-w-80 flex-col items-start gap-1"
+              >
+                {t('field.runFolder.actionTooltip')}
+                {/* Wraps only after a slash. */}
+                <span className="font-mono">
+                  {runFolderFix.split('/').map((part, i) => (
+                    <Fragment key={i}>
+                      {i > 0 && (
+                        <>
+                          /<wbr />
+                        </>
+                      )}
+                      {part}
+                    </Fragment>
+                  ))}
+                </span>
               </TooltipContent>
             </Tooltip>
           )}

@@ -23,23 +23,27 @@ interface BlockValidation {
   resolvedConfig: Record<string, string | null> | null
   /** Unresolvable glyph names per config option key; null when none. */
   missingGlyphs?: Record<string, ReadonlyArray<string>> | null
+  /** Output paths shared across runs: config key -> one-click fix (null: none). */
+  sharedOutputPaths?: Record<string, string | null> | null
 }
 
 const BlockValidationContext = createContext<BlockValidation>({
   fieldErrors: null,
   resolvedConfig: null,
   missingGlyphs: null,
+  sharedOutputPaths: null,
 })
 
 export function BlockValidationProvider({
   fieldErrors,
   resolvedConfig,
   missingGlyphs = null,
+  sharedOutputPaths = null,
   children,
 }: BlockValidation & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ fieldErrors, resolvedConfig, missingGlyphs }),
-    [fieldErrors, resolvedConfig, missingGlyphs],
+    () => ({ fieldErrors, resolvedConfig, missingGlyphs, sharedOutputPaths }),
+    [fieldErrors, resolvedConfig, missingGlyphs, sharedOutputPaths],
   )
   return (
     <BlockValidationContext.Provider value={value}>
@@ -61,4 +65,8 @@ export function useMissingGlyphs(): Record<
   ReadonlyArray<string>
 > | null {
   return useContext(BlockValidationContext).missingGlyphs ?? null
+}
+
+export function useSharedOutputPaths(): Record<string, string | null> | null {
+  return useContext(BlockValidationContext).sharedOutputPaths ?? null
 }
