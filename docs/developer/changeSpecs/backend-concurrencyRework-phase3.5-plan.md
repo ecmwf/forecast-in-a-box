@@ -158,8 +158,3 @@ packaging" among its responsibilities: point to `domain/run/logs.py` instead.
 - The migration shows a single `awaitable_submit(General, ..., _build_zip)` and
   leaves the gateway query placement open; this plan decides on `Io` for the
   query and `General` for the archive.
-
-## Open questions and concerns
-
-- None blocking. The archive is built fully in memory, as today; streaming
-  large gateway logs is not addressed.

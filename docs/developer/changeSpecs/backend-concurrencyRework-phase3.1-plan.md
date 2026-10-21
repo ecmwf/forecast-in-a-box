@@ -345,22 +345,24 @@ The warmup entrypoint does not start the execution manager, so it cannot use
 - `submit_after` returns a `Future` mirroring the continuation's outcome (the
   design document shows `-> None`).
 
-## Open questions and concerns
+## Notes and caveats
 
-1. Shutdown of an in-flight download: `ExecutionManager.shutdown` waits for
-   in-flight pool work only until its deadline, but `ThreadPoolExecutor`
-   worker threads are joined at interpreter exit. In practice a local HTTP
-   download aborts when the `http_pools` initializer closes the `Download`
-   client (it runs before the execution runtime stops), and an `ssh://`
-   download fails when the `tunnels` step disconnects the command handle. A
-   `file://` hardlink/copy or a stalled remote `curl` is not interrupted. This
-   is no worse than the previous unbounded `executor.shutdown(wait=True)`;
-   no action proposed.
-2. Observed pre-existing bugs, intentionally out of scope (fix separately if
-   desired): in `domain/artifact/io.py::_download_artifact_local`, a failing
-   `file://` copy is logged and swallowed, and an `os.link` `OSError` other
-   than `EXDEV` is silently ignored -- both are then reported as a successful
-   download. The delete/download/refresh races noted in `delete_model`'s TODO
-   also remain.
-3. `refresh_error` is written but never exposed by any route or status. Leave
-   it; surfacing it belongs to the Phase 8 status consolidation.
+These are informational; none of them requires action in this phase.
+
+1. Shutdown of an in-flight download (no action): `ExecutionManager.shutdown`
+   waits for in-flight pool work only until its deadline, but
+   `ThreadPoolExecutor` worker threads are joined at interpreter exit. In
+   practice a local HTTP download aborts when the `http_pools` initializer
+   closes the `Download` client (it runs before the execution runtime stops),
+   and an `ssh://` download fails when the `tunnels` step disconnects the
+   command handle. A `file://` hardlink/copy or a stalled remote `curl` is not
+   interrupted. This is no worse than the previous unbounded
+   `executor.shutdown(wait=True)`, so it is accepted as is.
+2. Delete/download/refresh races (no action): the races described in the TODO
+   comments of `delete_model` (and the refresh-vs-delete overwrite of
+   `locally_available`) are pre-existing and are not addressed by this
+   effort. Preserve those TODO comments as they are and do not attempt to fix
+   the root cause while moving the submission.
+3. `refresh_error` (no action): it is written but never exposed by any route
+   or status. Leave it as is; surfacing it belongs to the later status
+   consolidation (Phase 8).

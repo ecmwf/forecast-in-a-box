@@ -20,7 +20,7 @@ structure:
   into one helper.
 
 Splitting the run workflow into several chained pool tasks is explicitly not
-part of this phase (see "Deferred").
+part of this phase; it is only marked with a TODO (step 5).
 
 ### Original design references
 
@@ -191,8 +191,15 @@ Do not change any other artifact behaviour in this phase.
    `ARTIFACT_POLL_INTERVAL_SECONDS = 1.0`, and
    `RUN_STATUS_CHECK_INTERVAL_SECONDS = 10.0`. Behaviour:
    - for each artifact not yet `available`, call
-     `submit_artifact_download(artifact_id, retry=True)`; an `Either.error`
-     becomes `_ArtifactWait(error="Failed to submit download for <id>: ...")`.
+     `submit_artifact_download(artifact_id, retry=False)` -- pass `retry=False`
+     explicitly. A previously failed download is therefore *not* retried by a
+     run: `submit_artifact_download` returns `Either.error` with the earlier
+     failure, which becomes
+     `_ArtifactWait(error="Failed to submit download for <id>: ...")` and the
+     run fails. A failed download must always be cleared explicitly by the
+     user (artifacts route with `retry=True`), never implicitly by a run that
+     assumed the artifact to be present; implicit retries would also add load
+     to the already oversubscribable `RunSubmission`/`ArtifactIo` workers.
      `SubmissionRejected` is allowed to propagate (the generic `except` marks
      the run failed);
    - poll `get_download_status` for the remaining artifacts every
@@ -215,6 +222,7 @@ Do not change any other artifact behaviour in this phase.
    runtime_artifacts = compilation_result.execution_spec.environment.runtime_artifacts
    if runtime_artifacts:
        # NOTE the wait occupies this RunSubmission worker while downloads run on ArtifactIo
+       # TODO move the artifact download to the correct pool and chain with submit_after
        outcome = _await_runtime_artifacts(run_id, attempt_count, runtime_artifacts)
        if outcome.aborted:
            return
@@ -250,7 +258,37 @@ its existing "Failed to execute" error. Update the docstring of
 
 `execute` (the async wrapper on `General`) stays as is.
 
-### 5. Documentation
+### 5. TODO markers for deferred work
+
+Add these two comments verbatim; they mark known gaps that are deliberately
+not addressed in this phase:
+
+1. In `domain/run/background.py::execute_background`, at the
+   `_await_runtime_artifacts` call site (shown in step 3):
+
+   ```python
+   # TODO move the artifact download to the correct pool and chain with submit_after
+   ```
+
+   A run waiting for an hour-long download holds one of the two
+   `RunSubmission` workers; two such runs block all other run submissions
+   (they queue, up to 32). The proper fix is splitting the workflow into
+   chained tasks (`submit_after`, and a group variant for multiple
+   artifacts), which is deferred. Until then `RunSubmission.max_workers` is
+   the tuning knob.
+2. In `domain/run/service.py::_poll_and_update_once`, at the branch that only
+   polls the gateway for runs that have a `cascade_job_id`:
+
+   ```python
+   # TODO handle jobs with inactive cascade_proc_id -- either in poll_and_update, or in a db tombstone cleaner
+   ```
+
+   Runs left in `submitted`/`preparing` after a backend restart (or still
+   queued at shutdown) are never reconciled today; the intended handling is
+   to compare their `cascade_proc` with the currently active gateway process
+   and flag the ones belonging to an inactive gateway. Out of scope here.
+
+### 6. Documentation
 
 - `domain/run/__init__.py` needs no change.
 - `backend/development.md`: the bullet listing pre-existing ad hoc threads
@@ -274,7 +312,9 @@ time so no test sleeps for real:
      (no waiting for the timeout);
    - returns the timeout message when the clock passes the limit;
    - returns `aborted=True` when `_abort_if_not_proceeding` reports a stop;
-   - submits downloads with `retry=True` only for artifacts not yet available.
+   - submits downloads with `retry=False` only for artifacts not yet
+     available, and fails the run with the earlier error when an artifact
+     already has a failed download recorded (no implicit retry).
 3. `execute_background`:
    - a failed artifact wait marks the run `failed` with the message and never
      calls `execute_cascade`;
@@ -311,27 +351,11 @@ time so no test sleeps for real:
 - `cascade.py` is described as part of compile/submit; it is now gateway
   submission only.
 
-## Open questions and concerns
+## Notes and caveats
 
-1. Behaviour change, please confirm: the run path now calls
-   `submit_artifact_download(..., retry=True)`, so a previously failed
-   download is retried by a new run instead of failing the run immediately
-   with the old error. Recommended; revert to `retry=False` if an explicit
-   manual retry is preferred.
-2. Runs left in `submitted`/`preparing` without a cascade job id after a
-   backend restart (or still queued in `RunSubmission` at shutdown) are never
-   reconciled -- `poll_and_update` only acts on runs that have a
-   `cascade_job_id`. A startup reconciliation that marks such rows failed
-   ("interrupted by backend restart") would complete the "every failure is
-   recorded" rule, but needs a new DB helper and a startup step. Proposed as a
-   separate follow-up, not this phase.
-3. Capacity: a run waiting for an hour-long download holds one of the two
-   `RunSubmission` workers; two such runs block all other run submissions
-   (they queue, up to 32). The real fix is splitting the workflow into chained
-   tasks (`submit_after`, and `submit_after_all` for multiple artifacts),
-   which the design defers. Until then, `RunSubmission.max_workers` is the
-   tuning knob.
-4. Queued `RunSubmission` tasks are not cancelled at shutdown (the pool closes
-   with `cancel_futures=False`); they will run against an already stopped
-   gateway and be marked failed. Acceptable, given the design rule that
-   pending work is not silently discarded.
+These are informational; none of them requires action in this phase.
+
+1. Queued `RunSubmission` tasks are not cancelled at shutdown (no action): the
+   pool closes with `cancel_futures=False`, so queued tasks will run against
+   an already stopped gateway and be marked failed. This is accepted, in line
+   with the rule that pending work is not silently discarded.

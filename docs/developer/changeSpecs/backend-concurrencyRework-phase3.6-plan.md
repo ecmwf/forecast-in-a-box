@@ -51,7 +51,8 @@ reading them.
   - `ConcurrentPools.Io` (4 workers, 64 pending): network and remote probes,
     gateway (ZMQ) requests, HTTP to PyPI, disk/SSH I/O that is not artifact
     download;
-  - `ConcurrentPools.General` (2 workers, 32 pending): short blocking setup
+  - `ConcurrentPools.General` (2 workers, 32 pending; raised to 4 workers by
+    step 0 below): short blocking setup
     such as subprocess/process start and stop, archive creation.
 - Phase 3.1: artifact downloads/refresh run on `ArtifactIo`; the artifact
   state lock is only held for short in-memory swaps.
@@ -95,7 +96,8 @@ it already runs concurrently with downloads today (on AnyIO's threadpool), so
 `Io` does not widen its concurrency. The lens status probes are kept inline
 because they only connect to `127.0.0.1` (refused/accepted immediately) and
 the lens proxy already performs the same probe inline on every proxied
-request; see open question 3.
+request. This only holds for loopback-bound lenses, hence the TODO added in
+step 3.
 
 ### B. Async routes with blocking calls
 
@@ -113,6 +115,19 @@ request; see open question 3.
 fine; only the cascade probe is blocking.
 
 ## Implementation steps
+
+### 0. Raise the default `General` pool size
+
+In `utility/config.py::_default_concurrency_pools`, change
+`ConcurrentPools.General` to `PoolSettings(max_workers=4, max_pending=32)`.
+After this phase `General` carries `run.submit`, `run.stop.cascade`,
+`gateway.start` (startup and route), `gateway.stop`, `lens.start`,
+`lens.stop`, `run.logs.build-archive`, and -- until Phase 4 -- the startup
+`scheduler.await-prereqs` waiter, which blocks one worker until plugins are
+loaded and the gateway is up. With two workers, a slow `lens.stop` plus that
+waiter would stall run submission. The change is backwards compatible: it
+only affects configs that do not override `backend.concurrency.pools`.
+Update any unit test asserting the default pool sizes.
 
 ### 1. Artifacts routes (`routes/artifacts.py`)
 
@@ -150,6 +165,16 @@ changes.
    to `General` as `lens.stop`.
 3. `get_lens_status`, `list_lenses`, `list_supported_lenses` -> `async def`,
    direct calls.
+4. In `domain/lens/manager.py::check_server_ready` (the probe used by the
+   status/list routes and by `domain/lens/proxy.py::_resolve_port`), add:
+
+   ```python
+   # TODO add warning if lens not local, we are blocking async loop
+   ```
+
+   The probe is only acceptable inline because it targets `127.0.0.1`
+   (refused/accepted immediately, 0.1 s timeout per port). If lenses are ever
+   bound to non-loopback addresses, these probes must move to `Io`.
 
 `domain/lens/manager.py` (small correctness fixes exposed by this work):
 
@@ -315,25 +340,19 @@ calls are limited to in-memory reads and short lock sections.
 - The migration says the lens process start goes to `General`; this plan adds
   lens stop to `General` as well, because `shutdown_popen` can wait ~9 s.
 
-## Open questions and concerns
+## Notes and caveats
 
-1. `General` capacity. After this phase `General` carries `run.submit`,
-   `run.stop.cascade`, `gateway.start` (startup and route), `gateway.stop`,
-   `lens.start`, `lens.stop`, `run.logs.build-archive`, and -- until Phase 4 --
-   the startup `scheduler.await-prereqs` waiter, which blocks one of the two
-   default workers until plugins are loaded and the gateway is up (possibly
-   minutes on a fresh install). A slow `lens.stop` plus that waiter would
-   delay run submission. Options: raise the default `General.max_workers` to
-   4 in `utility/config.py` (backwards compatible for configs that do not
-   override `pools`), or accept the current default until Phase 4 removes the
-   waiter. Recommendation: raise to 4; please decide.
-2. Should `run/list` poll the gateway concurrently (`asyncio.gather` over the
-   page) instead of sequentially? It would cut latency for pages with many
-   active runs but multiplies `Io` and jobs-DB pressure per request. This plan
-   keeps the sequential behaviour; revisit only if list latency is reported.
-3. Lens status probes stay inline (localhost `connect_ex`, 0.1 s timeout per
-   port). If lenses are ever bound to non-loopback addresses, these must move
-   to `Io` (including the probe in `domain/lens/proxy.py::_resolve_port`).
-4. `routes/experiment.py::restart_scheduler` calls `stop_scheduler()` (a
-   thread join) directly on the loop. Left for Phase 4, which replaces the
-   scheduler thread with a managed one.
+These are informational; none of them requires action in this phase.
+
+1. Gateway polls stay sequential (do not parallelize): `/run/list` polls the
+   gateway once per run on the page, one after another through `Io`. Do not
+   change this to concurrent requests (e.g. `asyncio.gather`). The gateway
+   itself processes requests sequentially on a single thread, so concurrent
+   requests gain nothing and only add pressure; the individual requests are
+   expected to be fast. If the gateway ever runs on a distant host and
+   latency becomes a problem, the right direction is batching several job ids
+   into one request, not concurrency.
+2. Scheduler restart route (no action): `routes/experiment.py::restart_scheduler`
+   calls `stop_scheduler()` (a thread join) directly on the event loop. It is
+   left as is, marked with the TODO from step 8; Phase 4 replaces the
+   scheduler thread with a managed one and resolves it there.
