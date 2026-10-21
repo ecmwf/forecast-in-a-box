@@ -33,7 +33,7 @@ import {
   createRouter,
 } from '@tanstack/react-router'
 import { listMockLenses, resetLensState } from '@tests/../mocks/data/lens.data'
-import { resetJobsState } from '@tests/../mocks/data/job.data'
+import { resetJobsState, setMockGribDir } from '@tests/../mocks/data/job.data'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import { StoredOutputsCard } from '@/features/executions/components/StoredOutputsCard'
 import { lensOwner } from '@/features/visualise/lens-owners'
@@ -117,6 +117,19 @@ describe('StoredOutputsCard', () => {
     expect(screen.getByText('block_sink_1').elements()).toHaveLength(1)
     // Non-marker outputs are not listed.
     expect(screen.getByText('sink_temperature_map').elements()).toHaveLength(0)
+    // The folder carries the run ID: not shared.
+    expect(
+      screen.getByText('Folder shared with other runs').elements(),
+    ).toHaveLength(0)
+  })
+
+  it('flags a folder without the run ID as shared with other runs', async () => {
+    setMockGribDir('job-completed-001', '/data/output/latest')
+    const { screen } = await renderCard(outputsWithMarkers)
+    await expect.element(screen.getByText('latest')).toBeVisible()
+    await expect
+      .element(screen.getByText('Folder shared with other runs'))
+      .toBeVisible()
   })
 
   it('renders nothing without marker outputs', async () => {

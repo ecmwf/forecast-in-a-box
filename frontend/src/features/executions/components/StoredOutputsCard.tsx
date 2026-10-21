@@ -18,7 +18,15 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { Copy, Earth, FolderOpen, Loader2, Play, Square } from 'lucide-react'
+import {
+  AlertCircle,
+  Copy,
+  Earth,
+  FolderOpen,
+  Loader2,
+  Play,
+  Square,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import type {
@@ -335,6 +343,24 @@ function StoredOutputRowItem({
           >
             {row.lostReason ?? t('storedOutputs.fileMissing')}
           </P>
+        )}
+        {/* A per-run folder carries the run ID. */}
+        {dirPath && !dirPath.includes(jobId) && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <div className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground" />
+              }
+            >
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              {t('storedOutputs.sharedFolder')}
+            </TooltipTrigger>
+            <TooltipContent>
+              <P className="max-w-xs text-sm text-inherit">
+                {t('storedOutputs.sharedFolderHint')}
+              </P>
+            </TooltipContent>
+          </Tooltip>
         )}
         {/* Inline note: disabled buttons can't surface a title/tooltip. */}
         {wmsUnavailable && (
