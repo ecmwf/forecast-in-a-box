@@ -42,7 +42,7 @@ from fiab_plugin_ecmwf.constants import (
     VALUES,
 )
 from fiab_plugin_ecmwf.output.blocks import GribSink, ZarrSink
-from fiab_plugin_ecmwf.plotting.blocks import MapPlotSink
+from fiab_plugin_ecmwf.plotting.blocks import PLOT_ENVIRONMENT, MapPlotSink
 from fiab_plugin_ecmwf.products.blocks import EnsembleStatistics
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains
 
@@ -867,3 +867,53 @@ class TestMapPlotSink:
         block.validate(block=config, inputs={"dataset": sample_forecast_source_output}, restrictions={})  # type: ignore[dict-item]
         action = block.compile(inputs={BlockInstanceId("source_output"): sample_forecast_source_action}, block=config).get_or_raise()
         assert self._get_map_plot_domain(action) == ["global"]
+
+    def _get_map_plot_node(self, action: Action) -> object:
+        for _, arr in nodetree_arrays(action.nodes):
+            for node in arr.values.flat:
+                if hasattr(node, "payload") and "map_plot" in node.payload.definition.entrypoint:
+                    return node
+        raise AssertionError("map_plot node not found in compiled action")
+
+    def _compile_with_style(self, style: str | None, source_output: QubedOutput, source_action: Action) -> Action:
+        values: dict[str, object] = {"param": ["167"], "domain": ["global"], "format": "png", "groupby": "none", "splitby": []}
+        if style is not None:
+            values["style"] = style
+        block = MapPlotSink()
+        config = BlockInstance.from_block(
+            BlockFactoryId("mapPlotSink"),
+            BlockInstanceBase(input_ids={"dataset": BlockInstanceId("source_output")}, configuration_values=_config(values)),
+            MapPlotSink.configuration_options,
+        )
+        block.validate(block=config, inputs={"dataset": source_output}, restrictions={})  # type: ignore[dict-item]
+        return block.compile(inputs={BlockInstanceId("source_output"): source_action}, block=config).get_or_raise()
+
+    @pytest.mark.parametrize(
+        ("style", "expected_schema", "expected_extra_environment"),
+        [
+            (None, "default", []),
+            ("ECMWF", "default", []),
+            ("MetNorway", "dccms", ["earthkit-plots-metno-styles"]),
+        ],
+    )
+    def test_compile_style_sets_schema_and_environment(
+        self,
+        style: str | None,
+        expected_schema: str,
+        expected_extra_environment: list[str],
+        sample_forecast_source_output: QubedOutput,
+        sample_forecast_source_action: Action,
+    ) -> None:
+        action = self._compile_with_style(style, sample_forecast_source_output, sample_forecast_source_action)
+        node = self._get_map_plot_node(action)
+        assert node.payload.static_input_kw["style_schema"] == expected_schema  # type: ignore[attr-defined]
+        environment = set(node.metadata.requirements.environment)  # type: ignore[attr-defined]
+        assert set(PLOT_ENVIRONMENT) <= environment
+        extra = sorted(req.split(" @ ")[0] for req in environment - set(PLOT_ENVIRONMENT))
+        assert extra == expected_extra_environment
+
+    def test_validate_rejects_unknown_style(
+        self, sample_forecast_source_output: QubedOutput, sample_forecast_source_action: Action
+    ) -> None:
+        with pytest.raises(Exception):
+            self._compile_with_style("Unknown", sample_forecast_source_output, sample_forecast_source_action)

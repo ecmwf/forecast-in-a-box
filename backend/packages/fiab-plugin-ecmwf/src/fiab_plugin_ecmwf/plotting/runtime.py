@@ -49,6 +49,26 @@ def _configure_schema(style_schema: str) -> None:
         schema.use(style_schema)
 
 
+def _style_units(fields: ekd.FieldList) -> str | None:
+    """Return the units of the style the active earthkit-plots schema selects for *fields*, or None if unknown."""
+    # import inside function justified: earthkit.plots is an optional dependency
+    from earthkit.plots.sources import get_source  # type: ignore[unresolved-import]
+    from earthkit.plots.styles import auto  # type: ignore[unresolved-import]
+
+    try:
+        return getattr(auto.guess_style(get_source(fields)), "units", None)
+    except Exception as err:
+        logger.warning("map_plot: failed to determine style units: %s", err)
+        return None
+
+
+def _quickplot(subplot: "Subplot", fields: ekd.FieldList, **kwargs: Any) -> None:
+    """Quickplot *fields*, converting them to the units of the selected style."""
+    # earthkit-plots<1.0 picks a style in its preferred units (e.g. celsius) when the schema sets
+    # use_preferred_units, but only converts the data when units are passed explicitly
+    subplot.quickplot(fields, units=_style_units(fields), **kwargs)
+
+
 def _plot_fields(subplot: "Subplot", fields: ekd.FieldList, **kwargs: Any) -> None:
     """Plot fields on a subplot, selecting the appropriate method based on field metadata.
 
@@ -63,12 +83,14 @@ def _plot_fields(subplot: "Subplot", fields: ekd.FieldList, **kwargs: Any) -> No
 
     for method, comp in plot_categories.items():
         for _sub_cat, sub_fields in comp.items():
+            sub_fieldlist = ekd.FieldList.from_fields(sub_fields)
+            if method == "quickplot":
+                _quickplot(subplot, sub_fieldlist, **kwargs.get("quickplot", {}))
+                continue
             try:
-                getattr(subplot, method)(ekd.FieldList.from_fields(sub_fields), **kwargs.get(method, {}))
-            except Exception as err:
-                if method == "quickplot":
-                    raise err
-                subplot.quickplot(ekd.FieldList.from_fields(sub_fields), **kwargs.get("quickplot", {}))
+                getattr(subplot, method)(sub_fieldlist, **kwargs.get(method, {}))
+            except Exception:
+                _quickplot(subplot, sub_fieldlist, **kwargs.get("quickplot", {}))
 
 
 def _is_subarea_reduced_gg(field: Any) -> bool:

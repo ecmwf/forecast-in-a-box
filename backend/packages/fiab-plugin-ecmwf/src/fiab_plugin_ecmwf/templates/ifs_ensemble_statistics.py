@@ -89,6 +89,7 @@ template = BlueprintTemplate(
                     ConfigurationOptionId("groupby"): "none",
                     # A single field at a single step leaves nothing to split on.
                     ConfigurationOptionId("splitby"): "none",
+                    ConfigurationOptionId("style"): "ECMWF",
                 },
                 input_ids={
                     "dataset": BlockInstanceId("ensembleStatistic"),

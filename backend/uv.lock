@@ -1598,6 +1598,11 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+plots = [
+    { name = "earthkit-plots" },
+    { name = "earthkit-regrid" },
+    { name = "matplotlib" },
+]
 runtime = [
     { name = "earthkit" },
     { name = "earthkit-data" },
@@ -1616,14 +1621,17 @@ dev = [
 requires-dist = [
     { name = "earthkit", marker = "extra == 'runtime'", specifier = ">=0.13.2" },
     { name = "earthkit-data", marker = "extra == 'runtime'", specifier = ">=0.18.2,<1" },
+    { name = "earthkit-plots", marker = "extra == 'plots'", specifier = "<1.0.0" },
     { name = "earthkit-plots", marker = "extra == 'runtime'", specifier = ">=0.3.5,<1.0" },
+    { name = "earthkit-regrid", marker = "extra == 'plots'", specifier = "<1.0.0" },
     { name = "earthkit-workflows", specifier = ">=0.18.0" },
     { name = "earthkit-workflows-anemoi", specifier = ">=0.8.0" },
     { name = "earthkit-workflows-anemoi", extras = ["runtime-inference"], marker = "extra == 'runtime'" },
     { name = "fiab-core", editable = "packages/fiab-core" },
+    { name = "matplotlib", marker = "extra == 'plots'", specifier = "<3.11" },
     { name = "pproc-core", specifier = ">=0.4.0" },
 ]
-provides-extras = ["runtime"]
+provides-extras = ["runtime", "plots"]
 
 [package.metadata.requires-dev]
 dev = [

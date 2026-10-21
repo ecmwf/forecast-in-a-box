@@ -30,6 +30,13 @@ optional-dependencies.runtime = [
     "earthkit-workflows-anemoi[runtime-inference]",
 ]
 
+# installed at runtime by the map plot block
+optional-dependencies.plots = [
+    "earthkit-plots<1.0.0",
+    "earthkit-regrid<1.0.0",
+    "matplotlib<3.11",
+]
+
 [dependency-groups]
 dev = [
   "ty==0.0.2",

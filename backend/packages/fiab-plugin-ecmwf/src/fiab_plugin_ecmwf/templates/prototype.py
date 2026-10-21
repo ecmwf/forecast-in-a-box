@@ -88,6 +88,7 @@ template = BlueprintTemplate(
                     ConfigurationOptionId("groupby"): "none",
                     # A single step leaves nothing else to split on.
                     ConfigurationOptionId("splitby"): "param",
+                    ConfigurationOptionId("style"): "ECMWF",
                 },
                 input_ids={
                     "dataset": BlockInstanceId("selectStep"),

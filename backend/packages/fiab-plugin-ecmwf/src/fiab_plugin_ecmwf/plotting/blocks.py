@@ -41,6 +41,7 @@ from ..constants import (
     PARAM,
     SPLITBY,
     STEP,
+    STYLE,
 )
 from ..qubed_utils import axes, common_dimensions, contains
 
@@ -58,6 +59,34 @@ PLOT_FORMAT_TO_MIME: dict[str, str] = {
     "pdf": "application/pdf",
     "svg": "image/svg+xml",
 }
+
+# NOTE the plotting dependencies are declared as the `plots` extra in the plugin's pyproject.toml, except for the eckitlib
+# pin: it is a hotfix due to proj in newer eckits clashing with pyproj, leading to a segfault, and it conflicts with the
+# pymetkit requirement of the backend, so it cannot be part of the locked workspace
+PLOT_ENVIRONMENT: list[str] = ["fiab-plugin-ecmwf[plots]", "eckitlib<=2.2.0.27"]
+
+DEFAULT_PLOT_STYLE = "ECMWF"
+
+# NOTE the MetNorway package registers its earthkit-plots schema under the name "dccms"
+PLOT_STYLE_TO_SCHEMA: dict[str, str] = {
+    "ECMWF": "default",
+    "MetNorway": "dccms",
+}
+
+# NOTE git dependencies cannot be declared as extras of a package published to PyPI, hence listed here
+PLOT_STYLE_TO_ENVIRONMENT: dict[str, list[str]] = {
+    "ECMWF": [],
+    "MetNorway": [
+        "earthkit-plots-metno-styles @ git+https://github.com/metno/earthkit-plots-metno-styles@70a5da56bb39ea9da062e13f9d5556a059448578"
+    ],
+}
+
+
+def _plot_style(block: BlockInstanceRich) -> str:
+    """Return the configured plot style, or the default style for blocks saved without one."""
+    if STYLE not in block.block.configuration_values:
+        return DEFAULT_PLOT_STYLE
+    return block.config_as_str(STYLE)
 
 
 def _coord_value_str(value: Any) -> str:
@@ -118,11 +147,12 @@ class MapPlotSink(Sink):
             value_type=ListType(StringType()),
             default_value="step",
         ),
-        # ConfigurationOptionId("style_schema"): BlockConfigurationOption(
-        #     title="Style Schema",
-        #     description="earthkit-plots schema identifier",
-        #     value_type=StringType(),
-        # ),
+        STYLE: BlockConfigurationOption(
+            title="Style",
+            description="Colour scheme and styling of the plot",
+            value_type=ClosedEnumType(list(PLOT_STYLE_TO_SCHEMA)),
+            default_value=DEFAULT_PLOT_STYLE,
+        ),
     }
     inputs: list[str] = ["dataset"]
 
@@ -151,6 +181,10 @@ class MapPlotSink(Sink):
         if "none" in splitby_value and len(splitby_value) != 1:
             raise ValueError("Invalid splitby value: if none is selected, no other dimensions can be present")
 
+        style = _plot_style(block)
+        if style not in PLOT_STYLE_TO_SCHEMA:
+            raise ValueError(f"Unsupported style: {style}")
+
         mime_type = PLOT_FORMAT_TO_MIME.get(fmt)
         if mime_type is None:
             raise ValueError(f"Unsupported output format: {fmt}")
@@ -167,6 +201,7 @@ class MapPlotSink(Sink):
         splitby = block.config_as_list(SPLITBY, str, allow_empty=True)
         if "none" in splitby:
             splitby = []
+        style = _plot_style(block)
 
         selected = (
             inputs[input_task]
@@ -183,15 +218,10 @@ class MapPlotSink(Sink):
                     "domain": block.config_as_geodomain(DOMAIN).with_bbox_earthkitplots().value or None,
                     "format": block.config_as_str(FORMAT),
                     "groupby": None if groupby == "none" else groupby,
-                    # "style_schema": block.config_as_str("style_schema") or "inbuilt://fiab",
+                    "style_schema": PLOT_STYLE_TO_SCHEMA[style],
                 },
             ),
-            # NOTE the eckitlib pin is a hotfix due to proj in newer eckits clashing with pyproj, leading to a segfault
-            node_metadata=NodeMetadata(
-                requirements=Requirements(
-                    environment=["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11", "eckitlib<=2.2.0.27"]
-                )
-            ),
+            node_metadata=NodeMetadata(requirements=Requirements(environment=PLOT_ENVIRONMENT + PLOT_STYLE_TO_ENVIRONMENT[style])),
         )
         _set_plot_builder_metadata(action, self.title)
         return Either.ok(action)
