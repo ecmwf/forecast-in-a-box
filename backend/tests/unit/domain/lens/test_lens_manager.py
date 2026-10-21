@@ -11,6 +11,7 @@
 
 import subprocess
 from collections.abc import Iterator
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -27,8 +28,10 @@ from forecastbox.domain.lens.manager import (
     get_status,
     list_instances,
     shutdown_all_lens_instances,
+    start_skinny_wms,
     stop_instance,
 )
+from forecastbox.entrypoint.bootstrap.config import BACKEND_LOG_DIRECTORY_ENV
 from forecastbox.utility.concurrency.ports import FreePortsManager, NoFreePortsException
 
 
@@ -230,6 +233,17 @@ class TestShutdownAllInstances:
 
         with patch("forecastbox.domain.lens.manager.stop_instance", side_effect=flaky_stop):
             shutdown_all_lens_instances()  # should not raise
+
+
+class TestStartSkinnyWms:
+    def test_worker_timeout_outlasts_a_slow_first_scan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(BACKEND_LOG_DIRECTORY_ENV, str(tmp_path))
+        with patch("forecastbox.domain.lens.manager.subprocess.Popen") as mock_popen:
+            start_skinny_wms("/data/run")
+        cmd = mock_popen.call_args.args[0]
+        # gunicorn's 30 s default kills the worker mid-scan, and every retry rescans
+        assert int(cmd[cmd.index("--timeout") + 1]) > 30
+        assert cmd[-1] == "skinnywms.wmssvr:application"
 
 
 class TestCheckServerReady:

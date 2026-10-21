@@ -45,6 +45,8 @@ LensName = Literal["skinnyWMS"]
 LensStatus = Literal["starting", "running", "terminated", "failed"]
 
 timeout_acquire = 1
+# gunicorn worker timeout, seconds, as the proxy's read timeout; the first request scans the data folder
+timeout_lens_worker = 120
 
 
 class LensInstanceDetail(FiabBaseModel):
@@ -130,7 +132,16 @@ def start_skinny_wms(local_path: str) -> LensInstanceId:
 
     failed: str | None = None
     try:
-        cmd = ["uv", "run", "gunicorn", "--bind", f"127.0.0.1:{port}", "skinnywms.wmssvr:application"]
+        cmd = [
+            "uv",
+            "run",
+            "gunicorn",
+            "--bind",
+            f"127.0.0.1:{port}",
+            "--timeout",
+            str(timeout_lens_worker),
+            "skinnywms.wmssvr:application",
+        ]
         env = {
             **os.environ,
             # So that responses such as GetCapabilities refer to client-visible proxy urls,
