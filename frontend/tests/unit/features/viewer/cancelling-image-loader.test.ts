@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type OlImage from 'ol/Image'
 import {
   cancellingImageLoader,
+  clampGetMapBbox,
   loadRequestUrl,
   loadWasAborted,
 } from '@/features/viewer/ol-layers'
@@ -96,5 +97,143 @@ describe('cancellingImageLoader', () => {
     const { wrapper, img } = fakeImage()
     load(wrapper, 'http://wms.test/?TIME=T00')
     await vi.waitFor(() => expect(img.src).toContain('data:image/gif'))
+  })
+
+  it('retries a transient 502, then shows the image', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('bad gateway', { status: 502 }))
+      .mockResolvedValueOnce(pngResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const { wrapper, img } = fakeImage()
+    load(wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(img.src).toMatch(/^blob:/), {
+      timeout: 3000,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries a network error', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(pngResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const { wrapper, img } = fakeImage()
+    load(wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(img.src).toMatch(/^blob:/), {
+      timeout: 3000,
+    })
+  })
+
+  it('fails once the retries run out', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response('starting', { status: 503 })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const { wrapper, img } = fakeImage()
+    load(wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(img.src).toContain('data:image/gif'), {
+      timeout: 4000,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not retry other errors', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response('nope', { status: 500 })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const { wrapper, img } = fakeImage()
+    load(wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(img.src).toContain('data:image/gif'))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops retrying once superseded', async () => {
+    const fetchMock = vi.fn((url: string) =>
+      Promise.resolve(
+        url.includes('T00')
+          ? new Response('bad gateway', { status: 502 })
+          : pngResponse(),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const first = fakeImage()
+    const second = fakeImage()
+    load(first.wrapper, 'http://wms.test/?TIME=T00')
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    load(second.wrapper, 'http://wms.test/?TIME=T06')
+    await vi.waitFor(() => expect(loadWasAborted(first.img)).toBe(true))
+    // Past the first backoff: the superseded load must not refetch.
+    await new Promise((r) => setTimeout(r, 500))
+    expect(
+      fetchMock.mock.calls.filter(([url]) => url.includes('T00')),
+    ).toHaveLength(1)
+  })
+
+  it('fetches the BBOX trimmed to the world, attributing the original URL', () => {
+    const fetchMock = vi.fn(() => new Promise<Response>(() => {}))
+    vi.stubGlobal('fetch', fetchMock)
+    const load = cancellingImageLoader()
+    const { wrapper, img } = fakeImage()
+    load(wrapper, WORLD_OVERSHOOT)
+    expect(fetchMock).toHaveBeenCalledWith(
+      WORLD_OVERSHOOT.replace(
+        'BBOX=-20046021.04%2C-17271713.18%2C20046021.04%2C15275448.53',
+        `BBOX=${encodeURIComponent(`${-W},-17271713.18,${W},15275448.53`)}`,
+      ),
+      expect.anything(),
+    )
+    expect(loadRequestUrl(img)).toBe(WORLD_OVERSHOOT)
+  })
+})
+
+/** Mercator half-world (OL's EPSG:3857 HALF_SIZE). */
+const W = Math.PI * 6378137
+
+/** A request OL rounded 8.5 km past both world edges (seen in the app). */
+const WORLD_OVERSHOOT =
+  '/api/v1/lens/proxy/abc/wms?REQUEST=GetMap&VERSION=1.3.0&LAYERS=2t&WIDTH=1270&HEIGHT=1031&CRS=EPSG%3A3857&BBOX=-20046021.04%2C-17271713.18%2C20046021.04%2C15275448.53'
+
+describe('clampGetMapBbox', () => {
+  it('trims a Mercator box to the world edges, leaving other params', () => {
+    const clamped = clampGetMapBbox(WORLD_OVERSHOOT)
+    const bbox = new URL(clamped, 'http://x').searchParams.get('BBOX')
+    expect(bbox?.split(',').map(Number)).toEqual([
+      -W,
+      -17271713.18,
+      W,
+      15275448.53,
+    ])
+    expect(clamped.replace(/BBOX=[^&]*/, '')).toBe(
+      WORLD_OVERSHOOT.replace(/BBOX=[^&]*/, ''),
+    )
+  })
+
+  it('returns boxes inside the world unchanged', () => {
+    const inside = WORLD_OVERSHOOT.replace(
+      /BBOX=[^&]*/,
+      'BBOX=-1000%2C-1000%2C1000%2C1000',
+    )
+    expect(clampGetMapBbox(inside)).toBe(inside)
+  })
+
+  it('reads EPSG:4326 latitude first in WMS 1.3.0', () => {
+    const geo =
+      'http://wms.test/wms?VERSION=1.3.0&CRS=EPSG%3A4326&BBOX=-91%2C-180.5%2C91%2C180.5'
+    const bbox = new URL(clampGetMapBbox(geo)).searchParams.get('BBOX')
+    expect(bbox).toBe('-90,-180,90,180')
+  })
+
+  it('leaves other CRSs alone', () => {
+    const polar =
+      'http://wms.test/wms?VERSION=1.3.0&CRS=EPSG%3A32661&BBOX=-1e9%2C-1e9%2C1e9%2C1e9'
+    expect(clampGetMapBbox(polar)).toBe(polar)
   })
 })
