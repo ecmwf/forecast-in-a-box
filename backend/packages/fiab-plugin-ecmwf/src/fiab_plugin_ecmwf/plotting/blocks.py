@@ -60,10 +60,8 @@ PLOT_FORMAT_TO_MIME: dict[str, str] = {
     "svg": "image/svg+xml",
 }
 
-# NOTE the plotting dependencies are declared as the `plots` extra in the plugin's pyproject.toml, except for the eckitlib
-# pin: it is a hotfix due to proj in newer eckits clashing with pyproj, leading to a segfault, and it conflicts with the
-# pymetkit requirement of the backend, so it cannot be part of the locked workspace
-PLOT_ENVIRONMENT: list[str] = ["fiab-plugin-ecmwf[plots]", "eckitlib<=2.2.0.27"]
+# NOTE the eckitlib pin is a hotfix due to proj in newer eckits clashing with pyproj, leading to a segfault
+PLOT_ENVIRONMENT: list[str] = ["earthkit-plots<1.0.0", "earthkit-regrid<1.0.0", "matplotlib<3.11", "eckitlib<=2.2.0.27"]
 
 DEFAULT_PLOT_STYLE = "ECMWF"
 
@@ -76,9 +74,7 @@ PLOT_STYLE_TO_SCHEMA: dict[str, str] = {
 # NOTE git dependencies cannot be declared as extras of a package published to PyPI, hence listed here
 PLOT_STYLE_TO_ENVIRONMENT: dict[str, list[str]] = {
     "ECMWF": [],
-    "MetNorway": [
-        "earthkit-plots-metno-styles @ git+https://github.com/metno/earthkit-plots-metno-styles@70a5da56bb39ea9da062e13f9d5556a059448578"
-    ],
+    "MetNorway": ["temporary-earthkit-plots-metno-styles"],
 }
 
 
