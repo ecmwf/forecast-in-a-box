@@ -334,7 +334,9 @@ export function VisualisePage() {
   const stateB = useComparisonSource(b, { autoStart: true })
   // Lens on its way: the viewer's frame is already the right layout.
   const aPending =
-    stateA.phase === 'resolvingDir' || stateA.phase === 'starting'
+    stateA.phase === 'resolvingDir' ||
+    stateA.phase === 'waitingForRun' ||
+    stateA.phase === 'starting'
   const viewerFill = useViewportFill(
     entries.length > 0 &&
       a !== null &&
@@ -516,7 +518,12 @@ export function VisualisePage() {
               label={
                 stateA.phase === 'starting'
                   ? t('lens.starting')
-                  : t('lens.resolving')
+                  : stateA.phase === 'waitingForRun'
+                    ? t('lens.waitingForRun', {
+                        written: stateA.written,
+                        total: stateA.total,
+                      })
+                    : t('lens.resolving')
               }
             />
           ) : (
@@ -641,7 +648,12 @@ function SlotBStatusChip({ state }: { state: ComparisonSourceState }) {
       ) : (
         <>
           <Loader2 className="h-3 w-3 animate-spin" />
-          {t('lens.starting')}
+          {state.phase === 'waitingForRun'
+            ? t('lens.waitingForRun', {
+                written: state.written,
+                total: state.total,
+              })
+            : t('lens.starting')}
         </>
       )}
     </span>

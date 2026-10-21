@@ -116,6 +116,12 @@
       "hasTime": "Date field — the value carries a time component",
       "floorDayAction": "Truncate to date",
       "floorDayTooltip": "Appends `| floor_day` to truncate the expression to midnight"
+    },
+    "runFolder": {
+      "shared": "Not a per-run folder",
+      "details": "Later runs overwrite files with the same name, so an earlier run can silently show newer data. A shared folder also slows down the map viewer as it fills.",
+      "action": "Use run folder",
+      "actionTooltip": "Writes each run and attempt to its own folder:"
     }
   },
   "confirmDelete": {

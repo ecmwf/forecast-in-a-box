@@ -24,6 +24,7 @@ import type { BlockFactoryCatalogue } from '@/api/types/fable.types'
 import { useBlockDisplayNames } from '@/features/fable-builder/hooks/useBlockDisplayNames'
 import { definableGlyphs } from '@/features/fable-builder/utils/definable-glyphs'
 import { useFieldErrorMessages } from '@/features/fable-builder/hooks/useFieldErrorMessages'
+import { useOutputPathCheck } from '@/features/fable-builder/hooks/useOutputPathCheck'
 import { useReservedGlyphReason } from '@/features/glyphs/utils/reserved-names'
 import {
   findDownstreamBlocks,
@@ -198,6 +199,11 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
   const lastMappedErrorsRef = useRef<Record<string, typeof liveMappedErrors>>(
     {},
   )
+  const sharedOutputPaths = useOutputPathCheck(
+    selectedBlockId,
+    selectedBlock,
+    resolvedConfigForBlock,
+  )
 
   if (!selectedBlock || !factory) {
     return (
@@ -371,6 +377,7 @@ export function ConfigPanel({ catalogue }: ConfigPanelProps): React.ReactNode {
               resolvedConfig={resolvedConfigForBlock}
               fieldErrors={mappedErrors.byConfigKey}
               missingGlyphs={definableMissingGlyphs}
+              sharedOutputPaths={sharedOutputPaths}
             >
               <div className="space-y-3">
                 <div className="text-sm font-medium">

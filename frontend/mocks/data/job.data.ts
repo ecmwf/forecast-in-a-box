@@ -304,8 +304,17 @@ export const noStoredOutputsExecution: JobExecutionDetail = {
   planned_block_ids: null,
 }
 
+/** GribSink directory per run, when a test needs runs to share one. */
+let gribDirOverrides: Record<string, string> = {}
+
+/** Point a run's GribSink markers at `dir` (e.g. a folder shared by runs). */
+export function setMockGribDir(runId: string, dir: string): void {
+  gribDirOverrides[runId] = dir
+}
+
 export function resetJobsState(): void {
   executionsState = {}
+  gribDirOverrides = {}
   executionIdCounter = 200
   for (const exec of seedExecutions) {
     executionsState[exec.run_id] = JSON.parse(
@@ -617,10 +626,14 @@ export function createMockSvgBlob(): Blob {
  * GribSink markers resolve to a per-run directory path. */
 export function mockBlobForMime(mimeType: string, runId?: string): Blob {
   switch (mimeType) {
-    case 'text/plain; fiab-format=gribdir':
-      return new Blob([`/data/output/${runId ?? 'job-completed-001'}_1`], {
-        type: 'text/plain',
-      })
+    case 'text/plain; fiab-format=gribdir': {
+      const run = runId ?? 'job-completed-001'
+      const dir =
+        run in gribDirOverrides
+          ? gribDirOverrides[run]
+          : `/data/output/${run}_1`
+      return new Blob([dir], { type: 'text/plain' })
+    }
     case 'application/pdf':
       return createMockPdfBlob()
     case 'image/svg+xml':

@@ -77,6 +77,16 @@ function PanelBody({ state }: { state: ComparisonSourceState }) {
           {t('lens.resolving')}
         </Centered>
       )
+    case 'waitingForRun':
+      return (
+        <Centered muted>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {t('lens.waitingForRun', {
+            written: state.written,
+            total: state.total,
+          })}
+        </Centered>
+      )
     case 'starting':
       return (
         <Centered muted>

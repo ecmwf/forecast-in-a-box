@@ -35,6 +35,8 @@ import {
   injectMockExecution,
   resetJobsState,
   secondGribRunExecution,
+  setMockGribDir,
+  setMockOutputAvailable,
 } from '@tests/../mocks/data/job.data'
 import {
   failMockLens,
@@ -52,6 +54,7 @@ import {
   wmsCapabilitiesRequestCount,
 } from '@tests/../mocks/data/wms.data'
 import type * as GeoViewerModule from '@/features/viewer/geo/GeoViewer'
+import type { JobExecutionDetail } from '@/api/types/job.types'
 import { Route as VisualiseRoute } from '@/routes/_authenticated/visualise'
 import { setPollIntervalsForTests } from '@/api/pollIntervals'
 import { VisualisePage } from '@/features/visualise/components/VisualisePage'
@@ -131,6 +134,60 @@ const RUN_B = {
   taskId: 'task-out-grib-b',
   blockId: 'block_sink_1',
   runName: 'Run B',
+  blockTitle: 'GRIB Sink',
+  runCreatedAt: null,
+} as const
+
+const GRIB_DIR_MIME = 'text/plain; fiab-format=gribdir'
+
+/** Still writing its GRIB sink: one of two marker tasks finished. */
+const writingRun: JobExecutionDetail = {
+  ...secondGribRunExecution,
+  run_id: 'job-writing-010',
+  status: 'running',
+  outputs: {
+    'task-grib-2t': {
+      mime_type: GRIB_DIR_MIME,
+      original_block: 'block_sink_1',
+      is_available: true,
+    },
+    'task-grib-msl': {
+      mime_type: GRIB_DIR_MIME,
+      original_block: 'block_sink_1',
+      is_available: false,
+    },
+  },
+}
+
+const RUN_WRITING = {
+  kind: 'output',
+  jobId: 'job-writing-010',
+  taskId: 'task-grib-2t',
+  blockId: 'block_sink_1',
+  runName: 'Run W',
+  blockTitle: 'GRIB Sink',
+  runCreatedAt: null,
+} as const
+
+/** A later run whose GRIB path writes into Run A's folder. */
+const sharedFolderRun: JobExecutionDetail = {
+  ...secondGribRunExecution,
+  run_id: 'job-shared-011',
+  outputs: {
+    'task-out-grib-c': {
+      mime_type: GRIB_DIR_MIME,
+      original_block: 'block_sink_1',
+      is_available: true,
+    },
+  },
+}
+
+const RUN_C = {
+  kind: 'output',
+  jobId: 'job-shared-011',
+  taskId: 'task-out-grib-c',
+  blockId: 'block_sink_1',
+  runName: 'Run C',
   blockTitle: 'GRIB Sink',
   runCreatedAt: null,
 } as const
@@ -344,6 +401,61 @@ describe('VisualisePage', () => {
       .element(screen.getByText(/display is static/), { timeout: 8000 })
       .toBeVisible()
   })
+
+  it(
+    'waits for the run to write every file before starting a lens',
+    { timeout: 30000 },
+    async () => {
+      injectMockExecution(writingRun)
+      useComparisonStore.getState().addEntry(RUN_WRITING)
+      const screen = await renderVisualisePage()
+
+      await expect
+        .element(
+          screen.getByRole('status', {
+            name: /Waiting for the run to write its files \(1 of 2\)/,
+          }),
+        )
+        .toBeVisible()
+      // Give a premature start a beat to (wrongly) materialize.
+      await new Promise((r) => setTimeout(r, 1000))
+      expect(listMockLenses()).toHaveLength(0)
+
+      // The run status poll picks up the last file, then the lens starts.
+      setMockOutputAvailable('job-writing-010', 'task-grib-msl', true)
+      await expect
+        .poll(() => listMockLenses(), { timeout: 15000 })
+        .toHaveLength(1)
+    },
+  )
+
+  it(
+    "starts a fresh lens for a run writing into another run's folder",
+    { timeout: 30000 },
+    async () => {
+      injectMockExecution(sharedFolderRun)
+      setMockGribDir('job-shared-011', '/data/output/job-completed-001_1')
+      useComparisonStore.getState().addEntry(RUN_A)
+      const screen = await renderVisualisePage()
+      await expect
+        .element(screen.getByText(/display is static/), { timeout: 8000 })
+        .toBeVisible()
+      expect(listMockLenses()).toHaveLength(1)
+
+      // Run A's lens scanned the folder before Run C wrote to it.
+      useComparisonStore.getState().addEntry(RUN_C)
+      await expect
+        .element(screen.getByLabelText('Source for slot B'))
+        .toMatchTextContent('Run C')
+      await expect
+        .poll(() => listMockLenses(), { timeout: 15000 })
+        .toHaveLength(2)
+      expect(listMockLenses().map((l) => l.lens_params.local_path)).toEqual([
+        '/data/output/job-completed-001_1',
+        '/data/output/job-completed-001_1',
+      ])
+    },
+  )
 
   it('gates local sources when SkinnyWMS is missing; external WMS stays', async () => {
     resetLensState({ skinnyWmsInstalled: false })

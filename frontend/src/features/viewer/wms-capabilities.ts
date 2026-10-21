@@ -297,7 +297,8 @@ export async function fetchCapabilities(
   }
   try {
     return parseCapabilities(xml)
-  } catch {
+  } catch (err) {
+    if (err instanceof CapabilitiesError) throw err
     throw new CapabilitiesError('parse', 'GetCapabilities XML parse failed')
   }
 }
@@ -312,6 +313,14 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
   const doc = new DOMParser().parseFromString(xml, 'application/xml')
   if (doc.querySelector('parsererror')) {
     throw new Error('GetCapabilities XML parse failed')
+  }
+  // Servers report failures as an exception document, often with HTTP 200.
+  const failure = exceptionReportText(doc)
+  if (failure !== null) {
+    throw new CapabilitiesError(
+      'parse',
+      `GetCapabilities exception: ${failure}`,
+    )
   }
 
   const root = doc.querySelector('Capability > Layer')
@@ -333,6 +342,18 @@ export function parseCapabilities(xml: string): ParsedCapabilities {
     crs: [...crs],
     maxImageSize: parseMaxImageSize(doc),
   }
+}
+
+/** Message of an OGC exception report (WMS or OWS), else null. */
+function exceptionReportText(doc: Document): string | null {
+  const root = doc.documentElement
+  if (
+    root.localName !== 'ServiceExceptionReport' &&
+    root.localName !== 'ExceptionReport'
+  ) {
+    return null
+  }
+  return root.textContent.replace(/\s+/g, ' ').trim() || root.localName
 }
 
 function parseMaxImageSize(doc: Document): readonly [number, number] | null {
