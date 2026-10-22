@@ -3,7 +3,7 @@ from typing import Any
 
 import httpx
 
-from .conftest import fake_artifact_registry_port, fake_artifact_store_id, test_model_artifact_id
+from .conftest import fake_artifact_store_id, test_model_artifact_id
 from .utils import (
     NotificationTimeoutError,
     connect_notification_websocket,
@@ -14,7 +14,7 @@ from .utils import (
 )
 
 
-def test_download_model(backend_client_admin: httpx.Client, backend_client: httpx.Client) -> None:
+def test_download_model(backend_client_admin: httpx.Client, backend_client: httpx.Client, fake_artifact_registry_port: int) -> None:
     """Downloads bunch of artifacts in parallel, tests they successfully appear"""
 
     # Verify fake artifact registry is up
