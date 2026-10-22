@@ -133,7 +133,7 @@ def anemoi_source_ensemble_configuration(dummy_checkpoint: CompositeArtifactId) 
                 INPUT_SOURCE: "opendata",
                 LEAD_TIME: 24,
                 BASE_TIME: datetime(2024, 1, 1),
-                ENSEMBLE: 3,
+                ENSEMBLE: [3],
             },
         ),
         AnemoiSource.configuration_options,
