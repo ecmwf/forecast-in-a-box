@@ -13,10 +13,12 @@ import logging
 import earthkit.data as ekd
 import numpy as np
 
+from .runtime import GridRuntimeType
+
 LOG = logging.getLogger(__name__)
 
 
-GridSpec = str | list[float] | tuple[float, ...] | dict[str, list[float]]
+GridSpec = GridRuntimeType | tuple[int | float, ...]
 
 # GRIB keys copied from each source field onto the target-grid template
 # when using the (fast) array-based regridding path. Order matters
@@ -38,23 +40,26 @@ def normalise_grid(grid: GridSpec | None) -> str | None:
     Parameters
     ----------
     grid : GridSpec | None
-        The grid specification, which can be a string, list, tuple, or dict.
+        The grid specification: a string, a single number, or a list or tuple of two numbers.
 
     Returns
     -------
     str | None
-        The normalised grid specification as a string.
+        The normalised grid specification as a string. A pair is joined as 'west_east/south_north' in the order given, a single
+        number is used for both directions, and a string is upper-cased.
     """
     if grid is None:
         return grid
     if isinstance(grid, (list, tuple)):
+        if len(grid) != 2:
+            raise ValueError(f"Expected a grid of two resolutions, not {grid!r}.")
         return "/".join(map(str, iter(grid)))
     elif isinstance(grid, (int, float)):
         return f"{grid}/{grid}"
-    elif isinstance(grid, dict):
-        return "/".join(f"{k}={v}" for k, v in grid.items())
+    elif isinstance(grid, str):
+        return grid.upper()
     else:
-        return str(grid).upper()
+        raise TypeError(f"Unsupported grid specification of type {type(grid).__name__}: {grid!r}")
 
 
 def _make_job(grid: str | None, area: str | list[float] | None, packing: str, accuracy: int) -> "mir.Job":  # type: ignore[reportUndefinedVariable]

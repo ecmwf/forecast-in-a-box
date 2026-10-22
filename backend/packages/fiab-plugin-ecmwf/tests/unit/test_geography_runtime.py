@@ -36,14 +36,18 @@ class TestBBox:
 
         assert BBox(bbox.format("wsen"), fmt="wsen").format("nwse") == bbox.value
 
-    @pytest.mark.parametrize("fmt", ["nws", "abcd", ""])
+    @pytest.mark.parametrize("fmt", ["nws", "nwsee", "nwsen", "nnws", "abcd", ""])
     def test_rejects_invalid_constructor_format(self, fmt: str) -> None:
         with pytest.raises(ValueError, match="format string"):
             BBox((60.0, -10.0, 35.0, 30.0), fmt=fmt)
 
-    def test_rejects_invalid_output_format(self) -> None:
+    @pytest.mark.parametrize("fmt", ["nws", "nwsee", "nnws", ""])
+    def test_rejects_invalid_output_format(self, fmt: str) -> None:
         with pytest.raises(ValueError, match="format string"):
-            BBox((60.0, -10.0, 35.0, 30.0), fmt="nwse").format("nws")
+            BBox((60.0, -10.0, 35.0, 30.0), fmt="nwse").format(fmt)
+
+    def test_accepts_list_value(self) -> None:
+        assert BBox([-10.0, 35.0, 30.0, 60.0], fmt="wsen").format("nwse") == (60.0, -10.0, 35.0, 30.0)
 
     def test_rejects_wrong_length(self) -> None:
         with pytest.raises(ValueError, match="4 float"):
@@ -62,10 +66,25 @@ class TestNormaliseGrid:
             (1, "1/1"),
             ([0.25, 0.5], "0.25/0.5"),
             ((1.0, 2.0), "1.0/2.0"),
+            ([1, 2], "1/2"),
         ],
     )
     def test_normalise_grid(self, grid: Any, expected: str | None) -> None:
         assert normalise_grid(grid) == expected
+
+    def test_pair_order_is_passed_unchanged(self) -> None:
+        assert normalise_grid([0.5, 1.0]) == "0.5/1.0"
+        assert normalise_grid([1.0, 0.5]) == "1.0/0.5"
+
+    @pytest.mark.parametrize("grid", [[1.0], [1.0, 2.0, 3.0], (), (1.0, 2.0, 3.0)])
+    def test_rejects_wrong_number_of_resolutions(self, grid: Any) -> None:
+        with pytest.raises(ValueError, match="two resolutions"):
+            normalise_grid(grid)
+
+    @pytest.mark.parametrize("grid", [{"grid": [1.0, 1.0]}, object()])
+    def test_rejects_unsupported_type(self, grid: Any) -> None:
+        with pytest.raises(TypeError, match="Unsupported grid"):
+            normalise_grid(grid)
 
 
 class TestRegridArguments:
@@ -110,6 +129,25 @@ class TestRegridArguments:
 
         assert seen == ["Germany"]
         assert calls[0]["area"] == [55.0, 5.0, 47.0, 15.0]
+
+    @pytest.mark.parametrize("grid", [[0.5, 1.0], 0.25, "N320", None])
+    def test_grid_is_passed_unchanged(self, calls: list[dict[str, Any]], grid: Any) -> None:
+        regrid("fields", grid=grid)  # type: ignore[arg-type]
+
+        assert calls[0]["grid"] == grid
+
+    @pytest.mark.parametrize("fmt_if_list", [None, "nwse"])
+    def test_empty_list_domain_only_regrids(self, calls: list[dict[str, Any]], fmt_if_list: str | None) -> None:
+        regrid("fields", grid=[0.5, 1.0], domain=[], fmt_if_list=fmt_if_list)  # type: ignore[arg-type]
+
+        assert calls == [{"data": "fields", "grid": [0.5, 1.0], "area": None}]
+
+    @pytest.mark.parametrize("domain", [(60.0, -10.0, 35.0, 30.0), 5, {"north": 60.0}])
+    def test_unsupported_domain_type_is_rejected(self, calls: list[dict[str, Any]], domain: Any) -> None:
+        with pytest.raises(TypeError, match="`domain` must be"):
+            regrid("fields", grid="O96", domain=domain, fmt_if_list="nwse")  # type: ignore[arg-type]
+
+        assert calls == []
 
     def test_list_domain_requires_format(self, calls: list[dict[str, Any]]) -> None:
         with pytest.raises(ValueError, match="fmt_if_list"):

@@ -160,6 +160,69 @@ class TestRegridLatLon:
             assert (north, south) == (88.0, -88.0)
         _assert_values_match_analytic(result)
 
+    @pytest.mark.parametrize(
+        ("grid", "west_east", "south_north", "shape"),
+        [
+            ([1.0, 2.0], 1.0, 2.0, (91, 360)),
+            ("1/2", 1.0, 2.0, (91, 360)),
+            ([2.0, 1.0], 2.0, 1.0, (181, 180)),
+            ([1, 2], 1.0, 2.0, (91, 360)),
+        ],
+    )
+    def test_anisotropic_resolution_target(
+        self, input_fields: ekd.FieldList, grid: object, west_east: float, south_north: float, shape: tuple[int, int]
+    ) -> None:
+        # The first resolution is west-east and the second south-north, and MIR anchors a global grid at (0, 0)
+        result = _regrid(input_fields, grid=grid)
+
+        assert len(result) == len(PARAMS)
+        for field in result:
+            assert field.metadata("gridType") == "regular_ll"
+            assert field.metadata("iDirectionIncrementInDegrees") == west_east
+            assert field.metadata("jDirectionIncrementInDegrees") == south_north
+            assert field.shape == shape
+            north, _, south, _ = _extent(field)
+            assert (north, south) == (90.0, -90.0)
+        _assert_identity_preserved(result)
+        _assert_values_match_analytic(result)
+
+
+class TestRegridEmptyArea:
+    @pytest.mark.parametrize("domain", [None, []])
+    def test_empty_area_only_regrids(self, input_fields: ekd.FieldList, domain: object) -> None:
+        result = _regrid(input_fields, grid=1.0, domain=domain, fmt_if_list="nwse")
+
+        assert len(result) == len(PARAMS)
+        for field in result:
+            assert field.metadata("gridType") == "regular_ll"
+            assert field.shape == (181, 360)
+            north, west, south, east = _extent(field)
+            assert (north, south) == (90.0, -90.0)
+            assert east - west == 359.0
+        _assert_identity_preserved(result)
+        _assert_values_match_analytic(result)
+
+    def test_empty_area_with_pair_grid(self, input_fields: ekd.FieldList) -> None:
+        result = _regrid(input_fields, grid=[1.0, 2.0], domain=[], fmt_if_list="nwse")
+
+        for field in result:
+            assert field.shape == (91, 360)
+            north, _, south, _ = _extent(field)
+            assert (north, south) == (90.0, -90.0)
+        _assert_values_match_analytic(result)
+
+    def test_empty_area_with_gaussian_grid(self, input_fields: ekd.FieldList) -> None:
+        result = _regrid(input_fields, grid="O48", domain=[])
+
+        for field in result:
+            assert field.metadata("gridType") == "reduced_gg"
+            assert field.metadata("numberOfDataPoints") == 4 * 48 * (48 + 9)
+            north, west, south, east = _extent(field)
+            assert north > 88.0
+            assert south < -88.0
+            assert east - west > 350.0
+        _assert_values_match_analytic(result)
+
 
 class TestRegridBoundingBox:
     # nwse of the cut-out; on the 1 degree grid it holds 26 rows and 41 columns

@@ -9,6 +9,7 @@
 
 """Unit tests for FableType and its subclasses."""
 
+import math
 from datetime import date, datetime, timedelta
 
 import pytest
@@ -879,7 +880,7 @@ class TestFableTypeParseRemainder:
 
 class TestGridType:
     """GridType: union over named Gaussian grid (e.g. 'N320'), single positive
-    lat/lon resolution, and a two-element [lat_res, lon_res] pair."""
+    resolution, and a two-element [west_east, south_north] pair of resolutions."""
 
     def test_serialize(self) -> None:
         assert GridType().serialize() == "grid"
@@ -926,6 +927,34 @@ class TestGridType:
     def test_non_positive_numeric_raises(self, value: float) -> None:
         with pytest.raises(WrongType):
             GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["inf", "-inf", "nan", "infinity", "1e999", "inf/1", "1/inf", "nan/nan", "0.25/nan"])
+    def test_non_finite_string_resolution_raises(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", [math.inf, -math.inf, math.nan])
+    def test_non_finite_numeric_raises(self, value: float) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", [[math.inf, 1.0], [1.0, math.nan]])
+    def test_non_finite_list_resolution_raises(self, value: list) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["1/2/3", "0.25/0.5/1", "1//2", "1/", "/1", "/"])
+    def test_wrong_number_of_string_parts_raises(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", [True, False, [True, 1.0], [1.0, False]])
+    def test_bool_raises(self, value: object) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    def test_string_pair_keeps_west_east_first(self) -> None:
+        assert GridType().validate_convert("0.5/1") == [0.5, 1.0]
 
     @pytest.mark.parametrize("value", [None, {"grid": "N320"}, (0.25, 0.5)])
     def test_unsupported_type_raises(self, value: object) -> None:

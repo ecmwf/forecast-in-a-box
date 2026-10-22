@@ -8,7 +8,8 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from typing import get_args
+from decimal import Decimal
+from typing import cast, get_args
 
 from cascade.low.func import Either
 from earthkit.workflows.fluent import Action, create_task_instance
@@ -22,12 +23,14 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceRich, Transform
+from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Transform
+from fiab_core.tools.convert import GeoDomainRuntimeType
 from fiab_core.types import (
     BoundingBoxWSENType,
     GeoDomainSingleType,
     GeoDomainType,
     GridType,
+    GridValue,
     UnionType,
     UnrestrictedGeoDomainAlias,
     UnrestrictedGeoDomainLiteral,
@@ -40,11 +43,67 @@ from ..constants import (
     DOMAIN,
     GRID,
 )
-from ..qubed_utils import coxpand, expand
+from ..qubed_utils import collapse, coxpand, dimensions, expand
 
 logger = logging.getLogger(__name__)
 
 AreaType = UnionType([UnrestrictedGeoDomainAlias, BoundingBoxWSENType(), GeoDomainSingleType()])
+
+NO_CUTOUT_DOMAIN = "auto"
+"""The domain axis value for an empty area, which regrids without cutting out."""
+
+
+def _number_str(value: int | float) -> str:
+    return format(Decimal(repr(float(value))).normalize(), "f")
+
+
+def grid_axis_value(grid: GridValue) -> str:
+    """Return the canonical string of a grid for the grid axis.
+
+    A named grid is returned as given, a single resolution as its shortest decimal string without a trailing '.0' (for example
+    '0.25' or '1'), and a pair as the two such strings joined by a slash in west-east, south-north order (for example '0.25/0.5').
+    """
+    if isinstance(grid, str):
+        return grid
+    if isinstance(grid, list):
+        return "/".join(_number_str(resolution) for resolution in grid)
+    return _number_str(grid)
+
+
+def _single_named_domain(domain: list[str]) -> str:
+    if len(domain) > 1:
+        raise BlockInstanceConfigurationError("Only one string domain can be selected for cutout")
+    return domain[0]
+
+
+def domain_axis_value(domain: GeoDomainRuntimeType) -> str:
+    """Return the domain axis value for a domain already ordered as a MARS bounding box.
+
+    The unrestricted values ('auto', 'global', 'datadefined') are returned as given and an empty area is 'auto'. A single named
+    region is returned by name and a bounding box as the string of its north, west, south, east list.
+    """
+    if isinstance(domain, str):
+        return domain
+    if len(domain) == 0:
+        return NO_CUTOUT_DOMAIN
+    if isinstance(domain[0], str):
+        return _single_named_domain(cast(list[str], domain))
+    return str(domain)
+
+
+def domain_runtime_value(domain: GeoDomainRuntimeType) -> str | list[float] | None:
+    """Return the domain passed to the regrid task for a domain already ordered as a MARS bounding box.
+
+    The unrestricted values and an empty area give None, which regrids without cutting out. A single named region is returned
+    by name and a bounding box as its north, west, south, east list.
+    """
+    if isinstance(domain, str):
+        return None if domain in get_args(UnrestrictedGeoDomainLiteral) else domain
+    if len(domain) == 0:
+        return None
+    if isinstance(domain[0], str):
+        return _single_named_domain(cast(list[str], domain))
+    return cast(list[float], domain)
 
 
 class GeographicalTransform(Transform):
@@ -53,13 +112,16 @@ class GeographicalTransform(Transform):
     configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
         GRID: BlockConfigurationOption(
             title="Grid",
-            description="Resolution to regrid to, e.g. '0.25/0.25' for 0.25 degree resolution, or a named grid (e.g. 'N320')",
+            description=(
+                "Grid to regrid to: a resolution in degrees such as '0.25', a west-east/south-north pair such as '0.25/0.5', "
+                "or a named Gaussian grid such as 'N320' or 'O96'"
+            ),
             value_type=GridType(),
             default_value="auto",
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
-            description="Area to cut out: auto (fit the data), global, a named region/country (select several to union), or a drawn bounding box",
+            description="Area to cut out: auto (fit the data), global, a single named region/country, or a drawn bounding box; leave empty to regrid without cutting out",
             value_type=GeoDomainType(),
             default_value="auto",
         ),
@@ -72,18 +134,14 @@ class GeographicalTransform(Transform):
         input_dataset = _extract_dataset(inputs, "dataset")
 
         output = input_dataset
-        if grid := block.config_as_grid(GRID):
-            output = expand(output, {GRID: [grid]})
+        grid = block.config_as_grid(GRID)
+        if grid is not None:
+            if GRID in dimensions(output):
+                output = collapse(output, GRID)
+            output = expand(output, {GRID: [grid_axis_value(grid)]})
 
-        if domain := block.config_as_geodomain(DOMAIN):
-            if isinstance(domain.value, list) and len(domain.value) > 0 and isinstance(next(iter(domain.value)), str):
-                if len(domain.value) > 1:
-                    raise ValueError("Only one string domain can be selected for cutout")
-                domain = domain.value[0]
-            else:
-                domain = str(domain.with_bbox_mars().value)
-            output = coxpand(input_dataset, DOMAIN, {DOMAIN: [domain]})
-        return output
+        domain = block.config_as_geodomain(DOMAIN).with_bbox_mars().value
+        return coxpand(output, DOMAIN, {DOMAIN: [domain_axis_value(domain)]})
 
     def compile(
         self,
@@ -93,13 +151,7 @@ class GeographicalTransform(Transform):
         input_task = block.input_ids["dataset"]
 
         grid = block.config_as_grid(GRID)
-        domain = block.config_as_geodomain(DOMAIN).with_bbox_mars().value
-
-        if domain in get_args(UnrestrictedGeoDomainLiteral):
-            domain = None
-
-        if isinstance(domain, list) and len(domain) > 0 and isinstance(next(iter(domain)), str):
-            domain = domain[0]
+        domain = domain_runtime_value(block.config_as_geodomain(DOMAIN).with_bbox_mars().value)
 
         action = inputs[input_task].map(
             create_task_instance(

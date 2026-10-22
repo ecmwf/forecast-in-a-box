@@ -25,7 +25,7 @@ class GeoDomainWrapper:
     def with_bbox_ordering(self, fmt: str) -> Self:
         """Give some permutation of 'wsen' to reorder the bbox inside. If geo domain is inside instead,
         passthrough"""
-        if set(fmt) != {"w", "s", "e", "n"}:
+        if len(fmt) != 4 or set(fmt) != {"w", "s", "e", "n"}:
             raise ValueError(f"expected some permutation of 'wsen', but got {fmt} instead")
         if isinstance(self.value, list) and len(self.value) > 0 and isinstance(self.value[0], (int, float)):
             current = {v: i for i, v in enumerate(self.fmt)}

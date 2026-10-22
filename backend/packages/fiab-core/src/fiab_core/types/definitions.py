@@ -416,9 +416,17 @@ class GeoDomainType(UnionType):
 
 # GRID TYPES
 
+GridValue = str | int | float | list[int | float]
+"""A converted grid: a Gaussian grid name, a single resolution in degrees, or a [west_east, south_north] pair of resolutions."""
+
+
+def _is_positive_finite_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0
+
 
 class GridType(FableType):
-    """Grid type. A union of named grid, lat/lon resolution, or tuple of lat/lon resolutions."""
+    """Grid type. A union of a named Gaussian grid (e.g. 'N320' or 'O96'), a single positive resolution in degrees, and a pair of
+    positive resolutions in degrees written 'west_east/south_north', the order used by MARS and MIR. The string 'auto' converts to None."""
 
     def _ignore(self, value: str) -> bool:
         if value == "auto":
@@ -436,10 +444,10 @@ class GridType(FableType):
         return False
 
     def _is_latlon_resolution(self, value: list[int | float] | int | float | str) -> bool:
-        """Check if the value is a valid lat/lon resolution, e.g., [0.25, 0.25], or a single positive number."""
+        """Check if the value is a valid resolution: a single positive finite number, or a [west_east, south_north] pair."""
 
         if isinstance(value, (int, float)):
-            return value > 0
+            return _is_positive_finite_number(value)
 
         if isinstance(value, str):
             return self._validate_string_resolution(value)
@@ -450,25 +458,20 @@ class GridType(FableType):
         return False
 
     def _validate_string_resolution(self, value: str) -> bool:
-        """Validate string resolution (single number or slash-separated values)."""
+        """Validate string resolution: one positive finite number, or two separated by a slash."""
+        parts = value.split("/")
+        if len(parts) > 2:
+            return False
         try:
-            if "/" in value:
-                parts = value.split("/")
-                return all(float(part) > 0 for part in parts)
-            return float(value) > 0
+            return all(_is_positive_finite_number(float(part)) for part in parts)
         except ValueError:
             return False
 
     def _validate_list_resolution(self, value: list) -> bool:
-        """Validate list resolution as [lat_res, lon_res] pair."""
-        if len(value) != 2:
-            return False
-        lat_res, lon_res = value
-        if not isinstance(lat_res, (int, float)) or not isinstance(lon_res, (int, float)):
-            return False
-        return lat_res > 0 and lon_res > 0
+        """Validate list resolution as a [west_east, south_north] pair of positive finite numbers."""
+        return len(value) == 2 and all(_is_positive_finite_number(part) for part in value)
 
-    def validate_convert_main(self, value: Any) -> str | list[int | float] | int | float | None:
+    def validate_convert_main(self, value: Any) -> GridValue | None:
         if isinstance(value, str):
             if self._is_gaussian_grid(value):
                 return value
@@ -476,17 +479,17 @@ class GridType(FableType):
                 return list(map(float, value.split("/"))) if "/" in value else float(value)
             if self._ignore(value):
                 return None
-            raise WrongType(f"String value {value!r} is neither a valid Gaussian grid, a valid lat/lon resolution, or 'auto'.")
+            raise WrongType(f"String value {value!r} is neither a valid Gaussian grid, a valid resolution, or 'auto'.")
 
         if isinstance(value, list):
             if self._is_latlon_resolution(value):
                 return value
-            raise WrongType(f"List value {value!r} is not a valid lat/lon resolution")
+            raise WrongType(f"List value {value!r} is not a valid resolution")
 
         if isinstance(value, (int, float)):
             if self._is_latlon_resolution(value):
                 return value
-            raise WrongType(f"Numeric value {value!r} is not a valid lat/lon resolution")
+            raise WrongType(f"Numeric value {value!r} is not a valid resolution")
 
         raise WrongType(f"Value {value!r} is not a valid grid type")
 

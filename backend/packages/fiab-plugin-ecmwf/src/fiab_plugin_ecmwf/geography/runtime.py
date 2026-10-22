@@ -8,6 +8,7 @@
 # nor does it submit to any jurisdiction.
 
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -15,23 +16,31 @@ if TYPE_CHECKING:
     import earthkit.data as ekd
 
 
-GeoDomainRuntimeType = str | tuple[float, float, float, float]
+GridRuntimeType = str | int | float | list[int | float]
+"""A grid: a Gaussian grid name, a single resolution in degrees, or a [west_east, south_north] pair of resolutions."""
+
+GeoDomainRuntimeType = str | list[float]
+"""An area: a named region, or a bounding box list whose order is given by the format string."""
+
+
+def _is_bbox_format(fmt: str) -> bool:
+    return len(fmt) == 4 and set(fmt) == {"n", "w", "s", "e"}
 
 
 @dataclass
 class BBox:
-    value: tuple[float, float, float, float]
+    value: Sequence[float]
     fmt: str
 
     def __post_init__(self) -> None:
-        if set(self.fmt) != {"n", "w", "s", "e"}:
-            raise ValueError(f"Expected format string of 'nwse'-ish, not {self.fmt}.")
+        if not _is_bbox_format(self.fmt):
+            raise ValueError(f"Expected format string to be a permutation of 'nwse', not {self.fmt}.")
         if not len(self.value) == 4:
             raise ValueError(f"Expected value to contain 4 float's not: {self.value}")
 
     def format(self, fmt: str) -> tuple[float, float, float, float]:
-        if set(fmt) != {"n", "w", "s", "e"}:
-            raise ValueError(f"Expected format string of 'nwse'-ish, not {fmt}.")
+        if not _is_bbox_format(fmt):
+            raise ValueError(f"Expected format string to be a permutation of 'nwse', not {fmt}.")
         current = {c: v for c, v in zip(self.fmt, self.value)}
         new = tuple(current[c] for c in fmt)
 
@@ -64,20 +73,28 @@ def _ensure_mir_installed() -> None:
 
 def regrid(
     data: "ekd.FieldList",
-    grid: str | list[int | float] | None = None,
+    grid: GridRuntimeType | None = None,
     domain: GeoDomainRuntimeType | None = None,
     fmt_if_list: str | None = None,
 ) -> "ekd.FieldList":
-    """Regrid a fieldlist"""
+    """Regrid a fieldlist to the grid, and cut it out to the domain if one is given.
+
+    The grid is a Gaussian grid name, a single resolution in degrees or a [west_east, south_north] pair of resolutions, and is
+    passed to MIR unchanged. The domain is a named region, or a bounding box list in the order given by `fmt_if_list`. A domain
+    of None or an empty list leaves the area untouched.
+    """
     _ensure_mir_installed()
-    if domain is not None and isinstance(domain, list) and fmt_if_list is None:
+    if domain is not None and not isinstance(domain, (str, list)):
+        raise TypeError(f"`domain` must be a string, a list or None, not {type(domain).__name__}")
+    if isinstance(domain, list) and len(domain) > 0 and fmt_if_list is None:
         raise ValueError("`fmt_if_list` must be set if `domain` is a list")
 
+    # mir_backend imports earthkit-data, which is only present at runtime
     from .mir_backend import mir_regrid
 
     if isinstance(domain, str):
         bbox = list(_get_bbox_from_string(domain).format("nwse"))
-    elif isinstance(domain, list):
+    elif isinstance(domain, list) and len(domain) > 0:
         assert fmt_if_list is not None
         bbox = list(BBox(domain, fmt=fmt_if_list).format("nwse"))
     else:
