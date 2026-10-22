@@ -9,10 +9,12 @@
 
 import io
 import logging
+import re
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 import earthkit.data as ekd
+import numpy as np
 from fiab_core.types import UnrestrictedGeoDomainAlias
 
 if TYPE_CHECKING:
@@ -21,6 +23,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 WIND_SHORTNAMES = ["u", "v", "10u", "10v", "100u", "100v"]
+
+# TODO remove REDUCED_GG_PATTERN, LATLON_METADATA_KEYS, _is_subarea_reduced_gg, _to_latlon_field and _prepare_fields
+# once we switch to earthkit-plots 1.0, where a fix is probably available. earthkit-plots<1.0 drops the area from the
+# gridspec of reduced Gaussian GRIB fields, so sub-area fields (e.g. limited-area model output) are regridded with the
+# global matrix and fail with a dimension mismatch. As a workaround such fields are plotted as scattered lat/lon points.
+REDUCED_GG_PATTERN = re.compile(r"^[OoNn]\d+$")
+
+LATLON_METADATA_KEYS = ["shortName", "paramId", "name", "units", "levtype", "level", "step", "number", "date", "time"]
 
 
 def _configure_schema(style_schema: str) -> None:
@@ -61,6 +71,46 @@ def _plot_fields(subplot: "Subplot", fields: ekd.FieldList, **kwargs: Any) -> No
                 subplot.quickplot(ekd.FieldList.from_fields(sub_fields), **kwargs.get("quickplot", {}))
 
 
+def _is_subarea_reduced_gg(field: Any) -> bool:
+    """Return True if *field* is on a reduced Gaussian grid restricted to a non-global area."""
+    try:
+        gridspec = field.metadata().geography.gridspec()
+    except Exception:
+        return False
+    if gridspec is None:
+        return False
+    grid, area = gridspec.get("grid"), gridspec.get("area")
+    if not (isinstance(grid, str) and REDUCED_GG_PATTERN.match(grid)) or not area:
+        return False
+    north, west, south, east = area
+    return (north - south) < 170 or (east - west) % 360 < 350
+
+
+def _to_latlon_field(field: Any) -> ekd.ArrayField:
+    """Rewrap *field* as an ArrayField carrying explicit latitudes and longitudes and no grid definition."""
+    latlon = field.to_latlon(flatten=True)
+    lons = latlon["lon"]
+    datetimes = field.datetime()
+    metadata = {key: value for key in LATLON_METADATA_KEYS if (value := field.metadata(key, default=None)) is not None}
+    metadata.update(
+        param=metadata.get("shortName"),
+        base_datetime=datetimes["base_time"],
+        valid_datetime=datetimes["valid_time"],
+        latitudes=latlon["lat"],
+        longitudes=np.where(lons > 180, lons - 360, lons),
+    )
+    return ekd.ArrayField(field.to_numpy(flatten=True), metadata)
+
+
+def _prepare_fields(fields: ekd.FieldList) -> ekd.FieldList:
+    """Rewrap sub-area reduced Gaussian fields as lat/lon fields; other fields are returned unchanged."""
+    if not any(_is_subarea_reduced_gg(field) for field in fields):  # type: ignore[reportGeneralTypeIssues]
+        return fields
+    return ekd.FieldList.from_fields(
+        [_to_latlon_field(field) if _is_subarea_reduced_gg(field) else field for field in fields]  # type: ignore[reportGeneralTypeIssues]
+    )
+
+
 def _export_figure(figure: "Figure", fmt: str = "png", dpi: int = 100) -> bytes:
     """Serialise a Figure to bytes."""
     buf = io.BytesIO()
@@ -88,6 +138,8 @@ def map_plot(
 
     if not isinstance(fields, ekd.FieldList):
         fields = ekd.FieldList.from_fields(fields)
+    # TODO remove once we switch to earthkit-plots 1.0, see REDUCED_GG_PATTERN
+    fields = _prepare_fields(fields)
 
     resolved_domain = None if (isinstance(domain, str) and domain in UnrestrictedGeoDomainAlias.items) else domain
 
