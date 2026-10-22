@@ -80,8 +80,9 @@ def get_input_source_extras(source: str) -> list[str]:
 def get_available_input_sources() -> list[str]:
     """Get the list of available input sources.
 
-    Contains every base source from INPUT_SOURCE_CONFIGURATION_OPTIONS and INPUT_SOURCE_EXTRAS,
-    followed by each full combination of the variant groups of a source joined with ':'.
+    Contains each base source from INPUT_SOURCE_EXTRAS that has no variant groups, followed by
+    each full combination of the variant groups of every source in INPUT_SOURCE_CONFIGURATION_OPTIONS
+    joined with ':'.
     """
     base_sources = set(INPUT_SOURCE_EXTRAS.keys()) - set(INPUT_SOURCE_CONFIGURATION_OPTIONS.keys())
     available_input_sources = list(base_sources)
