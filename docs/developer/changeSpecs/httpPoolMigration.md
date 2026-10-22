@@ -50,8 +50,9 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
    Remove `_TIMEOUT` (it is now the `Proxy` profile).
 8. **Admin** (`domain/admin/__init__.py`, two `async with httpx.AsyncClient()`). [DONE]
    Use `get_async(HttpProfile.Default)`.
-9. **OIDC** (`domain/auth/oidc.py`).
+9. **OIDC** (`domain/auth/oidc.py`). [DONE]
    `httpx_oauth` creates its own clients internally. Check the `get_httpx_client` hook of `OpenID`, and supply a factory that returns the shared async client -- but only if the library does not close the returned client on exit (otherwise leave as is, and note it here).
+   Outcome: not migrated. `httpx_oauth` uses `async with self.get_httpx_client() as client:` at every call site, so a factory returning the shared client would close it on first use. `oidc.py` is left unchanged.
 
 Steps are independent of one another and can be done in any order.
 When a step is done, edit this file by adding `[DONE]` to the corresponding step line.
