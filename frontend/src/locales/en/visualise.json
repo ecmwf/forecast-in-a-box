@@ -122,7 +122,7 @@
   "focus": {
     "aria": "Source focus",
     "viewA": "View only A",
-    "viewBoth": "View both (compare)",
+    "viewBoth": "View both A·B (compare)",
     "viewB": "View only B"
   },
   "modes": {
@@ -214,6 +214,7 @@
   "projections": {
     "title": "Map projection",
     "popover": "Projection & basemap",
+    "popoverAria": "Projection & basemap: {{projection}}",
     "merc": "Web Mercator",
     "geo": "Equirectangular (lat/lon grid)",
     "npole": "Arctic — polar stereographic",

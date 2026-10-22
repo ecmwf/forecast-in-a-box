@@ -44,7 +44,7 @@ describe('GeoViewer 3D globe', () => {
     const screen = await render(<Harness portA={portA} />)
     await screen.getByText('2 m temperature').first().click()
 
-    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    await screen.getByRole('button', { name: /^Projection & basemap/ }).click()
     // Opening the menu warms the globe: mounted, hidden, before any choice.
     await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
     // Warm is not live: no data fetches until the globe is entered.
@@ -144,7 +144,7 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByText('2 m temperature').first())
       .toBeVisible()
-    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    await screen.getByRole('button', { name: /^Projection & basemap/ }).click()
     await expect.element(screen.getByTestId('globe-canvas')).toBeInTheDocument()
     // The flat map falls back to the outline; the globe must not switch style mid-bend.
     await expect.poll(() => engineCalls.basemaps.at(-1)?.kind).toBe('vector')
@@ -235,7 +235,7 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByText('2 m temperature').first())
       .toBeVisible()
-    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    await screen.getByRole('button', { name: /^Projection & basemap/ }).click()
     await expect
       .element(screen.getByRole('radio', { name: /3D globe/ }))
       .toBeDisabled()
@@ -251,7 +251,7 @@ describe('GeoViewer 3D globe', () => {
     await expect
       .element(screen.getByText('2 m temperature').first())
       .toBeVisible()
-    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    await screen.getByRole('button', { name: /^Projection & basemap/ }).click()
     const globe = screen.getByRole('radio', { name: /3D globe/ })
     await expect.element(globe).toBeDisabled()
     await expect
