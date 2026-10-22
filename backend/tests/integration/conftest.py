@@ -29,7 +29,19 @@ from forecastbox.utility.config import (
 
 from .utils import extract_auth_token_from_response, prepare_cookie_with_auth_token, retry_until
 
-fake_artifact_registry_port = 12001
+
+def _claim_free_port() -> int:
+    """Returns a port currently free on the loopback and wildcard interfaces, as picked by the OS."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("", 0))
+        return sock.getsockname()[1]
+
+
+@pytest.fixture(scope="session")
+def fake_artifact_registry_port() -> int:
+    return _claim_free_port()
+
+
 fake_artifact_store_id = "test_store"
 test_model_artifact_id = "test_models_checkpoint"
 test_blueprint_artifact_id = "test_blueprint_checkpoint"
@@ -38,6 +50,7 @@ testPluginId = PluginCompositeIdReadable.from_str("localTest:single")
 
 class FakeArtifactRegistry(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
+        port = int(self.server.server_address[1])  # ty: ignore
         if self.path == "/artifacts.json":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -48,7 +61,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
                 return {
                     "artifact_type": "AnemoiCheckpoint",
                     "common": {
-                        "url": f"http://localhost:{fake_artifact_registry_port}/{checkpoint_id}",
+                        "url": f"http://localhost:{port}/{checkpoint_id}",
                         "display_name": f"Test Model Checkpoint {i}",
                         "display_author": "Test Author",
                         "display_description": f"A test model checkpoint {i} for integration tests",
@@ -69,7 +82,7 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             small_artifact = {
                 "artifact_type": "AnemoiCheckpoint",
                 "common": {
-                    "url": f"http://localhost:{fake_artifact_registry_port}/{test_blueprint_artifact_id}",
+                    "url": f"http://localhost:{port}/{test_blueprint_artifact_id}",
                     "display_name": "Small Test Checkpoint",
                     "display_author": "Test Author",
                     "display_description": "A small test checkpoint for artifact runtime dependency tests",
@@ -126,8 +139,8 @@ class FakeArtifactRegistry(SimpleHTTPRequestHandler):
             self.send_error(404, f"Not Found: {self.path}")
 
 
-def run_artifact_registry(shutdown_event: Any) -> None:
-    server_address = ("", fake_artifact_registry_port)
+def run_artifact_registry(shutdown_event: Any, port: int) -> None:
+    server_address = ("", port)
 
     class WhyExposeFieldsInConstructorWhenYouCanSubclass(socketserver.ThreadingTCPServer):
         allow_reuse_address = True
@@ -147,7 +160,7 @@ def _register_user(backend_client: httpx.Client, email: str, password: str) -> N
 
 
 @pytest.fixture(scope="session")
-def backend_client() -> Generator[httpx.Client, None, None]:
+def backend_client(fake_artifact_registry_port: int) -> Generator[httpx.Client, None, None]:
     td = None
     td_data = None
     handles = None
@@ -176,7 +189,7 @@ def backend_client() -> Generator[httpx.Client, None, None]:
 
         config = FIABConfig()
         config.auth.jwt_secret = SecretStr("x" * 32)
-        config.backend.uvicorn_port = 30645
+        config.backend.uvicorn_port = _claim_free_port()
         config.cascade.gateway = LocalGateway(gateway_type="local", startup_params=GatewayStartupParams())
         config.db.sqlite_userdb_path = f"{td.name}/user.db"
         config.db.sqlite_jobdb_path = f"{td.name}/job.db"
@@ -205,7 +218,9 @@ def backend_client() -> Generator[httpx.Client, None, None]:
         # Start fake artifact registry before launching the app
         shutdown_event_artifacts = Event()
         # NOTE we basically need a `fork/spawn` here, as forkserver makes us lose the envvars
-        p_artifacts = get_mp_ctx("other").Process(target=run_artifact_registry, args=(shutdown_event_artifacts,))
+        p_artifacts = get_mp_ctx("other").Process(
+            target=run_artifact_registry, args=(shutdown_event_artifacts, fake_artifact_registry_port)
+        )
         p_artifacts.start()
 
         handles = launch_all(config)
