@@ -632,6 +632,120 @@ config:
                   comparison: "<="
                   value: 273.15
                   scale_factor: 2
+    fcmean:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      filter:param:
+        "228004":
+          accumulations:
+            step:
+              name:
+                type: default
+                length: "{steplength}:int"
+              operation: mean
+              metadata:
+                paramId: "{param}:int"
+                type: fcmean
+                typeOfStatisticalProcessing: 0
+                typeOfTimeIncrement: 2
+                # indicatorOfUnitForTimeRange: 1
+                # lengthOfTimeRange: "{coords_span}"
+                # indicatorOfUnitForTimeIncrement: 1
+                # timeIncrement: "{coords_increment}"
+                # typeOfGeneratingProcess: 4
+                # typeOfProcessedData: 10
+                # bitsPerValue: 16
+                # stepType: avg
+        "235055": 
+          preprocessing:
+            - operation: scale
+              value: 0.00001157407
+          accumulations:
+            step:
+              deaccumulate: true
+              name:
+                type: default
+                length: "{steplength}:int"
+              operation: mean
+              metadata:
+                paramId: "{param}:int"
+                type: fcmean
+                typeOfStatisticalProcessing: 0
+                typeOfTimeIncrement: 2
+                # indicatorOfUnitForTimeRange: 1
+                # lengthOfTimeRange: "{coords_span}"
+                # indicatorOfUnitForTimeIncrement: 1
+                # timeIncrement: "{coords_increment}"
+                # typeOfGeneratingProcess: 4
+                # typeOfProcessedData: 10
+                # bitsPerValue: 16
+                # stepType: avg
+    fcmax:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      filter:param:
+        "237167":
+          accumulations:
+            step:
+              name:
+                type: default
+                length: "{steplength}:int"
+              operation: maximum
+              metadata:
+                paramId: "{param}:int"
+                type: fcmax
+                typeOfStatisticalProcessing: 2
+                typeOfTimeIncrement: 2
+                # indicatorOfUnitForTimeRange: 1
+                # lengthOfTimeRange: "{coords_span}"
+                # indicatorOfUnitForTimeIncrement: 1
+                # timeIncrement: "{coords_increment}"
+                # typeOfGeneratingProcess: 4
+                # typeOfProcessedData: 10
+                # bitsPerValue: 16
+                # stepType: max
+    fcmin:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      filter:param:
+        "238167":
+          accumulations:
+            step:
+              name:
+                type: default
+                length: "{steplength}:int"
+              operation: minimum
+              metadata:
+                paramId: "{param}:int"
+                type: fcmin
+                typeOfStatisticalProcessing: 3
+                typeOfTimeIncrement: 2
+                # indicatorOfUnitForTimeRange: 1
+                # lengthOfTimeRange: "{coords_span}"
+                # indicatorOfUnitForTimeIncrement: 1
+                # timeIncrement: "{coords_increment}"
+                # typeOfGeneratingProcess: 4
+                # typeOfProcessedData: 10
+                # bitsPerValue: 16
+                # stepType: min
+    fcstdev:
+      metadata_from_output: ["param", "stream", "date", "type"]
+      accumulations:
+        step:
+          name:
+            type: default
+            length: "{steplength}:int"
+          operation: standard_deviation
+          metadata:
+            paramId: "{param}:int"
+            type: fcstdev
+            typeOfStatisticalProcessing: 6
+            typeOfTimeIncrement: 2
+            # indicatorOfUnitForTimeRange: 1
+            # lengthOfTimeRange: "{coords_span}"
+            # indicatorOfUnitForTimeIncrement: 1
+            # timeIncrement: "{coords_increment}"
+            # typeOfGeneratingProcess: 4
+            # typeOfProcessedData: 10
+            # bitsPerValue: 16
+            # stepType: sd
 windows:
   filter:stream:
     oper/wave/enfo/waef:
@@ -1029,3 +1143,48 @@ inputs:
       fc_inputs:
         select:
           ensemble: True
+    fcmean:
+      filter:param: 
+        "228004":
+          fc_inputs: 
+            select: 
+              param: "167"
+            derive:
+              step:
+                name: step_default
+        "235055":
+          fc_inputs: 
+            select: 
+              param: "228228"
+            derive:
+              step:
+                name: step_default
+                by: 24
+    fcmax:
+      filter:param: 
+        "237167":
+          fc_inputs: 
+            select: 
+              param: "167"
+            derive:
+              step:
+                name: step_default
+    fcmin:
+      filter:param: 
+        "238167":
+          fc_inputs: 
+            select: 
+              param: "167"
+            derive:
+              step:
+                name: step_default
+    fcstd:
+      filter:param: 
+        "239167":
+          fc_inputs: 
+            select: 
+              select: 
+                param: "167"
+              derive:
+                step:
+                  name: step_default
