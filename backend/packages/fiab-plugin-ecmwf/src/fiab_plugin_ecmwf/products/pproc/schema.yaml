@@ -1178,7 +1178,7 @@ inputs:
             derive:
               step:
                 name: step_default
-    fcstd:
+    fcstdev:
       filter:param: 
         "239167":
           fc_inputs: 

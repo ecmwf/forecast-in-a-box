@@ -423,3 +423,75 @@ class Quantiles(Product):
 
     def intersect(self, other: QubedOutput) -> bool:
         return contains(other, ENSEMBLE) and len(axes(other)[ENSEMBLE]) > 1 and contains(other, PARAM)
+
+class WeeklyStatistics(Product):
+    title: str = "Weekly Statistics"
+    description: str = "Computes weekly statistics"
+    configuration_options: dict[ConfigurationOptionId, BlockConfigurationOption] = {
+        STATISTIC: BlockConfigurationOption(
+            title="Statistic",
+            description="Statistic to compute",
+            value_type=ClosedEnumType(["mean", "max", "min", "stdev"]),
+        ),
+        PARAM: BlockConfigurationOption(
+            title="Parameter",
+            description="Parameter to compute",
+            value_type=ParameterType(),
+        ),
+    }
+    inputs: list[str] = ["dataset"]
+    stat_type: dict[str, str] = {"mean": "fcmean", "max": "fcmax", "min": "fcmin", "stdev": "fcstdev"}
+
+    def validate(
+        self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
+    ) -> BlockInstanceOutput:
+        input_dataset = _extract_dataset(inputs, "dataset")
+        coords = {dim: list(values) for dim, values in axes(input_dataset).items() if (len(values) == 1 and dim not in [ENSEMBLE, PARAM])}
+
+        prob_qube = Qube.empty()
+        for output, _ in PPROC_SCHEMA.outputs_from_inputs(
+            forecast=ForecastDefinition(
+                datacubes=list(datacubes(input_dataset)),
+            ),
+            output_template={**coords, TYPE: self.stat_type[block.config_as_str(STATISTIC)], "selection": "default"},
+        ):
+            prob_qube = prob_qube | Qube.from_datacube(output)
+        restrictions[PARAM] = ClosedEnumType(list(axes(prob_qube)[PARAM]), subtype=ParameterType())
+
+        selected_param_id = block.config_as_str(PARAM)
+        return QubedOutput(dataqube=prob_qube.select({PARAM: selected_param_id}))
+
+    def compile(
+        self,
+        inputs: ActionLookup,
+        block: BlockInstanceRich,
+    ) -> Either[Action, Error]:  # type:ignore[invalid-argument] # semigroup
+        input_task = block.input_ids["dataset"]
+        input_task_action = inputs[input_task]
+        output_qube = self.validate(
+            block, {"dataset": QubedOutput(dataqube=from_datacubes(nodetree_datacubes(input_task_action.nodes)))}, {}
+        )
+        action = action_from_outputs(
+            requests=list(datacubes(output_qube)),
+            pproc_schema=PPROC_SCHEMA,
+            forecast=input_task_action.as_action(PProcAction),
+        )
+        return Either.ok(action)
+
+    def intersect(self, other: QubedOutput) -> bool:
+        if not contains(other, STEP) or max(axes(other)[STEP]) < 7*24:
+            return False
+        cubes = list(datacubes(other))
+        coords = {dim: list(values) for dim, values in axes(other).items() if (len(values) == 1 and dim not in [ENSEMBLE, PARAM])}
+        try:
+            for _ in PPROC_SCHEMA.outputs_from_inputs(
+                forecast=ForecastDefinition(
+                    datacubes=cubes,
+                ),
+                output_template={**coords, TYPE: self.stat_type.values()},
+                method="dfs",
+            ):
+                return True
+        except Exception as e:
+            logger.debug(e)
+        return False
