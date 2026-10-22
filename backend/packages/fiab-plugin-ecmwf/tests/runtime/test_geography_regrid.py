@@ -31,8 +31,13 @@ INPUT_NJ = 91
 # (paramId, offset) of the generated fields
 PARAMS = ((167, 280.0), (151, 1000.0))
 
-# Interpolating the smooth input field from 2 degrees is accurate to a few hundredths; the tolerance leaves room for packing
-ATOL = 0.1
+# The field is linear in the Cartesian coordinates of the point on the unit sphere, so it is smooth everywhere including the poles.
+# Its second derivative along any direction is at most the amplitude A = sqrt(6^2 + 4^2 + 8^2) of about 10.8 K per radian squared,
+# so linear interpolation from the 2 degree source (h = 0.0349 rad) errs by at most h^2 / 8 * A = 1.6e-3 K in each of the two
+# directions, 3.3e-3 K in all. Packing the 22 K range in 16 bits adds at most 3.4e-4 K at the source and again at the target. The
+# largest error seen over all the targets is 3.0e-3 K, and the tolerance of 0.01 K is a factor 3 above that and about 2000 times
+# below the range of the field.
+ATOL = 0.01
 
 
 def _regrid(fields: ekd.FieldList, grid: Any = None, domain: Any = None, fmt_if_list: str | None = None) -> ekd.FieldList:
@@ -41,7 +46,12 @@ def _regrid(fields: ekd.FieldList, grid: Any = None, domain: Any = None, fmt_if_
 
 
 def _analytic(lat: np.ndarray, lon: np.ndarray, offset: float) -> np.ndarray:
-    return offset + 20.0 * np.cos(np.radians(lat)) + 2.0 * np.sin(np.radians(lon))
+    """A field linear in the Cartesian components x, y and z of the point on the unit sphere."""
+    lat_rad, lon_rad = np.radians(lat), np.radians(lon)
+    x = np.cos(lat_rad) * np.cos(lon_rad)
+    y = np.cos(lat_rad) * np.sin(lon_rad)
+    z = np.sin(lat_rad)
+    return offset + 6.0 * x + 4.0 * y + 8.0 * z
 
 
 def _global_latlon_message(param_id: int, offset: float) -> bytes:
@@ -80,7 +90,7 @@ def _assert_values_match_analytic(fields: ekd.FieldList) -> None:
         lon = np.asarray(latlon["lon"]).ravel()
         values = np.asarray(field.to_numpy()).ravel()
         assert np.isfinite(values).all()
-        np.testing.assert_allclose(values, _analytic(lat, lon, offset), atol=ATOL)
+        np.testing.assert_allclose(values, _analytic(lat, lon, offset), rtol=0, atol=ATOL)
 
 
 def _assert_identity_preserved(fields: ekd.FieldList) -> None:
