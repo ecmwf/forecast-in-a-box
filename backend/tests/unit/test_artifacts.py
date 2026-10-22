@@ -7,6 +7,7 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 
+import errno
 import importlib.metadata
 import json
 import subprocess
@@ -572,6 +573,141 @@ def test_download_artifact_chunked_download(tmpdir_path: Path, sample_artifact: 
     artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
     assert artifact_path.exists()
     assert artifact_path.read_bytes() == total_content
+
+
+# ---------------------------------------------------------------------------
+# file:// local copy tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def local_file_sample_common(tmpdir_path: Path) -> CommonArtifactMetadata:
+    """Common artifact metadata pointing at a local file:// source, with the source file created"""
+    source_path = tmpdir_path / "source.ckpt"
+    source_path.write_bytes(b"local checkpoint data")
+    return CommonArtifactMetadata(
+        url=f"file://{source_path}",
+        display_name="Test Model",
+        display_author="Test Author",
+        display_description="Test Description",
+        disk_size_bytes=1024,
+        supported_platforms=["linux"],
+        comment="",
+    )
+
+
+@pytest.fixture
+def local_file_artifact(
+    local_file_sample_common: CommonArtifactMetadata,
+    sample_checkpoint: AnemoiCheckpoint,
+) -> ArtifactResolved:
+    """ArtifactResolved whose source url is a local file:// path"""
+    return ArtifactResolved(
+        artifact_type="AnemoiCheckpoint",
+        common=local_file_sample_common,
+        specific=sample_checkpoint,
+        is_locally_compatible=True,
+        local_compatibility_detail=None,
+    )
+
+
+def test_download_local_artifact_hardlink(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+) -> None:
+    """Successful hardlink: target exists, progress callback called, no exception"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    progress: list[int] = []
+
+    download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}", progress_callback=progress.append)
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.read_bytes() == b"local checkpoint data"
+    assert progress == [100]
+
+
+def test_download_local_artifact_exdev_fallback_to_copy(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """os.link raising EXDEV falls back to shutil.copy"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+
+    def fake_link(src: Any, dst: Any) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.os.link", fake_link)
+
+    download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}")
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert artifact_path.exists()
+    assert artifact_path.read_bytes() == b"local checkpoint data"
+
+
+def test_download_local_artifact_link_error_raises(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """os.link raising a non-EXDEV OSError: call raises, no progress callback, no target file"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    progress: list[int] = []
+
+    def fake_link(src: Any, dst: Any) -> None:
+        raise OSError(errno.EACCES, "Permission denied")
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.os.link", fake_link)
+
+    with pytest.raises(OSError, match="Permission denied"):
+        download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}", progress_callback=progress.append)
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert not artifact_path.exists()
+    assert progress == []
+
+
+def test_download_local_artifact_missing_source_raises(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+) -> None:
+    """Missing source file: call raises"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+    source_path = Path(local_file_artifact.common.url.removeprefix("file://"))
+    source_path.unlink()
+
+    with pytest.raises(FileNotFoundError):
+        download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}")
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert not artifact_path.exists()
+
+
+def test_download_local_artifact_copy_failure_removes_partial(
+    tmpdir_path: Path,
+    local_file_artifact: ArtifactResolved,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """EXDEV fallback where shutil.copy writes a partial file then fails: call raises and partial is removed"""
+    composite_id = CompositeArtifactId(ArtifactStoreId("store1"), ArtifactLocalId("model1.ckpt"))
+
+    def fake_link(src: Any, dst: Any) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    def fake_copy(src: Any, dst: Any) -> None:
+        Path(dst).write_bytes(b"partial")
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr("forecastbox.domain.artifact.io.os.link", fake_link)
+    monkeypatch.setattr("forecastbox.domain.artifact.io.shutil.copy", fake_copy)
+
+    with pytest.raises(OSError, match="No space left on device"):
+        download_artifact(composite_id, local_file_artifact, f"file://{tmpdir_path}")
+
+    artifact_path = get_artifact_local_path(composite_id, f"file://{tmpdir_path}")
+    assert not artifact_path.exists()
 
 
 # ---------------------------------------------------------------------------
