@@ -17,7 +17,6 @@ failure distinction of the install loop.
 
 import asyncio
 from collections.abc import Iterator
-from concurrent.futures import Future
 from typing import Awaitable, Generator
 from unittest.mock import MagicMock, call, patch
 
@@ -62,16 +61,15 @@ def _run_coro_without_touching_global_loop(coro: Generator | Awaitable) -> None:
 def warmup_mocks() -> Iterator[dict[str, MagicMock]]:
     """Replace every side-effecting step of the warmup with a mock recording into a shared parent"""
     parent = MagicMock()
-    catalog_future: Future[None] = Future()
-    catalog_future.set_result(None)
     with (
         patch.object(warmup_module, "setup_process", parent.setup_process),
         patch.object(warmup_module, "validate_runtime", parent.validate_runtime),
         patch.object(warmup_module, "start_db_schema", parent.start_db_schema),
         patch.object(warmup_module, "register_fiabcore_providers", parent.register_fiabcore_providers),
-        patch.object(warmup_module, "submit_refresh_catalog", parent.submit_refresh_catalog),
+        patch.object(warmup_module, "start_http_pools", parent.start_http_pools),
+        patch.object(warmup_module, "stop_http_pools", parent.stop_http_pools),
+        patch.object(warmup_module, "refresh_catalog", parent.refresh_catalog),
         patch.object(warmup_module, "initialize_stores", parent.initialize_stores),
-        patch.object(warmup_module, "join_artifact_manager", parent.join_artifact_manager),
         patch.object(warmup_module, "resolve_plugin_from_store", parent.resolve_plugin_from_store),
         patch.object(warmup_module, "update_single", parent.update_single),
         patch.object(warmup_module, "upsert_plugin_state", parent.upsert_plugin_state),
@@ -85,7 +83,7 @@ def warmup_mocks() -> Iterator[dict[str, MagicMock]]:
             return None
 
         parent.start_db_schema.side_effect = lambda: _noop()
-        parent.submit_refresh_catalog.return_value = catalog_future
+        parent.stop_http_pools.side_effect = lambda: _noop()
         parent.resolve_plugin_from_store.return_value = _SETTINGS
         yield {"parent": parent}
 
@@ -108,11 +106,11 @@ def test_preparation_precedes_installation(warmup_mocks: dict[str, MagicMock]) -
     parent = warmup_mocks["parent"]
     with patch.object(warmup_module.config.external, "default_plugins", [_ALPHA]):
         warmup_module.warmup()
-    ordering = [call[0] for call in parent.mock_calls if not call[0].startswith("submit_refresh_catalog.")]
+    ordering = [call[0] for call in parent.mock_calls]
     assert ordering.index("start_db_schema") < ordering.index("update_single")
     assert ordering.index("register_fiabcore_providers") < ordering.index("update_single")
     assert ordering.index("initialize_stores") < ordering.index("update_single")
-    assert ordering.index("update_single") < ordering.index("join_artifact_manager")
+    assert ordering.index("refresh_catalog") < ordering.index("update_single")
 
 
 def test_unknown_to_store_falls_back_to_db(warmup_mocks: dict[str, MagicMock]) -> None:
@@ -148,7 +146,6 @@ def test_recoverable_failure_continues_and_exits_nonzero(warmup_mocks: dict[str,
             warmup_module.warmup()
     assert exit_info.value.code != 0
     assert [call.args[0] for call in parent.update_single.call_args_list] == [_ALPHA, _BETA]
-    parent.join_artifact_manager.assert_called_once()
 
 
 @pytest.mark.parametrize("error", [PluginEnvironmentAlreadyBroken("uv pip check failed"), PackagesError("cannot freeze")])
@@ -159,7 +156,6 @@ def test_environment_failure_aborts_immediately(warmup_mocks: dict[str, MagicMoc
         with pytest.raises(type(error)):
             warmup_module.warmup()
     assert [call.args[0] for call in parent.update_single.call_args_list] == [_ALPHA]
-    parent.join_artifact_manager.assert_called_once()
 
 
 def test_no_settings_override_skips_settings_application(warmup_mocks: dict[str, MagicMock]) -> None:
