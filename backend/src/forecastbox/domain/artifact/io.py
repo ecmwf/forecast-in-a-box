@@ -143,18 +143,23 @@ def _download_artifact_local(
         try:
             logger.debug(f"Starting copy for {composite_id} from {checkpoint.url}")
             src_path = Path(urllib.parse.urlparse(checkpoint.url).path).resolve()
-            target_path = str(artifact_path)
             try:
-                os.link(src_path, target_path)
+                os.link(src_path, artifact_path)
                 logger.info(f"Successfully hardlinked artifact {composite_id} to {artifact_path}")
             except OSError as e:
-                if e.errno == errno.EXDEV:
-                    shutil.copy(src_path, target_path)
+                if e.errno != errno.EXDEV:
+                    raise
+                try:
+                    shutil.copy(src_path, artifact_path)
                     logger.info(f"Successfully copied artifact {composite_id} to {artifact_path}")
+                except Exception:
+                    artifact_path.unlink(missing_ok=True)
+                    raise
             if progress_callback:
                 progress_callback(100)
         except Exception as e:
-            logger.error(f"Failed to copy artifact {composite_id}: {e}")
+            logger.exception(f"Failed to copy artifact {composite_id}: {e}")
+            raise
         return
 
     client = get_sync(HttpProfile.Download)
