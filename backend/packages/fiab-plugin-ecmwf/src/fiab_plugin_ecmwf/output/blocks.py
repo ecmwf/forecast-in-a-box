@@ -23,6 +23,7 @@ from fiab_core.fable import (
     ConfigurationOptionRestriction,
     QubedOutput,
     RawOutput,
+    get_fetchable_mime,
 )
 from fiab_core.plugin import Error
 from fiab_core.tools.blocks import BlockInstanceRich, Sink
@@ -46,7 +47,7 @@ GRIB_ALIASES = {
     "level": LEVEL,
 }
 
-GRIB_MIME = "text/plain; fiab-format=gribdir"
+GRIB_MIME = get_fetchable_mime("gribdir")
 
 PLOT_FORMAT_TO_MIME: dict[str, str] = {
     "png": "image/png",

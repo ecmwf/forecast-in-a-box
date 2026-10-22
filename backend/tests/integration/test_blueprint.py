@@ -1699,8 +1699,10 @@ def _make_builder_source_and_sink(tmpdir: str) -> BlueprintBuilder:
     )
 
 
-def _make_builder_source_and_two_sinks(tmpdir: str, images: int = 1) -> BlueprintBuilder:
-    """Blueprint with source_42 → sink_file and source_42 → sink_image, the latter producing `images` outputs."""
+def _make_builder_source_and_two_sinks(tmpdir: str, images: int = 1, filetree: bool = False) -> BlueprintBuilder:
+    """Blueprint with source_42 → sink_file and source_42 → sink_image, the latter producing `images` outputs.
+
+    With `filetree`, a sink_filetree block is added as well."""
     source_42 = RoutableBlock(
         instance_id=BlockInstanceId("source_42"),
         plugin=testPluginId,
@@ -1728,11 +1730,21 @@ def _make_builder_source_and_two_sinks(tmpdir: str, images: int = 1) -> Blueprin
             input_ids={"data": BlockInstanceId("source_42")},
         ),
     )
+    sink_filetree = RoutableBlock(
+        instance_id=BlockInstanceId("my_tree_sink"),
+        plugin=testPluginId,
+        factory=BlockFactoryId("sink_filetree"),
+        instance=BlockInstance(
+            configuration_values=_config({"path_root": f"{tmpdir}/tree_${{runId}}", "depth": "2"}),
+            input_ids={"data": BlockInstanceId("source_42")},
+        ),
+    )
     return BlueprintBuilder(
         blocks=[
             source_42,
             sink_file.model_copy(update={"instance_id": BlockInstanceId("my_sink")}),
             sink_image.model_copy(update={"instance_id": BlockInstanceId("my_image_sink")}),
+            *([sink_filetree] if filetree else []),
         ]
     )
 
@@ -1807,7 +1819,7 @@ def test_delete_stop_ok(tmpdir: Any, backend_client_user: httpx.Client) -> None:
 
 def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> None:
     """Execute a run, wait for completion, then retrieve output content via outputContent."""
-    builder = _make_builder_source_and_two_sinks(tmpdir, images=3)
+    builder = _make_builder_source_and_two_sinks(tmpdir, images=3, filetree=True)
     save_resp = backend_client_user.post("/blueprint/create", json=BlueprintSaveCommand(builder=builder).model_dump())
     assert save_resp.is_success, save_resp.text
     blueprint_id = save_resp.json()["blueprint_id"]
@@ -1829,7 +1841,7 @@ def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> N
     # Cascade only exposes sink tasks as ext_outputs; our blueprint has two sinks.
     # Task IDs encode the runtime function name: fiab_plugin_test.runtime.sink_file:<hash>
     # and fiab_plugin_test.runtime.sink_image:<hash>
-    sink_file_tasks = [t for t in available_tasks if "sink_file" in t]
+    sink_file_tasks = [t for t in available_tasks if "sink_file" in t and "sink_filetree" not in t]
     assert len(sink_file_tasks) == 1, f"Expected exactly one sink_file task, got: {available_tasks}"
     sink_file_task_id = sink_file_tasks[0]
 
@@ -1881,6 +1893,24 @@ def test_run_output_content(tmpdir: Any, backend_client_user: httpx.Client) -> N
         image_contents.add(image_resp.content)
     # Each task index yields a distinct grayscale value
     assert len(image_contents) == 3
+
+    # Fetchable output is returned as a zip preserving relative paths
+    tree_tasks = [t for t in available_tasks if "sink_filetree" in t]
+    assert len(tree_tasks) == 1, f"Expected exactly one sink_filetree task, got: {available_tasks}"
+    zip_resp = backend_client_user.get("/run/outputZipped", params={"run_id": run_id, "dataset_id": tree_tasks[0]})
+    assert zip_resp.is_success, zip_resp.text
+    assert zip_resp.headers.get("content-type", "").startswith("application/zip")
+    with zipfile.ZipFile(io.BytesIO(zip_resp.content)) as zf:
+        assert zf.testzip() is None
+        root = f"tree_{run_id}"
+        assert f"{root}/d1/d2/file" in zf.namelist()
+        assert zf.read(f"{root}/d1/d2/file").decode() == "42"
+        assert zip_resp.headers["content-disposition"].endswith(f'{root}.zip"')
+
+    # Non-fetchable outputs are refused
+    for task_id in (sink_file_task_id, sink_image_tasks[0]):
+        refused = backend_client_user.get("/run/outputZipped", params={"run_id": run_id, "dataset_id": task_id})
+        assert refused.status_code == 400, refused.text
 
 
 def _wait_until_running(client: httpx.Client, run_id: str, sleep: float = 1.0, attempts: int = 60) -> None:

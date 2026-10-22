@@ -31,7 +31,7 @@ from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
 from fastapi import APIRouter, Depends, Response
 from fastapi.exceptions import HTTPException
-from fiab_core.fable import BlockInstanceId
+from fiab_core.fable import BlockInstanceId, is_fetchable_mime
 from pydantic import Field
 
 from forecastbox.domain.auth.users import get_auth_context
@@ -237,6 +237,80 @@ async def _resolve_run_record(
     except RunAccessDenied:
         raise HTTPException(status_code=403, detail=f"Access denied to execution {execution_spec.run_id!r}.")
     return execution
+
+
+def _retrieve_output_bytes(execution: db.RunRecord, spec: RunLookup, dataset_id: str) -> tuple[bytes, str]:
+    """Retrieve the value and the mime type of an output, from the local cache if possible, otherwise from cascade.
+
+    Raises HTTPException if the run has not been submitted, or the output is not available.
+    """
+    if execution.cascade_job_id is None:
+        raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")
+    dataset = DatasetId(task=TaskId(dataset_id), output="0")
+
+    # Serve from locally cached value when available, without contacting cascade.
+    raw_outputs = cast(dict | None, execution.outputs)
+    if raw_outputs is not None:
+        try:
+            outputs_model = RunOutputs.model_validate(raw_outputs)
+            char = outputs_model.outputs.get(TaskId(dataset_id))
+            if char is not None and char.value is not None:
+                return char.value.encode(get_encoding(char.mime_type)), char.mime_type
+        except Exception:
+            pass  # fall through to cascade
+
+    mime_result = service.get_mime_of_output(execution, dataset)
+    if mime_result.t is None:
+        raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
+    response = client.request_response(
+        api.ResultRetrievalRequest(job_id=JobId(execution.cascade_job_id), dataset_id=dataset),
+        get_gateway_url(),
+    )
+    response = cast(api.ResultRetrievalResponse, response)
+    if response.error:
+        raise HTTPException(500, f"Result retrieval failed: {response.error}")
+    try:
+        decoded = api.decoded_result(response, job=None)  # type: ignore[attr-defined]
+    except Exception as e:
+        raise HTTPException(500, f"Result decoding failed: {e}")
+    if not isinstance(decoded, bytes):
+        raise HTTPException(500, f"Result decoding failed: expected bytes, got {type(decoded).__name__}")
+    return decoded, mime_result.t
+
+
+async def _build_output_zip_response(path: pathlib.Path) -> Response:
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Output path {str(path)!r} does not exist.")
+    root_name = path.resolve().name or "output"
+
+    def _build_zip() -> tuple[bytes, str]:
+        try:
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.write(path, arcname=root_name)
+                if path.is_dir():
+                    for dirpath, dirnames, filenames in os.walk(path):
+                        dirnames.sort()
+                        base = pathlib.Path(dirpath)
+                        for d in dirnames:
+                            zf.write(base / d, arcname=str(pathlib.Path(root_name) / (base / d).relative_to(path)))
+                        for f in sorted(filenames):
+                            zf.write(base / f, arcname=str(pathlib.Path(root_name) / (base / f).relative_to(path)))
+            return buffer.getvalue(), ""
+        except Exception as e:
+            logger.exception("building output zip")
+            return b"", repr(e)
+
+    loop = asyncio.get_running_loop()
+    bytez, error = await loop.run_in_executor(None, _build_zip)
+    if not error:
+        return Response(
+            content=bytez,
+            status_code=200,
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{root_name}.zip"'},
+        )
+    return Response(content=error, status_code=500, media_type="text/plain")
 
 
 async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
@@ -511,39 +585,37 @@ async def get_run_output_content(
 ) -> Response:
     """Retrieve the result of a specific output task, encoded as bytes."""
     execution = await _resolve_run_record(spec, auth_context)
+    decoded, mime_type = _retrieve_output_bytes(execution, spec, dataset_id)
+    return Response(decoded, media_type=mime_type)
+
+
+@router.get("/outputZipped")
+async def get_run_output_zipped(
+    spec: Annotated[RunLookup, Depends()],
+    dataset_id: str,
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> Response:
+    """Retrieve a fetchable output, ie, one whose value is a path to a file or a directory tree, as a zip archive.
+
+    The archive is named after the last component of the path, and contains that file, or the whole directory
+    tree below it with relative paths preserved. Returns 400 if the output is not of a fetchable mime type.
+    """
+    execution = await _resolve_run_record(spec, auth_context)
     if execution.cascade_job_id is None:
         raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")
-    dataset = DatasetId(task=TaskId(dataset_id), output="0")
-
-    # Serve from locally cached value when available, without contacting cascade.
-    raw_outputs = cast(dict | None, execution.outputs)
-    if raw_outputs is not None:
-        try:
-            outputs_model = RunOutputs.model_validate(raw_outputs)
-            char = outputs_model.outputs.get(TaskId(dataset_id))
-            if char is not None and char.value is not None:
-                encoding = get_encoding(char.mime_type)
-                return Response(char.value.encode(encoding), media_type=char.mime_type)
-        except Exception:
-            pass  # fall through to cascade
-
-    mime_result = service.get_mime_of_output(execution, dataset)
+    mime_result = service.get_mime_of_output(execution, DatasetId(task=TaskId(dataset_id), output="0"))
     if mime_result.t is None:
         raise HTTPException(500, f"Result mime lookup failed: {mime_result.e}")
-    response = client.request_response(
-        api.ResultRetrievalRequest(job_id=JobId(execution.cascade_job_id), dataset_id=dataset),
-        get_gateway_url(),
-    )
-    response = cast(api.ResultRetrievalResponse, response)
-    if response.error:
-        raise HTTPException(500, f"Result retrieval failed: {response.error}")
+    if not is_fetchable_mime(mime_result.t):
+        raise HTTPException(400, f"Output {dataset_id!r} of mime type {mime_result.t!r} is not fetchable as a zip.")
+    decoded, _ = _retrieve_output_bytes(execution, spec, dataset_id)
     try:
-        decoded = api.decoded_result(response, job=None)  # type: ignore[attr-defined]
+        path_str = decoded.decode(get_encoding(mime_result.t)).strip()
     except Exception as e:
-        raise HTTPException(500, f"Result decoding failed: {e}")
-    if not isinstance(decoded, bytes):
-        raise HTTPException(500, f"Result decoding failed: expected bytes, got {type(decoded).__name__}")
-    return Response(decoded, media_type=mime_result.t)
+        raise HTTPException(500, f"Output path decoding failed: {e}")
+    if path_str.startswith("file://"):
+        path_str = path_str[len("file://") :]
+    return await _build_output_zip_response(pathlib.Path(path_str))
 
 
 @router.get("/logs")

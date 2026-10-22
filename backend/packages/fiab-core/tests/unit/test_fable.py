@@ -138,3 +138,21 @@ def test_blueprint_template_example_input_accepts_none_type_hint() -> None:
 def test_blueprint_template_example_input_rejects_invalid_type_hint() -> None:
     with pytest.raises(ValidationError):
         BlueprintTemplateExampleInput.model_validate({"example_value": "hello", "type_hint": "not-a-fable-type"})
+
+
+def test_fetchable_mime_roundtrip() -> None:
+    from fiab_core.fable import get_fetchable_mime, is_fetchable_mime
+
+    mime = get_fetchable_mime("gribdir")
+    assert mime == "text/plain; fiab-format=gribdir; fiab-fetchable=1"
+    assert is_fetchable_mime(mime)
+    assert is_fetchable_mime("text/plain; fiab-fetchable=1")
+
+
+def test_is_fetchable_mime_negative() -> None:
+    from fiab_core.fable import is_fetchable_mime
+
+    assert not is_fetchable_mime("text/plain")
+    assert not is_fetchable_mime("text/plain; fiab-format=gribdir")
+    assert not is_fetchable_mime("text/plain; fiab-fetchable=0")
+    assert not is_fetchable_mime("application/octet-stream; fiab-fetchable=1")

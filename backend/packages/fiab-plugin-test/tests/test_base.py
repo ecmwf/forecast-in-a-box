@@ -21,10 +21,11 @@ from fiab_core.fable import (
     BlockInstanceId,
     ConfigurationOptionId,
     RawOutput,
+    is_fetchable_mime,
 )
 
 from fiab_plugin_test import _get_checkpoint_enum_type, catalogue, compiler, validator
-from fiab_plugin_test.runtime import DEFAULT_TEXT, sink_file, sink_image, source_filesize, source_text
+from fiab_plugin_test.runtime import DEFAULT_TEXT, sink_file, sink_filetree, sink_image, source_filesize, source_text
 
 # ---------------------------------------------------------------------------
 # runtime.source_text
@@ -233,6 +234,50 @@ def test_sink_file_returns_bytes_locator(tmp_path: pathlib.Path) -> None:
     locator = sink_file("hello", str(tmp_path / "out.txt"))
     assert isinstance(locator, bytes)
     assert locator.startswith(b"file://")
+
+
+def test_sink_filetree_creates_nested_file(tmp_path: pathlib.Path) -> None:
+    root = tmp_path / "tree"
+    locator = sink_filetree(42, str(root), 3)
+    assert locator == str(root.absolute()).encode("ascii")
+    assert (root / "d1" / "d2" / "d3" / "file").read_text() == "42"
+
+
+def test_sink_filetree_depth_zero(tmp_path: pathlib.Path) -> None:
+    root = tmp_path / "tree"
+    sink_filetree("x", str(root), 0)
+    assert (root / "file").read_text() == "x"
+
+
+def _compile_sink_filetree(path_root: object, depth: object) -> Either[Action, str]:  # ty:ignore[invalid-type-arguments] # semigroup
+    source = compiler({}, BlockFactoryId("source_42"), BlockInstance(configuration_values={}, input_ids={})).t
+    assert source is not None
+    instance = BlockInstance(
+        configuration_values={ConfigurationOptionId("path_root"): path_root, ConfigurationOptionId("depth"): depth},
+        input_ids={"data": BlockInstanceId("source")},
+    )
+    return compiler({BlockInstanceId("source"): source}, BlockFactoryId("sink_filetree"), instance)
+
+
+def test_compiler_sink_filetree() -> None:
+    result = _compile_sink_filetree("/tmp/x", 2)
+    assert result.t is not None, f"compiler returned error: {result.e}"
+    sinks = result.t.graph().sinks
+    assert len(sinks) == 1
+    assert sinks[0].payload.static_input_kw == {"path_root": "/tmp/x", "depth": 2}
+
+
+def test_compiler_sink_filetree_invalid() -> None:
+    assert _compile_sink_filetree(1, 2).e is not None
+    assert _compile_sink_filetree("/tmp/x", "2").e is not None
+    assert _compile_sink_filetree("/tmp/x", -1).e is not None
+
+
+def test_validator_sink_filetree_is_fetchable() -> None:
+    validation = validator(BlockFactoryId("sink_filetree"), BlockInstance(configuration_values={}, input_ids={}), {})
+    output = validation.result.t
+    assert isinstance(output, RawOutput)
+    assert is_fetchable_mime(output.mime_type)
 
 
 # ---------------------------------------------------------------------------
