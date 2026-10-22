@@ -33,6 +33,16 @@ function withAuth(ui: React.ReactNode) {
   return <AuthContext.Provider value={anonymousAuth}>{ui}</AuthContext.Provider>
 }
 
+// No CSS in tests: the unsized logo covers Base UI's hidden input, so click via the DOM.
+function tickDontShowAgain(
+  screen: Awaited<ReturnType<typeof renderWithRouter>>,
+) {
+  const checkbox = screen.getByRole('checkbox', {
+    name: "Don't show this again",
+  })
+  ;(checkbox.element() as HTMLElement).click()
+}
+
 describe('WelcomeDialog', () => {
   // Browser-mode tests render without the app stylesheet, so the dialog loses
   // its Tailwind `fixed`/`z-50` positioning while Base UI's modal backdrop
@@ -65,7 +75,7 @@ describe('WelcomeDialog', () => {
   it('the checkbox makes a tour start a permanent skip of the card', async () => {
     const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
-    await screen.getByText("Don't show this again").click()
+    tickDontShowAgain(screen)
     await screen.getByRole('button', { name: 'Take the tour' }).click()
 
     expect(useOnboardingStore.getState().status).toBe('skipped')
@@ -87,7 +97,7 @@ describe('WelcomeDialog', () => {
   it('the checkbox turns dismissal into a permanent skip', async () => {
     const screen = await renderWithRouter(withAuth(<WelcomeDialog />))
 
-    await screen.getByText("Don't show this again").click()
+    tickDontShowAgain(screen)
     await screen.getByRole('button', { name: 'Skip for now' }).click()
 
     expect(useOnboardingStore.getState().status).toBe('skipped')
