@@ -55,6 +55,7 @@ template = BlueprintTemplate(
                     ConfigurationOptionId("groupby"): "none",
                     # Splitting by param is valid only because two are selected.
                     ConfigurationOptionId("splitby"): "step,param",
+                    ConfigurationOptionId("style"): "ECMWF",
                 },
                 input_ids={
                     "dataset": BlockInstanceId("source"),

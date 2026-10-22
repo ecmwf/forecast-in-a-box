@@ -49,6 +49,26 @@ def _configure_schema(style_schema: str) -> None:
         schema.use(style_schema)
 
 
+def _style_units(fields: ekd.FieldList) -> str | None:
+    """Return the units of the style the active earthkit-plots schema selects for *fields*, or None if unknown."""
+    # import inside function justified: earthkit.plots is an optional dependency
+    from earthkit.plots.sources import get_source  # type: ignore[unresolved-import]
+    from earthkit.plots.styles import auto  # type: ignore[unresolved-import]
+
+    try:
+        return getattr(auto.guess_style(get_source(fields)), "units", None)
+    except Exception as err:
+        logger.warning("map_plot: failed to determine style units: %s", err)
+        return None
+
+
+def _quickplot(subplot: "Subplot", fields: ekd.FieldList, **kwargs: Any) -> None:
+    """Quickplot *fields*, converting them to the units of the selected style."""
+    # earthkit-plots<1.0 picks a style in its preferred units (e.g. celsius) when the schema sets
+    # use_preferred_units, but only converts the data when units are passed explicitly
+    subplot.quickplot(fields, units=_style_units(fields), **kwargs)
+
+
 def _plot_fields(subplot: "Subplot", fields: ekd.FieldList, **kwargs: Any) -> None:
     """Plot fields on a subplot, selecting the appropriate method based on field metadata.
 
@@ -63,12 +83,54 @@ def _plot_fields(subplot: "Subplot", fields: ekd.FieldList, **kwargs: Any) -> No
 
     for method, comp in plot_categories.items():
         for _sub_cat, sub_fields in comp.items():
+            sub_fieldlist = ekd.FieldList.from_fields(sub_fields)
+            if method == "quickplot":
+                _quickplot(subplot, sub_fieldlist, **kwargs.get("quickplot", {}))
+                continue
             try:
-                getattr(subplot, method)(ekd.FieldList.from_fields(sub_fields), **kwargs.get(method, {}))
-            except Exception as err:
-                if method == "quickplot":
-                    raise err
-                subplot.quickplot(ekd.FieldList.from_fields(sub_fields), **kwargs.get("quickplot", {}))
+                getattr(subplot, method)(sub_fieldlist, **kwargs.get(method, {}))
+            except Exception:
+                _quickplot(subplot, sub_fieldlist, **kwargs.get("quickplot", {}))
+
+
+def _is_subarea_reduced_gg(field: Any) -> bool:
+    """Return True if *field* is on a reduced Gaussian grid restricted to a non-global area."""
+    try:
+        gridspec = field.metadata().geography.gridspec()
+    except Exception:
+        return False
+    if gridspec is None:
+        return False
+    grid, area = gridspec.get("grid"), gridspec.get("area")
+    if not (isinstance(grid, str) and REDUCED_GG_PATTERN.match(grid)) or not area:
+        return False
+    north, west, south, east = area
+    return (north - south) < 170 or (east - west) % 360 < 350
+
+
+def _to_latlon_field(field: Any) -> ekd.ArrayField:
+    """Rewrap *field* as an ArrayField carrying explicit latitudes and longitudes and no grid definition."""
+    latlon = field.to_latlon(flatten=True)
+    lons = latlon["lon"]
+    datetimes = field.datetime()
+    metadata = {key: value for key in LATLON_METADATA_KEYS if (value := field.metadata(key, default=None)) is not None}
+    metadata.update(
+        param=metadata.get("shortName"),
+        base_datetime=datetimes["base_time"],
+        valid_datetime=datetimes["valid_time"],
+        latitudes=latlon["lat"],
+        longitudes=np.where(lons > 180, lons - 360, lons),
+    )
+    return ekd.ArrayField(field.to_numpy(flatten=True), metadata)
+
+
+def _prepare_fields(fields: ekd.FieldList) -> ekd.FieldList:
+    """Rewrap sub-area reduced Gaussian fields as lat/lon fields; other fields are returned unchanged."""
+    if not any(_is_subarea_reduced_gg(field) for field in fields):  # type: ignore[reportGeneralTypeIssues]
+        return fields
+    return ekd.FieldList.from_fields(
+        [_to_latlon_field(field) if _is_subarea_reduced_gg(field) else field for field in fields]  # type: ignore[reportGeneralTypeIssues]
+    )
 
 
 def _is_subarea_reduced_gg(field: Any) -> bool:
