@@ -348,6 +348,180 @@ class TestRegridAcrossAntimeridian:
         self._assert_crosses_the_180_line(result)
 
 
+class TestMirRegrid:
+    def test_list_and_string_grids_give_identical_values(self, input_fields: ekd.FieldList) -> None:
+        results = [mir_regrid(input_fields, grid=grid) for grid in ([1.0, 1.0], "1.0/1.0", "1/1", 1.0, (1.0, 1.0))]
+
+        for result in results[1:]:
+            assert len(result) == len(PARAMS)
+            for index in range(len(PARAMS)):
+                np.testing.assert_array_equal(results[0][index].to_numpy(), result[index].to_numpy())
+
+    def test_non_integer_increments_are_kept(self, input_fields: ekd.FieldList) -> None:
+        result = mir_regrid(input_fields, grid=[0.25, 0.5])
+
+        for field in result:
+            assert field.metadata("iDirectionIncrementInDegrees") == 0.25
+            assert field.metadata("jDirectionIncrementInDegrees") == 0.5
+            assert field.shape == (361, 1440)
+        _assert_values_match_analytic(result)
+
+    def test_output_is_grib2_with_the_given_packing_and_accuracy(self, input_fields: ekd.FieldList) -> None:
+        result = mir_regrid(input_fields, grid="O48", packing="ccsds", accuracy=12)
+
+        for field in result:
+            assert field.metadata("edition") == 2
+            assert field.metadata("packingType") == "grid_ccsds"
+            assert field.metadata("bitsPerValue") == 12
+
+    def test_each_field_keeps_its_own_values(self, input_fields: ekd.FieldList) -> None:
+        result = mir_regrid(input_fields, grid="O48")
+
+        assert len(result) == len(PARAMS)
+        assert result.metadata("paramId") == [param_id for param_id, _ in PARAMS]
+        means = [float(np.mean(field.to_numpy())) for field in result]
+        assert means[0] == pytest.approx(PARAMS[0][1], abs=1.0)
+        assert means[1] == pytest.approx(PARAMS[1][1], abs=1.0)
+
+    def test_area_reduces_the_number_of_points(self, input_fields: ekd.FieldList) -> None:
+        global_result = mir_regrid(input_fields, grid="O48")
+        area_result = mir_regrid(input_fields, grid="O48", area=[90.0, 0.0, 0.0, 180.0])
+
+        assert area_result[0].to_numpy().size < global_result[0].to_numpy().size
+
+    def test_area_without_grid_cuts_out_the_input_grid(self, input_fields: ekd.FieldList) -> None:
+        result = mir_regrid(input_fields, grid=None, area=[60.0, -10.0, 35.0, 30.0])
+
+        assert len(result) == len(PARAMS)
+        for field in result:
+            # the 2 degree grid of the input is kept, and its points inside the area remain
+            assert field.metadata("gridType") == "regular_ll"
+            assert field.metadata("iDirectionIncrementInDegrees") == 2.0
+            assert field.metadata("jDirectionIncrementInDegrees") == 2.0
+            assert field.shape == (13, 21)
+            north, west, south, east = _extent(field)
+            np.testing.assert_allclose([north, west, south, east], [60.0, -10.0, 36.0, 30.0])
+        _assert_identity_preserved(result)
+        _assert_values_match_analytic(result)
+
+    def test_neither_grid_nor_area_returns_the_fields_unchanged(self, input_fields: ekd.FieldList) -> None:
+        assert mir_regrid(input_fields, grid=None, area=None) is input_fields
+
+    def test_unstructured_grid_from_coordinate_lists(self, input_fields: ekd.FieldList) -> None:
+        latitudes = [0.0, 10.0, 20.0, 30.0]
+        longitudes = [0.0, 10.0, 20.0, 30.0]
+
+        result = mir_regrid(input_fields, grid={"latitudes": latitudes, "longitudes": longitudes})
+
+        assert len(result) == len(PARAMS)
+        for index, (_, offset) in enumerate(PARAMS):
+            field = result[index]
+            assert field.metadata("gridType") == "unstructured_grid"
+            # the unstructured GRIB output carries no coordinates, so the values are compared at the requested points
+            expected = _analytic(np.array(latitudes), np.array(longitudes), offset)
+            np.testing.assert_allclose(np.asarray(field.to_numpy()), expected, atol=ATOL)
+        _assert_identity_preserved(result)
+
+
+SPECTRAL_TRUNCATION = 15
+SPECTRAL_PARAM_ID = 167
+# MIR transforms a spectral field to a Gaussian grid of its truncation (F16, whose outermost latitude is 85.76 degrees) and
+# interpolates from there. A target point beyond that latitude takes the value of the outermost row, which is off by at most
+# 5 * sqrt(3) * (1 - sin(85.76 degrees)) = 0.024 K for the field below, and linear interpolation inside is off by at most 0.011 K.
+SPECTRAL_ATOL = 0.03
+SPECTRAL_MEAN = 280.0
+# the (n=1, m=0) term gives a field of coefficient * sqrt(3) * sin(latitude) in the normalisation of the spectral transform
+SPECTRAL_ZONAL_COEFFICIENT = 5.0
+
+
+def _spectral_message(mean: float, zonal_coefficient: float) -> bytes:
+    """Encode a triangular spectral GRIB2 message whose only non-zero coefficients are the mean and the (n=1, m=0) term."""
+    handle = eccodes.codes_grib_new_from_samples("sh_sfc_grib2")
+    try:
+        for key in ("J", "K", "M"):
+            eccodes.codes_set(handle, f"pentagonalResolutionParameter{key}", SPECTRAL_TRUNCATION)
+            eccodes.codes_set(handle, f"subSet{key}", SPECTRAL_TRUNCATION)
+        eccodes.codes_set(handle, "paramId", SPECTRAL_PARAM_ID)
+        eccodes.codes_set(handle, "dataDate", 20240101)
+        # the coefficients run over m, then n from m to the truncation, each as a real and an imaginary part
+        coefficients = np.zeros((SPECTRAL_TRUNCATION + 1) * (SPECTRAL_TRUNCATION + 2))
+        coefficients[0] = mean
+        coefficients[2] = zonal_coefficient
+        eccodes.codes_set_values(handle, coefficients)
+        return eccodes.codes_get_message(handle)
+    finally:
+        eccodes.codes_release(handle)
+
+
+def _spectral_expected(lat: np.ndarray) -> np.ndarray:
+    return SPECTRAL_MEAN + SPECTRAL_ZONAL_COEFFICIENT * np.sqrt(3.0) * np.sin(np.radians(lat))
+
+
+class TestRegridSpectral:
+    @pytest.fixture
+    def constant_field(self) -> ekd.FieldList:
+        return ekd.from_source("memory", _spectral_message(SPECTRAL_MEAN, 0.0))  # type: ignore[unresolved-attribute]
+
+    @pytest.fixture
+    def zonal_field(self) -> ekd.FieldList:
+        return ekd.from_source("memory", _spectral_message(SPECTRAL_MEAN, SPECTRAL_ZONAL_COEFFICIENT))  # type: ignore[unresolved-attribute]
+
+    def test_input_is_spectral(self, constant_field: ekd.FieldList) -> None:
+        assert constant_field[0].metadata("gridType") == "sh"
+        assert constant_field[0].metadata("J") == SPECTRAL_TRUNCATION
+
+    @pytest.mark.parametrize(
+        ("grid", "grid_type", "shape"),
+        [
+            ("O48", "reduced_gg", (10944,)),
+            ("N48", "reduced_gg", (13280,)),
+            (1.0, "regular_ll", (181, 360)),
+            ([1.0, 2.0], "regular_ll", (91, 360)),
+        ],
+    )
+    def test_constant_field_stays_constant(
+        self, constant_field: ekd.FieldList, grid: object, grid_type: str, shape: tuple[int, ...]
+    ) -> None:
+        result = mir_regrid(constant_field, grid=grid)  # type: ignore[invalid-argument-type]
+
+        assert len(result) == 1
+        assert result[0].metadata("gridType") == grid_type
+        assert result[0].shape == shape
+        assert result.metadata("paramId") == [SPECTRAL_PARAM_ID]
+        np.testing.assert_allclose(np.asarray(result[0].to_numpy()), SPECTRAL_MEAN, atol=1e-3)
+
+    @pytest.mark.parametrize("grid", ["O48", "N48", 1.0, [1.0, 2.0]])
+    def test_zonal_field_follows_the_sine_of_latitude(self, zonal_field: ekd.FieldList, grid: object) -> None:
+        result = mir_regrid(zonal_field, grid=grid)  # type: ignore[invalid-argument-type]
+
+        latlon = result[0].to_latlon()
+        lat = np.asarray(latlon["lat"]).ravel()
+        values = np.asarray(result[0].to_numpy()).ravel()
+        np.testing.assert_allclose(values, _spectral_expected(lat), atol=SPECTRAL_ATOL)
+        # the field is odd about the equator around its mean, and spans the whole range of the coefficient
+        assert values[lat > 0].mean() > SPECTRAL_MEAN
+        assert values[lat < 0].mean() < SPECTRAL_MEAN
+        assert values.max() == pytest.approx(SPECTRAL_MEAN + 5.0 * np.sqrt(3.0), abs=SPECTRAL_ATOL)
+        assert values.min() == pytest.approx(SPECTRAL_MEAN - 5.0 * np.sqrt(3.0), abs=SPECTRAL_ATOL)
+
+    def test_area_cuts_out_the_regridded_spectral_field(self, zonal_field: ekd.FieldList) -> None:
+        result = mir_regrid(zonal_field, grid=1.0, area=[60.0, -10.0, 35.0, 30.0])
+
+        assert result[0].shape == (26, 41)
+        latlon = result[0].to_latlon()
+        lat = np.asarray(latlon["lat"]).ravel()
+        np.testing.assert_allclose(np.asarray(result[0].to_numpy()).ravel(), _spectral_expected(lat), atol=SPECTRAL_ATOL)
+
+    def test_spectral_and_gridded_fields_regrid_together(self, constant_field: ekd.FieldList, input_fields: ekd.FieldList) -> None:
+        mixed = ekd.FieldList.from_fields([constant_field[0], input_fields[0]])
+
+        result = mir_regrid(mixed, grid="O48")
+
+        assert len(result) == 2
+        assert result.metadata("paramId") == [SPECTRAL_PARAM_ID, PARAMS[0][0]]
+        np.testing.assert_allclose(np.asarray(result[0].to_numpy()), SPECTRAL_MEAN, atol=1e-3)
+
+
 def test_empty_fieldlist_is_returned_unchanged() -> None:
     empty = ekd.FieldList.from_fields([])
 

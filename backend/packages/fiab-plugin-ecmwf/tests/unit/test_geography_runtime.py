@@ -25,7 +25,7 @@ from fiab_plugin_ecmwf.geography.runtime import BBox, regrid
 pytest.importorskip("earthkit.data")
 
 from fiab_plugin_ecmwf.geography import mir_backend  # noqa: E402
-from fiab_plugin_ecmwf.geography.mir_backend import normalise_grid  # noqa: E402
+from fiab_plugin_ecmwf.geography.mir_backend import grid_repr  # noqa: E402
 
 
 class TestBBox:
@@ -59,37 +59,163 @@ class TestBBox:
             BBox((60.0, -10.0, 35.0), fmt="nwse")  # type: ignore[arg-type]
 
 
-class TestNormaliseGrid:
+class _FakeMir:
+    """Stands in for the mir module, recording what it is asked to build and execute."""
+
+    def __init__(self) -> None:
+        self.grids: list[dict[str, Any]] = []
+        self.jobs: list[dict[str, Any]] = []
+        self.executions: list[tuple[bytes, Any]] = []
+        mir = self
+
+        class Grid:
+            def __init__(self, **kwargs: Any) -> None:
+                mir.grids.append(kwargs)
+                self.spec = dict(kwargs)
+
+        class Job:
+            def __init__(self, **kwargs: Any) -> None:
+                mir.jobs.append(kwargs)
+
+            def execute(self, source: Any, target: Any) -> None:
+                mir.executions.append((source.buffer.read(), target))
+                target.buffer.write(b"regridded")
+
+        class PyGribInput:
+            def __init__(self, buffer: Any) -> None:
+                self.buffer = buffer
+
+        class PyGribOutput:
+            def __init__(self, buffer: Any) -> None:
+                self.buffer = buffer
+
+        self.Grid, self.Job, self.PyGribInput, self.PyGribOutput = Grid, Job, PyGribInput, PyGribOutput
+
+
+@pytest.fixture
+def fake_mir(monkeypatch: pytest.MonkeyPatch) -> _FakeMir:
+    fake = _FakeMir()
+    monkeypatch.setitem(sys.modules, "mir", fake)  # type: ignore[arg-type]
+    return fake
+
+
+class TestMakeMirGrid:
     @pytest.mark.parametrize(
         ("grid", "expected"),
         [
-            (None, None),
             ("O96", "O96"),
             ("n320", "N320"),
             ("0.25/0.5", "0.25/0.5"),
-            (0.25, "0.25/0.25"),
-            (1, "1/1"),
-            ([0.25, 0.5], "0.25/0.5"),
-            ((1.0, 2.0), "1.0/2.0"),
-            ([1, 2], "1/2"),
+            ([0.25, 0.5], [0.25, 0.5]),
+            ((1.0, 2.0), [1.0, 2.0]),
+            ([1, 2], [1, 2]),
+            (0.25, [0.25, 0.25]),
+            (1, [1, 1]),
         ],
     )
-    def test_normalise_grid(self, grid: Any, expected: str | None) -> None:
-        assert normalise_grid(grid) == expected
+    def test_grid_is_passed_to_mir(self, fake_mir: _FakeMir, grid: Any, expected: Any) -> None:
+        assert mir_backend._make_mir_grid(grid).spec == {"grid": expected}
 
-    def test_pair_order_is_passed_unchanged(self) -> None:
-        assert normalise_grid([0.5, 1.0]) == "0.5/1.0"
-        assert normalise_grid([1.0, 0.5]) == "1.0/0.5"
+    def test_pair_order_is_passed_unchanged(self, fake_mir: _FakeMir) -> None:
+        assert mir_backend._make_mir_grid([0.5, 1.0]).spec == {"grid": [0.5, 1.0]}
+        assert mir_backend._make_mir_grid([1.0, 0.5]).spec == {"grid": [1.0, 0.5]}
+
+    def test_dict_is_passed_as_keyword_arguments(self, fake_mir: _FakeMir) -> None:
+        grid = {"latitudes": [0.0, 10.0], "longitudes": [5.0, 15.0]}
+
+        assert mir_backend._make_mir_grid(grid).spec == grid
 
     @pytest.mark.parametrize("grid", [[1.0], [1.0, 2.0, 3.0], (), (1.0, 2.0, 3.0)])
-    def test_rejects_wrong_number_of_resolutions(self, grid: Any) -> None:
+    def test_rejects_wrong_number_of_resolutions(self, fake_mir: _FakeMir, grid: Any) -> None:
         with pytest.raises(ValueError, match="two resolutions"):
-            normalise_grid(grid)
+            mir_backend._make_mir_grid(grid)
 
-    @pytest.mark.parametrize("grid", [{"grid": [1.0, 1.0]}, object()])
-    def test_rejects_unsupported_type(self, grid: Any) -> None:
-        with pytest.raises(TypeError, match="Unsupported grid"):
-            normalise_grid(grid)
+    @pytest.mark.parametrize("grid", [None, True, object()])
+    def test_rejects_unsupported_type(self, fake_mir: _FakeMir, grid: Any) -> None:
+        with pytest.raises(ValueError, match="Unsupported grid"):
+            mir_backend._make_mir_grid(grid)
+
+
+class TestGridRepr:
+    @pytest.mark.parametrize(
+        ("grid", "expected"),
+        [
+            (None, "None"),
+            ("n320", "N320"),
+            ("O32", "O32"),
+            ([0.25, 0.25], "[0.25, 0.25]"),
+            ((0.5, 1.0), "[0.5, 1.0]"),
+            (0.25, "0.25"),
+        ],
+    )
+    def test_grid_repr(self, grid: Any, expected: str) -> None:
+        assert grid_repr(grid) == expected
+
+    def test_long_list_is_truncated(self) -> None:
+        assert "..." in grid_repr([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
+
+    def test_dict_is_summarised_by_length(self) -> None:
+        result = grid_repr({"latitudes": [1.0, 2.0], "longitudes": [3.0, 4.0]})
+
+        assert "latitudes" in result
+        assert "list of len 2" in result
+
+
+class _FakeField:
+    def __init__(self, content: bytes) -> None:
+        self.content = content
+
+    def to_target(self, target: str, buffer: Any) -> None:
+        assert target == "file"
+        buffer.write(self.content)
+
+
+class TestMirRegrid:
+    @pytest.fixture
+    def fields(self, fake_mir: _FakeMir, monkeypatch: pytest.MonkeyPatch) -> list[_FakeField]:
+        fake_ekd = SimpleNamespace(
+            from_source=lambda kind, data: [("regridded", data)],
+            FieldList=SimpleNamespace(from_fields=lambda out_fields: list(out_fields)),
+        )
+        monkeypatch.setattr(mir_backend, "ekd", fake_ekd)
+        return [_FakeField(b"first"), _FakeField(b"second")]
+
+    def test_empty_fieldlist_is_returned_as_it_is(self, fake_mir: _FakeMir) -> None:
+        empty: list[Any] = []
+
+        assert mir_backend.mir_regrid(empty, grid="O48") is empty  # type: ignore[arg-type]
+        assert fake_mir.jobs == []
+
+    def test_job_gets_grid_spec_edition_packing_and_accuracy(self, fake_mir: _FakeMir, fields: list[_FakeField]) -> None:
+        mir_backend.mir_regrid(fields, grid=[0.25, 0.5])  # type: ignore[arg-type]
+
+        assert fake_mir.jobs == [{"edition": 2, "packing": "ccsds", "accuracy": 16, "grid": {"grid": [0.25, 0.5]}}]
+
+    def test_job_gets_area_only_when_given(self, fake_mir: _FakeMir, fields: list[_FakeField]) -> None:
+        mir_backend.mir_regrid(fields, grid="O48", area=[60.0, -10.0, 35.0, 30.0], packing="simple", accuracy=12)  # type: ignore[arg-type]
+
+        assert fake_mir.jobs == [
+            {"edition": 2, "packing": "simple", "accuracy": 12, "grid": {"grid": "O48"}, "area": [60.0, -10.0, 35.0, 30.0]},
+        ]
+
+    def test_one_job_executes_each_field_in_order(self, fake_mir: _FakeMir, fields: list[_FakeField]) -> None:
+        result = mir_backend.mir_regrid(fields, grid="O48")  # type: ignore[arg-type]
+
+        assert len(fake_mir.jobs) == 1
+        assert [source for source, _ in fake_mir.executions] == [b"first", b"second"]
+        assert result == [("regridded", b"regridded")] * 2
+
+    def test_area_without_grid_cuts_out_only(self, fake_mir: _FakeMir, fields: list[_FakeField]) -> None:
+        mir_backend.mir_regrid(fields, grid=None, area=[60.0, -10.0, 35.0, 30.0])  # type: ignore[arg-type]
+
+        assert fake_mir.grids == []
+        assert fake_mir.jobs == [{"edition": 2, "packing": "ccsds", "accuracy": 16, "area": [60.0, -10.0, 35.0, 30.0]}]
+
+    @pytest.mark.parametrize("area", [None, []])
+    def test_neither_grid_nor_area_returns_the_fields_unchanged(self, fake_mir: _FakeMir, fields: list[_FakeField], area: Any) -> None:
+        assert mir_backend.mir_regrid(fields, grid=None, area=area) is fields  # type: ignore[arg-type]
+        assert fake_mir.jobs == []
+        assert fake_mir.executions == []
 
 
 def _part(west: float, south: float, east: float, north: float) -> SimpleNamespace:
