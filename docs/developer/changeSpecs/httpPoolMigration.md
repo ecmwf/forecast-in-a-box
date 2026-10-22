@@ -48,7 +48,7 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
    Replace the module global `_client`, `get_client` and `aclose_client` with `get_async(HttpProfile.Proxy)`.
    Remove the `lens_proxy_client` initializer and its `_stop_lens_proxy_client`.
    Remove `_TIMEOUT` (it is now the `Proxy` profile).
-8. **Admin** (`domain/admin/__init__.py`, two `async with httpx.AsyncClient()`).
+8. **Admin** (`domain/admin/__init__.py`, two `async with httpx.AsyncClient()`). [DONE]
    Use `get_async(HttpProfile.Default)`.
 9. **OIDC** (`domain/auth/oidc.py`).
    `httpx_oauth` creates its own clients internally. Check the `get_httpx_client` hook of `OpenID`, and supply a factory that returns the shared async client -- but only if the library does not close the returned client on exit (otherwise leave as is, and note it here).
