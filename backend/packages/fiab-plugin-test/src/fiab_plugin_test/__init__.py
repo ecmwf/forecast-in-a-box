@@ -23,6 +23,7 @@ from fiab_core.fable import (
     ConfigurationOptionRestriction,
     NoOutput,
     RawOutput,
+    get_fetchable_mime,
 )
 from fiab_core.plugin import BlockValidation, Error, Plugin
 from fiab_core.types import ArtifactType, ClosedEnumType, FableType, FloatType, IntType, NoneType, StringType, UnionType, parse
@@ -33,6 +34,8 @@ CHECKPOINT = ConfigurationOptionId("checkpoint")
 AMOUNT = ConfigurationOptionId("amount")
 FNAME = ConfigurationOptionId("fname")
 IMAGES = ConfigurationOptionId("images")
+PATH_ROOT = ConfigurationOptionId("path_root")
+DEPTH = ConfigurationOptionId("depth")
 
 
 def _get_checkpoint_enum_type() -> FableType:
@@ -103,6 +106,16 @@ catalogue = lambda: BlockFactoryCatalogue(
             configuration_options={FNAME: BlockConfigurationOption(title="", description="", value_type=StringType())},
             inputs=["data"],
         ),
+        BlockFactoryId("sink_filetree"): BlockFactory(
+            kind="sink",
+            title="File Tree",
+            description="Saves the input to a single file nested in `depth` directories below path_root",
+            configuration_options={
+                PATH_ROOT: BlockConfigurationOption(title="Path Root", description="", value_type=StringType()),
+                DEPTH: BlockConfigurationOption(title="Depth", description="", value_type=IntType()),
+            },
+            inputs=["data"],
+        ),
         BlockFactoryId("sink_image"): BlockFactory(
             kind="sink",
             title="Image",
@@ -130,6 +143,8 @@ def validator(factory_id: BlockFactoryId, instance: BlockInstance, inputs: dict[
         restrictions = {AMOUNT: parse("enumClosed[int](1,2,3)")}
     if factory_id in ("sink_file",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="text/plain")), restrictions)
+    elif factory_id in ("sink_filetree",):
+        return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type=get_fetchable_mime("gribdir"))), restrictions)
     elif factory_id in ("sink_image",):
         return BlockValidation(Either.ok(RawOutput(type_fqn="bytes", mime_type="image/png")), restrictions)
     elif factory_id in ("source_sleep", "source_text", "source_filesize"):
@@ -150,10 +165,14 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
                 ),
                 BlockExpansion(factory=BlockFactoryId("product_join")),
                 BlockExpansion(factory=BlockFactoryId("sink_file")),
+                BlockExpansion(factory=BlockFactoryId("sink_filetree")),
                 BlockExpansion(factory=BlockFactoryId("sink_image")),
             ]
         if output.type_fqn in ("str", "bytes"):
-            return [BlockExpansion(factory=BlockFactoryId("sink_file"))]
+            return [
+                BlockExpansion(factory=BlockFactoryId("sink_file")),
+                BlockExpansion(factory=BlockFactoryId("sink_filetree")),
+            ]
     return []
 
 
@@ -244,6 +263,19 @@ def compiler(lookup: ActionLookup, factory_id: BlockFactoryId, instance: BlockIn
                 return Either.error(f"Invalid type for {FNAME!r}: expected str, got {type(fname).__name__}")
             with NodeMetadataContext(builder=_SINK_BUILDER_METADATA):
                 action = data.map(create_task_instance("fiab_plugin_test.runtime.sink_file", static_input_kw={"fname": fname}))
+        elif factory_id == "sink_filetree":
+            data = lookup[instance.input_ids["data"]]
+            path_root = instance.configuration_values[PATH_ROOT]
+            depth = instance.configuration_values[DEPTH]
+            if not isinstance(path_root, str):
+                return Either.error(f"Invalid type for {PATH_ROOT!r}: expected str, got {type(path_root).__name__}")
+            if not isinstance(depth, int):
+                return Either.error(f"Invalid type for {DEPTH!r}: expected int, got {type(depth).__name__}")
+            if depth < 0:
+                return Either.error(f"Invalid value for {DEPTH!r}: expected non-negative, got {depth}")
+            action = data.map(
+                create_task_instance("fiab_plugin_test.runtime.sink_filetree", static_input_kw={"path_root": path_root, "depth": depth})
+            )
         elif factory_id == "sink_image":
             data = lookup[instance.input_ids["data"]]
             images = instance.configuration_values[IMAGES]
