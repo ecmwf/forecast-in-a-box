@@ -494,6 +494,7 @@ class TestThermalIndices:
     )
     def test_anemoi_source_compile(
         self,
+        ensemble_model: None,
         dummy_checkpoint: CompositeArtifactId,
         thermal_indices_configuration: BlockInstance,
         ensemble: list[int],
@@ -719,6 +720,7 @@ class TestWindSpeed:
     )
     def test_anemoi_source_compile(
         self,
+        ensemble_model: None,
         dummy_checkpoint: CompositeArtifactId,
         wind_speed_configuration: BlockInstance,
         ensemble: list[int],
