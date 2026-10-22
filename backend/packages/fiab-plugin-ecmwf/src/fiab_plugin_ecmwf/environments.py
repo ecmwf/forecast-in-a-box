@@ -16,4 +16,5 @@
 # either on pip or on our side, which makes it do nothing
 
 mars_dependencies = ["ecmwf-api-client>=1.6.5"]  # effective for earthkit-data[mars]
-opendata_dependencies = ["ecmwf-opendata>=0.3.31"]  # effective for earthkit-data[opendata]
+opendata_dependencies = ["ecmwf-opendata>=0.3.35"]  # effective for earthkit-data[opendata]
+polytope_dependencies = ["polytope-client>=0.7.6"]  # effective for earthkit-data[polytope]

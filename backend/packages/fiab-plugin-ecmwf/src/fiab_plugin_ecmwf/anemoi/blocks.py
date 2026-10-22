@@ -42,23 +42,9 @@ from fiab_plugin_ecmwf.constants import (
     LEAD_TIME,
     TIME,
 )
-from fiab_plugin_ecmwf.environments import mars_dependencies
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
-from .utils import (
-    CheckpointArtifact,
-    get_checkpoint_enum_type,
-)
-
-opendata_dep = "anemoi-plugins-ecmwf-inference[opendata]>=0.7.0"
-INPUT_SOURCE_EXTRAS: dict[str, list[str]] = {
-    "opendata": [opendata_dep],
-    "opendata:google": [opendata_dep],
-    "opendata:aws": [opendata_dep],
-    "polytope": ["anemoi-plugins-ecmwf-inference[polytope]"],
-    "mars": mars_dependencies,
-    "dummy": [],
-}
+from .utils import CheckpointArtifact, get_available_input_sources, get_checkpoint_enum_type, get_input_source_extras
 
 
 def strip_timezone(dt: datetime) -> datetime:
@@ -126,7 +112,7 @@ class AnemoiBuilder:
 
     def from_input(self, input_source: str, date: datetime, lead_time: int, ensemble: int = 1, **k: Any) -> Action:
         input_configuration = self.checkpoint.get_input_configuration(input_source)
-        action = self.inference(lead_time=lead_time, extra_environment=INPUT_SOURCE_EXTRAS.get(input_source)).from_input(
+        action = self.inference(lead_time=lead_time, extra_environment=get_input_source_extras(input_source)).from_input(
             input=input_configuration,
             date=strip_timezone(date),
             lead_time=lead_time,
@@ -146,7 +132,7 @@ class AnemoiBuilder:
 
     def get_initial_conditions(self, input_source: str, date: datetime, ensemble: int = 1, **k: Any) -> Action:
         env = self.checkpoint.get_environment()
-        env.extend(INPUT_SOURCE_EXTRAS.get(input_source, []))
+        env.extend(get_input_source_extras(input_source))
 
         return get_initial_conditions(
             ckpt=self._local_path,
@@ -256,7 +242,7 @@ class AnemoiSource(Source, AnemoiBaseBlock):
         INPUT_SOURCE: BlockConfigurationOption(
             title="Input Source",
             description="Source of the initial conditions",
-            value_type=OpenEnumType(list(INPUT_SOURCE_EXTRAS.keys())),
+            value_type=OpenEnumType(list(get_available_input_sources())),
             default_value="opendata",
         ),
         LEAD_TIME: BlockConfigurationOption(
@@ -331,7 +317,7 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
         INPUT_SOURCE: BlockConfigurationOption(
             title="Input Source",
             description="Source of the initial conditions",
-            value_type=OpenEnumType(["mars", "opendata", "polytope"]),
+            value_type=OpenEnumType(list(get_available_input_sources())),
             default_value="opendata",
         ),
         BASE_TIME: BlockConfigurationOption(
