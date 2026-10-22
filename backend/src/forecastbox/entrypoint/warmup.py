@@ -12,7 +12,7 @@ after the venv itself has been prepared.
 
 Contrary to `forecastbox.entrypoint.main`, no backend is started here -- neither the FastAPI app,
 nor the execution manager pools, nor the event dispatcher. Only the minimum needed for a plugin
-install is prepared (database schema, artifact catalog, plugin stores), and then each default
+install is prepared (database schema, artifact catalog refreshed synchronously, plugin stores), and then each default
 plugin (per config.external.default_plugins) is installed by calling
 `domain.plugin.loading.update_single` directly and sequentially. That function is fully
 synchronous, accesses the jobs database through the `db.py` helpers (which take the database lock
@@ -42,7 +42,7 @@ import sys
 import fire
 from fiab_core.fable import PluginCompositeId
 
-from forecastbox.domain.artifact.manager import join_artifact_manager, submit_refresh_catalog
+from forecastbox.domain.artifact.manager import refresh_catalog
 from forecastbox.domain.plugin.db import get_plugin_state, upsert_plugin_state
 from forecastbox.domain.plugin.exceptions import PluginEnvironmentAlreadyBroken
 from forecastbox.domain.plugin.loading import unload_single, update_single
@@ -51,15 +51,10 @@ from forecastbox.domain.plugin.store import initialize_stores, resolve_plugin_fr
 from forecastbox.entrypoint.bootstrap.config import setup_process
 from forecastbox.entrypoint.initializers import register_fiabcore_providers, start_db_schema
 from forecastbox.utility.config import DefaultPluginSettings, config, validate_runtime
+from forecastbox.utility.http_pools import start_http_pools, stop_http_pools
 from forecastbox.utility.packages import PackagesError
 
 logger = logging.getLogger(__name__ if __name__ != "__main__" else __package__)
-
-CATALOG_TIMEOUT_SEC = 600
-"""How long we wait for the artifact catalog refresh -- generous, it is a plain http fetch"""
-
-CATALOG_JOIN_TIMEOUT_SEC = 10
-"""How long we wait for the artifact manager's executor to be joined at the very end"""
 
 
 def _resolve_settings(plugin_id: PluginCompositeId) -> PluginSettings:
@@ -131,15 +126,13 @@ def warmup() -> None:
 
     asyncio.run(start_db_schema())
     register_fiabcore_providers()
-    catalog_refresh = submit_refresh_catalog()
-    initialize_stores(config.external.plugin_stores)
-    catalog_refresh.result(timeout=CATALOG_TIMEOUT_SEC)
-
-    failures = None
+    start_http_pools()
     try:
+        refresh_catalog()
+        initialize_stores(config.external.plugin_stores)
         failures = _install_plugins(plugin_ids)
     finally:
-        join_artifact_manager(timeout_sec=CATALOG_JOIN_TIMEOUT_SEC)
+        asyncio.run(stop_http_pools())
 
     if failures:
         for plugin_id_str, error in failures.items():
