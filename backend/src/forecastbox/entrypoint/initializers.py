@@ -30,7 +30,7 @@ from fiab_core.metkit import MetkitParamResolver
 import forecastbox.domain
 import forecastbox.schemata
 from forecastbox.domain.artifact.base import get_artifact_local_path
-from forecastbox.domain.artifact.manager import ArtifactManager, join_artifact_manager, submit_refresh_catalog
+from forecastbox.domain.artifact.manager import ArtifactManager, submit_refresh_catalog
 from forecastbox.domain.experiment.scheduling.background import start_scheduler, stop_scheduler
 from forecastbox.domain.gateway.service import ensure_gateway, launch_gateway, shutdown_processes
 from forecastbox.domain.lens.manager import shutdown_all_lens_instances
@@ -163,8 +163,8 @@ def register_fiabcore_providers() -> None:
 #
 # TODO rework into better alignment with execution manager / initializers after concurrency migration concluded
 # In particular, we dont want to consume a thread by awaiting on a future, we want sequential task graphs
-# TODO we submit these futures via General pool, which may block it -- consider instead some AwaitOther
-# pool with high capacity to accomodate these no-consumption-long-duration tasks, to not livelock the pool
+# TODO the scheduler prerequisite waiter still blocks a General worker, as it waits on two futures and
+# the manager has no `submit_after_all`
 ArtifactsCatalogInitialized: Future[None] = Future()
 PluginsCatalogInitialized: Future[None] = Future()
 _T = TypeVar("_T")
@@ -196,17 +196,8 @@ def _start_artifact_manager() -> None:
     catalog_ready.add_done_callback(_forward_to_barrier(ArtifactsCatalogInitialized))
 
 
-def _stop_artifact_manager() -> None:
-    join_artifact_manager(timeout_sec=10)
-
-
 def _start_plugin_catalog() -> None:
-    artifacts_ready = execution_manager.submit_unmonitored(
-        ConcurrentPools.General,
-        TaskName("plugin.await-artifacts-catalog"),
-        ArtifactsCatalogInitialized.result,
-    )
-    plugins_ready = submit_load_plugins(start_after=artifacts_ready)
+    plugins_ready = submit_load_plugins(start_after=ArtifactsCatalogInitialized)
     plugins_ready.add_done_callback(_forward_to_barrier(PluginsCatalogInitialized))
 
 
@@ -268,7 +259,7 @@ def build_initializers() -> Initializers:
         Initializer("broadcaster", start=_start_broadcaster),
         Initializer("artifact_stores", start=_start_artifact_stores),
         Initializer("fiabcore_providers", start=register_fiabcore_providers),
-        Initializer("artifact_manager", start=_start_artifact_manager, stop=_stop_artifact_manager),
+        Initializer("artifact_manager", start=_start_artifact_manager),
         Initializer("plugin_catalog", start=_start_plugin_catalog),
         Initializer("gateway", start=_start_gateway),
     ]
