@@ -72,7 +72,7 @@ class ZarrSink(Sink):
         self, block: BlockInstanceRich, inputs: dict[str, QubedOutput], restrictions: ConfigurationOptionRestriction
     ) -> BlockInstanceOutput:
         _extract_dataset(inputs, "dataset")
-        return RawOutput(type_fqn="bytes", mime_type="text/plain")
+        return RawOutput(type_fqn="bytes", mime_type=get_fetchable_mime("zarr"))
 
     def compile(
         self,

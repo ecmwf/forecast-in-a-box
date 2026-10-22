@@ -165,10 +165,14 @@ def expander(output: BlockInstanceOutput) -> list[BlockExpansion]:
                 ),
                 BlockExpansion(factory=BlockFactoryId("product_join")),
                 BlockExpansion(factory=BlockFactoryId("sink_file")),
+                BlockExpansion(factory=BlockFactoryId("sink_filetree")),
                 BlockExpansion(factory=BlockFactoryId("sink_image")),
             ]
         if output.type_fqn in ("str", "bytes"):
-            return [BlockExpansion(factory=BlockFactoryId("sink_file"))]
+            return [
+                BlockExpansion(factory=BlockFactoryId("sink_file")),
+                BlockExpansion(factory=BlockFactoryId("sink_filetree")),
+            ]
     return []
 
 

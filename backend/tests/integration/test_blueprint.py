@@ -505,6 +505,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> Non
             },
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join", "restrictions": {}},
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file", "restrictions": {}},
+            {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_filetree", "restrictions": {}},
             {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image", "restrictions": {}},
         ]
     }
@@ -529,6 +530,7 @@ def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> Non
         },
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "product_join", "restrictions": {}},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_file", "restrictions": {}},
+        {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_filetree", "restrictions": {}},
         {"plugin": {"store": "localTest", "local": "single"}, "factory": "sink_image", "restrictions": {}},
     ]
 
@@ -616,7 +618,10 @@ def test_blueprint_expand(tmpdir: Any, backend_client_user: httpx.Client) -> Non
 
     builder = BlueprintBuilder(blocks=blocks)
     response = backend_client_user.request(url="/blueprint/expand", method="put", json=builder.model_dump())
-    expected_expansion = [{"factory": "sink_file", "plugin": {"local": "single", "store": "localTest"}, "restrictions": {}}]
+    expected_expansion = [
+        {"factory": "sink_file", "plugin": {"local": "single", "store": "localTest"}, "restrictions": {}},
+        {"factory": "sink_filetree", "plugin": {"local": "single", "store": "localTest"}, "restrictions": {}},
+    ]
     # NOTE this looks odd but sink_file produces the url of the file, and that url is a text which can again be written to a file
     assert response.json()["possible_expansions"]["sink_file"] == expected_expansion, "sink_file should expand only to sink_file"
     assert len(response.json()["block_errors"]) == 0
