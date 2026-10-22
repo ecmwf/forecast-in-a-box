@@ -488,7 +488,7 @@ class WeeklyStatistics(Product):
                 forecast=ForecastDefinition(
                     datacubes=cubes,
                 ),
-                output_template={**coords, TYPE: self.stat_type.values()},
+                output_template={**coords, TYPE: list(self.stat_type.values())},
                 method="dfs",
             ):
                 return True
