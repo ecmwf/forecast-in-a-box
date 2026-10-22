@@ -15,12 +15,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+import pytest_asyncio
 from fastapi import HTTPException, Request
 from pyrsistent import pmap
 
 from forecastbox.domain.lens import proxy as lens_proxy
 from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, NoLensFound, UnproxyableLens
 from forecastbox.domain.lens.manager import LensInstance, LensInstanceId, LensInstanceManager
+from forecastbox.utility.http_pools import HttpProfile
 
 
 def _make_request(method: str = "GET", headers: list[tuple[bytes, bytes]] | None = None, query: bytes = b"") -> Request:
@@ -50,10 +52,18 @@ def assume_ports_bound() -> Iterator[None]:
         yield
 
 
-@pytest.fixture(autouse=True)
-def reset_proxy_client() -> Iterator[None]:
-    yield
-    lens_proxy._client = None
+@pytest_asyncio.fixture
+async def proxied_client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[httpx.AsyncClient]:
+    """Install a shared client in the place of the http pools registry's Proxy client."""
+    client = httpx.AsyncClient()
+
+    def get_async(profile: HttpProfile) -> httpx.AsyncClient:
+        assert profile is HttpProfile.Proxy
+        return client
+
+    monkeypatch.setattr(lens_proxy, "get_async", get_async)
+    yield client
+    await client.aclose()
 
 
 class TestResolvePort:
@@ -168,19 +178,19 @@ class TestForward:
             await lens_proxy.forward(iid, "wms", request)
 
     @pytest.mark.asyncio
-    async def test_connect_error_yields_502(self) -> None:
+    async def test_connect_error_yields_502(self, proxied_client: httpx.AsyncClient) -> None:
         iid = LensInstanceId("running-id")
         mock_proc = MagicMock(spec=subprocess.Popen)
         mock_proc.poll.return_value = None
         LensInstanceManager.instances = pmap({iid: LensInstance(process=mock_proc, lens_params={}, lens_name="skinnyWMS", ports={19042})})
         request = _make_request()
-        with patch.object(httpx.AsyncClient, "send", AsyncMock(side_effect=httpx.ConnectError("refused"))):
+        with patch.object(proxied_client, "send", AsyncMock(side_effect=httpx.ConnectError("refused"))):
             with pytest.raises(HTTPException) as exc_info:
                 await lens_proxy.forward(iid, "wms", request)
         assert exc_info.value.status_code == 502
 
     @pytest.mark.asyncio
-    async def test_success_streams_response(self) -> None:
+    async def test_success_streams_response(self, proxied_client: httpx.AsyncClient) -> None:
         iid = LensInstanceId("running-id")
         mock_proc = MagicMock(spec=subprocess.Popen)
         mock_proc.poll.return_value = None
@@ -197,7 +207,7 @@ class TestForward:
         upstream_response.aiter_raw = fake_aiter_raw
         upstream_response.aclose = AsyncMock()
 
-        with patch.object(httpx.AsyncClient, "send", AsyncMock(return_value=upstream_response)):
+        with patch.object(proxied_client, "send", AsyncMock(return_value=upstream_response)):
             response = await lens_proxy.forward(iid, "wms", request)
 
         assert response.status_code == 200
@@ -233,22 +243,22 @@ class TestUpstreamRequestFraming:
         return response
 
     @pytest.mark.asyncio
-    async def test_bodyless_get_is_not_chunked(self) -> None:
+    async def test_bodyless_get_is_not_chunked(self, proxied_client: httpx.AsyncClient) -> None:
         iid = LensInstanceId("running-id")
         self._running(iid)
         send = AsyncMock(return_value=self._upstream())
-        with patch.object(httpx.AsyncClient, "send", send):
+        with patch.object(proxied_client, "send", send):
             await lens_proxy.forward(iid, "wms", _make_request())
         sent = send.await_args.args[0]
         assert "transfer-encoding" not in {name.lower() for name in sent.headers}
 
     @pytest.mark.asyncio
-    async def test_request_with_a_body_is_still_streamed(self) -> None:
+    async def test_request_with_a_body_is_still_streamed(self, proxied_client: httpx.AsyncClient) -> None:
         iid = LensInstanceId("running-id")
         self._running(iid)
         request = _make_request("POST", headers=[(b"host", b"example.com"), (b"content-length", b"12")])
         send = AsyncMock(return_value=self._upstream())
-        with patch.object(httpx.AsyncClient, "send", send):
+        with patch.object(proxied_client, "send", send):
             await lens_proxy.forward(iid, "wms", request)
         sent = send.await_args.args[0]
         assert sent.headers.get("transfer-encoding") == "chunked"
