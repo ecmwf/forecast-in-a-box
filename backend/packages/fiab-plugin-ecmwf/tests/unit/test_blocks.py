@@ -893,7 +893,7 @@ class TestMapPlotSink:
         [
             (None, "default", []),
             ("ECMWF", "default", []),
-            ("MetNorway", "dccms", ["earthkit-plots-metno-styles"]),
+            ("MetNorway", "dccms", ["temporary-earthkit-plots-metno-styles"]),
         ],
     )
     def test_compile_style_sets_schema_and_environment(
