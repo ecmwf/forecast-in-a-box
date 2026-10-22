@@ -48,6 +48,7 @@ _enum_item: BARE_ITEM | SQ_ITEM | DQ_ITEM
 traits: "{" trait ("," trait)* ","? "}"
 ?trait: "positive" -> positive
       | "nonNegative" -> non_negative
+      | "finite" -> finite
       | "divisibleBy" "(" TRAIT_ARG ")" -> divisible_by
 
 // A bare item may contain inner whitespace, but never leading or trailing whitespace.

@@ -135,6 +135,12 @@ class TestFloatType:
         assert t.validate_convert("0.0") == 0.0
         assert t.validate_convert("42") == 42.0
 
+    def test_convert_accepts_non_finite_without_trait(self) -> None:
+        t = FloatType()
+        assert math.isnan(t.validate_convert("nan"))
+        assert t.validate_convert("inf") == math.inf
+        assert t.validate_convert("-inf") == -math.inf
+
     def test_convert_invalid_string_raises_value_error(self) -> None:
         t = FloatType()
         with pytest.raises(WrongType):
@@ -694,6 +700,12 @@ class TestBoundingBoxWSENType:
         t = BoundingBoxWSENType()
         with pytest.raises(WrongType):
             t.validate_convert("a,b,c,d")
+
+    @pytest.mark.parametrize("value", ["nan,0,10,10", "0,0,inf,10", "-inf,0,10,10", "0,0,10,nan", "0,0,10,inf"])
+    def test_convert_non_finite_elements_raises_error(self, value: str) -> None:
+        t = BoundingBoxWSENType()
+        with pytest.raises(WrongType):
+            t.validate_convert(value)
 
     def test_convert_non_string_raises_type_error(self) -> None:
         t = BoundingBoxWSENType()

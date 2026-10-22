@@ -19,7 +19,7 @@ import fiab_core  # to satisfy the type checker for artifacts annotation
 from fiab_core.metkit import MetkitParamResolver
 from fiab_core.types.dt_util import parse_timedelta
 from fiab_core.types.exceptions import NotNoneInput, NotStringInput, WrongType
-from fiab_core.types.traits import FableTrait
+from fiab_core.types.traits import FableTrait, Finite
 
 logger = logging.getLogger(__name__)
 
@@ -132,21 +132,13 @@ class IntType(FableType):
 
 
 class FloatType(FableType):
-    """The float type. Converts string to float."""
-
-    def __init__(self, real: bool = False, traits: _Traits = None) -> None:
-        """If real is True, only allow real numbers (no NaN or inf)."""
-        super().__init__(traits)
-        self.real = real
+    """The float type. Converts string to float. NaN and infinity are accepted unless the Finite trait is attached."""
 
     def validate_convert_main(self, value: Any) -> float:
         if not isinstance(value, str):
             raise NotStringInput(f"Expected string, got {type(value).__name__}")
         try:
-            result = float(value)
-            if self.real and (math.isnan(result) or math.isinf(result)):
-                raise WrongType(f"Expected a real number, got {value!r}")
-            return result
+            return float(value)
         except ValueError:
             raise WrongType(f"Cannot convert {value!r} to float")
 
@@ -364,7 +356,7 @@ class BoundingBoxWSENType(ListType):
     - west > east is allowed and means the box crosses the antimeridian."""
 
     def __init__(self, traits: _Traits = None) -> None:
-        super().__init__(FloatType(real=True), traits=traits)
+        super().__init__(FloatType(traits=Finite()), traits=traits)
 
     def validate_convert_main(self, value: Any) -> list[float]:
         result = super().validate_convert_main(value)

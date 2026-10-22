@@ -57,6 +57,10 @@
 {"term": "int{positive}", "ast": {"name": "Int", "traits": [{"name": "Positive"}]}, "value_valid": "5", "value_invalid": "0"}
 {"term": "int{nonNegative}", "ast": {"name": "Int", "traits": [{"name": "NonNegative"}]}, "value_valid": "0", "value_invalid": "-1"}
 {"term": "float{nonNegative}", "ast": {"name": "Float", "traits": [{"name": "NonNegative"}]}, "value_valid": "0.0", "value_invalid": "-0.5"}
+{"term": "float{finite}", "ast": {"name": "Float", "traits": [{"name": "Finite"}]}, "value_valid": "1.5", "value_invalid": "nan"}
+{"term": "float{finite}", "ast": {"name": "Float", "traits": [{"name": "Finite"}]}, "value_valid": "-1.5", "value_invalid": "inf"}
+{"term": "float{finite,nonNegative}", "ast": {"name": "Float", "traits": [{"name": "Finite"}, {"name": "NonNegative"}]}, "value_valid": "0.0", "value_invalid": "-inf"}
+{"term": "list[float{finite}]", "ast": {"name": "List", "item": {"name": "Float", "traits": [{"name": "Finite"}]}}, "value_valid": "1.5,2", "value_invalid": "1,nan"}
 {"term": "int{divisibleBy(3)}", "ast": {"name": "Int", "traits": [{"name": "DivisibleBy", "arg": "3"}]}, "value_valid": "9", "value_invalid": "10"}
 {"term": "float{divisibleBy(0.5)}", "ast": {"name": "Float", "traits": [{"name": "DivisibleBy", "arg": "0.5"}]}, "value_valid": "2.5", "value_invalid": "2.25"}
 {"term": "int{positive,divisibleBy(3)}", "ast": {"name": "Int", "traits": [{"name": "Positive"}, {"name": "DivisibleBy", "arg": "3"}]}, "value_valid": "6", "value_invalid": "-3"}

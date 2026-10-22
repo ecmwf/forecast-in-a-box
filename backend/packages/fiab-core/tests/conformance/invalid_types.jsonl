@@ -39,6 +39,7 @@
 {"term": "{positive}"}
 {"term": "positive"}
 {"term": "int{positive()}"}
+{"term": "float{finite()}"}
 {"term": "date time"}
 {"term": "bbox"}
 {"term": "geoDomain"}
