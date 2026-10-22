@@ -453,7 +453,7 @@ class WeeklyStatistics(Product):
             forecast=ForecastDefinition(
                 datacubes=list(datacubes(input_dataset)),
             ),
-            output_template={**coords, TYPE: self.stat_type[block.config_as_str(STATISTIC)], "selection": "default"},
+            output_template={**coords, TYPE: self.stat_type[block.config_as_str(STATISTIC)]},
         ):
             prob_qube = prob_qube | Qube.from_datacube(output)
         restrictions[PARAM] = ClosedEnumType(list(axes(prob_qube)[PARAM]), subtype=ParameterType())
