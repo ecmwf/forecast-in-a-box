@@ -9,20 +9,22 @@
 
 """API for internal artifact management -- downloading artifact catalogs and individual artifacts.
 
-Synchronization is handled by ArtifactManager with a single lock protecting shared state:
-- artifact catalog (available artifacts from remote stores)
-- locally available artifacts set
-- background thread running I/O operations
+Shared state (artifact catalog, locally available artifacts set, ongoing downloads) is held in
+ArtifactManager as immutable pyrsistent values, published under one short lock; reads are lock-free.
 
-At most one thread at a time performs download/catalog operations.
-We use pyrsistent immutable structures for safe lock-free reads.
+Catalog refresh and downloads run on `ConcurrentPools.ArtifactIo`, which has exactly one worker, for two reasons:
+- catalog refresh publishes `locally_available` from a storage listing taken earlier in the same task, so a
+  download completing in between would be overwritten unless refresh and downloads are serialized,
+- downloads share one lazily created SSH command handle for `ssh://` data paths.
+
+Model deletion currently runs on the caller's thread.
 """
 
 import logging
 import threading
-import time
 import urllib.parse
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future
+from functools import partial
 
 from cascade.low.func import Either
 from pyrsistent import pmap, pset
@@ -33,6 +35,7 @@ from forecastbox.domain.artifact.catalog import get_artifacts_catalog
 from forecastbox.domain.artifact.events import ArtifactDownloadFinishedEvent
 from forecastbox.domain.artifact.io import delete_artifact, download_artifact, list_storage
 from forecastbox.utility import tunnel
+from forecastbox.utility.concurrency.manager import ConcurrentPools, SubmissionRejected, TaskName, execution_manager
 from forecastbox.utility.concurrency.synchronization import timed_acquire
 from forecastbox.utility.config import config
 from forecastbox.utility.dispatcher import Event, EventName, submit_event
@@ -40,11 +43,7 @@ from forecastbox.utility.tunnel import CommandHandle
 
 logger = logging.getLogger(__name__)
 
-# TODO consider rewriting all those managers with thread to utilize a single pool or at least a single
-# thread dispatcher class, and only track Futures on each individual manager level
-
 timeout_acquire_request = 1  # aggressive timeout, we dont want to block async worker for long
-timeout_acquire_init = 5  # moderate timeout during init, just in case some python background business
 timeout_acquire_task = 10  # leisure timeout, this is a background thread and it can wait
 timeout_acquire_error = 2  # something failed, report quickly so that can be joined
 
@@ -55,16 +54,8 @@ class ArtifactManager:
     catalog: ArtifactCatalog = pmap()
     locally_available: PSet[CompositeArtifactId] = pset()
     ongoing_downloads: PMap[CompositeArtifactId, int | str] = pmap()
-    executor: ThreadPoolExecutor | None = None
     refresh_error: str | None = None
     ssh_handle: CommandHandle | None = None
-
-    @classmethod
-    def _ensure_pool(cls) -> None:
-        # Temporary method until we refactor for external thread pool/dispatcher.
-        # Assumes lock held!
-        if cls.executor is None:
-            cls.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="artifact-io")
 
     @classmethod
     def _get_or_create_ssh_handle(cls, timeout: int) -> CommandHandle:
@@ -93,8 +84,9 @@ def _ssh_handle_if_needed(timeout: int = timeout_acquire_task) -> CommandHandle 
     return None
 
 
-def _refresh_catalog_task() -> None:
-    """Background task to refresh catalog and local artifact list."""
+def refresh_catalog() -> None:
+    """Fetch the catalog and list local storage, then publish both atomically under the state lock.
+    Records `refresh_error` and re-raises on failure."""
     try:
         logger.info("Starting artifact catalog refresh")
         catalog = get_artifacts_catalog(config.external.artifact_stores)
@@ -106,6 +98,7 @@ def _refresh_catalog_task() -> None:
                 raise ValueError("failed to acquire the shared lock")
             ArtifactManager.catalog = catalog
             ArtifactManager.locally_available = pset(local_artifacts)
+            ArtifactManager.refresh_error = None
         logger.info(f"Artifact catalog refreshed: {len(catalog)} total, {len(local_artifacts)} local")
     except Exception as e:
         logger.exception(f"catalog refresh failed with {repr(e)}")
@@ -114,47 +107,43 @@ def _refresh_catalog_task() -> None:
         raise
 
 
-def submit_refresh_catalog() -> Future[None]:  # ty: ignore[invalid-return-type]
-    """Submit catalog refresh task to background executor. Returns a Future that resolves when the refresh completes."""
-    with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
+def submit_refresh_catalog() -> Future[None]:
+    """Submit the catalog refresh to the artifact-io pool. The returned Future resolves when the refresh completes.
+    Raises SubmissionRejected if the task cannot be enqueued."""
+    return execution_manager.submit_unmonitored(
+        ConcurrentPools.ArtifactIo,
+        TaskName("artifact.catalog.refresh"),
+        refresh_catalog,
+    )
+
+
+def _download_and_publish(composite_id: CompositeArtifactId) -> None:
+    """Download a single artifact and publish it as locally available."""
+    logger.info(f"Starting download for artifact {composite_id}")
+    # Read checkpoint without lock - safe with pyrsistent
+    checkpoint = ArtifactManager.catalog.get(composite_id, None)
+    if checkpoint is None:
+        raise KeyError(f"Artifact not found in catalog: {composite_id}")
+
+    def progress_callback(progress: int) -> None:
+        report_artifact_download_progress(composite_id, progress=progress)
+
+    handle = _ssh_handle_if_needed()
+    download_artifact(composite_id, checkpoint, config.backend.data_path, handle=handle, progress_callback=progress_callback)
+
+    with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
         if not result:
-            logger.error("failed to submit refresh_catalog")
-            ArtifactManager.refresh_error = "failed to submit refresh_catalog"
-        ArtifactManager._ensure_pool()
-        return ArtifactManager.executor.submit(_refresh_catalog_task)  # ty: ignore[call-non-callable]
-
-
-def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
-    """Background task to download a single artifact."""
-    try:
-        logger.info(f"Starting download for artifact {composite_id}")
-        # Read checkpoint without lock - safe with pyrsistent
-        checkpoint = ArtifactManager.catalog.get(composite_id, None)
-        if checkpoint is None:
-            raise KeyError(f"Artifact not found in catalog: {composite_id}")
-
-        def progress_callback(progress: int) -> None:
-            report_artifact_download_progress(composite_id, progress=progress)
-
-        handle = _ssh_handle_if_needed()
-        download_artifact(composite_id, checkpoint, config.backend.data_path, handle=handle, progress_callback=progress_callback)
-
-        with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
-            if not result:
-                logger.error("failed to acquire lock to update locally_available")
+            logger.error("failed to acquire lock to update locally_available")
+        else:
+            ArtifactManager.locally_available = ArtifactManager.locally_available.add(composite_id)
+            if composite_id in ArtifactManager.ongoing_downloads:
+                ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.remove(composite_id)
             else:
-                ArtifactManager.locally_available = ArtifactManager.locally_available.add(composite_id)
-                if composite_id in ArtifactManager.ongoing_downloads:
-                    ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.remove(composite_id)
-                else:
-                    logger.warning(f"expected {composite_id} to be in ongoing downloads")
-        logger.info(f"Successfully downloaded artifact {composite_id}")
-        is_success = True
-    except Exception as e:
-        logger.exception(f"artifact download failed for {composite_id}: {repr(e)}")
-        report_artifact_download_progress(composite_id, failure=repr(e))
-        is_success = False
+                logger.warning(f"expected {composite_id} to be in ongoing downloads")
+    logger.info(f"Successfully downloaded artifact {composite_id}")
 
+
+def _notify_download_finished(composite_id: CompositeArtifactId, is_success: bool) -> None:
     try:
         submit_event(
             Event(
@@ -164,6 +153,19 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
         )
     except Exception as e:
         logger.exception(f"failed to submit download-completed notification for {composite_id}: {repr(e)}")
+
+
+def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
+    """Download a single artifact, recording the outcome in the domain state and notifying.
+    Re-raises download failures after recording them."""
+    try:
+        _download_and_publish(composite_id)
+    except Exception as e:
+        logger.exception(f"artifact download failed for {composite_id}: {repr(e)}")
+        report_artifact_download_progress(composite_id, failure=repr(e))
+        _notify_download_finished(composite_id, is_success=False)
+        raise
+    _notify_download_finished(composite_id, is_success=True)
 
 
 def submit_artifact_download(composite_id: CompositeArtifactId, retry: bool = False) -> Either[int, str]:  # ty: ignore[invalid-type-arguments]
@@ -182,10 +184,22 @@ def submit_artifact_download(composite_id: CompositeArtifactId, retry: bool = Fa
             elif not retry:
                 return Either.error(progress)
             logger.debug(f"Retrying artifact download for {composite_id}")
-        ArtifactManager._ensure_pool()
         ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.set(composite_id, 0)
 
-    ArtifactManager.executor.submit(_download_artifact_task, composite_id)
+    try:
+        execution_manager.submit_monitored(
+            ConcurrentPools.ArtifactIo,
+            TaskName("artifact.download"),
+            partial(_download_artifact_task, composite_id),
+        )
+    except SubmissionRejected:
+        # roll back the reservation so the artifact is not stuck "in progress"
+        with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
+            if not result:
+                logger.error(f"failed to acquire lock to roll back the download reservation of {composite_id}")
+            elif composite_id in ArtifactManager.ongoing_downloads:
+                ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.remove(composite_id)
+        raise
     return Either.ok(0)
 
 
@@ -205,26 +219,6 @@ def report_artifact_download_progress(composite_id: CompositeArtifactId, progres
                 ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.set(composite_id, progress)
         else:
             logger.warning(f"Attempted to report {progress=}, {failure=}, but {composite_id=} not found")
-
-
-def join_artifact_manager(timeout_sec: int) -> None:
-    """Wait for background executor to finish pending tasks."""
-    barrier = (time.perf_counter_ns() / 1e9) + timeout_sec
-    with timed_acquire(ArtifactManager.lock, timeout_sec) as result:
-        # TODO we would ideally signal all possibly running tasks that
-        # they should not attempt to lock anymore -- otherwise we need
-        # to wait for the lock timeout to elapse for those tasks to
-        # terminate. Lets make sure we handle shutdown properly as we migrate
-        # the artifacts manager to `utility.concurrency`
-        if not result:
-            logger.error("failed to lock for joining artifact manager")
-        else:
-            if ArtifactManager.executor is not None:
-                budget = barrier - (time.perf_counter_ns() / 1e9)
-                # TODO we dont use the budget here, but we actually cant, because there is no timeout on the shutdown!
-                # Lets make sure we handle shutdown properly as we migrate the artifacts manager to `utility.concurrency`
-                ArtifactManager.executor.shutdown(wait=True, cancel_futures=False)
-                logger.info("artifact manager executor joined")
 
 
 def list_models() -> list[MlModelOverview]:

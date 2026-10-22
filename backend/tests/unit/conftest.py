@@ -21,6 +21,18 @@ def inline_execution_manager(monkeypatch: pytest.MonkeyPatch) -> None:
         if inspect.isawaitable(result):
             raise TypeError(f"unit test inline submit_monitored received awaitable result for {task_name!r}")
 
+    def _submit_unmonitored(pool_name: object, task_name: object, task: Callable[[], object]) -> "Future[Any]":
+        future: "Future[Any]" = Future()
+        try:
+            result = task()
+            if inspect.isawaitable(result):
+                raise TypeError(f"unit test inline submit_unmonitored received awaitable result for {task_name!r}")
+        except BaseException as error:
+            future.set_exception(error)
+            return future
+        future.set_result(result)
+        return future
+
     def _submit_after(
         dependency: "Future[Any]",
         pool_name: object,
@@ -66,3 +78,4 @@ def inline_execution_manager(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(execution_manager, "awaitable_submit", _awaitable_submit)
     monkeypatch.setattr(execution_manager, "submit_monitored", _submit_monitored)
     monkeypatch.setattr(execution_manager, "submit_after", _submit_after)
+    monkeypatch.setattr(execution_manager, "submit_unmonitored", _submit_unmonitored)
