@@ -1271,9 +1271,9 @@ dependencies = [
     { name = "earthkit-workflows" },
     { name = "qubed" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2c/c8/f00dfeb6cc90328927d3a6c8e82d6cea7744b455ba881f93db7a0184b733/earthkit_workflows_anemoi-0.8.0.tar.gz", hash = "sha256:d840d6262db27bf22e55f9f5f2f9b66fef3c7beb3adf1dca496f67054729d66b", size = 52286, upload-time = "2026-09-22T15:51:47.734Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/7c/6eb941a8ff41a7d14c3a9b0faa81f5fd04c4f76a2c3ac6187572c888ec43/earthkit_workflows_anemoi-0.9.0.tar.gz", hash = "sha256:6376c719f00a2e4c963973450261025fd892063c4f2e00ef883aa9ab445cefad", size = 53065, upload-time = "2026-10-22T09:38:57.474Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/17/a7a69d934a2e27b7a31fcdc0701430064496fa7a0382040221598efc9238/earthkit_workflows_anemoi-0.8.0-py3-none-any.whl", hash = "sha256:bc87873f47281fc30b2225ba9ec734bcf65cb70b336664476ce47a9c803b28e8", size = 24407, upload-time = "2026-09-22T15:51:46.771Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/05/595449027b2276547b1a9fd3683fd10860beef601bb78757ccfd7a2a5071/earthkit_workflows_anemoi-0.9.0-py3-none-any.whl", hash = "sha256:eeb77f76043583b2504bda3d15f88b87a7d6f8f400eeabf7aa1780402692f452", size = 24446, upload-time = "2026-10-22T09:38:56.451Z" },
 ]
 
 [package.optional-dependencies]
