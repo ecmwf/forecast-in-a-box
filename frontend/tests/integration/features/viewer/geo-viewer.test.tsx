@@ -259,7 +259,9 @@ describe('GeoViewer', () => {
     // The focused (per-source) browser path shows it too.
     await screen.getByRole('button', { name: 'View only B' }).click()
     await expect.poll(glyphCount).toBeGreaterThan(0)
-    await screen.getByRole('button', { name: 'View both (compare)' }).click()
+    await screen
+      .getByRole('button', { name: 'View both A·B (compare)' })
+      .click()
 
     // A temporal layer swaps the hint for the real slider.
     await screen.getByText('2 m temperature').first().click()
@@ -516,7 +518,7 @@ describe('GeoViewer', () => {
     const { portA, portB } = registerDefaultPair()
     const screen = await render(<Harness portA={portA} portB={portB} />)
 
-    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    await screen.getByRole('button', { name: /^Projection & basemap/ }).click()
     await expect
       .element(screen.getByRole('button', { name: /Carto Positron/ }))
       .toBeVisible()
@@ -1356,7 +1358,7 @@ describe('GeoViewer startup', () => {
     await expect.element(pill).toBeVisible()
     // The chrome is already the real thing, not a skeleton.
     await expect
-      .element(screen.getByRole('button', { name: 'Projection & basemap' }))
+      .element(screen.getByRole('button', { name: /^Projection & basemap/ }))
       .toBeVisible()
 
     // Capabilities land → pill gone, catalogue in the browser.
@@ -1738,7 +1740,9 @@ describe('GeoViewer projections', () => {
         .poll(() => lastCrs(portA), { timeout: 8000 })
         .toBe('EPSG:3857')
 
-      await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+      await screen
+        .getByRole('button', { name: /^Projection & basemap/ })
+        .click()
       await screen
         .getByRole('radio', {
           name: /^Arctic — polar stereographic/,
@@ -1779,7 +1783,7 @@ describe('GeoViewer projections', () => {
       .element(screen.getByText('Mean sea level pressure'))
       .toBeVisible()
 
-    await screen.getByRole('button', { name: 'Projection & basemap' }).click()
+    await screen.getByRole('button', { name: /^Projection & basemap/ }).click()
     const arctic = screen.getByRole('radio', {
       name: /Arctic — polar stereographic/,
     })

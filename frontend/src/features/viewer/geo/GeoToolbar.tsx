@@ -341,7 +341,9 @@ export function GeoToolbar({
                   size="sm"
                   className="relative h-7 gap-1 px-2 pointer-coarse:h-11"
                   title={`${t('projections.popover')} (${keyLabel(COMPARE_KEYS.projection)})`}
-                  aria-label={t('projections.popover')}
+                  aria-label={t('projections.popoverAria', {
+                    projection: t(`projections.short.${projectionId}`),
+                  })}
                   {...tourAttr(TOUR.visualise.projection)}
                 />
               }
