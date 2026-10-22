@@ -116,7 +116,7 @@ class AnemoiBuilder:
             input=input_configuration,
             date=strip_timezone(date),
             lead_time=lead_time,
-            ensemble_members=ensemble if ensemble is not None else [1],
+            ensemble_members=ensemble if ensemble is not None else [0],
             artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
             **k,
         )
@@ -139,7 +139,7 @@ class AnemoiBuilder:
             input=self.checkpoint.get_input_configuration(input_source),
             date=strip_timezone(date),
             environment=env,
-            ensemble_members=ensemble if ensemble is not None else [1],
+            ensemble_members=ensemble if ensemble is not None else [0],
             artifacts=Artifacts(artifact_urls={CompositeArtifactId.to_str(self.artifact_id): self.checkpoint.get_url()}),
             **k,
             **self.checkpoint.get_additional_kwargs(),
@@ -158,12 +158,12 @@ class AnemoiBaseBlock:
     def validate_ensemble(self, checkpoint: CheckpointArtifact, ensemble_members: list[int]) -> None:
         """Validate the ensemble configuration option against the checkpoint properties
 
-        Ensemble models accept any member ids, non-ensemble models only the single member 1. An empty list
+        Ensemble models accept any member ids, non-ensemble models only the single member 0 (the control). An empty list
         means no members were requested (e.g. no `number` axis upstream) and is always accepted here.
         """
         if checkpoint.is_ensemble_model is None:  # Cannot know if the model is an ensemble or not, so cannot validate
             return
-        if not checkpoint.is_ensemble_model and ensemble_members and list(ensemble_members) != [1]:
+        if not checkpoint.is_ensemble_model and ensemble_members and list(ensemble_members) != [0]:
             raise ValueError(
                 f"Checkpoint {checkpoint.artifact} is not an ensemble model, but ensemble members requested: {ensemble_members}"
             )
@@ -171,8 +171,8 @@ class AnemoiBaseBlock:
     def add_restrictions(self, checkpoint: CheckpointArtifact, restrictions: ConfigurationOptionRestriction) -> None:
         """Add restrictions to the block configuration options based on the checkpoint properties"""
         if checkpoint.is_ensemble_model is False:
-            # Only allow the single member 1 for non-ensemble models
-            restrictions[ENSEMBLE] = ListType(ClosedEnumType(["1"], subtype=IntType()))
+            # Only allow the single control member 0 for non-ensemble models
+            restrictions[ENSEMBLE] = ListType(ClosedEnumType(["0"], subtype=IntType()))
         restrictions[LEAD_TIME] = IntType(traits=DivisibleBy(checkpoint.model_step))
 
     def _expand_ensemble(self, qube: Qube, ensemble_members: list[int] | None) -> Qube:
@@ -259,9 +259,9 @@ class AnemoiSource(Source, AnemoiBaseBlock):
         ),
         ENSEMBLE: BlockConfigurationOption(
             title="Ensemble members",
-            description="IDs of the ensemble members to run, 0 is the control member.",
+            description="IDs of the ensemble members to run. The default, 0, is the control forecast.",
             value_type=ListType(IntType(traits=NonNegative())),
-            default_value="1",
+            default_value="0",
         ),
     }
 
@@ -329,9 +329,9 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
         ),
         ENSEMBLE: BlockConfigurationOption(
             title="Ensemble members",
-            description="IDs of the ensemble members to run, 0 is the control member.",
+            description="IDs of the ensemble members to run. The default, 0, is the control forecast.",
             value_type=ListType(IntType(traits=NonNegative())),
-            default_value="1",
+            default_value="0",
         ),
     }
 

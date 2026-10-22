@@ -93,7 +93,7 @@ def anemoi_source_configuration(dummy_checkpoint: CompositeArtifactId) -> BlockI
             "input_source": "opendata",
             "lead_time": 24,
             "base_time": datetime(2024, 1, 1),
-            "number": [1],
+            "number": [0],
         },
     )
 
@@ -120,7 +120,7 @@ def anemoi_input_source_configuration(dummy_checkpoint: CompositeArtifactId) -> 
             "checkpoint": dummy_checkpoint,
             "input_source": "opendata",
             "base_time": datetime(2024, 1, 1),
-            "number": [1],
+            "number": [0],
         },
     )
 
@@ -265,10 +265,11 @@ class TestAnemoiSourceValidate:
         assert option.value_type.serialize() == "list[int{nonNegative}]"
 
     @pytest.mark.parametrize("block_cls", [AnemoiSource, AnemoiInputSource])
-    def test_number_default_parses_to_member_one(self, block_cls: type[AnemoiSource | AnemoiInputSource]) -> None:
+    def test_number_default_parses_to_control_member(self, block_cls: type[AnemoiSource | AnemoiInputSource]) -> None:
         option = block_cls.configuration_options[ENSEMBLE]
-        assert option.default_value == "1"
-        assert option.value_type.validate_convert(option.default_value) == [1]
+        assert option.default_value == "0"
+        assert option.value_type.validate_convert(option.default_value) == [0]
+        assert "control" in option.description
 
     @pytest.mark.parametrize(
         "raw, expected",
@@ -319,18 +320,54 @@ class TestAnemoiSourceValidate:
 
     def test_ensemble_model_single_member_has_number_axis(self, ensemble_model: None, anemoi_source_configuration: BlockInstance) -> None:
         output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions={})
-        assert axes(output)["number"] == {1}  # type: ignore[arg-type]
+        assert axes(output)["number"] == {0}  # type: ignore[arg-type]
 
     def test_unknown_model_gets_number_axis(self, anemoi_source_configuration: BlockInstance) -> None:
         """Unknown ensemble capability skips validation and still adds the requested members"""
         output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions={})
-        assert axes(output)["number"] == {1}  # type: ignore[arg-type]
+        assert axes(output)["number"] == {0}  # type: ignore[arg-type]
 
-    def test_non_ensemble_model_accepts_member_one(self, non_ensemble_model: None, anemoi_source_configuration: BlockInstance) -> None:
+    @pytest.mark.parametrize("model", ["ensemble_model", "unknown"])
+    def test_unset_number_defaults_to_control_member(
+        self, request: pytest.FixtureRequest, model: str, dummy_checkpoint: CompositeArtifactId
+    ) -> None:
+        """With no `number` set by the user the option default applies, so the control member 0 is run"""
+        if model != "unknown":
+            request.getfixturevalue(model)
+        option = AnemoiSource.configuration_options[ENSEMBLE]
+        default = option.value_type.validate_convert(option.default_value)
+        block = _make_block(
+            AnemoiSource,
+            {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": default},
+        )
+        output = AnemoiSource().validate(block=block, inputs={}, restrictions={})
+        assert axes(output)["number"] == {0}  # type: ignore[arg-type]
+
+    def test_builder_from_input_defaults_to_control_member(
+        self, monkeypatch: pytest.MonkeyPatch, dummy_checkpoint: CompositeArtifactId
+    ) -> None:
+        inference = MagicMock()
+        monkeypatch.setattr(AnemoiBuilder, "inference", inference)
+        monkeypatch.setattr(AnemoiBuilder, "_add_extra_output_keys", lambda self, action: action)
+        builder = AnemoiBuilder(dummy_checkpoint)
+        builder.from_input(input_source="opendata", date=datetime(2024, 1, 1), lead_time=24)
+        assert inference.return_value.from_input.call_args.kwargs["ensemble_members"] == [0]
+
+    def test_builder_get_initial_conditions_defaults_to_control_member(
+        self, monkeypatch: pytest.MonkeyPatch, dummy_checkpoint: CompositeArtifactId
+    ) -> None:
+        get_initial_conditions = MagicMock()
+        monkeypatch.setattr("fiab_plugin_ecmwf.anemoi.blocks.get_initial_conditions", get_initial_conditions)
+        monkeypatch.setattr(AnemoiBuilder, "_local_path", property(lambda self: "ckpt"))
+        builder = AnemoiBuilder(dummy_checkpoint)
+        builder.get_initial_conditions(input_source="opendata", date=datetime(2024, 1, 1))
+        assert get_initial_conditions.call_args.kwargs["ensemble_members"] == [0]
+
+    def test_non_ensemble_model_accepts_control_member(self, non_ensemble_model: None, anemoi_source_configuration: BlockInstance) -> None:
         output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions={})
         assert not contains(output, "number")  # type: ignore[arg-type]
 
-    @pytest.mark.parametrize("members", [[0], [2], [1, 2], [5, 1]])
+    @pytest.mark.parametrize("members", [[1], [2], [1, 2], [5, 1], [0, 1]])
     def test_non_ensemble_model_rejects_other_members(
         self, non_ensemble_model: None, dummy_checkpoint: CompositeArtifactId, members: list[int]
     ) -> None:
@@ -351,13 +388,13 @@ class TestAnemoiSourceValidate:
         assert set(axes(output)["number"]) == set(members)  # type: ignore[arg-type]
 
     def test_non_ensemble_model_restriction(self, non_ensemble_model: None, anemoi_source_configuration: BlockInstance) -> None:
-        """The restriction constructs and accepts only member 1"""
+        """The restriction constructs and accepts only the control member 0"""
         restrictions: dict = {}
         AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions=restrictions)
         restriction = restrictions[ENSEMBLE]
         assert isinstance(restriction, ListType)
-        assert restriction.validate_convert("1") == [1]
-        for invalid in ["0", "2", "1,2"]:
+        assert restriction.validate_convert("0") == [0]
+        for invalid in ["1", "2", "0,1", "1,2"]:
             with pytest.raises(WrongType):
                 restriction.validate_convert(invalid)
 
@@ -509,7 +546,7 @@ class TestAnemoiInputSourceValidate:
         output = AnemoiInputSource().validate(block=block, inputs={}, restrictions={})
         assert set(axes(output)["number"]) == set(members)  # type: ignore[arg-type]
 
-    @pytest.mark.parametrize("members", [[0], [2], [1, 2]])
+    @pytest.mark.parametrize("members", [[1], [2], [1, 2], [0, 1]])
     def test_non_ensemble_model_rejects_other_members(
         self, non_ensemble_model: None, dummy_checkpoint: CompositeArtifactId, members: list[int]
     ) -> None:
@@ -785,7 +822,7 @@ class TestFlowAnemoiInputSourceToTransform:
         assert isinstance(output, QubedOutput)
         assert contains(output, "param")
         assert contains(output, "step")
-        assert axes(output)["number"] == {1}
+        assert axes(output)["number"] == {0}
 
 
 class TestFlowChainedTransforms:
