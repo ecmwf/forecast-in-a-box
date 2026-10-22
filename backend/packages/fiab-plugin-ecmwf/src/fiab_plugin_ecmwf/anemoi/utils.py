@@ -83,12 +83,10 @@ def get_available_input_sources() -> list[str]:
     Contains every base source from INPUT_SOURCE_CONFIGURATION_OPTIONS and INPUT_SOURCE_EXTRAS,
     followed by each full combination of the variant groups of a source joined with ':'.
     """
-    base_sources = list(dict.fromkeys([*INPUT_SOURCE_CONFIGURATION_OPTIONS, *INPUT_SOURCE_EXTRAS]))
+    base_sources = set(INPUT_SOURCE_EXTRAS.keys()) - set(INPUT_SOURCE_CONFIGURATION_OPTIONS.keys())
     available_input_sources = list(base_sources)
-    for source in base_sources:
-        variant_groups = INPUT_SOURCE_CONFIGURATION_OPTIONS.get(source)
-        if not variant_groups:
-            continue
+    for source in INPUT_SOURCE_CONFIGURATION_OPTIONS.keys():
+        variant_groups = INPUT_SOURCE_CONFIGURATION_OPTIONS[source]
         for combination in itertools.product(*variant_groups):
             available_input_sources.append(":".join([source, *combination]))
     return available_input_sources

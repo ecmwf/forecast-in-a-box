@@ -1264,7 +1264,7 @@ wheels = [
 
 [[package]]
 name = "earthkit-workflows-anemoi"
-version = "0.8.0"
+version = "0.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anemoi-utils" },

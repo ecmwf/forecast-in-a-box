@@ -51,10 +51,15 @@ class TestInputSourceExtras:
 
 
 class TestAvailableInputSources:
-    def test_includes_base_sources(self) -> None:
+    def test_includes_sources_without_variants(self) -> None:
         available = get_available_input_sources()
-        for source in ("polytope", "opendata", "mars", "dummy"):
+        for source in ("mars", "dummy"):
             assert source in available
+
+    def test_excludes_bare_sources_with_variants(self) -> None:
+        available = get_available_input_sources()
+        for source in ("polytope", "opendata"):
+            assert source not in available
 
     def test_includes_polytope_variants(self) -> None:
         available = get_available_input_sources()
@@ -156,8 +161,10 @@ class TestInputSourceOption:
     def test_option_lists_variants(self, block: type[AnemoiSource] | type[AnemoiInputSource]) -> None:
         value_type = block.configuration_options[INPUT_SOURCE].value_type
         assert isinstance(value_type, OpenEnumType)
-        for name in ("mars", "dummy", "opendata", "polytope", "polytope:test", "opendata:google:highres"):
+        for name in ("mars", "dummy", "polytope:test", "opendata:google:highres"):
             assert name in value_type.items
+        for name in ("opendata", "polytope"):
+            assert name not in value_type.items
         assert value_type.items == get_available_input_sources()
 
 
