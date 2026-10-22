@@ -44,7 +44,7 @@ Once all are done, this document is deleted, and `backend/development.md` is upd
 6. **Bootstrap checks** (`entrypoint/bootstrap/checks.py`). [DONE]
    These run in a separate thread/process-phase parallel to the backend, possibly before it is up, so they must not use the registry. Leave them as they are (short lived local `httpx.Client`).
    Only unify their settings; no registry usage.
-7. **Lens proxy** (`domain/lens/proxy.py`).
+7. **Lens proxy** (`domain/lens/proxy.py`). [DONE]
    Replace the module global `_client`, `get_client` and `aclose_client` with `get_async(HttpProfile.Proxy)`.
    Remove the `lens_proxy_client` initializer and its `_stop_lens_proxy_client`.
    Remove `_TIMEOUT` (it is now the `Proxy` profile).

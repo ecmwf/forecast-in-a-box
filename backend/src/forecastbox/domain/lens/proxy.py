@@ -82,6 +82,7 @@ from starlette.datastructures import Headers
 from forecastbox.domain.lens.core import PREFIX as PREFIX_ROOT
 from forecastbox.domain.lens.exceptions import LensFailure, LensStarting, UnproxyableLens
 from forecastbox.domain.lens.manager import LensInstanceId, get_status
+from forecastbox.utility.http_pools import HttpProfile, get_async
 
 logger = logging.getLogger(__name__)
 
@@ -101,29 +102,6 @@ HOP_BY_HOP_HEADERS = {
     "upgrade",
     "content-length",
 }
-
-#: Timeout applied to the upstream connection. Generous read timeout because some
-#: lens responses (e.g. large tile renders) can take a while to produce.
-_TIMEOUT = httpx.Timeout(connect=5.0, read=120.0, write=120.0, pool=5.0)
-
-_client: httpx.AsyncClient | None = None
-
-
-def get_client() -> httpx.AsyncClient:
-    """Return the module-level `httpx.AsyncClient`, creating it lazily on first use."""
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(timeout=_TIMEOUT)
-    return _client
-
-
-async def aclose_client() -> None:
-    """Close the module-level client, if one was created. Intended for use during
-    application shutdown."""
-    global _client
-    if _client is not None:
-        await _client.aclose()
-        _client = None
 
 
 def _resolve_port(lens_instance_id: LensInstanceId) -> int:
@@ -233,7 +211,7 @@ async def forward(lens_instance_id: LensInstanceId, upstream_path: str, request:
 
     url = _build_upstream_url(port, upstream_path, request.url.query)
     headers = _build_upstream_headers(request, port, lens_instance_id)
-    client = get_client()
+    client = get_async(HttpProfile.Proxy)
 
     upstream_request = client.build_request(
         request.method,
