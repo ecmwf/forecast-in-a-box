@@ -9,11 +9,16 @@
 
 """Unit tests for the argument handling of the geography regrid task, with MIR replaced by a recorder."""
 
+import sys
+import types
+from collections.abc import Sequence
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
 from fiab_plugin_ecmwf.geography import runtime
+from fiab_plugin_ecmwf.geography.extent import LatLonBox
 from fiab_plugin_ecmwf.geography.runtime import BBox, regrid
 
 # mir_backend imports earthkit-data at module level
@@ -87,6 +92,165 @@ class TestNormaliseGrid:
             normalise_grid(grid)
 
 
+def _part(west: float, south: float, east: float, north: float) -> SimpleNamespace:
+    return SimpleNamespace(bounds=(west, south, east, north))
+
+
+class TestGetBboxFromNames:
+    """The lookup of each name is replaced by fixed boxes, so only the combination is exercised."""
+
+    @pytest.fixture
+    def lookups(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+        boxes: dict[str, list[LatLonBox]] = {
+            "Germany": [(54.98, 5.99, 47.30, 15.02)],
+            "France": [(51.15, -4.59, 41.38, 9.56)],
+            "Fiji": [(-16.02, 177.28, -18.29, 180.0), (-16.02, -180.0, -17.0, -178.0)],
+            "Samoa": [(-13.4, -172.8, -14.1, -171.4)],
+        }
+        seen: list[str] = []
+
+        def _boxes(identifier: str) -> list[LatLonBox]:
+            seen.append(identifier)
+            return boxes[identifier]
+
+        monkeypatch.setattr(runtime, "_latlon_boxes_for_name", _boxes)
+        return seen
+
+    def test_looks_up_each_name_once(self, lookups: list[str]) -> None:
+        runtime._get_bbox_from_names(["Germany", "France"])
+
+        assert lookups == ["Germany", "France"]
+
+    @pytest.mark.parametrize("names", [["Germany", "France"], ["France", "Germany"]])
+    def test_union_is_the_extent_of_the_names_whatever_their_order(self, lookups: list[str], names: list[str]) -> None:
+        bbox = runtime._get_bbox_from_names(names)
+
+        assert bbox.fmt == "nwse"
+        assert bbox.value == pytest.approx((54.98, -4.59, 41.38, 15.02))
+
+    def test_single_name_is_its_own_extent(self, lookups: list[str]) -> None:
+        assert runtime._get_bbox_from_names(["Germany"]).value == pytest.approx((54.98, 5.99, 47.30, 15.02))
+
+    def test_names_either_side_of_the_180_line_give_a_box_across_it(self, lookups: list[str]) -> None:
+        bbox = runtime._get_bbox_from_names(["Fiji", "Samoa"])
+
+        north, west, south, east = bbox.value
+        assert (north, south) == pytest.approx((-13.4, -18.29))
+        assert west == pytest.approx(177.28)
+        assert east == pytest.approx(360.0 - 171.4)
+        assert east - west < 20.0
+
+
+class TestLatLonBoxesForName:
+    """The earthkit-plots lookups are replaced by fakes."""
+
+    PRESETS: dict[str, Any] = {
+        "Central Europe": [2, 24, 45, 55],
+        "Europe": {"bounds": [2502500, 7497500, 752500, 5497500], "crs": {"name": "LambertAzimuthalEqualArea"}},
+    }
+    SHAPES: dict[str, Any] = {
+        "France": SimpleNamespace(geoms=[_part(-4.59, 42.3, 8.1, 51.1), _part(8.5, 41.4, 9.6, 43.0)]),
+        "Russian Federation": _part(19.6, 41.1, 190.1, 81.2),
+    }
+    ALIASES = {"russia": "Russian Federation"}
+
+    @pytest.fixture
+    def earthkit_plots(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
+        calls: dict[str, list[str]] = {"from_string": [], "shape": []}
+
+        def _format_name(name: str) -> str | None:
+            if name in self.PRESETS:
+                return name
+            return self.ALIASES.get(name.lower())
+
+        class _Domain:
+            def __init__(self, can_bbox: bool) -> None:
+                self.can_bbox = can_bbox
+                self.bbox = SimpleNamespace(to_latlon_bbox=lambda: SimpleNamespace(north=71.0, west=-35.0, south=24.0, east=74.0))
+
+            @classmethod
+            def from_string(cls, name: str) -> "_Domain":
+                calls["from_string"].append(name)
+                return cls(can_bbox=name != "Arctic")
+
+        class _NaturalEarthDomain:
+            def __init__(self, name: str) -> None:
+                calls["shape"].append(name)
+                self.name = name
+
+            @property
+            def geometry(self) -> Any:
+                if self.name == "Broken":
+                    raise AttributeError("no record")
+                return TestLatLonBoxesForName.SHAPES[self.name]
+
+        for module_name, attributes in {
+            "earthkit.plots.ancillary": {"load": lambda source, data_type=None: {"domains": self.PRESETS}},
+            "earthkit.plots.geo.domains": {"Domain": _Domain, "format_name": _format_name},
+            "earthkit.plots.geo.natural_earth": {"NaturalEarthDomain": _NaturalEarthDomain},
+        }.items():
+            module = types.ModuleType(module_name)
+            for attribute, value in attributes.items():
+                setattr(module, attribute, value)
+            monkeypatch.setitem(sys.modules, module_name, module)
+        return calls
+
+    def test_plain_preset_gives_its_configured_box(self, earthkit_plots: dict[str, list[str]]) -> None:
+        assert runtime._latlon_boxes_for_name("Central Europe") == [(55.0, 2.0, 45.0, 24.0)]
+        assert earthkit_plots["from_string"] == ["Central Europe"]
+        assert earthkit_plots["shape"] == []
+
+    def test_projected_preset_falls_back_to_the_projected_bounding_box(self, earthkit_plots: dict[str, list[str]]) -> None:
+        assert runtime._latlon_boxes_for_name("Europe") == [(71.0, -35.0, 24.0, 74.0)]
+
+    def test_country_gives_the_box_of_each_part_of_its_shape(self, earthkit_plots: dict[str, list[str]]) -> None:
+        assert runtime._latlon_boxes_for_name("France") == [(51.1, -4.59, 42.3, 8.1), (43.0, 8.5, 41.4, 9.6)]
+        assert earthkit_plots["from_string"] == ["France"]
+
+    def test_alias_looks_up_the_shape_by_its_canonical_name(self, earthkit_plots: dict[str, list[str]]) -> None:
+        assert runtime._latlon_boxes_for_name("Russia") == [(81.2, 19.6, 41.1, 190.1)]
+        assert earthkit_plots["shape"] == ["Russian Federation"]
+
+    def test_unreadable_shape_falls_back_to_the_projected_bounding_box(
+        self, earthkit_plots: dict[str, list[str]], caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level("WARNING"):
+            boxes = runtime._latlon_boxes_for_name("Broken")
+
+        assert boxes == [(71.0, -35.0, 24.0, 74.0)]
+        assert "Broken" in caplog.text
+
+    @pytest.mark.parametrize("missing", ["earthkit.plots.ancillary", "earthkit.plots.geo.natural_earth", "format_name"])
+    def test_unavailable_internals_fall_back_to_the_projected_bounding_box(
+        self,
+        earthkit_plots: dict[str, list[str]],
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+        missing: str,
+    ) -> None:
+        if missing == "format_name":
+            monkeypatch.delattr(sys.modules["earthkit.plots.geo.domains"], "format_name")
+        else:
+            monkeypatch.setitem(sys.modules, missing, None)
+
+        with caplog.at_level("WARNING"):
+            boxes = runtime._latlon_boxes_for_name("France")
+
+        assert boxes == [(71.0, -35.0, 24.0, 74.0)]
+        assert earthkit_plots["from_string"] == ["France"]
+        assert "France" in caplog.text
+
+    def test_missing_domain_class_is_an_error(self, earthkit_plots: dict[str, list[str]], monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setitem(sys.modules, "earthkit.plots.geo.domains", None)
+
+        with pytest.raises(RuntimeError, match="Cannot import `earthkit-plots"):
+            runtime._latlon_boxes_for_name("France")
+
+    def test_rejects_domain_that_cannot_be_a_bbox(self, earthkit_plots: dict[str, list[str]]) -> None:
+        with pytest.raises(RuntimeError, match="cannot be used as a bounding box"):
+            runtime._latlon_boxes_for_name("Arctic")
+
+
 class TestRegridArguments:
     @pytest.fixture
     def calls(self, monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
@@ -116,19 +280,50 @@ class TestRegridArguments:
 
         assert calls[0]["area"] == [60.0, -10.0, 35.0, 30.0]
 
-    def test_string_domain_is_resolved_to_bbox(self, calls: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch) -> None:
-        seen: list[str] = []
+    @pytest.fixture
+    def lookups(self, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+        seen: list[list[str]] = []
 
-        def _bbox(identifier: str) -> BBox:
-            seen.append(identifier)
+        def _bbox(identifiers: Sequence[str]) -> BBox:
+            seen.append(list(identifiers))
             return BBox((55.0, 5.0, 47.0, 15.0), fmt="nwse")
 
-        monkeypatch.setattr(runtime, "_get_bbox_from_string", _bbox)
+        monkeypatch.setattr(runtime, "_get_bbox_from_names", _bbox)
+        return seen
 
+    def test_string_domain_is_resolved_to_bbox(self, calls: list[dict[str, Any]], lookups: list[list[str]]) -> None:
         regrid("fields", grid="O96", domain="Germany")  # type: ignore[arg-type]
 
-        assert seen == ["Germany"]
+        assert lookups == [["Germany"]]
         assert calls[0]["area"] == [55.0, 5.0, 47.0, 15.0]
+
+    @pytest.mark.parametrize("names", [["Germany"], ["Germany", "France"], ["France", "Germany", "Italy"]])
+    def test_name_list_is_resolved_with_one_lookup_in_order(
+        self, calls: list[dict[str, Any]], lookups: list[list[str]], names: list[str]
+    ) -> None:
+        regrid("fields", grid="O96", domain=names)  # type: ignore[arg-type]
+
+        assert lookups == [names]
+        assert calls[0]["area"] == [55.0, 5.0, 47.0, 15.0]
+
+    def test_name_list_does_not_need_format(self, calls: list[dict[str, Any]], lookups: list[list[str]]) -> None:
+        regrid("fields", grid="O96", domain=["Germany", "France"], fmt_if_list=None)  # type: ignore[arg-type]
+
+        assert len(calls) == 1
+
+    @pytest.mark.parametrize("domain", [["Germany", 5.0], [60.0, "Germany"], [True, 1.0, 2.0, 3.0]])
+    def test_mixed_domain_list_is_rejected(self, calls: list[dict[str, Any]], lookups: list[list[str]], domain: Any) -> None:
+        with pytest.raises(TypeError, match="only names or only numbers"):
+            regrid("fields", grid="O96", domain=domain, fmt_if_list="nwse")  # type: ignore[arg-type]
+
+        assert calls == []
+        assert lookups == []
+
+    def test_number_list_does_not_use_lookup(self, calls: list[dict[str, Any]], lookups: list[list[str]]) -> None:
+        regrid("fields", grid="O96", domain=[60, -10, 35, 30], fmt_if_list="nwse")  # type: ignore[arg-type]
+
+        assert lookups == []
+        assert calls[0]["area"] == [60, -10, 35, 30]
 
     @pytest.mark.parametrize("grid", [[0.5, 1.0], 0.25, "N320", None])
     def test_grid_is_passed_unchanged(self, calls: list[dict[str, Any]], grid: Any) -> None:

@@ -180,7 +180,9 @@ class TestDomainValues:
             ("global", "global", None),
             ("datadefined", "datadefined", None),
             ([], "auto", None),
-            (["Germany"], "Germany", "Germany"),
+            (["Germany"], "Germany", ["Germany"]),
+            (["Germany", "France"], "Germany,France", ["Germany", "France"]),
+            (["France", "Germany"], "France,Germany", ["France", "Germany"]),
             (BBOX_NWSE, str(BBOX_NWSE), BBOX_NWSE),
         ],
     )
@@ -188,11 +190,8 @@ class TestDomainValues:
         assert domain_axis_value(domain) == axis
         assert domain_runtime_value(domain) == runtime
 
-    def test_multiple_named_domains_rejected(self) -> None:
-        with pytest.raises(BlockInstanceConfigurationError, match="Only one string domain"):
-            domain_axis_value(["Germany", "France"])
-        with pytest.raises(BlockInstanceConfigurationError, match="Only one string domain"):
-            domain_runtime_value(["Germany", "France"])
+    def test_named_domain_order_is_not_sorted(self) -> None:
+        assert domain_axis_value(["Germany", "France"]) != domain_axis_value(["France", "Germany"])
 
 
 class TestBlockInstanceAccessors:
@@ -307,13 +306,25 @@ class TestGeographicalTransformValidate:
         assert isinstance(twice, QubedOutput)
         assert axes(twice)["grid"] == {"O96"}
 
-    def test_validate_rejects_multiple_named_domains(self, sample_forecast_source_output: QubedOutput) -> None:
-        with pytest.raises(ValueError, match="Only one string domain"):
-            GeographicalTransform().validate(
-                block=_block(None, ["Germany", "France"]),
-                inputs={"dataset": sample_forecast_source_output},
-                restrictions={},  # type: ignore[arg-type]
-            )
+    @pytest.mark.parametrize(
+        ("domain", "expected_domain"),
+        [
+            (["Germany", "France"], "Germany,France"),
+            (["France", "Germany"], "France,Germany"),
+            (["Norway", "Sweden", "Finland"], "Norway,Sweden,Finland"),
+        ],
+    )
+    def test_validate_joins_several_named_domains_in_order(
+        self, sample_forecast_source_output: QubedOutput, domain: list[str], expected_domain: str
+    ) -> None:
+        output = GeographicalTransform().validate(
+            block=_block("O96", domain),
+            inputs={"dataset": sample_forecast_source_output},
+            restrictions={},  # type: ignore[arg-type]
+        )
+        assert isinstance(output, QubedOutput)
+        assert axes(output)["domain"] == {expected_domain}
+        assert axes(output)["grid"] == {"O96"}
 
     def test_validate_rejects_non_qubed_input(self) -> None:
         with pytest.raises(BlockInstanceConfigurationError, match="Unsupported input type"):
@@ -366,14 +377,16 @@ class TestGeographicalTransformCompile:
             ([0.25, 0.5], "global", [0.25, 0.5], None),
             (None, "global", None, None),
             (None, "auto", None, None),
-            ([0.5, 1.0], ["Germany"], [0.5, 1.0], "Germany"),
+            ([0.5, 1.0], ["Germany"], [0.5, 1.0], ["Germany"]),
             ([0.25, 0.5], BBOX_WSEN, [0.25, 0.5], BBOX_NWSE),
             ("O96", [], "O96", None),
             (0.25, [], 0.25, None),
             ([0.25, 0.5], [], [0.25, 0.5], None),
             (None, [], None, None),
-            (0.25, ["Germany"], 0.25, "Germany"),
-            ("O96", ["Europe"], "O96", "Europe"),
+            (0.25, ["Germany"], 0.25, ["Germany"]),
+            ("O96", ["Europe"], "O96", ["Europe"]),
+            ("O96", ["Germany", "France"], "O96", ["Germany", "France"]),
+            ("O96", ["France", "Germany"], "O96", ["France", "Germany"]),
             ("N320", BBOX_WSEN, "N320", BBOX_NWSE),
             (0.1, [170.0, -10.0, -170.0, 10.0], 0.1, [10.0, 170.0, -10.0, -170.0]),
         ],
@@ -425,17 +438,27 @@ class TestGeographicalTransformCompile:
         environment = list(nodes[0].metadata.requirements.environment)
         assert all(requirement in environment for requirement in REGRID_ENVIRONMENT)
 
-    def test_compile_rejects_multiple_named_domains(self, sample_forecast_source_action: Action) -> None:
-        with pytest.raises(BlockInstanceConfigurationError, match="Only one string domain"):
-            GeographicalTransform().compile(inputs={SOURCE_ID: sample_forecast_source_action}, block=_block("O96", ["Germany", "France"]))
+    def test_compile_passes_several_named_domains_unjoined_and_in_order(self, sample_forecast_source_action: Action) -> None:
+        action = (
+            GeographicalTransform()
+            .compile(inputs={SOURCE_ID: sample_forecast_source_action}, block=_block("O96", ["Germany", "France", "Italy"]))
+            .get_or_raise()
+        )
 
-    def test_compile_through_plugin_reports_multiple_named_domains_as_error(self, sample_forecast_source_action: Action) -> None:
+        nodes = _regrid_nodes(action)
+        assert len(nodes) > 0
+        for node in nodes:
+            assert node.payload.static_input_kw == {"grid": "O96", "domain": ["Germany", "France", "Italy"], "fmt_if_list": "nwse"}
+
+    def test_compile_several_named_domains_through_plugin(self, sample_forecast_source_action: Action) -> None:
         either = plugin().compiler(
             {SOURCE_ID: sample_forecast_source_action},
             BlockFactoryId("geographicalTransform"),
             _block("O96", ["Germany", "France"]).block,
         )
-        assert either.e is not None
+        action = either.get_or_raise()
+
+        assert all(node.payload.static_input_kw["domain"] == ["Germany", "France"] for node in _regrid_nodes(action))
 
     def test_compile_missing_input_raises(self) -> None:
         with pytest.raises(KeyError):

@@ -23,7 +23,7 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Transform
+from fiab_core.tools.blocks import BlockInstanceRich, Transform
 from fiab_core.tools.convert import GeoDomainRuntimeType
 from fiab_core.types import (
     BoundingBoxWSENType,
@@ -70,40 +70,32 @@ def grid_axis_value(grid: GridValue) -> str:
     return _number_str(grid)
 
 
-def _single_named_domain(domain: list[str]) -> str:
-    if len(domain) > 1:
-        raise BlockInstanceConfigurationError("Only one string domain can be selected for cutout")
-    return domain[0]
-
-
 def domain_axis_value(domain: GeoDomainRuntimeType) -> str:
     """Return the domain axis value for a domain already ordered as a MARS bounding box.
 
-    The unrestricted values ('auto', 'global', 'datadefined') are returned as given and an empty area is 'auto'. A single named
-    region is returned by name and a bounding box as the string of its north, west, south, east list.
+    The unrestricted values ('auto', 'global', 'datadefined') are returned as given and an empty area is 'auto'. Named regions
+    are returned joined by a comma in the order given, and a bounding box as the string of its north, west, south, east list.
     """
     if isinstance(domain, str):
         return domain
     if len(domain) == 0:
         return NO_CUTOUT_DOMAIN
     if isinstance(domain[0], str):
-        return _single_named_domain(cast(list[str], domain))
+        return ",".join(cast(list[str], domain))
     return str(domain)
 
 
-def domain_runtime_value(domain: GeoDomainRuntimeType) -> str | list[float] | None:
+def domain_runtime_value(domain: GeoDomainRuntimeType) -> list[str] | list[float] | None:
     """Return the domain passed to the regrid task for a domain already ordered as a MARS bounding box.
 
-    The unrestricted values and an empty area give None, which regrids without cutting out. A single named region is returned
-    by name and a bounding box as its north, west, south, east list.
+    The unrestricted values and an empty area give None, which regrids without cutting out. Named regions are returned as the
+    list of names in the order given, and a bounding box as its north, west, south, east list.
     """
     if isinstance(domain, str):
-        return None if domain in get_args(UnrestrictedGeoDomainLiteral) else domain
+        return None if domain in get_args(UnrestrictedGeoDomainLiteral) else [domain]
     if len(domain) == 0:
         return None
-    if isinstance(domain[0], str):
-        return _single_named_domain(cast(list[str], domain))
-    return cast(list[float], domain)
+    return domain
 
 
 class GeographicalTransform(Transform):
@@ -121,7 +113,11 @@ class GeographicalTransform(Transform):
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
-            description="Area to cut out: auto (fit the data), global, a single named region/country, or a drawn bounding box; leave empty to regrid without cutting out",
+            description=(
+                "Area to cut out: auto (fit the data), global, one or more named regions/countries, or a drawn bounding box; "
+                "several names are cut out as the smallest latitude/longitude box containing all of them, not as the union of their shapes; "
+                "leave empty to regrid without cutting out"
+            ),
             value_type=GeoDomainType(),
             default_value="auto",
         ),

@@ -13,6 +13,7 @@ The input fields are generated with ecCodes samples, so no network access is nee
 require the `runtime` extra (earthkit-data and mir-python).
 """
 
+from collections.abc import Sequence
 from typing import Any
 
 import earthkit.data as ekd
@@ -21,6 +22,7 @@ import numpy as np
 import pytest
 
 from fiab_plugin_ecmwf.geography import runtime
+from fiab_plugin_ecmwf.geography.mir_backend import mir_regrid
 from fiab_plugin_ecmwf.geography.runtime import BBox, regrid
 
 INPUT_NI = 180
@@ -255,10 +257,32 @@ class TestRegridBoundingBox:
 
     def test_named_domain(self, input_fields: ekd.FieldList, monkeypatch: pytest.MonkeyPatch) -> None:
         # the real lookup reads natural earth shapes through cartopy, which can need the network
-        monkeypatch.setattr(runtime, "_get_bbox_from_string", lambda identifier: BBox((60.0, -10.0, 35.0, 30.0), fmt="nwse"))
+        monkeypatch.setattr(runtime, "_get_bbox_from_names", lambda identifiers: BBox((60.0, -10.0, 35.0, 30.0), fmt="nwse"))
 
         result = _regrid(input_fields, grid=1.0, domain="Somewhere")
 
+        self._assert_cutout(result, (26, 41))
+
+    @pytest.mark.parametrize("names", [["West", "East"], ["East", "West"]])
+    def test_several_named_domains_are_cut_out_as_one_bounding_box(
+        self, input_fields: ekd.FieldList, monkeypatch: pytest.MonkeyPatch, names: list[str]
+    ) -> None:
+        # offline stand-in for the lookup and union of the named domains: the box (north, west, south, east) holding every named box
+        boxes = {"West": (60.0, -10.0, 45.0, 10.0), "East": (50.0, 5.0, 35.0, 30.0)}
+        lookups: list[list[str]] = []
+
+        def _union_bbox(identifiers: Sequence[str]) -> BBox:
+            lookups.append(list(identifiers))
+            selected = [boxes[name] for name in identifiers]
+            north, south = max(box[0] for box in selected), min(box[2] for box in selected)
+            west, east = min(box[1] for box in selected), max(box[3] for box in selected)
+            return BBox((north, west, south, east), fmt="nwse")
+
+        monkeypatch.setattr(runtime, "_get_bbox_from_names", _union_bbox)
+
+        result = _regrid(input_fields, grid=1.0, domain=names)
+
+        assert lookups == [names]
         self._assert_cutout(result, (26, 41))
 
     def test_cutout_is_smaller_than_global(self, input_fields: ekd.FieldList) -> None:
@@ -266,6 +290,52 @@ class TestRegridBoundingBox:
         cutout = _regrid(input_fields, grid=1.0, domain=self.AREA_NWSE, fmt_if_list="nwse")
 
         assert np.asarray(cutout[0].to_numpy()).size < np.asarray(global_result[0].to_numpy()).size
+
+
+class TestRegridAcrossAntimeridian:
+    # The union of the two named boxes below is north -10, south -22, and longitudes from 175 east over the 180 line to 190 (170 west).
+    # With an area given, MIR anchors the 1 degree grid at the south west corner, so the cut-out holds 13 rows and 16 columns.
+    NAMED_BOXES: dict[str, list[tuple[float, float, float, float]]] = {
+        "Eastland": [(-10.0, 175.0, -20.0, 180.0)],
+        "Westland": [(-12.0, -178.0, -22.0, -170.0)],
+    }
+    WEST = 175.0
+    SHAPE = (13, 16)
+
+    def _assert_crosses_the_180_line(self, result: ekd.FieldList) -> None:
+        assert len(result) == len(PARAMS)
+        for field in result:
+            assert field.metadata("gridType") == "regular_ll"
+            assert field.shape == self.SHAPE
+            latlon = field.to_latlon()
+            lat = np.asarray(latlon["lat"])
+            lon = np.asarray(latlon["lon"])
+            np.testing.assert_allclose([lat.max(), lat.min()], [-10.0, -22.0])
+            # longitudes measured eastwards from the west edge, whichever way MIR writes the ones past 180
+            eastwards = (lon - self.WEST) % 360.0
+            np.testing.assert_allclose([eastwards.min(), eastwards.max()], [0.0, 15.0])
+            wrapped = (lon + 180.0) % 360.0 - 180.0
+            assert (wrapped > 0).any()
+            assert (wrapped < 0).any()
+        _assert_identity_preserved(result)
+        _assert_values_match_analytic(result)
+
+    @pytest.mark.parametrize("names", [["Eastland", "Westland"], ["Westland", "Eastland"]])
+    def test_named_domains_either_side_of_the_180_line(
+        self, input_fields: ekd.FieldList, monkeypatch: pytest.MonkeyPatch, names: list[str]
+    ) -> None:
+        # only the per-name lookup is replaced, the combination into one area is the real union
+        monkeypatch.setattr(runtime, "_latlon_boxes_for_name", lambda identifier: self.NAMED_BOXES[identifier])
+
+        result = _regrid(input_fields, grid=1.0, domain=names)
+
+        self._assert_crosses_the_180_line(result)
+
+    @pytest.mark.parametrize("east", [190.0, -170.0])
+    def test_mir_regrid_accepts_an_area_with_east_beyond_180(self, input_fields: ekd.FieldList, east: float) -> None:
+        result = mir_regrid(input_fields, grid=1.0, area=[-10.0, 175.0, -22.0, east])
+
+        self._assert_crosses_the_180_line(result)
 
 
 def test_empty_fieldlist_is_returned_unchanged() -> None:
