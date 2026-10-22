@@ -11,7 +11,8 @@ import logging
 from typing import get_args
 
 from cascade.low.func import Either
-from earthkit.workflows.fluent import Action, Payload
+from earthkit.workflows.fluent import Action, create_task_instance
+from earthkit.workflows.metadata import NodeMetadata, Requirements
 from fiab_core.fable import (
     ActionLookup,
     BlockConfigurationOption,
@@ -101,11 +102,11 @@ class GeographicalTransform(Transform):
             domain = domain[0]
 
         action = inputs[input_task].map(
-            Payload(
+            create_task_instance(
                 "fiab_plugin_ecmwf.geography.runtime.regrid",
-                kwargs={"grid": grid, "domain": domain, "fmt_if_list": "nwse"},
-                metadata={"environment": ["mir-python", "earthkit-plots<1.0.0"]},
-            )
+                static_input_kw={"grid": grid, "domain": domain, "fmt_if_list": "nwse"},
+            ),
+            node_metadata=NodeMetadata(requirements=Requirements(environment=["mir-python", "earthkit-plots<1.0.0"])),
         )
         return Either.ok(action)
 

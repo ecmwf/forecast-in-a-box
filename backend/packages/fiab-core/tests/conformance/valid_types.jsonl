@@ -15,8 +15,9 @@
 {"term": "geodomainSingle", "ast": {"name": "GeoDomainSingle"}, "value_valid": "Germany", "value_invalid": "42"}
 {"term": "bboxWSEN", "ast": {"name": "BoundingBoxWSEN"}, "value_valid": "-10,40,30,70", "value_invalid": "1,2,3"}
 {"term": "bboxWSEN", "ast": {"name": "BoundingBoxWSEN"}, "value_valid": "170,-10,-170,10", "value_invalid": "-10,60,30,35"}
+{"term": "bboxWSEN", "ast": {"name": "BoundingBoxWSEN"}, "value_valid": "-10.25,35.5,30,60", "value_invalid": "nan,35,30,60"}
 {"term": "geodomain", "ast": {"name": "GeoDomain"}, "value_valid": "Germany,France,Italy", "value_invalid": "auto,Germany"}
-{"term": "geodomain", "ast": {"name": "GeoDomain"}, "value_valid": "-10,35,30,60", "value_invalid": "-10.25,35.5,30,60"}
+{"term": "geodomain", "ast": {"name": "GeoDomain"}, "value_valid": "-10.25,35.5,30,60", "value_invalid": "-10,35,30,95"}
 {"term": "geodomain", "ast": {"name": "GeoDomain"}, "value_valid": "global", "value_invalid": ["Germany"]}
 {"term": "enumClosed[str]('a','b','c')", "ast": {"name": "ClosedEnum", "subtype": {"name": "String"}, "items": ["a", "b", "c"]}, "value_valid": "b", "value_invalid": "d"}
 {"term": "enumClosed[str]('Option1','Option2')", "ast": {"name": "ClosedEnum", "subtype": {"name": "String"}, "items": ["Option1", "Option2"]}, "value_valid": "Option1", "value_invalid": "option1"}

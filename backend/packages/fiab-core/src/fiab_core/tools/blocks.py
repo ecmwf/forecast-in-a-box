@@ -202,9 +202,7 @@ class BlockInstanceRich:
         # NOTE we ignore types as we trust parser -- but its fragile!
         return GeoDomainWrapper(raw_value)  # ty:ignore[invalid-argument-type]
 
-    def config_as_grid(
-        self, key: str | ConfigurationOptionId, validator: Callable[[Any, ConfigurationOptionId], None] | None = None
-    ) -> str | list[int | float] | int | float | None:
+    def config_as_grid(self, key: str | ConfigurationOptionId) -> str | list[int | float] | int | float | None:
         option_id, option = self._get_configuration_option(key)
         if not isinstance(option.value_type, GridType):
             raise BlockInstanceConfigurationError(
@@ -212,10 +210,7 @@ class BlockInstanceRich:
             )
         raw_value = self._get_raw_value(option_id)
         if isinstance(raw_value, (str, list, int, float)):
-            typed_raw_value = cast(str | list[int | float] | int | float, raw_value)
-            if validator is not None:
-                validator(typed_raw_value, option_id)
-            return typed_raw_value
+            return cast(str | list[int | float] | int | float, raw_value)
         if raw_value is None:
             return None
         raise BlockInstanceConfigurationError(
