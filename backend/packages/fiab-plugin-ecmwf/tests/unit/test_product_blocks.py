@@ -42,6 +42,7 @@ from fiab_plugin_ecmwf.constants import (
     LEVTYPE,
     PARAM,
     QUANTILE,
+    STATISTIC,
     STEP,
     THRESHOLD,
     TYPE,
@@ -53,6 +54,7 @@ from fiab_plugin_ecmwf.products.blocks import (
     Quantiles,
     ThermalIndices,
     WindSpeed,
+    WeeklyStatistics,
 )
 from fiab_plugin_ecmwf.qubed_utils import axes, collapse, contains, coxpand, datacubes, select
 
@@ -145,6 +147,22 @@ def quantiles_configuration() -> BlockInstance:
         ),
         Quantiles.configuration_options,
     )
+
+
+@pytest.fixture
+def weekly_statistics_configuration() -> QubedOutput:
+    return BlockInstance.from_block(
+        BlockFactoryId("weeklyStatistics"),
+        BlockInstanceBase(
+            input_ids={"dataset": BlockInstanceId("source_output")},
+            configuration_values={
+                STATISTIC: "mean",
+                PARAM: "228004",
+            },
+        ),
+        WeeklyStatistics.configuration_options,
+    )
+
 
 
 @pytest.fixture
@@ -827,3 +845,25 @@ class TestQuantiles:
     def test_expansion(self, ensemble_statistics_output: QubedOutput) -> None:
         for expansion in plugin().expander(ensemble_statistics_output):
             assert expansion.factory not in PRODUCT_BLOCKS
+
+class TestWeeklyStatistics:
+    def test_intersect(self, dummy_blockinstance: BlockInstance) -> None:
+        oper_output = cast(QubedOutput, OperationalForecastSource().validate(block=dummy_blockinstance, inputs={}, restrictions={}))
+        block = WeeklyStatistics()
+
+        assert block.intersect(other=oper_output)  # type: ignore[arg-type]
+
+    def test_validator_adds_parameters_restrictions(
+        self, weekly_statistics_configuration: BlockInstance, dummy_blockinstance: BlockInstance
+    ) -> None:
+        oper_output = cast(QubedOutput, OperationalForecastSource().validate(block=dummy_blockinstance, inputs={}, restrictions={}))
+        restrictions = (
+            plugin()
+            .validator(
+                BlockFactoryId("weeklyStatistics"),
+                weekly_statistics_configuration.block,
+                {"dataset": oper_output},
+            )
+            .restrictions
+        )
+        assert restrictions[PARAM].serialize() == "enumClosed[param]('228004','235055')"
