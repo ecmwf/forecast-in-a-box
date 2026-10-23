@@ -105,7 +105,7 @@ def anemoi_source_configuration(dummy_checkpoint: CompositeArtifactId) -> BlockI
             "input_source": "opendata",
             "lead_time": 24,
             "base_time": datetime(2024, 1, 1),
-            "number": [0],
+            "number": [],
         },
     )
 
@@ -132,7 +132,7 @@ def anemoi_input_source_configuration(dummy_checkpoint: CompositeArtifactId) -> 
             "checkpoint": dummy_checkpoint,
             "input_source": "opendata",
             "base_time": datetime(2024, 1, 1),
-            "number": [0],
+            "number": [],
         },
     )
 
@@ -277,15 +277,15 @@ class TestAnemoiSourceValidate:
         assert option.value_type.serialize() == "list[int{nonNegative}]"
 
     @pytest.mark.parametrize("block_cls", [AnemoiSource, AnemoiInputSource])
-    def test_number_default_parses_to_control_member(self, block_cls: type[AnemoiSource | AnemoiInputSource]) -> None:
+    def test_number_default_is_empty(self, block_cls: type[AnemoiSource | AnemoiInputSource]) -> None:
         option = block_cls.configuration_options[ENSEMBLE]
-        assert option.default_value == "0"
-        assert option.value_type.validate_convert(option.default_value) == [0]
+        assert option.default_value == ""
+        assert option.value_type.validate_convert(option.default_value) == []
         assert "control" in option.description
 
     @pytest.mark.parametrize(
         "raw, expected",
-        [["0", [0]], ["5", [5]], ["1,2,3", [1, 2, 3]], ["3, 1, 2", [3, 1, 2]]],
+        [["", []], ["0", [0]], ["5", [5]], ["1,2,3", [1, 2, 3]], ["3, 1, 2", [3, 1, 2]]],
     )
     def test_number_accepts_member_lists(self, raw: str, expected: list[int]) -> None:
         """Member 0 (control) is valid, and the order given by the user is preserved."""
@@ -299,13 +299,22 @@ class TestAnemoiSourceValidate:
         with pytest.raises(WrongType, match="is not non-negative"):
             value_type.validate_convert("1,-1")
 
-    def test_invalid_number_empty(self, dummy_checkpoint: CompositeArtifactId) -> None:
-        block = _make_block(
-            AnemoiSource,
-            {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": []},
-        )
-        with pytest.raises(BlockInstanceConfigurationError, match="cannot be empty"):
-            AnemoiSource().validate(block=block, inputs={}, restrictions={})
+    @pytest.mark.parametrize("model", ["ensemble_model", "non_ensemble_model", "unknown_model"])
+    @pytest.mark.parametrize("number", [[], None], ids=["empty", "absent"])
+    def test_empty_number_is_valid(
+        self, request: pytest.FixtureRequest, model: str, number: list[int] | None, dummy_checkpoint: CompositeArtifactId
+    ) -> None:
+        """No members (an empty list, or the option absent) is valid for every model type: ensemble models run the control
+        member, other models run deterministically with no `number` axis."""
+        request.getfixturevalue(model)
+        config: dict = {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1)}
+        if number is not None:
+            config["number"] = number
+        output = AnemoiSource().validate(block=_make_block(AnemoiSource, config), inputs={}, restrictions={})
+        if model == "ensemble_model":
+            assert axes(output)["number"] == {0}  # type: ignore[arg-type]
+        else:
+            assert not contains(output, "number")  # type: ignore[arg-type]
 
     def test_invalid_number_not_a_digit(self, dummy_checkpoint: CompositeArtifactId) -> None:
         block = _make_raw_block(
@@ -330,7 +339,9 @@ class TestAnemoiSourceValidate:
         output = AnemoiSource().validate(block=block, inputs={}, restrictions={})
         assert set(axes(output)["number"]) == set(members)  # type: ignore[arg-type]
 
-    def test_ensemble_model_single_member_has_number_axis(self, ensemble_model: None, anemoi_source_configuration: BlockInstance) -> None:
+    def test_ensemble_model_without_members_runs_control_member(
+        self, ensemble_model: None, anemoi_source_configuration: BlockInstance
+    ) -> None:
         output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions={})
         assert axes(output)["number"] == {0}  # type: ignore[arg-type]
 
@@ -348,7 +359,7 @@ class TestAnemoiSourceValidate:
         assert contains(output, "step")  # type: ignore[arg-type]
 
     def test_unset_number_defaults_to_control_member(self, ensemble_model: None, dummy_checkpoint: CompositeArtifactId) -> None:
-        """With no `number` set by the user the option default applies, so the control member 0 is run"""
+        """With no `number` set by the user the (empty) option default applies, so an ensemble model runs the control member 0"""
         option = AnemoiSource.configuration_options[ENSEMBLE]
         default = option.value_type.validate_convert(option.default_value)
         block = _make_block(
@@ -367,6 +378,8 @@ class TestAnemoiSourceValidate:
         builder = AnemoiBuilder(dummy_checkpoint)
         builder.from_input(input_source="opendata", date=datetime(2024, 1, 1), lead_time=24)
         assert inference.return_value.from_input.call_args.kwargs["ensemble_members"] == [0]
+        builder.from_input(input_source="opendata", date=datetime(2024, 1, 1), lead_time=24, ensemble=[])
+        assert inference.return_value.from_input.call_args.kwargs["ensemble_members"] == [0]
 
     def test_builder_get_initial_conditions_defaults_to_control_member(
         self, monkeypatch: pytest.MonkeyPatch, ensemble_model: None, dummy_checkpoint: CompositeArtifactId
@@ -376,6 +389,8 @@ class TestAnemoiSourceValidate:
         monkeypatch.setattr(AnemoiBuilder, "_local_path", property(lambda self: "ckpt"))
         builder = AnemoiBuilder(dummy_checkpoint)
         builder.get_initial_conditions(input_source="opendata", date=datetime(2024, 1, 1))
+        assert get_initial_conditions.call_args.kwargs["ensemble_members"] == [0]
+        builder.get_initial_conditions(input_source="opendata", date=datetime(2024, 1, 1), ensemble=[])
         assert get_initial_conditions.call_args.kwargs["ensemble_members"] == [0]
 
     @pytest.mark.parametrize("model", ["non_ensemble_model", "unknown_model"])
@@ -387,7 +402,7 @@ class TestAnemoiSourceValidate:
         monkeypatch.setattr(AnemoiBuilder, "inference", inference)
         monkeypatch.setattr(AnemoiBuilder, "_add_extra_output_keys", lambda self, action: action)
         builder = AnemoiBuilder(dummy_checkpoint)
-        builder.from_input(input_source="opendata", date=datetime(2024, 1, 1), lead_time=24, ensemble=[0])
+        builder.from_input(input_source="opendata", date=datetime(2024, 1, 1), lead_time=24, ensemble=[])
         assert inference.return_value.from_input.call_args.kwargs["ensemble_members"] is None
 
     @pytest.mark.parametrize("model", ["non_ensemble_model", "unknown_model"])
@@ -399,7 +414,7 @@ class TestAnemoiSourceValidate:
         monkeypatch.setattr("fiab_plugin_ecmwf.anemoi.blocks.get_initial_conditions", get_initial_conditions)
         monkeypatch.setattr(AnemoiBuilder, "_local_path", property(lambda self: "ckpt"))
         builder = AnemoiBuilder(dummy_checkpoint)
-        builder.get_initial_conditions(input_source="opendata", date=datetime(2024, 1, 1), ensemble=[0])
+        builder.get_initial_conditions(input_source="opendata", date=datetime(2024, 1, 1), ensemble=[])
         assert get_initial_conditions.call_args.kwargs["ensemble_members"] is None
 
     def test_builder_passes_member_list_for_ensemble_models(
@@ -412,27 +427,27 @@ class TestAnemoiSourceValidate:
         builder.from_input(input_source="opendata", date=datetime(2024, 1, 1), lead_time=24, ensemble=[3, 1])
         assert inference.return_value.from_input.call_args.kwargs["ensemble_members"] == [3, 1]
 
-    def test_non_ensemble_model_accepts_control_member(self, non_ensemble_model: None, anemoi_source_configuration: BlockInstance) -> None:
+    def test_non_ensemble_model_accepts_no_members(self, non_ensemble_model: None, anemoi_source_configuration: BlockInstance) -> None:
         output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions={})
         assert not contains(output, "number")  # type: ignore[arg-type]
 
-    @pytest.mark.parametrize("members", [[1], [2], [1, 2], [5, 1], [0, 1]])
-    def test_non_ensemble_model_rejects_other_members(
+    @pytest.mark.parametrize("members", [[0], [1], [2], [1, 2], [5, 1], [0, 1]])
+    def test_non_ensemble_model_rejects_any_members(
         self, non_ensemble_model: None, dummy_checkpoint: CompositeArtifactId, members: list[int]
     ) -> None:
         block = _make_block(
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": members},
         )
-        with pytest.raises(ValueError, match="not an ensemble model"):
+        with pytest.raises(ValueError, match="not an ensemble model, so ensemble members cannot be set"):
             AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
-    def test_unknown_model_accepts_control_member(self, unknown_model: None, anemoi_source_configuration: BlockInstance) -> None:
+    def test_unknown_model_accepts_no_members(self, unknown_model: None, anemoi_source_configuration: BlockInstance) -> None:
         output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions={})
         assert not contains(output, "number")  # type: ignore[arg-type]
 
-    @pytest.mark.parametrize("members", [[1], [2], [1, 2], [5, 1], [0, 1]])
-    def test_unknown_model_rejects_other_members(
+    @pytest.mark.parametrize("members", [[0], [1], [2], [1, 2], [5, 1], [0, 1]])
+    def test_unknown_model_rejects_any_members(
         self, unknown_model: None, dummy_checkpoint: CompositeArtifactId, members: list[int]
     ) -> None:
         """Unknown models run deterministically, so are treated like non-ensemble models"""
@@ -440,28 +455,32 @@ class TestAnemoiSourceValidate:
             AnemoiSource,
             {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": members},
         )
-        with pytest.raises(ValueError, match="not known to be an ensemble model"):
+        with pytest.raises(ValueError, match="not known to be an ensemble model, so ensemble members cannot be set"):
             AnemoiSource().validate(block=block, inputs={}, restrictions={})
 
-    @pytest.mark.parametrize("model", ["non_ensemble_model", "unknown_model"])
-    def test_deterministic_model_restriction(
+    @pytest.mark.parametrize("model", ["ensemble_model", "non_ensemble_model", "unknown_model"])
+    def test_ensemble_option_is_never_restricted(
         self, request: pytest.FixtureRequest, model: str, anemoi_source_configuration: BlockInstance
     ) -> None:
-        """The restriction constructs and accepts only the control member 0"""
+        """The grammar cannot express an empty enumeration, so members are rejected by validate, not by a restriction"""
         request.getfixturevalue(model)
         restrictions: dict = {}
         AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions=restrictions)
-        restriction = restrictions[ENSEMBLE]
-        assert isinstance(restriction, ListType)
-        assert restriction.validate_convert("0") == [0]
-        for invalid in ["1", "2", "0,1", "1,2"]:
-            with pytest.raises(WrongType):
-                restriction.validate_convert(invalid)
+        assert set(restrictions) == {"lead_time"}
 
-    def test_ensemble_model_has_no_ensemble_restriction(self, ensemble_model: None, anemoi_source_configuration: BlockInstance) -> None:
-        restrictions: dict = {}
-        AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions=restrictions)
-        assert ENSEMBLE not in restrictions
+    def test_rejected_members_error_through_the_plugin_validator(self, unknown_model: None, dummy_checkpoint: CompositeArtifactId) -> None:
+        """The plugin reports the rejection as an error on the block, with a message telling the user what to do"""
+        block = BlockInstanceBase(
+            input_ids={},
+            configuration_values=_config(
+                {"checkpoint": dummy_checkpoint, "lead_time": 24, "base_time": datetime(2024, 1, 1), "number": [1]}
+            ),
+        )
+        validation = plugin().validator(BlockFactoryId("anemoiSource"), block, {})
+        assert validation.result.t is None
+        assert validation.result.e is not None
+        assert "ensemble members cannot be set" in validation.result.e.reason
+        assert "Leave the ensemble members empty" in validation.result.e.reason
 
     def test_unknown_checkpoint(self, registered_provider: None) -> None:
         block = _make_block(
@@ -494,8 +513,7 @@ class TestAnemoiSourceCompile:
     @pytest.mark.parametrize(
         "source_output, source_action, exclude_keys",
         [
-            # the released library labels deterministic runs as member 0, so ignore `number`
-            [lf("anemoi_source_output"), lf("anemoi_source_action"), ["dataset", "number"]],
+            [lf("anemoi_source_output"), lf("anemoi_source_action"), ["dataset"]],
             [lf("anemoi_source_ensemble_output"), lf("anemoi_source_ensemble_action"), ["dataset"]],
         ],
     )
@@ -503,6 +521,20 @@ class TestAnemoiSourceCompile:
         action_datacubes = nodetree.datacubes(source_action.nodes)
         for index, cube in enumerate(datacubes(source_output)):
             assert set(cube.keys()) == set(x for x in action_datacubes[index] if x not in exclude_keys)
+            assert all(cube[dim] == action_datacubes[index][dim] for dim in cube)
+
+
+class TestAnemoiSourceCompileWithoutMembers:
+    def test_ensemble_model_compiles_to_the_control_member_it_advertises(
+        self, ensemble_model: None, anemoi_source_configuration: BlockInstance
+    ) -> None:
+        """No members requested: an ensemble model advertises and runs member 0"""
+        output = AnemoiSource().validate(block=anemoi_source_configuration, inputs={}, restrictions={})
+        action = AnemoiSource().compile(inputs={}, block=anemoi_source_configuration).get_or_raise()
+        assert axes(output)["number"] == {0}  # type: ignore[arg-type]
+        action_datacubes = nodetree.datacubes(action.nodes)  # type: ignore[union-attr]
+        for index, cube in enumerate(datacubes(output)):  # type: ignore[arg-type]
+            assert set(cube.keys()) == set(x for x in action_datacubes[index] if x != "dataset")
             assert all(cube[dim] == action_datacubes[index][dim] for dim in cube)
 
 
@@ -607,15 +639,21 @@ class TestAnemoiInputSourceValidate:
         output = AnemoiInputSource().validate(block=block, inputs={}, restrictions={})
         assert set(axes(output)["number"]) == set(members)  # type: ignore[arg-type]
 
-    @pytest.mark.parametrize("members", [[1], [2], [1, 2], [0, 1]])
-    def test_non_ensemble_model_rejects_other_members(
+    def test_ensemble_model_without_members_runs_control_member(
+        self, ensemble_model: None, anemoi_input_source_configuration: BlockInstance
+    ) -> None:
+        output = AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}, restrictions={})
+        assert axes(output)["number"] == {0}  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("members", [[0], [1], [2], [1, 2], [0, 1]])
+    def test_non_ensemble_model_rejects_any_members(
         self, non_ensemble_model: None, dummy_checkpoint: CompositeArtifactId, members: list[int]
     ) -> None:
         block = _make_block(
             AnemoiInputSource,
             {"checkpoint": dummy_checkpoint, "input_source": "opendata", "base_time": datetime(2024, 1, 1), "number": members},
         )
-        with pytest.raises(ValueError, match="not an ensemble model"):
+        with pytest.raises(ValueError, match="ensemble members cannot be set"):
             AnemoiInputSource().validate(block=block, inputs={}, restrictions={})
 
     @pytest.mark.parametrize("model", ["non_ensemble_model", "unknown_model"])
@@ -628,32 +666,22 @@ class TestAnemoiInputSourceValidate:
         assert axes(output)["date"] == {"20240101"}  # type: ignore[arg-type]
         assert axes(output)["time"] == {"0000"}  # type: ignore[arg-type]
 
-    @pytest.mark.parametrize("members", [[1], [1, 2], [0, 1]])
-    def test_unknown_model_rejects_other_members(
+    @pytest.mark.parametrize("members", [[0], [1], [1, 2], [0, 1]])
+    def test_unknown_model_rejects_any_members(
         self, unknown_model: None, dummy_checkpoint: CompositeArtifactId, members: list[int]
     ) -> None:
         block = _make_block(
             AnemoiInputSource,
             {"checkpoint": dummy_checkpoint, "input_source": "opendata", "base_time": datetime(2024, 1, 1), "number": members},
         )
-        with pytest.raises(ValueError, match="not known to be an ensemble model"):
+        with pytest.raises(ValueError, match="ensemble members cannot be set"):
             AnemoiInputSource().validate(block=block, inputs={}, restrictions={})
 
-    @pytest.mark.parametrize("model", ["non_ensemble_model", "unknown_model"])
-    def test_deterministic_model_restriction(
+    @pytest.mark.parametrize("model", ["ensemble_model", "non_ensemble_model", "unknown_model"])
+    def test_ensemble_option_is_never_restricted(
         self, request: pytest.FixtureRequest, model: str, anemoi_input_source_configuration: BlockInstance
     ) -> None:
         request.getfixturevalue(model)
-        restrictions: dict = {}
-        AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}, restrictions=restrictions)
-        restriction = restrictions[ENSEMBLE]
-        assert restriction.validate_convert("0") == [0]
-        for invalid in ["1", "0,1"]:
-            with pytest.raises(WrongType):
-                restriction.validate_convert(invalid)
-        assert set(restrictions) == {ENSEMBLE}  # the input source has no lead time option
-
-    def test_ensemble_model_has_no_restriction(self, ensemble_model: None, anemoi_input_source_configuration: BlockInstance) -> None:
         restrictions: dict = {}
         AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}, restrictions=restrictions)
         assert restrictions == {}
@@ -887,8 +915,7 @@ class TestAnemoiTransformCompile:
         )
         action_datacubes = nodetree.datacubes(action.nodes)
         for index, cube in enumerate(datacubes(qubed_output)):
-            # the released library labels deterministic runs as member 0, so ignore `number`
-            assert set(cube.keys()) == set(x for x in action_datacubes[index] if x not in ("dataset", "number"))
+            assert set(cube.keys()) == set(x for x in action_datacubes[index] if x != "dataset")
             assert all(cube[dim] == action_datacubes[index][dim] for dim in cube)
 
     # @pytest.mark.parametrize("source_output, source_action", [
@@ -1084,7 +1111,7 @@ class TestFlowTransformMembersMatchCompile:
         anemoi_input_source_configuration: BlockInstance,
         model: str,
     ) -> None:
-        """A deterministic upstream has no `number` axis: advertised has none, the compiled action has none (new library)"""
+        """A deterministic upstream has no `number` axis: advertised has none, the compiled action has none"""
         request.getfixturevalue(model)
         source_output: QubedOutput = AnemoiInputSource().validate(block=anemoi_input_source_configuration, inputs={}, restrictions={})  # type: ignore[assignment]
         source_action = AnemoiInputSource().compile(inputs={}, block=anemoi_input_source_configuration).get_or_raise()
@@ -1098,8 +1125,7 @@ class TestFlowTransformMembersMatchCompile:
         assert not contains(output, "number")
         action_datacubes = nodetree.datacubes(action.nodes)
         for index, cube in enumerate(datacubes(output)):
-            # the released library labels a deterministic run as member 0, which only a newer library drops
-            assert set(cube.keys()) == set(x for x in action_datacubes[index] if x not in ("dataset", "number"))
+            assert set(cube.keys()) == set(x for x in action_datacubes[index] if x != "dataset")
 
 
 class TestFlowChainedTransforms:
