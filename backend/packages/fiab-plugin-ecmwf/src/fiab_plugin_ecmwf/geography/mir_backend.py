@@ -89,7 +89,8 @@ def mir_regrid(
         job_args["grid"] = _make_mir_grid(grid).spec
     if area:
         job_args["area"] = area
-    job = mir.Job(**job_args)
+    # NOTE mir-python's Job and PyGrib classes come from a compiled extension without type stubs
+    job = mir.Job(**job_args)  # ty: ignore[unresolved-attribute]
 
     out_fields = []
     for field in fields:
@@ -98,7 +99,7 @@ def mir_regrid(
         input_buffer.seek(0)
 
         output_buffer = io.BytesIO()
-        job.execute(mir.PyGribInput(input_buffer), mir.PyGribOutput(output_buffer))
+        job.execute(mir.PyGribInput(input_buffer), mir.PyGribOutput(output_buffer))  # ty: ignore[unresolved-attribute]
         out_fields.append(ekd.from_source("memory", output_buffer.getvalue())[0])  # type: ignore[reportAttributeAccessIssue]
 
         input_buffer.close()
