@@ -47,3 +47,11 @@
 {"term": "str[]"}
 {"term": "list[str]suffix"}
 {"term": "dict[str,int]"}
+{"term": "Grid"}
+{"term": "grid[]"}
+{"term": "grid[int]"}
+{"term": "grid()"}
+{"term": "list[grid"}
+{"term": "enumOpen[grid]()"}
+{"term": "enumOpen[grid](auto"}
+{"term": "enumOpen[grid]auto"}

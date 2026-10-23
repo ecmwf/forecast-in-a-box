@@ -66,3 +66,16 @@
 {"term": "int{positive,divisibleBy(3)}", "ast": {"name": "Int", "traits": [{"name": "Positive"}, {"name": "DivisibleBy", "arg": "3"}]}, "value_valid": "6", "value_invalid": "-3"}
 {"term": "timedelta{divisibleBy(P1D)}", "ast": {"name": "TimeDelta", "traits": [{"name": "DivisibleBy", "arg": "P1D"}]}, "value_valid": "P3D", "value_invalid": "PT12H"}
 {"term": "timedelta{positive,divisibleBy(PT6H)}", "ast": {"name": "TimeDelta", "traits": [{"name": "Positive"}, {"name": "DivisibleBy", "arg": "PT6H"}]}, "value_valid": "PT18H", "value_invalid": "PT0H"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "0.25", "value_invalid": "0.001"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "0.01", "value_invalid": "0.0099"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "0.25/0.5", "value_invalid": "0.25/0.001"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "0.25/0.5", "value_invalid": "1/2/3"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "n320", "value_invalid": "N0"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "O8000", "value_invalid": "O8001"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "O96", "value_invalid": "O096"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "auto", "value_invalid": "AUTO"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "1", "value_invalid": "inf"}
+{"term": "grid", "ast": {"name": "Grid"}, "value_valid": "2/1", "value_invalid": "nan"}
+{"term": "enumOpen[grid](auto,0.25,O96)", "ast": {"name": "OpenEnum", "subtype": {"name": "Grid"}, "items": ["auto", "0.25", "O96"]}, "value_valid": "auto", "value_invalid": "0.001"}
+{"term": "enumOpen[grid](auto,0.25,O96)", "ast": {"name": "OpenEnum", "subtype": {"name": "Grid"}, "items": ["auto", "0.25", "O96"]}, "value_valid": "0.5/1", "value_invalid": "O0"}
+{"term": "enumOpen[grid](auto,0.25,0.5,1,O96,O320,N320)", "ast": {"name": "OpenEnum", "subtype": {"name": "Grid"}, "items": ["auto", "0.25", "0.5", "1", "O96", "O320", "N320"]}, "value_valid": "n1280", "value_invalid": "N8001"}

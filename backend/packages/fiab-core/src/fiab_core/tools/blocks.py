@@ -205,7 +205,8 @@ class BlockInstanceRich:
 
     def config_as_grid(self, key: str | ConfigurationOptionId) -> GridValue | None:
         option_id, option = self._get_configuration_option(key)
-        if not isinstance(option.value_type, GridType):
+        value_type = option.value_type
+        if not (isinstance(value_type, GridType) or (isinstance(value_type, OpenEnumType) and isinstance(value_type.subtype, GridType))):
             raise BlockInstanceConfigurationError(
                 f"Configuration option {option_id!r} has type {option.value_type.serialize()!r}, not GridType"
             )

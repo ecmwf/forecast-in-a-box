@@ -18,12 +18,13 @@ from fiab_core.fable import BlockFactoryId, BlockInstanceId, ConfigurationOption
 from fiab_core.fable import BlockInstance as BlockInstanceBase
 from fiab_core.tools.blocks import BlockInstanceConfigurationError
 from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
-from fiab_core.types import GeoDomainType, GridType, GridValue, WrongType
+from fiab_core.types import GeoDomainType, GridType, GridValue, OpenEnumType, WrongType
 from qubed import Qube
 
 from fiab_plugin_ecmwf import plugin
 from fiab_plugin_ecmwf.constants import DOMAIN, GRID
 from fiab_plugin_ecmwf.geography.blocks import GeographicalTransform, domain_axis_value, domain_runtime_value, grid_axis_value
+from fiab_plugin_ecmwf.plotting.blocks import MapPlotSink
 from fiab_plugin_ecmwf.qubed_utils import axes
 
 REGRID_TASK = "fiab_plugin_ecmwf.geography.runtime.regrid"
@@ -63,16 +64,24 @@ def _regrid_nodes(action: Action) -> list[Any]:
 class TestGridOption:
     value_type = GeographicalTransform.configuration_options[GRID].value_type
 
-    def test_declared_as_grid_type(self) -> None:
-        assert isinstance(self.value_type, GridType)
-        assert self.value_type.serialize() == "grid"
+    def test_declared_as_open_enum_of_grids(self) -> None:
+        assert isinstance(self.value_type, OpenEnumType)
+        assert isinstance(self.value_type.subtype, GridType)
+        assert self.value_type.serialize() == "enumOpen[grid](auto,0.25,0.5,1,O96,O320,N320)"
+
+    def test_suggestions(self) -> None:
+        assert isinstance(self.value_type, OpenEnumType)
+        assert self.value_type.items == [None, 0.25, 0.5, 1.0, "O96", "O320", "N320"]
 
     @pytest.mark.parametrize(
         ("raw", "expected"),
         [
             ("O96", "O96"),
             ("N320", "N320"),
+            ("n320", "N320"),
+            ("o48", "O48"),
             ("0.25", 0.25),
+            ("0.01", 0.01),
             ("1", 1.0),
             ("0.25/0.5", [0.25, 0.5]),
             ("1/2", [1.0, 2.0]),
@@ -84,7 +93,30 @@ class TestGridOption:
 
     @pytest.mark.parametrize(
         "raw",
-        ["", "N", "F320", "X96", "0", "-0.25", "0.25/-0.5", "0.25/abc", "abc", "O9.6", "inf", "-inf", "nan", "1/2/3", "0.25/inf"],
+        [
+            "",
+            "N",
+            "F320",
+            "X96",
+            "0",
+            "-0.25",
+            "0.25/-0.5",
+            "0.25/abc",
+            "abc",
+            "O9.6",
+            "inf",
+            "-inf",
+            "nan",
+            "1/2/3",
+            "0.25/inf",
+            "0.001",
+            "0.0001",
+            "0.25/0.001",
+            "N0",
+            "O0",
+            "O096",
+            "N8001",
+        ],
     )
     def test_invalid(self, raw: str) -> None:
         with pytest.raises(WrongType):
@@ -137,6 +169,71 @@ class TestDomainOption:
         default = GeographicalTransform.configuration_options[DOMAIN].default_value
         assert default == "auto"
         assert self.value_type.validate_convert(default) == "auto"
+
+
+class TestGridOptionEndToEnd:
+    value_type = GeographicalTransform.configuration_options[GRID].value_type
+
+    @pytest.mark.parametrize(
+        ("raw", "expected_axis"),
+        [
+            ("n320", "N320"),
+            ("N320", "N320"),
+            ("o96", "O96"),
+            ("0.25", "0.25"),
+            ("1", "1"),
+            ("0.1", "0.1"),
+            ("0.5/1", "0.5/1"),
+            ("0.5/1.0", "0.5/1"),
+        ],
+    )
+    def test_converted_entry_gives_the_canonical_grid_axis_value(
+        self, sample_forecast_source_output: QubedOutput, raw: str, expected_axis: str
+    ) -> None:
+        output = GeographicalTransform().validate(
+            block=_block(self.value_type.validate_convert(raw), "global"),
+            inputs={"dataset": sample_forecast_source_output},
+            restrictions={},  # type: ignore[arg-type]
+        )
+
+        assert isinstance(output, QubedOutput)
+        assert axes(output)["grid"] == {expected_axis}
+
+    def test_auto_adds_no_grid_axis_and_compiles_to_no_grid(
+        self, sample_forecast_source_output: QubedOutput, sample_forecast_source_action: Action
+    ) -> None:
+        converted = self.value_type.validate_convert("auto")
+        block = _block(converted, "global")
+
+        output = GeographicalTransform().validate(
+            block=block,
+            inputs={"dataset": sample_forecast_source_output},
+            restrictions={},  # type: ignore[arg-type]
+        )
+        action = GeographicalTransform().compile(inputs={SOURCE_ID: sample_forecast_source_action}, block=block).get_or_raise()
+
+        assert isinstance(output, QubedOutput)
+        assert "grid" not in axes(output)
+        assert all(node.payload.static_input_kw["grid"] is None for node in _regrid_nodes(action))
+
+    def test_default_value_converts_to_no_grid(self) -> None:
+        default = GeographicalTransform.configuration_options[GRID].default_value
+
+        assert self.value_type.validate_convert(default) is None
+
+
+class TestDomainDescriptions:
+    def test_geographical_transform_domain_cuts_the_data(self) -> None:
+        description = GeographicalTransform.configuration_options[DOMAIN].description
+
+        assert "cut out" in description
+        assert "everything outside the area is dropped for all downstream blocks" in description
+
+    def test_map_plot_domain_only_frames_the_view(self) -> None:
+        description = MapPlotSink.configuration_options[DOMAIN].description
+
+        assert "only frames the map" in description
+        assert "does not change the data" in description
 
 
 class TestGridAxisValue:

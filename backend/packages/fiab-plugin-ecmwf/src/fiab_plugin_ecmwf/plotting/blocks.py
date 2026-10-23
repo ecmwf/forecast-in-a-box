@@ -121,7 +121,10 @@ class MapPlotSink(Sink):
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
-            description="Area to display: auto (fit the data), global, a named region/country (select several to union), or a drawn bounding box",
+            description=(
+                "Area the map view shows: it only frames the map and does not change the data. Choose auto (fit the data), global, "
+                "a named region/country (select several to union), or a drawn bounding box"
+            ),
             value_type=GeoDomainType(),
             default_value="global",
         ),

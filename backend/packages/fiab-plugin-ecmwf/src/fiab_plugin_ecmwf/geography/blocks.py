@@ -8,7 +8,6 @@
 # nor does it submit to any jurisdiction.
 
 import logging
-from decimal import Decimal
 from typing import cast, get_args
 
 from cascade.low.func import Either
@@ -31,6 +30,7 @@ from fiab_core.types import (
     GeoDomainType,
     GridType,
     GridValue,
+    OpenEnumType,
     UnionType,
     UnrestrictedGeoDomainAlias,
     UnrestrictedGeoDomainLiteral,
@@ -53,21 +53,13 @@ NO_CUTOUT_DOMAIN = "auto"
 """The domain axis value for an empty area, which regrids without cutting out."""
 
 
-def _number_str(value: int | float) -> str:
-    return format(Decimal(repr(float(value))).normalize(), "f")
-
-
 def grid_axis_value(grid: GridValue) -> str:
     """Return the canonical string of a grid for the grid axis.
 
-    A named grid is returned as given, a single resolution as its shortest decimal string without a trailing '.0' (for example
-    '0.25' or '1'), and a pair as the two such strings joined by a slash in west-east, south-north order (for example '0.25/0.5').
+    A Gaussian grid is its upper case name, a single resolution its shortest decimal string without a trailing '.0' (for example
+    '0.25' or '1'), and a pair the two such strings joined by a slash in west-east, south-north order (for example '0.25/0.5').
     """
-    if isinstance(grid, str):
-        return grid
-    if isinstance(grid, list):
-        return "/".join(_number_str(resolution) for resolution in grid)
-    return _number_str(grid)
+    return GridType.value_to_str(grid)
 
 
 def domain_axis_value(domain: GeoDomainRuntimeType) -> str:
@@ -105,16 +97,17 @@ class GeographicalTransform(Transform):
         GRID: BlockConfigurationOption(
             title="Grid",
             description=(
-                "Grid to regrid to: a resolution in degrees such as '0.25', a west-east/south-north pair such as '0.25/0.5', "
-                "or a named Gaussian grid such as 'N320' or 'O96'"
+                "Grid to regrid to: a resolution in degrees such as '0.25' (at least 0.01), a west-east/south-north pair such as "
+                "'0.25/0.5', or a Gaussian grid such as 'N320' or 'O96' (number from 1 to 8000); auto leaves the grid unchanged"
             ),
-            value_type=GridType(),
+            value_type=OpenEnumType(["auto", "0.25", "0.5", "1", "O96", "O320", "N320"], GridType()),
             default_value="auto",
         ),
         DOMAIN: BlockConfigurationOption(
             title="Domain",
             description=(
-                "Area to cut out: auto (fit the data), global, one or more named regions/countries, or a drawn bounding box; "
+                "Area the data is cut out to: everything outside the area is dropped for all downstream blocks. Choose auto or global "
+                "to leave the area unchanged, one or more named regions/countries, or a drawn bounding box; "
                 "several names are cut out as the smallest latitude/longitude box containing all of them, not as the union of their shapes; "
                 "leave empty to regrid without cutting out"
             ),

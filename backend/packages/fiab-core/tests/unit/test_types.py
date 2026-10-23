@@ -897,9 +897,56 @@ class TestGridType:
     def test_serialize(self) -> None:
         assert GridType().serialize() == "grid"
 
-    @pytest.mark.parametrize("value", ["N320", "O96", "n1280", "o48"])
+    @pytest.mark.parametrize("value", ["N320", "O96", "N1", "O8000"])
     def test_convert_named_gaussian_grid(self, value: str) -> None:
         assert GridType().validate_convert(value) == value
+
+    @pytest.mark.parametrize(("value", "expected"), [("n320", "N320"), ("o96", "O96"), ("n1280", "N1280"), ("o48", "O48")])
+    def test_gaussian_grid_name_is_converted_to_upper_case(self, value: str, expected: str) -> None:
+        assert GridType().validate_convert(value) == expected
+
+    @pytest.mark.parametrize("value", ["N0", "O0", "n0", "N8001", "O9000", "O100000"])
+    def test_gaussian_grid_number_out_of_range_raises(self, value: str) -> None:
+        with pytest.raises(WrongType, match="must be from 1 to 8000"):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["O096", "N00320", "o01"])
+    def test_gaussian_grid_number_with_leading_zeros_raises(self, value: str) -> None:
+        with pytest.raises(WrongType, match="leading zeros"):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["O\u0663\u0662", "N\u00b2"])
+    def test_gaussian_grid_number_with_non_ascii_digits_raises(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            GridType().validate_convert(value)
+
+    @pytest.mark.parametrize("value", ["0.01", 0.01, "0.01/0.01", [0.01, 0.01], "0.25/0.01", 1e-2])
+    def test_finest_resolution_is_accepted(self, value: object) -> None:
+        GridType().validate_convert(value)
+
+    @pytest.mark.parametrize(
+        "value", ["0.0099", "0.001", "0.0001", 0.001, 0.0099, "0.25/0.001", "0.001/0.25", [0.25, 0.001], [0.001, 0.25], "1e-5"]
+    )
+    def test_resolution_finer_than_minimum_raises(self, value: object) -> None:
+        with pytest.raises(WrongType, match="finer than the minimum of 0.01 degrees"):
+            GridType().validate_convert(value)
+
+    def test_value_to_str_is_canonical_and_converts_back(self) -> None:
+        grid_type = GridType()
+        for text, expected in [
+            ("auto", "auto"),
+            ("n320", "N320"),
+            ("0.25", "0.25"),
+            ("1", "1"),
+            ("1.0", "1"),
+            ("0.01", "0.01"),
+            ("0.25/0.5", "0.25/0.5"),
+            ("1/2", "1/2"),
+            ("0.5/1.0", "0.5/1"),
+        ]:
+            converted = grid_type.validate_convert(text)
+            assert GridType.value_to_str(converted) == expected
+            assert grid_type.validate_convert(expected) == converted
 
     def test_convert_string_single_resolution(self) -> None:
         assert GridType().validate_convert("0.25") == 0.25
@@ -979,3 +1026,48 @@ class TestGridType:
         assert t.validate_convert("N320") == "N320"
         assert t.validate_convert("0.25/0.5") == [0.25, 0.5]
         assert t.serialize() == "grid"
+
+
+class TestGridEnum:
+    """enumOpen[grid]: suggestions of grids with free entry allowed."""
+
+    TERM = "enumOpen[grid](auto,0.25,0.5,1,O96,O320,N320)"
+
+    def test_parse_and_serialize_round_trip(self) -> None:
+        t = parse(self.TERM)
+        assert isinstance(t, OpenEnumType)
+        assert isinstance(t.subtype, GridType)
+        assert t.serialize() == self.TERM
+        assert parse(t.serialize()).serialize() == self.TERM
+
+    def test_items_are_converted_by_the_grid_type(self) -> None:
+        t = parse(self.TERM)
+        assert isinstance(t, OpenEnumType)
+        assert t.items == [None, 0.25, 0.5, 1.0, "O96", "O320", "N320"]
+
+    def test_items_with_pairs_and_lower_case_names_serialize_canonically(self) -> None:
+        t = parse("enumOpen[grid](auto,0.5/1.0,n320)")
+        assert t.serialize() == "enumOpen[grid](auto,0.5/1,N320)"
+
+    def test_suggestions_are_converted(self) -> None:
+        t = parse(self.TERM)
+        assert t.validate_convert("auto") is None
+        assert t.validate_convert("0.25") == 0.25
+        assert t.validate_convert("1") == 1.0
+        assert t.validate_convert("O96") == "O96"
+
+    def test_free_entries_are_converted(self) -> None:
+        t = parse(self.TERM)
+        assert t.validate_convert("0.1") == 0.1
+        assert t.validate_convert("0.25/0.5") == [0.25, 0.5]
+        assert t.validate_convert("n1280") == "N1280"
+        assert t.validate_convert("O48") == "O48"
+
+    @pytest.mark.parametrize("value", ["0.001", "O0", "N8001", "abc", "1/2/3", "inf", ""])
+    def test_invalid_free_entries_are_rejected(self, value: str) -> None:
+        with pytest.raises(WrongType):
+            parse(self.TERM).validate_convert(value)
+
+    def test_invalid_item_is_rejected_at_parse_time(self) -> None:
+        with pytest.raises(WrongType):
+            parse("enumOpen[grid](auto,0.001)")
