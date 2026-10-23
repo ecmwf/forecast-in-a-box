@@ -206,6 +206,6 @@ def test_anemoi_source_validates_for_a_model_of_unknown_type(template: Blueprint
             resolved = _GLYPH.sub(lambda m: template.example_glyphs[_leading_identifier(m.group(1))].example_value, raw)
         values[option_id] = parse(factory.configuration_options[option_id].value_type).validate_convert(resolved)
 
-    assert values.get(ConfigurationOptionId(ENSEMBLE), []) == []
+    assert values.get(ConfigurationOptionId(ENSEMBLE), "none") == "none"
     validation = plugin().validator(block.factory_id, BlockInstance(configuration_values=values, input_ids={}), {})
     assert validation.result.e is None, validation.result.e

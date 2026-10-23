@@ -27,8 +27,8 @@ from fiab_core.fable import (
     QubedOutput,
 )
 from fiab_core.plugin import Error
-from fiab_core.tools.blocks import BlockInstanceRich, Source, Transform
-from fiab_core.types import DatetimeType, IntType, ListType, OpenEnumType
+from fiab_core.tools.blocks import BlockInstanceConfigurationError, BlockInstanceRich, Source, Transform
+from fiab_core.types import ClosedEnumType, DatetimeType, IntType, ListType, OpenEnumType, UnionType
 from fiab_core.types.traits import DivisibleBy, NonNegative, Positive
 from qubed import Qube
 from qubed.value_types import QEnum
@@ -45,6 +45,18 @@ from fiab_plugin_ecmwf.constants import (
 from fiab_plugin_ecmwf.qubed_utils import axes, contains, expand
 
 from .utils import CheckpointArtifact, get_available_input_sources, get_checkpoint_enum_type, get_input_source_extras
+
+NO_ENSEMBLE_MEMBERS = "none"
+"""Sentinel value of the ensemble members option for no members. The frontend flags any empty option value as missing,
+so "no members" cannot be spelled as an empty string."""
+
+ENSEMBLE_MEMBERS_TYPE = UnionType([ClosedEnumType([NO_ENSEMBLE_MEMBERS]), ListType(IntType(traits=NonNegative()))])
+"""Either the sentinel "none" or a list of member ids. The sentinel is tried first so that it is never read as a list."""
+
+ENSEMBLE_MEMBERS_DESCRIPTION = (
+    'List of ensemble member ids to run, for ensemble models only, eg "1,2,3". "none" runs the control forecast (member 0)'
+    " of an ensemble model, or a deterministic model, which has no members."
+)
 
 
 def strip_timezone(dt: datetime) -> datetime:
@@ -166,15 +178,24 @@ class AnemoiBaseBlock:
             raise ValueError(validation_error)
 
     def get_ensemble_members(self, block: BlockInstanceRich) -> list[int]:
-        """The ensemble members requested in the block configuration, empty if none (or the option is absent)"""
-        if ENSEMBLE not in block.block.configuration_values:
+        """The ensemble members requested in the block configuration, empty for "none" (or if the option is absent)
+
+        The option is a union of the "none" sentinel and a list of ints, which has no typed accessor, so the converted
+        value is read directly. An empty list is also read as no members.
+        """
+        value = block.block.configuration_values.get(ENSEMBLE, NO_ENSEMBLE_MEMBERS)
+        if value == NO_ENSEMBLE_MEMBERS:
             return []
-        return block.config_as_list(ENSEMBLE, int, allow_empty=True)
+        if isinstance(value, list) and all(type(member) is int for member in value):
+            return list(value)
+        raise BlockInstanceConfigurationError(
+            f"Configuration option {ENSEMBLE!r} expected {NO_ENSEMBLE_MEMBERS!r} or list[int], got {value!r}"
+        )
 
     def validate_ensemble(self, checkpoint: CheckpointArtifact, ensemble_members: list[int]) -> None:
         """Validate the ensemble configuration option against the checkpoint properties
 
-        Ensemble models accept any member ids, or none to run the control member. Non-ensemble and unknown models run
+        Ensemble models accept any member ids, or "none" to run the control member. Non-ensemble and unknown models run
         deterministically, so cannot be given members.
         """
         if checkpoint.is_ensemble_model is True or not ensemble_members:
@@ -182,7 +203,7 @@ class AnemoiBaseBlock:
         reason = "not an ensemble model" if checkpoint.is_ensemble_model is False else "not known to be an ensemble model"
         raise ValueError(
             f"Checkpoint {checkpoint.artifact} is {reason}, so ensemble members cannot be set, but {ensemble_members} were requested. "
-            "Leave the ensemble members empty."
+            f'Set the ensemble members to "{NO_ENSEMBLE_MEMBERS}".'
         )
 
     def resolve_ensemble(self, checkpoint: CheckpointArtifact, ensemble_members: list[int]) -> list[int]:
@@ -190,6 +211,14 @@ class AnemoiBaseBlock:
         if checkpoint.is_ensemble_model is True and not ensemble_members:
             return [0]
         return ensemble_members
+
+    def add_ensemble_restriction(self, checkpoint: CheckpointArtifact, restrictions: ConfigurationOptionRestriction) -> None:
+        """Restrict the ensemble members option to "none" for models that are not known ensembles
+
+        Ensemble models are given the full option type rather than no restriction, to replace any restriction the
+        frontend still holds from a previously selected checkpoint.
+        """
+        restrictions[ENSEMBLE] = ENSEMBLE_MEMBERS_TYPE if checkpoint.is_ensemble_model is True else ClosedEnumType([NO_ENSEMBLE_MEMBERS])
 
     def add_restrictions(self, checkpoint: CheckpointArtifact, restrictions: ConfigurationOptionRestriction) -> None:
         """Add restrictions to the block configuration options based on the checkpoint properties"""
@@ -281,12 +310,9 @@ class AnemoiSource(Source, AnemoiBaseBlock):
         ),
         ENSEMBLE: BlockConfigurationOption(
             title="Ensemble members",
-            description=(
-                "IDs of the ensemble members to run, for ensemble models only. Leave empty to run the control forecast (member 0)"
-                " of an ensemble model. Models that are not ensembles cannot be given members."
-            ),
-            value_type=ListType(IntType(traits=NonNegative())),
-            default_value="",
+            description=ENSEMBLE_MEMBERS_DESCRIPTION,
+            value_type=ENSEMBLE_MEMBERS_TYPE,
+            default_value=NO_ENSEMBLE_MEMBERS,
         ),
     }
 
@@ -298,9 +324,11 @@ class AnemoiSource(Source, AnemoiBaseBlock):
         lead_time = block.config_as_int(LEAD_TIME)
         base_time = block.config_as_datetime(BASE_TIME)
 
+        # Restrictions are added before validating, so they are reported with any validation error
+        self.add_restrictions(checkpoint, restrictions)
+        self.add_ensemble_restriction(checkpoint, restrictions)
         self.validate_lead_time(checkpoint, lead_time)
         self.validate_ensemble(checkpoint, ensemble_members)
-        self.add_restrictions(checkpoint, restrictions)
 
         return self.get_output_qube(checkpoint, lead_time, self.resolve_ensemble(checkpoint, ensemble_members), base_time=base_time)
 
@@ -354,12 +382,9 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
         ),
         ENSEMBLE: BlockConfigurationOption(
             title="Ensemble members",
-            description=(
-                "IDs of the ensemble members to run, for ensemble models only. Leave empty to run the control forecast (member 0)"
-                " of an ensemble model. Models that are not ensembles cannot be given members."
-            ),
-            value_type=ListType(IntType(traits=NonNegative())),
-            default_value="",
+            description=ENSEMBLE_MEMBERS_DESCRIPTION,
+            value_type=ENSEMBLE_MEMBERS_TYPE,
+            default_value=NO_ENSEMBLE_MEMBERS,
         ),
     }
 
@@ -370,6 +395,8 @@ class AnemoiInputSource(Source, AnemoiBaseBlock):
         ensemble_members = self.get_ensemble_members(block)
         base_time = block.config_as_datetime(BASE_TIME)
 
+        # Restrictions are added before validating, so they are reported with any validation error
+        self.add_ensemble_restriction(checkpoint, restrictions)
         self.validate_ensemble(checkpoint, ensemble_members)
         return self.get_input_qube(checkpoint, self.resolve_ensemble(checkpoint, ensemble_members), base_time=base_time)
 
