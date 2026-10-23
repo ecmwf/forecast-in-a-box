@@ -11,6 +11,8 @@
 import { Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { outputFileName } from './actions/download'
+import { isFetchableMime } from './mime'
+import { OutputZipButton } from './OutputZipButton'
 import type { OutputAdapter, OutputItem } from './types'
 import { useExecutionHoverStore } from '@/features/executions/stores/executionHoverStore'
 import { Button } from '@/components/ui/button'
@@ -144,6 +146,14 @@ export function OutputCard({ item, adapter, onOpenViewer }: OutputCardProps) {
             </Button>
           )
         })}
+        {item.isAvailable && isFetchableMime(item.mimeType) && (
+          <OutputZipButton
+            jobId={item.jobId}
+            taskId={item.taskId}
+            ready
+            compact
+          />
+        )}
       </div>
     </div>
   )

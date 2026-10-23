@@ -9,7 +9,11 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { canonicalMime, mimeParam } from '@/features/executions/outputs/mime'
+import {
+  canonicalMime,
+  isFetchableMime,
+  mimeParam,
+} from '@/features/executions/outputs/mime'
 import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
 
 const GRIB_OLD = 'text/plain; fiab-format=gribdir'
@@ -48,5 +52,23 @@ describe('isGribDirMime', () => {
     expect(isGribDirMime(ZARR)).toBe(false)
     expect(isGribDirMime('text/plain')).toBe(false)
     expect(isGribDirMime(undefined)).toBe(false)
+  })
+})
+
+describe('isFetchableMime', () => {
+  it('accepts text/plain with fiab-fetchable=1', () => {
+    expect(isFetchableMime(GRIB_NEW)).toBe(true)
+    expect(isFetchableMime(ZARR)).toBe(true)
+  })
+
+  it('mirrors the backend negatives', () => {
+    expect(isFetchableMime(GRIB_OLD)).toBe(false)
+    expect(
+      isFetchableMime('text/plain; fiab-format=gribdir; fiab-fetchable=0'),
+    ).toBe(false)
+    expect(isFetchableMime('application/octet-stream; fiab-fetchable=1')).toBe(
+      false,
+    )
+    expect(isFetchableMime(null)).toBe(false)
   })
 })

@@ -28,3 +28,12 @@ export function canonicalMime(mime: string): string {
   const format = mimeParam(mime, 'fiab-format')
   return format ? `${base}; fiab-format=${format}` : base
 }
+
+/** Mirrors fiab-core is_fetchable_mime. */
+export function isFetchableMime(mime: string | null | undefined): boolean {
+  return (
+    !!mime &&
+    mime.startsWith('text/plain') &&
+    mimeParam(mime, 'fiab-fetchable') === '1'
+  )
+}
