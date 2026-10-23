@@ -13,7 +13,7 @@ import type { JobExecutionDetail } from '@/api/types/job.types'
 import type { ScheduleRunsResponse } from '@/api/types/schedule.types'
 import { getJobStatus } from '@/api/endpoints/job'
 import { getScheduleRuns } from '@/api/endpoints/schedule'
-import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
 
 /** How far back the schedule's run history is searched for a comparison partner. */
 const HISTORY_PAGE_SIZE = 50
@@ -56,7 +56,7 @@ function gribOutputs(detail: JobExecutionDetail) {
   return Object.entries(detail.outputs ?? {})
     .filter(
       ([taskId, meta]) =>
-        meta.mime_type === GRIB_DIR_MIME && !(taskId in detail.lost_task_ids),
+        isGribDirMime(meta.mime_type) && !(taskId in detail.lost_task_ids),
     )
     .map(([taskId, meta]) => ({ taskId, blockId: meta.original_block }))
 }

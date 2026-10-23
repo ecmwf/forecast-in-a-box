@@ -10,6 +10,7 @@
 
 import { Download } from 'lucide-react'
 import { outputTitle } from '../dims'
+import { isFetchableMime } from '../mime'
 import { fetchJobResultBlob } from '../useJobResult'
 import type { ActionContext, OutputAction, OutputItem } from '../types'
 import { createLogger } from '@/lib/logger'
@@ -56,6 +57,7 @@ export const downloadAction: OutputAction = {
   label: (t) => t('outputs.actions.download'),
   icon: Download,
   variant: 'outline',
-  isAvailable: (item) => item.isAvailable,
+  // Fetchable payloads are paths; the card offers the zip.
+  isAvailable: (item) => item.isAvailable && !isFetchableMime(item.mimeType),
   run: runDownload,
 }

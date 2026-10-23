@@ -16,7 +16,7 @@
  */
 
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import { GRIB_DIR_MIME } from './adapters/grib'
+import { isGribDirMime } from './adapters/grib'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import { getJobResultHead } from '@/api/endpoints/job'
 import { isTerminalStatus } from '@/api/types/job.types'
@@ -37,7 +37,7 @@ export function gribSinkProgress(
   let written = 0
   let total = 0
   for (const meta of Object.values(outputs ?? {})) {
-    if (meta.mime_type !== GRIB_DIR_MIME || meta.original_block !== blockId) {
+    if (!isGribDirMime(meta.mime_type) || meta.original_block !== blockId) {
       continue
     }
     total += 1

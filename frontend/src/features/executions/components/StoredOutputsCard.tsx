@@ -48,7 +48,9 @@ import {
   isSinkComplete,
   useStoredDirPath,
 } from '@/features/executions/outputs/stored-dir'
-import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
+import { isFetchableMime } from '@/features/executions/outputs/mime'
+import { OutputZipButton } from '@/features/executions/outputs/OutputZipButton'
 import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
 import { lensOwnerKey, setLensOwner } from '@/features/visualise/lens-owners'
 import { showToast } from '@/lib/toast'
@@ -100,6 +102,8 @@ interface StoredOutputRow {
   count: number
   /** Marker tasks already written. */
   written: number
+  /** Backend can zip the folder. */
+  fetchable: boolean
 }
 
 export function StoredOutputsCard({
@@ -121,7 +125,7 @@ export function StoredOutputsCard({
     if (!outputs) return []
     const byBlock = new Map<string, StoredOutputRow>()
     for (const [taskId, meta] of Object.entries(outputs)) {
-      if (meta.mime_type !== GRIB_DIR_MIME) continue
+      if (!isGribDirMime(meta.mime_type)) continue
       const availability = classifyOutput(
         meta.is_available,
         taskId,
@@ -154,6 +158,7 @@ export function StoredOutputsCard({
           availability.state === 'lost' ? availability.reason : undefined,
         count: 1,
         written: meta.is_available ? 1 : 0,
+        fetchable: isFetchableMime(meta.mime_type),
       })
     }
     return Array.from(byBlock.values())
@@ -296,9 +301,11 @@ function StoredOutputRowItem({
     ? t('storedOutputs.wmsUnavailable')
     : t('storedOutputs.startWms')
   const { dir, name } = dirPath ? splitPath(dirPath) : { dir: '', name: '' }
+  // A per-run folder carries the run ID.
+  const sharedFolder = !!dirPath && !dirPath.includes(jobId)
 
   return (
-    <li className="flex items-start gap-3 py-2.5">
+    <li className="flex flex-wrap items-start gap-3 py-2.5">
       <span
         className={cn(
           'mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-mono text-sm font-semibold',
@@ -307,7 +314,8 @@ function StoredOutputRowItem({
       >
         GRIB
       </span>
-      <div className="min-w-0 flex-1">
+      {/* Actions wrap below 12rem of text. */}
+      <div className="min-w-0 flex-1 basis-48">
         <div className="flex items-baseline gap-2">
           <P className="truncate text-sm font-medium">{row.title}</P>
           {row.count > 1 && (
@@ -344,8 +352,7 @@ function StoredOutputRowItem({
             {row.lostReason ?? t('storedOutputs.fileMissing')}
           </P>
         )}
-        {/* A per-run folder carries the run ID. */}
-        {dirPath && !dirPath.includes(jobId) && (
+        {sharedFolder && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -369,7 +376,7 @@ function StoredOutputRowItem({
           </P>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
         {row.isAvailable && (
           <Button
             size="sm"
@@ -438,6 +445,15 @@ function StoredOutputRowItem({
               ? t('storedOutputs.startingWms')
               : t('storedOutputs.startWms')}
           </Button>
+        )}
+        {/* Last: stays put when WMS controls change. */}
+        {row.isAvailable && row.fetchable && (
+          <OutputZipButton
+            jobId={jobId}
+            taskId={row.taskId}
+            ready={complete}
+            sharedFolder={sharedFolder}
+          />
         )}
       </div>
     </li>

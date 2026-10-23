@@ -19,7 +19,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { registerFirstPartyAdapters } from './adapters'
-import { GRIB_DIR_MIME } from './adapters/grib'
+import { isGribDirMime } from './adapters/grib'
 import {
   compareDimValues,
   compareDims,
@@ -132,7 +132,7 @@ export function OutputsView({
     if (!outputs) return []
     const list = Object.entries(outputs)
       // GRIB markers show in the Stored outputs card, not the grid.
-      .filter(([, meta]) => meta.mime_type !== GRIB_DIR_MIME)
+      .filter(([, meta]) => !isGribDirMime(meta.mime_type))
       .map(([taskId, meta]) => {
         const availability = classifyOutput(
           meta.is_available,
@@ -182,7 +182,7 @@ export function OutputsView({
     let lost = 0
     const blocks = new Set<string>()
     for (const [taskId, meta] of Object.entries(outputs ?? {})) {
-      if (meta.mime_type !== GRIB_DIR_MIME) continue
+      if (!isGribDirMime(meta.mime_type)) continue
       blocks.add(meta.original_block)
       switch (classifyOutput(meta.is_available, taskId, lostTaskIds).state) {
         case 'available':

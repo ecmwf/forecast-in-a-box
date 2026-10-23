@@ -151,6 +151,15 @@ export async function getJobResultHead(
   return new Uint8Array(buf, 0, Math.min(buf.byteLength, byteCount))
 }
 
+/** Absolute zip URL of a fetchable output. */
+export function buildOutputZipUrl(runId: string, datasetId: string): string {
+  const url = buildUrl(API_ENDPOINTS.job.outputZipped, {
+    run_id: runId,
+    dataset_id: datasetId,
+  })
+  return new URL(url, window.location.href).href
+}
+
 export async function downloadJobLogs(runId: string): Promise<Blob> {
   const url = buildUrl(API_ENDPOINTS.job.logs, {
     run_id: runId,

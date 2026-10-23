@@ -68,7 +68,7 @@ const seedExecutions: Array<JobExecutionDetail> = [
       },
       // GribSink marker: payload is the run-private output directory.
       'task-out-grib': {
-        mime_type: 'text/plain; fiab-format=gribdir',
+        mime_type: 'text/plain; fiab-format=gribdir; fiab-fetchable=1',
         original_block: 'block_sink_1',
         is_available: true,
       },
@@ -625,15 +625,14 @@ export function createMockSvgBlob(): Blob {
  * sniff-promotion path stays exercised; unknown mimes also fall back to PNG.
  * GribSink markers resolve to a per-run directory path. */
 export function mockBlobForMime(mimeType: string, runId?: string): Blob {
+  // With or without extra mime parameters.
+  if (mimeType.startsWith('text/plain; fiab-format=gribdir')) {
+    const run = runId ?? 'job-completed-001'
+    const dir =
+      run in gribDirOverrides ? gribDirOverrides[run] : `/data/output/${run}_1`
+    return new Blob([dir], { type: 'text/plain' })
+  }
   switch (mimeType) {
-    case 'text/plain; fiab-format=gribdir': {
-      const run = runId ?? 'job-completed-001'
-      const dir =
-        run in gribDirOverrides
-          ? gribDirOverrides[run]
-          : `/data/output/${run}_1`
-      return new Blob([dir], { type: 'text/plain' })
-    }
     case 'application/pdf':
       return createMockPdfBlob()
     case 'image/svg+xml':
