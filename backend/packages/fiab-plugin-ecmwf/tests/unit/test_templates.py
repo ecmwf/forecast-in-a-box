@@ -23,10 +23,13 @@ from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager as ContextManager
 
 import pytest
-from fiab_core.fable import BlockFactory, BlockInstanceId, BlueprintTemplate, ConfigurationOptionId
+from fiab_core.artifacts import CompositeArtifactId
+from fiab_core.fable import BlockFactory, BlockInstance, BlockInstanceId, BlueprintTemplate, ConfigurationOptionId
 from fiab_core.types import WrongType, parse
 
 from fiab_plugin_ecmwf import plugin
+from fiab_plugin_ecmwf.anemoi.utils import CheckpointArtifact
+from fiab_plugin_ecmwf.constants import BASE_TIME, CHECKPOINT, ENSEMBLE
 
 # Supplied by the runtime, not by the user, so they are never declared as example glyphs.
 INTRINSIC_GLYPHS = {"runId", "submitDatetime", "startDatetime", "attemptCount"}
@@ -177,3 +180,32 @@ def test_templates_ship_no_local_glyphs(template: BlueprintTemplate) -> None:
     """`template_to_builder` drops example glyphs, so undefined references are what
     prompts the client for values. Pre-filling local_glyphs would suppress that."""
     assert template.local_glyphs == {}
+
+
+ANEMOI_SOURCE_BLOCKS = [(t, block_id) for t, block_id in ALL_BLOCKS if t.blocks[block_id].factory_id == "anemoiSource"]
+
+
+@pytest.mark.parametrize(("template", "block_id"), ANEMOI_SOURCE_BLOCKS, ids=_id)
+def test_anemoi_source_validates_for_a_model_of_unknown_type(template: BlueprintTemplate, block_id: BlockInstanceId) -> None:
+    """Regression: members cannot be set on a deterministic or unknown-type model, so a template must not set any.
+
+    The checkpoints these templates reference are registered with no model type, as for a checkpoint that does not declare one.
+    """
+    block = template.blocks[block_id]
+    factory = _factory(template, block_id)
+    checkpoint = CompositeArtifactId.from_str(str(block.instance.configuration_values[ConfigurationOptionId(CHECKPOINT)]))
+    assert CheckpointArtifact(checkpoint).is_ensemble_model is None
+
+    values = {}
+    for option_id, raw_value in block.instance.configuration_values.items():
+        raw = str(raw_value)
+        if _glyph_names(raw) & INTRINSIC_GLYPHS:
+            assert option_id == BASE_TIME, f"{option_id} depends on a run time glyph, unsupported by this test"
+            resolved = "2024-01-01T00:00:00"
+        else:
+            resolved = _GLYPH.sub(lambda m: template.example_glyphs[_leading_identifier(m.group(1))].example_value, raw)
+        values[option_id] = parse(factory.configuration_options[option_id].value_type).validate_convert(resolved)
+
+    assert values.get(ConfigurationOptionId(ENSEMBLE), "none") == "none"
+    validation = plugin().validator(block.factory_id, BlockInstance(configuration_values=values, input_ids={}), {})
+    assert validation.result.e is None, validation.result.e

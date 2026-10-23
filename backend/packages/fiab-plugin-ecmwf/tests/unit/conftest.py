@@ -26,6 +26,7 @@ from fiab_core.tools.blocks import BlockInstanceRich as BlockInstance
 from qubed import Qube
 
 from fiab_plugin_ecmwf.anemoi.blocks import AnemoiSource
+from fiab_plugin_ecmwf.anemoi.utils import CheckpointArtifact
 from fiab_plugin_ecmwf.blocks import (
     FORECAST_DATASETS,
     OperationalForecastSource,
@@ -123,7 +124,13 @@ def sample_forecast_source_action(mock_forecast_preset: pytest.FixtureRequest, d
 
 
 @pytest.fixture
-def anemoi_source_ensemble_configuration(dummy_checkpoint: CompositeArtifactId) -> BlockInstance:
+def ensemble_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the dummy checkpoint report itself as an ensemble model, so members other than 0 are run"""
+    monkeypatch.setattr(CheckpointArtifact, "is_ensemble_model", property(lambda self: True))
+
+
+@pytest.fixture
+def anemoi_source_ensemble_configuration(ensemble_model: None, dummy_checkpoint: CompositeArtifactId) -> BlockInstance:
     return BlockInstance.from_block(
         BlockFactoryId("anemoiSource"),
         BlockInstanceBase(
@@ -133,7 +140,7 @@ def anemoi_source_ensemble_configuration(dummy_checkpoint: CompositeArtifactId) 
                 INPUT_SOURCE: "opendata",
                 LEAD_TIME: 24,
                 BASE_TIME: datetime(2024, 1, 1),
-                ENSEMBLE: 3,
+                ENSEMBLE: [3],
             },
         ),
         AnemoiSource.configuration_options,

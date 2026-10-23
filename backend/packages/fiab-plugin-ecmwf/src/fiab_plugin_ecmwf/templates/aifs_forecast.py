@@ -40,7 +40,8 @@ template = BlueprintTemplate(
                     ConfigurationOptionId("input_source"): "${initialConditions}",
                     ConfigurationOptionId("lead_time"): "72",
                     ConfigurationOptionId("base_time"): YESTERDAY_MIDNIGHT,
-                    ConfigurationOptionId("number"): "1",
+                    # Not a known ensemble model, so no members can be set
+                    ConfigurationOptionId("number"): "none",
                 },
                 input_ids={},
             ),
