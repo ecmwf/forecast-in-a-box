@@ -35,7 +35,7 @@ import { useComparisonStore } from '../stores/comparisonStore'
 import { allowedWmsUrl } from '../wms-probe'
 import { jobKeys } from '@/api/hooks/useJobs'
 import { getJobStatus } from '@/api/endpoints/job'
-import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
 import { showToast } from '@/lib/toast'
 import { createLogger } from '@/lib/logger'
 
@@ -214,7 +214,7 @@ export function useHydrateComparisonFromUrl(): HydrateComparisonResult {
         )
         .then((detail) => {
           const meta = detail.outputs?.[decoded.taskId]
-          if (meta?.mime_type !== GRIB_DIR_MIME) {
+          if (!meta || !isGribDirMime(meta.mime_type)) {
             throw new Error(`task ${decoded.taskId} is not a stored output`)
           }
           if (decoded.taskId in detail.lost_task_ids) {

@@ -123,6 +123,20 @@ describe('StoredOutputsCard', () => {
     ).toHaveLength(0)
   })
 
+  it('lists markers whose mime also carries fiab-fetchable', async () => {
+    const { screen } = await renderCard({
+      'task-out-grib': {
+        mime_type: `${GRIB_DIR_MIME}; fiab-fetchable=1`,
+        original_block: 'block_sink_1',
+        is_available: true,
+      },
+    })
+    await expect.element(screen.getByText('job-completed-001_1')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: 'Visualise' }))
+      .toBeVisible()
+  })
+
   it('flags a folder without the run ID as shared with other runs', async () => {
     setMockGribDir('job-completed-001', '/data/output/latest')
     const { screen } = await renderCard(outputsWithMarkers)

@@ -48,7 +48,7 @@ import {
   isSinkComplete,
   useStoredDirPath,
 } from '@/features/executions/outputs/stored-dir'
-import { GRIB_DIR_MIME } from '@/features/executions/outputs/adapters/grib'
+import { isGribDirMime } from '@/features/executions/outputs/adapters/grib'
 import { SLOT_B_OFF, entryRef } from '@/features/visualise/entry-ref'
 import { lensOwnerKey, setLensOwner } from '@/features/visualise/lens-owners'
 import { showToast } from '@/lib/toast'
@@ -121,7 +121,7 @@ export function StoredOutputsCard({
     if (!outputs) return []
     const byBlock = new Map<string, StoredOutputRow>()
     for (const [taskId, meta] of Object.entries(outputs)) {
-      if (meta.mime_type !== GRIB_DIR_MIME) continue
+      if (!isGribDirMime(meta.mime_type)) continue
       const availability = classifyOutput(
         meta.is_available,
         taskId,
