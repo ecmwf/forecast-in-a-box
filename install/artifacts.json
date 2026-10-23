@@ -288,7 +288,10 @@
           "type": "fc",
           "class": "ai"
         },
-        "timestep": "6h"
+        "timestep": "6h",
+        "configuration": {
+          "is_ensemble_model": false
+        }
       }
     },
     "aifs-single-mse-1.1_w_flash_attn": {
@@ -602,7 +605,8 @@
         "configuration": {
           "control_options": {
             "ANEMOI_INFERENCE_NUM_CHUNKS": 8
-          }
+          },
+          "is_ensemble_model": false
         }
       }
     },
@@ -917,7 +921,8 @@
         "configuration": {
           "control_options": {
             "ANEMOI_INFERENCE_NUM_CHUNKS": 8
-          }
+          },
+          "is_ensemble_model": false
         }
       }
     },
@@ -1228,7 +1233,8 @@
         "configuration": {
           "control_options": {
             "ANEMOI_INFERENCE_NUM_CHUNKS": 8
-          }
+          },
+          "is_ensemble_model": true
         }
       }
     },
@@ -1540,7 +1546,8 @@
         "configuration": {
           "control_options": {
             "ANEMOI_INFERENCE_NUM_CHUNKS": 8
-          }
+          },
+          "is_ensemble_model": true
         }
       }
     },
@@ -2599,7 +2606,8 @@
           "control_options": {
             "ANEMOI_INFERENCE_NUM_CHUNKS": 8
           },
-          "nested_model": false
+          "nested_model": false,
+          "is_ensemble_model": false
         },
         "timestep": "6h"
       }
