@@ -14,6 +14,7 @@ import { DateTimeField } from './fields/DateTimeField'
 import { EnumField } from './fields/EnumField'
 import { EnumListField } from './fields/EnumListField'
 import { GeoDomainField } from './fields/GeoDomainField'
+import { GridField } from './fields/GridField'
 import { ListField } from './fields/ListField'
 import { NumberField } from './fields/NumberField'
 import { StringField } from './fields/StringField'
@@ -212,6 +213,21 @@ function renderField(
           configKey={configKey}
           value={value}
           onChange={onChange}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={className}
+        />
+      )
+
+    case 'grid':
+      return (
+        <GridField
+          id={id}
+          configKey={configKey}
+          value={value}
+          onChange={onChange}
+          options={parsedType.options}
+          closed={parsedType.closed}
           placeholder={placeholder}
           disabled={disabled}
           className={className}

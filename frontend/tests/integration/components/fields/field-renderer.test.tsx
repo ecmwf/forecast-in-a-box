@@ -356,6 +356,60 @@ describe('FieldRenderer Integration', () => {
     })
   })
 
+  // The grid option of ecmwf#667.
+  describe('Grid field', () => {
+    const gridType = 'enumOpen[grid](auto,0.25,0.5,1,O96,O320,N320)'
+
+    it('summarises the grid with its spacing', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={gridType} initialValue="0.25" />,
+      )
+      await expect.element(screen.getByText('0.25° lat/lon')).toBeVisible()
+      await expect.element(screen.getByText('~28 km')).toBeVisible()
+    })
+
+    it('lists the suggestions by family and picks one', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={gridType} initialValue="auto" />,
+      )
+      await screen.getByText('Keep input grid').click()
+      await expect.element(screen.getByText('Regular lat/lon')).toBeVisible()
+      await expect
+        .element(screen.getByText('Octahedral Gaussian'))
+        .toBeVisible()
+      await expect.element(screen.getByText('Reduced Gaussian')).toBeVisible()
+
+      await screen.getByRole('option', { name: /O96/ }).click()
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('O96')
+    })
+
+    it('accepts a typed grid in canonical form', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={gridType} initialValue="auto" />,
+      )
+      await screen.getByText('Keep input grid').click()
+      await screen.getByPlaceholder(/type a grid/).fill('n640')
+      await expect.element(screen.getByText('Your entry')).toBeVisible()
+      await userEvent.keyboard('{Enter}')
+      await expect
+        .element(screen.getByTestId('current-value'))
+        .toHaveTextContent('N640')
+    })
+
+    it('explains why a typed grid is invalid', async () => {
+      const screen = await renderWithProviders(
+        <ControlledFieldRenderer valueType={gridType} initialValue="auto" />,
+      )
+      await screen.getByText('Keep input grid').click()
+      await screen.getByPlaceholder(/type a grid/).fill('N0')
+      await expect
+        .element(screen.getByText('Gaussian grid numbers run from 1 to 8000.'))
+        .toBeVisible()
+    })
+  })
+
   // Labels come from the MSW resolveDisplay handler (mockParamDisplays).
   describe('Parameter fields', () => {
     const PARAM_LIST = "list[enumClosed[param]('151','165','167','999')]"

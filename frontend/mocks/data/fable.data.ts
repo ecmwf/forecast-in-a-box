@@ -29,6 +29,8 @@ import type { PluginCompositeId } from '@/api/types/plugins.types'
 import { getFactory } from '@/api/types/fable.types'
 import {
   closedEnum,
+  gridType,
+  openEnum,
   serializeValueType,
 } from '@/components/base/fields/fable-type'
 
@@ -91,6 +93,34 @@ export const mockCatalogue: BlockFactoryCatalogue = {
             title: 'Values',
             description: 'Values to select from the chosen dimension',
             value_type: 'list[str]',
+          },
+        },
+        inputs: ['dataset'],
+      },
+      // ecmwf#667, title and texts verbatim.
+      geographicalTransform: {
+        kind: 'transform',
+        title: 'GeographicalTransform',
+        description: 'Transform the data to a different grid or area',
+        configuration_options: {
+          grid: {
+            title: 'Grid',
+            description:
+              "Grid to regrid to: a resolution in degrees such as '0.25' (at least 0.01), a west-east/south-north pair such as '0.25/0.5', or a Gaussian grid such as 'N320' or 'O96' (number from 1 to 8000); auto leaves the grid unchanged",
+            value_type: serializeValueType(
+              openEnum(
+                ['auto', '0.25', '0.5', '1', 'O96', 'O320', 'N320'],
+                gridType,
+              ),
+            ),
+            default_value: 'auto',
+          },
+          domain: {
+            title: 'Domain',
+            description:
+              'Area the data is cut out to: everything outside the area is dropped for all downstream blocks. Choose auto or global to leave the area unchanged, one or more named regions/countries, or a drawn bounding box; several names are cut out as the smallest latitude/longitude box containing all of them, not as the union of their shapes; leave empty to regrid without cutting out',
+            value_type: 'geodomain',
+            default_value: 'auto',
           },
         },
         inputs: ['dataset'],
@@ -426,6 +456,11 @@ export function calculateExpansion(fable: FableBuilderV1): {
     {
       plugin: pluginId('ecmwf', 'ecmwf-base'),
       factory: 'select',
+      restrictions: {},
+    },
+    {
+      plugin: pluginId('ecmwf', 'ecmwf-base'),
+      factory: 'geographicalTransform',
       restrictions: {},
     },
     {

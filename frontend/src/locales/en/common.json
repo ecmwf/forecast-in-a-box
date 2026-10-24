@@ -231,6 +231,29 @@
     "boxSummary": "Box: {{west}}, {{south}}, {{east}}, {{north}}",
     "advancedHint": "Enter a region, comma-separated countries, a bounding box in degrees (west,south,east,north), or a ${variable}."
   },
+  "grid": {
+    "placeholder": "Select a grid…",
+    "search": "Search or type a grid",
+    "keep": "Keep input grid",
+    "latlon": "{{resolution}} lat/lon",
+    "degrees": "{{value}}°",
+    "pair": "{{dx}}° × {{dy}}°",
+    "spacing": "~{{km}} km",
+    "points": "{{count}} points",
+    "pointsApprox": "~{{count}} points",
+    "groupCustom": "Your entry",
+    "groupLatlon": "Regular lat/lon",
+    "groupOctahedral": "Octahedral Gaussian",
+    "groupReduced": "Reduced Gaussian",
+    "error": {
+      "notGrid": "Not a grid. Use a resolution such as 0.25, a pair such as 0.25/0.5, a Gaussian grid such as O96, or auto.",
+      "tooManyParts": "Use at most two resolutions: west-east/south-north.",
+      "notPositive": "{{resolution}} is not a positive number of degrees.",
+      "tooFine": "{{resolution}} is finer than the minimum of {{min}}°.",
+      "gaussianRange": "Gaussian grid numbers run from {{min}} to {{max}}.",
+      "leadingZeros": "Write the Gaussian grid number without leading zeros, as in O96."
+    }
+  },
   "notificationBanner": {
     "dismiss": "Dismiss notification"
   },
