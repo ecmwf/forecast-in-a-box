@@ -211,7 +211,7 @@
   "geoDomain": {
     "placeholder": "Select an area…",
     "autoLabel": "Auto",
-    "autoHint": "Plot everything the data covers",
+    "autoHint": "Use the area the data covers",
     "empty": "No area selected",
     "tabPresets": "Presets",
     "tabCountries": "Countries",
@@ -229,7 +229,7 @@
     "clear": "Clear",
     "clearHint": "Clear (or press Delete)",
     "boxSummary": "Box: {{west}}, {{south}}, {{east}}, {{north}}",
-    "advancedHint": "Enter a region, comma-separated countries, a bounding box in whole degrees (west,south,east,north), or a ${variable}."
+    "advancedHint": "Enter a region, comma-separated countries, a bounding box in degrees (west,south,east,north), or a ${variable}."
   },
   "notificationBanner": {
     "dismiss": "Dismiss notification"

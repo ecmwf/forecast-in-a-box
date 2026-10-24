@@ -17,7 +17,7 @@
  * - the exclusive `auto` sentinel (plot everything the data covers)
  * - preset/region names, e.g. `Europe`
  * - country names to union, e.g. `Germany,France,Italy`
- * - an integer bounding box `west,south,east,north` in whole degrees (exactly four integer tokens)
+ * - a bounding box `west,south,east,north` in degrees (four numeric tokens)
  * Anything else (free text, `${glyph}`) is treated as raw.
  */
 
@@ -31,7 +31,7 @@ import { containsGlyphs } from '@/features/fable-builder/utils/glyph-display'
 export const PRESET_DOMAINS: ReadonlyArray<string> = presetDomains
 
 /**
- * A bounding box in wire order `[west, south, east, north]` (whole degrees) — the same order
+ * A bounding box in wire order `[west, south, east, north]` (degrees), the same order
  * and units as core's `bbox` type, and the same layout as a lon/lat OpenLayers extent
  * (`[minX, minY, maxX, maxY]`). The backend runtime reorders to earthkit's `[W, E, S, N]`
  * at its boundary.
@@ -54,8 +54,11 @@ export function isAutoDomain(value: string): boolean {
   return value.trim().toLowerCase() === AUTO_DOMAIN
 }
 
-// Whole degrees only — mirrors core's integer bbox type.
-const NUMERIC = /^-?\d+$/
+// Signed decimal degrees, mirroring core's float bbox type.
+const NUMERIC = /^-?(\d+(\.\d*)?|\.\d+)$/
+
+/** Drawn boxes snap to this many degrees. */
+const BBOX_SNAP_DEGREES = 0.25
 
 /** Split a stored geodomain value into its comma-separated tokens (same as `list[str]`). */
 export function tokenize(value: string): Array<string> {
@@ -77,9 +80,15 @@ export function parseBbox(value: string): Bbox | null {
   return tokens.map(Number) as Bbox
 }
 
-/** Serialise a bbox to the stored value, rounding to whole degrees. */
+/** Serialise a bbox to the stored value, snapping to `BBOX_SNAP_DEGREES`. */
 export function serializeBbox(bbox: Bbox): string {
-  return bbox.map((coord) => Math.round(coord)).join(',')
+  return bbox
+    .map((coord) => {
+      const snapped = Math.round(coord / BBOX_SNAP_DEGREES) * BBOX_SNAP_DEGREES
+      // `|| 0` turns -0 into 0
+      return String(snapped || 0)
+    })
+    .join(',')
 }
 
 /** True if the value is a bbox with zero width or height (e.g. a click instead of a drag). */
