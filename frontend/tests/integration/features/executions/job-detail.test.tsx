@@ -720,6 +720,64 @@ describe('RunDetailPage Integration', () => {
     })
   })
 
+  describe('workflow version', () => {
+    const blueprint = (version: number, domain: string, name: string) => ({
+      blueprint_id: 'edited-later',
+      version,
+      builder: {
+        blocks: [
+          {
+            instance_id: 'src',
+            plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+            factory: 'operationalForecastSource',
+            instance: { configuration_values: {}, input_ids: {} },
+          },
+          {
+            instance_id: 'plot',
+            plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+            factory: 'mapPlotSink',
+            instance: {
+              configuration_values: { param: '167', domain, format: 'png' },
+              input_ids: { dataset: 'src' },
+            },
+          },
+        ],
+      },
+      display_name: name,
+      display_description: '',
+      tags: [],
+      parent_id: null,
+      created_at: '2026-10-25T00:00:00+00:00',
+      updated_at: '2026-10-25T00:00:00+00:00',
+    })
+
+    it('shows the workflow as run, under its latest name', async () => {
+      worker.use(
+        http.get(API_ENDPOINTS.fable.get, ({ request }) =>
+          HttpResponse.json(
+            new URL(request.url).searchParams.get('version') === '1'
+              ? blueprint(1, 'Malawi', 'Plots')
+              : blueprint(2, 'Kenya', 'Plots renamed'),
+          ),
+        ),
+      )
+      injectMockExecution({
+        ...resolvedConfigExecution,
+        run_id: 'job-edited-014',
+        blueprint_id: 'edited-later',
+        blueprint_version: 1,
+        resolution: null,
+      })
+      const screen = await renderDetailPage('job-edited-014')
+
+      await expect
+        .element(screen.getByRole('heading', { name: 'Plots renamed' }))
+        .toBeVisible()
+      await expect.element(screen.getByText('Malawi')).toBeVisible()
+      await expect.element(screen.getByText('Kenya')).not.toBeInTheDocument()
+    })
+  })
+
   describe('as-run configuration (ecmwf#640 resolution)', () => {
     it('shows resolved values instead of glyph templates on the canvas', async () => {
       injectMockExecution(resolvedConfigExecution)

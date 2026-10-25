@@ -132,7 +132,13 @@ export function RunDetailPage() {
 
   const jobData = statusQuery.data
   const { data: fableData } = useFableRetrieve(jobData?.blueprint_id)
-  const blockNames = useBlockDisplayNames(fableData?.builder)
+  // Builder as run; name and metadata from latest.
+  const { data: runBlueprint } = useFableRetrieve(
+    jobData?.blueprint_id,
+    jobData?.blueprint_version,
+  )
+  const runBuilder = runBlueprint?.builder
+  const blockNames = useBlockDisplayNames(runBuilder)
 
   // Cross-panel selection is per-run; clear it on mount and on jobId change.
   const resetExecutionSelection = useExecutionHoverStore(
@@ -162,10 +168,10 @@ export function RunDetailPage() {
   const resolvedConfig = jobData?.resolution ?? undefined
   const blockSettings = useMemo(
     () =>
-      fableData?.builder
-        ? distinguishingSettings(fableData.builder, catalogue, resolvedConfig)
+      runBuilder
+        ? distinguishingSettings(runBuilder, catalogue, resolvedConfig)
         : undefined,
-    [fableData?.builder, catalogue, resolvedConfig],
+    [runBuilder, catalogue, resolvedConfig],
   )
 
   // Sync scroll-to-top before paint — a tall /configure scroll position
@@ -346,9 +352,9 @@ export function RunDetailPage() {
           onStartPctChange={onStartPctChange}
           canvas={
             <div className={WIDE_COLUMN}>
-              {fableData?.builder && catalogue ? (
+              {runBuilder && catalogue ? (
                 <RunCanvas
-                  fable={fableData.builder}
+                  fable={runBuilder}
                   catalogue={catalogue}
                   status={jobData.status}
                   completedBlockIds={jobData.completed_block_ids}
@@ -418,7 +424,7 @@ export function RunDetailPage() {
                     attempt={jobData.attempt_count}
                     outputs={jobData.outputs}
                     lostTaskIds={jobData.lost_task_ids}
-                    fable={fableData?.builder}
+                    fable={runBuilder}
                     catalogue={catalogue}
                     runName={fableData?.display_name ?? undefined}
                   />
@@ -442,7 +448,7 @@ export function RunDetailPage() {
                   <CompilationPanel
                     jobId={jobId}
                     status={jobData.status}
-                    fable={fableData?.builder}
+                    fable={runBuilder}
                     catalogue={catalogue}
                     onSwitchTab={setActiveTab}
                   />
@@ -451,12 +457,12 @@ export function RunDetailPage() {
                   <CompilationForceGraph
                     jobId={jobId}
                     status={jobData.status}
-                    fable={fableData?.builder}
+                    fable={runBuilder}
                     catalogue={catalogue}
                   />
                 </TabsContent>
                 <TabsContent value="specification" className={WIDE_TAB_CONTENT}>
-                  <SpecificationPanel fableSnapshot={fableData?.builder} />
+                  <SpecificationPanel fableSnapshot={runBuilder} />
                 </TabsContent>
               </Tabs>
             </div>
