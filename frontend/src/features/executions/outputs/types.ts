@@ -35,6 +35,8 @@ export interface OutputItem {
   blockName: string
   /** Split coordinates, e.g. [["param", "167"], ["step", "6"]]. */
   dims?: ReadonlyArray<OutputDim>
+  /** Differing block options, keyed `setting:<option>`. */
+  settings?: ReadonlyArray<OutputDim>
   /** Short coordinate label, e.g. 2t and step 6. */
   subtitle?: string
   /** Long form of `subtitle` with full parameter names. */

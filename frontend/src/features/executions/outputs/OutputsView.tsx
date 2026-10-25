@@ -21,6 +21,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { registerFirstPartyAdapters } from './adapters'
 import { isGribDirMime } from './adapters/grib'
 import {
+  SETTING_PREFIX,
   compareDimValues,
   compareDims,
   dimLine,
@@ -48,7 +49,8 @@ import { prefetchJobResultBlob } from './useJobResult'
 import { needsSniff, useResolvedMimes } from './useResolvedMimes'
 import { classifyOutput } from './availability'
 import type { LostTaskIds } from './availability'
-import type { DimFilter } from './dims'
+import type { BlockSettings } from './block-settings'
+import type { DimFilter, OutputDim } from './dims'
 import type { DimFormat } from './useDimFormat'
 import type { JobStatus, RunOutputs } from '@/api/types/job.types'
 import type { OutputAdapter, OutputItem } from './types'
@@ -100,6 +102,8 @@ interface OutputsViewProps {
   plannedBlockIds?: ReadonlyArray<string> | null
   /** Display name per block id, from the run's workflow. */
   blockNames?: Readonly<Record<string, string>>
+  /** Options differing between same-type blocks. */
+  blockSettings?: BlockSettings
   /** Portal target for the toolbar; falls back to inline. */
   toolbarSlot?: HTMLElement | null
   /** Switches to the Logs tab from the failed-run notice. */
@@ -114,6 +118,7 @@ export function OutputsView({
   completedBlockIds,
   plannedBlockIds,
   blockNames,
+  blockSettings,
   toolbarSlot,
   onViewLogs,
 }: OutputsViewProps) {
@@ -125,9 +130,19 @@ export function OutputsView({
     adapter: OutputAdapter
   } | null>(null)
 
-  const dimFormat = useDimFormat(outputs)
+  const dimFormat = useDimFormat(outputs, blockSettings)
 
-  /** Block, coordinates (time last), taskId; pending items hold their slot. */
+  /** Block settings as prefixed pairs. */
+  const settingsOf = useCallback(
+    (blockId: string): Array<OutputDim> | undefined =>
+      blockSettings?.[blockId]?.map(({ key, value }) => [
+        `${SETTING_PREFIX}${key}`,
+        value,
+      ]),
+    [blockSettings],
+  )
+
+  /** Block, settings, coordinates (time last), taskId; pending keep slots. */
   const items = useMemo<Array<OutputItem>>(() => {
     if (!outputs) return []
     const list = Object.entries(outputs)
@@ -140,7 +155,9 @@ export function OutputsView({
           lostTaskIds,
         )
         const dims = meta.dimension_kvs ?? undefined
-        const split = dims !== undefined && dims.length > 0
+        const settings = settingsOf(meta.original_block)
+        const coords = [...(settings ?? []), ...(dims ?? [])]
+        const split = coords.length > 0
         // Plugin label only for outputs without coordinates.
         const label =
           meta.dimension_kvs == null
@@ -153,8 +170,9 @@ export function OutputsView({
           originalBlock: meta.original_block,
           blockName: blockNames?.[meta.original_block] ?? meta.original_block,
           dims,
-          subtitle: split ? dimFormat.dims(dims, 'compact') : label,
-          subtitleFull: split ? dimFormat.dims(dims, 'full') : label,
+          settings,
+          subtitle: split ? dimFormat.dims(coords, 'compact') : label,
+          subtitleFull: split ? dimFormat.dims(coords, 'full') : label,
           isAvailable: meta.is_available,
           lostReason:
             availability.state === 'lost' ? availability.reason : undefined,
@@ -165,6 +183,8 @@ export function OutputsView({
         return a.blockName.localeCompare(b.blockName)
       }
       if (a.originalBlock !== b.originalBlock) {
+        const bySettings = compareDimValues(settingValues(a), settingValues(b))
+        if (bySettings !== 0) return bySettings
         return a.originalBlock < b.originalBlock ? -1 : 1
       }
       const byDims = compareDims(a, b)
@@ -172,7 +192,7 @@ export function OutputsView({
       return a.taskId < b.taskId ? -1 : 1
     })
     return list
-  }, [jobId, outputs, lostTaskIds, blockNames, dimFormat])
+  }, [jobId, outputs, lostTaskIds, blockNames, settingsOf, dimFormat])
 
   /** GRIB markers aren't grid cards, but still count toward the header tally
    * and block count. */
@@ -233,7 +253,7 @@ export function OutputsView({
 
   const activeMimes = useMemo(() => parseMimes(search.mimes), [search.mimes])
 
-  /** Varying coordinates with their values, outer to inner. */
+  /** Varying settings and coordinates with their values, outer to inner. */
   const splitDims = useMemo(
     () =>
       [...dimValueCounts(items)]
@@ -343,16 +363,30 @@ export function OutputsView({
       plannedBlockIds
         // GRIB sink blocks belong to the Stored outputs card.
         .filter((blockId) => !storedStats.blocks.has(blockId))
-        .map((blockId) => ({
-          jobId,
-          taskId: `__planned__:${blockId}`,
-          mimeType: 'application/octet-stream',
-          blockName: blockNames?.[blockId] ?? blockId,
-          originalBlock: blockId,
-          isAvailable: false,
-        }))
+        .map((blockId) => {
+          const settings = settingsOf(blockId)
+          return {
+            jobId,
+            taskId: `__planned__:${blockId}`,
+            mimeType: 'application/octet-stream',
+            blockName: blockNames?.[blockId] ?? blockId,
+            originalBlock: blockId,
+            settings,
+            subtitle: settings && dimFormat.dims(settings, 'compact'),
+            isAvailable: false,
+          }
+        })
     )
-  }, [items.length, plannedBlockIds, jobId, status, storedStats, blockNames])
+  }, [
+    items.length,
+    plannedBlockIds,
+    jobId,
+    status,
+    storedStats,
+    blockNames,
+    settingsOf,
+    dimFormat,
+  ])
 
   /** Distinct source blocks in the run. The group-by control only earns its
    * place — and is only shown — when there's more than one. */
@@ -965,8 +999,19 @@ function GroupedGrid({
 
   const title = (group: OutputGroup): React.ReactNode => {
     switch (group.kind) {
-      case 'block':
-        return group.items[0].blockName
+      case 'block': {
+        const { blockName, settings } = group.items[0]
+        if (!settings?.length) return blockName
+        return (
+          <>
+            {blockName}
+            <span className="font-normal text-muted-foreground">
+              {' · '}
+              {dimFormat.dims(settings, 'full')}
+            </span>
+          </>
+        )
+      }
       case 'mime':
         return <MimeSectionLabel mime={group.key} />
       case 'dim':
@@ -1186,6 +1231,11 @@ function groupByI18nKey(
     case 'block-and-mime':
       return 'outputs.groupBy.blockAndMime'
   }
+}
+
+/** Sort key for same-type blocks. */
+function settingValues(item: OutputItem): string {
+  return (item.settings ?? []).map(([, value]) => value).join('\n')
 }
 
 /**

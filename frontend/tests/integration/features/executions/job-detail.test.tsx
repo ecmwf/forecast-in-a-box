@@ -592,6 +592,134 @@ describe('RunDetailPage Integration', () => {
     })
   })
 
+  describe('same-type output blocks', () => {
+    const plot = (id: string, domain: string) => ({
+      instance_id: id,
+      plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+      factory: 'mapPlotSink',
+      instance: {
+        configuration_values: { param: '167', domain, format: 'png' },
+        input_ids: { dataset: 'src' },
+      },
+    })
+    const output = (block: string, step: string) => ({
+      mime_type: 'image/png',
+      display_name: `Map Plot (step=${step})`,
+      dimension_kvs: [['step', step]] as Array<[string, string]>,
+      original_block: block,
+      is_available: true,
+    })
+    const twoPlotsRun = {
+      ...resolvedConfigExecution,
+      run_id: 'job-two-plots-012',
+      blueprint_id: 'two-plots',
+      outputs: {
+        'plotA:0': output('plotA', '0'),
+        'plotA:6': output('plotA', '6'),
+        'plotB:0': output('plotB', '0'),
+        'plotB:6': output('plotB', '6'),
+      },
+      resolution: {
+        plotA: { domain: 'Malawi' },
+        plotB: { domain: 'Europe' },
+      },
+    }
+
+    beforeEach(() => {
+      // Domains via two local glyphs.
+      worker.use(
+        http.get(API_ENDPOINTS.fable.get, () =>
+          HttpResponse.json({
+            blueprint_id: 'two-plots',
+            version: 1,
+            builder: {
+              blocks: [
+                {
+                  instance_id: 'src',
+                  plugin: { store: 'ecmwf', local: 'ecmwf-base' },
+                  factory: 'operationalForecastSource',
+                  instance: { configuration_values: {}, input_ids: {} },
+                },
+                plot('plotA', '${regionA}'),
+                plot('plotB', '${regionB}'),
+              ],
+              local_glyphs: { regionA: 'Malawi', regionB: 'Europe' },
+            },
+            display_name: 'Two plots',
+            display_description: '',
+            tags: [],
+            parent_id: null,
+            created_at: '2026-10-25T00:00:00+00:00',
+            updated_at: '2026-10-25T00:00:00+00:00',
+          }),
+        ),
+      )
+    })
+
+    it('shows as-run settings in the subtitle and filters by them', async () => {
+      injectMockExecution(twoPlotsRun)
+      const screen = await renderDetailPage('job-two-plots-012')
+
+      await expect
+        .element(screen.getByText('domain Malawi · step 0'))
+        .toBeVisible()
+      await expect
+        .element(screen.getByText('domain Europe · step 6'))
+        .toBeVisible()
+
+      await screen.getByText('Domain: All').click()
+      await screen.getByRole('option', { name: 'domain Malawi' }).click()
+      await expect
+        .element(screen.getByText('domain Europe · step 0'))
+        .not.toBeInTheDocument()
+      await expect
+        .element(screen.getByText('domain Malawi · step 6'))
+        .toBeVisible()
+    })
+
+    it('groups by a setting from the URL', async () => {
+      injectMockExecution(twoPlotsRun)
+      const screen = await renderDetailPage(
+        'job-two-plots-012',
+        '?groupBy=dim:setting:domain',
+      )
+      await expect
+        .element(screen.getByRole('heading', { name: 'domain Europe' }))
+        .toBeVisible()
+      await expect
+        .element(screen.getByRole('heading', { name: 'domain Malawi' }))
+        .toBeVisible()
+    })
+
+    it('adds the settings to block section headers', async () => {
+      injectMockExecution(twoPlotsRun)
+      const screen = await renderDetailPage(
+        'job-two-plots-012',
+        '?groupBy=block',
+      )
+      // Two mock Map Plots, hence the plugin.
+      await expect
+        .element(
+          screen.getByRole('heading', {
+            name: 'Map Plot · ecmwf-base · domain Malawi',
+          }),
+        )
+        .toBeVisible()
+    })
+
+    it('shows glyph templates on runs without a resolution', async () => {
+      injectMockExecution({
+        ...twoPlotsRun,
+        run_id: 'job-two-plots-013',
+        resolution: null,
+      })
+      const screen = await renderDetailPage('job-two-plots-013')
+      await expect
+        .element(screen.getByText('domain ${regionA} · step 0'))
+        .toBeVisible()
+    })
+  })
+
   describe('as-run configuration (ecmwf#640 resolution)', () => {
     it('shows resolved values instead of glyph templates on the canvas', async () => {
       injectMockExecution(resolvedConfigExecution)

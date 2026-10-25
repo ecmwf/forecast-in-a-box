@@ -15,9 +15,9 @@ import { RunDetailPage } from '@/features/executions/components/RunDetailPage'
 /** Search params for the execution detail page.
  * - `mimes` is a comma-joined list of active filter chips on the Outputs tab;
  *   missing/empty = "All".
- * - `dims` filters by split coordinates, e.g. `param=167,151;step=6`.
+ * - `dims` filters by coordinates and `setting:<option>`, e.g. `step=6`.
  * - `groupBy` controls how the Outputs grid is sectioned; `dim:<key>` groups
- *   by a split coordinate. Missing = flat. */
+ *   by a coordinate or setting. Missing = flat. */
 const searchSchema = z.object({
   mimes: z.string().optional(),
   dims: z.string().optional(),
