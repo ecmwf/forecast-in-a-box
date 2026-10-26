@@ -44,3 +44,7 @@ class CompilationDetailCorrupted(Exception):
 
 class RunLogsArchiveFailed(Exception):
     """Raised when the run logs archive could not be built."""
+
+
+class OutputPathNotFound(Exception):
+    """Raised when the output path to be archived does not exist."""

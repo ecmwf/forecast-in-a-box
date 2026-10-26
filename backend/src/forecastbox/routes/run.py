@@ -15,12 +15,8 @@ Contains three categories of routes:
  - Further detail endpoints -- inspecting outputs, getting logs, and retrieving compilation detail
 """
 
-import asyncio
-import io
 import logging
-import os
 import pathlib
-import zipfile
 from functools import partial
 from typing import Annotated, Literal, cast
 
@@ -41,6 +37,7 @@ from forecastbox.domain.run.detail import retrieve_compilation_detail
 from forecastbox.domain.run.exceptions import (
     CompilationDetailCorrupted,
     CompilationDetailNotFound,
+    OutputPathNotFound,
     RunAccessDenied,
     RunConcurrencyIssue,
     RunLogsArchiveFailed,
@@ -48,7 +45,7 @@ from forecastbox.domain.run.exceptions import (
     RunNotFound,
     RunNotStoppable,
 )
-from forecastbox.domain.run.logs import get_run_logs_archive
+from forecastbox.domain.run.logs import get_output_archive, get_run_logs_archive
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import SubmissionRejected, execution_manager
@@ -276,41 +273,6 @@ def _retrieve_output_bytes(execution: db.RunRecord, spec: RunLookup, dataset_id:
     if not isinstance(decoded, bytes):
         raise HTTPException(500, f"Result decoding failed: expected bytes, got {type(decoded).__name__}")
     return decoded, mime_result.t
-
-
-async def _build_output_zip_response(path: pathlib.Path) -> Response:
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Output path {str(path)!r} does not exist.")
-    root_name = path.resolve().name or "output"
-
-    def _build_zip() -> tuple[bytes, str]:
-        try:
-            buffer = io.BytesIO()
-            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                zf.write(path, arcname=root_name)
-                if path.is_dir():
-                    for dirpath, dirnames, filenames in os.walk(path):
-                        dirnames.sort()
-                        base = pathlib.Path(dirpath)
-                        for d in dirnames:
-                            zf.write(base / d, arcname=str(pathlib.Path(root_name) / (base / d).relative_to(path)))
-                        for f in sorted(filenames):
-                            zf.write(base / f, arcname=str(pathlib.Path(root_name) / (base / f).relative_to(path)))
-            return buffer.getvalue(), ""
-        except Exception as e:
-            logger.exception("building output zip")
-            return b"", repr(e)
-
-    loop = asyncio.get_running_loop()
-    bytez, error = await loop.run_in_executor(None, _build_zip)
-    if not error:
-        return Response(
-            content=bytez,
-            status_code=200,
-            media_type="application/zip",
-            headers={"Content-Disposition": f'attachment; filename="{root_name}.zip"'},
-        )
-    return Response(content=error, status_code=500, media_type="text/plain")
 
 
 # ---------------------------------------------------------------------------
@@ -575,7 +537,18 @@ async def get_run_output_zipped(
         raise HTTPException(500, f"Output path decoding failed: {e}")
     if path_str.startswith("file://"):
         path_str = path_str[len("file://") :]
-    return await _build_output_zip_response(pathlib.Path(path_str))
+    try:
+        archive, root_name = await get_output_archive(pathlib.Path(path_str))
+    except OutputPathNotFound:
+        raise HTTPException(status_code=404, detail=f"Output path {path_str!r} does not exist.")
+    except RunLogsArchiveFailed as e:
+        return Response(content=repr(e.__cause__ or e), status_code=500, media_type="text/plain")
+    return Response(
+        content=archive,
+        status_code=200,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{root_name}.zip"'},
+    )
 
 
 @router.get("/logs")
