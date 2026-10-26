@@ -9,11 +9,12 @@
 
 """API for internal artifact management -- downloading artifact catalogs and individual artifacts.
 
-Shared state (artifact catalog, locally available artifacts set, ongoing downloads) is held in
-ArtifactManager as immutable pyrsistent values, published under one short lock; reads are lock-free.
+Shared state (artifact catalog, per-artifact status) is held in ArtifactManager as immutable pyrsistent
+values; writes are published under one short lock, reads are lock-free. The per-artifact status is a single map, so
+the transition from downloading to available is one assignment.
 
 Catalog refresh and downloads run on `ConcurrentPools.ArtifactIo`, which has exactly one worker, for two reasons:
-- catalog refresh publishes `locally_available` from a storage listing taken earlier in the same task, so a
+- catalog refresh publishes `artifact_status` from a storage listing taken earlier in the same task, so a
   download completing in between would be overwritten unless refresh and downloads are serialized,
 - downloads share one lazily created SSH command handle for `ssh://` data paths.
 
@@ -24,13 +25,13 @@ import logging
 import threading
 import urllib.parse
 from concurrent.futures import Future
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from typing import Literal
 
 from cascade.low.func import Either
-from pyrsistent import pmap, pset
-from pyrsistent.typing import PMap, PSet
+from pyrsistent import pmap
+from pyrsistent.typing import PMap
 
 from forecastbox.domain.artifact.base import ArtifactCatalog, CompositeArtifactId, MlModelDetail, MlModelOverview
 from forecastbox.domain.artifact.catalog import get_artifacts_catalog
@@ -50,12 +51,29 @@ timeout_acquire_task = 10  # leisure timeout, this is a background thread and it
 timeout_acquire_error = 2  # something failed, report quickly so that can be joined
 
 
+@dataclass(frozen=True, eq=True, slots=True)
+class ArtifactAvailable:
+    """Marker status of an artifact present in local storage."""
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class DownloadOngoing:
+    """Status of an artifact being downloaded, or whose last download attempt failed (``failure`` set)."""
+
+    progress: int = 0
+    failure: str | None = None
+
+
+ArtifactStatus = ArtifactAvailable | DownloadOngoing
+
+AVAILABLE = ArtifactAvailable()
+
+
 class ArtifactManager:
     lock: threading.Lock = threading.Lock()
     ssh_handle_lock: threading.Lock = threading.Lock()
     catalog: ArtifactCatalog = pmap()
-    locally_available: PSet[CompositeArtifactId] = pset()
-    ongoing_downloads: PMap[CompositeArtifactId, int | str] = pmap()
+    artifact_status: PMap[CompositeArtifactId, ArtifactStatus] = pmap()
     refresh_error: str | None = None
     ssh_handle: CommandHandle | None = None
 
@@ -99,7 +117,9 @@ def refresh_catalog() -> None:
             if not result:
                 raise ValueError("failed to acquire the shared lock")
             ArtifactManager.catalog = catalog
-            ArtifactManager.locally_available = pset(local_artifacts)
+            if ArtifactManager.artifact_status:
+                logger.error(f"artifact status not empty at catalog refresh, discarding: {len(ArtifactManager.artifact_status)} entries")
+            ArtifactManager.artifact_status = pmap({artifact_id: AVAILABLE for artifact_id in local_artifacts})
             ArtifactManager.refresh_error = None
         logger.info(f"Artifact catalog refreshed: {len(catalog)} total, {len(local_artifacts)} local")
     except Exception as e:
@@ -135,13 +155,11 @@ def _download_and_publish(composite_id: CompositeArtifactId) -> None:
 
     with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
         if not result:
-            logger.error("failed to acquire lock to update locally_available")
+            logger.error("failed to acquire lock to update artifact_status")
         else:
-            ArtifactManager.locally_available = ArtifactManager.locally_available.add(composite_id)
-            if composite_id in ArtifactManager.ongoing_downloads:
-                ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.remove(composite_id)
-            else:
+            if not isinstance(ArtifactManager.artifact_status.get(composite_id), DownloadOngoing):
                 logger.warning(f"expected {composite_id} to be in ongoing downloads")
+            ArtifactManager.artifact_status = ArtifactManager.artifact_status.set(composite_id, AVAILABLE)
     logger.info(f"Successfully downloaded artifact {composite_id}")
 
 
@@ -178,24 +196,15 @@ class ArtifactDownloadStatus:
 
 
 def get_download_status(composite_id: CompositeArtifactId) -> ArtifactDownloadStatus:
-    """Return the local availability and download state of an artifact, read consistently under the state lock.
-
-    Raises TimeoutError if the lock cannot be acquired. Intended for synchronous worker threads, not the event loop.
-    """
-    # NOTE each field is an immutable value, but writers update the two fields in separate assignments (a finished
-    # download adds to locally_available, then removes from ongoing_downloads). Reading them lock-free could observe
-    # a mix of old and new and misreport a just-finished download as "absent", which fails a waiting run.
-    with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
-        if not result:
-            raise TimeoutError("failed to acquire the artifact manager lock")
-        available = composite_id in ArtifactManager.locally_available
-        entry = ArtifactManager.ongoing_downloads.get(composite_id)
-    if available:
+    """Return the local availability and download state of an artifact."""
+    # NOTE lock-free: the status is one immutable map entry
+    entry = ArtifactManager.artifact_status.get(composite_id)
+    if isinstance(entry, ArtifactAvailable):
         return ArtifactDownloadStatus("available")
-    if isinstance(entry, int):
-        return ArtifactDownloadStatus("downloading", progress=entry)
-    if isinstance(entry, str):
-        return ArtifactDownloadStatus("failed", error=entry)
+    if isinstance(entry, DownloadOngoing):
+        if entry.failure is not None:
+            return ArtifactDownloadStatus("failed", error=entry.failure)
+        return ArtifactDownloadStatus("downloading", progress=entry.progress)
     return ArtifactDownloadStatus("absent")
 
 
@@ -206,16 +215,16 @@ def submit_artifact_download(composite_id: CompositeArtifactId, retry: bool = Fa
             return Either.error("Corresponding internal component is busy")
         if composite_id not in ArtifactManager.catalog:
             return Either.error(f"ArtifactId not found: {composite_id}")
-        if composite_id in ArtifactManager.locally_available:
+        current = ArtifactManager.artifact_status.get(composite_id)
+        if isinstance(current, ArtifactAvailable):
             return Either.ok(100)
-        if composite_id in ArtifactManager.ongoing_downloads:
-            progress = ArtifactManager.ongoing_downloads[composite_id]
-            if isinstance(progress, int):
-                return Either.ok(progress)
+        if isinstance(current, DownloadOngoing):
+            if current.failure is None:
+                return Either.ok(current.progress)
             elif not retry:
-                return Either.error(progress)
+                return Either.error(current.failure)
             logger.debug(f"Retrying artifact download for {composite_id}")
-        ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.set(composite_id, 0)
+        ArtifactManager.artifact_status = ArtifactManager.artifact_status.set(composite_id, DownloadOngoing())
 
     try:
         execution_manager.submit_monitored(
@@ -228,8 +237,8 @@ def submit_artifact_download(composite_id: CompositeArtifactId, retry: bool = Fa
         with timed_acquire(ArtifactManager.lock, timeout_acquire_task) as result:
             if not result:
                 logger.error(f"failed to acquire lock to roll back the download reservation of {composite_id}")
-            elif composite_id in ArtifactManager.ongoing_downloads:
-                ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.remove(composite_id)
+            elif isinstance(ArtifactManager.artifact_status.get(composite_id), DownloadOngoing):
+                ArtifactManager.artifact_status = ArtifactManager.artifact_status.remove(composite_id)
         raise
     return Either.ok(0)
 
@@ -243,11 +252,12 @@ def report_artifact_download_progress(composite_id: CompositeArtifactId, progres
             logger.warning(f"Failed to acquire lock to report progress for {composite_id}")
             return
 
-        if composite_id in ArtifactManager.ongoing_downloads:
+        current = ArtifactManager.artifact_status.get(composite_id)
+        if isinstance(current, DownloadOngoing):
             if failure is not None:
-                ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.set(composite_id, failure)
+                ArtifactManager.artifact_status = ArtifactManager.artifact_status.set(composite_id, replace(current, failure=failure))
             elif progress is not None:
-                ArtifactManager.ongoing_downloads = ArtifactManager.ongoing_downloads.set(composite_id, progress)
+                ArtifactManager.artifact_status = ArtifactManager.artifact_status.set(composite_id, replace(current, progress=progress))
         else:
             logger.warning(f"Attempted to report {progress=}, {failure=}, but {composite_id=} not found")
 
@@ -270,7 +280,7 @@ def list_models() -> list[MlModelOverview]:
                 disk_size_bytes=common.disk_size_bytes,
                 supported_platforms=common.supported_platforms,
                 tags=common.tags,
-                is_available=composite_id in ArtifactManager.locally_available,
+                is_available=isinstance(ArtifactManager.artifact_status.get(composite_id), ArtifactAvailable),
                 is_locally_compatible=artifact.is_locally_compatible,
                 local_compatibility_detail=artifact.local_compatibility_detail,
             )
@@ -304,7 +314,7 @@ def get_model_details(composite_id: CompositeArtifactId) -> MlModelDetail:
             input_qube=checkpoint.input_qube,
             output_qube=checkpoint.output_qube,
             input_characteristics=checkpoint.input_characteristics,
-            is_available=composite_id in ArtifactManager.locally_available,
+            is_available=isinstance(ArtifactManager.artifact_status.get(composite_id), ArtifactAvailable),
             is_locally_compatible=artifact.is_locally_compatible,
             local_compatibility_detail=artifact.local_compatibility_detail,
         )
@@ -322,11 +332,12 @@ def delete_model(composite_id: CompositeArtifactId) -> Either[str, str]:  # ty: 
     with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
         if not result:
             raise TimeoutError
-        if composite_id not in ArtifactManager.locally_available:
-            return Either.error(f"Model {composite_id} is not locally available")
-        if composite_id in ArtifactManager.ongoing_downloads:
+        current = ArtifactManager.artifact_status.get(composite_id)
+        if isinstance(current, DownloadOngoing):
             return Either.error(f"Model {composite_id} has an ongoing download")
-        ArtifactManager.locally_available = ArtifactManager.locally_available.remove(composite_id)
+        if not isinstance(current, ArtifactAvailable):
+            return Either.error(f"Model {composite_id} is not locally available")
+        ArtifactManager.artifact_status = ArtifactManager.artifact_status.remove(composite_id)
 
     # TODO race condition possibility 1/ pop in one thread 2/ another request triggers a download
     # 3/ unlink happens while download is ongoing -> fix by making the delete two-step

@@ -98,11 +98,8 @@ def _await_runtime_artifacts(run_id: RunId, attempt_count: int, artifacts: Itera
     # (submit_artifact_download, get_download_status). Moving it would need a callback-heavy generic wait API.
     pending: list[CompositeArtifactId] = []
     for artifact_id in artifacts:
-        try:
-            if get_download_status(artifact_id).state == "available":
-                continue
-        except TimeoutError:
-            pass
+        if get_download_status(artifact_id).state == "available":
+            continue
         result = submit_artifact_download(artifact_id, retry=False)
         if result.e:
             return _ArtifactWait(error=f"Failed to submit download for {artifact_id}: {result.e}")
@@ -113,11 +110,7 @@ def _await_runtime_artifacts(run_id: RunId, attempt_count: int, artifacts: Itera
     while pending:
         remaining: list[CompositeArtifactId] = []
         for artifact_id in pending:
-            try:
-                status = get_download_status(artifact_id)
-            except TimeoutError:
-                remaining.append(artifact_id)
-                continue
+            status = get_download_status(artifact_id)
             if status.state == "available":
                 continue
             if status.state == "failed":

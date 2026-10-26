@@ -30,9 +30,9 @@ def artifact_id() -> Any:
 
 @pytest.fixture(autouse=True)
 def _reset_state() -> Generator[None, None, None]:
-    saved = (ArtifactManager.catalog, ArtifactManager.locally_available, ArtifactManager.ongoing_downloads)
+    saved = (ArtifactManager.catalog, ArtifactManager.artifact_status)
     yield
-    ArtifactManager.catalog, ArtifactManager.locally_available, ArtifactManager.ongoing_downloads = saved
+    ArtifactManager.catalog, ArtifactManager.artifact_status = saved
 
 
 def _events(submit_event: MagicMock) -> list[ArtifactDownloadFinishedEvent]:
@@ -55,8 +55,7 @@ def test_submit_refresh_catalog_uses_artifact_pool() -> None:
 
 def _setup_catalog(artifact_id: Any) -> None:
     ArtifactManager.catalog = pmap({artifact_id: MagicMock()})
-    ArtifactManager.locally_available = pset()
-    ArtifactManager.ongoing_downloads = pmap()
+    ArtifactManager.artifact_status = pmap()
 
 
 def test_submit_download_submits_monitored_task(artifact_id: Any) -> None:
@@ -66,7 +65,7 @@ def test_submit_download_submits_monitored_task(artifact_id: Any) -> None:
         result = submit_artifact_download(artifact_id)
     assert result.t == 0 and result.e is None
     assert recorded == [(ConcurrentPools.ArtifactIo, TaskName("artifact.download"))]
-    assert ArtifactManager.ongoing_downloads[artifact_id] == 0
+    assert ArtifactManager.artifact_status[artifact_id] == manager.DownloadOngoing()
 
 
 def test_rejected_submission_rolls_back_reservation(artifact_id: Any) -> None:
@@ -74,7 +73,7 @@ def test_rejected_submission_rolls_back_reservation(artifact_id: Any) -> None:
     with patch.object(execution_manager, "submit_monitored", side_effect=SubmissionRejected("full")):
         with pytest.raises(SubmissionRejected):
             submit_artifact_download(artifact_id)
-    assert artifact_id not in ArtifactManager.ongoing_downloads
+    assert artifact_id not in ArtifactManager.artifact_status
 
 
 def test_successful_download_publishes_and_notifies(artifact_id: Any) -> None:
@@ -82,23 +81,22 @@ def test_successful_download_publishes_and_notifies(artifact_id: Any) -> None:
     with patch.object(manager, "download_artifact"), patch.object(manager, "submit_event") as submit_event:
         result = submit_artifact_download(artifact_id)
         assert result.e is None
-    assert artifact_id in ArtifactManager.locally_available
-    assert artifact_id not in ArtifactManager.ongoing_downloads
+    assert ArtifactManager.artifact_status[artifact_id] is manager.AVAILABLE
     events = _events(submit_event)
     assert len(events) == 1 and events[0].is_success is True
 
 
 def test_failed_download_records_failure_notifies_and_reraises(artifact_id: Any) -> None:
     _setup_catalog(artifact_id)
-    ArtifactManager.ongoing_downloads = pmap({artifact_id: 0})
+    ArtifactManager.artifact_status = pmap({artifact_id: manager.DownloadOngoing()})
     with (
         patch.object(manager, "download_artifact", side_effect=RuntimeError("dl boom")),
         patch.object(manager, "submit_event") as submit_event,
     ):
         with pytest.raises(RuntimeError, match="dl boom"):
             manager._download_artifact_task(artifact_id)
-    failure = ArtifactManager.ongoing_downloads[artifact_id]
-    assert isinstance(failure, str) and "dl boom" in failure
-    assert artifact_id not in ArtifactManager.locally_available
+    status = ArtifactManager.artifact_status[artifact_id]
+    assert isinstance(status, manager.DownloadOngoing)
+    assert status.failure is not None and "dl boom" in status.failure
     events = _events(submit_event)
     assert len(events) == 1 and events[0].is_success is False
