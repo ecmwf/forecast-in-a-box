@@ -82,6 +82,18 @@ describe('DateTimeField timezone projection', () => {
       .toMatchTextContent(/^UTC\+2$/)
   })
 
+  it('labels the badge with the offset at the value, not today', async () => {
+    useUiStore.setState({ timeZone: 'Europe/Berlin' })
+    const screen = await renderWithProviders(
+      <ControlledDateTime initialValue="2026-01-15T00:00:00" />,
+    )
+    // 00:00 UTC in January is 01:00 CET.
+    await expect.element(screen.getByLabelText('Time')).toHaveValue('01:00')
+    await expect
+      .element(screen.getByTestId('datetime-tz-badge'))
+      .toMatchTextContent(/^UTC\+1$/)
+  })
+
   it('stores edits back as canonical UTC', async () => {
     useUiStore.setState({ timeZone: 'Europe/Berlin' })
     const screen = await renderWithProviders(

@@ -153,6 +153,15 @@ describe('formatLocalDateTime', () => {
     )
   })
 
+  it('labels the instant with its own DST offset, not today', () => {
+    expect(
+      formatLocalDateTime(new Date('2026-07-15T12:00:00Z'), 'Europe/Berlin'),
+    ).toBe('15/07/2026, 14:00 UTC+2')
+    expect(
+      formatLocalDateTime(new Date('2026-01-15T12:00:00Z'), 'Europe/Berlin'),
+    ).toBe('15/01/2026, 13:00 UTC+1')
+  })
+
   it('includes seconds when requested', () => {
     const instant = new Date('2026-03-26T14:20:35Z')
     expect(formatLocalDateTime(instant, 'UTC', { includeSeconds: true })).toBe(

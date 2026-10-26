@@ -59,8 +59,9 @@ export function TimeZoneSelect({
   // Offset labels are stable for the component's lifetime; compute them once
   // so a highlight change (fired on hover) doesn't recompute ~400 of them.
   const offsetLabels = useMemo(() => {
+    const now = new Date()
     const labels = new Map<string, string>()
-    for (const tz of allZones) labels.set(tz, timeZoneOffsetLabel(tz))
+    for (const tz of allZones) labels.set(tz, timeZoneOffsetLabel(tz, now))
     return labels
   }, [allZones])
 

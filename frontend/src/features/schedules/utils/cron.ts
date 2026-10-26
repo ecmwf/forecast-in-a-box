@@ -17,7 +17,7 @@
  */
 
 import {
-  formatInZone,
+  formatInZoneWithOffset,
   nowPartsInZone,
   timeZoneOffsetLabel,
   todayInZone,
@@ -98,7 +98,7 @@ export function cronToHumanReadable(
       const local = utcHourMinuteToLocal(parsed.hour, parsed.minute, timeZone)
       return i18n.t('executions:cron.humanReadable.everyDayAt', {
         time: formatHourMinute(local.hour, local.minute),
-        zone: timeZoneOffsetLabel(timeZone),
+        zone: timeZoneOffsetLabel(timeZone, new Date()),
       })
     }
     case 'weekly': {
@@ -106,7 +106,7 @@ export function cronToHumanReadable(
       return i18n.t('executions:cron.humanReadable.everyDayOfWeekAt', {
         day: i18n.t(`executions:${DAY_NAME_KEYS[parsed.dayOfWeek]}`),
         time: formatHourMinute(local.hour, local.minute),
-        zone: timeZoneOffsetLabel(timeZone),
+        zone: timeZoneOffsetLabel(timeZone, new Date()),
       })
     }
     default:
@@ -188,5 +188,5 @@ export function formatLocalDateTime(
   const pattern = opts?.includeSeconds
     ? 'dd/MM/yyyy, HH:mm:ss'
     : 'dd/MM/yyyy, HH:mm'
-  return `${formatInZone(date, timeZone, pattern)} ${timeZoneOffsetLabel(timeZone)}`
+  return formatInZoneWithOffset(date, timeZone, pattern)
 }
