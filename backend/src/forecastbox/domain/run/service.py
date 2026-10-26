@@ -15,7 +15,7 @@ Owns:
 - status polling with cascade,
 - linked-blueprint lookup,
 - output availability / content lookups,
-- logs packaging.
+- (logs packaging lives in ``domain/run/logs.py``).
 
 No HTTP exceptions are raised here; callers are responsible for mapping domain
 exceptions (``RunNotFound``, ``RunAccessDenied``) to HTTP responses.

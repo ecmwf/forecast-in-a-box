@@ -21,11 +21,9 @@ import logging
 import os
 import pathlib
 import zipfile
-from dataclasses import asdict
 from functools import partial
 from typing import Annotated, Literal, cast
 
-import orjson
 from cascade.controller.report import JobId
 from cascade.gateway import api, client
 from cascade.low.core import DatasetId, TaskId
@@ -36,7 +34,7 @@ from pydantic import Field
 
 from forecastbox.domain.auth.users import get_auth_context
 from forecastbox.domain.blueprint.types import BlueprintId
-from forecastbox.domain.gateway.service import get_gateway_url, get_logs_directory
+from forecastbox.domain.gateway.service import get_gateway_url
 from forecastbox.domain.run import db, service, stop
 from forecastbox.domain.run.cascade import RunOutputs, delete_cascade_datasets
 from forecastbox.domain.run.detail import retrieve_compilation_detail
@@ -45,10 +43,12 @@ from forecastbox.domain.run.exceptions import (
     CompilationDetailNotFound,
     RunAccessDenied,
     RunConcurrencyIssue,
+    RunLogsArchiveFailed,
     RunNotDeletable,
     RunNotFound,
     RunNotStoppable,
 )
+from forecastbox.domain.run.logs import get_run_logs_archive
 from forecastbox.domain.run.types import RunId
 from forecastbox.utility.auth import AuthContext
 from forecastbox.utility.concurrency.manager import SubmissionRejected, execution_manager
@@ -310,46 +310,6 @@ async def _build_output_zip_response(path: pathlib.Path) -> Response:
             media_type="application/zip",
             headers={"Content-Disposition": f'attachment; filename="{root_name}.zip"'},
         )
-    return Response(content=error, status_code=500, media_type="text/plain")
-
-
-async def _build_run_logs_response(cascade_job_id: str, db_entity_ser: bytes) -> Response:
-    try:
-        request = api.JobProgressRequest(job_ids=[JobId(cascade_job_id)])
-        gw_state = client.request_response(request, get_gateway_url()).model_dump()
-    except TimeoutError:
-        gw_state = {"progresses": {}, "datasets": {}, "error": "TimeoutError"}
-    except Exception as e:
-        gw_state = {"progresses": {}, "datasets": {}, "error": repr(e)}
-
-    def _build_zip() -> tuple[bytes, str]:
-        try:
-            buffer = io.BytesIO()
-            with zipfile.ZipFile(buffer, "a", zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr("db_entity.json", db_entity_ser)
-                zf.writestr("gw_state.json", orjson.dumps(gw_state))
-                maybe_logs_directory = get_logs_directory()
-                if maybe_logs_directory.t is None:
-                    zf.writestr("logs_directory.error.txt", "logs directory missing: {maybe_logs_directory.e}")
-                else:
-                    p = pathlib.Path(maybe_logs_directory.t.name)
-                    f = ""
-                    try:
-                        for f in os.listdir(p):
-                            j_pref = f"job_{cascade_job_id}"
-                            if f == "backend.logs.txt" or f.startswith("gateway") or f.startswith(j_pref):
-                                zf.write(f"{p / f}", arcname=f)
-                    except Exception as e:
-                        zf.writestr("logs_directory.error.txt", f"{f} => {repr(e)}")
-            return buffer.getvalue(), ""
-        except Exception as e:
-            logger.exception("building zip")
-            return b"", repr(e)
-
-    loop = asyncio.get_running_loop()
-    bytez, error = await loop.run_in_executor(None, _build_zip)
-    if not error:
-        return Response(content=bytez, status_code=200, media_type="application/zip")
     return Response(content=error, status_code=500, media_type="text/plain")
 
 
@@ -627,5 +587,8 @@ async def get_run_logs(
     run_record = await _resolve_run_record(spec, auth_context)
     if run_record.cascade_job_id is None:
         raise HTTPException(status_code=409, detail=f"Run {spec.run_id!r} has not been submitted to cascade yet.")
-    entity_dict = asdict(run_record)
-    return await _build_run_logs_response(run_record.cascade_job_id, orjson.dumps(entity_dict))
+    try:
+        archive = await get_run_logs_archive(run_record)
+    except RunLogsArchiveFailed as e:
+        return Response(content=repr(e.__cause__ or e), status_code=500, media_type="text/plain")
+    return Response(content=archive, status_code=200, media_type="application/zip")
