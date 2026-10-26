@@ -9,17 +9,24 @@
 
 """Background execution of a run: compilation, context persistence, and cascade submission.
 
-Runs on a worker thread so the caller can return an ExecuteResult immediately
-without waiting for potentially slow cascade submission. Jobs-database access is
-performed synchronously on the worker thread and serialized by the shared jobs RLock.
+The task runs on a ``ConcurrentPools.RunSubmission`` worker so the caller can return an
+ExecuteResult immediately. It may wait, bounded, for runtime artifacts which are downloaded
+on ``ConcurrentPools.ArtifactIo``. Business failures are recorded in the run row.
+Jobs-database access is performed synchronously on the worker thread and serialized by
+the shared jobs RLock.
 """
 
 import logging
+import time
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import cast
 
 from fiab_core.fable import BlockInstanceId
 
+from forecastbox.domain.artifact.base import CompositeArtifactId
+from forecastbox.domain.artifact.manager import get_download_status, submit_artifact_download
 from forecastbox.domain.blueprint.db import BlueprintRecord
 from forecastbox.domain.blueprint.service import BlueprintBuilder
 from forecastbox.domain.gateway.service import get_current_cascade_proc
@@ -46,6 +53,10 @@ from forecastbox.utility.time import current_time
 
 logger = logging.getLogger(__name__)
 
+ARTIFACT_WAIT_TIMEOUT_SECONDS = 3600
+ARTIFACT_POLL_INTERVAL_SECONDS = 1.0
+RUN_STATUS_CHECK_INTERVAL_SECONDS = 10.0
+
 
 def _abort_if_not_proceeding(run_id: RunId, attempt_count: int, expected: str) -> bool:
     """Return whether the submission must not proceed, because the Run is gone or its status is not ``expected``.
@@ -63,6 +74,70 @@ def _abort_if_not_proceeding(run_id: RunId, attempt_count: int, expected: str) -
     return record.status != expected
 
 
+def _mark_failed(run_id: RunId, attempt_count: int, current_status: RunStatus, error: str) -> None:
+    """Record a failed status with compare-and-swap, reconciling with a concurrent stop or deletion if the write is lost."""
+    if not db.update_run_runtime(run_id, attempt_count, expected_status=current_status, status="failed", error=error[:255]):
+        # NOTE lost to a concurrent stop or deletion
+        _abort_if_not_proceeding(run_id, attempt_count, expected=current_status)
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class _ArtifactWait:
+    aborted: bool = False  # run stopped/deleted meanwhile; caller returns silently
+    error: str | None = None  # caller marks the run failed with this message
+
+
+def _await_runtime_artifacts(run_id: RunId, attempt_count: int, artifacts: Iterable[CompositeArtifactId]) -> _ArtifactWait:
+    """Start downloads of missing artifacts and wait, bounded, until all are available.
+
+    Failed downloads are not retried here. Returns early on a failed or vanished artifact, on timeout,
+    or when the run was stopped or deleted.
+    """
+    pending: list[CompositeArtifactId] = []
+    for artifact_id in artifacts:
+        try:
+            if get_download_status(artifact_id).state == "available":
+                continue
+        except TimeoutError:
+            pass
+        result = submit_artifact_download(artifact_id, retry=False)
+        if result.e:
+            return _ArtifactWait(error=f"Failed to submit download for {artifact_id}: {result.e}")
+        pending.append(artifact_id)
+
+    start = time.monotonic()
+    last_status_check = start
+    while pending:
+        remaining: list[CompositeArtifactId] = []
+        for artifact_id in pending:
+            try:
+                status = get_download_status(artifact_id)
+            except TimeoutError:
+                remaining.append(artifact_id)
+                continue
+            if status.state == "available":
+                continue
+            if status.state == "failed":
+                return _ArtifactWait(error=f"Runtime artifact {artifact_id} failed to download: {status.error}")
+            if status.state == "absent":
+                return _ArtifactWait(error=f"Runtime artifact {artifact_id} is no longer available")
+            remaining.append(artifact_id)
+        pending = remaining
+        if not pending:
+            break
+
+        now = time.monotonic()
+        if now - start > ARTIFACT_WAIT_TIMEOUT_SECONDS:
+            return _ArtifactWait(error="Timeout waiting for runtime artifacts to download")
+        if now - last_status_check >= RUN_STATUS_CHECK_INTERVAL_SECONDS:
+            last_status_check = now
+            if _abort_if_not_proceeding(run_id, attempt_count, expected="preparing"):
+                return _ArtifactWait(aborted=True)
+        time.sleep(ARTIFACT_POLL_INTERVAL_SECONDS)
+    logger.info(f"all runtime artifacts available for {run_id=}")
+    return _ArtifactWait()
+
+
 def execute_background(
     run_id: RunId,
     attempt_count: int,
@@ -78,6 +153,10 @@ def execute_background(
     intrinsic glyphs so that retries preserve the original submission time.
     ``startDatetime`` is set to the moment this function actually begins executing
     (i.e. ``current_time()``).
+
+    Business failures (compilation error, gateway rejection, failed artifact, timeout) are
+    recorded in the run row and are a normal task completion; they are not re-raised. Only an
+    exception escaping the failure recording itself reaches the manager's monitoring.
     """
     logger.debug(f"starting background compilation of {run_id=}")
 
@@ -135,6 +214,19 @@ def execute_background(
         if _abort_if_not_proceeding(run_id, attempt_count, expected="preparing"):
             return
 
+        runtime_artifacts = compilation_result.execution_spec.environment.runtime_artifacts
+        if runtime_artifacts:
+            # NOTE the wait occupies this RunSubmission worker while downloads run on ArtifactIo -- never share the pool
+            # TODO move the artifact download to the correct pool and chain with submit_after
+            outcome = _await_runtime_artifacts(run_id, attempt_count, runtime_artifacts)
+            if outcome.aborted:
+                return
+            if outcome.error is not None:
+                _mark_failed(run_id, attempt_count, current_status, outcome.error)
+                return
+            if _abort_if_not_proceeding(run_id, attempt_count, expected="preparing"):
+                return
+
         logger.debug(f"starting background submission of {run_id=}")
         response = execute_cascade(compilation_result.execution_spec)
         if response.job_id is not None:
@@ -169,11 +261,8 @@ def execute_background(
                 stop_cascade_and_mark(run_id, attempt_count, job_id)
         else:
             error = (response.error or "no error provided by cascade")[:255]
-            if not db.update_run_runtime(run_id, attempt_count, expected_status=current_status, status="failed", error=error):
-                _abort_if_not_proceeding(run_id, attempt_count, expected=current_status)
+            _mark_failed(run_id, attempt_count, current_status, error)
     except Exception as e:
         logger.exception(f"execute_background failed for run {run_id!r} attempt {attempt_count}: {repr(e)}")
         logger.debug(f"updating background data of {run_id=}")
-        if not db.update_run_runtime(run_id, attempt_count, expected_status=current_status, status="failed", error=repr(e)[:255]):
-            # NOTE lost to a concurrent stop, which has no cascade job to act on
-            _abort_if_not_proceeding(run_id, attempt_count, expected=current_status)
+        _mark_failed(run_id, attempt_count, current_status, repr(e))

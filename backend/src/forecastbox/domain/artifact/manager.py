@@ -24,7 +24,9 @@ import logging
 import threading
 import urllib.parse
 from concurrent.futures import Future
+from dataclasses import dataclass
 from functools import partial
+from typing import Literal
 
 from cascade.low.func import Either
 from pyrsistent import pmap, pset
@@ -166,6 +168,32 @@ def _download_artifact_task(composite_id: CompositeArtifactId) -> None:
         _notify_download_finished(composite_id, is_success=False)
         raise
     _notify_download_finished(composite_id, is_success=True)
+
+
+@dataclass(frozen=True, eq=True, slots=True)
+class ArtifactDownloadStatus:
+    state: Literal["available", "downloading", "failed", "absent"]
+    progress: int | None = None
+    error: str | None = None
+
+
+def get_download_status(composite_id: CompositeArtifactId) -> ArtifactDownloadStatus:
+    """Return the local availability and download state of an artifact, read consistently under the state lock.
+
+    Raises TimeoutError if the lock cannot be acquired. Intended for synchronous worker threads, not the event loop.
+    """
+    with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
+        if not result:
+            raise TimeoutError("failed to acquire the artifact manager lock")
+        available = composite_id in ArtifactManager.locally_available
+        entry = ArtifactManager.ongoing_downloads.get(composite_id)
+    if available:
+        return ArtifactDownloadStatus("available")
+    if isinstance(entry, int):
+        return ArtifactDownloadStatus("downloading", progress=entry)
+    if isinstance(entry, str):
+        return ArtifactDownloadStatus("failed", error=entry)
+    return ArtifactDownloadStatus("absent")
 
 
 def submit_artifact_download(composite_id: CompositeArtifactId, retry: bool = False) -> Either[int, str]:  # ty: ignore[invalid-type-arguments]
