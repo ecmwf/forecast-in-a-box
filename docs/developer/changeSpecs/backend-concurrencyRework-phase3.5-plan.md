@@ -29,9 +29,9 @@ reading them.
   blocking the event loop; exceptions raised by the task are re-raised to the
   awaiting coroutine. `SubmissionRejected` (pool full / shutting down)
   becomes HTTP 503 through the common handler in `utility/fastapi.py`.
-- Pools: `ConcurrentPools.Io` (4 workers) for network/disk I/O,
+- Pools: `ConcurrentPools.Io` (4 workers) for network/disk transfers and archive creation,
   `ConcurrentPools.General` (2 workers) for short blocking work such as
-  archive creation.
+  light gateway queries.
 - Unit tests have an autouse inline fake for `awaitable_submit`
   (`tests/unit/conftest.py`), which simply runs the task.
 
@@ -68,7 +68,7 @@ def build_logs_archive(cascade_job_id: str, db_entity_ser: bytes, gw_state: dict
     """Blocking disk work; raises RunLogsArchiveFailed on failure."""
 
 async def get_run_logs_archive(run: RunRecord) -> bytes:
-    """Awaits fetch on ConcurrentPools.Io, then the archive on ConcurrentPools.General."""
+    """Awaits fetch on ConcurrentPools.General, then the archive on ConcurrentPools.Io."""
 ```
 
 - `fetch_gateway_job_state` is the current step 1 moved verbatim (same
@@ -86,19 +86,20 @@ async def get_run_logs_archive(run: RunRecord) -> bytes:
 
   ```python
   gw_state = await execution_manager.awaitable_submit(
-      ConcurrentPools.Io,
+      ConcurrentPools.General,
       TaskName("run.logs.gateway-state"),
       partial(fetch_gateway_job_state, cascade_job_id),
   )
   return await execution_manager.awaitable_submit(
-      ConcurrentPools.General,
+      ConcurrentPools.Io,
       TaskName("run.logs.build-archive"),
       partial(build_logs_archive, cascade_job_id, db_entity_ser, gw_state),
   )
   ```
 
-  The gateway query goes to `Io` because it is a network round-trip; the
-  archive goes to `General` because it is short local disk + compression work.
+  The gateway query goes to `General` because it is a light request whose
+  latency comes from waiting on a possibly busy gateway; the archive goes to
+  `Io` because it is disk reading plus compression.
   Two separate awaits keep each pool's occupancy to its own kind of work.
 
 `routes/run.py`:
@@ -136,8 +137,8 @@ packaging" among its responsibilities: point to `domain/run/logs.py` instead.
    - a missing logs directory yields `logs_directory.error.txt` containing the
      actual error text (regression test for the f-string fix);
    - `get_run_logs_archive` submits `run.logs.gateway-state` to
-     `ConcurrentPools.Io` and `run.logs.build-archive` to
-     `ConcurrentPools.General` (patch `execution_manager.awaitable_submit` with
+     `ConcurrentPools.General` and `run.logs.build-archive` to
+     `ConcurrentPools.Io` (patch `execution_manager.awaitable_submit` with
      a recording fake for this test).
 2. Integration: `tests/integration/test_blueprint.py` already downloads
    `/run/logs` for a completed run; run it.
@@ -148,7 +149,7 @@ packaging" among its responsibilities: point to `domain/run/logs.py` instead.
 
 - `/run/logs` performs no blocking work on the event loop and no default
   executor submission; the gateway query and the archive appear as
-  `run.logs.gateway-state` (`Io`) and `run.logs.build-archive` (`General`)
+  `run.logs.gateway-state` (`General`) and `run.logs.build-archive` (`Io`)
   activity in `/api/v1/status` pool counters.
 - The archive-building logic lives in `domain/run/logs.py`; the route is a
   thin mapping layer with an unchanged response contract.
@@ -156,5 +157,6 @@ packaging" among its responsibilities: point to `domain/run/logs.py` instead.
 ## Outdated information in the original documents
 
 - The migration shows a single `awaitable_submit(General, ..., _build_zip)` and
-  leaves the gateway query placement open; this plan decides on `Io` for the
-  query and `General` for the archive.
+  leaves the gateway query placement open; this plan decides on `General` for the
+  query and `Io` for the archive. The output directory zip (`/outputContent`) is
+  also moved to `domain/run/logs.py` and runs on `Io` as `run.output.build-archive`.
