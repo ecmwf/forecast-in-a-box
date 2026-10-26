@@ -182,6 +182,9 @@ def get_download_status(composite_id: CompositeArtifactId) -> ArtifactDownloadSt
 
     Raises TimeoutError if the lock cannot be acquired. Intended for synchronous worker threads, not the event loop.
     """
+    # NOTE each field is an immutable value, but writers update the two fields in separate assignments (a finished
+    # download adds to locally_available, then removes from ongoing_downloads). Reading them lock-free could observe
+    # a mix of old and new and misreport a just-finished download as "absent", which fails a waiting run.
     with timed_acquire(ArtifactManager.lock, timeout_acquire_request) as result:
         if not result:
             raise TimeoutError("failed to acquire the artifact manager lock")

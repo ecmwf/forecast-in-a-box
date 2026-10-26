@@ -93,6 +93,9 @@ def _await_runtime_artifacts(run_id: RunId, attempt_count: int, artifacts: Itera
     Failed downloads are not retried here. Returns early on a failed or vanished artifact, on timeout,
     or when the run was stopped or deleted.
     """
+    # NOTE kept here rather than in domain.artifact: the loop is mostly run-lifecycle logic (stop/delete checks against
+    # the run row, run-specific failure messages), and the artifact domain already exposes the needed primitives
+    # (submit_artifact_download, get_download_status). Moving it would need a callback-heavy generic wait API.
     pending: list[CompositeArtifactId] = []
     for artifact_id in artifacts:
         try:
